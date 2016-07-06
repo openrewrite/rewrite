@@ -1,0 +1,19 @@
+plugins {
+    id 'nebula.kotlin' version '1.0.3'
+}
+
+repositories {
+    mavenCentral()
+    maven { url "http://repository.jetbrains.com/all" }
+}
+
+dependencies {
+    compile files("${System.getProperty('java.home')}/../lib/tools.jar")
+
+    testCompile 'junit:junit:4.+'
+    testCompile 'org.ow2.asm:asm:latest.release'
+    testCompile 'org.ow2.asm:asm-util:latest.release'
+    testCompile 'org.jetbrains.spek:spek:latest.release'
+
+    testCompile 'org.slf4j:slf4j-api:1.7.21'
+}
