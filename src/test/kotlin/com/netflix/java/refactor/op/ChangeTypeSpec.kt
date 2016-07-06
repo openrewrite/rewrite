@@ -44,7 +44,7 @@ class ChangeTypeSpec {
 
         RefactorRule("a1-to-a2")
                 .changeType("a.A1", "a.A2")
-                .refactorAndFix(listOf(b, a1, a2))
+                .refactorAndFix(b, a1, a2)
         
         assertEquals("""
             |package b;
