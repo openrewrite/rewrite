@@ -1,10 +1,10 @@
 package com.netflix.java.refactor.op
 
 import com.netflix.java.refactor.RefactorRule
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
-import kotlin.test.assertEquals
 
 class ChangeTypeSpec {
     @JvmField @Rule
@@ -43,7 +43,7 @@ class ChangeTypeSpec {
         """.trimMargin())
 
         RefactorRule("a1-to-a2")
-                .changeType("a.A1", "a.A2")
+                .changeType("a.A1", "a", "A2")
                 .refactorAndFix(b, a1, a2)
         
         assertEquals("""

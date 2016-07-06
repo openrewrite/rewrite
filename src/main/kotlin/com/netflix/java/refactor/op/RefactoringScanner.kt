@@ -36,7 +36,7 @@ open class BaseRefactoringScanner :
             RefactorFix(this.startPosition..this.getEndPosition(session.cu.endPositions), changes, session.source)
 
     protected fun JCTree.insertAfter(changes: String, session: Session): RefactorFix {
-        val end = this.getEndPosition(session.cu.endPositions)
+        val end = this.getEndPosition(session.cu.endPositions)+1
         return RefactorFix(end..end, changes, session.source)
     }
 
@@ -58,4 +58,13 @@ open class BaseRefactoringScanner :
 class CompositeScanner(vararg val scanners: RefactoringScanner): RefactoringScanner {
     override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File) =
         scanners.flatMap { it.scan(cu, context, source) }
+}
+
+class IfThenScanner(val ifFixed: RefactoringScanner, vararg thenRun: RefactoringScanner): RefactoringScanner {
+    private val compositeThenRun = CompositeScanner(*thenRun)
+    
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix> {
+        val fixes = ifFixed.scan(cu, context, source)
+        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context, source)) else emptyList()
+    }
 }

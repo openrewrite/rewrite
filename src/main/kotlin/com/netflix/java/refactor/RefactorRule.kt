@@ -1,8 +1,7 @@
 package com.netflix.java.refactor
 
-import com.netflix.java.refactor.op.ChangeType
-import com.netflix.java.refactor.op.RefactorOperation
-import com.netflix.java.refactor.op.RemoveImport
+import com.netflix.java.refactor.op.*
+import com.sun.tools.javac.tree.JCTree
 import java.io.File
 import java.util.*
 
@@ -11,13 +10,19 @@ class RefactorRule(val id: String,
 
     private val ops = ArrayList<RefactorOperation>()
     
-    fun changeType(from: String, to: String): RefactorRule {
-        ops.add(ChangeType(from, to))
+    fun changeType(from: String, toPackage: String, toClass: String): RefactorRule {
+        ops.add(ChangeType(from, toPackage, toClass))
         return this
     }
 
-    fun changeType(from: Class<Any>, to: Class<Any>) = changeType(from.name, to.name)
+    fun changeType(from: Class<Any>, to: Class<Any>) = changeType(from.name, to.`package`.toString(), to.simpleName)
 
+    fun changeMethod(signature: String): ChangeMethodInvocation {
+        val changeMethod = ChangeMethodInvocation(signature, this)
+        ops.add(changeMethod)
+        return changeMethod
+    }
+    
     fun removeImport(clazz: String): RefactorRule {
         ops.add(RemoveImport(clazz))
         return this
@@ -25,21 +30,29 @@ class RefactorRule(val id: String,
     
     fun removeImport(clazz: Class<Any>) = removeImport(clazz.name)
     
-    /**
-     * Perform refactoring on a set of source files
-     */
-    fun refactor(vararg sources: File): List<RefactorFix> =
+    fun addImport(pkg: String, clazz: String): RefactorRule {
+        ops.add(AddImport(pkg, clazz))
+        return this
+    }
+    
+    fun addImport(clazz: Class<Any>) = addImport(clazz.`package`.toString(), clazz.simpleName)
+ 
+    fun refactorWhen(matches: (File, JCTree.JCCompilationUnit) -> Boolean, vararg sources: File) =
         ops.flatMap { op ->
             val parser = AstParser()
             val filesToCompilationUnit = sources.zip(parser.parseFiles(sources.toList()))
             filesToCompilationUnit.flatMap {
                 val (file, cu) = it
-                op.scanner.scan(cu, parser.context, file)
+                if(matches.invoke(file, cu)) {
+                    op.scanner.scan(cu, parser.context, file)
+                } else emptyList()
             }
-        }
+        }        
     
-    fun refactorAndFix(vararg sources: File): List<RefactorFix> {
-        val fixes = refactor(*sources)
+    fun refactor(vararg sources: File): List<RefactorFix> = refactorWhen({ f, cu -> true }, *sources)
+
+    fun refactorAndFixWhen(matches: (File, JCTree.JCCompilationUnit) -> Boolean, vararg sources: File): List<RefactorFix> {
+        val fixes = refactorWhen(matches, *sources)
         fixes.groupBy { it.source }
                 .forEach {
                     val fileText = it.key.readText()
@@ -55,43 +68,8 @@ class RefactorRule(val id: String,
                     }
                     it.key.writeText(source)
                 }
-        return fixes
+        return fixes        
     }
+    
+    fun refactorAndFix(vararg sources: File): List<RefactorFix> = refactorAndFixWhen({ f, cu -> true }, *sources)
 }
-
-/*
-class ILogLintRule {
-  static Linter linter = new Linter();
-
-  // generate a properties file with this name in META-INF/lint-rules
-  @LintRule("ilog-to-slf4j", description = "we want to use SLF4J", severity = Level.Warning)
-  static List<LintRule> iLogToSlf4j() {
-    return Arrays.asList(
-      linter.methodInvocation("logger.info(contains('%s'))")
-
-      linter.methodInvocation("logger.info(s)")
-        .whereArgument("s").isType(String.class)
-
-      linter.methodInvocation("logger.info(any, any, ...)")
-        .whereVariableIsType(ILog.class)
-        .refactorArguments()
-          .argument(0, ...)
-          .argument(1, ...)
-          .done()
-        .refactorSomethingElse()
-        .build(),
-
-      linter.changeType(ILog.class, org.slf4j.Logger.class),
-      linter.refactorFieldType(ILog.class, org.slf4j.Logger.class), // is this useful?
-
-      linter.staticMethodInvocation("Log.getLogger(any)")
-        .refactorTargetTypeTo(org.slf4j.Logger.class)
-    );
-  }
-
-  @LintRule("ilog-to-juli")
-  static List<LintRule> iLogToJuli() {
-
-  }
-}
-*/

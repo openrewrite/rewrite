@@ -18,7 +18,7 @@ class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
     override fun visitImport(node: ImportTree, session: Session): List<RefactorFix>? {
         val import = node as JCTree.JCImport
         val importType = import.qualid as JCTree.JCFieldAccess
-        return if (import.qualid.toString() == op.clazz) {
+        return if (importType.toString() == op.clazz) {
             listOf(import.delete(session))
         }
         else if(importType.name.toString() == "*" && importType.selected.toString() == classOwner(session)) {

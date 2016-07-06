@@ -5,11 +5,11 @@ import com.sun.source.tree.IdentifierTree
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 
-data class ChangeType(val from: String, val to: String): RefactorOperation {
-    override val scanner = CompositeScanner(
+data class ChangeType(val from: String, val toPkg: String, val toClass: String): RefactorOperation {
+    override val scanner = IfThenScanner(
+            ChangeTypeScanner(this),
             RemoveImport(from).scanner,
-            AddImport(to).scanner,
-            ChangeTypeScanner(this)
+            AddImport(toPkg, toClass).scanner
     )
 }
 
@@ -20,7 +20,7 @@ class ChangeTypeScanner(val op: ChangeType) : BaseRefactoringScanner() {
                 session.cu.starImportScope.getElementsByName(ident.name).firstOrNull()
 
         return if(import is Symbol.ClassSymbol && import.fullname.toString() == op.from) {
-            listOf(ident.replace(typeElement(op.from, session).name.toString(), session))
+            listOf(ident.replace(op.toClass, session))
         } else null
     }
 }
