@@ -1,16 +1,14 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.op
 
+import com.netflix.java.refactor.RefactorRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import kotlin.test.assertEquals
 
-class RefactorTypeReferenceSpec {
+class ChangeTypeSpec {
     @JvmField @Rule
     val temp = TemporaryFolder()
-
-    // TODO should the refactorer run as an annotation processor so that symbols are somewhat predetermined?
-    // or can we somehow emulate this ordering?
     
     @Test
     fun refactorType() {
@@ -44,8 +42,9 @@ class RefactorTypeReferenceSpec {
             |}
         """.trimMargin())
 
-        val rule = LintRule("a1-to-a2", "Refactor A1 to A2")
-        val fixes = SourceScanner.TypeReference("a.A1", "a.A2").run(rule, listOf(b, a1, a2))
+        RefactorRule("a1-to-a2")
+                .changeType("a.A1", "a.A2")
+                .refactorAndFix(listOf(b, a1, a2))
         
         assertEquals("""
             |package b;
@@ -61,6 +60,6 @@ class RefactorTypeReferenceSpec {
             |        return aVar;
             |    }
             |}
-        """.trimMargin(), Patch2().patchFiles(fixes).first().readText())
+        """.trimMargin(), b.readText())
     }
 }
