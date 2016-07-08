@@ -26,6 +26,33 @@ To apply this plugin:
     }
 
     apply plugin: 'nebula.source-refactor'
+    
+To perform refactoring, run `./gradlew fixSourceLint`.
+    
+The plugin scans the classpath looking for methods annotated with `@Refactor` and applies the rule defined by each of
+these methods to the project's source.
+    
+## Writing Refactor Rules
+
+To create a new rule, provide a public static method annotated with @Refactor that returns `com.netflix.java.refactor.RefactorRule`.
+
+```java
+@Refactor(value = "foo-to-bar", description = "replace foo() with bar()")
+public static RefactorRule fooToBar() {
+    return new RefactorRule()
+        .changeMethod("B foo(int)")
+            .refactorName("bar")
+            .done()
+        .changeType(B.class, B2.class);
+    }
+}
+```
+
+In the example rule above, two refactoring operations are chained together into one rule: changing invocations of `B.foo` to
+`B.bar()` and types of `B` to `B2`. Together, this changes method invocations of `B.foo` to `B2.bar`.
+
+That's it! Any project that declares a dependency on the artifact that contains your new rule and applies `nebula.source-refactor` will
+now be refactorable.
 
 # License
 
