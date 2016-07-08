@@ -5,8 +5,7 @@ import com.sun.tools.javac.tree.JCTree
 import java.io.File
 import java.util.*
 
-class RefactorRule(val id: String,
-                   val description: String = "") {
+class RefactorRule() {
 
     private val ops = ArrayList<RefactorOperation>()
     

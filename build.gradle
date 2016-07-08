@@ -1,6 +1,18 @@
 plugins {
     id 'nebula.kotlin' version '1.0.3'
     id 'me.champeau.gradle.antlr4' version '0.1'
+    id 'com.gradle.plugin-publish' version '0.9.4'
+    id 'java-gradle-plugin'
+    id 'nebula.plugin-plugin' version '4.24.0'
+}
+
+description 'Pluggable and distributed refactoring tool for Java source code'
+
+contacts {
+    'jkschneider@gmail.com' {
+        moniker 'Jon Schneider'
+        github 'jkschneider'
+    }
 }
 
 repositories {
@@ -18,9 +30,30 @@ configurations {
 
 dependencies {
     compile files("${System.getProperty('java.home')}/../lib/tools.jar")
-
+    compile 'eu.infomas:annotation-detector:latest.release'
+    
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'
     testCompile 'org.jetbrains.spek:spek:latest.release'
+}
+
+pluginBundle {
+    website = 'https://github.com/nebula-plugins/java-source-refactor'
+    vcsUrl = 'https://github.com/nebula-plugins/java-source-refactor.git'
+    description = 'Pluggable and distributed refactoring tool for Java source code'
+
+    plugins {
+        sourceRefactor {
+            id = 'nebula.source-refactor'
+            displayName = 'Distributed source refactoring plugin'
+            description = 'Pluggable and distributed refactoring tool for Java source code'
+            tags = ['nebula', 'lint']
+        }
+    }
+
+    mavenCoordinates {
+        groupId = 'com.netflix.nebula'
+        artifactId = 'java-source-refactor'
+    }
 }
