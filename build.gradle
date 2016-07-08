@@ -18,12 +18,9 @@ configurations {
 
 dependencies {
     compile files("${System.getProperty('java.home')}/../lib/tools.jar")
-    compile 'org.aspectj:aspectjweaver:1.8.9'
 
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'
     testCompile 'org.jetbrains.spek:spek:latest.release'
-
-    testCompile 'org.slf4j:slf4j-api:1.7.21'
 }
