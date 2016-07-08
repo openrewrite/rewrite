@@ -1,5 +1,6 @@
 plugins {
     id 'nebula.kotlin' version '1.0.3'
+    id 'me.champeau.gradle.antlr4' version '0.1'
 }
 
 repositories {
@@ -7,8 +8,17 @@ repositories {
     maven { url "http://repository.jetbrains.com/all" }
 }
 
+antlr4.output = new File('src/main/java/com/netflix/java/refactor/aspectj')
+antlr4.extraArgs = ['-package', 'com.netflix.java.refactor.aspectj']
+
+// add antlr4 to classpath
+configurations {
+    compile.extendsFrom antlr4
+}
+
 dependencies {
     compile files("${System.getProperty('java.home')}/../lib/tools.jar")
+    compile 'org.aspectj:aspectjweaver:1.8.9'
 
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'

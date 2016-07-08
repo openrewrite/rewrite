@@ -15,7 +15,7 @@ class RefactorRule(val id: String,
         return this
     }
 
-    fun changeType(from: Class<Any>, to: Class<Any>) = changeType(from.name, to.`package`.toString(), to.simpleName)
+    fun changeType(from: Class<*>, to: Class<*>) = changeType(from.name, to.`package`.toString(), to.simpleName)
 
     fun changeMethod(signature: String): ChangeMethodInvocation {
         val changeMethod = ChangeMethodInvocation(signature, this)
@@ -28,14 +28,14 @@ class RefactorRule(val id: String,
         return this
     }
     
-    fun removeImport(clazz: Class<Any>) = removeImport(clazz.name)
+    fun removeImport(clazz: Class<*>) = removeImport(clazz.name)
     
     fun addImport(pkg: String, clazz: String): RefactorRule {
         ops.add(AddImport(pkg, clazz))
         return this
     }
     
-    fun addImport(clazz: Class<Any>) = addImport(clazz.`package`.toString(), clazz.simpleName)
+    fun addImport(clazz: Class<*>) = addImport(clazz.`package`.toString(), clazz.simpleName)
  
     fun refactorWhen(matches: (File, JCTree.JCCompilationUnit) -> Boolean, vararg sources: File) =
         ops.flatMap { op ->

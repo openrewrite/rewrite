@@ -2,9 +2,15 @@ package com.netflix.java.refactor.op
 
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.util.TreePathScanner
+import com.sun.tools.javac.code.Symbol
+import com.sun.tools.javac.comp.Attr
+import com.sun.tools.javac.comp.AttrContext
+import com.sun.tools.javac.comp.Env
+import com.sun.tools.javac.comp.Todo
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
+import com.sun.tools.javac.util.Name
 import java.io.File
 
 /**
@@ -21,6 +27,14 @@ open class BaseRefactoringScanner :
 
     data class Session(val cu: JCTree.JCCompilationUnit, val context: Context, val source: File) {
         val sourceText: String by lazy { source.readText() }
+        val env: Env<AttrContext> by lazy { Todo.instance(context).first { it.toplevel === cu } }
+        val attr: Attr by lazy { Attr.instance(context) }
+        
+        fun classSymbol(name: Name) = (cu.namedImportScope.getElementsByName(name).firstOrNull() ?: 
+                cu.starImportScope.getElementsByName(name).firstOrNull()) as Symbol.ClassSymbol?
+
+        fun type(tree: JCTree) = attr.attribExpr(tree, env)
+        fun types(trees: com.sun.tools.javac.util.List<JCTree>) = trees.asIterable().map { attr.attribExpr(it, env) }
     }
 
     override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix> {
@@ -34,6 +48,11 @@ open class BaseRefactoringScanner :
 
     protected fun JCTree.replace(changes: String, session: Session) =
             RefactorFix(this.startPosition..this.getEndPosition(session.cu.endPositions), changes, session.source)
+    
+    protected fun JCTree.JCFieldAccess.replaceName(changes: String, session: Session): RefactorFix {
+        val nameStart = this.selected.getEndPosition(session.cu.endPositions) + 1
+        return RefactorFix(nameStart..nameStart + this.name.toString().length, changes, session.source)
+    }
 
     protected fun JCTree.insertAfter(changes: String, session: Session): RefactorFix {
         val end = this.getEndPosition(session.cu.endPositions)+1

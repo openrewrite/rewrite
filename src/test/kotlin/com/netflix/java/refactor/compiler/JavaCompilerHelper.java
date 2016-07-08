@@ -16,6 +16,9 @@
 
 package com.netflix.java.refactor.compiler;
 
+import com.sun.tools.javac.main.Option;
+import com.sun.tools.javac.util.Context;
+import com.sun.tools.javac.util.Options;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
@@ -45,32 +48,58 @@ public class JavaCompilerHelper {
 		this.processors = Arrays.asList(processors);
 	}
 
+	private boolean addSource(String sourceStr) {
+		String className = fullyQualifiedName(sourceStr);
+		if(className != null) {
+			return sources.add(new SimpleJavaFileObject(URI.create("string:///" + className.replaceAll("\\.", "/") + ".java"), JavaFileObject.Kind.SOURCE) {
+				@Override
+				public CharSequence getCharContent(boolean ignoreEncodingErrors) {
+					return sourceStr.trim();
+				}
+			});
+		}
+		return false;
+	}
+	
+	public void compileAll(String... sourceStr) {
+		for (String s : sourceStr) {
+			addSource(s);
+		}
+		compileInternal();
+	}
+	
     public byte[] compile(final String sourceStr) {
-        String className = fullyQualifiedName(sourceStr);
-
-        if(className != null) {
-            sources.add(new SimpleJavaFileObject(URI.create("string:///" + className.replaceAll("\\.", "/") + ".java"), JavaFileObject.Kind.SOURCE) {
-                @Override
-				public CharSequence getCharContent(boolean ignoreEncodingErrors) { return sourceStr.trim(); }
-            });
-
-			JavaCompiler.CompilationTask task = compiler.getTask(null, inMemoryClassFileManager, diagnostics,
-					Collections.singletonList("-g"), null, sources);
-			task.setProcessors(this.processors);
-			if(!task.call()) {
-                for(Diagnostic<? extends JavaFileObject> d : diagnostics.getDiagnostics()) {
-                    System.out.println("line " + d.getLineNumber() + ": " + d.getMessage(Locale.getDefault()));
-                }
-                throw new RuntimeException("compilation failed");
-            }
-
-            return inMemoryClassFileManager.classBytes(className);
+		if(addSource(sourceStr)) {
+			compileInternal();
+			return inMemoryClassFileManager.classBytes(fullyQualifiedName(sourceStr));
         }
-
         return null;
     }
+	
+	private void compileInternal() {
+		Context context = new Context();
+		context.put(JavaFileManager.class, inMemoryClassFileManager);
 
-    public static String fullyQualifiedName(String sourceStr) {
+		Options options = Options.instance(context);
+		options.put("-g", "");
+//		options.put("-verbose", "");
+		options.put("verboseCompilePolicy", "");
+		options.put("dev", "");
+		options.put("-Xdiags:verbose", "");
+		options.isSet(Option.XDIAGS, "verbose");
+		
+		com.sun.tools.javac.main.JavaCompiler compiler = new com.sun.tools.javac.main.JavaCompiler(context);
+		compiler.initProcessAnnotations(this.processors);
+
+		try {
+			compiler.compile(com.sun.tools.javac.util.List.from(sources));
+		} catch (Throwable e) {
+			e.printStackTrace();
+			throw new RuntimeException(e);
+		}
+	}
+
+    static String fullyQualifiedName(String sourceStr) {
 		Matcher pkgMatcher = Pattern.compile("\\s*package\\s+([\\w\\.]+)").matcher(sourceStr);
 		String pkg = pkgMatcher.find() ? pkgMatcher.group(1) + "." : "";
 
