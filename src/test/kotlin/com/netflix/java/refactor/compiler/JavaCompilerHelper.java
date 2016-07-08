@@ -16,7 +16,6 @@
 
 package com.netflix.java.refactor.compiler;
 
-import com.sun.tools.javac.main.Option;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Options;
 import org.objectweb.asm.ClassReader;
@@ -106,13 +105,13 @@ public class JavaCompilerHelper {
 		options.put("verboseCompilePolicy", "");
 		options.put("dev", "");
 		options.put("-Xdiags:verbose", "");
-		options.isSet(Option.XDIAGS, "verbose");
+//		options.isSet(Option.XDIAGS, "verbose");
 		
 		com.sun.tools.javac.main.JavaCompiler compiler = new com.sun.tools.javac.main.JavaCompiler(context);
 		compiler.initProcessAnnotations(this.processors);
 
 		try {
-			compiler.compile(com.sun.tools.javac.util.List.from(sources));
+			compiler.compile(com.sun.tools.javac.util.List.from(sources.toArray(new JavaFileObject[sources.size()])));
 		} catch (Throwable e) {
 			e.printStackTrace();
 			throw new RuntimeException(e);

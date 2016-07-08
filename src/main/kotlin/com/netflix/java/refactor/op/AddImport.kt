@@ -29,7 +29,7 @@ class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
     }
 
     override fun visitEnd(session: Session): List<RefactorFix>? {
-        val lastPrior = lastPriorImport(session)
+        val lastPrior = lastPriorImport()
         
         return if(coveredByExistingImport) {
             null
@@ -46,7 +46,7 @@ class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
         else listOf(session.cu.insertBefore("import ${op.pkg}.${op.clazz};\n", session))
     }
     
-    fun lastPriorImport(session: Session): JCTree.JCImport? {
+    fun lastPriorImport(): JCTree.JCImport? {
         return imports.lastOrNull { import ->
             val importType = import.qualid as JCTree.JCFieldAccess
             when(packageComparator.compare(importType.selected.toString(), op.pkg)) {

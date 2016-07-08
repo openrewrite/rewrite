@@ -55,7 +55,7 @@ class AstParser {
      */
     private fun List<JCTree.JCCompilationUnit>.enterAll(): List<JCTree.JCCompilationUnit> {
         val enter = Enter.instance(context)
-        val compilationUnits = com.sun.tools.javac.util.List.from(this)
+        val compilationUnits = com.sun.tools.javac.util.List.from(this.toTypedArray())
         enter.main(compilationUnits)
         return this
     }

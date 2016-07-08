@@ -3,6 +3,7 @@ package com.netflix.java.refactor.op
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.util.TreePathScanner
 import com.sun.tools.javac.code.Symbol
+import com.sun.tools.javac.code.Type
 import com.sun.tools.javac.comp.Attr
 import com.sun.tools.javac.comp.AttrContext
 import com.sun.tools.javac.comp.Env
@@ -33,8 +34,16 @@ open class BaseRefactoringScanner :
         fun classSymbol(name: Name) = (cu.namedImportScope.getElementsByName(name).firstOrNull() ?: 
                 cu.starImportScope.getElementsByName(name).firstOrNull()) as Symbol.ClassSymbol?
 
-        fun type(tree: JCTree) = attr.attribExpr(tree, env)
-        fun types(trees: com.sun.tools.javac.util.List<JCTree>) = trees.asIterable().map { attr.attribExpr(it, env) }
+        fun type(tree: JCTree) = attr.attribExpr(tree, env, noType)
+        fun types(trees: com.sun.tools.javac.util.List<JCTree>) = trees.asIterable().map { attr.attribExpr(it, env, null) }
+        
+        // In JDK 8, the type argument for attribExpr is optional, but in JDK 7 it is not. Unfortunately, noType is a concrete
+        // implementation of a class that is inaccessible from this context, so let's jump through some hoops.
+        val noType by lazy {
+            val noType = Type::class.java.getField("noType")
+            noType.isAccessible = true
+            noType.get(null) as Type
+        }
     }
 
     override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix> {
