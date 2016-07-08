@@ -12,7 +12,7 @@ class ChangeMethodInvocationSpec {
     
     @Test
     fun refactorMethodName() {
-        val rule = RefactorRule("foo-to-bar")
+        val rule = RefactorRule()
                 .changeMethod("B foo(int)")
                     .refactorName("bar")
                     .done()
@@ -47,7 +47,7 @@ class ChangeMethodInvocationSpec {
 
     @Test
     fun transformStringArgument() {
-        val rule = RefactorRule("foo-to-bar")
+        val rule = RefactorRule()
                 .changeMethod("B foo(String)")
                     .refactorArgument(0)
                         .isType(String::class.java)

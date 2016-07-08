@@ -10,7 +10,7 @@ class RemoveImportSpec {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
-    val removeImportRule = RefactorRule("remove-list-import")
+    val removeImportRule = RefactorRule()
             .removeImport("java.util.List")
     
     @Test

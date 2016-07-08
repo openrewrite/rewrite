@@ -42,7 +42,7 @@ class ChangeTypeSpec {
             |}
         """.trimMargin())
 
-        RefactorRule("a1-to-a2")
+        RefactorRule()
                 .changeType("a.A1", "a", "A2")
                 .refactorAndFix(b, a1, a2)
         

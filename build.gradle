@@ -57,3 +57,7 @@ pluginBundle {
         artifactId = 'java-source-refactor'
     }
 }
+
+tasks.withType(Javadoc) {
+    options.addStringOption('Xdoclint:none', '-quiet')
+}

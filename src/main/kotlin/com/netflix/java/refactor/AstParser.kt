@@ -11,6 +11,16 @@ import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
 
 class AstParser {
+    companion object {
+        fun fullyQualifiedName(sourceStr: String): String? {
+            val pkgMatcher = Pattern.compile("\\s*package\\s+([\\w\\.]+)").matcher(sourceStr)
+            val pkg = if (pkgMatcher.find()) pkgMatcher.group(1) + "." else ""
+
+            val classMatcher = Pattern.compile("\\s*(class|interface|enum)\\s+(\\w+)").matcher(sourceStr)
+            return if (classMatcher.find()) pkg + classMatcher.group(2) else null
+        }
+    }
+    
     val context = Context()
     val compiler = JavaCompiler(context)
     
@@ -32,14 +42,6 @@ class AstParser {
      */
     fun parseSources(vararg fileSources: String): List<JCTree.JCCompilationUnit> =
         fileSources.map { source ->
-            fun fullyQualifiedName(sourceStr: String): String? {
-                val pkgMatcher = Pattern.compile("\\s*package\\s+([\\w\\.]+)").matcher(sourceStr)
-                val pkg = if (pkgMatcher.find()) pkgMatcher.group(1) + "." else ""
-
-                val classMatcher = Pattern.compile("\\s*(class|interface|enum)\\s+(\\w+)").matcher(sourceStr)
-                return if (classMatcher.find()) pkg + classMatcher.group(2) else null
-            }
-
             val sourceUri = URI.create("string:///" + fullyQualifiedName(source)?.replace("\\.".toRegex(), "/") + ".java") ?:
                     throw IllegalArgumentException("Source must contain a class definition")
 

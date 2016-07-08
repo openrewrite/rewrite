@@ -29,16 +29,16 @@ import org.objectweb.asm.util.TraceMethodVisitor;
 
 import javax.annotation.processing.Processor;
 import javax.tools.*;
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStream;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.URI;
 import java.util.*;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class JavaCompilerHelper {
-    List<SimpleJavaFileObject> sources = new ArrayList<>();
+    List<JavaFileObject> sources = new ArrayList<>();
     JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     DiagnosticCollector<JavaFileObject> diagnostics = new DiagnosticCollector<>();
 	InMemoryClassFileManager inMemoryClassFileManager = new InMemoryClassFileManager();
@@ -48,7 +48,7 @@ public class JavaCompilerHelper {
 		this.processors = Arrays.asList(processors);
 	}
 
-	private boolean addSource(String sourceStr) {
+	private boolean addSource(final String sourceStr) {
 		String className = fullyQualifiedName(sourceStr);
 		if(className != null) {
 			return sources.add(new SimpleJavaFileObject(URI.create("string:///" + className.replaceAll("\\.", "/") + ".java"), JavaFileObject.Kind.SOURCE) {
@@ -75,6 +75,26 @@ public class JavaCompilerHelper {
         }
         return null;
     }
+
+	public File jar(File f, String classSource) {
+		return jar(f, Collections.singletonList(classSource));
+	}
+	
+	public File jar(File f, Collection<String> classSources) {
+		f.getParentFile().mkdirs();
+		try(FileOutputStream fos = new FileOutputStream(f);
+			JarOutputStream jos = new JarOutputStream(fos)) {
+
+			for (String classSource : classSources) {
+				String fqn = fullyQualifiedName(classSource);
+				jos.putNextEntry(new JarEntry(fqn.replaceAll("\\.", "/") + ".class"));
+				jos.write(compile(classSource));
+			}
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+		return f;
+	}
 	
 	private void compileInternal() {
 		Context context = new Context();

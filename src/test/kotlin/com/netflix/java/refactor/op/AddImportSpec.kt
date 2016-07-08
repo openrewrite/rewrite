@@ -10,7 +10,7 @@ class AddImportSpec {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
-    val addImportRule = RefactorRule("add-list-import")
+    val addImportRule = RefactorRule()
             .addImport("java.util", "List")
     
     @Test
@@ -72,7 +72,7 @@ class AddImportSpec {
         listOf("b" to 0, "c.b" to 1, "c.c.b" to 2).forEach {
             val (pkg, order) = it
 
-            val addImportRule = RefactorRule("add-list-import")
+            val addImportRule = RefactorRule()
                     .addImport(pkg, "B")
             
             b.writeText("""
