@@ -29,7 +29,7 @@ configurations {
 }
 
 dependencies {
-    compile files("${System.getProperty('java.home')}/../lib/tools.jar")
+    compileOnly files("${System.getProperty('java.home')}/../lib/tools.jar")
     compile 'eu.infomas:annotation-detector:latest.release'
     
     testCompile 'junit:junit:4.+'

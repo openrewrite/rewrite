@@ -1,14 +1,31 @@
 # Distributing Java Source Refactoring
 
 ![Support Status](https://img.shields.io/badge/nebula-incubating-yellow.svg)
-[![Build Status](https://travis-ci.org/nebula-plugins/java-source-refactor.svg?branch=master)](https://travis-ci.org/nebula-plugins/java-source-refactor)
-[![Coverage Status](https://coveralls.io/repos/github/nebula-plugins/java-source-refactor/badge.svg?branch=master)](https://coveralls.io/github/nebula-plugins/java-source-refactor?branch=master)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nebula-plugins/java-source-refactor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Apache 2.0](https://img.shields.io/github/license/nebula-plugins/java-source-refactor.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 ## Purpose
 
 The Java Source Refactoring plugin is a pluggable and distributed refactoring tool for Java source code.
+
+## Usage
+
+Clone and build with:
+
+    ./gradlew publishToMavenLocal
+
+To apply this plugin:
+
+    buildscript {
+        repositories { mavenLocal() }
+        dependencies {
+            classpath 'com.netflix.nebula:java-source-refactor:latest.release'
+        }
+
+        configurations.classpath.resolutionStrategy.cacheDynamicVersionsFor 0, 'minutes'
+    }
+
+    apply plugin: 'nebula.source-refactor'
 
 # License
 

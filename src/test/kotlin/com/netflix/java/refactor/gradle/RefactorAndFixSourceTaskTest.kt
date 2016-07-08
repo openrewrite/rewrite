@@ -14,6 +14,21 @@ class RefactorAndFixSourceTaskTest: TestKitTest() {
     @Test
     fun refactorSource() {
         val repo = temp.newFolder("repo")
+
+        createJavaSourceFile("""
+            |class B {
+            |   @Deprecated public void foo(int i) {}
+            |   public void bar(int i) {}
+            |}
+        """.trimMargin())
+
+        val a = createJavaSourceFile("""
+            |class A {
+            |   public void test() {
+            |       new B().foo(0);
+            |   }
+            |}
+        """.trimMargin())
         
         // publish a jar with a rule
         publishDependency(repo, DefaultModuleVersionIdentifier("netflix", "rule-source", "1.0"), """
@@ -44,21 +59,6 @@ class RefactorAndFixSourceTaskTest: TestKitTest() {
                 compile "netflix:rule-source:1.0"
             }
         """)
-        
-        createJavaSourceFile("""
-            |class B {
-            |   public void foo(int i) {}
-            |   public void bar(int i) {}
-            |}
-        """.trimMargin())
-        
-        val a = createJavaSourceFile("""
-            |class A {
-            |   public void test() {
-            |       new B().foo(0);
-            |   }
-            |}
-        """.trimMargin())
         
         val result = runTasksSuccessfully("fixSourceLint")
         
