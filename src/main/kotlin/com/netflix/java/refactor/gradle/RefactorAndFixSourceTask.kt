@@ -7,8 +7,7 @@ import eu.infomas.annotation.AnnotationDetector
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.TaskAction
-import org.gradle.internal.logging.text.StyledTextOutput
-import org.gradle.internal.logging.text.StyledTextOutputFactory
+import org.gradle.logging.StyledTextOutputFactory
 import java.lang.reflect.Modifier
 import java.net.URLClassLoader
 import java.util.*
@@ -66,9 +65,9 @@ open class RefactorAndFixSourceTask : DefaultTask() {
         val textOutput = getTextOutputFactory()!!.create(RefactorAndFixSourceTask::class.java)
         
         if(fixesByRule.isEmpty()) {
-            textOutput.style(StyledTextOutput.Style.Identifier).println("Passed refactoring check with no changes necessary")
+            textOutput.style(Styling.Green).println("Passed refactoring check with no changes necessary")
         } else {
-            textOutput.withStyle(StyledTextOutput.Style.UserInput).text("Refactoring operations were performed on this project. ")
+            textOutput.withStyle(Styling.Bold).text("Refactoring operations were performed on this project. ")
             textOutput.println("A complete listing of fixes follows. Please review and commit the changes.\n")
         }
 
