@@ -67,28 +67,15 @@ open class RefactorAndFixSourceTask : DefaultTask() {
         if(fixesByRule.isEmpty()) {
             textOutput.style(Styling.Green).println("Passed refactoring check with no changes necessary")
         } else {
-            textOutput.withStyle(Styling.Bold).text("Refactoring operations were performed on this project. ")
-            textOutput.println("A complete listing of fixes follows. Please review and commit the changes.\n")
-        }
-
-        fixesByRule.forEach {
-            val (rule, ruleFixes) = it
+            textOutput.text("Refactoring operations were performed on this project. ")
+                    .withStyle(Styling.Bold).println("Please review the changes and commit.\n")
             
-            ruleFixes.groupBy { it.source }.forEach { 
-                val (file, fileFixes) = it
-                val relativePath = project.rootDir.toURI().relativize(file.toURI()).toString()
-                
-                fileFixes.forEach { fix ->
-                    textOutput.withStyle(Styling.Green).text("fixed".padEnd(15))
-                    textOutput.text(rule.value.padEnd(35))
-                    textOutput.withStyle(Styling.Yellow).println(rule.description)
-
-                    textOutput.withStyle(Styling.Bold).println("$relativePath: ${fix.lineNumber}")
-                    textOutput.println() // extra space between violations
-                }
+            fixesByRule.entries.forEachIndexed { i, entry ->
+                val (rule, ruleFixes) = entry
+                textOutput.withStyle(Styling.Bold).text("${"${i+1}.".padEnd(2)} ${rule.value}")
+                textOutput.text(" (${ruleFixes.size} fixes) - ")
+                textOutput.withStyle(Styling.Yellow).println(rule.description)
             }
         }
-
-        textOutput.style(Styling.Green).println("Made ${fixesByRule.values.sumBy { it.size }} changes\n")
     }
 }
