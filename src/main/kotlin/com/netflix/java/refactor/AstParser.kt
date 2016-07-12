@@ -5,7 +5,11 @@ import com.sun.tools.javac.file.JavacFileManager
 import com.sun.tools.javac.main.JavaCompiler
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
+import com.sun.tools.javac.util.Log
+import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.PrintWriter
+import java.io.Writer
 import java.util.regex.Pattern
 import javax.tools.JavaFileManager
 import javax.tools.JavaFileObject
@@ -21,6 +25,8 @@ class AstParser {
             val classMatcher = Pattern.compile("\\s*(class|interface|enum)\\s+(\\w+)").matcher(sourceStr)
             return if (classMatcher.find()) pkg + classMatcher.group(2) else null
         }
+        
+        val logger = LoggerFactory.getLogger(AstParser::class.java)
     }
     
     val context = Context()
@@ -30,14 +36,18 @@ class AstParser {
         // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position 
         // for every tree element
         compiler.genEndPos = true
+        val log = Log.instance(context)
+        log.setWriters(PrintWriter(object: Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) {
+                logger.debug(String(cbuf.slice(off..(off + len)).toCharArray()))
+            }
+            override fun flush() {}
+            override fun close() {}
+        }))
     }
 
-    /**
-     * TODO look at JavacTool line 36 (JDK 8) for hints about how to quiet error logging during parsing?
-     */
     fun parseFiles(files: Iterable<File>, classPath: Iterable<File>? = null): List<JCTree.JCCompilationUnit> {
         val fm = context.get(JavaFileManager::class.java)
-        
         if(classPath != null) // override classpath
             (fm as JavacFileManager).setLocation(StandardLocation.CLASS_PATH, classPath)
         

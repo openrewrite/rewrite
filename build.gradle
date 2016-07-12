@@ -31,6 +31,7 @@ configurations {
 dependencies {
     compileOnly files("${System.getProperty('java.home')}/../lib/tools.jar")
     compile 'eu.infomas:annotation-detector:latest.release'
+    compile 'org.slf4j:slf4j-api:1.7.+'
     
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
