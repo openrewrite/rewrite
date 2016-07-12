@@ -7,20 +7,6 @@ import JavaParser;
 methodPattern
 	:	typePattern simpleNamePattern formalParametersPattern
 	;
-	
-methodModifiersPattern
-	:	'!'? methodModifier methodModifiersPattern*
-	;
-		
-methodModifier
-	:	(	'public'
-		|	'private'
-		|	'protected'
-		|	'static'
-		|	'synchronized'
-		|	'final'
-		)
-	;
 
 formalParametersPattern
 	:	'(' formalsPattern? ')'
@@ -36,25 +22,16 @@ formalsPatternAfterDotDot
 	:	optionalParensTypePattern (',' formalsPatternAfterDotDot)* 
 	|	typePattern '...'
 	;
-	  		
-typePatternList
-	:	typePattern (',' typePattern)*
-	;
 
 typePattern
-	:	simpleTypePattern
+    :   dottedNamePattern
 	|	'!' typePattern 
-//	|	'(' annotationPattern? typePattern ')'
 	|	typePattern '&&' typePattern 
   	|	typePattern '||' typePattern
   	;
-  	  	
-simpleTypePattern
-	:	dottedNamePattern '+'? ('[' ']')*
-  	;
   	
 dottedNamePattern
-	:	(type | Identifier | '*' | '.' | '..')+
+	:	(Identifier | '*' | '.' | '..')+
 	|	'void'
 	;
 	

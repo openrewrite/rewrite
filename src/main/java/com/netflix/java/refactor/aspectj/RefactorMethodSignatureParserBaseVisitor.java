@@ -1,4 +1,4 @@
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-linter/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
+// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
 package com.netflix.java.refactor.aspectj;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
@@ -171,14 +171,6 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitClassOrInterfaceType(@NotNull RefactorMethodSignatureParser.ClassOrInterfaceTypeContext ctx) { return visitChildren(ctx); }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}
@@ -402,14 +394,6 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx) { return visitChildren(ctx); }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
 	@Override public T visitExpression(@NotNull RefactorMethodSignatureParser.ExpressionContext ctx) { return visitChildren(ctx); }
 
 	/**
@@ -435,14 +419,6 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitQualifiedNameList(@NotNull RefactorMethodSignatureParser.QualifiedNameListContext ctx) { return visitChildren(ctx); }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}
@@ -563,14 +539,6 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitElementValue(@NotNull RefactorMethodSignatureParser.ElementValueContext ctx) { return visitChildren(ctx); }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}

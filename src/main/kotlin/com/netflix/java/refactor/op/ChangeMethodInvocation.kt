@@ -23,11 +23,6 @@ class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule
     init {
         val parser = RefactorMethodSignatureParser(CommonTokenStream(AspectJLexer(ANTLRInputStream(signature))))
 
-        /*
-        An embedded * in an identifier matches any sequence of characters, but does not match the package (or inner-type) separator ".".
-        An embedded .. in an identifier matches any sequence of characters that starts and ends with the package (or inner-type) separator ".".
-         */
-
         object: RefactorMethodSignatureParserBaseVisitor<Void>() {
             override fun visitMethodPattern(ctx: RefactorMethodSignatureParser.MethodPatternContext): Void? {
                 targetTypePattern = TypeVisitor().visitTypePattern(ctx.typePattern())
@@ -35,11 +30,6 @@ class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule
                 return super.visitMethodPattern(ctx)
             }
         }.visit(parser.methodPattern())
-    }
-    
-    class TypeVisitor: RefactorMethodSignatureParserBaseVisitor<Regex>() {
-        override fun visitSimpleTypePattern(ctx: RefactorMethodSignatureParser.SimpleTypePatternContext) =
-            ctx.dottedNamePattern().type()[0].classOrInterfaceType().Identifier(0).toString().replace("..", ".*").toRegex()
     }
     
     fun refactorName(name: String): ChangeMethodInvocation {
@@ -82,7 +72,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
             
-            if(/*op.targetTypePattern?.matches(session.type(meth.selected).toString()) ?: true &&*/
+            if(op.targetTypePattern?.matches(session.type(meth.selected).toString()) ?: true &&
                     op.methodNamePattern?.matches(meth.name.toString()) ?: true) {
                 return refactorMethod(invocation, session)
             }
@@ -125,4 +115,24 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         
         return fixes
     }
+}
+
+/**
+ * An embedded * in an identifier matches any sequence of characters, but 
+ * does not match the package (or inner-type) separator ".".
+ * 
+ * An embedded .. in an identifier matches any sequence of characters that 
+ * starts and ends with the package (or inner-type) separator ".".
+ */
+fun String.aspectjToRegexSyntax() = this
+        .replace("([^\\.])*.([^\\.])*", "$1\\.$2")
+        .replace("*", "[^\\.]*")
+        .replace("..", ".*")
+
+class TypeVisitor: RefactorMethodSignatureParserBaseVisitor<Regex>() {
+    override fun visitDottedNamePattern(ctx: RefactorMethodSignatureParser.DottedNamePatternContext): Regex =
+        ctx.children // all TerminalNode instances
+                .map { it.toString().aspectjToRegexSyntax() }
+                .joinToString("")
+                .toRegex()
 }

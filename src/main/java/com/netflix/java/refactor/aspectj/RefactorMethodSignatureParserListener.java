@@ -1,4 +1,4 @@
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-linter/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
+// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
 package com.netflix.java.refactor.aspectj;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -227,17 +227,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitClassOrInterfaceType(@NotNull RefactorMethodSignatureParser.ClassOrInterfaceTypeContext ctx);
-
-	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#typePatternList}.
-	 * @param ctx the parse tree
-	 */
-	void enterTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#typePatternList}.
-	 * @param ctx the parse tree
-	 */
-	void exitTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#typeBound}.
@@ -537,17 +526,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	void exitArrayCreatorRest(@NotNull RefactorMethodSignatureParser.ArrayCreatorRestContext ctx);
 
 	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#methodModifiersPattern}.
-	 * @param ctx the parse tree
-	 */
-	void enterMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#methodModifiersPattern}.
-	 * @param ctx the parse tree
-	 */
-	void exitMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx);
-
-	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#expression}.
 	 * @param ctx the parse tree
 	 */
@@ -590,17 +568,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitQualifiedNameList(@NotNull RefactorMethodSignatureParser.QualifiedNameListContext ctx);
-
-	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#simpleTypePattern}.
-	 * @param ctx the parse tree
-	 */
-	void enterSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#simpleTypePattern}.
-	 * @param ctx the parse tree
-	 */
-	void exitSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#constructorDeclaration}.
@@ -766,17 +733,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitElementValue(@NotNull RefactorMethodSignatureParser.ElementValueContext ctx);
-
-	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#methodModifier}.
-	 * @param ctx the parse tree
-	 */
-	void enterMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#methodModifier}.
-	 * @param ctx the parse tree
-	 */
-	void exitMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#constDeclaration}.

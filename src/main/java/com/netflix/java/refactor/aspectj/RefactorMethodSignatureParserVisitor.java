@@ -1,4 +1,4 @@
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-linter/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
+// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
 package com.netflix.java.refactor.aspectj;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
@@ -150,13 +150,6 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	 * @return the visitor result
 	 */
 	T visitClassOrInterfaceType(@NotNull RefactorMethodSignatureParser.ClassOrInterfaceTypeContext ctx);
-
-	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#typePatternList}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#typeBound}.
@@ -348,13 +341,6 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	T visitArrayCreatorRest(@NotNull RefactorMethodSignatureParser.ArrayCreatorRestContext ctx);
 
 	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#methodModifiersPattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx);
-
-	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#expression}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -381,13 +367,6 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	 * @return the visitor result
 	 */
 	T visitQualifiedNameList(@NotNull RefactorMethodSignatureParser.QualifiedNameListContext ctx);
-
-	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#simpleTypePattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#constructorDeclaration}.
@@ -493,13 +472,6 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	 * @return the visitor result
 	 */
 	T visitElementValue(@NotNull RefactorMethodSignatureParser.ElementValueContext ctx);
-
-	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#methodModifier}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#constDeclaration}.

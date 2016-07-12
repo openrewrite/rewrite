@@ -1,4 +1,4 @@
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-linter/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
+// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
 package com.netflix.java.refactor.aspectj;
 
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -271,19 +271,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitClassOrInterfaceType(@NotNull RefactorMethodSignatureParser.ClassOrInterfaceTypeContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTypePatternList(@NotNull RefactorMethodSignatureParser.TypePatternListContext ctx) { }
 
 	/**
 	 * {@inheritDoc}
@@ -641,19 +628,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
-	@Override public void enterMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitMethodModifiersPattern(@NotNull RefactorMethodSignatureParser.MethodModifiersPatternContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
 	@Override public void enterExpression(@NotNull RefactorMethodSignatureParser.ExpressionContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -700,19 +674,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitQualifiedNameList(@NotNull RefactorMethodSignatureParser.QualifiedNameListContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitSimpleTypePattern(@NotNull RefactorMethodSignatureParser.SimpleTypePatternContext ctx) { }
 
 	/**
 	 * {@inheritDoc}
@@ -908,19 +869,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitElementValue(@NotNull RefactorMethodSignatureParser.ElementValueContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitMethodModifier(@NotNull RefactorMethodSignatureParser.MethodModifierContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

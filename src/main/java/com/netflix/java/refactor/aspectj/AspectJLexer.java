@@ -1,4 +1,4 @@
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-linter/src/main/antlr4/AspectJLexer.g4 by ANTLR 4.2.2
+// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/AspectJLexer.g4 by ANTLR 4.2.2
 package com.netflix.java.refactor.aspectj;
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.CharStream;
