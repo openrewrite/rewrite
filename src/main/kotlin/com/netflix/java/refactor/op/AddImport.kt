@@ -6,7 +6,7 @@ import com.sun.tools.javac.tree.JCTree
 import java.util.*
 
 class AddImport(val pkg: String, val clazz: String): RefactorOperation {
-    override val scanner = AddImportScanner(this)
+    override fun scanner() = AddImportScanner(this)
 }
 
 class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
@@ -49,15 +49,14 @@ class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
     fun lastPriorImport(): JCTree.JCImport? {
         return imports.lastOrNull { import ->
             val importType = import.qualid as JCTree.JCFieldAccess
-            when(packageComparator.compare(importType.selected.toString(), op.pkg)) {
-                0 -> {
-                    if(importType.name.toString().compareTo(op.clazz) < 0) 
-                        true 
-                    else false
-                }
-                -1 -> true
-                else -> false
+            val comp = packageComparator.compare(importType.selected.toString(), op.pkg)
+            if(comp == 0) {
+                if(importType.name.toString().compareTo(op.clazz) < 0) 
+                    true 
+                else false
             }
+            else if(comp < 0) true
+            else false
         }
     }
     

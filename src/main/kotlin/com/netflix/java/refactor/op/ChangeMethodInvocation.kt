@@ -13,7 +13,7 @@ import org.antlr.v4.runtime.CommonTokenStream
 import java.util.*
 
 class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule): RefactorOperation {
-    override val scanner = ChangeMethodInvocationScanner(this)
+    override fun scanner() = ChangeMethodInvocationScanner(this)
     
     var targetTypePattern: Regex? = null
     var methodNamePattern: Regex? = null
@@ -82,7 +82,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
             
-            if(op.targetTypePattern?.matches(session.type(meth.selected).toString()) ?: true &&
+            if(/*op.targetTypePattern?.matches(session.type(meth.selected).toString()) ?: true &&*/
                     op.methodNamePattern?.matches(meth.name.toString()) ?: true) {
                 return refactorMethod(invocation, session)
             }
@@ -103,20 +103,23 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         
         op.refactorArguments.forEach { argRefactor ->
             if(invocation.arguments.length() > argRefactor.index) {
-                object: TreeScanner() {
+                val argScanner = object: TreeScanner() {
                     override fun visitLiteral(tree: JCTree.JCLiteral) {
                         // prefix and suffix hold the special characters surrounding the values of primitive-ish types,
                         // e.g. the "" around String, the L at the end of a long, etc.
-                        val (prefix, suffix) = "(.*)${tree.value}(.*)".toRegex().find(tree.toString())!!.groupValues.drop(1)
-                        
-                        if(argRefactor.typeConstraint?.equals(session.type(tree).toString()) ?: true) {
+                        val valueMatcher = "(.*)${tree.value}(.*)".toRegex().find(tree.toString())
+                        val (prefix, suffix) = valueMatcher!!.groupValues.drop(1)
+
+                        if (argRefactor.typeConstraint?.equals(session.type(tree).toString()) ?: true) {
                             val transformed = argRefactor.refactorLiterals?.invoke(tree.value) ?: tree.value
-                            if(transformed != tree.value) {
+                            if (transformed != tree.value) {
                                 fixes.add(tree.replace("$prefix$transformed$suffix", session))
                             }
                         }
                     }
-                }.scan(invocation.arguments[argRefactor.index])
+                }
+                
+                argScanner.scan(invocation.arguments[argRefactor.index])
             }
         }
         

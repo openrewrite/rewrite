@@ -6,7 +6,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-class RemoveImportSpec {
+class RemoveImportTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
@@ -21,7 +21,19 @@ class RemoveImportSpec {
             |class A {}
         """.trimMargin())
         
-        removeImportRule.refactorAndFix(a)
+        removeImportRule.refactorAndFix(listOf(a))
+        assertEquals("class A {}", a.readText())
+    }
+
+    @Test
+    fun removeNamedImportByClass() {
+        val a = temp.newFile("A.java")
+        a.writeText("""
+            |import java.util.List;
+            |class A {}
+        """.trimMargin())
+
+        RefactorRule().removeImport(List::class.java).refactorAndFix(listOf(a))
         assertEquals("class A {}", a.readText())
     }
     
@@ -33,7 +45,7 @@ class RemoveImportSpec {
             |class A {}
         """.trimMargin())
 
-        removeImportRule.refactorAndFix(a)
+        removeImportRule.refactorAndFix(listOf(a))
         assertEquals("class A {}", a.readText())
     }
     
@@ -47,7 +59,7 @@ class RemoveImportSpec {
             |}
         """.trimMargin())
         
-        removeImportRule.refactorAndFix(a)
+        removeImportRule.refactorAndFix(listOf(a))
         assertEquals("""
             |import java.util.Collection;
             |class A {
@@ -67,7 +79,7 @@ class RemoveImportSpec {
             |}
         """.trimMargin())
         
-        removeImportRule.refactorAndFix(a)
+        removeImportRule.refactorAndFix(listOf(a))
         assertEquals("""
             |import java.util.*;
             |class A {

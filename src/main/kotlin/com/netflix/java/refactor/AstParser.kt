@@ -1,14 +1,16 @@
 package com.netflix.java.refactor
 
 import com.sun.tools.javac.comp.Enter
+import com.sun.tools.javac.file.JavacFileManager
 import com.sun.tools.javac.main.JavaCompiler
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.io.File
-import java.net.URI
 import java.util.regex.Pattern
+import javax.tools.JavaFileManager
 import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
+import javax.tools.StandardLocation
 
 class AstParser {
     companion object {
@@ -29,27 +31,23 @@ class AstParser {
         // for every tree element
         compiler.genEndPos = true
     }
-    
-    fun parseFiles(files: Iterable<File>): List<JCTree.JCCompilationUnit> =
-        files.map { f ->
-            compiler.parse(object: SimpleJavaFileObject(f.toURI(), JavaFileObject.Kind.SOURCE) {
+
+    /**
+     * TODO look at JavacTool line 36 (JDK 8) for hints about how to quiet error logging during parsing?
+     */
+    fun parseFiles(files: Iterable<File>, classPath: Iterable<File>? = null): List<JCTree.JCCompilationUnit> {
+        val fm = context.get(JavaFileManager::class.java)
+        
+        if(classPath != null) // override classpath
+            (fm as JavacFileManager).setLocation(StandardLocation.CLASS_PATH, classPath)
+        
+        return files.map { f ->
+            compiler.parse(object : SimpleJavaFileObject(f.toURI(), JavaFileObject.Kind.SOURCE) {
                 override fun getCharContent(ignoreEncodingErrors: Boolean) = f.readText()
             })
         }.enterAll()
-
-    /**
-     * For use in tests
-     */
-    fun parseSources(vararg fileSources: String): List<JCTree.JCCompilationUnit> =
-        fileSources.map { source ->
-            val sourceUri = URI.create("string:///" + fullyQualifiedName(source)?.replace("\\.".toRegex(), "/") + ".java") ?:
-                    throw IllegalArgumentException("Source must contain a class definition")
-
-            compiler.parse(object : SimpleJavaFileObject(sourceUri, JavaFileObject.Kind.SOURCE) {
-                override fun getCharContent(ignoreEncodingErrors: Boolean) = source
-            })
-        }.enterAll()
-
+    }
+    
     /**
      * Enter symbol definitions into each compilation unit's scope
      */

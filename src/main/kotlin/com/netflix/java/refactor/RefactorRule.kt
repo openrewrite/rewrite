@@ -14,7 +14,7 @@ class RefactorRule() {
         return this
     }
 
-    fun changeType(from: Class<*>, to: Class<*>) = changeType(from.name, to.`package`.toString(), to.simpleName)
+    fun changeType(from: Class<*>, to: Class<*>) = changeType(from.name, to.`package`.name, to.simpleName)
 
     fun changeMethod(signature: String): ChangeMethodInvocation {
         val changeMethod = ChangeMethodInvocation(signature, this)
@@ -34,41 +34,63 @@ class RefactorRule() {
         return this
     }
     
-    fun addImport(clazz: Class<*>) = addImport(clazz.`package`.toString(), clazz.simpleName)
- 
-    fun refactorWhen(matches: (File, JCTree.JCCompilationUnit) -> Boolean, vararg sources: File) =
-        ops.flatMap { op ->
-            val parser = AstParser()
-            val filesToCompilationUnit = sources.zip(parser.parseFiles(sources.toList()))
-            filesToCompilationUnit.flatMap {
-                val (file, cu) = it
-                if(matches.invoke(file, cu)) {
-                    op.scanner.scan(cu, parser.context, file)
+    fun addImport(clazz: Class<*>) = addImport(clazz.`package`.name, clazz.simpleName)
+
+    /**
+     * Perform refactoring on sources whose parsed representation matches
+     */
+    fun refactorWhen(matches: (JCTree.JCCompilationUnit) -> Boolean, sources: Iterable<File>, 
+                     classPath: Iterable<File>? = null): List<RefactorFix> {
+        val parser = AstParser()
+        val cus = parser.parseFiles(sources.toList(), classPath)
+        return ops.flatMap { op ->
+            val fixes = cus.flatMap { cu ->
+                if (matches.invoke(cu)) {
+                    op.scanner().scan(cu, parser.context)
                 } else emptyList()
             }
-        }        
-    
-    fun refactor(vararg sources: File): List<RefactorFix> = refactorWhen({ f, cu -> true }, *sources)
+            fixes
+        }
+    }
 
-    fun refactorAndFixWhen(matches: (File, JCTree.JCCompilationUnit) -> Boolean, vararg sources: File): List<RefactorFix> {
-        val fixes = refactorWhen(matches, *sources)
+    /**
+     * Refactor all sources
+     */
+    fun refactor(sources: Iterable<File>, classPath: Iterable<File>? = null) = 
+            refactorWhen({ cu -> true }, sources, classPath)
+
+    /**
+     * Perform refactoring and fix sources whose parsed representation matches
+     */
+    fun refactorAndFixWhen(matches: (JCTree.JCCompilationUnit) -> Boolean, sources: Iterable<File>,
+                           classPath: Iterable<File>? = null): List<RefactorFix> {
+        val fixes = refactorWhen(matches, sources, classPath)
         fixes.groupBy { it.source }
                 .forEach {
-                    val fileText = it.key.readText()
-                    val sortedFixes = it.value.sortedBy { it.position.first }
-                    var source = sortedFixes.foldIndexed("") { i, source, fix ->
-                        val prefix = if(i == 0)
-                            fileText.substring(0, fix.position.first)
-                        else fileText.substring(sortedFixes[i-1].position.last, fix.position.start)
-                        source + prefix + (fix.changes ?: "")
+                    try {
+                        val fileText = it.key.readText()
+                        val sortedFixes = it.value.sortedBy { it.position.last }.sortedBy { it.position.start }
+                        var source = sortedFixes.foldIndexed("") { i, source, fix ->
+                            val prefix = if (i == 0)
+                                fileText.substring(0, fix.position.first)
+                            else fileText.substring(sortedFixes[i - 1].position.last, fix.position.start)
+                            source + prefix + (fix.changes ?: "")
+                        }
+                        if (sortedFixes.last().position.last < fileText.length) {
+                            source += fileText.substring(sortedFixes.last().position.last)
+                        }
+                        it.key.writeText(source)
+                    } catch(t: Throwable) {
+                        // TODO how can we throw a better exception?
+                        t.printStackTrace()
                     }
-                    if(sortedFixes.last().position.last < fileText.length) {
-                        source += fileText.substring(sortedFixes.last().position.last)
-                    }
-                    it.key.writeText(source)
                 }
-        return fixes        
+        return fixes
     }
-    
-    fun refactorAndFix(vararg sources: File): List<RefactorFix> = refactorAndFixWhen({ f, cu -> true }, *sources)
+
+    /**
+     * Refactor and fix all sources
+     */
+    fun refactorAndFix(sources: Iterable<File>, classPath: Iterable<File>? = null) =
+            refactorAndFixWhen({ cu -> true }, sources, classPath)
 }

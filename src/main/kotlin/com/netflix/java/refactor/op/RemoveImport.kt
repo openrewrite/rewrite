@@ -8,7 +8,7 @@ import com.sun.tools.javac.tree.JCTree
 import java.util.*
 
 class RemoveImport(val clazz: String) : RefactorOperation {
-    override val scanner = RemoveImportScanner(this)
+    override fun scanner() = RemoveImportScanner(this)
 }
 
 class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
@@ -21,7 +21,7 @@ class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
         return if (importType.toString() == op.clazz) {
             listOf(import.delete(session))
         }
-        else if(importType.name.toString() == "*" && importType.selected.toString() == classOwner(session)) {
+        else if(importType.name.toString() == "*" && importType.selected.toString() == session.packageContaining(op.clazz)) {
             starImport = import
             null
         }
@@ -34,7 +34,7 @@ class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
                 session.cu.starImportScope.getElementsByName(ident.name).firstOrNull()
         type?.let {
             val sym = it as Symbol.ClassSymbol
-            if(sym.owner.toString() == classOwner(session)) {
+            if(sym.owner.toString() == session.packageContaining(op.clazz) && !op.clazz.endsWith(sym.name.toString())) {
                 otherTypes.add(sym)
             }
         }
@@ -49,6 +49,4 @@ class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
         }
         else null
     }
-
-    private fun classOwner(session: Session) = typeElement(op.clazz, session).owner.toString()
 }

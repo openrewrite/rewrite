@@ -47,9 +47,9 @@ open class RefactorAndFixSourceTask : DefaultTask() {
                 val rule = method.invoke(null) as RefactorRule
 
                 val fixes = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.flatMap {
-                    rule.refactorAndFix(*it.allJava.toList().toTypedArray())
+                    rule.refactorAndFix(it.allJava, it.compileClasspath)
                 }
-
+                
                 if (fixes.isNotEmpty()) {
                     fixesByRule.put(refactor, fixes)
                 }

@@ -6,7 +6,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-class ChangeTypeSpec {
+class ChangeTypeTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
     
@@ -44,7 +44,7 @@ class ChangeTypeSpec {
 
         RefactorRule()
                 .changeType("a.A1", "a", "A2")
-                .refactorAndFix(b, a1, a2)
+                .refactorAndFix(listOf(b, a1, a2))
         
         assertEquals("""
             |package b;

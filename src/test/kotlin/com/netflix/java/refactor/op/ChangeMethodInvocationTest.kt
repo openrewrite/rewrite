@@ -6,7 +6,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
-class ChangeMethodInvocationSpec {
+class ChangeMethodInvocationTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
     
@@ -34,7 +34,7 @@ class ChangeMethodInvocationSpec {
             |}
         """.trimMargin())
 
-        rule.refactorAndFix(a, b)
+        rule.refactorAndFix(listOf(a, b))
 
         assertEquals("""
             |class A {
@@ -72,7 +72,7 @@ class ChangeMethodInvocationSpec {
             |}
         """.trimMargin())
 
-        rule.refactorAndFix(a, b)
+        rule.refactorAndFix(listOf(a, b))
 
         assertEquals("""
             |class A {

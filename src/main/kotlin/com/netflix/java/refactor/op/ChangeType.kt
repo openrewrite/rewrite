@@ -5,10 +5,12 @@ import com.sun.source.tree.IdentifierTree
 import com.sun.tools.javac.tree.JCTree
 
 data class ChangeType(val from: String, val toPkg: String, val toClass: String): RefactorOperation {
-    override val scanner = IfThenScanner(
-            ChangeTypeScanner(this),
-            RemoveImport(from).scanner,
-            AddImport(toPkg, toClass).scanner
+    override fun scanner() = IfThenScanner(
+            ifFixesResultFrom = ChangeTypeScanner(this),
+            then = arrayOf(
+                RemoveImport(from).scanner(),
+                AddImport(toPkg, toClass).scanner()
+            )
     )
 }
 

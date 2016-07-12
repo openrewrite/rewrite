@@ -13,29 +13,42 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import com.sun.tools.javac.util.Name
 import java.io.File
+import java.util.*
 
 /**
  * A separate instance will be created for each file scan, so implementations can safely hold state
  * about a source file without having to clean it up.
  */
 interface RefactoringScanner {
-    fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix>
+    fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix>
 }
 
 open class BaseRefactoringScanner :
         TreePathScanner<List<RefactorFix>, BaseRefactoringScanner.Session>(),
         RefactoringScanner {
 
-    data class Session(val cu: JCTree.JCCompilationUnit, val context: Context, val source: File) {
-        val sourceText: String by lazy { source.readText() }
+    data class Session(val cu: JCTree.JCCompilationUnit, val context: Context) {
+        companion object {
+            val classSymbolTable = HashMap<Name, Symbol.ClassSymbol?>()
+        }
+        
+        val source: File = File(cu.sourcefile.toUri().path)
+        val sourceText: CharSequence by lazy { cu.sourcefile.getCharContent(true) }
         val env: Env<AttrContext> by lazy { Todo.instance(context).first { it.toplevel === cu } }
         val attr: Attr by lazy { Attr.instance(context) }
         
-        fun classSymbol(name: Name) = (cu.namedImportScope.getElementsByName(name).firstOrNull() ?: 
-                cu.starImportScope.getElementsByName(name).firstOrNull()) as Symbol.ClassSymbol?
+        fun classSymbol(name: Name) =
+            classSymbolTable.getOrPut(name) {
+                (cu.namedImportScope.getElementsByName(name).firstOrNull() ?:
+                        cu.starImportScope.getElementsByName(name).firstOrNull()) as Symbol.ClassSymbol?
+            }
 
-        fun type(tree: JCTree) = attr.attribExpr(tree, env, noType)
-        fun types(trees: com.sun.tools.javac.util.List<JCTree>) = trees.asIterable().map { attr.attribExpr(it, env, null) }
+        fun typeElement(clazz: String): Symbol.ClassSymbol? = JavacElements.instance(context).getTypeElement(clazz)
+        fun packageContaining(clazz: String) = typeElement(clazz)?.owner?.toString()
+
+        fun type(tree: JCTree): Type? = attr.attribExpr(tree, env, noType)
+        fun types(trees: com.sun.tools.javac.util.List<JCTree>): List<Type> = 
+                trees.asIterable().map { attr.attribExpr(it, env, null) }
         
         // In JDK 8, the type argument for attribExpr is optional, but in JDK 7 it is not. Unfortunately, noType is a concrete
         // implementation of a class that is inaccessible from this context, so let's jump through some hoops.
@@ -46,8 +59,8 @@ open class BaseRefactoringScanner :
         }
     }
 
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix> {
-        val session = Session(cu, context, source)
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
+        val session = Session(cu, context)
         return scan(cu, session).plus(visitEnd(session) ?: emptyList())
     }
 
@@ -78,21 +91,18 @@ open class BaseRefactoringScanner :
         }
         return RefactorFix(this.startPosition..end, null, session.source)
     }
-    
-    protected fun typeElement(clazz: String, session: Session) = 
-            JavacElements.instance(session.context).getTypeElement(clazz)
 }
 
 class CompositeScanner(vararg val scanners: RefactoringScanner): RefactoringScanner {
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File) =
-        scanners.flatMap { it.scan(cu, context, source) }
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context) =
+        scanners.flatMap { it.scan(cu, context) }
 }
 
-class IfThenScanner(val ifFixed: RefactoringScanner, vararg thenRun: RefactoringScanner): RefactoringScanner {
-    private val compositeThenRun = CompositeScanner(*thenRun)
+class IfThenScanner(val ifFixesResultFrom: RefactoringScanner, then: Array<RefactoringScanner>): RefactoringScanner {
+    private val compositeThenRun = CompositeScanner(*then)
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, source: File): List<RefactorFix> {
-        val fixes = ifFixed.scan(cu, context, source)
-        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context, source)) else emptyList()
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
+        val fixes = ifFixesResultFrom.scan(cu, context)
+        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context)) else emptyList()
     }
 }

@@ -5,8 +5,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 
-class AddImportSpec {
+class AddImportTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
@@ -18,7 +19,20 @@ class AddImportSpec {
         val a = temp.newFile("A.java")
         a.writeText("class A {}")
 
-        addImportRule.refactorAndFix(a)
+        addImportRule.refactorAndFix(listOf(a))
+
+        assertEquals("""
+            |import java.util.List;
+            |class A {}
+        """.trimMargin(), a.readText())
+    }
+
+    @Test
+    fun addNamedImportByClass() {
+        val a = temp.newFile("A.java")
+        a.writeText("class A {}")
+
+        RefactorRule().addImport(List::class.java).refactorAndFix(listOf(a))
 
         assertEquals("""
             |import java.util.List;
@@ -34,7 +48,7 @@ class AddImportSpec {
             |class A {}
         """.trimMargin())
 
-        addImportRule.refactorAndFix(a)
+        addImportRule.refactorAndFix(listOf(a))
 
         assertEquals("""
             |package a;
@@ -90,7 +104,7 @@ class AddImportSpec {
                 |class A {}
             """.trimMargin())
 
-            addImportRule.refactorAndFixWhen({ f, cu -> f === a }, *otherImports.plus(b).plus(a).toTypedArray())
+            addImportRule.refactorAndFixWhen({ cu -> File(cu.sourcefile.toUri().path) == a }, otherImports.plus(b).plus(a))
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -108,7 +122,7 @@ class AddImportSpec {
             |class A {}
         """.trimMargin())
 
-        addImportRule.refactorAndFix(a)
+        addImportRule.refactorAndFix(listOf(a))
 
         assertEquals("""
             |package a;
@@ -128,7 +142,7 @@ class AddImportSpec {
             |class A {}
         """.trimMargin())
 
-        addImportRule.refactorAndFix(a)
+        addImportRule.refactorAndFix(listOf(a))
 
         assertEquals("""
             |package a;
@@ -148,7 +162,7 @@ class AddImportSpec {
             |class A {}
         """.trimMargin())
 
-        addImportRule.refactorAndFix(a)
+        addImportRule.refactorAndFix(listOf(a))
 
         assertEquals("""
             |package a;
