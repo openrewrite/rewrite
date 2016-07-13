@@ -79,9 +79,8 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
-            val sym = (meth.sym as Symbol.MethodSymbol)
-            val args = sym.params().map { it.type.toString() }.joinToString(",")
-            if(op.targetTypePattern.matches((sym.owner as Symbol.ClassSymbol).toString()) &&
+            val args = invocation.args.map { it.type.toString() }.joinToString(",")
+            if(op.targetTypePattern.matches((meth.sym.owner as Symbol.ClassSymbol).toString()) &&
                     op.methodNamePattern.matches(meth.name.toString()) &&
                     op.argumentPattern.matches(args)) {
                 return refactorMethod(invocation)

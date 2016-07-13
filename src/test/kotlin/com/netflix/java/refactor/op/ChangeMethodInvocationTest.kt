@@ -51,6 +51,14 @@ class ChangeMethodInvocationTest {
     }
     
     @Test
+    fun matchesMethodSymbolsWithVarargs() {
+    }
+    
+    @Test
+    fun matchesArrayArguments() {
+    }
+    
+    @Test
     fun refactorMethodName() {
         val rule = RefactorRule()
                 .changeMethod("B foo(int)")
