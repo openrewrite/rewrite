@@ -6,12 +6,14 @@ import com.netflix.java.refactor.aspectj.AspectJLexer
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParser
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParserBaseVisitor
 import com.sun.source.tree.MethodInvocationTree
+import com.sun.tools.javac.code.Flags
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.tree.TreeScanner
 import com.sun.tools.javac.util.Context
 import org.antlr.v4.runtime.ANTLRInputStream
 import org.antlr.v4.runtime.CommonTokenStream
+import org.antlr.v4.runtime.tree.TerminalNode
 import java.util.*
 
 class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule): RefactorOperation {
@@ -79,7 +81,27 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
-            val args = invocation.args.map { it.type.toString() }.joinToString(",")
+            
+            val args = when(meth.sym) {
+                is Symbol.MethodSymbol -> {
+                    (meth.sym as Symbol.MethodSymbol).params().map { 
+                        val baseType = it.type.toString()
+                        if(it.flags() and Flags.VARARGS != 0L) {
+                            baseType.substringBefore("[") + "..."
+                        }
+                        else
+                            baseType
+                    }.joinToString("")
+                }
+
+                // This is a weird case... for some reason the attribution phase will sometimes assign a ClassSymbol to
+                // method invocation, making the parameters of the resolved method inaccessible to us. In these cases,
+                // we can make a best effort at determining the method's argument types by observing the types that are
+                // being passed to it by the code.
+                else -> invocation.args.map { it.type.toString() }.joinToString(",")
+            } 
+            
+            
             if(op.targetTypePattern.matches((meth.sym.owner as Symbol.ClassSymbol).toString()) &&
                     op.methodNamePattern.matches(meth.name.toString()) &&
                     op.argumentPattern.matches(args)) {
@@ -186,10 +208,21 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
         }
         
         class FormalType(ctx: RefactorMethodSignatureParser.FormalTypePatternContext): Argument() {
-            override val regex = TypeVisitor().visitFormalTypePattern(ctx)
+            override val regex: String by lazy { 
+                val baseType = TypeVisitor().visitFormalTypePattern(ctx)
+                if(variableArgs) "$baseType..." else baseType
+            }
+            var variableArgs = false
         }
     }
 
+    override fun visitTerminal(node: TerminalNode): String? {
+        if(node.text == "...") {
+            (arguments.last() as Argument.FormalType).variableArgs = true
+        }
+        return super.visitTerminal(node)
+    }
+    
     override fun visitDotDot(ctx: RefactorMethodSignatureParser.DotDotContext): String? {
         arguments.add(Argument.DotDot)
         return super.visitDotDot(ctx)

@@ -68,7 +68,7 @@ class ChangeMethodInvocationTest {
     
     @Test
     fun matchesArrayArguments() {
-        assertTrue(argRegex("A foo(String[])").matches("String[]"))
+        assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
     }
     
     @Test
@@ -124,6 +124,33 @@ class ChangeMethodInvocationTest {
             |}
         """.trimMargin(), a.readText())
     }
+
+    @Test
+    fun refactorMethodNameForMethodWithVarargArg() {
+        val rule = RefactorRule()
+                .changeMethod("B varargArg(String...)")
+                .refactorName("bar")
+                .done()
+
+        val a = temp.newFile("A.java")
+        a.writeText("""
+            |class A {
+            |   public void test() {
+            |       new B().varargArg("boo", "again");
+            |   }
+            |}
+        """.trimMargin())
+
+        rule.refactorAndFix(listOf(a, b()))
+
+        assertEquals("""
+            |class A {
+            |   public void test() {
+            |       new B().bar("boo", "again");
+            |   }
+            |}
+        """.trimMargin(), a.readText())
+    }
     
     @Test
     fun transformStringArgument() {
@@ -163,6 +190,7 @@ class ChangeMethodInvocationTest {
             |class B {
             |   public void singleArg(String s) {}
             |   public void arrArg(String[] s) {}
+            |   public void varargArg(String... s) {}
             |}
         """.trimMargin())
         return b
