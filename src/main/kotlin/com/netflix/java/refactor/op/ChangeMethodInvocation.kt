@@ -137,6 +137,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
  * the code is in any declaration of a type whose name begins with "com.xerox.".
  */
 fun String.aspectjToRegexSyntax() = this
+        .replace("[", "\\[").replace("]", "\\]")
         .replace("([^\\.])*.([^\\.])*", "$1\\.$2")
         .replace("*", "[^\\.]*")
         .replace("..", "\\.(.+\\.)?")
@@ -151,7 +152,7 @@ class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
                 .let { className ->
                     if(!className.contains('.')) {
                         try {
-                            Class.forName("java.lang.$className", false, TypeVisitor::class.java.classLoader)
+                            Class.forName("java.lang.${className.substringBefore("\\[")}", false, TypeVisitor::class.java.classLoader)
                             return@let "java.lang.$className"
                         } catch(ignore: ClassNotFoundException) {
                         }
@@ -198,7 +199,7 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
         arguments.add(Argument.FormalType(ctx))
         return super.visitFormalTypePattern(ctx)
     }
-    
+
     override fun visitFormalParametersPattern(ctx: RefactorMethodSignatureParser.FormalParametersPatternContext): String {
         super.visitFormalParametersPattern(ctx)
         return arguments.mapIndexed { i, argument -> 

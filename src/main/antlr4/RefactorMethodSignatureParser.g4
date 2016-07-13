@@ -15,16 +15,16 @@ formalParametersPattern
 formalsPattern
 	:	dotDot (',' formalsPatternAfterDotDot)* 
 	|	optionalParensTypePattern (',' formalsPattern)* 
-	|	formalTypePattern ELLIPSIS
+	|	formalTypePattern '...'
 	;
 	
 dotDot
-    :   DOTDOT
+    :   '..'
     ;
 	                 
 formalsPatternAfterDotDot
 	:	optionalParensTypePattern (',' formalsPatternAfterDotDot)* 
-	|	formalTypePattern ELLIPSIS
+	|	formalTypePattern '...'
 	;
 
 optionalParensTypePattern
@@ -38,7 +38,7 @@ targetTypePattern
 	|	targetTypePattern '&&' targetTypePattern 
   	|	targetTypePattern '||' targetTypePattern
   	;
-  	
+  
 formalTypePattern
 	:	classNameOrInterface
 	|	primitiveType
@@ -48,7 +48,7 @@ formalTypePattern
 	;
 
 classNameOrInterface
-    :	(Identifier | '*' | DOT | DOTDOT)+
+    :	(Identifier | '*' | '.' | '..')+ ('[' ']')*
     ;
 	
 simpleNamePattern
