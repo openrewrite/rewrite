@@ -33,7 +33,7 @@ class ChangeMethodInvocationTest {
     }
     
     @Test
-    fun matchesArgumentsInJavaLangPackage() {
+    fun matchesArguments() {
         val argRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).argumentPattern }
 
         assertTrue(argRegex("A foo()").matches(""))
@@ -45,6 +45,9 @@ class ChangeMethodInvocationTest {
         
         assertTrue(argRegex("A foo(.., int)").matches("int"))
         assertTrue(argRegex("A foo(.., int)").matches("int,int"))
+
+        assertTrue(argRegex("A foo(int, ..)").matches("int"))
+        assertTrue(argRegex("A foo(int, ..)").matches("int,int"))
     }
     
     @Test

@@ -176,29 +176,42 @@ class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
  * picks out execution join points for void methods named m whose last parameter is of type int.
  */
 class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>() {
-    var regex = ""
-    var precededByDotDot = false
+    private val arguments = ArrayList<Argument>()
+    
+    private sealed class Argument {
+        abstract val regex: String
 
-    override fun visitDotDot(ctx: RefactorMethodSignatureParser.DotDotContext?): String? {
-        append("([^,]+,)*")
-        precededByDotDot = true
+        object DotDot: Argument() {
+            override val regex = "([^,]+,)*([^,]+)"
+        }
+        
+        class FormalType(ctx: RefactorMethodSignatureParser.FormalTypePatternContext): Argument() {
+            override val regex = TypeVisitor().visitFormalTypePattern(ctx)
+        }
+    }
+
+    override fun visitDotDot(ctx: RefactorMethodSignatureParser.DotDotContext): String? {
+        arguments.add(Argument.DotDot)
         return super.visitDotDot(ctx)
     }
     
-    override fun visitFormalTypePattern(ctx: RefactorMethodSignatureParser.FormalTypePatternContext?): String? {
-        append(TypeVisitor().visitFormalTypePattern(ctx))
+    override fun visitFormalTypePattern(ctx: RefactorMethodSignatureParser.FormalTypePatternContext): String? {
+        arguments.add(Argument.FormalType(ctx))
         return super.visitFormalTypePattern(ctx)
     }
     
     override fun visitFormalParametersPattern(ctx: RefactorMethodSignatureParser.FormalParametersPatternContext): String {
         super.visitFormalParametersPattern(ctx)
-        return regex
-    }
-    
-    fun append(regexFragment: String) {
-        if(regex.isEmpty() || precededByDotDot)
-            regex += regexFragment
-        else regex += "," + regexFragment
-        precededByDotDot = false
+        return arguments.mapIndexed { i, argument -> 
+            // Note: the AspectJ grammar doesn't allow for multiple ..'s in one formal parameter pattern
+            when(argument) {
+                is Argument.DotDot -> {
+                    if(i > 0)
+                        "(,${argument.regex})?"
+                    else "(${argument.regex},)?"
+                }
+                is Argument.FormalType -> argument.regex
+            }
+        }.joinToString("")
     }
 }
