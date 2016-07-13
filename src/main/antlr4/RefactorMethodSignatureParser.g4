@@ -5,7 +5,7 @@ options { tokenVocab=AspectJLexer; }
 import JavaParser;
 	
 methodPattern
-	:	typePattern simpleNamePattern formalParametersPattern
+	:	targetTypePattern simpleNamePattern formalParametersPattern
 	;
 
 formalParametersPattern
@@ -13,34 +13,45 @@ formalParametersPattern
 	;
 
 formalsPattern
-	:	'..' (',' formalsPatternAfterDotDot)* 
+	:	dotDot (',' formalsPatternAfterDotDot)* 
 	|	optionalParensTypePattern (',' formalsPattern)* 
-	|	typePattern '...'
+	|	formalTypePattern ELLIPSIS
 	;
-	              
+	
+dotDot
+    :   DOTDOT
+    ;
+	                 
 formalsPatternAfterDotDot
 	:	optionalParensTypePattern (',' formalsPatternAfterDotDot)* 
-	|	typePattern '...'
+	|	formalTypePattern ELLIPSIS
 	;
 
-typePattern
-    :   dottedNamePattern
-	|	'!' typePattern 
-	|	typePattern '&&' typePattern 
-  	|	typePattern '||' typePattern
+optionalParensTypePattern
+    :	'(' formalTypePattern ')'
+    |	formalTypePattern
+    ;
+
+targetTypePattern
+    :   classNameOrInterface
+	|	'!' targetTypePattern 
+	|	targetTypePattern '&&' targetTypePattern 
+  	|	targetTypePattern '||' targetTypePattern
   	;
   	
-dottedNamePattern
-	:	(Identifier | '*' | '.' | '..')+
-	|	'void'
+formalTypePattern
+	:	classNameOrInterface
+	|	primitiveType
+    |	'!' formalTypePattern 
+    |	formalTypePattern '&&' formalTypePattern 
+    |	formalTypePattern '||' formalTypePattern
 	;
+
+classNameOrInterface
+    :	(Identifier | '*' | DOT | DOTDOT)+
+    ;
 	
 simpleNamePattern
     :	Identifier ('*' Identifier)* '*'?
     |	'*' (Identifier '*')* Identifier?
-    ;
-    
-optionalParensTypePattern
-    :	'(' typePattern ')'
-    |	typePattern
     ;

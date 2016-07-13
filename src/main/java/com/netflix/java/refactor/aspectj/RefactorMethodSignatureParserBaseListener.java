@@ -524,6 +524,19 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx) { }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterEnumDeclaration(@NotNull RefactorMethodSignatureParser.EnumDeclarationContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -713,6 +726,19 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitSuperSuffix(@NotNull RefactorMethodSignatureParser.SuperSuffixContext ctx) { }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx) { }
 
 	/**
 	 * {@inheritDoc}
@@ -966,6 +992,19 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx) { }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterAnnotationMethodRest(@NotNull RefactorMethodSignatureParser.AnnotationMethodRestContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -1044,6 +1083,19 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 *
 	 * <p>The default implementation does nothing.</p>
 	 */
+	@Override public void enterFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx) { }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
 	@Override public void enterTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx) { }
 	/**
 	 * {@inheritDoc}
@@ -1051,19 +1103,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx) { }
 
 	/**
 	 * {@inheritDoc}
@@ -1103,19 +1142,6 @@ public class RefactorMethodSignatureParserBaseListener implements RefactorMethod
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitClassDeclaration(@NotNull RefactorMethodSignatureParser.ClassDeclarationContext ctx) { }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void enterDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx) { }
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation does nothing.</p>
-	 */
-	@Override public void exitDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

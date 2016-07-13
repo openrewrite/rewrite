@@ -285,6 +285,13 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	T visitCreatedName(@NotNull RefactorMethodSignatureParser.CreatedNameContext ctx);
 
 	/**
+	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#targetTypePattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx);
+
+	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#enumDeclaration}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -388,6 +395,13 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	 * @return the visitor result
 	 */
 	T visitSuperSuffix(@NotNull RefactorMethodSignatureParser.SuperSuffixContext ctx);
+
+	/**
+	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#classNameOrInterface}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#variableDeclarators}.
@@ -523,6 +537,13 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	T visitCompilationUnit(@NotNull RefactorMethodSignatureParser.CompilationUnitContext ctx);
 
 	/**
+	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#dotDot}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx);
+
+	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#annotationMethodRest}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
@@ -565,18 +586,18 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	T visitMethodBody(@NotNull RefactorMethodSignatureParser.MethodBodyContext ctx);
 
 	/**
+	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#formalTypePattern}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx);
+
+	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#typeArgument}.
 	 * @param ctx the parse tree
 	 * @return the visitor result
 	 */
 	T visitTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx);
-
-	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#typePattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#typeDeclaration}.
@@ -598,13 +619,6 @@ public interface RefactorMethodSignatureParserVisitor<T> extends ParseTreeVisito
 	 * @return the visitor result
 	 */
 	T visitClassDeclaration(@NotNull RefactorMethodSignatureParser.ClassDeclarationContext ctx);
-
-	/**
-	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#dottedNamePattern}.
-	 * @param ctx the parse tree
-	 * @return the visitor result
-	 */
-	T visitDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx);
 
 	/**
 	 * Visit a parse tree produced by {@link RefactorMethodSignatureParser#enumConstant}.

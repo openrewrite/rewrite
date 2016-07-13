@@ -438,6 +438,17 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	void exitCreatedName(@NotNull RefactorMethodSignatureParser.CreatedNameContext ctx);
 
 	/**
+	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#targetTypePattern}.
+	 * @param ctx the parse tree
+	 */
+	void enterTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#targetTypePattern}.
+	 * @param ctx the parse tree
+	 */
+	void exitTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx);
+
+	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#enumDeclaration}.
 	 * @param ctx the parse tree
 	 */
@@ -601,6 +612,17 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitSuperSuffix(@NotNull RefactorMethodSignatureParser.SuperSuffixContext ctx);
+
+	/**
+	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#classNameOrInterface}.
+	 * @param ctx the parse tree
+	 */
+	void enterClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#classNameOrInterface}.
+	 * @param ctx the parse tree
+	 */
+	void exitClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#variableDeclarators}.
@@ -812,6 +834,17 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	void exitCompilationUnit(@NotNull RefactorMethodSignatureParser.CompilationUnitContext ctx);
 
 	/**
+	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#dotDot}.
+	 * @param ctx the parse tree
+	 */
+	void enterDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#dotDot}.
+	 * @param ctx the parse tree
+	 */
+	void exitDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx);
+
+	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#annotationMethodRest}.
 	 * @param ctx the parse tree
 	 */
@@ -878,6 +911,17 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	void exitMethodBody(@NotNull RefactorMethodSignatureParser.MethodBodyContext ctx);
 
 	/**
+	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#formalTypePattern}.
+	 * @param ctx the parse tree
+	 */
+	void enterFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#formalTypePattern}.
+	 * @param ctx the parse tree
+	 */
+	void exitFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx);
+
+	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#typeArgument}.
 	 * @param ctx the parse tree
 	 */
@@ -887,17 +931,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx);
-
-	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#typePattern}.
-	 * @param ctx the parse tree
-	 */
-	void enterTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#typePattern}.
-	 * @param ctx the parse tree
-	 */
-	void exitTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#typeDeclaration}.
@@ -931,17 +964,6 @@ public interface RefactorMethodSignatureParserListener extends ParseTreeListener
 	 * @param ctx the parse tree
 	 */
 	void exitClassDeclaration(@NotNull RefactorMethodSignatureParser.ClassDeclarationContext ctx);
-
-	/**
-	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#dottedNamePattern}.
-	 * @param ctx the parse tree
-	 */
-	void enterDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx);
-	/**
-	 * Exit a parse tree produced by {@link RefactorMethodSignatureParser#dottedNamePattern}.
-	 * @param ctx the parse tree
-	 */
-	void exitDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx);
 
 	/**
 	 * Enter a parse tree produced by {@link RefactorMethodSignatureParser#enumConstant}.

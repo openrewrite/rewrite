@@ -330,6 +330,14 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitTargetTypePattern(@NotNull RefactorMethodSignatureParser.TargetTypePatternContext ctx) { return visitChildren(ctx); }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitEnumDeclaration(@NotNull RefactorMethodSignatureParser.EnumDeclarationContext ctx) { return visitChildren(ctx); }
 
 	/**
@@ -443,6 +451,14 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitSuperSuffix(@NotNull RefactorMethodSignatureParser.SuperSuffixContext ctx) { return visitChildren(ctx); }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
+	@Override public T visitClassNameOrInterface(@NotNull RefactorMethodSignatureParser.ClassNameOrInterfaceContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}
@@ -602,6 +618,14 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
+	@Override public T visitDotDot(@NotNull RefactorMethodSignatureParser.DotDotContext ctx) { return visitChildren(ctx); }
+
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation returns the result of calling
+	 * {@link #visitChildren} on {@code ctx}.</p>
+	 */
 	@Override public T visitAnnotationMethodRest(@NotNull RefactorMethodSignatureParser.AnnotationMethodRestContext ctx) { return visitChildren(ctx); }
 
 	/**
@@ -650,7 +674,7 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx) { return visitChildren(ctx); }
+	@Override public T visitFormalTypePattern(@NotNull RefactorMethodSignatureParser.FormalTypePatternContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}
@@ -658,7 +682,7 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypePattern(@NotNull RefactorMethodSignatureParser.TypePatternContext ctx) { return visitChildren(ctx); }
+	@Override public T visitTypeArgument(@NotNull RefactorMethodSignatureParser.TypeArgumentContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}
@@ -683,14 +707,6 @@ public class RefactorMethodSignatureParserBaseVisitor<T> extends AbstractParseTr
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
 	@Override public T visitClassDeclaration(@NotNull RefactorMethodSignatureParser.ClassDeclarationContext ctx) { return visitChildren(ctx); }
-
-	/**
-	 * {@inheritDoc}
-	 *
-	 * <p>The default implementation returns the result of calling
-	 * {@link #visitChildren} on {@code ctx}.</p>
-	 */
-	@Override public T visitDottedNamePattern(@NotNull RefactorMethodSignatureParser.DottedNamePatternContext ctx) { return visitChildren(ctx); }
 
 	/**
 	 * {@inheritDoc}

@@ -1,12 +1,7 @@
 package com.netflix.java.refactor.op
 
 import com.netflix.java.refactor.RefactorRule
-import com.netflix.java.refactor.aspectj.AspectJLexer
-import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParser
-import org.antlr.v4.runtime.ANTLRInputStream
-import org.antlr.v4.runtime.CommonTokenStream
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -16,19 +11,40 @@ class ChangeMethodInvocationTest {
     val temp = TemporaryFolder()
     
     @Test
-    fun typeVisitorMatchesTargetType() {
-        val typeVisitor = TypeVisitor()
-        
-        val typeRegex = { signature: String ->
-            val methodPattern = RefactorMethodSignatureParser(CommonTokenStream(AspectJLexer(ANTLRInputStream(signature))))
-                .methodPattern()
-            typeVisitor.visitTypePattern(methodPattern.typePattern())
-        }
+    fun matchesMethodTargetType() {
+        val typeRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).targetTypePattern }
 
-        assertTrue(typeRegex("..MyClass foo()").matches("com.bar.MyClass"))
+        assertTrue(typeRegex("*..MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("MyClass foo()").matches("MyClass"))
         assertTrue(typeRegex("com.bar.MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("com.*.MyClass foo()").matches("com.bar.MyClass"))
+    }
+
+    @Test
+    fun matchesMethodName() {
+        val nameRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).methodNamePattern }
+        
+        assertTrue(nameRegex("A foo()").matches("foo"))
+        assertTrue(nameRegex("A *()").matches("foo"))
+        assertTrue(nameRegex("A fo*()").matches("foo"))
+
+        // FIXME see section 5.4 in the Definitive ANTLR4 Reference for why ambiguity in the grammar places the star with the type expression
+        assertFalse(nameRegex("A *oo()").matches("foo"))
+    }
+    
+    @Test
+    fun matchesArgumentsInJavaLangPackage() {
+        val argRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).argumentPattern }
+
+        assertTrue(argRegex("A foo()").matches(""))
+        assertTrue(argRegex("A foo(int)").matches("int"))
+        assertTrue(argRegex("A foo(String)").matches("java.lang.String"))
+        assertTrue(argRegex("A foo(java.util.Map)").matches("java.util.Map"))
+        assertTrue(argRegex("A foo(java.util.*)").matches("java.util.Map"))
+        assertTrue(argRegex("A foo(java..*)").matches("java.util.Map"))
+        
+        assertTrue(argRegex("A foo(.., int)").matches("int"))
+        assertTrue(argRegex("A foo(.., int)").matches("int,int"))
     }
     
     @Test

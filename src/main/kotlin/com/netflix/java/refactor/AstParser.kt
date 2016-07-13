@@ -51,11 +51,15 @@ class AstParser {
         if(classPath != null) // override classpath
             (fm as JavacFileManager).setLocation(StandardLocation.CLASS_PATH, classPath)
         
-        return files.map { f ->
+        val cus = files.map { f ->
             compiler.parse(object : SimpleJavaFileObject(f.toURI(), JavaFileObject.Kind.SOURCE) {
                 override fun getCharContent(ignoreEncodingErrors: Boolean) = f.readText()
             })
         }.enterAll()
+        
+        compiler.attribute(compiler.todo)
+        
+        return cus
     }
     
     /**

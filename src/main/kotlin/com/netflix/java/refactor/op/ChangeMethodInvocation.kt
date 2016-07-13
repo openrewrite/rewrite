@@ -6,8 +6,10 @@ import com.netflix.java.refactor.aspectj.AspectJLexer
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParser
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParserBaseVisitor
 import com.sun.source.tree.MethodInvocationTree
+import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.tree.TreeScanner
+import com.sun.tools.javac.util.Context
 import org.antlr.v4.runtime.ANTLRInputStream
 import org.antlr.v4.runtime.CommonTokenStream
 import java.util.*
@@ -15,8 +17,10 @@ import java.util.*
 class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule): RefactorOperation {
     override fun scanner() = ChangeMethodInvocationScanner(this)
     
-    var targetTypePattern: Regex? = null
-    var methodNamePattern: Regex? = null
+    lateinit var targetTypePattern: Regex
+    lateinit var methodNamePattern: Regex
+    lateinit var argumentPattern: Regex
+    
     var refactorName: String? = null
     val refactorArguments = ArrayList<MethodArgumentMatcher>()
     
@@ -25,9 +29,13 @@ class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule
 
         object: RefactorMethodSignatureParserBaseVisitor<Void>() {
             override fun visitMethodPattern(ctx: RefactorMethodSignatureParser.MethodPatternContext): Void? {
-                targetTypePattern = TypeVisitor().visitTypePattern(ctx.typePattern())
-                methodNamePattern = ctx.simpleNamePattern().Identifier(0).toString().replace("*", ".*").toRegex()
-                return super.visitMethodPattern(ctx)
+                targetTypePattern = TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()).toRegex()
+                methodNamePattern = ctx.simpleNamePattern().children // all TerminalNode instances
+                        .map { it.toString().aspectjToRegexSyntax() }
+                        .joinToString("")
+                        .toRegex()
+                argumentPattern = FormalParameterVisitor().visitFormalParametersPattern(ctx.formalParametersPattern()).toRegex()
+                return null
             }
         }.visit(parser.methodPattern())
     }
@@ -67,14 +75,16 @@ open class MethodArgumentMatcher(val index: Int, val op: ChangeMethodInvocation)
 }
 
 class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefactoringScanner() {
-    override fun visitMethodInvocation(node: MethodInvocationTree, session: Session): List<RefactorFix>? {
+    override fun visitMethodInvocation(node: MethodInvocationTree, context: Context): List<RefactorFix>? {
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
-            
-            if(op.targetTypePattern?.matches(session.type(meth.selected).toString()) ?: true &&
-                    op.methodNamePattern?.matches(meth.name.toString()) ?: true) {
-                return refactorMethod(invocation, session)
+            val sym = (meth.sym as Symbol.MethodSymbol)
+            val args = sym.params().map { it.type.toString() }.joinToString(",")
+            if(op.targetTypePattern.matches((sym.owner as Symbol.ClassSymbol).toString()) &&
+                    op.methodNamePattern.matches(meth.name.toString()) &&
+                    op.argumentPattern.matches(args)) {
+                return refactorMethod(invocation)
             }
         } else {
             // this is a method invocation on a method in the same class, which we won't be refactoring on ever
@@ -83,12 +93,12 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
         return null
     }
     
-    fun refactorMethod(invocation: JCTree.JCMethodInvocation, session: Session): List<RefactorFix> {
+    fun refactorMethod(invocation: JCTree.JCMethodInvocation): List<RefactorFix> {
         val meth = invocation.meth as JCTree.JCFieldAccess
         val fixes = ArrayList<RefactorFix>()
         
         if(op.refactorName is String) {
-            fixes.add(meth.replaceName(op.refactorName!!, session))
+            fixes.add(meth.replaceName(op.refactorName!!))
         }
         
         op.refactorArguments.forEach { argRefactor ->
@@ -100,10 +110,10 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
                         val valueMatcher = "(.*)${tree.value}(.*)".toRegex().find(tree.toString())
                         val (prefix, suffix) = valueMatcher!!.groupValues.drop(1)
 
-                        if (argRefactor.typeConstraint?.equals(session.type(tree).toString()) ?: true) {
+                        if (argRefactor.typeConstraint?.equals(tree.type.toString()) ?: true) {
                             val transformed = argRefactor.refactorLiterals?.invoke(tree.value) ?: tree.value
                             if (transformed != tree.value) {
-                                fixes.add(tree.replace("$prefix$transformed$suffix", session))
+                                fixes.add(tree.replace("$prefix$transformed$suffix"))
                             }
                         }
                     }
@@ -118,21 +128,77 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefacto
 }
 
 /**
+ * See https://eclipse.org/aspectj/doc/next/progguide/semantics-pointcuts.html#type-patterns
+ * 
  * An embedded * in an identifier matches any sequence of characters, but 
  * does not match the package (or inner-type) separator ".".
  * 
- * An embedded .. in an identifier matches any sequence of characters that 
- * starts and ends with the package (or inner-type) separator ".".
+ * The ".." wildcard matches any sequence of characters that start and end with a ".", so it can be used to pick out all 
+ * types in any subpackage, or all inner types. e.g. <code>within(com.xerox..*)</code> picks out all join points where 
+ * the code is in any declaration of a type whose name begins with "com.xerox.".
  */
 fun String.aspectjToRegexSyntax() = this
         .replace("([^\\.])*.([^\\.])*", "$1\\.$2")
         .replace("*", "[^\\.]*")
-        .replace("..", ".*")
+        .replace("..", "\\.(.+\\.)?")
 
-class TypeVisitor: RefactorMethodSignatureParserBaseVisitor<Regex>() {
-    override fun visitDottedNamePattern(ctx: RefactorMethodSignatureParser.DottedNamePatternContext): Regex =
-        ctx.children // all TerminalNode instances
-                .map { it.toString().aspectjToRegexSyntax() }
+class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
+    override fun visitClassNameOrInterface(ctx: RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
+        return ctx.children // all TerminalNode instances
+                .map { 
+                    it.text.aspectjToRegexSyntax()
+                }
                 .joinToString("")
-                .toRegex()
+                .let { className ->
+                    if(!className.contains('.')) {
+                        try {
+                            Class.forName("java.lang.$className", false, TypeVisitor::class.java.classLoader)
+                            return@let "java.lang.$className"
+                        } catch(ignore: ClassNotFoundException) {
+                        }
+                    }
+                    className
+                }
+    }
+
+    override fun visitPrimitiveType(ctx: RefactorMethodSignatureParser.PrimitiveTypeContext): String {
+        return ctx.text
+    }
+}
+
+/**
+ * The wildcard .. indicates zero or more parameters, so:
+ *
+ * <code>execution(void m(..))</code>
+ * picks out execution join points for void methods named m, of any number of arguments, while
+ *
+ * <code>execution(void m(.., int))</code>
+ * picks out execution join points for void methods named m whose last parameter is of type int.
+ */
+class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>() {
+    var regex = ""
+    var precededByDotDot = false
+
+    override fun visitDotDot(ctx: RefactorMethodSignatureParser.DotDotContext?): String? {
+        append("([^,]+,)*")
+        precededByDotDot = true
+        return super.visitDotDot(ctx)
+    }
+    
+    override fun visitFormalTypePattern(ctx: RefactorMethodSignatureParser.FormalTypePatternContext?): String? {
+        append(TypeVisitor().visitFormalTypePattern(ctx))
+        return super.visitFormalTypePattern(ctx)
+    }
+    
+    override fun visitFormalParametersPattern(ctx: RefactorMethodSignatureParser.FormalParametersPatternContext): String {
+        super.visitFormalParametersPattern(ctx)
+        return regex
+    }
+    
+    fun append(regexFragment: String) {
+        if(regex.isEmpty() || precededByDotDot)
+            regex += regexFragment
+        else regex += "," + regexFragment
+        precededByDotDot = false
+    }
 }

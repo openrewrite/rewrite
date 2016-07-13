@@ -3,6 +3,7 @@ package com.netflix.java.refactor.op
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.tree.ImportTree
 import com.sun.tools.javac.tree.JCTree
+import com.sun.tools.javac.util.Context
 import java.util.*
 
 class AddImport(val pkg: String, val clazz: String): RefactorOperation {
@@ -13,7 +14,7 @@ class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
     val imports = ArrayList<JCTree.JCImport>()
     var coveredByExistingImport = false
     
-    override fun visitImport(node: ImportTree?, p: Session?): List<RefactorFix>? {
+    override fun visitImport(node: ImportTree?, context: Context): List<RefactorFix>? {
         val import = node as JCTree.JCImport
         val importType = import.qualid as JCTree.JCFieldAccess
         imports.add(import)
@@ -28,22 +29,22 @@ class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
         return null
     }
 
-    override fun visitEnd(session: Session): List<RefactorFix>? {
+    override fun visitEnd(context: Context): List<RefactorFix> {
         val lastPrior = lastPriorImport()
         
         return if(coveredByExistingImport) {
-            null
+            emptyList()
         }
         else if(lastPrior == null && imports.isNotEmpty()) {
-            listOf(imports.first().insertBefore("import ${op.pkg}.${op.clazz};\n", session))
+            listOf(imports.first().insertBefore("import ${op.pkg}.${op.clazz};\n"))
         }
         else if(lastPrior is JCTree.JCImport) {
-            listOf(lastPrior.insertAfter("import ${op.pkg}.${op.clazz};\n", session))
+            listOf(lastPrior.insertAfter("import ${op.pkg}.${op.clazz};\n"))
         }
-        else if(session.cu.packageName != null) {
-            listOf(session.cu.packageName.insertAfter("\n\nimport ${op.pkg}.${op.clazz};", session))
+        else if(cu.packageName != null) {
+            listOf(cu.packageName.insertAfter("\n\nimport ${op.pkg}.${op.clazz};"))
         }
-        else listOf(session.cu.insertBefore("import ${op.pkg}.${op.clazz};\n", session))
+        else listOf(cu.insertBefore("import ${op.pkg}.${op.clazz};\n"))
     }
     
     fun lastPriorImport(): JCTree.JCImport? {
