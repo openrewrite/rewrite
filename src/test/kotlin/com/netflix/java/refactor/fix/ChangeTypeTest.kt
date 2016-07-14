@@ -33,7 +33,7 @@ class ChangeTypeTest: RefactorTest() {
             |}
         """)
 
-        refactor(b, a1, a2).changeType("a.A1", "a", "A2")
+        refactor(b, a1, a2).changeType("a.A1", "a.A2")
         
         assertRefactored(b, """
             |package b;

@@ -1,14 +1,12 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.FixingOperation
-import com.netflix.java.refactor.FixingScanner
-import com.netflix.java.refactor.RefactorFix
+import com.netflix.java.refactor.*
 import com.sun.source.tree.ImportTree
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class AddImport(val pkg: String, val clazz: String): FixingOperation {
+class AddImport(val clazz: String, val staticMethod: String? = null): FixingOperation {
     override fun scanner() = AddImportScanner(this)
 }
 
@@ -16,16 +14,27 @@ class AddImportScanner(val op: AddImport): FixingScanner() {
     val imports = ArrayList<JCTree.JCImport>()
     var coveredByExistingImport = false
     
+    private val packageComparator = PackageComparator()
+    
     override fun visitImport(node: ImportTree?, context: Context): List<RefactorFix>? {
         val import = node as JCTree.JCImport
         val importType = import.qualid as JCTree.JCFieldAccess
         imports.add(import)
         
-        if(importType.toString() == "${op.pkg}.${op.clazz}") {
-            coveredByExistingImport = true
+        if (addingStaticImport()) {
+            if (importType.selected.matches(op.clazz) && importType.name.toString() == op.staticMethod) {
+                coveredByExistingImport = true
+            }
+            if (importType.selected.matches(op.clazz) && importType.name.toString() == "*") {
+                coveredByExistingImport = true
+            }
         }
-        else if(importType.name.toString() == "*" && importType.selected.toString() == op.pkg) {
-            coveredByExistingImport = true
+        else {
+            if (importType.matches(op.clazz)) {
+                coveredByExistingImport = true
+            } else if (importType.selected.toString() == packageOwner(op.clazz) && importType.name.toString() == "*") {
+                coveredByExistingImport = true
+            }
         }
         
         return null
@@ -33,28 +42,41 @@ class AddImportScanner(val op: AddImport): FixingScanner() {
 
     override fun visitEnd(context: Context): List<RefactorFix> {
         val lastPrior = lastPriorImport()
+        val importStatementToAdd = if(addingStaticImport()) {
+            "import static ${op.clazz}.${op.staticMethod};"
+        } else "import ${op.clazz};"
         
         return if(coveredByExistingImport) {
             emptyList()
         }
         else if(lastPrior == null && imports.isNotEmpty()) {
-            listOf(imports.first().insertBefore("import ${op.pkg}.${op.clazz};\n"))
+            listOf(imports.first().insertBefore("$importStatementToAdd\n"))
         }
         else if(lastPrior is JCTree.JCImport) {
-            listOf(lastPrior.insertAfter("import ${op.pkg}.${op.clazz};\n"))
+            listOf(lastPrior.insertAfter("$importStatementToAdd\n"))
         }
         else if(cu.packageName != null) {
-            listOf(cu.packageName.insertAfter("\n\nimport ${op.pkg}.${op.clazz};"))
+            listOf(cu.packageName.insertAfter("\n\n$importStatementToAdd"))
         }
-        else listOf(cu.insertBefore("import ${op.pkg}.${op.clazz};\n"))
+        else listOf(cu.insertBefore("$importStatementToAdd\n"))
     }
     
     fun lastPriorImport(): JCTree.JCImport? {
         return imports.lastOrNull { import ->
+            // static imports go after all non-static imports
+            if(addingStaticImport() && !import.staticImport)
+                return@lastOrNull true
+            
+            // non-static imports should always go before static imports
+            if(!addingStaticImport() && import.staticImport)
+                return@lastOrNull false
+            
             val importType = import.qualid as JCTree.JCFieldAccess
-            val comp = packageComparator.compare(importType.selected.toString(), op.pkg)
+            val comp = packageComparator.compare(importType.selected.toString(), 
+                    if(addingStaticImport()) op.clazz else packageOwner(op.clazz))
             if(comp == 0) {
-                if(importType.name.toString().compareTo(op.clazz) < 0) 
+                if(importType.name.toString().compareTo(
+                        if(addingStaticImport()) op.staticMethod!! else className(op.clazz)) < 0) 
                     true 
                 else false
             }
@@ -63,15 +85,5 @@ class AddImportScanner(val op: AddImport): FixingScanner() {
         }
     }
     
-    val packageComparator = Comparator<String> { p1, p2 ->
-        val p1s = p1.split(".")
-        val p2s = p2.split(".")
-        
-        p1s.forEachIndexed { i, fragment ->
-            if(p2s.size < i + 1) return@Comparator 1
-            if(fragment != p2s[i]) return@Comparator fragment.compareTo(p2s[i])
-        }
-        
-        if(p1s.size < p2s.size) -1 else 0
-    }
+    fun addingStaticImport() = op.staticMethod is String
 }

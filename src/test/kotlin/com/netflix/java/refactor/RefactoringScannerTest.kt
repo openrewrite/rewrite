@@ -1,6 +1,5 @@
 package com.netflix.java.refactor
 
-import com.netflix.java.refactor.RefactorTest
 import org.junit.Test
 import java.net.URL
 
@@ -22,7 +21,7 @@ class RefactoringScannerTest: RefactorTest() {
         testng.outputStream().use { it.write(testngDownloaded) }
         
         refactor(a, emptyList(), listOf(testng))
-                .changeType("org.testng.annotations.Test", "org.junit", "Test")
+                .changeType("org.testng.annotations.Test", "org.junit.Test")
 
         assertRefactored(a, """
             |package a;

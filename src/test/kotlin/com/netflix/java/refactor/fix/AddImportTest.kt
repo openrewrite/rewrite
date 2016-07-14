@@ -1,7 +1,6 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.RefactorTest
-import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AddImportTest: RefactorTest() {
@@ -9,7 +8,7 @@ class AddImportTest: RefactorTest() {
     fun addNamedImport() {
         val a = java("class A {}")
         
-        refactor(a).addImport("java.util", "List")
+        refactor(a).addImport("java.util.List")
 
         assertRefactored(a, """
             |import java.util.List;
@@ -46,19 +45,6 @@ class AddImportTest: RefactorTest() {
     }
     
     @Test
-    fun comparePackages() {
-        val comp = AddImportScanner(AddImport("doesnotmatter", "doesnotmatter")).packageComparator
-        
-        assertEquals(-1, comp.compare("a", "b"))
-        assertEquals(-1, comp.compare("a.a", "a.b"))
-        assertEquals(1, comp.compare("b", "a"))
-        assertEquals(1, comp.compare("a.b", "a.a"))
-        assertEquals(0, comp.compare("a", "a"))
-        assertEquals(1, comp.compare("a.a", "a"))
-        assertEquals(-1, comp.compare("a", "a.a"))
-    }
-    
-    @Test
     fun importsAddedInAlphabeticalOrder() {
         val otherPackages = listOf("c", "c.c", "c.c.c")
         val otherImports = otherPackages.mapIndexed { i, pkg ->
@@ -86,7 +72,7 @@ class AddImportTest: RefactorTest() {
                 |class A {}
             """.trimMargin())
 
-            refactor(a, otherImports.plus(b)).addImport(pkg, "B")
+            refactor(a, otherImports.plus(b)).addImport("$pkg.B")
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -148,6 +134,22 @@ class AddImportTest: RefactorTest() {
             |
             |import java.util.List;
             |import static java.util.List.*;
+            |class A {}
+        """)
+    }
+
+    @Test
+    fun addNamedStaticImport() {
+        val a = java("""
+            |import java.util.*;
+            |class A {}
+        """)
+
+        refactor(a).addStaticImport("java.util.Collections", "emptyList")
+
+        assertRefactored(a, """
+            |import java.util.*;
+            |import static java.util.Collections.emptyList;
             |class A {}
         """)
     }

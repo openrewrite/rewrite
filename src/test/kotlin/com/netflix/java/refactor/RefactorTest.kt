@@ -1,9 +1,9 @@
 package com.netflix.java.refactor
 
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.File
-import kotlin.test.assertEquals
 
 abstract class RefactorTest {
     @JvmField @Rule

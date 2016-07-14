@@ -1,10 +1,7 @@
 package com.netflix.java.refactor
 
 import com.netflix.java.refactor.find.*
-import com.netflix.java.refactor.fix.AddImport
-import com.netflix.java.refactor.fix.ChangeMethodInvocation
-import com.netflix.java.refactor.fix.ChangeType
-import com.netflix.java.refactor.fix.RemoveImport
+import com.netflix.java.refactor.fix.*
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.io.File
@@ -25,11 +22,15 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
     fun findField(clazz: Class<*>): Field =
         FindField(clazz.name).scanner().scan(cu, context)
     
+    fun hasField(clazz: Class<*>) = findField(clazz).exists
+    
     fun findMethod(signature: String): Method =
         FindMethod(signature).scanner().scan(cu, context)
     
-    fun changeType(from: String, toPackage: String, toClass: String) {
-        tx().changeType(from, toPackage, toClass).commit()
+    fun hasMethod(signature: String) = findMethod(signature).exists
+    
+    fun changeType(from: String, to: String) {
+        tx().changeType(from, to).commit()
     }
     
     fun changeType(from: Class<*>, to: Class<*>) {
@@ -38,6 +39,9 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
 
     fun changeMethod(signature: String): ChangeMethodInvocation = autoTx().changeMethod(signature)
 
+    fun changeField(clazz: Class<*>): ChangeField = autoTx().changeField(clazz)
+    fun changeField(clazz: String): ChangeField = autoTx().changeField(clazz)
+    
     fun removeImport(clazz: String) {
         tx().removeImport(clazz).commit()
     }
@@ -46,12 +50,20 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
         tx().removeImport(clazz).commit()
     }
 
-    fun addImport(pkg: String, clazz: String) {
-        tx().addImport(pkg, clazz).commit()
+    fun addImport(clazz: String) {
+        tx().addImport(clazz).commit()
     }
 
     fun addImport(clazz: Class<*>) {
         tx().addImport(clazz).commit()
+    }
+    
+    fun addStaticImport(clazz: String, method: String) {
+        tx().addStaticImport(clazz, method).commit()
+    }
+    
+    fun addStaticImport(clazz: Class<*>, method: String) {
+        tx().addStaticImport(clazz, method).commit()
     }
 }
 
@@ -59,17 +71,25 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
 class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = false) {
     private val ops = ArrayList<FixingOperation>()
     
-    fun changeType(from: String, toPackage: String, toClass: String): RefactorTransaction {
-        ops.add(ChangeType(from, toPackage, toClass))
+    fun changeType(from: String, to: String): RefactorTransaction {
+        ops.add(ChangeType(from, to))
         return this
     }
 
-    fun changeType(from: Class<*>, to: Class<*>) = changeType(from.name, to.`package`.name, to.simpleName)
+    fun changeType(from: Class<*>, to: Class<*>) = changeType(from.name, to.name)
 
     fun changeMethod(signature: String): ChangeMethodInvocation {
         val changeMethod = ChangeMethodInvocation(signature, this)
         ops.add(changeMethod)
         return changeMethod
+    }
+
+    fun changeField(clazz: Class<*>): ChangeField = changeField(clazz.name)
+    
+    fun changeField(clazz: String): ChangeField {
+        val changeField = ChangeField(clazz, this)
+        ops.add(changeField)
+        return changeField
     }
 
     fun removeImport(clazz: String): RefactorTransaction {
@@ -79,12 +99,19 @@ class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = 
 
     fun removeImport(clazz: Class<*>) = removeImport(clazz.name)
 
-    fun addImport(pkg: String, clazz: String): RefactorTransaction {
-        ops.add(AddImport(pkg, clazz))
+    fun addImport(clazz: String): RefactorTransaction {
+        ops.add(AddImport(clazz))
         return this
     }
 
-    fun addImport(clazz: Class<*>) = addImport(clazz.`package`.name, clazz.simpleName)
+    fun addImport(clazz: Class<*>) = addImport(clazz.name)
+    
+    fun addStaticImport(clazz: String, method: String): RefactorTransaction {
+        ops.add(AddImport(clazz, method))
+        return this
+    }
+    
+    fun addStaticImport(clazz: Class<*>, method: String) = addStaticImport(clazz.name, method)
     
     fun commit() {
         val fixes = ops.flatMap { it.scanner().scan(refactorer.cu, refactorer.context) }
