@@ -2,7 +2,7 @@ package com.netflix.java.refactor.gradle
 
 import com.netflix.java.refactor.Refactor
 import com.netflix.java.refactor.RefactorFix
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import eu.infomas.annotation.AnnotationDetector
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
@@ -34,7 +34,7 @@ open class RefactorAndFixSourceTask : DefaultTask() {
                 val method = Class.forName(className, false, classLoader).getMethod(methodName)
                 val refactor = method.getAnnotation(Refactor::class.java)
                 
-                if(method.returnType != RefactorRule::class.java) {
+                if(method.returnType != Refactorer::class.java) {
                     project.logger.warn("Rule ${refactor.value} must return RefactorRule, will not be applied")
                     return
                 }
@@ -44,7 +44,7 @@ open class RefactorAndFixSourceTask : DefaultTask() {
                     return
                 }
                 
-                val rule = method.invoke(null) as RefactorRule
+                val rule = method.invoke(null) as Refactorer
 
                 val fixes = project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.flatMap {
                     rule.refactorAndFix(it.allJava, it.compileClasspath)

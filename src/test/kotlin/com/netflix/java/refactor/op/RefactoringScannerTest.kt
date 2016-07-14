@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -27,7 +27,7 @@ class RefactoringScannerTest {
         val testng = temp.newFile("testng-6.9.9.jar")
         testng.outputStream().use { it.write(testngDownloaded) }
         
-        RefactorRule().changeType("org.testng.annotations.Test", "org.junit", "Test")
+        Refactorer().changeType("org.testng.annotations.Test", "org.junit", "Test")
             .refactorAndFix(listOf(a), listOf(testng))
 
         assertEquals("""

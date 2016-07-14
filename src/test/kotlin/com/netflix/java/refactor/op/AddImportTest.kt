@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -11,7 +11,7 @@ class AddImportTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
-    val addImportRule = RefactorRule()
+    val addImportRule = Refactorer()
             .addImport("java.util", "List")
     
     @Test
@@ -32,7 +32,7 @@ class AddImportTest {
         val a = temp.newFile("A.java")
         a.writeText("class A {}")
 
-        RefactorRule().addImport(List::class.java).refactorAndFix(listOf(a))
+        Refactorer().addImport(List::class.java).refactorAndFix(listOf(a))
 
         assertEquals("""
             |import java.util.List;
@@ -86,7 +86,7 @@ class AddImportTest {
         listOf("b" to 0, "c.b" to 1, "c.c.b" to 2).forEach {
             val (pkg, order) = it
 
-            val addImportRule = RefactorRule()
+            val addImportRule = Refactorer()
                     .addImport(pkg, "B")
             
             b.writeText("""

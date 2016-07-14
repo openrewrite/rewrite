@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -13,7 +13,7 @@ class ChangeMethodInvocationTest {
     
     @Test
     fun matchesMethodTargetType() {
-        val typeRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).targetTypePattern }
+        val typeRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).targetTypePattern }
 
         assertTrue(typeRegex("*..MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("MyClass foo()").matches("MyClass"))
@@ -23,7 +23,7 @@ class ChangeMethodInvocationTest {
 
     @Test
     fun matchesMethodName() {
-        val nameRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).methodNamePattern }
+        val nameRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).methodNamePattern }
         
         assertTrue(nameRegex("A foo()").matches("foo"))
         assertTrue(nameRegex("A *()").matches("foo"))
@@ -33,7 +33,7 @@ class ChangeMethodInvocationTest {
         assertFalse(nameRegex("A *oo()").matches("foo"))
     }
 
-    val argRegex = { signature: String -> ChangeMethodInvocation(signature, RefactorRule()).argumentPattern }
+    val argRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).argumentPattern }
     
     @Test
     fun matchesArguments() {
@@ -73,7 +73,7 @@ class ChangeMethodInvocationTest {
     
     @Test
     fun refactorMethodNameForMethodWithSingleArg() {
-        val rule = RefactorRule()
+        val rule = Refactorer()
                 .changeMethod("B singleArg(String)")
                 .refactorName("bar")
                 .done()
@@ -100,7 +100,7 @@ class ChangeMethodInvocationTest {
 
     @Test
     fun refactorMethodNameForMethodWithArrayArg() {
-        val rule = RefactorRule()
+        val rule = Refactorer()
                 .changeMethod("B arrArg(String[])")
                 .refactorName("bar")
                 .done()
@@ -127,7 +127,7 @@ class ChangeMethodInvocationTest {
 
     @Test
     fun refactorMethodNameForMethodWithVarargArg() {
-        val rule = RefactorRule()
+        val rule = Refactorer()
                 .changeMethod("B varargArg(String...)")
                 .refactorName("bar")
                 .done()
@@ -154,7 +154,7 @@ class ChangeMethodInvocationTest {
     
     @Test
     fun transformStringArgument() {
-        val rule = RefactorRule()
+        val rule = Refactorer()
                 .changeMethod("B singleArg(String)")
                     .refactorArgument(0)
                         .isType(String::class.java)

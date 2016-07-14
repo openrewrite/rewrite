@@ -12,7 +12,7 @@ import java.io.File
  * about a source file without having to clean it up.
  */
 interface RefactoringScanner {
-    fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix>
+    fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix>
 }
 
 open class BaseRefactoringScanner :
@@ -22,9 +22,11 @@ open class BaseRefactoringScanner :
     protected lateinit var cu: JCTree.JCCompilationUnit
     protected val source: File by lazy { File(cu.sourcefile.toUri().path) }
     protected val sourceText: CharSequence by lazy { cu.sourcefile.getCharContent(true) }
+    protected lateinit var bookmarks: BookmarkTable
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix> {
         this.cu = cu
+        this.bookmarks = bookmarkTable
         return super.scan(cu, context).plus(visitEnd(context))
     }
 
@@ -61,15 +63,15 @@ open class BaseRefactoringScanner :
 }
 
 class CompositeScanner(vararg val scanners: RefactoringScanner): RefactoringScanner {
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context) =
-        scanners.flatMap { it.scan(cu, context) }
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable) =
+        scanners.flatMap { it.scan(cu, context, bookmarkTable) }
 }
 
 class IfThenScanner(val ifFixesResultFrom: RefactoringScanner, then: Array<RefactoringScanner>): RefactoringScanner {
     private val compositeThenRun = CompositeScanner(*then)
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
-        val fixes = ifFixesResultFrom.scan(cu, context)
-        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context)) else emptyList()
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix> {
+        val fixes = ifFixesResultFrom.scan(cu, context, bookmarkTable)
+        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context, bookmarkTable)) else emptyList()
     }
 }

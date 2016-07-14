@@ -5,11 +5,18 @@ import com.sun.tools.javac.tree.JCTree
 import java.io.File
 import java.util.*
 
-class RefactorRule() {
+class Refactorer() {
 
     private val ops = ArrayList<RefactorOperation>()
+    private val bookmarks = BookmarkTable()
     
-    fun changeType(from: String, toPackage: String, toClass: String): RefactorRule {
+    fun bookmark(id: String): Bookmark {
+        val bookmark = Bookmark(id, this)
+        ops.add(bookmark)
+        return bookmark
+    }
+    
+    fun changeType(from: String, toPackage: String, toClass: String): Refactorer {
         ops.add(ChangeType(from, toPackage, toClass))
         return this
     }
@@ -22,14 +29,14 @@ class RefactorRule() {
         return changeMethod
     }
     
-    fun removeImport(clazz: String): RefactorRule {
+    fun removeImport(clazz: String): Refactorer {
         ops.add(RemoveImport(clazz))
         return this
     }
     
     fun removeImport(clazz: Class<*>) = removeImport(clazz.name)
     
-    fun addImport(pkg: String, clazz: String): RefactorRule {
+    fun addImport(pkg: String, clazz: String): Refactorer {
         ops.add(AddImport(pkg, clazz))
         return this
     }
@@ -46,7 +53,7 @@ class RefactorRule() {
         return ops.flatMap { op ->
             val fixes = cus.flatMap { cu ->
                 if (matches.invoke(cu)) {
-                    op.scanner().scan(cu, parser.context)
+                    op.scanner().scan(cu, parser.context, bookmarks)
                 } else emptyList()
             }
             fixes

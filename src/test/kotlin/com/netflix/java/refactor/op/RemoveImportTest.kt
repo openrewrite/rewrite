@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -10,7 +10,7 @@ class RemoveImportTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
 
-    val removeImportRule = RefactorRule()
+    val removeImportRule = Refactorer()
             .removeImport("java.util.List")
     
     @Test
@@ -33,7 +33,7 @@ class RemoveImportTest {
             |class A {}
         """.trimMargin())
 
-        RefactorRule().removeImport(List::class.java).refactorAndFix(listOf(a))
+        Refactorer().removeImport(List::class.java).refactorAndFix(listOf(a))
         assertEquals("class A {}", a.readText())
     }
     

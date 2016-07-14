@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -42,7 +42,7 @@ class ChangeTypeTest {
             |}
         """.trimMargin())
 
-        RefactorRule()
+        Refactorer()
                 .changeType("a.A1", "a", "A2")
                 .refactorAndFix(listOf(b, a1, a2))
         

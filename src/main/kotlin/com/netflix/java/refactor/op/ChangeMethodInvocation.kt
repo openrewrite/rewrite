@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.op
 
 import com.netflix.java.refactor.RefactorFix
-import com.netflix.java.refactor.RefactorRule
+import com.netflix.java.refactor.Refactorer
 import com.netflix.java.refactor.aspectj.AspectJLexer
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParser
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParserBaseVisitor
@@ -16,7 +16,7 @@ import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.TerminalNode
 import java.util.*
 
-class ChangeMethodInvocation(signature: String, val containingRule: RefactorRule): RefactorOperation {
+class ChangeMethodInvocation(signature: String, val containingRule: Refactorer): RefactorOperation {
     override fun scanner() = ChangeMethodInvocationScanner(this)
     
     lateinit var targetTypePattern: Regex
