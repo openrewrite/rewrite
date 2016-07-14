@@ -1,187 +1,110 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.Refactorer
-import org.junit.Assert.*
-import org.junit.Rule
+import com.netflix.java.refactor.RefactorTest
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 import java.io.File
 
-class ChangeMethodInvocationTest {
-    @JvmField @Rule
-    val temp = TemporaryFolder()
-    
-    @Test
-    fun matchesMethodTargetType() {
-        val typeRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).targetTypePattern }
-
-        assertTrue(typeRegex("*..MyClass foo()").matches("com.bar.MyClass"))
-        assertTrue(typeRegex("MyClass foo()").matches("MyClass"))
-        assertTrue(typeRegex("com.bar.MyClass foo()").matches("com.bar.MyClass"))
-        assertTrue(typeRegex("com.*.MyClass foo()").matches("com.bar.MyClass"))
-    }
-
-    @Test
-    fun matchesMethodName() {
-        val nameRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).methodNamePattern }
-        
-        assertTrue(nameRegex("A foo()").matches("foo"))
-        assertTrue(nameRegex("A *()").matches("foo"))
-        assertTrue(nameRegex("A fo*()").matches("foo"))
-
-        // FIXME see section 5.4 in the Definitive ANTLR4 Reference for why ambiguity in the grammar places the star with the type expression
-        assertFalse(nameRegex("A *oo()").matches("foo"))
-    }
-
-    val argRegex = { signature: String -> ChangeMethodInvocation(signature, Refactorer()).argumentPattern }
-    
-    @Test
-    fun matchesArguments() {
-        assertTrue(argRegex("A foo()").matches(""))
-        assertTrue(argRegex("A foo(int)").matches("int"))
-        assertTrue(argRegex("A foo(java.util.Map)").matches("java.util.Map"))
-    }
-    
-    @Test
-    fun matchesUnqualifiedJavaLangArguments() {
-        assertTrue(argRegex("A foo(String)").matches("java.lang.String"))
-    }
-    
-    @Test
-    fun matchesArgumentsWithWildcards() {
-        assertTrue(argRegex("A foo(java.util.*)").matches("java.util.Map"))
-        assertTrue(argRegex("A foo(java..*)").matches("java.util.Map"))
-    }
-    
-    @Test
-    fun matchesArgumentsWithDotDot() {
-        assertTrue(argRegex("A foo(.., int)").matches("int"))
-        assertTrue(argRegex("A foo(.., int)").matches("int,int"))
-
-        assertTrue(argRegex("A foo(int, ..)").matches("int"))
-        assertTrue(argRegex("A foo(int, ..)").matches("int,int"))        
-    }
-    
-    @Test
-    fun matchesMethodSymbolsWithVarargs() {
-    }
-    
-    @Test
-    fun matchesArrayArguments() {
-        assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
-    }
+class ChangeMethodInvocationTest: RefactorTest() {
     
     @Test
     fun refactorMethodNameForMethodWithSingleArg() {
-        val rule = Refactorer()
-                .changeMethod("B singleArg(String)")
-                .refactorName("bar")
-                .done()
-
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |class A {
             |   public void test() {
             |       new B().singleArg("boo");
             |   }
             |}
-        """.trimMargin())
+        """)
 
-        rule.refactorAndFix(listOf(a, b()))
-
-        assertEquals("""
+        refactor(a, b())
+                .changeMethod("B singleArg(String)")
+                    .refactorName("bar")
+                    .done()
+        
+        assertRefactored(a, """
             |class A {
             |   public void test() {
             |       new B().bar("boo");
             |   }
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
 
     @Test
     fun refactorMethodNameForMethodWithArrayArg() {
-        val rule = Refactorer()
-                .changeMethod("B arrArg(String[])")
-                .refactorName("bar")
-                .done()
-
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |class A {
             |   public void test() {
             |       new B().arrArg(new String[] {"boo"});
             |   }
             |}
-        """.trimMargin())
+        """)
 
-        rule.refactorAndFix(listOf(a, b()))
+        refactor(a, b())
+                .changeMethod("B arrArg(String[])")
+                .refactorName("bar")
+                .done()
 
-        assertEquals("""
+        assertRefactored(a, """
             |class A {
             |   public void test() {
             |       new B().bar(new String[] {"boo"});
             |   }
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
 
     @Test
     fun refactorMethodNameForMethodWithVarargArg() {
-        val rule = Refactorer()
-                .changeMethod("B varargArg(String...)")
-                .refactorName("bar")
-                .done()
-
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |class A {
             |   public void test() {
             |       new B().varargArg("boo", "again");
             |   }
             |}
-        """.trimMargin())
+        """)
 
-        rule.refactorAndFix(listOf(a, b()))
+        refactor(a, b())
+                .changeMethod("B varargArg(String...)")
+                    .refactorName("bar")
+                    .done()
 
-        assertEquals("""
+        assertRefactored(a, """
             |class A {
             |   public void test() {
             |       new B().bar("boo", "again");
             |   }
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
     fun transformStringArgument() {
-        val rule = Refactorer()
-                .changeMethod("B singleArg(String)")
-                    .refactorArgument(0)
-                        .isType(String::class.java)
-                        .mapLiterals { s -> s.toString().replace("%s", "{}") }
-                        .done()
-                .done()
-
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |class A {
             |   public void test() {
             |       String s = "bar";
             |       new B().singleArg("foo %s " + s + 0L);
             |   }
             |}
-        """.trimMargin())
+        """)
 
-        rule.refactorAndFix(listOf(a, b()))
+        refactor(a, b())
+                .changeMethod("B singleArg(String)")
+                    .refactorArgument(0)
+                        .isType(String::class.java)
+                        .mapLiterals { s -> s.toString().replace("%s", "{}") }
+                    .done()
+                .done()
 
-        assertEquals("""
+        assertRefactored(a, """
             |class A {
             |   public void test() {
             |       String s = "bar";
             |       new B().singleArg("foo {} " + s + 0L);
             |   }
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
 
     private fun b(): File {

@@ -49,7 +49,7 @@ abstract class TestKitTest {
     fun createJavaFile(projectDir: File, source: String, sourceFolderPath: String): File {
         val sourceFolder = File(projectDir, sourceFolderPath)
         sourceFolder.mkdirs()
-        val f = File(sourceFolder, AstParser.fullyQualifiedName(source)!!.replace("\\.", "/") + ".java")
+        val f = File(sourceFolder, fullyQualifiedName(source)!!.replace("\\.", "/") + ".java")
         f.writeText(source)
         return f
     }

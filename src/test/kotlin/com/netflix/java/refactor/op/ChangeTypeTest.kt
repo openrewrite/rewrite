@@ -1,32 +1,23 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.Refactorer
-import org.junit.Assert.assertEquals
-import org.junit.Rule
+import com.netflix.java.refactor.RefactorTest
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
-class ChangeTypeTest {
-    @JvmField @Rule
-    val temp = TemporaryFolder()
+class ChangeTypeTest: RefactorTest() {
     
     @Test
     fun refactorType() {
-        val a1 = temp.newFile("A1.java")
-        val a2 = temp.newFile("A2.java")
-        val b = temp.newFile("B.java")
-        
-        a1.writeText("""
-            package a;
-            public class A1 {}
+        val a1 = java("""
+            |package a;
+            |public class A1 {}
         """)
 
-        a2.writeText("""
-            package a;
-            public class A2 {}
+        val a2 = java("""
+            |package a;
+            |public class A2 {}
         """)
         
-        b.writeText("""
+        val b = java("""
             |package b;
             |import java.util.List;
             |import a.A1;
@@ -40,13 +31,11 @@ class ChangeTypeTest {
             |        return aVar;
             |    }
             |}
-        """.trimMargin())
+        """)
 
-        Refactorer()
-                .changeType("a.A1", "a", "A2")
-                .refactorAndFix(listOf(b, a1, a2))
+        refactor(b, a1, a2).changeType("a.A1", "a", "A2")
         
-        assertEquals("""
+        assertRefactored(b, """
             |package b;
             |import java.util.List;
             |import a.A2;
@@ -60,6 +49,6 @@ class ChangeTypeTest {
             |        return aVar;
             |    }
             |}
-        """.trimMargin(), b.readText())
+        """)
     }
 }

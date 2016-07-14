@@ -1,61 +1,48 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.Refactorer
+import com.netflix.java.refactor.RefactorTest
 import org.junit.Assert.assertEquals
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
-class AddImportTest {
-    @JvmField @Rule
-    val temp = TemporaryFolder()
-
-    val addImportRule = Refactorer()
-            .addImport("java.util", "List")
-    
+class AddImportTest: RefactorTest() {
     @Test
     fun addNamedImport() {
-        val a = temp.newFile("A.java")
-        a.writeText("class A {}")
+        val a = java("class A {}")
+        
+        refactor(a).addImport("java.util", "List")
 
-        addImportRule.refactorAndFix(listOf(a))
-
-        assertEquals("""
+        assertRefactored(a, """
             |import java.util.List;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
 
     @Test
     fun addNamedImportByClass() {
-        val a = temp.newFile("A.java")
-        a.writeText("class A {}")
-
-        Refactorer().addImport(List::class.java).refactorAndFix(listOf(a))
-
-        assertEquals("""
+        val a = java("class A {}")
+        
+        refactor(a).addImport(List::class.java)
+        
+        assertRefactored(a, """
             |import java.util.List;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
     fun namedImportAddedAfterPackageDeclaration() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |package a;
             |class A {}
-        """.trimMargin())
+        """)
+        refactor(a).addImport(List::class.java)
 
-        addImportRule.refactorAndFix(listOf(a))
-
-        assertEquals("""
+        assertRefactored(a, """
             |package a;
             |
             |import java.util.List;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
@@ -75,19 +62,14 @@ class AddImportTest {
     fun importsAddedInAlphabeticalOrder() {
         val otherPackages = listOf("c", "c.c", "c.c.c")
         val otherImports = otherPackages.mapIndexed { i, pkg ->
-            val otherImport = temp.newFile("C$i.java")
-            otherImport.writeText("package $pkg;\npublic class C$i {}")
-            otherImport
+            java("package $pkg;\npublic class C$i {}")
         }
         
         val a = temp.newFile("A.java")
         val b = temp.newFile("B.java")
-
+        
         listOf("b" to 0, "c.b" to 1, "c.c.b" to 2).forEach {
             val (pkg, order) = it
-
-            val addImportRule = Refactorer()
-                    .addImport(pkg, "B")
             
             b.writeText("""
                 |package $pkg;
@@ -104,72 +86,69 @@ class AddImportTest {
                 |class A {}
             """.trimMargin())
 
-            addImportRule.refactorAndFixWhen({ cu -> File(cu.sourcefile.toUri().path) == a }, otherImports.plus(b).plus(a))
+            refactor(a, otherImports.plus(b)).addImport(pkg, "B")
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
-            assertEquals("package a;\n\n${expectedImports.map { "import $it;" }.joinToString("\n")}\n\nclass A {}", a.readText())
+            assertRefactored(a, "package a;\n\n${expectedImports.map { "import $it;" }.joinToString("\n")}\n\nclass A {}")
         }
     }
     
     @Test
     fun doNotAddImportIfAlreadyExists() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |package a;
             |
             |import java.util.List;
             |class A {}
-        """.trimMargin())
+        """)
 
-        addImportRule.refactorAndFix(listOf(a))
+        refactor(a).addImport(List::class.java)
 
-        assertEquals("""
+        assertRefactored(a, """
             |package a;
             |
             |import java.util.List;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
     fun doNotAddImportIfCoveredByStarImport() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |package a;
             |
             |import java.util.*;
             |class A {}
-        """.trimMargin())
+        """)
 
-        addImportRule.refactorAndFix(listOf(a))
+        refactor(a).addImport(List::class.java)
 
-        assertEquals("""
+        assertRefactored(a, """
             |package a;
             |
             |import java.util.*;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
     fun addNamedImportIfStarStaticImportExists() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |package a;
             |
             |import static java.util.List.*;
             |class A {}
-        """.trimMargin())
+        """)
 
-        addImportRule.refactorAndFix(listOf(a))
+        refactor(a).addImport(List::class.java)
 
-        assertEquals("""
+        assertRefactored(a, """
             |package a;
             |
             |import java.util.List;
             |import static java.util.List.*;
             |class A {}
-        """.trimMargin(), a.readText())
+        """)
     }
 }

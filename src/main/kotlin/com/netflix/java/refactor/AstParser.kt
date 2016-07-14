@@ -10,27 +10,16 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.PrintWriter
 import java.io.Writer
-import java.util.regex.Pattern
 import javax.tools.JavaFileManager
 import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
 import javax.tools.StandardLocation
 
 class AstParser {
-    companion object {
-        fun fullyQualifiedName(sourceStr: String): String? {
-            val pkgMatcher = Pattern.compile("\\s*package\\s+([\\w\\.]+)").matcher(sourceStr)
-            val pkg = if (pkgMatcher.find()) pkgMatcher.group(1) + "." else ""
-
-            val classMatcher = Pattern.compile("\\s*(class|interface|enum)\\s+(\\w+)").matcher(sourceStr)
-            return if (classMatcher.find()) pkg + classMatcher.group(2) else null
-        }
-        
-        val logger = LoggerFactory.getLogger(AstParser::class.java)
-    }
-    
     val context = Context()
     val compiler = JavaCompiler(context)
+
+    private val logger = LoggerFactory.getLogger(AstParser::class.java)
     
     init {
         // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position 

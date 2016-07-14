@@ -2,21 +2,52 @@ package com.netflix.java.refactor
 
 import com.netflix.java.refactor.op.*
 import com.sun.tools.javac.tree.JCTree
+import com.sun.tools.javac.util.Context
 import java.io.File
 import java.util.*
 
-class Refactorer() {
+class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dryRun: Boolean = false) {
+    var changedFile = false
+    
+    val source = File(cu.sourceFile.toUri().path)
+    val sourceText: String by lazy { source.readText() }
 
+    fun tx() = RefactorTransaction(this)
+    private fun autoTx() = RefactorTransaction(this, true)
+
+    fun changeType(from: String, toPackage: String, toClass: String) {
+        tx().changeType(from, toPackage, toClass).commit()
+    }
+    
+    fun changeType(from: Class<*>, to: Class<*>) {
+        tx().changeType(from, to).commit()
+    }
+
+    fun changeMethod(signature: String): ChangeMethodInvocation = autoTx().changeMethod(signature)
+
+    fun removeImport(clazz: String) {
+        tx().removeImport(clazz).commit()
+    }
+    
+    fun removeImport(clazz: Class<*>) {
+        tx().removeImport(clazz).commit()
+    }
+
+    fun addImport(pkg: String, clazz: String) {
+        tx().addImport(pkg, clazz).commit()
+    }
+
+    fun addImport(clazz: Class<*>) {
+        tx().addImport(clazz).commit()
+    }
+}
+
+
+class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = false) {
     private val ops = ArrayList<RefactorOperation>()
     private val bookmarks = BookmarkTable()
     
-    fun bookmark(id: String): Bookmark {
-        val bookmark = Bookmark(id, this)
-        ops.add(bookmark)
-        return bookmark
-    }
-    
-    fun changeType(from: String, toPackage: String, toClass: String): Refactorer {
+    fun changeType(from: String, toPackage: String, toClass: String): RefactorTransaction {
         ops.add(ChangeType(from, toPackage, toClass))
         return this
     }
@@ -28,76 +59,45 @@ class Refactorer() {
         ops.add(changeMethod)
         return changeMethod
     }
-    
-    fun removeImport(clazz: String): Refactorer {
+
+    fun removeImport(clazz: String): RefactorTransaction {
         ops.add(RemoveImport(clazz))
         return this
     }
-    
+
     fun removeImport(clazz: Class<*>) = removeImport(clazz.name)
-    
-    fun addImport(pkg: String, clazz: String): Refactorer {
+
+    fun addImport(pkg: String, clazz: String): RefactorTransaction {
         ops.add(AddImport(pkg, clazz))
         return this
     }
-    
+
     fun addImport(clazz: Class<*>) = addImport(clazz.`package`.name, clazz.simpleName)
-
-    /**
-     * Perform refactoring on sources whose parsed representation matches
-     */
-    fun refactorWhen(matches: (JCTree.JCCompilationUnit) -> Boolean, sources: Iterable<File>, 
-                     classPath: Iterable<File>? = null): List<RefactorFix> {
-        val parser = AstParser()
-        val cus = parser.parseFiles(sources.toList(), classPath)
-        return ops.flatMap { op ->
-            val fixes = cus.flatMap { cu ->
-                if (matches.invoke(cu)) {
-                    op.scanner().scan(cu, parser.context, bookmarks)
-                } else emptyList()
-            }
-            fixes
-        }
-    }
-
-    /**
-     * Refactor all sources
-     */
-    fun refactor(sources: Iterable<File>, classPath: Iterable<File>? = null) = 
-            refactorWhen({ cu -> true }, sources, classPath)
-
-    /**
-     * Perform refactoring and fix sources whose parsed representation matches
-     */
-    fun refactorAndFixWhen(matches: (JCTree.JCCompilationUnit) -> Boolean, sources: Iterable<File>,
-                           classPath: Iterable<File>? = null): List<RefactorFix> {
-        val fixes = refactorWhen(matches, sources, classPath)
-        fixes.groupBy { it.source }
-                .forEach {
-                    try {
-                        val fileText = it.key.readText()
-                        val sortedFixes = it.value.sortedBy { it.position.last }.sortedBy { it.position.start }
-                        var source = sortedFixes.foldIndexed("") { i, source, fix ->
-                            val prefix = if (i == 0)
-                                fileText.substring(0, fix.position.first)
-                            else fileText.substring(sortedFixes[i - 1].position.last, fix.position.start)
-                            source + prefix + (fix.changes ?: "")
-                        }
-                        if (sortedFixes.last().position.last < fileText.length) {
-                            source += fileText.substring(sortedFixes.last().position.last)
-                        }
-                        it.key.writeText(source)
-                    } catch(t: Throwable) {
-                        // TODO how can we throw a better exception?
-                        t.printStackTrace()
-                    }
+    
+    fun commit() {
+        val fixes = ops.flatMap { it.scanner().scan(refactorer.cu, refactorer.context, bookmarks) }
+        
+        if(!refactorer.dryRun) {
+            try {
+                val sourceText = refactorer.sourceText
+                val sortedFixes = fixes.sortedBy { it.position.last }.sortedBy { it.position.start }
+                var source = sortedFixes.foldIndexed("") { i, source, fix ->
+                    val prefix = if (i == 0)
+                        sourceText.substring(0, fix.position.first)
+                    else sourceText.substring(sortedFixes[i - 1].position.last, fix.position.start)
+                    source + prefix + (fix.changes ?: "")
                 }
-        return fixes
+                if (sortedFixes.last().position.last < sourceText.length) {
+                    source += sourceText.substring(sortedFixes.last().position.last)
+                }
+                refactorer.source.writeText(source)
+            } catch(t: Throwable) {
+                // TODO how can we throw a better exception?
+                t.printStackTrace()
+            }
+        }
+        
+        if(fixes.isNotEmpty())
+            refactorer.changedFile = true
     }
-
-    /**
-     * Refactor and fix all sources
-     */
-    fun refactorAndFix(sources: Iterable<File>, classPath: Iterable<File>? = null) =
-            refactorAndFixWhen({ cu -> true }, sources, classPath)
 }

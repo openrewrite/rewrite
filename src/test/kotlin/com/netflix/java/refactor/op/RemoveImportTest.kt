@@ -1,91 +1,83 @@
 package com.netflix.java.refactor.op
 
-import com.netflix.java.refactor.Refactorer
-import org.junit.Assert.assertEquals
-import org.junit.Rule
+import com.netflix.java.refactor.RefactorTest
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
 
-class RemoveImportTest {
-    @JvmField @Rule
-    val temp = TemporaryFolder()
+class RemoveImportTest: RefactorTest() {
 
-    val removeImportRule = Refactorer()
-            .removeImport("java.util.List")
-    
     @Test
     fun removeNamedImport() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |import java.util.List;
             |class A {}
-        """.trimMargin())
+        """)
         
-        removeImportRule.refactorAndFix(listOf(a))
-        assertEquals("class A {}", a.readText())
+        refactor(a).removeImport("java.util.List")
+        
+        assertRefactored(a, "class A {}")
     }
 
     @Test
     fun removeNamedImportByClass() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |import java.util.List;
             |class A {}
-        """.trimMargin())
+        """)
 
-        Refactorer().removeImport(List::class.java).refactorAndFix(listOf(a))
-        assertEquals("class A {}", a.readText())
+        refactor(a).removeImport(List::class.java)
+        
+        assertRefactored(a, "class A {}")
     }
     
     @Test
     fun removeStarImportIfNoTypesReferredTo() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |import java.util.*;
             |class A {}
         """.trimMargin())
 
-        removeImportRule.refactorAndFix(listOf(a))
-        assertEquals("class A {}", a.readText())
+        refactor(a).removeImport(List::class.java)
+
+        assertRefactored(a, "class A {}")
     }
     
     @Test
     fun replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |import java.util.*;
             |class A {
             |   Collection c;
             |}
-        """.trimMargin())
+        """)
+
+        refactor(a).removeImport(List::class.java)
         
-        removeImportRule.refactorAndFix(listOf(a))
-        assertEquals("""
+        assertRefactored(a, """
             |import java.util.Collection;
             |class A {
             |   Collection c;
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
     
     @Test
     fun leaveStarImportInPlaceIfMoreThanTwoTypesStillReferredTo() {
-        val a = temp.newFile("A.java")
-        a.writeText("""
+        val a = java("""
             |import java.util.*;
             |class A {
             |   Collection c;
             |   Set s;
             |}
-        """.trimMargin())
+        """)
         
-        removeImportRule.refactorAndFix(listOf(a))
-        assertEquals("""
+        refactor(a).removeImport("java.util.List")
+
+        assertRefactored(a, """
             |import java.util.*;
             |class A {
             |   Collection c;
             |   Set s;
             |}
-        """.trimMargin(), a.readText())
+        """)
     }
 }
