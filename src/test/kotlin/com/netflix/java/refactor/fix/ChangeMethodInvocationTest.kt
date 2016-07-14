@@ -106,16 +106,52 @@ class ChangeMethodInvocationTest: RefactorTest() {
             |}
         """)
     }
-
-    private fun b(): File {
-        val b = temp.newFile("B.java")
-        b.writeText("""
-            |class B {
-            |   public void singleArg(String s) {}
-            |   public void arrArg(String[] s) {}
-            |   public void varargArg(String... s) {}
+    
+    @Test
+    fun refactorTargetToStatic() {
+        val a = java("""
+            |package a;
+            |class A {
+            |   public void foo() {}
             |}
-        """.trimMargin())
-        return b
+        """)
+        
+        val b = java("""
+            |package b;
+            |class B {
+            |   public static void foo() {}
+            |}
+        """)
+        
+        val c = java("""
+            |import a.*;
+            |class C {
+            |   public void test() {
+            |       new A().foo();
+            |   }
+            |
+        """)
+        
+        refactor(c, a, b).changeMethod("a.A foo()")
+                .refactorTargetToStatic("b.B")
+                .done()
+        
+        assertRefactored(c, """
+            |import a.*;
+            |import b.B;
+            |class C {
+            |   public void test() {
+            |       B.foo();
+            |   }
+            |
+        """)
     }
+
+    private fun b(): File = java("""
+                |class B {
+                |   public void singleArg(String s) {}
+                |   public void arrArg(String[] s) {}
+                |   public void varargArg(String... s) {}
+                |}
+            """)
 }
