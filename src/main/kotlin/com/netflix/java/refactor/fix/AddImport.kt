@@ -1,16 +1,18 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor.fix
 
+import com.netflix.java.refactor.FixingOperation
+import com.netflix.java.refactor.FixingScanner
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.tree.ImportTree
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class AddImport(val pkg: String, val clazz: String): RefactorOperation {
+class AddImport(val pkg: String, val clazz: String): FixingOperation {
     override fun scanner() = AddImportScanner(this)
 }
 
-class AddImportScanner(val op: AddImport): BaseRefactoringScanner() {
+class AddImportScanner(val op: AddImport): FixingScanner() {
     val imports = ArrayList<JCTree.JCImport>()
     var coveredByExistingImport = false
     

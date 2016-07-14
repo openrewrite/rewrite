@@ -1,5 +1,7 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor.fix
 
+import com.netflix.java.refactor.FixingOperation
+import com.netflix.java.refactor.FixingScanner
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.ImportTree
@@ -8,11 +10,11 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class RemoveImport(val clazz: String) : RefactorOperation {
+class RemoveImport(val clazz: String) : FixingOperation {
     override fun scanner() = RemoveImportScanner(this)
 }
 
-class RemoveImportScanner(val op: RemoveImport) : BaseRefactoringScanner() {
+class RemoveImportScanner(val op: RemoveImport) : FixingScanner() {
     var starImport: JCTree.JCImport? = null
     var otherTypes = ArrayList<Symbol.ClassSymbol>()
     

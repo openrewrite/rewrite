@@ -1,4 +1,4 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.RefactorTest
 import org.junit.Assert.assertEquals

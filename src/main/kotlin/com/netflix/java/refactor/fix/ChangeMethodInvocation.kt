@@ -1,7 +1,6 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.RefactorFix
-import com.netflix.java.refactor.RefactorTransaction
+import com.netflix.java.refactor.*
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.code.Flags
 import com.sun.tools.javac.code.Symbol
@@ -10,7 +9,7 @@ import com.sun.tools.javac.tree.TreeScanner
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction): RefactorOperation {
+class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction): FixingOperation {
     override fun scanner() = ChangeMethodInvocationScanner(this)
 
     var refactorName: String? = null
@@ -55,7 +54,7 @@ open class MethodArgumentMatcher(val index: Int, val op: ChangeMethodInvocation)
     fun done() = op
 }
 
-class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): BaseRefactoringScanner() {
+class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation): FixingScanner() {
     override fun visitMethodInvocation(node: MethodInvocationTree, context: Context): List<RefactorFix>? {
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCFieldAccess) {

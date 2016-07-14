@@ -1,4 +1,4 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor
 
 import org.junit.Assert
 import org.junit.Test

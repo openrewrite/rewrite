@@ -1,4 +1,4 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor
 
 import com.netflix.java.refactor.aspectj.AspectJLexer
 import com.netflix.java.refactor.aspectj.RefactorMethodSignatureParser

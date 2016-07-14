@@ -1,6 +1,10 @@
 package com.netflix.java.refactor
 
-import com.netflix.java.refactor.op.*
+import com.netflix.java.refactor.find.*
+import com.netflix.java.refactor.fix.AddImport
+import com.netflix.java.refactor.fix.ChangeMethodInvocation
+import com.netflix.java.refactor.fix.ChangeType
+import com.netflix.java.refactor.fix.RemoveImport
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.io.File
@@ -15,6 +19,15 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
     fun tx() = RefactorTransaction(this)
     private fun autoTx() = RefactorTransaction(this, true)
 
+    fun hasType(clazz: Class<*>): Boolean =
+        HasType(clazz.name).scanner().scan(cu, context)
+    
+    fun findField(clazz: Class<*>): Field =
+        FindField(clazz.name).scanner().scan(cu, context)
+    
+    fun findMethod(signature: String): Method =
+        FindMethod(signature).scanner().scan(cu, context)
+    
     fun changeType(from: String, toPackage: String, toClass: String) {
         tx().changeType(from, toPackage, toClass).commit()
     }
@@ -44,8 +57,7 @@ class Refactorer(val cu: JCTree.JCCompilationUnit, val context: Context, val dry
 
 
 class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = false) {
-    private val ops = ArrayList<RefactorOperation>()
-    private val bookmarks = BookmarkTable()
+    private val ops = ArrayList<FixingOperation>()
     
     fun changeType(from: String, toPackage: String, toClass: String): RefactorTransaction {
         ops.add(ChangeType(from, toPackage, toClass))
@@ -75,9 +87,9 @@ class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = 
     fun addImport(clazz: Class<*>) = addImport(clazz.`package`.name, clazz.simpleName)
     
     fun commit() {
-        val fixes = ops.flatMap { it.scanner().scan(refactorer.cu, refactorer.context, bookmarks) }
+        val fixes = ops.flatMap { it.scanner().scan(refactorer.cu, refactorer.context) }
         
-        if(!refactorer.dryRun) {
+        if(!refactorer.dryRun && fixes.isNotEmpty()) {
             try {
                 val sourceText = refactorer.sourceText
                 val sortedFixes = fixes.sortedBy { it.position.last }.sortedBy { it.position.start }

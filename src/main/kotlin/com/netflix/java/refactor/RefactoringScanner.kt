@@ -1,6 +1,5 @@
-package com.netflix.java.refactor.op
+package com.netflix.java.refactor
 
-import com.netflix.java.refactor.RefactorFix
 import com.sun.source.util.TreePathScanner
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.tree.JCTree
@@ -11,28 +10,24 @@ import java.io.File
  * A separate instance will be created for each file scan, so implementations can safely hold state
  * about a source file without having to clean it up.
  */
-interface RefactoringScanner {
-    fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix>
+interface RefactoringScanner<T> {
+    fun scan(cu: JCTree.JCCompilationUnit, context: Context): T
 }
 
-open class BaseRefactoringScanner :
-        TreePathScanner<List<RefactorFix>, Context>(),
-        RefactoringScanner {
+abstract class BaseRefactoringScanner<T> :
+        TreePathScanner<T, Context>(),
+        RefactoringScanner<T> {
 
     protected lateinit var cu: JCTree.JCCompilationUnit
     protected val source: File by lazy { File(cu.sourcefile.toUri().path) }
     protected val sourceText: CharSequence by lazy { cu.sourcefile.getCharContent(true) }
-    protected lateinit var bookmarks: BookmarkTable
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix> {
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): T {
         this.cu = cu
-        this.bookmarks = bookmarkTable
-        return super.scan(cu, context).plus(visitEnd(context))
+        return reduce(super.scan(cu, context), visitEnd(context))
     }
 
-    open fun visitEnd(context: Context): List<RefactorFix> = emptyList()
-
-    override fun reduce(r1: List<RefactorFix>?, r2: List<RefactorFix>?) = (r1 ?: emptyList()).plus(r2 ?: emptyList())
+    open fun visitEnd(context: Context): T? = null
 
     protected fun JCTree.replace(changes: String) =
             RefactorFix(this.startPosition..this.getEndPosition(cu.endPositions), changes, source)
@@ -62,16 +57,24 @@ open class BaseRefactoringScanner :
             JavacElements.instance(this).getTypeElement(clazz)?.owner?.toString()
 }
 
-class CompositeScanner(vararg val scanners: RefactoringScanner): RefactoringScanner {
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable) =
-        scanners.flatMap { it.scan(cu, context, bookmarkTable) }
+open class FixingScanner : BaseRefactoringScanner<List<RefactorFix>>() {
+    override fun reduce(r1: List<RefactorFix>?, r2: List<RefactorFix>?): List<RefactorFix> =
+        (r1 ?: emptyList()).plus(r2 ?: emptyList())
 }
 
-class IfThenScanner(val ifFixesResultFrom: RefactoringScanner, then: Array<RefactoringScanner>): RefactoringScanner {
+class CompositeScanner(vararg val scanners: RefactoringScanner<List<RefactorFix>>): RefactoringScanner<List<RefactorFix>> {
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context) =
+        scanners.fold(emptyList<RefactorFix>()) { acc, scanner -> 
+            acc.plus(scanner.scan(cu, context))
+        }
+}
+
+class IfThenScanner(val ifFixesResultFrom: RefactoringScanner<List<RefactorFix>>,
+                    then: Array<RefactoringScanner<List<RefactorFix>>>): RefactoringScanner<List<RefactorFix>> {
     private val compositeThenRun = CompositeScanner(*then)
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context, bookmarkTable: BookmarkTable): List<RefactorFix> {
-        val fixes = ifFixesResultFrom.scan(cu, context, bookmarkTable)
-        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context, bookmarkTable)) else emptyList()
+    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
+        val fixes = ifFixesResultFrom.scan(cu, context)
+        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context)) else emptyList()
     }
 }
