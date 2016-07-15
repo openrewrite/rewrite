@@ -8,6 +8,10 @@
 
 The Java Source Refactoring plugin is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
 
+It allows for the creation of style-preserving, type-aware refactoring changes that can be described programatically and distributed to the organization through the build process.
+
+Refactoring rules are packed into libraries (generally the library which is trying to deprecate some aspect of its API). When other projects pick up a new version of the library with a refactoring rule, it is applied to their source code. In this sense, the refactoring operation is distributed to dependent teams and source code across the organization adapts to the change in an "eventually consistent" manner.
+
 ## Usage
 
 Clone and build with:
