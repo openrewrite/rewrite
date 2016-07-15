@@ -9,6 +9,7 @@ import java.util.*
 data class ChangeField(val clazz: String, val tx: RefactorTransaction) : FixingOperation {
     var refactorTargetType: String? = null
     var refactorName: String? = null
+    var refactorDelete: Boolean = false
     
     fun refactorType(clazz: Class<*>): ChangeField {
         refactorTargetType = clazz.name
@@ -18,6 +19,11 @@ data class ChangeField(val clazz: String, val tx: RefactorTransaction) : FixingO
     fun refactorName(name: String): ChangeField {
         refactorName = name
         return this
+    }
+    
+    fun delete(): RefactorTransaction {
+        refactorDelete = true
+        return done()
     }
     
     fun done(): RefactorTransaction {
@@ -52,6 +58,11 @@ class ChangeFieldScanner(val op: ChangeField) : FixingScanner() {
     private fun refactorField(decl: JCTree.JCVariableDecl): ArrayList<RefactorFix> {
         val fixes = ArrayList<RefactorFix>()
 
+        if (op.refactorDelete) {
+            fixes.add(decl.delete())
+            return fixes
+        }
+        
         if (op.refactorTargetType is String && !decl.vartype.matches(op.refactorTargetType!!)) {
             fixes.add(decl.vartype.replace(className(op.refactorTargetType!!)))
         }

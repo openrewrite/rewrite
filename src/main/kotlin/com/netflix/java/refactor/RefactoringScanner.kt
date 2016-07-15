@@ -48,11 +48,17 @@ abstract class BaseRefactoringScanner<T> :
             RefactorFix(this.startPosition..this.startPosition, changes, source)
 
     protected fun JCTree.delete(): RefactorFix {
+        var start = this.startPosition
         var end = this.getEndPosition(cu.endPositions)
         if(sourceText.length > end && sourceText[end] == '\n') {
-            end++ // delete the newline too
+            // delete the newline and any leading whitespace too
+            end++
+            
+            while(start > 0 && sourceText[start-1].isWhitespace() && sourceText[start-1] != '\n') {
+                start--
+            }
         }
-        return RefactorFix(this.startPosition..end, null, source)
+        return RefactorFix(start..end, null, source)
     }
 
     protected fun Context.packageContaining(clazz: String) =

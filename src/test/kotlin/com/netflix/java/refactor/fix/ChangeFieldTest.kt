@@ -46,4 +46,22 @@ class ChangeFieldTest: RefactorTest() {
             |}
         """)
     }
+    
+    @Test
+    fun deleteField() {
+        val a = java("""
+            |import java.util.List;
+            |public class A {
+            |   List collection = null;
+            |}
+        """)
+
+        refactor(a).changeField(List::class.java).delete()
+
+        assertRefactored(a, """
+            |import java.util.List;
+            |public class A {
+            |}
+        """)
+    }
 }
