@@ -32,6 +32,8 @@ abstract class BaseRefactoringScanner<T> :
     protected fun JCTree.replace(changes: String) =
             RefactorFix(this.startPosition..this.getEndPosition(cu.endPositions), changes, source)
     
+    protected fun replace(range: IntRange, changes: String) = RefactorFix(range, changes, source)
+    
     protected fun JCTree.JCFieldAccess.replaceName(changes: String): RefactorFix {
         val nameStart = this.selected.getEndPosition(cu.endPositions) + 1
         return RefactorFix(nameStart..nameStart + this.name.toString().length, changes, source)

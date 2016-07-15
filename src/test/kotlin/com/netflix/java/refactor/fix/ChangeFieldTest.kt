@@ -6,7 +6,7 @@ import org.junit.Test
 class ChangeFieldTest: RefactorTest() {
     
     @Test
-    fun changeField() {
+    fun changeFieldType() {
         val a = java("""
             |import java.util.List;
             |public class A {
@@ -22,6 +22,27 @@ class ChangeFieldTest: RefactorTest() {
             |import java.util.Collection;
             |public class A {
             |   Collection collection;
+            |}
+        """)
+    }
+    
+    @Test
+    fun changeFieldName() {
+        val a = java("""
+            |import java.util.List;
+            |public class A {
+            |   List collection = null;
+            |}
+        """)
+
+        refactor(a).changeField(List::class.java)
+                .refactorName("list")
+                .done()
+
+        assertRefactored(a, """
+            |import java.util.List;
+            |public class A {
+            |   List list = null;
             |}
         """)
     }
