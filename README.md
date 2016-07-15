@@ -6,7 +6,7 @@
 
 ## Purpose
 
-The Java Source Refactoring plugin is a pluggable and distributed refactoring tool for Java source code.
+The Java Source Refactoring plugin is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
 
 ## Usage
 
@@ -34,21 +34,21 @@ these methods to the project's source.
     
 ## Writing Refactor Rules
 
-To create a new rule, provide a public static method annotated with @Refactor that returns `com.netflix.java.refactor.RefactorRule`.
+To create a new rule, provide a public static method annotated with `@Refactor` that takes a `Refactorer` argument.
 
 ```java
 @Refactor(value = "foo-to-bar", description = "replace foo() with bar()")
-public static RefactorRule fooToBar() {
-    return new RefactorRule()
+public static void fooToBar(Refactorer refactorer) {
+    Refactorer.tx()
         .changeMethod("B foo(int)")
             .refactorName("bar")
             .done()
-        .changeType(B.class, B2.class);
-    }
+        .changeType(B.class, B2.class)
+        .commit();
 }
 ```
 
-In the example rule above, two refactoring operations are chained together into one rule: changing invocations of `B.foo` to
+In the example rule above, two refactoring operations are chained together into one operation: changing invocations of `B.foo` to
 `B.bar()` and types of `B` to `B2`. Together, this changes method invocations of `B.foo` to `B2.bar`.
 
 That's it! Any project that declares a dependency on the artifact that contains your new rule and applies `nebula.source-refactor` will
