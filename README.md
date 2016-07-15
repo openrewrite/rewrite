@@ -1,4 +1,4 @@
-# Distributing Java Source Refactoring
+# Distributed Java Source Refactoring
 
 ![Support Status](https://img.shields.io/badge/nebula-incubating-yellow.svg)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nebula-plugins/java-source-refactor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
