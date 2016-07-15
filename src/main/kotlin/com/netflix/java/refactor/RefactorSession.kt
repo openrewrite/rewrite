@@ -9,8 +9,8 @@ import java.net.URLClassLoader
 
 class RefactorSession(sources: Iterable<File>, val classpath: Iterable<File>) {
     val logger = LoggerFactory.getLogger(RefactorSession::class.java)
-    val parser = AstParser()
-    val compilationUnits = parser.parseFiles(sources.toList(), classpath)
+    val parser = AstParser(classpath)
+    val compilationUnits = parser.parseFiles(sources.toList())
     
     fun refactor(): Map<Refactor, Iterable<File>> {
         val results = HashMultimap.create<Refactor, File>()
@@ -34,10 +34,10 @@ class RefactorSession(sources: Iterable<File>, val classpath: Iterable<File>) {
                 }
 
                 compilationUnits.forEach { cu ->
-                    val refactorer = Refactorer(cu, parser.context)
+                    val refactorer = Refactorer(cu, parser)
                     method.invoke(null, refactorer)
                     if(refactorer.changedFile)
-                        results.put(refactor, refactorer.source)
+                        results.put(refactor, refactorer.source())
                 }
             }
 

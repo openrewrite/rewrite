@@ -1,5 +1,6 @@
 package com.netflix.java.refactor
 
+import com.sun.tools.javac.comp.Check
 import com.sun.tools.javac.comp.Enter
 import com.sun.tools.javac.file.JavacFileManager
 import com.sun.tools.javac.main.JavaCompiler
@@ -15,7 +16,7 @@ import javax.tools.JavaFileObject
 import javax.tools.SimpleJavaFileObject
 import javax.tools.StandardLocation
 
-class AstParser {
+class AstParser(val classpath: Iterable<File>?) {
     val context = Context()
     val compiler = JavaCompiler(context)
 
@@ -35,10 +36,10 @@ class AstParser {
         }))
     }
 
-    fun parseFiles(files: Iterable<File>, classPath: Iterable<File>? = null): List<JCTree.JCCompilationUnit> {
+    fun parseFiles(files: Iterable<File>): List<JCTree.JCCompilationUnit> {
         val fm = context.get(JavaFileManager::class.java)
-        if(classPath != null) // override classpath
-            (fm as JavacFileManager).setLocation(StandardLocation.CLASS_PATH, classPath)
+        if(classpath != null) // override classpath
+            (fm as JavacFileManager).setLocation(StandardLocation.CLASS_PATH, classpath)
         
         val cus = files.map { f ->
             compiler.parse(object : SimpleJavaFileObject(f.toURI(), JavaFileObject.Kind.SOURCE) {
@@ -49,6 +50,15 @@ class AstParser {
         compiler.attribute(compiler.todo)
         
         return cus
+    }
+    
+    fun reparse(cu: JCTree.JCCompilationUnit): JCTree.JCCompilationUnit {
+        // this will cause the new AST to be re-entered and re-attributed
+        val chk = Check.instance(context)
+        cu.defs.filterIsInstance<JCTree.JCClassDecl>().forEach {
+            chk.compiled.remove(it.sym.flatname)
+        }
+        return parseFiles(listOf(File(cu.sourcefile.toUri().path))).first()
     }
     
     /**

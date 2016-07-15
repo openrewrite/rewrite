@@ -153,4 +153,13 @@ class AddImportTest: RefactorTest() {
             |class A {}
         """)
     }
+    
+    @Test
+    fun dontAddImportWhenClassHasNoPackage() {
+        val a = java("class A {}")
+        
+        refactor(a).addImport("C")
+        
+        assertRefactored(a, "class A {}")
+    }
 }

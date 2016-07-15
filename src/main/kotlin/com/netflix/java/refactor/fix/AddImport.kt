@@ -7,7 +7,9 @@ import com.sun.tools.javac.util.Context
 import java.util.*
 
 class AddImport(val clazz: String, val staticMethod: String? = null): FixingOperation {
-    override fun scanner() = AddImportScanner(this)
+    override fun scanner() = if(packageOwner(clazz).isNotEmpty())
+        AddImportScanner(this)
+    else NoOpScanner
 }
 
 class AddImportScanner(val op: AddImport): FixingScanner() {

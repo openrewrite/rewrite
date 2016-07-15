@@ -13,10 +13,10 @@ abstract class RefactorTest {
         refactor(target, otherFiles.toList(), null)
     
     fun refactor(target: File, otherFiles: Iterable<File>, classpath: Iterable<File>? = null): Refactorer {
-        val parser = AstParser()
+        val parser = AstParser(classpath)
         val allFiles = otherFiles.plus(target)
-        val cu = parser.parseFiles(allFiles.toList(), classpath).last()
-        return Refactorer(cu, parser.context)
+        val cu = parser.parseFiles(allFiles.toList()).last()
+        return Refactorer(cu, parser)
     }
     
     fun java(sourceStr: String): File {
