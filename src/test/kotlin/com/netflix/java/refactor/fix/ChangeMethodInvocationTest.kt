@@ -1,6 +1,7 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.RefactorTest
+import com.netflix.java.refactor.compiler.JavaCompilerHelper
 import org.junit.Test
 import java.io.File
 
@@ -144,6 +145,49 @@ class ChangeMethodInvocationTest: RefactorTest() {
             |       B.foo();
             |   }
             |
+        """)
+    }
+
+    @Test
+    fun refactorTargetToVariable() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo() {}
+            |}
+        """)
+
+        val b = java("""
+            |package b;
+            |public class B {
+            |   public static void foo() {}
+            |}
+        """)
+
+        val c = java("""
+            |import a.*;
+            |import b.B;
+            |public class C {
+            |   A a;
+            |   public void test() {
+            |       B.foo();
+            |   }
+            |}
+        """)
+
+        refactor(c, a, b).changeMethod("b.B foo()")
+                .refactorTargetToVariable("a")
+                .done()
+
+        assertRefactored(c, """
+            |import a.*;
+            |import b.B;
+            |public class C {
+            |   A a;
+            |   public void test() {
+            |       a.foo();
+            |   }
+            |}
         """)
     }
 

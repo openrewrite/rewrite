@@ -31,7 +31,7 @@ class MethodMatcher(signature: String) {
             }
         }.visit(parser.methodPattern())
     }
-    
+
     fun matches(invocation: JCTree.JCMethodInvocation): Boolean =
         if(invocation.meth is JCTree.JCFieldAccess) {
             val meth = (invocation.meth as JCTree.JCFieldAccess)
@@ -55,10 +55,15 @@ class MethodMatcher(signature: String) {
                 else -> invocation.args.map { it.type.toString() }.joinToString(",")
             }
 
-            val targetType = if(meth.selected is JCTree.JCNewClass) {
-                val clazzIdent = ((meth.selected as JCTree.JCNewClass).clazz as JCTree.JCIdent)
-                clazzIdent.type.originalType.toString()
-            } else meth.sym.owner.toString()
+            val targetType = 
+                    if(meth.selected is JCTree.JCNewClass) {
+                        // we have to do a bit of spelunking to get the type of a new expression...
+                        val clazzIdent = ((meth.selected as JCTree.JCNewClass).clazz as JCTree.JCIdent)
+                        clazzIdent.type.originalType.toString()
+                    } 
+                    else {
+                        meth.sym.owner.toString()
+                    }
             
             targetTypePattern.matches(targetType) &&
                     methodNamePattern.matches(meth.name.toString()) &&

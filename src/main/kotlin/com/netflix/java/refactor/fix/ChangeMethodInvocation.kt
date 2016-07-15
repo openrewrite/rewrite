@@ -23,6 +23,7 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : F
     var refactorName: String? = null
     val refactorArguments = ArrayList<MethodArgumentMatcher>()
     var refactorTargetToStatic: String? = null
+    var refactorTargetToVariable: String? = null
 
     fun refactorName(name: String): ChangeMethodInvocation {
         refactorName = name
@@ -42,6 +43,11 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : F
     
     fun refactorTargetToStatic(clazz: Class<*>) = refactorTargetToStatic(clazz.name)
 
+    fun refactorTargetToVariable(variable: String): ChangeMethodInvocation {
+        refactorTargetToVariable = variable
+        return this
+    }
+    
     fun done(): RefactorTransaction {
         if (tx.autoCommit)
             tx.commit()
@@ -110,6 +116,10 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
         
         if(op.refactorTargetToStatic is String) {
             fixes.add(meth.selected.replace(className(op.refactorTargetToStatic!!)))
+        }
+        
+        if(op.refactorTargetToVariable is String) {
+            fixes.add(meth.selected.replace(op.refactorTargetToVariable!!))
         }
 
         return fixes
