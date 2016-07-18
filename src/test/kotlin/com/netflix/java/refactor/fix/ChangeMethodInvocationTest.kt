@@ -1,7 +1,6 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.RefactorTest
-import com.netflix.java.refactor.compiler.JavaCompilerHelper
 import org.junit.Test
 import java.io.File
 
@@ -112,14 +111,14 @@ class ChangeMethodInvocationTest: RefactorTest() {
     fun refactorTargetToStatic() {
         val a = java("""
             |package a;
-            |class A {
+            |public class A {
             |   public void foo() {}
             |}
         """)
         
         val b = java("""
             |package b;
-            |class B {
+            |public class B {
             |   public static void foo() {}
             |}
         """)
@@ -130,7 +129,7 @@ class ChangeMethodInvocationTest: RefactorTest() {
             |   public void test() {
             |       new A().foo();
             |   }
-            |
+            |}
         """)
         
         refactor(c, a, b).changeMethod("a.A foo()")
@@ -144,12 +143,52 @@ class ChangeMethodInvocationTest: RefactorTest() {
             |   public void test() {
             |       B.foo();
             |   }
-            |
+            |}
+        """)
+    }
+    
+    @Test
+    fun refactorStaticTargetToStatic() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public static void foo() {}
+            |}
+        """)
+
+        val b = java("""
+            |package b;
+            |public class B {
+            |   public static void foo() {}
+            |}
+        """)
+
+        val c = java("""
+            |import static a.A.*;
+            |class C {
+            |   public void test() {
+            |       foo();
+            |   }
+            |}
+        """)
+
+        refactor(c, a, b).changeMethod("a.A foo()")
+                .refactorTargetToStatic("b.B")
+                .done()
+
+        assertRefactored(c, """
+            |import b.B;
+            |import static a.A.*;
+            |class C {
+            |   public void test() {
+            |       B.foo();
+            |   }
+            |}
         """)
     }
 
     @Test
-    fun refactorTargetToVariable() {
+    fun refactorExplicitStaticToVariable() {
         val a = java("""
             |package a;
             |public class A {
@@ -182,6 +221,49 @@ class ChangeMethodInvocationTest: RefactorTest() {
         assertRefactored(c, """
             |import a.*;
             |import b.B;
+            |public class C {
+            |   A a;
+            |   public void test() {
+            |       a.foo();
+            |   }
+            |}
+        """)
+    }
+
+    @Test
+    fun refactorStaticImportToVariable() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo() {}
+            |}
+        """)
+
+        val b = java("""
+            |package b;
+            |public class B {
+            |   public static void foo() {}
+            |}
+        """)
+
+        val c = java("""
+            |import a.*;
+            |import static b.B.*;
+            |public class C {
+            |   A a;
+            |   public void test() {
+            |       foo();
+            |   }
+            |}
+        """)
+
+        refactor(c, a, b).changeMethod("b.B foo()")
+                .refactorTargetToVariable("a")
+                .done()
+
+        assertRefactored(c, """
+            |import a.*;
+            |import static b.B.*;
             |public class C {
             |   A a;
             |   public void test() {

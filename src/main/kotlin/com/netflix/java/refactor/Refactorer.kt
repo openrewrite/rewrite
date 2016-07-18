@@ -14,6 +14,8 @@ class Refactorer(var cu: JCTree.JCCompilationUnit, val parser: AstParser, val dr
     
     internal var lastCommitChangedFile = false
 
+    fun tx() = tx(false) // Java support
+    
     fun tx(autoCommit: Boolean = false): RefactorTransaction {
         val tx = RefactorTransaction(this, autoCommit)
         

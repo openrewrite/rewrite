@@ -32,46 +32,54 @@ class MethodMatcher(signature: String) {
         }.visit(parser.methodPattern())
     }
 
-    fun matches(invocation: JCTree.JCMethodInvocation): Boolean =
-        if(invocation.meth is JCTree.JCFieldAccess) {
-            val meth = (invocation.meth as JCTree.JCFieldAccess)
-
-            val args = when(meth.sym) {
-                is Symbol.MethodSymbol -> {
-                    (meth.sym as Symbol.MethodSymbol).params().map {
-                        val baseType = it.type.toString()
-                        if(it.flags() and Flags.VARARGS != 0L) {
-                            baseType.substringBefore("[") + "..."
-                        }
-                        else
-                            baseType
-                    }.joinToString("")
+    fun matches(invocation: JCTree.JCMethodInvocation): Boolean {
+        val meth = invocation.meth
+        
+        val (methodSymbol, name) = when(meth) {
+            is JCTree.JCFieldAccess -> meth.sym to meth.name
+            is JCTree.JCIdent -> meth.sym to meth.name
+            else -> return@matches false
+        }
+        
+        val targetType = when(meth) {
+            is JCTree.JCFieldAccess -> {
+                if (meth.selected is JCTree.JCNewClass) {
+                    // we have to do a bit of spelunking to get the type of a new expression...
+                    val clazzIdent = ((meth.selected as JCTree.JCNewClass).clazz as JCTree.JCIdent)
+                    clazzIdent.type.originalType.toString()
+                } else {
+                    meth.sym.owner.toString()
                 }
+            }
+            is JCTree.JCIdent -> {
+                meth.sym.owner.toString()
+            }
+            // this is a method invocation on a method in the same class, which we won't be refactoring on ever
+            else -> return@matches false
+        }
+        
+        val args = when(methodSymbol) {
+            is Symbol.MethodSymbol -> {
+                methodSymbol.params().map {
+                    val baseType = it.type.toString()
+                    if (it.flags() and Flags.VARARGS != 0L) {
+                        baseType.substringBefore("[") + "..."
+                    } else
+                        baseType
+                }.joinToString("")
+            }
 
             // This is a weird case... for some reason the attribution phase will sometimes assign a ClassSymbol to
             // method invocation, making the parameters of the resolved method inaccessible to us. In these cases,
             // we can make a best effort at determining the method's argument types by observing the types that are
             // being passed to it by the code.
-                else -> invocation.args.map { it.type.toString() }.joinToString(",")
-            }
-
-            val targetType = 
-                    if(meth.selected is JCTree.JCNewClass) {
-                        // we have to do a bit of spelunking to get the type of a new expression...
-                        val clazzIdent = ((meth.selected as JCTree.JCNewClass).clazz as JCTree.JCIdent)
-                        clazzIdent.type.originalType.toString()
-                    } 
-                    else {
-                        meth.sym.owner.toString()
-                    }
-            
-            targetTypePattern.matches(targetType) &&
-                    methodNamePattern.matches(meth.name.toString()) &&
-                    argumentPattern.matches(args)
-        } else {
-            // this is a method invocation on a method in the same class, which we won't be refactoring on ever
-            false
+            else -> invocation.args.map { it.type.toString() }.joinToString(",")
         }
+
+        return targetTypePattern.matches(targetType) &&
+                methodNamePattern.matches(name.toString()) &&
+                argumentPattern.matches(args)
+    }
 }
 
 /**

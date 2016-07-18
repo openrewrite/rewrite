@@ -85,11 +85,19 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
     }
 
     fun refactorMethod(invocation: JCTree.JCMethodInvocation): List<RefactorFix> {
-        val meth = invocation.meth as JCTree.JCFieldAccess
+        val meth = invocation.meth
         val fixes = ArrayList<RefactorFix>()
 
         if (op.refactorName is String) {
-            fixes.add(meth.replaceName(op.refactorName!!))
+            when(meth) {
+                is JCTree.JCFieldAccess -> {
+                    val nameStart = meth.selected.getEndPosition(cu.endPositions) + 1
+                    fixes.add(RefactorFix(nameStart..nameStart + meth.name.toString().length, op.refactorName!!, source))
+                }
+                is JCTree.JCIdent -> {
+                    meth.replace(op.refactorName!!)
+                }
+            }
         }
 
         op.refactorArguments.forEach { argRefactor ->
@@ -115,11 +123,21 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
         }
         
         if(op.refactorTargetToStatic is String) {
-            fixes.add(meth.selected.replace(className(op.refactorTargetToStatic!!)))
+            when(meth) {
+                is JCTree.JCFieldAccess ->
+                    fixes.add(meth.selected.replace(className(op.refactorTargetToStatic!!)))
+                is JCTree.JCIdent ->
+                    fixes.add(meth.insertBefore(className(op.refactorTargetToStatic!! + ".")))
+            }
         }
         
         if(op.refactorTargetToVariable is String) {
-            fixes.add(meth.selected.replace(op.refactorTargetToVariable!!))
+            when(meth) {
+                is JCTree.JCFieldAccess ->
+                    fixes.add(meth.selected.replace(op.refactorTargetToVariable!!))
+                is JCTree.JCIdent ->
+                    fixes.add(meth.insertBefore(op.refactorTargetToVariable!! + "."))
+            }
         }
 
         return fixes
