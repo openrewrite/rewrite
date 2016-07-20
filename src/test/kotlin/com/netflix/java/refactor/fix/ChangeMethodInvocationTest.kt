@@ -91,9 +91,10 @@ class ChangeMethodInvocationTest: RefactorTest() {
 
         refactor(a, b())
                 .changeMethod("B singleArg(String)")
-                    .refactorArgument(0)
-                        .isType(String::class.java)
-                        .mapLiterals { s -> s.toString().replace("%s", "{}") }
+                    .refactorArguments()
+                        .arg(String::class.java)
+                            .refactorLiterals { s -> s.toString().replace("%s", "{}") }
+                        .done()
                     .done()
                 .done()
 
@@ -268,6 +269,46 @@ class ChangeMethodInvocationTest: RefactorTest() {
             |   A a;
             |   public void test() {
             |       a.foo();
+            |   }
+            |}
+        """)
+    }
+
+    @Test
+    fun refactorReorderArguments() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo(String s, Integer n) {}
+            |   public void foo(Integer n, String s) {}
+            |}
+        """)
+
+        val b = java("""
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.foo("mystring", 0);
+            |   }
+            |}
+        """)
+
+        refactor(b, a).changeMethod("a.A foo(..)")
+                .refactorArguments()
+                    .arg(String::class.java)
+                        .refactorLiterals { s -> "anotherstring" }
+                        .done()
+                    .reorderArguments("n", "s")
+                    .done()
+                .done()
+
+        assertRefactored(b, """
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.foo(0, "anotherstring");
             |   }
             |}
         """)

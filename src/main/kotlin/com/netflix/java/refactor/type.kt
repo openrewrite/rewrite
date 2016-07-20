@@ -9,8 +9,10 @@ fun packageOwner(fullyQualifiedClassName: String) =
 fun className(fullyQualifiedClassName: String) =
     fullyQualifiedClassName.split('.').dropWhile { it[0].isLowerCase() }.joinToString(".")
 
-fun Type.matches(fullyQualifiedClassName: String) = matches(toString(), fullyQualifiedClassName)
-fun JCTree.matches(fullyQualifiedClassName: String) = matches(toString(), fullyQualifiedClassName)
+fun Type.matches(fullyQualifiedClassName: String?) = matches(toString(), fullyQualifiedClassName)
+fun JCTree.matches(fullyQualifiedClassName: String?) = matches(toString(), fullyQualifiedClassName)
 
-private fun matches(javacTypeSerialization: String, fullyQualifiedClassName: String) =
-    javacTypeSerialization == "${packageOwner(fullyQualifiedClassName)}.${className(fullyQualifiedClassName).replace("\\.", "\\$")}"
+private fun matches(javacTypeSerialization: String, fullyQualifiedClassName: String?) =
+    if(fullyQualifiedClassName is String)
+        javacTypeSerialization == "${packageOwner(fullyQualifiedClassName)}.${className(fullyQualifiedClassName).replace("\\.", "\\$")}"
+    else false

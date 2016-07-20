@@ -66,7 +66,7 @@ class MethodMatcher(signature: String) {
                         baseType.substringBefore("[") + "..."
                     } else
                         baseType
-                }.joinToString("")
+                }.joinToString(",")
             }
 
             // This is a weird case... for some reason the attribution phase will sometimes assign a ClassSymbol to
@@ -173,7 +173,9 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
             // Note: the AspectJ grammar doesn't allow for multiple ..'s in one formal parameter pattern
             when(argument) {
                 is Argument.DotDot -> {
-                    if(i > 0)
+                    if(arguments.size == 1)
+                        "(${argument.regex})?"
+                    else if(i > 0)
                         "(,${argument.regex})?"
                     else "(${argument.regex},)?"
                 }

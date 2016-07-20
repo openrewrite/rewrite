@@ -32,6 +32,9 @@ abstract class BaseRefactoringScanner<T> :
     protected fun JCTree.replace(changes: String) =
             RefactorFix(this.startPosition..this.getEndPosition(cu.endPositions), changes, source)
     
+    protected fun com.sun.tools.javac.util.List<JCTree>.replace(changes: String) =
+            RefactorFix(this.head.startPosition..this.last().getEndPosition(cu.endPositions), changes, source)
+    
     protected fun replace(range: IntRange, changes: String) = RefactorFix(range, changes, source)
     
     protected fun JCTree.insertAfter(changes: String): RefactorFix {
@@ -58,6 +61,9 @@ abstract class BaseRefactoringScanner<T> :
 
     protected fun Context.packageContaining(clazz: String) =
             JavacElements.instance(this).getTypeElement(clazz)?.owner?.toString()
+    
+    protected fun JCTree.source() =
+            sourceText.substring(startPosition, getEndPosition(cu.endPositions))
 }
 
 open class FixingScanner : BaseRefactoringScanner<List<RefactorFix>>() {
