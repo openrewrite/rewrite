@@ -1,10 +1,10 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.RefactorTest
+import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
 import java.io.File
 
-class ChangeMethodInvocationTest: RefactorTest() {
+class ChangeMethodInvocationTest: AbstractRefactorTest() {
     
     @Test
     fun refactorMethodNameForMethodWithSingleArg() {

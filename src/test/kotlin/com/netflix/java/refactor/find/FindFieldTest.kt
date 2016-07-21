@@ -1,10 +1,10 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.RefactorTest
+import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-class FindFieldTest: RefactorTest() {
+class FindFieldTest: AbstractRefactorTest() {
     
     @Test
     fun findField() {

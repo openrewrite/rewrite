@@ -2,7 +2,7 @@ package com.netflix.java.refactor
 
 import org.junit.Test
 
-class RefactorerTest: RefactorTest() {
+class JavaSourceTest : AbstractRefactorTest() {
     
     @Test
     fun multiPhaseRefactoring() {

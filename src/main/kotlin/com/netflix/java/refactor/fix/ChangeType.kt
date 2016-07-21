@@ -1,6 +1,10 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.*
+import com.netflix.java.refactor.ast.FixingOperation
+import com.netflix.java.refactor.ast.FixingScanner
+import com.netflix.java.refactor.ast.IfThenScanner
+import com.netflix.java.refactor.ast.className
 import com.sun.source.tree.IdentifierTree
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree

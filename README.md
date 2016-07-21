@@ -42,13 +42,15 @@ To create a new rule, provide a public static method annotated with `@Refactor` 
 
 ```java
 @Refactor(value = "foo-to-bar", description = "replace foo() with bar()")
-public static void fooToBar(Refactorer refactorer) {
-    Refactorer.tx()
-        .changeMethod("B foo(int)")
-            .refactorName("bar")
-            .done()
-        .changeType(B.class, B2.class)
-        .commit();
+public class FooToBar extends JavaSourceVisitor {
+    public void visit(JavaSource source) {
+        source.refactor()
+            .changeMethod("B foo(int)")
+                .refactorName("bar")
+                .done()
+            .changeType(B.class, B2.class)
+            .fix();
+    }
 }
 ```
 

@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.BaseRefactoringScanner
-import com.netflix.java.refactor.RefactorOperation
+import com.netflix.java.refactor.ast.BaseRefactoringScanner
+import com.netflix.java.refactor.ast.RefactorOperation
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.code.Symbol

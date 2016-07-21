@@ -1,4 +1,4 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.ast
 
 import com.sun.tools.javac.code.Type
 import com.sun.tools.javac.tree.JCTree

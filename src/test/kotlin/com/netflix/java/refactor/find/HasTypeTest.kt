@@ -1,11 +1,11 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.RefactorTest
+import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
 import java.util.*
 import kotlin.test.assertTrue
 
-class HasTypeTest: RefactorTest() {
+class HasTypeTest: AbstractRefactorTest() {
     
     @Test
     fun hasType() {

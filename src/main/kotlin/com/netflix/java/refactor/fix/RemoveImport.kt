@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.FixingOperation
-import com.netflix.java.refactor.FixingScanner
+import com.netflix.java.refactor.ast.FixingOperation
+import com.netflix.java.refactor.ast.FixingScanner
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.ImportTree

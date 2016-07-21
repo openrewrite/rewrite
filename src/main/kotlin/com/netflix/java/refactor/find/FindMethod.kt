@@ -1,8 +1,8 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.BaseRefactoringScanner
-import com.netflix.java.refactor.MethodMatcher
-import com.netflix.java.refactor.RefactorOperation
+import com.netflix.java.refactor.ast.BaseRefactoringScanner
+import com.netflix.java.refactor.ast.MethodMatcher
+import com.netflix.java.refactor.ast.RefactorOperation
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context

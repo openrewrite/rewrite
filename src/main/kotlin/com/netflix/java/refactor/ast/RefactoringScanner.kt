@@ -1,5 +1,7 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.ast
 
+import com.netflix.java.refactor.CompilationUnit
+import com.netflix.java.refactor.RefactorFix
 import com.sun.source.util.TreePathScanner
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.tree.JCTree
@@ -11,7 +13,7 @@ import java.io.File
  * about a source file without having to clean it up.
  */
 interface RefactoringScanner<T> {
-    fun scan(cu: JCTree.JCCompilationUnit, context: Context): T
+    fun scan(cu: CompilationUnit): T
 }
 
 abstract class BaseRefactoringScanner<T> :
@@ -22,9 +24,10 @@ abstract class BaseRefactoringScanner<T> :
     protected val source: File by lazy { File(cu.sourcefile.toUri().path) }
     protected val sourceText: CharSequence by lazy { cu.sourcefile.getCharContent(true) }
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): T {
-        this.cu = cu
-        return reduce(super.scan(cu, context), visitEnd(context))
+    override fun scan(cu: CompilationUnit): T {
+        val (jcCu, parser) = cu
+        this.cu = jcCu
+        return reduce(super.scan(jcCu, parser.context), visitEnd(parser.context))
     }
 
     open fun visitEnd(context: Context): T? = null
@@ -72,9 +75,9 @@ open class FixingScanner : BaseRefactoringScanner<List<RefactorFix>>() {
 }
 
 class CompositeScanner(vararg val scanners: RefactoringScanner<List<RefactorFix>>): RefactoringScanner<List<RefactorFix>> {
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context) =
+    override fun scan(cu: CompilationUnit) =
         scanners.fold(emptyList<RefactorFix>()) { acc, scanner -> 
-            acc.plus(scanner.scan(cu, context))
+            acc.plus(scanner.scan(cu))
         }
 }
 
@@ -82,8 +85,8 @@ class IfThenScanner(val ifFixesResultFrom: RefactoringScanner<List<RefactorFix>>
                     then: Array<RefactoringScanner<List<RefactorFix>>>): RefactoringScanner<List<RefactorFix>> {
     private val compositeThenRun = CompositeScanner(*then)
     
-    override fun scan(cu: JCTree.JCCompilationUnit, context: Context): List<RefactorFix> {
-        val fixes = ifFixesResultFrom.scan(cu, context)
-        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu, context)) else emptyList()
+    override fun scan(cu: CompilationUnit): List<RefactorFix> {
+        val fixes = ifFixesResultFrom.scan(cu)
+        return if(fixes.isNotEmpty()) fixes.plus(compositeThenRun.scan(cu)) else emptyList()
     }
 }

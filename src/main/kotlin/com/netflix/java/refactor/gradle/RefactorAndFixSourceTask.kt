@@ -1,7 +1,6 @@
 package com.netflix.java.refactor.gradle
 
-import com.netflix.java.refactor.Refactor
-import com.netflix.java.refactor.RefactorSession
+import com.netflix.java.refactor.SourceSet
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.TaskAction
@@ -15,20 +14,29 @@ open class RefactorAndFixSourceTask : DefaultTask() {
     @Inject
     open fun getTextOutputFactory(): StyledTextOutputFactory? = null
     
+    private class RuleDescriptor(val name: String, val description: String)
+    
     @TaskAction
     fun refactorSource() {
-        val fixesByRule = HashMultimap.create<Refactor, File>()
+        val fixesByRule = HashMultimap.create<RuleDescriptor, File>()
 
         project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.forEach {
-            RefactorSession(it.allJava, it.compileClasspath).refactor().entries.forEach { 
-                fixesByRule.putAll(it.key, it.value)
+            val sourceSet = SourceSet(it.allJava, it.compileClasspath)
+            sourceSet.findScanners().forEach { scanner ->
+                sourceSet.allJava().forEach { source ->
+                    scanner.scan(source)
+                    if(source.changedFile) {
+                        fixesByRule.put(RuleDescriptor(scanner.name(), scanner.description()),
+                                source.file())
+                    }
+                }
             }
         }
         
         printReport(fixesByRule.asMap())
     }
     
-    fun printReport(fixesByRule: Map<Refactor, Collection<File>>) {
+    private fun printReport(fixesByRule: Map<RuleDescriptor, Collection<File>>) {
         val textOutput = getTextOutputFactory()!!.create(RefactorAndFixSourceTask::class.java)
         
         if(fixesByRule.isEmpty()) {
@@ -39,7 +47,7 @@ open class RefactorAndFixSourceTask : DefaultTask() {
             
             fixesByRule.entries.forEachIndexed { i, entry ->
                 val (rule, ruleFixes) = entry
-                textOutput.withStyle(Styling.Bold).text("${"${i+1}.".padEnd(2)} ${rule.value}")
+                textOutput.withStyle(Styling.Bold).text("${"${i+1}.".padEnd(2)} ${rule.description}")
                 textOutput.text(" (${ruleFixes.size} files changed) - ")
                 textOutput.withStyle(Styling.Yellow).println(rule.description)
             }

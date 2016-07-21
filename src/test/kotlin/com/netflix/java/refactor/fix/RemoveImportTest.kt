@@ -1,9 +1,9 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.RefactorTest
+import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
 
-class RemoveImportTest: RefactorTest() {
+class RemoveImportTest: AbstractRefactorTest() {
 
     @Test
     fun removeNamedImport() {

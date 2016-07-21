@@ -1,4 +1,4 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.ast
 
 import org.junit.Test
 import kotlin.test.assertEquals

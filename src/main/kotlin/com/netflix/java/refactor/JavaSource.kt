@@ -1,84 +1,81 @@
 package com.netflix.java.refactor
 
+import com.netflix.java.refactor.ast.FixingOperation
 import com.netflix.java.refactor.find.*
 import com.netflix.java.refactor.fix.*
-import com.sun.tools.javac.tree.JCTree
-import java.io.File
 import java.util.*
 
-class Refactorer(var cu: JCTree.JCCompilationUnit, val parser: AstParser, val dryRun: Boolean = false) {
+class JavaSource(val cu: CompilationUnit) {
     var changedFile = false
-    
-    fun source() = File(cu.sourceFile.toUri().path)
-    fun sourceText() = source().readText()
+
+    fun file() = cu.source()
+    fun text() = cu.source().readText()
     
     internal var lastCommitChangedFile = false
 
-    fun tx() = tx(false) // Java support
-    
-    fun tx(autoCommit: Boolean = false): RefactorTransaction {
-        val tx = RefactorTransaction(this, autoCommit)
-        
+    fun refactor(): RefactorTransaction {
+        val tx = RefactorTransaction(this)
+
         if(lastCommitChangedFile) {
-            cu = parser.reparse(cu)
+            cu.reparse()
             lastCommitChangedFile = false
         }
         return tx
     }
-
+    
     fun hasType(clazz: Class<*>): Boolean =
-        HasType(clazz.name).scanner().scan(cu, parser.context)
+        HasType(clazz.name).scanner().scan(cu)
     
     fun findField(clazz: Class<*>): Field =
-        FindField(clazz.name).scanner().scan(cu, parser.context)
+        FindField(clazz.name).scanner().scan(cu)
     
     fun hasField(clazz: Class<*>) = findField(clazz).exists
     
     fun findMethod(signature: String): Method =
-        FindMethod(signature).scanner().scan(cu, parser.context)
+        FindMethod(signature).scanner().scan(cu)
     
     fun hasMethod(signature: String) = findMethod(signature).exists
     
     fun changeType(from: String, to: String) {
-        tx().changeType(from, to).commit()
+        refactor().changeType(from, to).fix()
     }
     
     fun changeType(from: Class<*>, to: Class<*>) {
-        tx().changeType(from, to).commit()
+        refactor().changeType(from, to).fix()
     }
 
-    fun changeMethod(signature: String): ChangeMethodInvocation = tx(true).changeMethod(signature)
+    fun changeMethod(signature: String): ChangeMethodInvocation = refactor().changeMethod(signature)
 
-    fun changeField(clazz: Class<*>): ChangeField = tx(true).changeField(clazz)
-    fun changeField(clazz: String): ChangeField = tx(true).changeField(clazz)
+    fun changeField(clazz: Class<*>): ChangeField = refactor().changeField(clazz)
+    fun changeField(clazz: String): ChangeField = refactor().changeField(clazz)
     
     fun removeImport(clazz: String) {
-        tx().removeImport(clazz).commit()
+        refactor().removeImport(clazz).fix()
     }
     
     fun removeImport(clazz: Class<*>) {
-        tx().removeImport(clazz).commit()
+        refactor().removeImport(clazz).fix()
     }
 
     fun addImport(clazz: String) {
-        tx().addImport(clazz).commit()
+        refactor().addImport(clazz).fix()
     }
 
     fun addImport(clazz: Class<*>) {
-        tx().addImport(clazz).commit()
+        refactor().addImport(clazz).fix()
     }
     
     fun addStaticImport(clazz: String, method: String) {
-        tx().addStaticImport(clazz, method).commit()
+        refactor().addStaticImport(clazz, method).fix()
     }
     
     fun addStaticImport(clazz: Class<*>, method: String) {
-        tx().addStaticImport(clazz, method).commit()
+        refactor().addStaticImport(clazz, method).fix()
     }
 }
 
 
-class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = false) {
+class RefactorTransaction(val refactorer: JavaSource) {
     private val ops = ArrayList<FixingOperation>()
     
     fun changeType(from: String, to: String): RefactorTransaction {
@@ -123,12 +120,12 @@ class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = 
     
     fun addStaticImport(clazz: Class<*>, method: String) = addStaticImport(clazz.name, method)
     
-    fun commit() {
-        val fixes = ops.flatMap { it.scanner().scan(refactorer.cu, refactorer.parser.context) }
+    fun fix() {
+        val fixes = ops.flatMap { it.scanner().scan(refactorer.cu) }
         
-        if(!refactorer.dryRun && fixes.isNotEmpty()) {
+        if(fixes.isNotEmpty()) {
             try {
-                val sourceText = refactorer.sourceText()
+                val sourceText = refactorer.text()
                 val sortedFixes = fixes.sortedBy { it.position.last }.sortedBy { it.position.start }
                 var source = sortedFixes.foldIndexed("") { i, source, fix ->
                     val prefix = if (i == 0)
@@ -139,7 +136,7 @@ class RefactorTransaction(val refactorer: Refactorer, val autoCommit: Boolean = 
                 if (sortedFixes.last().position.last < sourceText.length) {
                     source += sourceText.substring(sortedFixes.last().position.last)
                 }
-                refactorer.source().writeText(source)
+                refactorer.file().writeText(source)
             } catch(t: Throwable) {
                 // TODO how can we throw a better exception?
                 t.printStackTrace()

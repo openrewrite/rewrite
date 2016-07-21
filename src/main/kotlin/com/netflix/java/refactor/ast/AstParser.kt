@@ -1,4 +1,4 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.ast
 
 import com.sun.tools.javac.comp.Check
 import com.sun.tools.javac.comp.Enter

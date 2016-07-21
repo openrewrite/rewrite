@@ -1,9 +1,10 @@
-package com.netflix.java.refactor
+package com.netflix.java.refactor.ast
 
+import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
 import java.net.URL
 
-class RefactoringScannerTest: RefactorTest() {
+class RefactoringScannerTest: AbstractRefactorTest() {
     
     @Test
     fun scannerIsAbleToIdentifyTypesFromExternalDependencies() {

@@ -1,6 +1,8 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.*
+import com.netflix.java.refactor.RefactorFix
+import com.netflix.java.refactor.RefactorTransaction
+import com.netflix.java.refactor.ast.*
 import com.sun.source.tree.VariableTree
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
@@ -26,11 +28,7 @@ data class ChangeField(val clazz: String, val tx: RefactorTransaction) : FixingO
         return done()
     }
     
-    fun done(): RefactorTransaction {
-        if (tx.autoCommit)
-            tx.commit()
-        return tx
-    }
+    fun done() = tx
 
     override fun scanner() =
             if (refactorTargetType != null) {
