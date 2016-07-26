@@ -1,5 +1,6 @@
 package com.netflix.java.refactor.gradle
 
+import com.netflix.java.refactor.AutoRefactor
 import com.netflix.java.refactor.SourceSet
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
@@ -22,12 +23,12 @@ open class RefactorAndFixSourceTask : DefaultTask() {
 
         project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.forEach {
             val sourceSet = SourceSet(it.allJava, it.compileClasspath)
-            sourceSet.findScanners().forEach { scanner ->
+            sourceSet.allAutoRefactorsOnClasspath().forEach {
+                val (refactor, scanner) = it
                 sourceSet.allJava().forEach { source ->
                     scanner.scan(source)
                     if(source.changedFile) {
-                        fixesByRule.put(RuleDescriptor(scanner.name(), scanner.description()),
-                                source.file())
+                        fixesByRule.put(RuleDescriptor(refactor.value, refactor.description), source.file())
                     }
                 }
             }

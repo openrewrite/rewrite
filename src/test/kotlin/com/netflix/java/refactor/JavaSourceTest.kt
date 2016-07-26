@@ -37,9 +37,11 @@ class JavaSourceTest : AbstractRefactorTest() {
             |}
         """)
         
-        refactorer.changeMethod("C foo()")
-            .refactorName("bar")
-            .done()
+        refactorer
+                .changeMethod("C foo()")
+                    .refactorName("bar")
+                    .done()
+                .fix()
         
         assertRefactored(a, """
             |public class A {

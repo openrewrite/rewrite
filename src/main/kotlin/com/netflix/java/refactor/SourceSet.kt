@@ -18,8 +18,11 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
     
     fun allJava() = compilationUnits.map { cu -> JavaSource(cu) }
 
-    fun findScanners(): Iterable<JavaSourceScanner<*>> {
-        val scanners = ArrayList<JavaSourceScanner<*>>()
+    /**
+     * Find all classes annotated with @AutoRefactor on the classpath that implement JavaSourceScanner
+     */
+    fun allAutoRefactorsOnClasspath(): Map<AutoRefactor, JavaSourceScanner<*>> {
+        val scanners = HashMap<AutoRefactor, JavaSourceScanner<*>>()
         val classLoader = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray(), javaClass.classLoader)
 
         val reporter = object: AnnotationDetector.TypeReporter {
@@ -28,11 +31,17 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
             override fun reportTypeAnnotation(annotation: Class<out Annotation>, className: String) {
                 val clazz = Class.forName(className, false, classLoader)
                 val refactor = clazz.getAnnotation(AutoRefactor::class.java)
-                
+
                 try {
-                    scanners.add(clazz.newInstance() as JavaSourceScanner<*>)
+                    val scanner = clazz.newInstance()
+                    if(scanner is JavaSourceScanner<*>) {
+                        scanners.put(refactor, scanner)
+                    }
+                    else {
+                        logger.warn("To be useable, an @AutoRefactor must implement JavaSourceScanner or extend JavaSourceVisitor")
+                    }
                 } catch(ignored: ReflectiveOperationException) {
-                    logger.warn("Unable to construct @AutoRefactor with id '${refactor.value}'. It must extend either JavaSourceScanner or JavaSourceVisitor.")
+                    logger.warn("Unable to construct @AutoRefactor with id '${refactor.value}'. It must extend implement JavaSourceScanner or extend JavaSourceVisitor and have a zero argument public constructor.")
                 }
             }
         }
@@ -40,4 +49,6 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
         AnnotationDetector(reporter).detect(*classpath.toList().toTypedArray())
         return scanners
     }
+    
+    fun <T> scan(scanner: JavaSourceScanner<T>): List<T?> = allJava().map { scanner.scan(it) }
 }

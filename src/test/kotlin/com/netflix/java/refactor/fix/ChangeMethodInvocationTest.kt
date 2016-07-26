@@ -20,6 +20,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
                 .changeMethod("B singleArg(String)")
                     .refactorName("bar")
                     .done()
+                .fix()
         
         assertRefactored(a, """
             |class A {
@@ -42,8 +43,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
 
         refactor(a, b())
                 .changeMethod("B arrArg(String[])")
-                .refactorName("bar")
-                .done()
+                    .refactorName("bar")
+                    .done()
+                .fix()
 
         assertRefactored(a, """
             |class A {
@@ -68,6 +70,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
                 .changeMethod("B varargArg(String...)")
                     .refactorName("bar")
                     .done()
+                .fix()
 
         assertRefactored(a, """
             |class A {
@@ -94,9 +97,10 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
                     .refactorArguments()
                         .arg(String::class.java)
                             .refactorLiterals { s -> s.toString().replace("%s", "{}") }
+                            .done()
                         .done()
                     .done()
-                .done()
+                .fix()
 
         assertRefactored(a, """
             |class A {
@@ -133,9 +137,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(c, a, b).changeMethod("a.A foo()")
-                .refactorTargetToStatic("b.B")
-                .done()
+        refactor(c, a, b)
+                .changeMethod("a.A foo()")
+                    .refactorTargetToStatic("b.B")
+                    .done()
+                .fix()
         
         assertRefactored(c, """
             |import a.*;
@@ -173,9 +179,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).changeMethod("a.A foo()")
-                .refactorTargetToStatic("b.B")
-                .done()
+        refactor(c, a, b)
+                .changeMethod("a.A foo()")
+                    .refactorTargetToStatic("b.B")
+                    .done()
+                .fix()
 
         assertRefactored(c, """
             |import b.B;
@@ -215,9 +223,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).changeMethod("b.B foo()")
-                .refactorTargetToVariable("a")
-                .done()
+        refactor(c, a, b)
+                .changeMethod("b.B foo()")
+                    .refactorTargetToVariable("a")
+                    .done()
+                .fix()
 
         assertRefactored(c, """
             |import a.*;
@@ -258,9 +268,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).changeMethod("b.B foo()")
-                .refactorTargetToVariable("a")
-                .done()
+        refactor(c, a, b)
+                .changeMethod("b.B foo()")
+                    .refactorTargetToVariable("a")
+                    .done()
+                .fix()
 
         assertRefactored(c, """
             |import a.*;
@@ -294,14 +306,16 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(b, a).changeMethod("a.A foo(..)")
-                .refactorArguments()
-                    .arg(String::class.java)
-                        .refactorLiterals { s -> "anotherstring" }
+        refactor(b, a)
+                .changeMethod("a.A foo(..)")
+                    .refactorArguments()
+                        .arg(String::class.java)
+                            .refactorLiterals { s -> "anotherstring" }
+                            .done()
+                        .reorderArguments("n", "s")
                         .done()
-                    .reorderArguments("n", "s")
                     .done()
-                .done()
+                .fix()
 
         assertRefactored(b, """
             |import a.*;

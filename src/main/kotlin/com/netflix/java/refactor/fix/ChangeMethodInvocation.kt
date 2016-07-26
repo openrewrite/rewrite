@@ -113,8 +113,8 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
         val meth = invocation.meth
         val fixes = ArrayList<RefactorFix>()
         val methSym = when (meth) {
-            is JCTree.JCFieldAccess -> meth.sym as Symbol.MethodSymbol
-            is JCTree.JCIdent -> meth.sym as Symbol.MethodSymbol
+            is JCTree.JCFieldAccess -> meth.sym
+            is JCTree.JCIdent -> meth.sym
             else -> null
         }
 
@@ -133,7 +133,10 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
         if (op.refactorArguments is RefactorArguments) {
             if (op.refactorArguments?.reorderArguments != null) {
                 val reorders = op.refactorArguments!!.reorderArguments!!
-                val paramNames = methSym?.params()?.map { it.name.toString() }
+                val paramNames = when(methSym) {
+                    is Symbol.MethodSymbol -> methSym.params().map { it.name.toString() }
+                    else -> null
+                }
 
                 if(paramNames != null) {
                     reorders.forEachIndexed { i, reorder ->
