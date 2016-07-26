@@ -12,7 +12,7 @@ class RemoveImportTest: AbstractRefactorTest() {
             |class A {}
         """)
         
-        refactor(a).refactor().removeImport("java.util.List").fix()
+        parseJava(a).refactor().removeImport("java.util.List").fix()
         
         assertRefactored(a, "class A {}")
     }
@@ -24,7 +24,7 @@ class RemoveImportTest: AbstractRefactorTest() {
             |class A {}
         """)
 
-        refactor(a).refactor().removeImport(List::class.java).fix()
+        parseJava(a).refactor().removeImport(List::class.java).fix()
         
         assertRefactored(a, "class A {}")
     }
@@ -36,7 +36,7 @@ class RemoveImportTest: AbstractRefactorTest() {
             |class A {}
         """.trimMargin())
 
-        refactor(a).refactor().removeImport(List::class.java).fix()
+        parseJava(a).refactor().removeImport(List::class.java).fix()
 
         assertRefactored(a, "class A {}")
     }
@@ -50,7 +50,7 @@ class RemoveImportTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a).refactor().removeImport(List::class.java).fix()
+        parseJava(a).refactor().removeImport(List::class.java).fix()
         
         assertRefactored(a, """
             |import java.util.Collection;
@@ -70,7 +70,7 @@ class RemoveImportTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(a).refactor().removeImport("java.util.List").fix()
+        parseJava(a).refactor().removeImport("java.util.List").fix()
 
         assertRefactored(a, """
             |import java.util.*;

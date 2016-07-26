@@ -16,7 +16,7 @@ class FindMethodTest: AbstractRefactorTest() {
             |}
         """)
         
-        val m = refactor(a).findMethods("java.util.Collections emptyList()").first()
+        val m = parseJava(a).findMethods("java.util.Collections emptyList()").first()
         
         assertEquals("Collections.emptyList", m.name)
     }

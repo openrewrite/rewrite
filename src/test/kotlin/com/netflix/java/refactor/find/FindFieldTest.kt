@@ -15,6 +15,6 @@ class FindFieldTest: AbstractRefactorTest() {
             |}
         """)
         
-        assertEquals("list", refactor(a).findFields(List::class.java).first().name)
+        assertEquals("list", parseJava(a).findFields(List::class.java).first().name)
     }
 }

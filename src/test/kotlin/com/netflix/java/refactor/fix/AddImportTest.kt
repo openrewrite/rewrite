@@ -8,7 +8,7 @@ class AddImportTest: AbstractRefactorTest() {
     fun addNamedImport() {
         val a = java("class A {}")
         
-        refactor(a).refactor().addImport("java.util.List").fix()
+        parseJava(a).refactor().addImport("java.util.List").fix()
 
         assertRefactored(a, """
             |import java.util.List;
@@ -20,7 +20,7 @@ class AddImportTest: AbstractRefactorTest() {
     fun addNamedImportByClass() {
         val a = java("class A {}")
         
-        refactor(a).refactor().addImport(List::class.java).fix()
+        parseJava(a).refactor().addImport(List::class.java).fix()
         
         assertRefactored(a, """
             |import java.util.List;
@@ -34,7 +34,7 @@ class AddImportTest: AbstractRefactorTest() {
             |package a;
             |class A {}
         """)
-        refactor(a).refactor().addImport(List::class.java).fix()
+        parseJava(a).refactor().addImport(List::class.java).fix()
 
         assertRefactored(a, """
             |package a;
@@ -72,7 +72,7 @@ class AddImportTest: AbstractRefactorTest() {
                 |class A {}
             """.trimMargin())
 
-            refactor(a, otherImports.plus(b)).refactor().addImport("$pkg.B").fix()
+            parseJava(a, otherImports.plus(b)).refactor().addImport("$pkg.B").fix()
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -89,7 +89,7 @@ class AddImportTest: AbstractRefactorTest() {
             |class A {}
         """)
 
-        refactor(a).refactor().addImport(List::class.java).fix()
+        parseJava(a).refactor().addImport(List::class.java).fix()
 
         assertRefactored(a, """
             |package a;
@@ -108,7 +108,7 @@ class AddImportTest: AbstractRefactorTest() {
             |class A {}
         """)
 
-        refactor(a).refactor().addImport(List::class.java).fix()
+        parseJava(a).refactor().addImport(List::class.java).fix()
 
         assertRefactored(a, """
             |package a;
@@ -127,7 +127,7 @@ class AddImportTest: AbstractRefactorTest() {
             |class A {}
         """)
 
-        refactor(a).refactor().addImport(List::class.java).fix()
+        parseJava(a).refactor().addImport(List::class.java).fix()
 
         assertRefactored(a, """
             |package a;
@@ -145,7 +145,7 @@ class AddImportTest: AbstractRefactorTest() {
             |class A {}
         """)
 
-        refactor(a).refactor().addStaticImport("java.util.Collections", "emptyList").fix()
+        parseJava(a).refactor().addStaticImport("java.util.Collections", "emptyList").fix()
 
         assertRefactored(a, """
             |import java.util.*;
@@ -158,7 +158,7 @@ class AddImportTest: AbstractRefactorTest() {
     fun dontAddImportWhenClassHasNoPackage() {
         val a = java("class A {}")
         
-        refactor(a).refactor().addImport("C").fix()
+        parseJava(a).refactor().addImport("C").fix()
         
         assertRefactored(a, "class A {}")
     }

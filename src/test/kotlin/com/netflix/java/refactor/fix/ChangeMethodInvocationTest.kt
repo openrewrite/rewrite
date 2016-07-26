@@ -16,7 +16,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b()).refactor()
+        parseJava(a, b()).refactor()
                 .findMethodCalls("B singleArg(String)")
                     .changeName("bar")
                     .done()
@@ -41,7 +41,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b()).refactor()
+        parseJava(a, b()).refactor()
                 .findMethodCalls("B arrArg(String[])")
                     .changeName("bar")
                     .done()
@@ -66,7 +66,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b()).refactor()
+        parseJava(a, b()).refactor()
                 .findMethodCalls("B varargArg(String...)")
                     .changeName("bar")
                     .done()
@@ -92,7 +92,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b()).refactor()
+        parseJava(a, b()).refactor()
                 .findMethodCalls("B singleArg(String)")
                     .changeArguments()
                         .arg(String::class.java)
@@ -137,7 +137,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(c, a, b).refactor()
+        parseJava(c, a, b).refactor()
                 .findMethodCalls("a.A foo()")
                     .changeTarget("b.B")
                     .done()
@@ -179,7 +179,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).refactor()
+        parseJava(c, a, b).refactor()
                 .findMethodCalls("a.A foo()")
                     .changeTarget("b.B")
                     .done()
@@ -223,7 +223,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).refactor()
+        parseJava(c, a, b).refactor()
                 .findMethodCalls("b.B foo()")
                     .changeTargetToVariable("a")
                     .done()
@@ -268,7 +268,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b).refactor()
+        parseJava(c, a, b).refactor()
                 .findMethodCalls("b.B foo()")
                     .changeTargetToVariable("a")
                     .done()
@@ -306,7 +306,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(b, a).refactor()
+        parseJava(b, a).refactor()
                 .findMethodCalls("a.A foo(..)")
                     .changeArguments()
                         .arg(String::class.java)

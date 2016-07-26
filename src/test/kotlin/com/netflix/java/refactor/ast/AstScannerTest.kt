@@ -21,7 +21,7 @@ class AstScannerTest : AbstractRefactorTest() {
         val testng = temp.newFile("testng-6.9.9.jar")
         testng.outputStream().use { it.write(testngDownloaded) }
         
-        refactor(a, emptyList(), listOf(testng)).refactor()
+        parseJava(a, emptyList(), listOf(testng)).refactor()
                 .changeType("org.testng.annotations.Test", "org.junit.Test")
                 .fix()
 

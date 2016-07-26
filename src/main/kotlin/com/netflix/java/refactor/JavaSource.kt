@@ -1,6 +1,7 @@
 package com.netflix.java.refactor
 
 import com.netflix.java.refactor.find.*
+import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 
 class JavaSource(internal val cu: CompilationUnit) {
@@ -8,7 +9,11 @@ class JavaSource(internal val cu: CompilationUnit) {
 
     fun file() = cu.source()
     fun text() = cu.source().readText()
-    fun classes() = cu.jcCompilationUnit.defs.filterIsInstance<JCTree.JCClassDecl>().map { it.name.toString() }
+    fun classes() = cu.jcCompilationUnit.defs
+            .filterIsInstance<JCTree.JCClassDecl>()
+            .map { it.sym }
+            .filterIsInstance<Symbol.ClassSymbol>()
+            .map { it.toString() }
     
     internal var lastCommitChangedFile = false
 

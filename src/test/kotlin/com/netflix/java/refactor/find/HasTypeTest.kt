@@ -16,7 +16,7 @@ class HasTypeTest: AbstractRefactorTest() {
             |}
         """)
         
-        assertTrue(refactor(a).hasType(List::class.java))
+        assertTrue(parseJava(a).hasType(List::class.java))
     }
 
     @Test
@@ -28,6 +28,6 @@ class HasTypeTest: AbstractRefactorTest() {
             |}
         """)
 
-        assertTrue(refactor(a).hasType(Collections::class.java))
+        assertTrue(parseJava(a).hasType(Collections::class.java))
     }
 }

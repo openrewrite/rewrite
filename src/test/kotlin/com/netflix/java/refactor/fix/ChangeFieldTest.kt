@@ -14,7 +14,7 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(a).refactor()
+        parseJava(a).refactor()
                 .findFieldsOfType(List::class.java)
                     .changeType(Collection::class.java)
                     .done()
@@ -38,7 +38,7 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a).refactor()
+        parseJava(a).refactor()
                 .findFieldsOfType(List::class.java)
                     .changeName("list")
                     .done()
@@ -61,7 +61,7 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a).refactor()
+        parseJava(a).refactor()
                 .findFieldsOfType(List::class.java)
                 .delete()
                 .fix()
