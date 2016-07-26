@@ -49,6 +49,16 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
         AnnotationDetector(reporter).detect(*classpath.toList().toTypedArray())
         return scanners
     }
-    
-    fun <T> scan(scanner: JavaSourceScanner<T>): List<T?> = allJava().map { scanner.scan(it) }
+
+    fun <T> scan(scanner: JavaSourceScanner<T>): List<T> = allJava().map { scanner.scan(it) }.filter { it != null }
+
+    fun scanForClasses(predicate: (JavaSource) -> Boolean): List<String> {
+        return scan(object : JavaSourceScanner<List<String>> {
+            override fun scan(source: JavaSource): List<String> {
+                return if (predicate.invoke(source))
+                    source.classes()
+                else emptyList<String>()
+            }
+        }).flatten()
+    }
 }

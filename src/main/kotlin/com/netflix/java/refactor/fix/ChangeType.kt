@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.*
-import com.netflix.java.refactor.ast.FixingOperation
+import com.netflix.java.refactor.ast.RefactoringAstScannerBuilder
 import com.netflix.java.refactor.ast.FixingScanner
 import com.netflix.java.refactor.ast.IfThenScanner
 import com.netflix.java.refactor.ast.className
@@ -10,7 +10,7 @@ import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 
-data class ChangeType(val from: String, val to: String): FixingOperation {
+data class ChangeType(val from: String, val to: String): RefactoringAstScannerBuilder {
     override fun scanner() = IfThenScanner(
             ifFixesResultFrom = ChangeTypeScanner(this),
             then = arrayOf(

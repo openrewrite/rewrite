@@ -16,9 +16,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b())
-                .changeMethod("B singleArg(String)")
-                    .refactorName("bar")
+        refactor(a, b()).refactor()
+                .findMethodCalls("B singleArg(String)")
+                    .changeName("bar")
                     .done()
                 .fix()
         
@@ -41,9 +41,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b())
-                .changeMethod("B arrArg(String[])")
-                    .refactorName("bar")
+        refactor(a, b()).refactor()
+                .findMethodCalls("B arrArg(String[])")
+                    .changeName("bar")
                     .done()
                 .fix()
 
@@ -66,9 +66,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b())
-                .changeMethod("B varargArg(String...)")
-                    .refactorName("bar")
+        refactor(a, b()).refactor()
+                .findMethodCalls("B varargArg(String...)")
+                    .changeName("bar")
                     .done()
                 .fix()
 
@@ -92,11 +92,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a, b())
-                .changeMethod("B singleArg(String)")
-                    .refactorArguments()
+        refactor(a, b()).refactor()
+                .findMethodCalls("B singleArg(String)")
+                    .changeArguments()
                         .arg(String::class.java)
-                            .refactorLiterals { s -> s.toString().replace("%s", "{}") }
+                            .changeLiterals { s -> s.toString().replace("%s", "{}") }
                             .done()
                         .done()
                     .done()
@@ -137,9 +137,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(c, a, b)
-                .changeMethod("a.A foo()")
-                    .refactorTargetToStatic("b.B")
+        refactor(c, a, b).refactor()
+                .findMethodCalls("a.A foo()")
+                    .changeTarget("b.B")
                     .done()
                 .fix()
         
@@ -179,9 +179,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b)
-                .changeMethod("a.A foo()")
-                    .refactorTargetToStatic("b.B")
+        refactor(c, a, b).refactor()
+                .findMethodCalls("a.A foo()")
+                    .changeTarget("b.B")
                     .done()
                 .fix()
 
@@ -223,9 +223,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b)
-                .changeMethod("b.B foo()")
-                    .refactorTargetToVariable("a")
+        refactor(c, a, b).refactor()
+                .findMethodCalls("b.B foo()")
+                    .changeTargetToVariable("a")
                     .done()
                 .fix()
 
@@ -268,9 +268,9 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(c, a, b)
-                .changeMethod("b.B foo()")
-                    .refactorTargetToVariable("a")
+        refactor(c, a, b).refactor()
+                .findMethodCalls("b.B foo()")
+                    .changeTargetToVariable("a")
                     .done()
                 .fix()
 
@@ -306,11 +306,11 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(b, a)
-                .changeMethod("a.A foo(..)")
-                    .refactorArguments()
+        refactor(b, a).refactor()
+                .findMethodCalls("a.A foo(..)")
+                    .changeArguments()
                         .arg(String::class.java)
-                            .refactorLiterals { s -> "anotherstring" }
+                            .changeLiterals { s -> "anotherstring" }
                             .done()
                         .reorderArguments("n", "s")
                         .done()

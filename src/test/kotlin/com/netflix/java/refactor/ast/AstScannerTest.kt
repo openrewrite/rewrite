@@ -4,7 +4,7 @@ import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
 import java.net.URL
 
-class RefactoringScannerTest: AbstractRefactorTest() {
+class AstScannerTest : AbstractRefactorTest() {
     
     @Test
     fun scannerIsAbleToIdentifyTypesFromExternalDependencies() {
@@ -21,8 +21,9 @@ class RefactoringScannerTest: AbstractRefactorTest() {
         val testng = temp.newFile("testng-6.9.9.jar")
         testng.outputStream().use { it.write(testngDownloaded) }
         
-        refactor(a, emptyList(), listOf(testng))
+        refactor(a, emptyList(), listOf(testng)).refactor()
                 .changeType("org.testng.annotations.Test", "org.junit.Test")
+                .fix()
 
         assertRefactored(a, """
             |package a;

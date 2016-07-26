@@ -1,6 +1,6 @@
 package com.netflix.java.refactor.fix
 
-import com.netflix.java.refactor.ast.FixingOperation
+import com.netflix.java.refactor.ast.RefactoringAstScannerBuilder
 import com.netflix.java.refactor.ast.FixingScanner
 import com.netflix.java.refactor.RefactorFix
 import com.sun.source.tree.IdentifierTree
@@ -10,7 +10,7 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class RemoveImport(val clazz: String) : FixingOperation {
+class RemoveImport(val clazz: String) : RefactoringAstScannerBuilder {
     override fun scanner() = RemoveImportScanner(this)
 }
 

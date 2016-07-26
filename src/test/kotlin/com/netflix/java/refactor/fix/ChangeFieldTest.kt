@@ -14,11 +14,12 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
         
-        refactor(a)
-                .changeField(List::class.java)
-                    .refactorType(Collection::class.java)
+        refactor(a).refactor()
+                .findFieldsOfType(List::class.java)
+                    .changeType(Collection::class.java)
                     .done()
                 .fix()
+        
         
         assertRefactored(a, """
             |import java.util.Collection;
@@ -37,9 +38,9 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a)
-                .changeField(List::class.java)
-                    .refactorName("list")
+        refactor(a).refactor()
+                .findFieldsOfType(List::class.java)
+                    .changeName("list")
                     .done()
                 .fix()
 
@@ -60,7 +61,10 @@ class ChangeFieldTest: AbstractRefactorTest() {
             |}
         """)
 
-        refactor(a).changeField(List::class.java).delete().fix()
+        refactor(a).refactor()
+                .findFieldsOfType(List::class.java)
+                .delete()
+                .fix()
 
         assertRefactored(a, """
             |import java.util.List;

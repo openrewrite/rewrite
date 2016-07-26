@@ -12,8 +12,8 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : FixingOperation {
-    override fun scanner(): RefactoringScanner<List<RefactorFix>> =
+class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : RefactoringAstScannerBuilder {
+    override fun scanner(): AstScanner<List<RefactorFix>> =
             if (refactorTargetToStatic is String) {
                 IfThenScanner(ifFixesResultFrom = ChangeMethodInvocationScanner(this),
                         then = arrayOf(
@@ -30,24 +30,33 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : F
     internal var refactorTargetToStatic: String? = null
     internal var refactorTargetToVariable: String? = null
 
-    fun refactorName(name: String): ChangeMethodInvocation {
+    fun changeName(name: String): ChangeMethodInvocation {
         refactorName = name
         return this
     }
 
-    fun refactorArguments(): RefactorArguments {
+    fun changeArguments(): RefactorArguments {
         refactorArguments = RefactorArguments(this)
         return refactorArguments!!
     }
 
-    fun refactorTargetToStatic(clazz: String): ChangeMethodInvocation {
+    /**
+     * Change to a static method invocation on clazz
+     */
+    fun changeTarget(clazz: String): ChangeMethodInvocation {
         refactorTargetToStatic = clazz
         return this
     }
 
-    fun refactorTargetToStatic(clazz: Class<*>) = refactorTargetToStatic(clazz.name)
+    /**
+     * Change to a static method invocation on clazz
+     */
+    fun changeTarget(clazz: Class<*>) = changeTarget(clazz.name)
 
-    fun refactorTargetToVariable(variable: String): ChangeMethodInvocation {
+    /**
+     * Change the target to a named variable
+     */
+    fun changeTargetToVariable(variable: String): ChangeMethodInvocation {
         refactorTargetToVariable = variable
         return this
     }
@@ -84,16 +93,10 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
 open class RefactorArgument(val op: RefactorArguments,
                             val typeConstraint: String? = null,
                             val posConstraint: Int? = null) {
-    var moveToLast: Boolean = false
     var refactorLiterals: ((Any) -> Any)? = null
 
-    fun refactorLiterals(transform: (Any) -> Any): RefactorArgument {
+    fun changeLiterals(transform: (Any) -> Any): RefactorArgument {
         this.refactorLiterals = transform
-        return this
-    }
-
-    fun moveToLast(): RefactorArgument {
-        this.moveToLast = true
         return this
     }
 

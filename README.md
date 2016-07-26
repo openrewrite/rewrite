@@ -45,8 +45,8 @@ To create a new rule, provide a public static method annotated with `@Refactor` 
 public class FooToBar extends JavaSourceVisitor {
     public void visit(JavaSource source) {
         source.refactor()
-            .changeMethod("B foo(int)")
-                .refactorName("bar")
+            .findMethodCalls("B foo(int)")
+                .changeName("bar")
                 .done()
             .changeType(B.class, B2.class)
             .fix();

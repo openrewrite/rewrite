@@ -8,17 +8,17 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-data class ChangeField(val clazz: String, val tx: RefactorTransaction) : FixingOperation {
+data class ChangeField(val clazz: String, val tx: RefactorTransaction) : RefactoringAstScannerBuilder {
     var refactorTargetType: String? = null
     var refactorName: String? = null
     var refactorDelete: Boolean = false
     
-    fun refactorType(clazz: Class<*>): ChangeField {
+    fun changeType(clazz: Class<*>): ChangeField {
         refactorTargetType = clazz.name
         return this
     }
 
-    fun refactorName(name: String): ChangeField {
+    fun changeName(name: String): ChangeField {
         refactorName = name
         return this
     }

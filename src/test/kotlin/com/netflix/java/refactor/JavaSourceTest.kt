@@ -26,7 +26,7 @@ class JavaSourceTest : AbstractRefactorTest() {
         
         val refactorer = refactor(a, b, c)
         
-        refactorer.changeType("B", "C")
+        refactorer.refactor().changeType("B", "C").fix()
         
         assertRefactored(a, """
             |public class A {
@@ -37,9 +37,9 @@ class JavaSourceTest : AbstractRefactorTest() {
             |}
         """)
         
-        refactorer
-                .changeMethod("C foo()")
-                    .refactorName("bar")
+        refactorer.refactor()
+                .findMethodCalls("C foo()")
+                    .changeName("bar")
                     .done()
                 .fix()
         

@@ -38,8 +38,8 @@ class RefactorAndFixSourceTaskTest: TestKitTest() {
             |   @Refactor(value = "foo-to-bar", description = "replace foo() with bar()")
             |   public static RefactorRule fooToBar() {
             |       return new RefactorRule()
-            |           .changeMethod("B foo(int)")
-            |               .refactorName("bar")
+            |           .findMethodCalls("B foo(int)")
+            |               .changeName("bar")
             |                   .done();
             |   }
             |}

@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.ast.BaseRefactoringScanner
-import com.netflix.java.refactor.ast.RefactorOperation
+import com.netflix.java.refactor.ast.SingleCompilationUnitAstScanner
+import com.netflix.java.refactor.ast.AstScannerBuilder
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.code.Symbol
@@ -9,11 +9,11 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 
 
-class HasType(val clazz: String): RefactorOperation<Boolean> {
+class HasType(val clazz: String): AstScannerBuilder<Boolean> {
     override fun scanner() = HasTypeScanner(this)
 }
 
-class HasTypeScanner(val op: HasType): BaseRefactoringScanner<Boolean>() {
+class HasTypeScanner(val op: HasType): SingleCompilationUnitAstScanner<Boolean>() {
     override fun visitIdentifier(node: IdentifierTree, context: Context): Boolean {
         val ident = node as JCTree.JCIdent
         if(ident.sym is Symbol.ClassSymbol) {

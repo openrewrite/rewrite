@@ -12,13 +12,13 @@ import java.io.File
  * A separate instance will be created for each file scan, so implementations can safely hold state
  * about a source file without having to clean it up.
  */
-interface RefactoringScanner<T> {
+interface AstScanner<T> {
     fun scan(cu: CompilationUnit): T
 }
 
-abstract class BaseRefactoringScanner<T> :
+abstract class SingleCompilationUnitAstScanner<T> :
         TreePathScanner<T, Context>(),
-        RefactoringScanner<T> {
+        AstScanner<T> {
 
     protected lateinit var cu: JCTree.JCCompilationUnit
     protected val source: File by lazy { File(cu.sourcefile.toUri().path) }
@@ -69,20 +69,20 @@ abstract class BaseRefactoringScanner<T> :
             sourceText.substring(startPosition, getEndPosition(cu.endPositions))
 }
 
-open class FixingScanner : BaseRefactoringScanner<List<RefactorFix>>() {
+open class FixingScanner : SingleCompilationUnitAstScanner<List<RefactorFix>>() {
     override fun reduce(r1: List<RefactorFix>?, r2: List<RefactorFix>?): List<RefactorFix> =
         (r1 ?: emptyList()).plus(r2 ?: emptyList())
 }
 
-class CompositeScanner(vararg val scanners: RefactoringScanner<List<RefactorFix>>): RefactoringScanner<List<RefactorFix>> {
+class CompositeScanner(vararg val scanners: AstScanner<List<RefactorFix>>): AstScanner<List<RefactorFix>> {
     override fun scan(cu: CompilationUnit) =
         scanners.fold(emptyList<RefactorFix>()) { acc, scanner -> 
             acc.plus(scanner.scan(cu))
         }
 }
 
-class IfThenScanner(val ifFixesResultFrom: RefactoringScanner<List<RefactorFix>>,
-                    then: Array<RefactoringScanner<List<RefactorFix>>>): RefactoringScanner<List<RefactorFix>> {
+class IfThenScanner(val ifFixesResultFrom: AstScanner<List<RefactorFix>>,
+                    then: Array<AstScanner<List<RefactorFix>>>): AstScanner<List<RefactorFix>> {
     private val compositeThenRun = CompositeScanner(*then)
     
     override fun scan(cu: CompilationUnit): List<RefactorFix> {

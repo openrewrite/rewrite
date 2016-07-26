@@ -7,7 +7,7 @@ import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
 
-class AddImport(val clazz: String, val staticMethod: String? = null): FixingOperation {
+class AddImport(val clazz: String, val staticMethod: String? = null): RefactoringAstScannerBuilder {
     override fun scanner() = if(packageOwner(clazz).isNotEmpty())
         AddImportScanner(this)
     else NoOpScanner
