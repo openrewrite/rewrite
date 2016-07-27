@@ -29,7 +29,7 @@ class FindFieldScanner(val op: FindFields): SingleCompilationUnitAstScanner<List
         val fields = (type.tsym as Symbol.ClassSymbol).members_field.elements
                 .filter { it is Symbol.VarSymbol }
                 .filter { it.type.toString() == op.clazz }
-                .filter { it.flags() and Flags.PRIVATE.toLong() != 0L }
+                .filter { it.flags() and Flags.PRIVATE.toLong() == 0L }
                 .map { Field(it.name.toString()) }
 
         return fields + if(op.includeInherited) superFields(type.supertype_field as Type.ClassType) 
