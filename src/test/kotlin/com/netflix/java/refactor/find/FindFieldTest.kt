@@ -9,12 +9,26 @@ class FindFieldTest: AbstractRefactorTest() {
     @Test
     fun findField() {
         val a = java("""
-            |import java.util.List;
-            |public class A {
-            |   List list;
-            |}
+            import java.util.List;
+            public class A {
+               List list;
+            }
         """)
         
-        assertEquals("list", parseJava(a).findFields(List::class.java).first().name)
+        assertEquals("list", parseJava(a).findFields(List::class.java).firstOrNull()?.name)
+    }
+    
+    @Test
+    fun findFieldOnParentClass() {
+        val a = java("""
+            import java.util.List;
+            public class A {
+               List list;
+            }
+        """)
+        
+        val b = java("public class B extends A { }")
+
+        assertEquals("list", parseJava(b, a).findFields(List::class.java).firstOrNull()?.name)
     }
 }
