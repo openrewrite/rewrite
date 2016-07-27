@@ -65,8 +65,8 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : R
 }
 
 class RefactorArguments(val op: ChangeMethodInvocation) {
-    val individualArgumentRefactors = ArrayList<RefactorArgument>()
-    var reorderArguments: List<String>? = null
+    internal val individualArgumentRefactors = ArrayList<RefactorArgument>()
+    internal var reorderArguments: List<String>? = null
 
     fun arg(clazz: String): RefactorArgument {
         val arg = RefactorArgument(this, typeConstraint = clazz)
@@ -82,7 +82,7 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
         return arg
     }
 
-    fun reorderArguments(vararg nameOrType: String): RefactorArguments {
+    fun reorderByArgName(vararg nameOrType: String): RefactorArguments {
         reorderArguments = nameOrType.toList()
         return this
     }
@@ -93,7 +93,7 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
 open class RefactorArgument(val op: RefactorArguments,
                             val typeConstraint: String? = null,
                             val posConstraint: Int? = null) {
-    var refactorLiterals: ((Any) -> Any)? = null
+    internal var refactorLiterals: ((Any) -> Any)? = null
 
     fun changeLiterals(transform: (Any) -> Any): RefactorArgument {
         this.refactorLiterals = transform

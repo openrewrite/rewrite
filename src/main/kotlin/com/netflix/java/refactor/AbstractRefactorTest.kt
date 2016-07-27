@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.util.regex.Pattern
 
 abstract class AbstractRefactorTest {
     @JvmField @Rule
@@ -29,4 +30,12 @@ abstract class AbstractRefactorTest {
     fun assertRefactored(file: File, refactored: String) {
         assertEquals(refactored.trimMargin(), file.readText())
     }
+}
+
+fun fullyQualifiedName(sourceStr: String): String? {
+    val pkgMatcher = Pattern.compile("\\s*package\\s+([\\w\\.]+)").matcher(sourceStr)
+    val pkg = if (pkgMatcher.find()) pkgMatcher.group(1) + "." else ""
+
+    val classMatcher = Pattern.compile("\\s*(class|interface|enum)\\s+(\\w+)").matcher(sourceStr)
+    return if (classMatcher.find()) pkg + classMatcher.group(2) else null
 }

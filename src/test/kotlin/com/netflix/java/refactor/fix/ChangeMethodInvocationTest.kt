@@ -312,7 +312,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
                         .arg(String::class.java)
                             .changeLiterals { s -> "anotherstring" }
                             .done()
-                        .reorderArguments("n", "s")
+                        .reorderByArgName("n", "s")
                         .done()
                     .done()
                 .fix()
@@ -323,6 +323,46 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |   A a;
             |   public void test() {
             |       a.foo(0, "anotherstring");
+            |   }
+            |}
+        """)
+    }
+
+    @Test
+    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsAVararg() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo(String s, Integer n, Object... o) {}
+            |   public void bar(String s, Object... o) {}
+            |}
+        """)
+
+        val b = java("""
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.foo("mystring", 0, "a");
+            |   }
+            |}
+        """)
+
+        parseJava(b, a).refactor()
+                .findMethodCalls("a.A foo(..)")
+                    .changeName("bar")
+                    .changeArguments()
+                        .reorderByArgName("s", "o", "n")
+                        .done()
+                    .done()
+                .fix()
+
+        assertRefactored(b, """
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.bar("mystring", "a", 0);
             |   }
             |}
         """)
