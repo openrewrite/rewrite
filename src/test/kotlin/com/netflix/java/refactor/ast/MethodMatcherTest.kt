@@ -23,9 +23,7 @@ class MethodMatcherTest {
         assertTrue(nameRegex("A foo()").matches("foo"))
         assertTrue(nameRegex("A *()").matches("foo"))
         assertTrue(nameRegex("A fo*()").matches("foo"))
-
-        // FIXME see section 5.4 in the Definitive ANTLR4 Reference for why ambiguity in the grammar places the star with the type expression
-        assertFalse(nameRegex("A *oo()").matches("foo"))
+        assertTrue(nameRegex("A *oo()").matches("foo"))
     }
 
     val argRegex = { signature: String -> MethodMatcher(signature).argumentPattern }

@@ -5,7 +5,7 @@ options { tokenVocab=AspectJLexer; }
 import JavaParser;
 	
 methodPattern
-	:	targetTypePattern simpleNamePattern formalParametersPattern
+	:	targetTypePattern SPACE simpleNamePattern formalParametersPattern
 	;
 
 formalParametersPattern
