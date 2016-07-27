@@ -17,7 +17,7 @@ formalsPattern
 	|	optionalParensTypePattern (',' formalsPattern)* 
 	|	formalTypePattern '...'
 	;
-	
+
 dotDot
     :   '..'
     ;
