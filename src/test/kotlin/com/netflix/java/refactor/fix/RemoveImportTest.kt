@@ -30,6 +30,25 @@ class RemoveImportTest: AbstractRefactorTest() {
     }
     
     @Test
+    fun leaveImportIfRemovedTypeIsStillReferredTo() {
+        val a = java("""
+            |import java.util.List;
+            |class A {
+            |   List list;
+            |}
+        """)
+
+        parseJava(a).refactor().removeImport(List::class.java).fix()
+
+        assertRefactored(a, """
+            |import java.util.List;
+            |class A {
+            |   List list;
+            |}
+        """)
+    }
+    
+    @Test
     fun removeStarImportIfNoTypesReferredTo() {
         val a = java("""
             |import java.util.*;

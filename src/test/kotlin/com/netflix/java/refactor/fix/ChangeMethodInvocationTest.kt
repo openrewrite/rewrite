@@ -368,6 +368,38 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         """)
     }
 
+    @Test
+    fun refactorMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken() {
+        val b = java("""
+            |class B {
+            |   public void error() {}
+            |   public void foo() {}
+            |}
+        """)
+        
+        val a = java("""
+            |class A {
+            |   public void test() {
+            |       new B().error();
+            |   }
+            |}
+        """)
+
+        parseJava(a, b).refactor()
+                .findMethodCalls("B error()")
+                    .changeName("foo")
+                    .done()
+                .fix()
+
+        assertRefactored(a, """
+            |class A {
+            |   public void test() {
+            |       new B().foo();
+            |   }
+            |}
+        """)
+    }
+
     private fun b(): File = java("""
                 |class B {
                 |   public void singleArg(String s) {}
