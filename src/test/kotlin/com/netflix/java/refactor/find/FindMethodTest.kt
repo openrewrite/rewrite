@@ -7,7 +7,7 @@ import org.junit.Test
 class FindMethodTest: AbstractRefactorTest() {
 
     @Test
-    fun findMethod() {
+    fun findMethodCalls() {
         
         val a = java("""
             |import java.util.Collections;
@@ -16,7 +16,7 @@ class FindMethodTest: AbstractRefactorTest() {
             |}
         """)
         
-        val m = parseJava(a).findMethods("java.util.Collections emptyList()").first()
+        val m = parseJava(a).findMethodCalls("java.util.Collections emptyList()").first()
         
         assertEquals("Collections.emptyList", m.name)
     }

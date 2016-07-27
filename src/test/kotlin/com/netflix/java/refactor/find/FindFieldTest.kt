@@ -3,6 +3,7 @@ package com.netflix.java.refactor.find
 import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import kotlin.test.assertTrue
 
 class FindFieldTest: AbstractRefactorTest() {
     
@@ -19,16 +20,20 @@ class FindFieldTest: AbstractRefactorTest() {
     }
     
     @Test
-    fun findFieldOnParentClass() {
+    fun findInheritedField() {
         val a = java("""
-            import java.util.List;
+            import java.util.*;
             public class A {
                List list;
+               private Set set;
             }
         """)
         
         val b = java("public class B extends A { }")
 
-        assertEquals("list", parseJava(b, a).findFields(List::class.java).firstOrNull()?.name)
+        assertTrue(parseJava(b, a).findFields(List::class.java).isEmpty())
+
+        assertEquals("list", parseJava(b, a).findFieldsIncludingInherited(List::class.java).firstOrNull()?.name)
+        assertTrue(parseJava(b, a).findFieldsIncludingInherited(Set::class.java).isEmpty())
     }
 }

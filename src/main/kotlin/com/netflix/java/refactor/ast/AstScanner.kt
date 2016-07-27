@@ -45,6 +45,9 @@ abstract class SingleCompilationUnitAstScanner<T> :
         return RefactorFix(end..end, changes, source)
     }
 
+    protected fun insertAfter(pos: Int, changes: String): RefactorFix =
+        RefactorFix(pos..pos, changes, source)
+    
     protected fun JCTree.insertBefore(changes: String) =
             RefactorFix(this.startPosition..this.startPosition, changes, source)
 

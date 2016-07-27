@@ -28,7 +28,16 @@ class JavaSource(internal val cu: CompilationUnit) {
     }
     
     fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).scanner().scan(cu)
+
+    /**
+     * Find fields defined on this class, but do not include inherited fields up the type hierarchy 
+     */
+    fun findFields(clazz: Class<*>): List<Field> = FindFields(clazz.name, false).scanner().scan(cu)
+
+    /**
+     * Find fields defined both on this class and visible inherited fields up the type hierarchy
+     */
+    fun findFieldsIncludingInherited(clazz: Class<*>): List<Field> = FindFields(clazz.name, true).scanner().scan(cu)
     
-    fun findFields(clazz: Class<*>): List<Field> = FindFields(clazz.name).scanner().scan(cu)
-    fun findMethods(signature: String): List<Method> = FindMethods(signature).scanner().scan(cu)
+    fun findMethodCalls(signature: String): List<Method> = FindMethods(signature).scanner().scan(cu)
 }

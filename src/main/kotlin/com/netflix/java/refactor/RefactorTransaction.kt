@@ -48,6 +48,13 @@ class RefactorTransaction(val refactorer: JavaSource) {
     }
 
     fun addStaticImport(clazz: Class<*>, method: String) = addStaticImport(clazz.name, method)
+    
+    fun addField(clazz: Class<*>, name: String, init: String?): RefactorTransaction {
+        ops.add(AddField(clazz.name, name, init))
+        return this
+    }
+    
+    fun addField(clazz: Class<*>, name: String) = addField(clazz, name, null)
 
     fun fix() {
         val fixes = ops.flatMap { it.scanner().scan(refactorer.cu) }
