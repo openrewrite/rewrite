@@ -11,6 +11,7 @@ import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import java.util.*
+import java.util.regex.Pattern
 
 class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : RefactoringAstScannerBuilder {
     override fun scanner(): AstScanner<List<RefactorFix>> =
@@ -197,7 +198,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
 
             // prefix and suffix hold the special characters surrounding the values of primitive-ish types,
             // e.g. the "" around String, the L at the end of a long, etc.
-            val valueMatcher = "(.*)$value(.*)".toRegex().find(node.toString())
+            val valueMatcher = "(.*)${Pattern.quote(value.toString())}(.*)".toRegex().find(node.toString())
             val (prefix, suffix) = valueMatcher!!.groupValues.drop(1)
 
             val transformed = refactor.refactorLiterals?.invoke(value) ?: value

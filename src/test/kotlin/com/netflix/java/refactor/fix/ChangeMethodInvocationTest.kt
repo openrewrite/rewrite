@@ -87,7 +87,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |class A {
             |   public void test() {
             |       String s = "bar";
-            |       new B().singleArg("foo %s " + s + 0L);
+            |       new B().singleArg("foo (%s)" + s + 0L);
             |   }
             |}
         """)
@@ -106,7 +106,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |class A {
             |   public void test() {
             |       String s = "bar";
-            |       new B().singleArg("foo {} " + s + 0L);
+            |       new B().singleArg("foo ({})" + s + 0L);
             |   }
             |}
         """)
@@ -328,6 +328,8 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         """)
     }
 
+    
+    
     @Test
     fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsAVararg() {
         val a = java("""
