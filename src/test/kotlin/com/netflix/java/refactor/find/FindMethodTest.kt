@@ -33,7 +33,7 @@ class FindMethodTest: AbstractRefactorTest() {
         val b = java("""
             |public class B {
             |   public void test() {
-            |       new A().foo("s", "a");
+            |       new A().foo("s", "a", 1);
             |   }
             |}
         """)

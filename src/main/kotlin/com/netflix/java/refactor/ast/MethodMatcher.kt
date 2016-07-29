@@ -60,15 +60,7 @@ class MethodMatcher(signature: String) {
         }
         
         val args = when(methodSymbol) {
-            is Symbol.MethodSymbol -> {
-                methodSymbol.params().map {
-                    val baseType = it.type.toString()
-                    if (it.flags() and Flags.VARARGS != 0L) {
-                        baseType.substringBefore("[") + "..."
-                    } else
-                        baseType
-                }.joinToString(",")
-            }
+            is Symbol.MethodSymbol -> methodSymbol.params().map { it.type.toString() }.joinToString(",")
 
             // This is a weird case... for some reason the attribution phase will sometimes assign a ClassSymbol to
             // method invocation, making the parameters of the resolved method inaccessible to us. In these cases,
@@ -97,14 +89,13 @@ fun String.aspectjToRegexSyntax() = this
         .replace("[", "\\[").replace("]", "\\]")
         .replace("([^\\.])*.([^\\.])*", "$1\\.$2")
         .replace("*", "[^\\.]*")
+        .replace("...", "\\[\\]")
         .replace("..", "\\.(.+\\.)?")
 
 class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
     override fun visitClassNameOrInterface(ctx: RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
         return ctx.children // all TerminalNode instances
-                .map {
-                    it.text.aspectjToRegexSyntax()
-                }
+                .map { it.text.aspectjToRegexSyntax() }
                 .joinToString("")
                 .let { className ->
                     if(!className.contains('.')) {
@@ -186,6 +177,6 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
                     else argument.regex
                 }
             }
-        }.joinToString("")
+        }.joinToString("").aspectjToRegexSyntax()
     }
 }
