@@ -1,7 +1,5 @@
 package com.netflix.java.refactor.ast
 
-import com.netflix.java.refactor.ast.MethodMatcher
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -61,7 +59,7 @@ class MethodMatcherTest {
 
     @Test
     fun matchesMethodSymbolsWithVarargs() {
-        // TODO implement me
+        argRegex("A foo(String, Object...)").matches("String,Object[]")
     }
 
     @Test

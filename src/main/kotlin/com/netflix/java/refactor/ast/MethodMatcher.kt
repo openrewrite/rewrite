@@ -9,6 +9,7 @@ import com.sun.tools.javac.tree.JCTree
 import org.antlr.v4.runtime.ANTLRInputStream
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.TerminalNode
+import org.antlr.v4.runtime.tree.Trees
 import java.util.*
 
 class MethodMatcher(signature: String) {
@@ -179,7 +180,11 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
                         "(,${argument.regex})?"
                     else "(${argument.regex},)?"
                 }
-                is Argument.FormalType -> argument.regex
+                is Argument.FormalType -> {
+                    if(i > 0 && arguments[i-1] !is Argument.DotDot)
+                        ",${argument.regex}"
+                    else argument.regex
+                }
             }
         }.joinToString("")
     }

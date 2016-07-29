@@ -13,8 +13,8 @@ formalParametersPattern
 	;
 
 formalsPattern
-	:	dotDot (',' formalsPatternAfterDotDot)* 
-	|	optionalParensTypePattern (',' formalsPattern)* 
+	:	dotDot (',' SPACE* formalsPatternAfterDotDot)* 
+	|	optionalParensTypePattern (',' SPACE* formalsPattern)* 
 	|	formalTypePattern '...'
 	;
 
@@ -23,7 +23,7 @@ dotDot
     ;
 	                 
 formalsPatternAfterDotDot
-	:	optionalParensTypePattern (',' formalsPatternAfterDotDot)* 
+	:	optionalParensTypePattern (',' SPACE* formalsPatternAfterDotDot)* 
 	|	formalTypePattern '...'
 	;
 
