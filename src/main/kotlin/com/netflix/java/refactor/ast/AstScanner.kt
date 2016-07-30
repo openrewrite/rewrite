@@ -40,12 +40,12 @@ abstract class SingleCompilationUnitAstScanner<T> :
     
     protected fun replace(range: IntRange, changes: String) = RefactorFix(range, changes, source)
     
-    protected fun JCTree.insertAfter(changes: String): RefactorFix {
+    protected fun JCTree.insertAt(changes: String): RefactorFix {
         val end = this.getEndPosition(cu.endPositions)+1
         return RefactorFix(end..end, changes, source)
     }
 
-    protected fun insertAfter(pos: Int, changes: String): RefactorFix =
+    protected fun insertAt(pos: Int, changes: String): RefactorFix =
         RefactorFix(pos..pos, changes, source)
     
     protected fun JCTree.insertBefore(changes: String) =

@@ -56,10 +56,10 @@ class AddImportScanner(val op: AddImport): FixingScanner() {
             listOf(imports.first().insertBefore("$importStatementToAdd\n"))
         }
         else if(lastPrior is JCTree.JCImport) {
-            listOf(lastPrior.insertAfter("$importStatementToAdd\n"))
+            listOf(lastPrior.insertAt("$importStatementToAdd\n"))
         }
         else if(cu.packageName != null) {
-            listOf(cu.packageName.insertAfter("\n\n$importStatementToAdd"))
+            listOf(cu.packageName.insertAt("\n\n$importStatementToAdd"))
         }
         else listOf(cu.insertBefore("$importStatementToAdd\n"))
     }

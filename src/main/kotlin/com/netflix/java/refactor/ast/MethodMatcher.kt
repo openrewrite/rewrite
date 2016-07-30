@@ -24,7 +24,7 @@ class MethodMatcher(signature: String) {
             override fun visitMethodPattern(ctx: RefactorMethodSignatureParser.MethodPatternContext): Void? {
                 targetTypePattern = TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()).toRegex()
                 methodNamePattern = ctx.simpleNamePattern().children // all TerminalNode instances
-                        .map { it.toString().aspectjToRegexSyntax() }
+                        .map { it.toString().aspectjNameToRegexSyntax() }
                         .joinToString("")
                         .toRegex()
                 argumentPattern = FormalParameterVisitor().visitFormalParametersPattern(ctx.formalParametersPattern()).toRegex()
@@ -85,17 +85,16 @@ class MethodMatcher(signature: String) {
  * types in any subpackage, or all inner types. e.g. <code>within(com.xerox..*)</code> picks out all join points where
  * the code is in any declaration of a type whose name begins with "com.xerox.".
  */
-fun String.aspectjToRegexSyntax() = this
+fun String.aspectjNameToRegexSyntax() = this
         .replace("[", "\\[").replace("]", "\\]")
         .replace("([^\\.])*.([^\\.])*", "$1\\.$2")
         .replace("*", "[^\\.]*")
-        .replace("...", "\\[\\]")
         .replace("..", "\\.(.+\\.)?")
 
 class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
     override fun visitClassNameOrInterface(ctx: RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
         return ctx.children // all TerminalNode instances
-                .map { it.text.aspectjToRegexSyntax() }
+                .map { it.text.aspectjNameToRegexSyntax() }
                 .joinToString("")
                 .let { className ->
                     if(!className.contains('.')) {
@@ -177,6 +176,6 @@ class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>()
                     else argument.regex
                 }
             }
-        }.joinToString("").aspectjToRegexSyntax()
+        }.joinToString("").replace("...", "\\[\\]")
     }
 }

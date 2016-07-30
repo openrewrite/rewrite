@@ -68,6 +68,7 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : R
 class RefactorArguments(val op: ChangeMethodInvocation) {
     internal val individualArgumentRefactors = ArrayList<RefactorArgument>()
     internal var reorderArguments: List<String>? = null
+    internal val insertions = ArrayList<InsertArgument>()
 
     fun arg(clazz: String): RefactorArgument {
         val arg = RefactorArgument(this, typeConstraint = clazz)
@@ -87,9 +88,16 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
         reorderArguments = nameOrType.toList()
         return this
     }
+    
+    fun insert(pos: Int, value: String): RefactorArguments {
+        insertions.add(InsertArgument(pos, value))
+        return this
+    }
 
     fun done() = op
 }
+
+data class InsertArgument(val pos: Int, val value: String)
 
 open class RefactorArgument(val op: RefactorArguments,
                             val typeConstraint: String? = null,
@@ -166,6 +174,19 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
                     arg.changesToArgument(i)?.let { changes ->
                         fixes.add(arg.replace(changes))
                     }
+                }
+            }
+            
+            op.refactorArguments?.insertions?.forEach { insertion ->
+                if(invocation.arguments.isEmpty()) {
+                    val argStart = sourceText.indexOf('(', invocation.methodSelect.getEndPosition(cu.endPositions)) + 1
+                    fixes.add(insertAt(argStart, "${if(insertion.pos > 0) ", " else ""}${insertion.value}"))
+                }
+                else if(invocation.arguments.size <= insertion.pos) {
+                    fixes.add(insertAt(invocation.arguments.last().getEndPosition(cu.endPositions), ", ${insertion.value}"))
+                }
+                else {
+                    fixes.add(insertAt(invocation.arguments[insertion.pos].startPosition, "${insertion.value}, "))
                 }
             }
         }

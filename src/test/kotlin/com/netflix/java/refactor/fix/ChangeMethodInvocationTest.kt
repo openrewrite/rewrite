@@ -402,6 +402,63 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         """)
     }
 
+    @Test
+    fun refactorInsertArgument() {
+        val b = java("""
+            |class B {
+            |   public void foo() {}
+            |   public void foo(String s) {}
+            |   public void foo(String s1, String s2) {}
+            |   public void foo(String s1, String s2, String s3) {}
+            |
+            |   public void bar(String s, String s2) {}
+            |   public void bar(String s, String s2, String s3) {}
+            |}
+        """)
+
+        val a = java("""
+            |class A {
+            |   public void test() {
+            |       B b = new B();
+            |       b.foo();
+            |       b.foo("1");
+            |       b.bar("1", "2");
+            |   }
+            |}
+        """)
+
+        parseJava(a, b).refactor()
+                .findMethodCalls("B foo(String)")
+                    .changeArguments()
+                        .insert(0, "\"0\"") // insert at beginning
+                        .insert(2, "\"2\"") // insert at end
+                        .done()
+                    .done()
+                .findMethodCalls("B foo()")
+                    .changeArguments()
+                        .insert(0, "\"0\"")
+                        .done()
+                    .done()
+                .findMethodCalls("B bar(String, String)")
+                    .changeArguments()
+                        .reorderByArgName("s2", "s") // compatibility of reordering and insertion
+                        .insert(0, "\"0\"")
+                        .done()
+                    .done()
+                .fix()
+
+        assertRefactored(a, """
+            |class A {
+            |   public void test() {
+            |       B b = new B();
+            |       b.foo("0");
+            |       b.foo("0", "1", "2");
+            |       b.bar("0", "2", "1");
+            |   }
+            |}
+        """)
+    }
+
     private fun b(): File = java("""
                 |class B {
                 |   public void singleArg(String s) {}

@@ -63,6 +63,11 @@ class MethodMatcherTest {
     }
 
     @Test
+    fun dotDotMatchesArrayArgs() {
+        argRegex("A foo(..)").matches("String,Object[]")
+    }
+
+    @Test
     fun matchesArrayArguments() {
         assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
     }
