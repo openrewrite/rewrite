@@ -68,6 +68,7 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : R
 class RefactorArguments(val op: ChangeMethodInvocation) {
     internal val individualArgumentRefactors = ArrayList<RefactorArgument>()
     internal var reorderArguments: List<String>? = null
+    internal var argumentNames: List<String>? = null
     internal val insertions = ArrayList<InsertArgument>()
 
     fun arg(clazz: String): RefactorArgument {
@@ -83,9 +84,14 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
         individualArgumentRefactors.add(arg)
         return arg
     }
+    
+    fun whereArgNamesAre(vararg name: String): RefactorArguments {
+        this.argumentNames = name.toList()
+        return this
+    }
 
-    fun reorderByArgName(vararg nameOrType: String): RefactorArguments {
-        reorderArguments = nameOrType.toList()
+    fun reorderByArgName(vararg name: String): RefactorArguments {
+        reorderArguments = name.toList()
         return this
     }
     
@@ -160,8 +166,14 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
 
                         val arg = invocation.arguments[i]
                         if (paramNames[i] != reorder) {
-                            val swap = invocation.arguments.filterIndexed { j, swap -> paramNames[j] == reorder }.firstOrNull() ?: 
-                                    throw RuntimeException("Unable to find argument '$reorder' on method")
+                            var swap = invocation.arguments.filterIndexed { j, swap -> paramNames[j] == reorder }.firstOrNull()
+                            if(swap == null) {
+                                val pos = op.refactorArguments?.argumentNames?.indexOf(reorder) ?: -1
+                                if(pos >= 0)
+                                    swap = invocation.arguments[pos]
+                            }
+                            if(swap == null)
+                                throw RuntimeException("Unable to find argument '$reorder' on method")
                             fixes.add(arg.replace(swap.changesToArgument(i) ?: swap.source()))
                         }
                     }

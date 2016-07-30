@@ -285,7 +285,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
     }
-
+    
     @Test
     fun refactorReorderArguments() {
         val a = java("""
@@ -328,7 +328,45 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         """)
     }
 
-    
+    @Test
+    fun refactorReorderArgumentsWithNoSourceAttachment() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo(String arg0, Integer arg1) {}
+            |   public void foo(Integer arg0, String arg1) {}
+            |}
+        """)
+
+        val b = java("""
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.foo("s", 0);
+            |   }
+            |}
+        """)
+
+        parseJava(b, a).refactor()
+                .findMethodCalls("a.A foo(..)")
+                    .changeArguments()
+                        .whereArgNamesAre("s", "n")
+                        .reorderByArgName("n", "s")
+                        .done()
+                    .done()
+                .fix()
+
+        assertRefactored(b, """
+            |import a.*;
+            |public class B {
+            |   A a;
+            |   public void test() {
+            |       a.foo(0, "s");
+            |   }
+            |}
+        """)
+    }
     
     @Test
     fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsAVararg() {
