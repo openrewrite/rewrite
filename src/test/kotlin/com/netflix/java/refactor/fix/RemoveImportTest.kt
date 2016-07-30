@@ -2,6 +2,7 @@ package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Test
+import java.util.*
 
 class RemoveImportTest: AbstractRefactorTest() {
 
@@ -99,4 +100,56 @@ class RemoveImportTest: AbstractRefactorTest() {
             |}
         """)
     }
+
+    @Test
+    fun removeStarStaticImport() {
+        val a = java("""
+            |import static java.util.Collections.*;
+            |class A {}
+        """)
+
+        parseJava(a).refactor().removeImport(Collections::class.java).fix()
+
+        assertRefactored(a, "class A {}")
+    }
+
+    @Test
+    fun leaveStarStaticImportIfReferenceStillExists() {
+        val a = java("""
+            |import static java.util.Collections.*;
+            |class A {
+            |   Object o = emptyList();
+            |}
+        """)
+
+        parseJava(a).refactor().removeImport(Collections::class.java).fix()
+
+        assertRefactored(a, """
+            |import static java.util.Collections.*;
+            |class A {
+            |   Object o = emptyList();
+            |}
+        """)
+    }
+    
+    @Test
+    fun leaveNamedStaticImportIfReferenceStillExists() {
+        val a = java("""
+            |import static java.util.Collections.emptyList;
+            |import static java.util.Collections.emptySet;
+            |class A {
+            |   Object o = emptyList();
+            |}
+        """)
+
+        parseJava(a).refactor().removeImport(Collections::class.java).fix()
+
+        assertRefactored(a, """
+            |import static java.util.Collections.emptyList;
+            |class A {
+            |   Object o = emptyList();
+            |}
+        """)
+    }
+
 }
