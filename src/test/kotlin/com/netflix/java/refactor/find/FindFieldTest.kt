@@ -20,6 +20,18 @@ class FindFieldTest: AbstractRefactorTest() {
     }
     
     @Test
+    fun findPrivateNonInheritedField() {
+        val a = java("""
+            import java.util.List;
+            public class A {
+               private List list;
+            }
+        """)
+
+        assertEquals("list", parseJava(a).findFields(List::class.java).firstOrNull()?.name)
+    }
+    
+    @Test
     fun findInheritedField() {
         val a = java("""
             import java.util.*;

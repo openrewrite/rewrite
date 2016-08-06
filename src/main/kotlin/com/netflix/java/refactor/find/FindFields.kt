@@ -22,17 +22,17 @@ class FindFieldScanner(val op: FindFields): SingleCompilationUnitAstScanner<List
         return cu.defs.filterIsInstance<JCTree.JCClassDecl>().flatMap { superFields(it.type as Type.ClassType) }
     }
     
-    private fun superFields(type: Type.ClassType): List<Field> {
+    private fun superFields(type: Type.ClassType, inHierarchy: Boolean = false): List<Field> {
         if(type.supertype_field == Type.noType)
             return emptyList()
         
         val fields = (type.tsym as Symbol.ClassSymbol).members_field.elements
                 .filter { it is Symbol.VarSymbol }
                 .filter { it.type.toString() == op.clazz }
-                .filter { it.flags() and Flags.PRIVATE.toLong() == 0L }
+                .filter { !inHierarchy || it.flags() and Flags.PRIVATE.toLong() == 0L }
                 .map { Field(it.name.toString()) }
 
-        return fields + if(op.includeInherited) superFields(type.supertype_field as Type.ClassType) 
+        return fields + if(op.includeInherited) superFields(type.supertype_field as Type.ClassType, true) 
             else emptyList()
     }
 
