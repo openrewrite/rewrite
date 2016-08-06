@@ -258,7 +258,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
                 op.refactorArguments?.individualArgumentRefactors?.find { this.type?.matches(it.typeConstraint) ?: false }
 
         return if (refactor is RefactorArgument) {
-            val fixes = ChangeArgumentScanner().scan(TreePath.getPath(cu, this), refactor)
+            val fixes = ChangeArgumentScanner().scan(TreePath.getPath(cu, this), refactor) ?: emptyList()
 
             // aggregate all the fixes to this argument into one "change" replacement rule
             return if (fixes.isNotEmpty()) {
