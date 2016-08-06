@@ -49,11 +49,11 @@ class MethodMatcher(signature: String) {
                     val clazzIdent = ((meth.selected as JCTree.JCNewClass).clazz as JCTree.JCIdent)
                     clazzIdent.type.originalType.toString()
                 } else {
-                    meth.sym.owner.toString()
+                    meth.sym?.owner?.toString()
                 }
             }
             is JCTree.JCIdent -> {
-                meth.sym.owner.toString()
+                meth.sym?.owner?.toString()
             }
             // this is a method invocation on a method in the same class, which we won't be refactoring on ever
             else -> return@matches false
@@ -69,7 +69,7 @@ class MethodMatcher(signature: String) {
             else -> invocation.args.map { it.type.toString() }.joinToString(",")
         }
 
-        return targetTypePattern.matches(targetType) &&
+        return targetType is String && targetTypePattern.matches(targetType) &&
                 methodNamePattern.matches(name.toString()) &&
                 argumentPattern.matches(args)
     }

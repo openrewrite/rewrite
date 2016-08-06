@@ -1,9 +1,10 @@
 package com.netflix.java.refactor.ast
 
-import org.junit.Assert.assertTrue
+import com.netflix.java.refactor.AbstractRefactorTest
+import org.junit.Assert.*
 import org.junit.Test
 
-class MethodMatcherTest {
+class MethodMatcherTest: AbstractRefactorTest() {
     @Test
     fun matchesMethodTargetType() {
         val typeRegex = { signature: String -> MethodMatcher(signature).targetTypePattern }
