@@ -66,12 +66,15 @@ class MethodMatcher(signature: String) {
             // method invocation, making the parameters of the resolved method inaccessible to us. In these cases,
             // we can make a best effort at determining the method's argument types by observing the types that are
             // being passed to it by the code.
-            else -> invocation.args.map { it.type.toString() }.joinToString(",")
+            else -> 
+                if(invocation.args.all { it.type != null })
+                    invocation.args.map { it.type.toString() }.joinToString(",")
+                else null
         }
 
         return targetType is String && targetTypePattern.matches(targetType) &&
                 methodNamePattern.matches(name.toString()) &&
-                argumentPattern.matches(args)
+                args != null && argumentPattern.matches(args)
     }
 }
 
