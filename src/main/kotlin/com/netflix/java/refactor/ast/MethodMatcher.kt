@@ -46,7 +46,7 @@ class MethodMatcher(signature: String) {
             is JCTree.JCFieldAccess -> {
                 if (meth.selected is JCTree.JCNewClass) {
                     // we have to do a bit of spelunking to get the type of a new expression...
-                    (meth.selected as JCTree.JCNewClass).clazz.type.originalType.toString()
+                    (meth.selected as JCTree.JCNewClass).clazz?.type?.originalType?.toString()
                 } else {
                     meth.sym?.owner?.toString()
                 }
