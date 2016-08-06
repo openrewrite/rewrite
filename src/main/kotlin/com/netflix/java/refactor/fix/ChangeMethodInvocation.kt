@@ -255,7 +255,7 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
 
     fun JCTree.JCExpression.changesToArgument(pos: Int): String? {
         val refactor = op.refactorArguments?.individualArgumentRefactors?.find { it.posConstraint == pos } ?:
-                op.refactorArguments?.individualArgumentRefactors?.find { this.type.matches(it.typeConstraint) }
+                op.refactorArguments?.individualArgumentRefactors?.find { this.type?.matches(it.typeConstraint) ?: false }
 
         return if (refactor is RefactorArgument) {
             val fixes = ChangeArgumentScanner().scan(TreePath.getPath(cu, this), refactor)

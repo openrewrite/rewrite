@@ -46,7 +46,7 @@ class ChangeFieldScanner(val op: ChangeField) : FixingScanner() {
     override fun visitVariable(node: VariableTree, context: Context): List<RefactorFix>? {
         val decl = node as JCTree.JCVariableDecl
         
-        if(decl.type.toString() == op.clazz) {
+        if(decl.type?.toString() == op.clazz) {
             return refactorField(decl)
         }
         
