@@ -333,8 +333,8 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         val a = java("""
             |package a;
             |public class A {
-            |   public void foo(String arg0, Integer arg1) {}
-            |   public void foo(Integer arg0, String arg1) {}
+            |   public void foo(String arg0, Integer... arg1) {}
+            |   public void foo(Integer arg0, Integer arg1, String arg2) {}
             |}
         """)
 
@@ -343,7 +343,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |   A a;
             |   public void test() {
-            |       a.foo("s", 0);
+            |       a.foo("s", 0, 1);
             |   }
             |}
         """)
@@ -362,14 +362,14 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |   A a;
             |   public void test() {
-            |       a.foo(0, "s");
+            |       a.foo(0, 1, "s");
             |   }
             |}
         """)
     }
     
     @Test
-    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsAVararg() {
+    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
         val a = java("""
             |package a;
             |public class A {
@@ -383,7 +383,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |   A a;
             |   public void test() {
-            |       a.foo("mystring", 0, "a");
+            |       a.foo("mystring", 0, "a", "b");
             |   }
             |}
         """)
@@ -402,7 +402,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |   A a;
             |   public void test() {
-            |       a.bar("mystring", "a", 0);
+            |       a.bar("mystring", "a", "b", 0);
             |   }
             |}
         """)

@@ -157,24 +157,36 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
                 }
 
                 if(paramNames != null) {
-                    reorders.forEachIndexed { i, reorder ->
-                        if (invocation.arguments.size <= i) {
+                    var argPos = 0
+                    reorders.forEachIndexed { paramPos, reorder ->
+                        if (invocation.arguments.size <= argPos) {
                             // this is a weird case, there are not enough arguments in the invocation to satisfy the reordering specification
                             // TODO what to do?
                             return@forEachIndexed
                         }
 
-                        val arg = invocation.arguments[i]
-                        if (paramNames[i] != reorder) {
-                            var swap = invocation.arguments.filterIndexed { j, swap -> paramNames[j] == reorder }.firstOrNull()
-                            if(swap == null) {
+                        if (paramNames[paramPos] != reorder) {
+                            var swaps = invocation.arguments.filterIndexed { j, swap -> paramNames[Math.min(j, paramNames.size-1)] == reorder }
+
+                            // when no source is attached, we must define names first
+                            if(swaps.isEmpty()) {
                                 val pos = op.refactorArguments?.argumentNames?.indexOf(reorder) ?: -1
-                                if(pos >= 0 && pos < invocation.arguments.size)
-                                    swap = invocation.arguments[pos]
+                                if (pos >= 0 && pos < invocation.arguments.size) {
+                                    swaps = if(pos < op.refactorArguments!!.argumentNames!!.size - 1) {
+                                        listOf(invocation.args[pos])
+                                    } else {
+                                        // this is a varargs argument, grab them all
+                                        invocation.arguments.drop(pos)
+                                    }
+                                }
                             }
-                            if(swap != null)
-                                fixes.add(arg.replace(swap.changesToArgument(i) ?: swap.source()))
+                            
+                            swaps.forEach { swap ->
+                                fixes.add(invocation.arguments[argPos].replace(swap.changesToArgument(argPos) ?: swap.source()))
+                                argPos++
+                            }
                         }
+                        else argPos++
                     }
                 }
                 else {
