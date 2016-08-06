@@ -72,4 +72,25 @@ class MethodMatcherTest: AbstractRefactorTest() {
     fun matchesArrayArguments() {
         assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
     }
+    
+    @Test
+    fun matchOnInnerClass() {
+        val b = java("""
+            |public class B {
+            |   public class C {
+            |       public void foo() {}
+            |   }
+            |}
+        """)
+        
+        val a = java("""
+            |public class A {
+            |   void test() {
+            |       new B.C().foo();
+            |   }
+            |}
+        """)
+        
+        assertEquals(1, parseJava(a, b).findMethodCalls("B.C foo()").size)
+    }
 }
