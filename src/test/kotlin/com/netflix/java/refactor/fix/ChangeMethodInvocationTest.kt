@@ -409,6 +409,43 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
     }
 
     @Test
+    fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |   public void foo(String s, Object... o) {}
+            |}
+        """)
+
+        val b = java("""
+            |import a.*;
+            |public class B {
+            |   public void test() {
+            |       new A().foo("mystring");
+            |   }
+            |}
+        """)
+
+        parseJava(b, a).refactor()
+                .findMethodCalls("a.A foo(..)")
+                    .changeArguments()
+                        .whereArgNamesAre("s", "o")
+                        .reorderByArgName("o", "s")
+                        .done()
+                    .done()
+                .fix()
+
+        assertRefactored(b, """
+            |import a.*;
+            |public class B {
+            |   public void test() {
+            |       new A().foo("mystring");
+            |   }
+            |}
+        """)
+    }
+
+    @Test
     fun refactorMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken() {
         val b = java("""
             |class B {

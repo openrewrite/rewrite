@@ -169,12 +169,11 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
                             var swap = invocation.arguments.filterIndexed { j, swap -> paramNames[j] == reorder }.firstOrNull()
                             if(swap == null) {
                                 val pos = op.refactorArguments?.argumentNames?.indexOf(reorder) ?: -1
-                                if(pos >= 0)
+                                if(pos >= 0 && pos < invocation.arguments.size)
                                     swap = invocation.arguments[pos]
                             }
-                            if(swap == null)
-                                throw RuntimeException("Unable to find argument '$reorder' on method")
-                            fixes.add(arg.replace(swap.changesToArgument(i) ?: swap.source()))
+                            if(swap != null)
+                                fixes.add(arg.replace(swap.changesToArgument(i) ?: swap.source()))
                         }
                     }
                 }
