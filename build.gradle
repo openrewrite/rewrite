@@ -6,6 +6,8 @@ plugins {
     id 'nebula.plugin-plugin' version '4.24.0'
 }
 
+group = 'com.netflix.devinsight'
+
 description 'Pluggable and distributed refactoring tool for Java source code'
 
 contacts {
@@ -55,11 +57,12 @@ pluginBundle {
     }
 
     mavenCoordinates {
-        groupId = 'com.netflix.nebula'
+        groupId = 'com.netflix.devinsight'
         artifactId = 'java-source-refactor'
     }
 }
 
 tasks.withType(Javadoc) {
+    // generated ANTLR sources violate doclint
     options.addStringOption('Xdoclint:none', '-quiet')
 }
