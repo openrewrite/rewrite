@@ -3,12 +3,13 @@ package com.netflix.java.refactor
 import com.netflix.java.refactor.find.*
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
+import java.nio.file.Files
 
 class JavaSource(internal val cu: CompilationUnit) {
     var changedFile = false
 
     fun file() = cu.source()
-    fun text() = cu.source().readText()
+    fun text() = String(Files.readAllBytes(cu.source()))
     fun classes() = cu.jcCompilationUnit.defs
             .filterIsInstance<JCTree.JCClassDecl>()
             .map { it.sym }

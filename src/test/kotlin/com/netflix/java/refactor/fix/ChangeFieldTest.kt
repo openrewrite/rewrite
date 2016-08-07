@@ -19,7 +19,9 @@ class ChangeFieldTest: AbstractRefactorTest() {
                     .changeType(Collection::class.java)
                     .done()
                 .fix()
-        
+        parseJava(a).refactor()
+                .removeImport(List::class.java)
+                .fix()
         
         assertRefactored(a, """
             |import java.util.Collection;

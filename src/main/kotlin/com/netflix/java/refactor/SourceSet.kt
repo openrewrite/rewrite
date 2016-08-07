@@ -6,9 +6,10 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLClassLoader
+import java.nio.file.Path
 import java.util.*
 
-data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable<File>) {
+data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable<Path>) {
     val logger: Logger = LoggerFactory.getLogger(SourceSet::class.java)
     
     private val parser = AstParser(classpath)
@@ -19,11 +20,12 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
     fun allJava() = compilationUnits.map { cu -> JavaSource(cu) }
 
     /**
-     * Find all classes annotated with @AutoRefactor on the classpath that implement JavaSourceScanner
+     * Find all classes annotated with @AutoRefactor on the classpath that implement JavaSourceScanner.
+     * Does not work on virtual file systems at this time.
      */
     fun allAutoRefactorsOnClasspath(): Map<AutoRefactor, JavaSourceScanner<*>> {
         val scanners = HashMap<AutoRefactor, JavaSourceScanner<*>>()
-        val classLoader = URLClassLoader(classpath.map { it.toURI().toURL() }.toTypedArray(), javaClass.classLoader)
+        val classLoader = URLClassLoader(classpath.map { it.toFile().toURI().toURL() }.toTypedArray(), javaClass.classLoader)
 
         val reporter = object: AnnotationDetector.TypeReporter {
             override fun annotations() = arrayOf(AutoRefactor::class.java)
@@ -46,7 +48,7 @@ data class SourceSet(val allSourceFiles: Iterable<File>, val classpath: Iterable
             }
         }
         
-        AnnotationDetector(reporter).detect(*classpath.toList().toTypedArray())
+        AnnotationDetector(reporter).detect(*classpath.map { it.toFile() }.toTypedArray())
         return scanners
     }
 

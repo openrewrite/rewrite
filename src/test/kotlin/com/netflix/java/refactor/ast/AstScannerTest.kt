@@ -25,9 +25,12 @@ class AstScannerTest : AbstractRefactorTest() {
                 .changeType("org.testng.annotations.Test", "org.junit.Test")
                 .fix()
 
+        // FIXME the import remains because RemoveImport can't tell whether you intend to use org.junit.Test or
+        // org.testng.annotations.Test
         assertRefactored(a, """
             |package a;
             |import org.junit.Test;
+            |import org.testng.annotations.Test;
             |public class A {
             |   @Test
             |   public void test() {}

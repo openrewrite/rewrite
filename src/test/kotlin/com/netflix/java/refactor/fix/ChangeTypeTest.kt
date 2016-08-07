@@ -19,32 +19,34 @@ class ChangeTypeTest: AbstractRefactorTest() {
         
         val b = java("""
             |package b;
-            |import java.util.List;
+            |import java.util.*;
             |import a.A1;
             |
             |public class B extends A1 {
             |    List<A1> aList = new ArrayList<>();
             |    A1 aField = new A1();
             |
-            |    public <T extends A1> T b(A1 aParam) {
+            |    public A1 b(A1 aParam) {
             |        A1 aVar = new A1();
             |        return aVar;
             |    }
             |}
         """)
 
-        parseJava(b, a1, a2).refactor().changeType("a.A1", "a.A2").fix()
+        val javaSource = parseJava(b, a1, a2)
+        javaSource.refactor().changeType("a.A1", "a.A2").fix()
+        javaSource.refactor().removeImport("a.A1").fix()
         
         assertRefactored(b, """
             |package b;
-            |import java.util.List;
+            |import java.util.*;
             |import a.A2;
             |
             |public class B extends A2 {
             |    List<A2> aList = new ArrayList<>();
             |    A2 aField = new A2();
             |
-            |    public <T extends A2> T b(A2 aParam) {
+            |    public A2 b(A2 aParam) {
             |        A2 aVar = new A2();
             |        return aVar;
             |    }

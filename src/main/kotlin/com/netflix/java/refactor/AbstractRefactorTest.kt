@@ -15,14 +15,14 @@ abstract class AbstractRefactorTest {
         parseJava(target, otherFiles.toList(), null)
     
     fun parseJava(target: File, otherFiles: Iterable<File>, classpath: Iterable<File>? = null): JavaSource {
-        val parser = AstParser(classpath)
+        val parser = AstParser(classpath?.map { it.toPath() })
         val allFiles = otherFiles.plus(target)
-        val cu = parser.parseFiles(allFiles.toList()).last()
+        val cu = parser.parseFiles(allFiles.map { it.toPath() }).last()
         return JavaSource(CompilationUnit(cu, parser))
     }
     
     fun java(sourceStr: String): File {
-        val source = temp.newFile(fullyQualifiedName(sourceStr.trimMargin()) + ".java")
+        val source = temp.newFile(fullyQualifiedName(sourceStr.trimMargin())!!.substringAfterLast(".") + ".java")
         source.writeText(sourceStr.trimMargin())
         return source
     }

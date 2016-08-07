@@ -8,6 +8,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.internal.impldep.com.google.common.collect.HashMultimap
 import org.gradle.logging.StyledTextOutputFactory
 import java.io.File
+import java.nio.file.Path
 import javax.inject.Inject
 
 open class RefactorAndFixSourceTask : DefaultTask() {
@@ -19,10 +20,10 @@ open class RefactorAndFixSourceTask : DefaultTask() {
     
     @TaskAction
     fun refactorSource() {
-        val fixesByRule = HashMultimap.create<RuleDescriptor, File>()
+        val fixesByRule = HashMultimap.create<RuleDescriptor, Path>()
 
         project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.forEach {
-            val sourceSet = SourceSet(it.allJava, it.compileClasspath)
+            val sourceSet = SourceSet(it.allJava.map { it.toPath() }, it.compileClasspath.map { it.toPath() })
             sourceSet.allAutoRefactorsOnClasspath().forEach {
                 val (refactor, scanner) = it
                 sourceSet.allJava().forEach { source ->
@@ -37,7 +38,7 @@ open class RefactorAndFixSourceTask : DefaultTask() {
         printReport(fixesByRule.asMap())
     }
     
-    private fun printReport(fixesByRule: Map<RuleDescriptor, Collection<File>>) {
+    private fun printReport(fixesByRule: Map<RuleDescriptor, Collection<Path>>) {
         val textOutput = getTextOutputFactory()!!.create(RefactorAndFixSourceTask::class.java)
         
         if(fixesByRule.isEmpty()) {

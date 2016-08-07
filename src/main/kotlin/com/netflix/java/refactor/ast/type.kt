@@ -14,5 +14,5 @@ fun JCTree.matches(fullyQualifiedClassName: String?) = matches(toString(), fully
 
 private fun matches(javacTypeSerialization: String, fullyQualifiedClassName: String?) =
     if(fullyQualifiedClassName is String)
-        javacTypeSerialization == "${packageOwner(fullyQualifiedClassName)}.${className(fullyQualifiedClassName).replace("\\.", "\\$")}"
+        javacTypeSerialization == "${packageOwner(fullyQualifiedClassName)}.${className(fullyQualifiedClassName).replace(".", "\$")}"
     else false
