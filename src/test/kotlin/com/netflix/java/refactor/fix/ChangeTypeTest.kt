@@ -1,10 +1,12 @@
 package com.netflix.java.refactor.fix
 
 import com.netflix.java.refactor.AbstractRefactorTest
+import org.junit.Ignore
 import org.junit.Test
 
 class ChangeTypeTest: AbstractRefactorTest() {
     
+    @Ignore
     @Test
     fun refactorType() {
         val a1 = java("""

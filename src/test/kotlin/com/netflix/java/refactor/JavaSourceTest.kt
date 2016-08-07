@@ -31,7 +31,7 @@ class JavaSourceTest : AbstractRefactorTest() {
             |public class A {
             |   public void test() {
             |      B local = new B();
-            |      local.foo();
+            |      local.foo(0);
             |   }
             |}
         """)
@@ -44,13 +44,13 @@ class JavaSourceTest : AbstractRefactorTest() {
             |public class A {
             |   public void test() {
             |      C local = new C();
-            |      local.foo();
+            |      local.foo(0);
             |   }
             |}
         """)
         
         refactorer.refactor()
-                .findMethodCalls("C foo()")
+                .findMethodCalls("C foo(int)")
                     .changeName("bar")
                     .done()
                 .fix()
@@ -59,7 +59,7 @@ class JavaSourceTest : AbstractRefactorTest() {
             |public class A {
             |   public void test() {
             |      C local = new C();
-            |      local.bar();
+            |      local.bar(0);
             |   }
             |}
         """)
