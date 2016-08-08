@@ -3,6 +3,7 @@ plugins {
     id 'me.champeau.gradle.antlr4' version '0.1'
     id 'com.gradle.plugin-publish' version '0.9.4'
     id 'java-gradle-plugin'
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
     id 'nebula.plugin-plugin' version '4.24.0'
 }
 
@@ -30,8 +31,13 @@ configurations {
     compile.extendsFrom antlr4
 }
 
+configurations {
+    jdk.description = 'The JDK itself so that we can shade it and run this code against a JRE'
+    compile.extendsFrom jdk
+}
+
 dependencies {
-    compile files("${System.getProperty('java.home')}/../lib/tools.jar")
+    jdk files("${System.getProperty('java.home')}/../lib/tools.jar")
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
     compileOnly 'junit:junit:4.+'
@@ -66,3 +72,20 @@ tasks.withType(Javadoc) {
     // generated ANTLR sources violate doclint
     options.addStringOption('Xdoclint:none', '-quiet')
 }
+
+// Relocate jgit dependency not available in Maven Central
+// Replaces the main artifact by removing the classifier for the shadow jar, and replacing jar with shadowJar
+// Relocated dependencies are removed from the generated pom
+shadowJar {
+    configurations = [project.configurations.jdk]
+    classifier = null
+    relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
+    relocate 'sun', 'com.netflix.devinsight.shaded.sun'
+
+    mergeServiceFiles {
+        exclude 'META-INF/services/com.sun.*'
+    }
+}
+
+jar.deleteAllActions()
+jar.dependsOn shadowJar
