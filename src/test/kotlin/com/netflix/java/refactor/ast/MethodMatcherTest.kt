@@ -77,7 +77,7 @@ class MethodMatcherTest: AbstractRefactorTest() {
     fun matchOnInnerClass() {
         val b = java("""
             |public class B {
-            |   public class C {
+            |   public static class C {
             |       public void foo() {}
             |   }
             |}

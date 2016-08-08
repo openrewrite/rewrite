@@ -78,14 +78,31 @@ tasks.withType(Javadoc) {
 // Relocated dependencies are removed from the generated pom
 shadowJar {
     configurations = [project.configurations.jdk]
-    classifier = null
-    relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
-    relocate 'sun', 'com.netflix.devinsight.shaded.sun'
+    classifier = 'jdkbundle'
 
+    exclude 'sun/**/*'
+    exclude 'org/relaxng/**/*'
+    exclude 'META-INF/services/*'
+    exclude 'com/sun/xml/**/*'
+    exclude 'com/sun/jarsigner/**/*'
+    exclude 'com/sun/javadoc/**/*'
+    exclude 'com/sun/istack/**/*'
+    exclude 'com/sun/xml/**/*'
+    
+    relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
+    
+    
     mergeServiceFiles {
         exclude 'META-INF/services/com.sun.*'
     }
 }
 
-jar.deleteAllActions()
-jar.dependsOn shadowJar
+publishing {
+    publications {
+        nebula(MavenPublication) {
+            artifact shadowJar {
+                classifier = 'jdkbundle'
+            }
+        }
+    }
+}
