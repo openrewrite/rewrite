@@ -39,13 +39,13 @@ class AstParser(val classpath: Iterable<Path>?) {
         // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position 
         // for every tree element
         compiler.genEndPos = true
-//        mutableLog.setWriters(PrintWriter(object: Writer() {
-//            override fun write(cbuf: CharArray, off: Int, len: Int) {
-//                logger.debug(String(cbuf.slice(off..(off + len)).toCharArray()))
-//            }
-//            override fun flush() {}
-//            override fun close() {}
-//        }))
+        mutableLog.setWriters(PrintWriter(object: Writer() {
+            override fun write(cbuf: CharArray, off: Int, len: Int) {
+                logger.debug(String(cbuf.slice(off..(off + len)).toCharArray()))
+            }
+            override fun flush() {}
+            override fun close() {}
+        }))
     }
 
     fun parseFiles(files: Iterable<Path>): List<JCTree.JCCompilationUnit> {

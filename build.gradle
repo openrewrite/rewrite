@@ -46,6 +46,7 @@ dependencies {
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'
     testCompile 'org.jetbrains.spek:spek:latest.release'
+    testCompile 'com.github.marschall:memoryfilesystem:0.8.0'
 }
 
 pluginBundle {

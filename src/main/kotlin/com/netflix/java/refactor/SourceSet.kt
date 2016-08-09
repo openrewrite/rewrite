@@ -4,7 +4,6 @@ import com.netflix.java.refactor.ast.AstParser
 import eu.infomas.annotation.AnnotationDetector
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.*
