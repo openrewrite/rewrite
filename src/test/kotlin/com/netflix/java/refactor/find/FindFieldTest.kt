@@ -10,13 +10,15 @@ class FindFieldTest: AbstractRefactorTest() {
     @Test
     fun findField() {
         val a = java("""
-            import java.util.List;
+            import java.util.*;
             public class A {
-               List list;
+               List list = new ArrayList<>();
             }
         """)
-        
-        assertEquals("list", parseJava(a).findFields(List::class.java).firstOrNull()?.name)
+
+        val field = parseJava(a).findFields(List::class.java).first()
+        assertEquals("list", field.name)
+        assertEquals("java.util.List", field.type)
     }
     
     @Test

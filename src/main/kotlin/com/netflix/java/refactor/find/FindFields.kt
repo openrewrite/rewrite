@@ -9,7 +9,7 @@ import com.sun.tools.javac.code.Type
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 
-data class Field(val name: String)
+data class Field(val name: String, val type: String)
 
 class FindFields(val clazz: String, val includeInherited: Boolean) : AstScannerBuilder<List<Field>> {
     override fun scanner() = FindFieldScanner(this)
@@ -29,7 +29,7 @@ class FindFieldScanner(val op: FindFields) : SingleCompilationUnitAstScanner<Lis
                 .filter { it is Symbol.VarSymbol }
                 .filter { it.type.toString() == op.clazz }
                 .filter { !inHierarchy || it.flags() and Flags.PRIVATE.toLong() == 0L }
-                .map { Field(it.name.toString()) }
+                .map { Field(it.name.toString(), it.type.toString()) }
 
         return fields + (
                 if (op.includeInherited && type.supertype_field is Type.ClassType)

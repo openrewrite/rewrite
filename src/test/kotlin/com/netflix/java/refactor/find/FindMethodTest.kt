@@ -20,6 +20,7 @@ class FindMethodTest: AbstractRefactorTest() {
         val m = parseJava(a).findMethodCalls("java.util.Collections emptyList()").first()
         
         assertEquals("Collections.emptyList", m.name)
+        assertEquals("Collections.emptyList()", m.source)
     }
 
     @Test
