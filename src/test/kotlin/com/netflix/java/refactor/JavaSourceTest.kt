@@ -2,6 +2,7 @@ package com.netflix.java.refactor
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Test
+import org.junit.Assert.assertEquals
 
 class JavaSourceTest : AbstractRefactorTest() {
     
@@ -20,10 +21,10 @@ class JavaSourceTest : AbstractRefactorTest() {
     fun multiPhaseRefactoring() {
         val (b, c) = listOf("B", "C").map {
             java("""
-                public class $it {
-                    public void foo(int i) {}
-                    public void bar(int i) {}
-                }
+                |public class $it {
+                |    public void foo(int i) {}
+                |    public void bar(int i) {}
+                |}
             """)
         }
         
@@ -63,5 +64,47 @@ class JavaSourceTest : AbstractRefactorTest() {
             |   }
             |}
         """)
+    }
+    
+    @Test
+    fun recordGitStyleDiff() {
+        val (b, c) = listOf("B", "C").map {
+            java("""
+                |public class $it {
+                |    public void foo(int i) {}
+                |}
+            """)
+        }
+
+        val a = java("""
+            |public class A {
+            |   public void test() {
+            |      B local = new B();
+            |      local.foo(0);
+            |   }
+            |}
+            |
+        """)
+
+        val source = parseJava(a, b, c)
+        val diff = source.diff {
+            refactor().changeType("B", "C").fix()
+        }
+        
+        assertEquals("""
+            |diff --git a/${a.absolutePath} b/${a.absolutePath}
+            |index 70f03ee..b82f543 100644
+            |--- a/${a.absolutePath}
+            |+++ b/${a.absolutePath}
+            |@@ -1,6 +1,6 @@
+            | public class A {
+            |    public void test() {
+            |-      B local = new B();
+            |+      C local = new C();
+            |       local.foo(0);
+            |    }
+            | }
+            |
+        """.trimMargin(), diff)
     }
 }

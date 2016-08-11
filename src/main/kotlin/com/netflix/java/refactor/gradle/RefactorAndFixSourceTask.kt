@@ -1,13 +1,11 @@
 package com.netflix.java.refactor.gradle
 
-import com.netflix.java.refactor.AutoRefactor
+import com.google.common.collect.HashMultimap
 import com.netflix.java.refactor.SourceSet
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.TaskAction
-import org.gradle.internal.impldep.com.google.common.collect.HashMultimap
 import org.gradle.logging.StyledTextOutputFactory
-import java.io.File
 import java.nio.file.Path
 import javax.inject.Inject
 
