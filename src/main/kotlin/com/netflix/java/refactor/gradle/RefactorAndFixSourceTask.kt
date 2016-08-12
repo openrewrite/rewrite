@@ -1,12 +1,12 @@
 package com.netflix.java.refactor.gradle
 
-import com.google.common.collect.HashMultimap
 import com.netflix.java.refactor.SourceSet
 import org.gradle.api.DefaultTask
 import org.gradle.api.plugins.JavaPluginConvention
 import org.gradle.api.tasks.TaskAction
 import org.gradle.logging.StyledTextOutputFactory
 import java.nio.file.Path
+import java.util.*
 import javax.inject.Inject
 
 open class RefactorAndFixSourceTask : DefaultTask() {
@@ -18,7 +18,7 @@ open class RefactorAndFixSourceTask : DefaultTask() {
     
     @TaskAction
     fun refactorSource() {
-        val fixesByRule = HashMultimap.create<RuleDescriptor, Path>()
+        val fixesByRule = hashMapOf<RuleDescriptor, MutableSet<Path>>()
 
         project.convention.getPlugin(JavaPluginConvention::class.java).sourceSets.forEach {
             val sourceSet = SourceSet(it.allJava.map { it.toPath() }, it.compileClasspath.map { it.toPath() })
@@ -27,13 +27,13 @@ open class RefactorAndFixSourceTask : DefaultTask() {
                 sourceSet.allJava().forEach { source ->
                     scanner.scan(source)
                     if(source.changedFile) {
-                        fixesByRule.put(RuleDescriptor(refactor.value, refactor.description), source.file())
+                        fixesByRule.getOrPut(RuleDescriptor(refactor.value, refactor.description), { HashSet<Path>() }).add(source.file())
                     }
                 }
             }
         }
         
-        printReport(fixesByRule.asMap())
+        printReport(fixesByRule)
     }
     
     private fun printReport(fixesByRule: Map<RuleDescriptor, Collection<Path>>) {
