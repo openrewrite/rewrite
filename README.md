@@ -5,63 +5,131 @@
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nebula-plugins/java-source-refactor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Apache 2.0](https://img.shields.io/github/license/nebula-plugins/java-source-refactor.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+  - [Purpose](#purpose)
+  - [Constructing and using a `SourceSet`](#constructing-and-using-a-sourceset)
+  - [Searching for code with `JavaSourceScanner`](#searching-for-code-with-javasourcescanner)
+  - [Refactoring code with `JavaSourceScanner`](#refactoring-code-with-javasourcescanner)
+  - [Using the Gradle plugin](#using-the-gradle-plugin)
+  - [Writing @AutoRefactor rules for the Gradle plugin](#writing-@autorefactor-rules-for-the-gradle-plugin)
+  - [License](#license)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 ## Purpose
 
-The Java Source Refactoring plugin is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
+The Java Source Refactoring project is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
 
-It allows for the creation of style-preserving, type-aware refactoring changes that can be described programatically and distributed to the organization through the build process.
+It consists of an interface that allows you to perform type-aware searches for code patterns and make style-preserving refactoring changes.
+It also packs with a Gradle plugin that performs refactoring operations on a project-wide basis.
 
-Refactoring rules are packed into libraries (generally the library which is trying to deprecate some aspect of its API). When other projects pick up a new version of the library with a refactoring rule, it is applied to their source code. In this sense, the refactoring operation is distributed to dependent teams and source code across the organization adapts to the change in an "eventually consistent" manner.
+## Constructing and using a `SourceSet`
 
-## Usage
+A `SourceSet` consists of Java source files and their required compile-time binary dependencies. Code search and refactoring operations are performed
+against groups of Java files represented by a `SourceSet`.
 
-Clone and build with:
+Once we have a `SourceSet` instance, we can run operations against it via the `scan` method.
 
-    ./gradlew publishToMavenLocal
+## Searching for code with `JavaSourceScanner`
 
-To apply this plugin:
+`JavaSourceScanner` contains a single method `scan` that takes a single `JavaSource` parameter and returns any value you choose.
 
-    buildscript {
-        repositories { mavenLocal() }
-        dependencies {
-            classpath 'com.netflix.nebula:java-source-refactor:latest.release'
-        }
-
-        configurations.classpath.resolutionStrategy.cacheDynamicVersionsFor 0, 'minutes'
-    }
-
-    apply plugin: 'nebula.source-refactor'
-    
-To perform refactoring, run `./gradlew fixSourceLint`.
-    
-The plugin scans the classpath looking for methods annotated with `@Refactor` and applies the rule defined by each of
-these methods to the project's source.
-    
-## Writing Refactor Rules
-
-To create a new rule, provide a public static method annotated with `@Refactor` that takes a `Refactorer` argument.
+In this simple example, we are simply returning all the call sites for `org.slf4j.Logger.info(...)` where the call takes any number of arguments. Since a single java source file may
+contain several matching calls, we are returning a `List<Method>` with the code used at each of those call sites. The results are then flattened into a single list.
 
 ```java
-@Refactor(value = "foo-to-bar", description = "replace foo() with bar()")
-public class FooToBar extends JavaSourceVisitor {
+sourceSet
+  .scan(java -> java.findMethodCalls("org.slf4j.Logger info(..)"))
+  .stream()
+  .flatMap(Collection::stream)
+  .collect(Collectors.toList());
+```
+
+If we were just interested in the files that contained a reference, we could modify it like so:
+
+```java
+sourceSet
+  .scan(java -> java.findMethodCalls("org.slf4j.Logger info(..)").isEmpty() ? null : java.file())
+  .stream()
+  .filter(file -> file != null)
+  .collect(Collectors.toList());
+```
+
+You can find the following language constructs at this point:
+
+| method                                      | description                                                                           |
+| ------------------------------------------- | ------------------------------------------------------------------------------------- |
+| findMethodCalls(String)                     | The method matching argument supports much of the AspectJ syntax for method matching  |
+| findFields(Class/String)                    | Find fields matching this fully qualified name or class reference                     |
+| findFieldsIncludingInherited(Class/String)  | Find fields including those declared on super types                                   |
+| hasType(Class/String)                       | Simple boolean check for the existence of a reference to a types                      |
+
+## Refactoring code with `JavaSourceScanner`
+
+To initiate a refactoring operation, call `refactor()` on `JavaSource`. You can then chain together any number of refactoring operations and
+complete the refactoring transaction with a call to `fix()`.
+
+Here is a simple example where we just want to change all type references from `Foo` to `Bar`:
+
+```java
+sourceSet
+  .scan(java -> {
+    java.refactor().changeType(Foo.class, Bar.class).fix();
+    return null; // we don't care to return anything in this case
+  })
+```
+
+Here we change both a type and a method reference together:
+
+```java
+sourceSet
+  .scan(java -> {
+    java.refactor()
+        .changeType(Foo.class, Bar.class)
+        .findMethodCalls("com.netflix.Foo foo(String)")
+          .changeName("bar")
+          .changeArguments()
+            .arg(0).changeLiterals(s -> s.toString().replaceAll("A", "B")).done()
+            .done() // done changing arguments
+          .done() // done changing the method call
+        .fix();
+    return null; // we don't care to return anything in this case
+  })
+```
+
+Some refactoring operations, such as those directed at method calls can involve one or more individual changes and require a call to `done()` to mark the end of that change and the beginning (or continuation) of another.
+
+## Using the Gradle plugin
+
+Refer to the [Gradle Plugin Portal](https://plugins.gradle.org/plugin/nebula.source-refactor) for how to apply the Gradle plugin.
+
+To perform refactoring, run `./gradlew fixSourceLint`.
+
+The plugin scans the classpath looking for methods annotated with `@AutoRefactor` and applies the rule defined by each of
+these methods to the project's source.
+
+## Writing @AutoRefactor rules for the Gradle plugin
+
+You may pack refactoring rules into libraries (generally the library which is trying to deprecate some aspect of its API). When other projects pick up a new version of the library with a refactoring rule, it can be applied to their source code via `./gradlew fixSourceLint`. In this way the refactoring operation is distributed to dependent teams and source code across the organization adapts to the change in an "eventually consistent" manner.
+
+To create a new rule, provide a public static method annotated with `@AutoRefactor` and implements `JavaSourceScanner`. `JavaSourceScanner` is a generic type, and need not return anything
+when used for this purpose.
+
+```java
+@AutoRefactor(value = "b-to-b2", description = "replace all references to B with B2")
+public class FooToBar extends JavaSourceScanner<Void> {
     public void visit(JavaSource source) {
-        source.refactor()
-            .findMethodCalls("B foo(int)")
-                .changeName("bar")
-                .done()
-            .changeType(B.class, B2.class)
-            .fix();
+        source.refactor().changeType(B.class, B2.class).fix();
+        return null;
     }
 }
 ```
 
-In the example rule above, two refactoring operations are chained together into one operation: changing invocations of `B.foo` to
-`B.bar()` and types of `B` to `B2`. Together, this changes method invocations of `B.foo` to `B2.bar`.
-
 That's it! Any project that declares a dependency on the artifact that contains your new rule and applies `nebula.source-refactor` will
 now be refactorable.
 
-# License
+## License
 
 Copyright 2015-2016 Netflix, Inc.
 
