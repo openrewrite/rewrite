@@ -13,10 +13,12 @@ data class ChangeField(val clazz: String, val tx: RefactorTransaction) : Refacto
     var refactorName: String? = null
     var refactorDelete: Boolean = false
     
-    fun changeType(clazz: Class<*>): ChangeField {
-        refactorTargetType = clazz.name
+    fun changeType(clazz: String): ChangeField {
+        refactorTargetType = clazz
         return this
     }
+    
+    fun changeType(clazz: Class<*>) = changeType(clazz.name)
 
     fun changeName(name: String): ChangeField {
         refactorName = name
