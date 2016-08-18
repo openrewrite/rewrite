@@ -53,8 +53,13 @@ class AstParser(val classpath: Iterable<Path>?) {
             assert(context.get(JavaFileManager::class.java) === pfm)
             pfm.setLocation(StandardLocation.CLASS_PATH, classpath)
         }
+
+        val fileObjects = pfm.getJavaFileObjects(*files.toList().toTypedArray())
         
-        val cus = pfm.getJavaFileObjects(*files.toList().toTypedArray())
+        // if we are in a reparsing phase, we want to ensure that the contents of the file get re-read
+        fileObjects.forEach { pfm.flushCache(it) }
+        
+        val cus = fileObjects
                 .map { compiler.parse(it) }
                 .enterAll()
         
@@ -74,7 +79,7 @@ class AstParser(val classpath: Iterable<Path>?) {
         // otherwise, when the parser attempts to set endPosTable on the DiagnosticSource of this file it will blow up
         // because the previous parsing iteration has already set one
         mutableLog.removeFile(pfm.getJavaFileObjects(cu.source()).first())
-        
+
         return parseFiles(listOf(cu.source())).first()
     }
     

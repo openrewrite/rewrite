@@ -2,8 +2,8 @@ package com.netflix.java.refactor
 
 import com.netflix.java.refactor.ast.RefactoringAstScannerBuilder
 import com.netflix.java.refactor.fix.*
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
+import java.nio.file.StandardOpenOption
 import java.util.*
 
 class RefactorTransaction(val refactorer: JavaSource) {
@@ -78,7 +78,9 @@ class RefactorTransaction(val refactorer: JavaSource) {
                 if (sortedFixes.last().position.last < sourceText.length) {
                     source += sourceText.substring(sortedFixes.last().position.last)
                 }
-                Files.write(refactorer.file(), source.toByteArray())
+                
+                Files.write(refactorer.file(), source.toByteArray(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
+                
             } catch(t: Throwable) {
                 // TODO how can we throw a better exception?
                 t.printStackTrace()
