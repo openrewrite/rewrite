@@ -87,11 +87,13 @@ class JavaSourceTest : AbstractRefactorTest() {
         """)
 
         val source = parseJava(a, b, c)
-        val diff = source.diff {
+        val diff1 = source.beginDiff()
+        
+        val diff2 = source.diff {
             refactor().changeType("B", "C").fix()
         }
-        
-        assertEquals("""
+
+        val expectedDiff = """
             |diff --git a/${a.absolutePath} b/${a.absolutePath}
             |index 70f03ee..b82f543 100644
             |--- a/${a.absolutePath}
@@ -105,6 +107,9 @@ class JavaSourceTest : AbstractRefactorTest() {
             |    }
             | }
             |
-        """.trimMargin(), diff)
+        """.trimMargin()
+        
+        assertEquals(expectedDiff, diff1.gitStylePatch())
+        assertEquals(expectedDiff, diff2)
     }
 }

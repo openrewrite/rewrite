@@ -4,6 +4,8 @@ import com.netflix.java.refactor.find.*
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import java.nio.file.Files
+import java.util.function.Consumer
+import kotlin.concurrent.thread
 
 class JavaSource(internal val cu: CompilationUnit) {
     var changedFile = false
@@ -51,4 +53,6 @@ class JavaSource(internal val cu: CompilationUnit) {
         val after = text()
         return InMemoryDiffEntry(file().toString(), before, after).diff
     }
+    
+    fun beginDiff() = JavaSourceDiff(this)
 }
