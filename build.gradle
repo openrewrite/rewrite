@@ -32,17 +32,16 @@ configurations {
 }
 
 configurations {
-    jdk.description = 'The JDK itself so that we can shade it and run this code against a JRE'
-    compile.extendsFrom jdk
+    compile.extendsFrom compileShaded
 }
 
 dependencies {
-    jdk files("${System.getProperty('java.home')}/../lib/tools.jar")
+    compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
     compileOnly 'junit:junit:4.+'
 
-    compile 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
     
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
@@ -80,7 +79,7 @@ tasks.withType(Javadoc) {
 // Replaces the main artifact by removing the classifier for the shadow jar, and replacing jar with shadowJar
 // Relocated dependencies are removed from the generated pom
 shadowJar {
-    configurations = [project.configurations.jdk]
+    configurations = [project.configurations.compileShaded]
     classifier = 'jdkbundle'
 
     exclude 'sun/**/*'
