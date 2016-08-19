@@ -93,7 +93,7 @@ shadowJar {
     exclude 'com/sun/xml/**/*'
     
     relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
-    
+    relocate 'org.eclipse.jgit', 'com.netflix.devinsight.shaded.org.eclipse.jgit'
     
     mergeServiceFiles {
         exclude 'META-INF/services/com.sun.*'
