@@ -63,7 +63,12 @@ class AstParser(val classpath: Iterable<Path>?) {
                 .map { compiler.parse(it) }
                 .enterAll()
         
-        compiler.attribute(compiler.todo)
+        try {
+            compiler.attribute(compiler.todo)
+        } catch(ignore: Throwable) {
+            // when symbol entering fails on problems like missing types, attribution can often times proceed
+            // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
+        }
         
         return cus
     }

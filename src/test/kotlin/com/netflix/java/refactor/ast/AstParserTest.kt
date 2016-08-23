@@ -10,10 +10,30 @@ import java.nio.file.Files
 import java.util.zip.ZipInputStream
 import kotlin.test.assertEquals
 
-class AstScannerTest : AbstractRefactorTest() {
+class AstParserTest : AbstractRefactorTest() {
+
+    /**
+     * Often type attribution can succeed in spite of symbol entering failures, but there are edge cases
+     * where it does not. Therefore, attribution after symbol entering failures is always a BEST EFFORT only.
+     */
+    @Test
+    fun typeAttributionDoesNotCauseRuntimeExceptionsWhenSymbolEnteringFails() {
+        val a = java("""
+            |import java.util.function.Consumer;
+            |public class A {
+            |    public void fail(){
+            |        Consumer<String> c = s -> {
+            |            Function<String, OOPS> f = s2 -> null;
+            |        };
+            |    }
+            |}
+        """)
+        
+        parseJava(a)
+    }
     
     @Test
-    fun scannerIsAbleToIdentifyTypesFromExternalDependencies() {
+    fun parserIsAbleToIdentifyTypesFromExternalDependencies() {
         val a = java("""
             |package a;
             |import org.testng.annotations.*;
@@ -47,7 +67,7 @@ class AstScannerTest : AbstractRefactorTest() {
     // FIXME how to do this?
     @Ignore
     @Test
-    fun scannerIsAbleToLoadExternalDependenciesFromInMemoryFileSystems() {
+    fun parserIsAbleToLoadExternalDependenciesFromInMemoryFileSystems() {
         val fs = MemoryFileSystemBuilder.newEmpty().build("virtual")
         fs.use { fs ->
             val a = fs.getPath("A.java")
