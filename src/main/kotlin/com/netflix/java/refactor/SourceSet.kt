@@ -10,10 +10,14 @@ import java.util.*
 
 data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable<Path>) {
     val logger: Logger = LoggerFactory.getLogger(SourceSet::class.java)
+    val filteredClasspath = classpath.filter {
+        val fn = it.fileName.toString()
+        fn.endsWith(".jar") && !fn.endsWith("-javadoc.jar") && !fn.endsWith("-sources.jar")
+    }
     
-    private val parser = AstParser(classpath)
+    private val parser = AstParser(filteredClasspath)
     private val compilationUnits by lazy { 
-        parser.parseFiles(allSourceFiles.toList()).map { CompilationUnit(it, parser) }
+        parser.parseFiles(allSourceFiles.filter { it.fileName.toString().endsWith(".java") }.toList()).map { CompilationUnit(it, parser) }
     }
     
     fun allJava() = compilationUnits.map { cu -> JavaSource(cu) }
@@ -24,7 +28,7 @@ data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable
      */
     fun allAutoRefactorsOnClasspath(): Map<AutoRefactor, JavaSourceScanner<*>> {
         val scanners = HashMap<AutoRefactor, JavaSourceScanner<*>>()
-        val classLoader = URLClassLoader(classpath.map { it.toFile().toURI().toURL() }.toTypedArray(), javaClass.classLoader)
+        val classLoader = URLClassLoader(filteredClasspath.map { it.toFile().toURI().toURL() }.toTypedArray(), javaClass.classLoader)
 
         val reporter = object: AnnotationDetector.TypeReporter {
             override fun annotations() = arrayOf(AutoRefactor::class.java)
@@ -47,7 +51,7 @@ data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable
             }
         }
         
-        AnnotationDetector(reporter).detect(*classpath.map { it.toFile() }.toTypedArray())
+        AnnotationDetector(reporter).detect(*filteredClasspath.map { it.toFile() }.toTypedArray())
         return scanners
     }
 
