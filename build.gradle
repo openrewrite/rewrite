@@ -102,5 +102,13 @@ publishing {
                 classifier = 'jdkbundle'
             }
         }
+
+        withType(MavenPublication) {
+            pom.withXml {
+                asNode().dependencies.dependency.scope.each {
+                    it.value = 'compile'
+                }
+            }
+        }
     }
 }
