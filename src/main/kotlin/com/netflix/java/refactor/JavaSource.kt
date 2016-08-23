@@ -12,6 +12,7 @@ class JavaSource(internal val cu: CompilationUnit) {
 
     fun file() = cu.source()
     fun text() = String(Files.readAllBytes(cu.source()))
+    
     fun classes() = cu.jcCompilationUnit.defs
             .filterIsInstance<JCTree.JCClassDecl>()
             .map { it.sym }

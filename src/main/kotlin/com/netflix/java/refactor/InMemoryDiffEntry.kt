@@ -9,7 +9,7 @@ import java.io.ByteArrayOutputStream
 
 class InMemoryDiffEntry(filePath: String, old: String, new: String): DiffEntry() {
     private val repo = InMemoryRepository.Builder().build()
-
+    
     init {
         changeType = DiffEntry.ChangeType.MODIFY
         oldPath = filePath
@@ -22,13 +22,18 @@ class InMemoryDiffEntry(filePath: String, old: String, new: String): DiffEntry()
 
         oldMode = FileMode.REGULAR_FILE
         newMode = FileMode.REGULAR_FILE
+        repo.close()
     }
 
     val diff: String by lazy {
-        val patch = ByteArrayOutputStream()
-        val formatter = DiffFormatter(patch)
-        formatter.setRepository(repo)
-        formatter.format(this)
-        String(patch.toByteArray())
+        if(oldId == newId)
+            ""
+        else {
+            val patch = ByteArrayOutputStream()
+            val formatter = DiffFormatter(patch)
+            formatter.setRepository(repo)
+            formatter.format(this)
+            String(patch.toByteArray())
+        }
     }
 }

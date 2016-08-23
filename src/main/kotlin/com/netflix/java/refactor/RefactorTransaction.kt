@@ -80,7 +80,7 @@ class RefactorTransaction(val refactorer: JavaSource) {
                 }
                 
                 Files.write(refactorer.file(), source.toByteArray(), StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)
-                
+//                refactorer.file().toFile().writeText(source)
             } catch(t: Throwable) {
                 // TODO how can we throw a better exception?
                 t.printStackTrace()

@@ -6,7 +6,16 @@ import org.junit.Assert.assertEquals
 class InMemoryDiffEntryTest {
     
     @Test
-    fun diffTest() {
+    fun idempotent() {
+        val diff = InMemoryDiffEntry("com/netflix/MyJavaClass.java",
+                "public class A {}",
+                "public class A {}")
+        
+        assertEquals("", diff.diff)
+    }
+    
+    @Test
+    fun singleLineChange() {
         val diff = InMemoryDiffEntry("com/netflix/MyJavaClass.java",
             """
                 |public void test() {

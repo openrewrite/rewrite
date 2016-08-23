@@ -1,10 +1,7 @@
 package com.netflix.java.refactor
 
 class JavaSourceDiff(private val source: JavaSource) {
-    val before = source.text()
+    private val before = source.text()
     
-    fun gitStylePatch(): String {
-        val after = source.text()
-        return InMemoryDiffEntry(source.file().toString(), before, after).diff
-    }
+    fun gitStylePatch() = InMemoryDiffEntry(source.file().toString(), before, source.text()).diff  
 }
