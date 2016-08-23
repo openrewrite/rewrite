@@ -287,6 +287,46 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
     }
     
     @Test
+    fun refactorLiteralStringWithEscapableCharacters() {
+        val a = java("""
+            |package a;
+            |public class A {
+            |    public void foo(String s) {}
+            |}
+        """)
+        
+        val b = java("""
+            |import a.*;
+            |public class B {
+            |    A a;
+            |    public void test() {
+            |        a.foo("mystring '%s'");
+            |    }
+            |}
+        """)
+        
+        parseJava(b, a).refactor()
+            .findMethodCalls("a.A foo(..)")
+                .changeArguments()
+                    .arg(String::class.java)
+                        .changeLiterals { s -> s.toString().replace("%s", "{}") }
+                        .done()
+                    .done()
+                .done()
+            .fix()
+        
+        assertRefactored(b, """
+            |import a.*;
+            |public class B {
+            |    A a;
+            |    public void test() {
+            |        a.foo("mystring '{}'");
+            |    }
+            |}
+        """)
+    }
+    
+    @Test
     fun refactorReorderArguments() {
         val a = java("""
             |package a;

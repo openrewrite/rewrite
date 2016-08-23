@@ -242,11 +242,19 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
 
             // prefix and suffix hold the special characters surrounding the values of primitive-ish types,
             // e.g. the "" around String, the L at the end of a long, etc.
-            val valueMatcher = "(.*)${Pattern.quote(value.toString())}(.*)".toRegex().find(node.toString())
-            val (prefix, suffix) = valueMatcher!!.groupValues.drop(1)
+            val valueMatcher = "(.*)${Pattern.quote(value.toString())}(.*)".toRegex().find(node.toString().replace("\\", ""))
+            return when(valueMatcher) {
+                is MatchResult -> {
+                    val (prefix, suffix) = valueMatcher.groupValues.drop(1)
 
-            val transformed = refactor.refactorLiterals?.invoke(value) ?: value
-            return if (transformed != value.toString()) listOf(literal.replace("$prefix$transformed$suffix")) else emptyList()
+                    val transformed = refactor.refactorLiterals?.invoke(value) ?: value
+                    if (transformed != value.toString()) listOf(literal.replace("$prefix$transformed$suffix")) else emptyList()
+                }
+                else -> {
+                    // this should never happen
+                    emptyList()
+                }
+            }
         }
 
         override fun reduce(r1: List<RefactorFix>?, r2: List<RefactorFix>?): List<RefactorFix> =
