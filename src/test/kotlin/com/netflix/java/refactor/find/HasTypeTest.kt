@@ -30,4 +30,24 @@ class HasTypeTest: AbstractRefactorTest() {
 
         assertTrue(parseJava(a).hasType(Collections::class.java))
     }
+
+    @Test
+    fun unresolvableMethodSymbol() {
+        val a = java(
+            """
+            |public class B {
+            |		public static void baz() {
+            |				A a = new A() {
+            |						@Override public void foo() {
+            |								bar();
+            |						}
+            |				}
+            |		}
+            |		public static void bar() {}
+            |}
+			"""
+        )
+
+        parseJava(a).hasType("Something")
+    }
 }
