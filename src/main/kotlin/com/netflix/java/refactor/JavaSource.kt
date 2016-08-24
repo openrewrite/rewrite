@@ -33,6 +33,9 @@ class JavaSource(internal val cu: CompilationUnit) {
     
     fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).scanner().scan(cu)
     fun hasType(clazz: String): Boolean = HasType(clazz).scanner().scan(cu)
+
+    fun hasImport(clazz: Class<*>): Boolean = HasImport(clazz.name).scanner().scan(cu)
+    fun hasImport(clazz: String): Boolean = HasImport(clazz).scanner().scan(cu)
     
     /**
      * Find fields defined on this class, but do not include inherited fields up the type hierarchy 

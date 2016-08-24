@@ -64,6 +64,7 @@ You can find the following language constructs at this point:
 | findFields(Class/String)                    | Find fields matching this fully qualified name or class reference                     |
 | findFieldsIncludingInherited(Class/String)  | Find fields including those declared on super types                                   |
 | hasType(Class/String)                       | Simple boolean check for the existence of a reference to a types                      |
+| hasImport(Class/String)                     | Simple boolean check for the existence of an import (also matches on star imports)    |
 
 ## Refactoring code with `JavaSourceScanner`
 

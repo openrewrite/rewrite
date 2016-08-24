@@ -11,7 +11,7 @@ abstract class AbstractRefactorTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
     
-    fun parseJava(target: File, vararg otherFiles: File) =
+    fun parseJava(target: File, vararg otherFiles: File): JavaSource =
         parseJava(target, otherFiles.toList(), null)
     
     fun parseJava(target: File, otherFiles: Iterable<File>, classpath: Iterable<File>? = null): JavaSource {
