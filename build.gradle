@@ -89,6 +89,7 @@ shadowJar {
     
     relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
     relocate 'org.eclipse.jgit', 'com.netflix.devinsight.shaded.org.eclipse.jgit'
+    relocate 'org.apache.http', 'com.netflix.devinsight.shaded.org.apache.http'
     
     mergeServiceFiles {
         exclude 'META-INF/services/com.sun.*'
