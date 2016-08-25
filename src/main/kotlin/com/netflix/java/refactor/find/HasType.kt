@@ -26,7 +26,7 @@ class HasTypeScanner(val op: HasType): SingleCompilationUnitAstScanner<Boolean>(
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCIdent) {
             // statically imported type
-            return (invocation.meth as JCTree.JCIdent).sym.owner.toString() == op.clazz
+            return (invocation.meth as JCTree.JCIdent)?.sym?.owner?.toString() == op.clazz
         }
         return super.visitMethodInvocation(node, context)
     }
