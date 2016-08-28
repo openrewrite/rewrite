@@ -5,7 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import kotlin.test.assertTrue
 
-class FindFieldTest: AbstractRefactorTest() {
+class FindFieldsTest : AbstractRefactorTest() {
     
     @Test
     fun findField() {
@@ -49,5 +49,19 @@ class FindFieldTest: AbstractRefactorTest() {
 
         assertEquals("list", parseJava(b, a).findFieldsIncludingInherited(List::class.java).firstOrNull()?.name)
         assertTrue(parseJava(b, a).findFieldsIncludingInherited(Set::class.java).isEmpty())
+    }
+
+    // FIXME this is intended to test the case where there is something that satisfies cu.defs.find { it.type == null }, but
+    // doesn't currently
+    @Test
+    fun unresolvableTypeSymbol() {
+        val b = java("""
+            import java.util.List;
+            public class <T extends A> B<T> {
+                List unresolvable;
+            }
+		""")
+
+        parseJava(b).findFields(List::class.java)
     }
 }

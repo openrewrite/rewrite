@@ -18,10 +18,13 @@ class FindFields(val clazz: String, val includeInherited: Boolean) : AstScannerB
 class FindFieldScanner(val op: FindFields) : SingleCompilationUnitAstScanner<List<Field>>() {
     override fun visitCompilationUnit(node: CompilationUnitTree?, p: Context?): List<Field> {
         super.visitCompilationUnit(node, p)
-        return cu.defs.filterIsInstance<JCTree.JCClassDecl>().flatMap { superFields(it.type as Type.ClassType) }
+        return cu.defs.filterIsInstance<JCTree.JCClassDecl>().flatMap { superFields(it.type as Type.ClassType?) }
     }
 
-    private fun superFields(type: Type.ClassType, inHierarchy: Boolean = false): List<Field> {
+    private fun superFields(type: Type.ClassType?, inHierarchy: Boolean = false): List<Field> {
+        if(type == null)
+            return emptyList()
+        
         if (type.supertype_field == Type.noType)
             return emptyList()
 
