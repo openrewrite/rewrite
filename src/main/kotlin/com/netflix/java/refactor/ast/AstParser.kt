@@ -59,11 +59,10 @@ class AstParser(val classpath: Iterable<Path>?) {
         // if we are in a reparsing phase, we want to ensure that the contents of the file get re-read
         fileObjects.forEach { pfm.flushCache(it) }
         
-        val cus = fileObjects
-                .map { compiler.parse(it) }
-                .enterAll()
+        val cus = fileObjects.map { compiler.parse(it) }
         
         try {
+            cus.enterAll()
             compiler.attribute(compiler.todo)
         } catch(ignore: Throwable) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
