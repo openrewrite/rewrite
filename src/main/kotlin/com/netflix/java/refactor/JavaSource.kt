@@ -7,7 +7,7 @@ import java.nio.file.Files
 import java.util.function.Consumer
 import kotlin.concurrent.thread
 
-class JavaSource(internal val cu: CompilationUnit) {
+class JavaSource(val cu: CompilationUnit) {
     var changedFile = false
 
     fun file() = cu.source()
