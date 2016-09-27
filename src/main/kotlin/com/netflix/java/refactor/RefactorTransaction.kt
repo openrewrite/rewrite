@@ -6,7 +6,7 @@ import java.nio.file.Files
 import java.nio.file.StandardOpenOption
 import java.util.*
 
-class RefactorTransaction(val refactorer: JavaSource) {
+class RefactorTransaction(val refactorer: JavaSource<*>) {
     private val ops = ArrayList<RefactoringAstScannerBuilder>()
 
     fun changeType(from: String, to: String): RefactorTransaction {

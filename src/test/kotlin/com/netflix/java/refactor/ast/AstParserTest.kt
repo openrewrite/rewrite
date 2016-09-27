@@ -2,6 +2,7 @@ package com.netflix.java.refactor.ast
 
 import com.github.marschall.memoryfilesystem.MemoryFileSystemBuilder
 import com.netflix.java.refactor.AbstractRefactorTest
+import com.netflix.java.refactor.SourceInput
 import com.netflix.java.refactor.SourceSet
 import org.junit.Ignore
 import org.junit.Test
@@ -88,9 +89,10 @@ class AstParserTest : AbstractRefactorTest() {
                     Files.createDirectories(path.parent)
                 if(!entry.isDirectory)
                     Files.copy(zin, path)
+                entry = zin.nextEntry
             }
             
-            val classes = SourceSet(listOf(a), listOf(fs.getPath("testng-6.9.9"))).scanForClasses { it.hasType("org.testng.annotations.Test") }
+            val classes = SourceSet(listOf(SourceInput(a, Unit)), listOf(fs.getPath("testng-6.9.9"))).scanForClasses { it.hasType("org.testng.annotations.Test") }
             assertEquals(listOf("a.A"), classes)
         }
     }

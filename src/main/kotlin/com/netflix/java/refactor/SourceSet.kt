@@ -8,7 +8,8 @@ import java.net.URLClassLoader
 import java.nio.file.Path
 import java.util.*
 
-data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable<Path>) {
+data class SourceSet<P>(val allSourceInputs: Iterable<SourceInput<P>>, val classpath: Iterable<Path>) {
+    
     val logger: Logger = LoggerFactory.getLogger(SourceSet::class.java)
     val filteredClasspath = classpath.filter {
         val fn = it.fileName.toString()
@@ -16,18 +17,25 @@ data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable
     }
     
     private val parser = AstParser(filteredClasspath)
-    private val compilationUnits by lazy { 
-        parser.parseFiles(allSourceFiles.filter { it.fileName.toString().endsWith(".java") }.toList()).map { CompilationUnit(it, parser) }
+    
+    private val compilationUnits: List<JavaSource<P>> by lazy {
+        val javaFiles = allSourceInputs.filter { it.path.fileName.toString().endsWith(".java") }
+        val parsedFiles = parser.parseFiles(javaFiles.map { it.path })
+                
+        parsedFiles.zip(javaFiles.map { it.datum }).map { 
+            val (parsed, datum) = it
+            JavaSource(CompilationUnit(parsed, parser), datum) 
+        }
     }
     
-    fun allJava() = compilationUnits.map { cu -> JavaSource(cu) }
+    fun allJava(): List<JavaSource<P>> = compilationUnits
 
     /**
      * Find all classes annotated with @AutoRefactor on the classpath that implement JavaSourceScanner.
      * Does not work on virtual file systems at this time.
      */
-    fun allAutoRefactorsOnClasspath(): Map<AutoRefactor, JavaSourceScanner<*>> {
-        val scanners = HashMap<AutoRefactor, JavaSourceScanner<*>>()
+    fun allAutoRefactorsOnClasspath(): Map<AutoRefactor, JavaSourceScanner<Any, *>> {
+        val scanners = HashMap<AutoRefactor, JavaSourceScanner<Any, *>>()
         val classLoader = URLClassLoader(filteredClasspath.map { it.toFile().toURI().toURL() }.toTypedArray(), javaClass.classLoader)
 
         val reporter = object: AnnotationDetector.TypeReporter {
@@ -39,11 +47,11 @@ data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable
 
                 try {
                     val scanner = clazz.newInstance()
-                    if(scanner is JavaSourceScanner<*>) {
-                        scanners.put(refactor, scanner)
+                    if(scanner is JavaSourceScanner<*, *>) {
+                        scanners.put(refactor, scanner as JavaSourceScanner<Any, *>)
                     }
                     else {
-                        logger.warn("To be useable, an @AutoRefactor must implement JavaSourceScanner or extend JavaSourceVisitor")
+                        logger.warn("To be useable, an @AutoRefactor must implement JavaSourceScanner")
                     }
                 } catch(ignored: ReflectiveOperationException) {
                     logger.warn("Unable to construct @AutoRefactor with id '${refactor.value}'. It must extend implement JavaSourceScanner or extend JavaSourceVisitor and have a zero argument public constructor.")
@@ -55,11 +63,11 @@ data class SourceSet(val allSourceFiles: Iterable<Path>, val classpath: Iterable
         return scanners
     }
 
-    fun <T> scan(scanner: JavaSourceScanner<T>): List<T> = allJava().map { scanner.scan(it) }.filter { it != null }
+    fun <R> scan(scanner: JavaSourceScanner<P, R>): List<R> = allJava().map { scanner.scan(it) }.filter { it != null }
 
-    fun scanForClasses(predicate: (JavaSource) -> Boolean): List<String> {
-        return scan(object : JavaSourceScanner<List<String>> {
-            override fun scan(source: JavaSource): List<String> {
+    fun scanForClasses(predicate: (JavaSource<P>) -> Boolean): List<String> {
+        return scan(object : JavaSourceScanner<P, List<String>> {
+            override fun scan(source: JavaSource<P>): List<String> {
                 return if (predicate.invoke(source))
                     source.classes()
                 else emptyList<String>()

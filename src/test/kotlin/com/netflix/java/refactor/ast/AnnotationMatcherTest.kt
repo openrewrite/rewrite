@@ -1,25 +1,23 @@
 package com.netflix.java.refactor.ast
 
 import com.netflix.java.refactor.AbstractRefactorTest
-import org.junit.Assert.*
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Ignore
 import org.junit.Test
 
+@Ignore
 class AnnotationMatcherTest : AbstractRefactorTest() {
     @Test
     fun matchesSimpleFullyQualifiedAnnotation() {
-        assertFalse(
-            parseJava(
-                java(
-                    """
-                    @Deprecated
-                    public class A {}
-                    """
-                )
-            )
+        val a = java("""
+            @Deprecated
+            public class A {}
+        """)
+        
+        assertTrue(parseJava(a)
                 .findAnnotations("@java.lang.Deprecated")
-                .isEmpty()
-
-        )
+                .isNotEmpty())
     }
 
     @Test

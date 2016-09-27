@@ -2,9 +2,10 @@ package com.netflix.java.refactor.find
 
 import com.netflix.java.refactor.AbstractRefactorTest
 import org.junit.Assert.assertEquals
+import org.junit.Ignore
 import org.junit.Test
-import java.lang.Deprecated
 
+@Ignore
 class FindAnnotationsTest: AbstractRefactorTest() {
 
     @Test

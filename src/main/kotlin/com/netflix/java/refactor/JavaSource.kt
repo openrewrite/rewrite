@@ -5,10 +5,8 @@ import com.netflix.java.refactor.find.Annotation
 import com.sun.tools.javac.code.Symbol
 import com.sun.tools.javac.tree.JCTree
 import java.nio.file.Files
-import java.util.function.Consumer
-import kotlin.concurrent.thread
 
-class JavaSource(val cu: CompilationUnit) {
+class JavaSource<P>(val cu: CompilationUnit, val datum: P) {
     var changedFile = false
 
     fun file() = cu.source()
@@ -55,7 +53,7 @@ class JavaSource(val cu: CompilationUnit) {
 
     fun findMethodCalls(signature: String): List<Method> = FindMethods(signature).scanner().scan(cu)
 
-    fun diff(body: JavaSource.() -> Unit): String {
+    fun diff(body: JavaSource<*>.() -> Unit): String {
         val before = text()
         this.body()
         val after = text()

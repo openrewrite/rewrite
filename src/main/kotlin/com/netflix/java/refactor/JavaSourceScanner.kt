@@ -1,5 +1,5 @@
 package com.netflix.java.refactor
 
-interface JavaSourceScanner<out T> {
-    fun scan(source: JavaSource): T
+interface JavaSourceScanner<P, out R> {
+    fun scan(source: JavaSource<P>): R
 }

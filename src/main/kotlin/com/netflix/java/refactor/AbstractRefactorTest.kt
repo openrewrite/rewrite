@@ -11,14 +11,14 @@ abstract class AbstractRefactorTest {
     @JvmField @Rule
     val temp = TemporaryFolder()
     
-    fun parseJava(target: File, vararg otherFiles: File): JavaSource =
+    fun parseJava(target: File, vararg otherFiles: File): JavaSource<*> =
         parseJava(target, otherFiles.toList(), null)
     
-    fun parseJava(target: File, otherFiles: Iterable<File>, classpath: Iterable<File>? = null): JavaSource {
+    fun parseJava(target: File, otherFiles: Iterable<File>, classpath: Iterable<File>? = null): JavaSource<*> {
         val parser = AstParser(classpath?.map { it.toPath() })
         val allFiles = otherFiles.plus(target)
         val cu = parser.parseFiles(allFiles.map { it.toPath() }).last()
-        return JavaSource(CompilationUnit(cu, parser))
+        return JavaSource(CompilationUnit(cu, parser), Unit)
     }
     
     fun java(sourceStr: String): File {
