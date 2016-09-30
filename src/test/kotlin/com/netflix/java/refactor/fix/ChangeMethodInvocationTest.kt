@@ -30,6 +30,48 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |}
         """)
     }
+    
+    @Test
+    fun refactorMethodNameBasedOnArgumentSource() {
+        val b = java("""
+            |public enum B {
+            |    One, Two
+            |}
+        """)
+        
+        val a = java("""
+            |class A {
+            |   public void test() {
+            |       conditionedOnB(B.One);
+            |   }
+            |
+            |   public void conditionedOnB(B b) { }
+            |   public void one() {}
+            |   public void two() {}
+            |}
+        """)
+        
+        parseJava(a, b).refactor()
+            .findMethodCalls("A conditionedOnB(..)")
+                .changeName { if(it.args[0].source.contains("One")) "one" else "two" }
+                .changeArguments()
+                    .delete(0)
+                    .done()
+                .done()
+            .fix()
+        
+        assertRefactored(a, """
+            |class A {
+            |   public void test() {
+            |       one();
+            |   }
+            |
+            |   public void conditionedOnB(B b) { }
+            |   public void one() {}
+            |   public void two() {}
+            |}
+        """)
+    }
 
     @Test
     fun refactorMethodNameForMethodWithArrayArg() {
@@ -517,6 +559,41 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
         """)
     }
 
+    @Test
+    fun refactorDeleteArgument() {
+        val b = java("""
+            |class B {
+            |   public void foo() {}
+            |   public void foo(String s) {}
+        """)
+        
+        val a = java("""
+            |class A {
+            |   public void test() {
+            |       B b = new B();
+            |       b.foo("1");
+            |   }
+            |}
+        """)
+        
+        parseJava(a, b).refactor()
+            .findMethodCalls("B foo(String)")
+                .changeArguments()
+                    .delete(0)
+                    .done()
+                .done()
+            .fix()
+
+        assertRefactored(a, """
+            |class A {
+            |   public void test() {
+            |       B b = new B();
+            |       b.foo();
+            |   }
+            |}
+        """)
+    }
+    
     @Test
     fun refactorInsertArgument() {
         val b = java("""

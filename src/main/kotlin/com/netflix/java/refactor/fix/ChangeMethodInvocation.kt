@@ -3,6 +3,8 @@ package com.netflix.java.refactor.fix
 import com.netflix.java.refactor.RefactorFix
 import com.netflix.java.refactor.RefactorTransaction
 import com.netflix.java.refactor.ast.*
+import com.netflix.java.refactor.find.Argument
+import com.netflix.java.refactor.find.Method
 import com.sun.source.tree.LiteralTree
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.source.util.TreePath
@@ -30,9 +32,15 @@ class ChangeMethodInvocation(signature: String, val tx: RefactorTransaction) : R
     internal var refactorArguments: RefactorArguments? = null
     internal var refactorTargetToStatic: String? = null
     internal var refactorTargetToVariable: String? = null
+    internal var refactorNameBuilder: ((Method) -> String)? = null
 
     fun changeName(name: String): ChangeMethodInvocation {
         refactorName = name
+        return this
+    }
+    
+    fun changeName(nameBuilder: (Method) -> String): ChangeMethodInvocation {
+        refactorNameBuilder = nameBuilder
         return this
     }
 
@@ -70,6 +78,7 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
     internal var reorderArguments: List<String>? = null
     internal var argumentNames: List<String>? = null
     internal val insertions = ArrayList<InsertArgument>()
+    internal val deletions = ArrayList<DeleteArgument>()
 
     fun arg(clazz: String): RefactorArgument {
         val arg = RefactorArgument(this, typeConstraint = clazz)
@@ -99,11 +108,18 @@ class RefactorArguments(val op: ChangeMethodInvocation) {
         insertions.add(InsertArgument(pos, value))
         return this
     }
+    
+    fun delete(pos: Int): RefactorArguments {
+        deletions.add(DeleteArgument(pos))
+        return this
+    }
 
     fun done() = op
 }
 
 data class InsertArgument(val pos: Int, val value: String)
+
+data class DeleteArgument(val pos: Int)
 
 open class RefactorArgument(val op: RefactorArguments,
                             val typeConstraint: String? = null,
@@ -136,14 +152,25 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
             else -> null
         }
 
-        if (op.refactorName is String) {
+        val newName = 
+                if(op.refactorName is String) {
+                    op.refactorName
+                }
+                else if(op.refactorNameBuilder != null) {
+                    op.refactorNameBuilder!!(Method(invocation.meth.toString(), invocation.source(), invocation.args.map { Argument(it.source()) }))
+                } 
+                else { 
+                    null
+                }
+        
+        if(newName is String) {
             when (meth) {
                 is JCTree.JCFieldAccess -> {
                     val nameStart = meth.selected.getEndPosition(cu.endPositions) + 1
-                    fixes.add(RefactorFix(nameStart..nameStart + meth.name.toString().length, op.refactorName!!, source))
+                    fixes.add(RefactorFix(nameStart..nameStart + meth.name.toString().length, newName, source))
                 }
                 is JCTree.JCIdent -> {
-                    meth.replace(op.refactorName!!)
+                    fixes.add(meth.replace(newName))
                 }
             }
         }
@@ -211,6 +238,10 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
                 else {
                     fixes.add(insertAt(invocation.arguments[insertion.pos].startPosition, "${insertion.value}, "))
                 }
+            }
+            
+            op.refactorArguments?.deletions?.forEach { deletion ->
+                fixes.add(invocation.arguments[deletion.pos].delete())
             }
         }
 

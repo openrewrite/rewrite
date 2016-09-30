@@ -1,13 +1,14 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.ast.SingleCompilationUnitAstScanner
-import com.netflix.java.refactor.ast.MethodMatcher
 import com.netflix.java.refactor.ast.AstScannerBuilder
+import com.netflix.java.refactor.ast.MethodMatcher
+import com.netflix.java.refactor.ast.SingleCompilationUnitAstScanner
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 
-data class Method(val name: String, val source: String)
+data class Method(val name: String, val source: String, val args: List<Argument>)
+data class Argument(val source: String)
 
 class FindMethods(signature: String): AstScannerBuilder<List<Method>> {
     val matcher = MethodMatcher(signature)
@@ -20,7 +21,7 @@ class FindMethodScanner(val op: FindMethods): SingleCompilationUnitAstScanner<Li
     override fun visitMethodInvocation(node: MethodInvocationTree, context: Context): List<Method>? {
         val invocation = node as JCTree.JCMethodInvocation
         if(op.matcher.matches(invocation)) {
-            return listOf(Method(invocation.meth.toString(), invocation.source()))
+            return listOf(Method(invocation.meth.toString(), invocation.source(), invocation.args.map { Argument(it.source()) }))
         }
         return super.visitMethodInvocation(node, context)
     }
