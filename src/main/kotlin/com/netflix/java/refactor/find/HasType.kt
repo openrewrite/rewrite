@@ -1,7 +1,7 @@
 package com.netflix.java.refactor.find
 
-import com.netflix.java.refactor.ast.SingleCompilationUnitAstScanner
 import com.netflix.java.refactor.ast.AstScannerBuilder
+import com.netflix.java.refactor.ast.SingleCompilationUnitAstScanner
 import com.sun.source.tree.IdentifierTree
 import com.sun.source.tree.MethodInvocationTree
 import com.sun.tools.javac.code.Symbol
@@ -26,7 +26,7 @@ class HasTypeScanner(val op: HasType): SingleCompilationUnitAstScanner<Boolean>(
         val invocation = node as JCTree.JCMethodInvocation
         if(invocation.meth is JCTree.JCIdent) {
             // statically imported type
-            return (invocation.meth as JCTree.JCIdent)?.sym?.owner?.toString() == op.clazz
+            return (invocation.meth as JCTree.JCIdent).sym?.owner?.toString() == op.clazz
         }
         return super.visitMethodInvocation(node, context)
     }
