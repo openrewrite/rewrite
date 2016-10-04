@@ -263,23 +263,24 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
     private inner class ChangeArgumentScanner : TreePathScanner<List<RefactorFix>, RefactorArgument>() {
         override fun visitLiteral(node: LiteralTree, refactor: RefactorArgument): List<RefactorFix> {
             val literal = node as JCTree.JCLiteral
-            val value = literal.value
 
             // prefix and suffix hold the special characters surrounding the values of primitive-ish types,
             // e.g. the "" around String, the L at the end of a long, etc.
-            val valueMatcher = "(.*)${Pattern.quote(value.toString())}(.*)".toRegex().find(node.toString().replace("\\", ""))
-            return when (valueMatcher) {
-                is MatchResult -> {
-                    val (prefix, suffix) = valueMatcher.groupValues.drop(1)
-
-                    val transformed = refactor.refactorLiterals?.invoke(value) ?: value
-                    if (transformed != value.toString()) listOf(literal.replace("$prefix$transformed$suffix")) else emptyList()
-                }
+            val (prefix, suffix, value) = when(literal.value) {
+                is String -> arrayOf("\"", "\"", node.source().trim('"'))
                 else -> {
-                    // this should never happen
-                    emptyList()
+                    val valueMatcher = "(.*)${Pattern.quote(literal.value.toString())}(.*)".toRegex().find(node.toString())
+                    when(valueMatcher) {
+                        is MatchResult -> (valueMatcher.groupValues.drop(1) + literal.value).toTypedArray()
+                        else -> arrayOf("", "", literal.value)
+                    }
                 }
             }
+
+            val transformed = refactor.refactorLiterals?.invoke(value) ?: value
+            return if (transformed != value.toString())
+                listOf(literal.replace("$prefix$transformed$suffix"))
+            else emptyList()
         }
 
         override fun reduce(r1: List<RefactorFix>?, r2: List<RefactorFix>?): List<RefactorFix> =
