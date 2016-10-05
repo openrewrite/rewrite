@@ -267,7 +267,10 @@ class ChangeMethodInvocationScanner(val op: ChangeMethodInvocation) : FixingScan
             // prefix and suffix hold the special characters surrounding the values of primitive-ish types,
             // e.g. the "" around String, the L at the end of a long, etc.
             val (prefix, suffix, value) = when(literal.value) {
-                is String -> arrayOf("\"", "\"", node.source().trim('"'))
+                is String -> {
+                    val source = node.source()
+                    arrayOf("\"", "\"", source.substring(1, source.length - 1))
+                }
                 else -> {
                     val valueMatcher = "(.*)${Pattern.quote(literal.value.toString())}(.*)".toRegex().find(node.toString())
                     when(valueMatcher) {

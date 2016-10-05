@@ -342,7 +342,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |    A a;
             |    public void test() {
-            |        a.foo("mystring '%s' \"%s\" \n");
+            |        a.foo("mystring '%s' \"%s\" \n\"");
             |    }
             |}
         """)
@@ -362,7 +362,7 @@ class ChangeMethodInvocationTest: AbstractRefactorTest() {
             |public class B {
             |    A a;
             |    public void test() {
-            |        a.foo("mystring '{}' \"{}\" \n");
+            |        a.foo("mystring '{}' \"{}\" \n\"");
             |    }
             |}
         """)
