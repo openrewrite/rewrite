@@ -1,9 +1,9 @@
 # Rewrite - Distributed Java Source Refactoring
 
 ![Support Status](https://img.shields.io/badge/nebula-incubating-yellow.svg)
-[![Build Status](https://travis-ci.org/nebula-plugins/java-source-refactor.svg?branch=master)](https://travis-ci.org/nebula-plugins/java-source-refactor)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nebula-plugins/java-source-refactor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Apache 2.0](https://img.shields.io/github/license/nebula-plugins/java-source-refactor.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![Build Status](https://travis-ci.org/Netflix/rewrite.svg?branch=master)](https://travis-ci.org/nebula-plugins/java-source-refactor)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Netflix/rewrite?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Apache 2.0](https://img.shields.io/github/license/Netflix/rewrite.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 ## Purpose
 
@@ -11,7 +11,25 @@ The Rewrite project is a pluggable and distributed refactoring tool for Java sou
 
 It consists of an interface that allows you to perform type-aware searches for code patterns and make style-preserving refactoring changes.
 
-## Example
+## Installing
+
+Install the dependency from Maven Central or JCenter with:
+
+```xml
+<dependency>
+    <groupId>com.netflix.devinsight</groupId>
+    <artifactId>rewrite</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+or
+
+```groovy
+compile 'com.netflix.devinsight:rewrite:0.1.0'
+```
+
+## Example usage
 
 Below is a simple example of a refactoring operation that changes the name of a method.
 
