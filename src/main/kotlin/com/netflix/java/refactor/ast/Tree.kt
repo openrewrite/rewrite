@@ -6,10 +6,10 @@ import com.netflix.java.refactor.refactor.Refactor
 import com.netflix.java.refactor.search.*
 import groovy.lang.Closure
 import java.io.Serializable
+import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
 import java.util.*
 import java.util.function.Consumer
-import java.util.function.Function
 import java.util.regex.Pattern
 
 interface Tree {
@@ -280,6 +280,8 @@ sealed class Tr : Serializable, Tree {
 
         fun findMethodCalls(signature: String): List<Tr.MethodInvocation> = FindMethods(signature).visit(this)
 
+        fun findAnnotations(signature: String): List<Tr.Annotation> = FindAnnotations(signature).visit(this)
+
         fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).visit(this)
         fun hasType(clazz: String): Boolean = HasType(clazz).visit(this)
     }
@@ -322,7 +324,6 @@ sealed class Tr : Serializable, Tree {
             ops.call(r)
             return r
         }
-
 
         fun typeCache() = TypeCache.of(cacheId)
     }
