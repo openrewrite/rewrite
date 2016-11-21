@@ -1,7 +1,6 @@
 # Rewrite - Distributed Java Source Refactoring
 
-![Support Status](https://img.shields.io/badge/nebula-incubating-yellow.svg)
-[![Build Status](https://travis-ci.org/Netflix/rewrite.svg?branch=master)](https://travis-ci.org/nebula-plugins/java-source-refactor)
+[![Build Status](https://travis-ci.org/Netflix/rewrite.svg?branch=master)](https://travis-ci.org/Netflix/rewrite)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Netflix/rewrite?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Apache 2.0](https://img.shields.io/github/license/Netflix/rewrite.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
