@@ -5,130 +5,101 @@
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/nebula-plugins/java-source-refactor?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Apache 2.0](https://img.shields.io/github/license/nebula-plugins/java-source-refactor.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-  - [Purpose](#purpose)
-  - [Constructing and using a `SourceSet`](#constructing-and-using-a-sourceset)
-  - [Searching for code with `JavaSourceScanner`](#searching-for-code-with-javasourcescanner)
-  - [Refactoring code with `JavaSourceScanner`](#refactoring-code-with-javasourcescanner)
-  - [Using the Gradle plugin](#using-the-gradle-plugin)
-  - [Writing @AutoRefactor rules for the Gradle plugin](#writing-@autorefactor-rules-for-the-gradle-plugin)
-  - [License](#license)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
 ## Purpose
 
 The Java Source Refactoring project is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
 
 It consists of an interface that allows you to perform type-aware searches for code patterns and make style-preserving refactoring changes.
-It also packs with a Gradle plugin that performs refactoring operations on a project-wide basis.
 
-## Constructing and using a `SourceSet`
+## Example
 
-A `SourceSet` consists of Java source files and their required compile-time binary dependencies. Code search and refactoring operations are performed
-against groups of Java files represented by a `SourceSet`.
-
-Once we have a `SourceSet` instance, we can run operations against it via the `scan` method.
-
-## Searching for code with `JavaSourceScanner`
-
-`JavaSourceScanner` contains a single method `scan` that takes a single `JavaSource` parameter and returns any value you choose.
-
-In this simple example, we are simply returning all the call sites for `org.slf4j.Logger.info(...)` where the call takes any number of arguments. Since a single java source file may
-contain several matching calls, we are returning a `List<Method>` with the code used at each of those call sites. The results are then flattened into a single list.
+Below is a simple example of a refactoring operation that changes the name of a method.
 
 ```java
-sourceSet
-  .scan(java -> java.findMethodCalls("org.slf4j.Logger info(..)"))
-  .stream()
-  .flatMap(Collection::stream)
-  .collect(Collectors.toList());
-```
+public class ChangeMethodNameTestJava {
+    Parser parser = new OracleJdkParser(); // pass binary dependencies to this constructor on a real project
 
-If we were just interested in the files that contained a reference, we could modify it like so:
+    @Test
+    public void refactorMethodName() {
+        String a = "class A {{ B.foo(0); }}";
+        String b = "class B { static void foo(int n) {} }";
 
-```java
-sourceSet
-  .scan(java -> java.findMethodCalls("org.slf4j.Logger info(..)").isEmpty() ? null : java.file())
-  .stream()
-  .filter(file -> file != null)
-  .collect(Collectors.toList());
-```
+        final Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
-You can find the following language constructs at this point:
+        Refactor refactor = cu.refactor();
 
-| method                                      | description                                                                           |
-| ------------------------------------------- | ------------------------------------------------------------------------------------- |
-| findMethodCalls(String)                     | The method matching argument supports much of the AspectJ syntax for method matching  |
-| findFields(Class/String)                    | Find fields matching this fully qualified name or class reference                     |
-| findFieldsIncludingInherited(Class/String)  | Find fields including those declared on super types                                   |
-| hasType(Class/String)                       | Simple boolean check for the existence of a reference to a types                      |
-| hasImport(Class/String)                     | Simple boolean check for the existence of an import (also matches on star imports)    |
+        for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
+             refactor.changeName(inv, "bar");
+        }
 
-## Refactoring code with `JavaSourceScanner`
+        Tr.CompilationUnit fixed = refactor.fix();
 
-To initiate a refactoring operation, call `refactor()` on `JavaSource`. You can then chain together any number of refactoring operations and
-complete the refactoring transaction with a call to `fix()`.
-
-Here is a simple example where we just want to change all type references from `Foo` to `Bar`:
-
-```java
-sourceSet
-  .scan(java -> {
-    java.refactor().changeType(Foo.class, Bar.class).fix();
-    return null; // we don't care to return anything in this case
-  })
-```
-
-Here we change both a type and a method reference together:
-
-```java
-sourceSet
-  .scan(java -> {
-    java.refactor()
-        .changeType(Foo.class, Bar.class)
-        .findMethodCalls("com.netflix.Foo foo(String)")
-          .changeName("bar")
-          .changeArguments()
-            .arg(0).changeLiterals(s -> s.toString().replaceAll("A", "B")).done()
-            .done() // done changing arguments
-          .done() // done changing the method call
-        .fix();
-    return null; // we don't care to return anything in this case
-  })
-```
-
-Some refactoring operations, such as those directed at method calls can involve one or more individual changes and require a call to `done()` to mark the end of that change and the beginning (or continuation) of another.
-
-## Using the Gradle plugin
-
-Refer to the [Gradle Plugin Portal](https://plugins.gradle.org/plugin/nebula.source-refactor) for how to apply the Gradle plugin.
-
-To perform refactoring, run `./gradlew fixSourceLint`.
-
-The plugin scans the classpath looking for methods annotated with `@AutoRefactor` and applies the rule defined by each of
-these methods to the project's source.
-
-## Writing @AutoRefactor rules for the Gradle plugin
-
-You may pack refactoring rules into libraries (generally the library which is trying to deprecate some aspect of its API). When other projects pick up a new version of the library with a refactoring rule, it can be applied to their source code via `./gradlew fixSourceLint`. In this way the refactoring operation is distributed to dependent teams and source code across the organization adapts to the change in an "eventually consistent" manner.
-
-To create a new rule, provide a public static method annotated with `@AutoRefactor` and implements `JavaSourceScanner`. `JavaSourceScanner` is a generic type, and need not return anything
-when used for this purpose.
-
-```java
-@AutoRefactor(value = "b-to-b2", description = "replace all references to B with B2")
-public class FooToBar extends JavaSourceScanner<Void> {
-    public void visit(JavaSource source) {
-        source.refactor().changeType(B.class, B2.class).fix();
-        return null;
+        assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
     }
 }
 ```
 
-That's it! Any project that declares a dependency on the artifact that contains your new rule and applies `nebula.source-refactor` will
-now be refactorable.
+First, we construct a `Parser` instance, in this case an `OracleJdkParser` which will tightly control the parsing and type attribution phases of the standard
+Oracle JDK to produce an abstract syntax tree (AST) that we can work with. If we were working with a real project, we would pass a `List<Path>` of the binary
+dependencies of the project to the `OracleJdkParser` constructor.
+
+Next, we use the parser to parse some source code. Typically, you would pass a `List<Path>` of all the source files in the project, and `parse` would return
+a `List<Tr.CompilationUnit>` representing the ASTs of each source file in order. Here we are using a convenience utility that is especially handy while writing
+tests that allows us to pass any number of strings each representing a different Java source file, and we will receive back a single `Tr.CompilationUnit` for the first
+source string in the list. Note that a compilation unit is a combination of package declaration, imports, and all of the types (classes, interfaces, enums, etc.) defined
+in the file. Remember that, while usually there is one type per file whose name matches the file name, Java does allow additional non-public types to be defined inside
+a single Java source file.
+
+At this point, we can use the `Tr.CompilationUnit` to either do a type-aware deep dive on the code or perform a refactoring operation. Here, we begin a refactoring
+operation by calling `refactor` on our compilation unit. The refactoring operation searches for method invocations matching a certain signature (using the AspectJ pointcut grammar),
+and for each matching invocation, changes the name to a method called `bar`.
+
+Next, we call `fix` to return a copy of the original AST with the refactoring changes made.
+
+Lastly, we call `print` on the AST to emit the source code for the resulting change. Notice how the original style of the class was preserved!
+
+To cut down a bit on the ceremony, we can shorten the process of setting up and executing a refactor operation into one call:
+
+```java
+Tr.CompilationUnit fixed = cu.refactor(refactor -> {
+    for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
+         refactor.changeName(inv, "bar");
+    }
+}).fix();
+```
+
+### Generating a git-style patch for a refactor
+
+Rather than calling `fix` on a `Refactor` instance as described above, you may also call `diff`() which generates a git-style patch that can be used to generate
+a pull request or submit a patch for review and integration later. We also use `diff` when performing a refactoring operation across thousands of projects to wrap
+our heads around what kinds of changes are going to be made to the source code and sanity-check that our refactoring logic makes sense.
+
+Let's adjust our definition of the A class in our above example to incorporate some newlines, so that it looks like this:
+
+```java
+class A {
+   {
+      B.foo(0);
+   }
+}
+```
+
+Performing the same refactoring operation, but calling `diff` instead would yield:
+
+```text
+diff --git a//home/A.java b//home/A.java
+index 9b034e8..0234fb8 100644
+--- a//home/A.java
++++ b//home/A.java
+@@ -1,5 +1,5 @@
+ class A {
+    {
+-      B.foo(0);
++      B.bar(0);
+    }
+ }
+\ No newline at end of file
+```
 
 ## License
 

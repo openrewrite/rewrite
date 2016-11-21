@@ -1,30 +1,39 @@
-plugins {
-    id 'nebula.kotlin' version '1.0.3'
-    id 'me.champeau.gradle.antlr4' version '0.1'
-    id 'com.gradle.plugin-publish' version '0.9.4'
-    id 'java-gradle-plugin'
-    id 'com.github.johnrengelman.shadow' version '1.2.3'
-    id 'nebula.plugin-plugin' version '4.24.0'
+buildscript {
+    repositories {
+        maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M02"
+    }
 }
+
+plugins {
+    id 'nebula.netflixoss' version '3.5.2'
+    id 'me.champeau.gradle.antlr4' version '0.1'
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+}
+
+apply plugin: 'nebula.kotlin'
 
 group = 'com.netflix.devinsight'
 
 description 'Pluggable and distributed refactoring tool for Java source code'
-
-contacts {
-    'jkschneider@gmail.com' {
-        moniker 'Jon Schneider'
-        github 'jkschneider'
-    }
-}
 
 repositories {
     mavenCentral()
     maven { url "http://repository.jetbrains.com/all" }
 }
 
+license {
+    ignoreFailures = true
+}
+
 antlr4.output = new File('src/main/java/com/netflix/java/refactor/aspectj')
 antlr4.extraArgs = ['-package', 'com.netflix.java.refactor.aspectj']
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 configurations {
     compile.extendsFrom antlr4
@@ -35,35 +44,15 @@ dependencies {
     compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
+    compile 'commons-lang:commons-lang:2.6'
     compileOnly 'junit:junit:4.+'
+    compileOnly 'org.codehaus.groovy:groovy:2.4.7'
 
     compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
     
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'
-    testCompile 'org.jetbrains.spek:spek:latest.release'
-    testCompile 'com.github.marschall:memoryfilesystem:0.8.0'
-}
-
-pluginBundle {
-    website = 'https://github.com/nebula-plugins/java-source-refactor'
-    vcsUrl = 'https://github.com/nebula-plugins/java-source-refactor.git'
-    description = 'Pluggable and distributed refactoring tool for Java source code'
-
-    plugins {
-        sourceRefactor {
-            id = 'nebula.source-refactor'
-            displayName = 'Distributed source refactoring plugin'
-            description = 'Pluggable and distributed refactoring tool for Java source code'
-            tags = ['nebula', 'lint']
-        }
-    }
-
-    mavenCoordinates {
-        groupId = 'com.netflix.devinsight'
-        artifactId = 'java-source-refactor'
-    }
 }
 
 tasks.withType(Javadoc) {
