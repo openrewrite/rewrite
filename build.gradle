@@ -103,3 +103,12 @@ publishing {
         }
     }
 }
+
+license {
+    header = file('gradle/licenseHeader.txt')
+    exclude '**/*.tokens'
+    mapping {
+        kt = 'JAVADOC_STYLE'
+    }
+    sourceSets = project.sourceSets
+}
