@@ -7,7 +7,7 @@
 
 ## Purpose
 
-The Java Source Refactoring project is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
+The Rewrite project is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
 
 It consists of an interface that allows you to perform type-aware searches for code patterns and make style-preserving refactoring changes.
 
