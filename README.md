@@ -1,4 +1,4 @@
-# Distributed Java Source Refactoring
+# Rewrite - Distributed Java Source Refactoring
 
 ![Support Status](https://img.shields.io/badge/nebula-incubating-yellow.svg)
 [![Build Status](https://travis-ci.org/nebula-plugins/java-source-refactor.svg?branch=master)](https://travis-ci.org/nebula-plugins/java-source-refactor)
