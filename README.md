@@ -18,14 +18,14 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight</groupId>
     <artifactId>rewrite</artifactId>
-    <version>0.1.0</version>
+    <version>0.7.0</version>
 </dependency>
 ```
 
 or
 
 ```groovy
-compile 'com.netflix.devinsight:rewrite:0.1.0'
+compile 'com.netflix.devinsight:rewrite:0.7.0'
 ```
 
 ## Example usage
