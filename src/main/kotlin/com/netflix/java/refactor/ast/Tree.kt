@@ -26,6 +26,7 @@ import java.lang.IllegalStateException
 import java.util.*
 import java.util.function.Consumer
 import java.util.regex.Pattern
+import kotlin.reflect.KClass
 
 interface Tree {
     var formatting: Formatting
@@ -299,6 +300,19 @@ sealed class Tr : Serializable, Tree {
 
         fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).visit(this)
         fun hasType(clazz: String): Boolean = HasType(clazz).visit(this)
+
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+
+        fun hasModifier(modifier: String) = Modifier::class.nestedClasses
+                .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
+                .filterIsInstance<KClass<Modifier>>()
+                .filter { hasModifier(it.java) }
+                .any()
+
+        fun isEnum() = kind is Kind.Enum
+        fun isClass() = kind is Kind.Class
+        fun isInterface() = kind is Kind.Interface
+        fun isAnnotation() = kind is Kind.Annotation
     }
 
     data class CompilationUnit(val sourcePath: String,
@@ -341,6 +355,8 @@ sealed class Tr : Serializable, Tree {
         }
 
         fun typeCache() = TypeCache.of(cacheId)
+
+        fun firstClass() = classes.firstOrNull()
     }
 
     data class Continue(val label: Ident?,
@@ -551,6 +567,14 @@ sealed class Tr : Serializable, Tree {
 
         data class Throws(val exceptions: List<NameTree>, override var formatting: Formatting,
                           override val id: String = id()): Tr()
+
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+
+        fun hasModifier(modifier: String) = Modifier::class.nestedClasses
+                .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
+                .filterIsInstance<KClass<Modifier>>()
+                .filter { hasModifier(it.java) }
+                .any()
     }
 
     data class MethodInvocation(val select: Expression?,
@@ -813,6 +837,14 @@ sealed class Tr : Serializable, Tree {
 
             override fun <R> accept(v: AstVisitor<R>): R = v.visitVariable(this)
         }
+
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+
+        fun hasModifier(modifier: String) = Modifier::class.nestedClasses
+                .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
+                .filterIsInstance<KClass<Modifier>>()
+                .filter { hasModifier(it.java) }
+                .any()
     }
 
     data class WhileLoop(val condition: Parentheses<Expression>,

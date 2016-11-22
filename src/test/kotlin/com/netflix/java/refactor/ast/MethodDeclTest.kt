@@ -16,8 +16,8 @@
 package com.netflix.java.refactor.ast
 
 import com.netflix.java.refactor.parse.Parser
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
+import org.junit.Assert
+import org.junit.Assert.*
 import org.junit.Test
 
 abstract class MethodDeclTest(p: Parser): Parser by p {
@@ -49,6 +49,9 @@ abstract class MethodDeclTest(p: Parser): Parser by p {
         assertEquals(3, meth.params.params.size)
         assertEquals(1, meth.body!!.statements.size)
         assertEquals("R", ((meth.returnTypeExpr as Tr.Ident).type as Type.GenericTypeVariable).fullyQualifiedName)
+
+        assertTrue(meth.hasModifier(Tr.MethodDecl.Modifier.Public::class.java))
+        assertTrue(meth.hasModifier("public"))
     }
 
     @Test

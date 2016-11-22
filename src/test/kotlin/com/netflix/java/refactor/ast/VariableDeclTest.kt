@@ -25,7 +25,7 @@ abstract class VariableDeclTest(p: Parser): Parser by p {
     fun fieldDefinition() {
         val a = parse("""
             public class A {
-                String a = "";
+                public String a = "";
             }
         """)
         
@@ -37,6 +37,9 @@ abstract class VariableDeclTest(p: Parser): Parser by p {
         assertEquals("java.lang.String", singleVar.type.asClass()?.fullyQualifiedName)
         assertEquals((varDecl.typeExpr as Tr.Ident).type, singleVar.type)
         assertTrue(singleVar.initializer is Tr.Literal)
+
+        assertTrue(varDecl.hasModifier(Tr.VariableDecls.Modifier.Public::class.java))
+        assertTrue(varDecl.hasModifier("public"))
     }
 
     @Test

@@ -17,8 +17,7 @@ package com.netflix.java.refactor.ast
 
 import com.netflix.java.refactor.parse.Parser
 import org.junit.Assert
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.*
 import org.junit.Test
 
 abstract class ClassDeclTest(p: Parser): Parser by p {
@@ -31,6 +30,14 @@ abstract class ClassDeclTest(p: Parser): Parser by p {
         """)
 
         assertEquals(listOf("A", "B"), a.classes.map { it.name.name }.sorted())
+    }
+
+    @Test
+    fun modifiers() {
+        val a = parse("public class A {}")
+
+        assertTrue(a.classes[0].hasModifier(Tr.ClassDecl.Modifier.Public::class.java))
+        assertTrue(a.classes[0].hasModifier("public"))
     }
     
     @Test
