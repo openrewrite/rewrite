@@ -20,9 +20,6 @@ import com.netflix.java.refactor.parse.OracleJdkParser;
 import com.netflix.java.refactor.parse.Parser;
 import org.junit.Test;
 
-import java.util.Collections;
-import java.util.List;
-
 import static org.junit.Assert.assertEquals;
 
 public class ChangeMethodNameTestJava {

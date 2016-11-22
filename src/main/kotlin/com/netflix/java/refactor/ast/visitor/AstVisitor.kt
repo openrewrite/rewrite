@@ -40,7 +40,7 @@ open class AstVisitor<R> {
     open fun reduce(r1: R, r2: R): R = when (r1) {
         is Boolean -> (r1 || r2 as Boolean) as R
         is Iterable<*> -> r1.plus(r2 as Iterable<*>) as R
-        else -> r1
+        else -> r1 ?: r2
     }
 
     private val cursorStack = Stack<Tree>()

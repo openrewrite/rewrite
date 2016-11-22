@@ -17,6 +17,7 @@ package com.netflix.java.refactor.ast
 
 import com.netflix.java.refactor.ast.visitor.AstVisitor
 import com.netflix.java.refactor.ast.visitor.PrintVisitor
+import com.netflix.java.refactor.ast.visitor.RetrieveCursorVisitor
 import com.netflix.java.refactor.refactor.Refactor
 import com.netflix.java.refactor.search.*
 import groovy.lang.Closure
@@ -359,6 +360,8 @@ sealed class Tr : Serializable, Tree {
         fun typeCache() = TypeCache.of(cacheId)
 
         fun firstClass() = classes.firstOrNull()
+
+        fun cursor(t: Tree) = RetrieveCursorVisitor(t).visit(this)
     }
 
     data class Continue(val label: Ident?,
