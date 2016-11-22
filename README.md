@@ -118,6 +118,64 @@ index 9b034e8..0234fb8 100644
 \ No newline at end of file
 ```
 
+### Abstract Syntax Tree (AST) Type Reference
+
+Below is a visual reference of the AST elements that are available:
+
+* Tr.Annotation - `@SuppressWarnings("ALL")`
+* Tr.ArrayAccess - The index portion of `myArray[0]`
+* Tr.ArrayType - The type portion of `String[][] foo`
+* Tr.AssignOp - `n += 1`
+* Tr.Assign - `n = 0`
+* Tr.Binary - `n + 1`
+* Tr.Block - The class body and method body portions of:
+```java
+public class A {
+	public void foo() {  }
+}
+```
+* Tr.Break - `break label` (optional label)
+* Tr.Case - Case statements inside switches `case 0:` including `default`.
+* Tr.Catch - `catch (Throwable t) { }`
+* Tr.ClassDecl - Any type declaration:
+	- `class A {}`
+	- `interface A {}`
+	- `@interface A {}`
+	- `enum A {}`
+* Tr.Comment - Raw comments, either block or single line.
+* Tr.CompilationUnit - Package declaration (optional), imports (optional), and any type declarations contained in a single Java source file.
+* Tr.Continue - `continue label` (optional label).
+* Tr.DoWhile - `do { } while(cond)`
+* Tr.Empty - Empty statements can appear in as statements in blocks (`{ ; }`) and other constructs like for loops (e.g. `for(;;) {}`)
+* Tr.FieldAccess - `new A().myField`
+* Tr.ForEachLoop - `for(A a: listOfAs) { }`
+* Tr.ForLoop - `for(int i = 0; i < 10; i++) { }`
+* Tr.Ident - Either a qualified (`com.foo.A`) or unqualified (`A`, `int`, `myField`) name. Refers to either a package portion, a type, or variable name, depending on the context.
+* Tr.If - `if(cond) { } else if(cond2) { } else { }`
+* Tr.Import - A regular or static import, including wildcard imports (e.g. `import com.foo.A`)
+* Tr.InstanceOf - `a instanceof A`
+* Tr.Label - The label and target statement of `labeled: while(cond) { }`
+* Tr.Lambda - `(String s) -> s.substring(1)`
+* Tr.Literal - `0`, `'a'`, `"a"`. Also preserves base markers `010`, `0xA0`, `0b01` and type both standard and non-standard markers `0.0f`, `1.0d`, `1.0D`, `1L`.
+* Tr.MethodDecl - `public <P, R> R foo(P p, String s, String... args) { }`
+* Tr.MethodInvocation - `a.foo(0, 1, 2)`
+* Tr.NewArray - `new int[0]`
+* Tr.NewClass - `new A.B() {}`
+* Tr.Parentheses - `( 0 )`
+* Tr.Primitive - Where type declarations are possible: `int`, `double`, etc.
+* Tr.Return - `return value` (optional value)
+* Tr.Switch - `switch(n) { case 0: break; }`
+* Tr.Synchronized - `synchronized(mutex) { }`
+* Tr.Ternary - `n % 2 == 0 ? "even" : "odd"`
+* Tr.Throw - `throw new UnsupportedOperationException()`
+* Tr.TryCatch - `try { } catch(Throwable t) { } finally { }`
+* Tr.TypeCast -  `(Class<A>)`
+* Tr.TypeParameter - `<P>` and `<P extends A>`
+* Tr.Unary - `i++`, `!foo`, etc.
+* Tr.VariableDecls - Single or multi-variable declaration, e.g. `Integer n = 0` and `Integer n = 0, m = 0`
+* Tr.WhileLoop - `while(cond) { }`
+* Tr.Wildcard - `<?>`, `<? extends A`>, and `<? super A>`
+
 ## License
 
 Copyright 2015-2016 Netflix, Inc.
