@@ -35,4 +35,7 @@ data class Cursor(val path: List<Tree>) {
     } else false
 
     override fun hashCode(): Int = path.hashCode()
+
+    fun enclosingMethod(): Tr.MethodDecl? = path.filterIsInstance<Tr.MethodDecl>().lastOrNull()
+    fun enclosingClass(): Tr.ClassDecl? = path.filterIsInstance<Tr.ClassDecl>().lastOrNull()
 }

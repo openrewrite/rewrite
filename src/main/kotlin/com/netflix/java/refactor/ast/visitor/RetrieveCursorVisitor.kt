@@ -5,7 +5,7 @@ import com.netflix.java.refactor.ast.Expression
 import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.ast.Tree
 
-class RetrieveCursorVisitor(val t: Tree): AstVisitor<Cursor?>(null) {
+class RetrieveCursorVisitor(val t: Tree?): AstVisitor<Cursor?>(null) {
 
     override fun visitAnnotation(annotation: Tr.Annotation) = if(annotation === t) cursor() else super.visitAnnotation(annotation)
 

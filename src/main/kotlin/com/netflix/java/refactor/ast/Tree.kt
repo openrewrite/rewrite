@@ -361,7 +361,7 @@ sealed class Tr : Serializable, Tree {
 
         fun firstClass() = classes.firstOrNull()
 
-        fun cursor(t: Tree) = RetrieveCursorVisitor(t).visit(this)
+        fun cursor(t: Tree?) = RetrieveCursorVisitor(t).visit(this)
     }
 
     data class Continue(val label: Ident?,

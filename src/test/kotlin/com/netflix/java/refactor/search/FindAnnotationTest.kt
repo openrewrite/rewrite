@@ -19,7 +19,7 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import com.netflix.java.refactor.parse.OracleJdkParser
 import com.netflix.java.refactor.parse.Parser
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Test
 import org.slf4j.LoggerFactory
@@ -46,7 +46,7 @@ abstract class FindAnnotationTest(p: Parser): Parser by p {
             @Deprecated
             public class A {}
         """)
-        
+
         assertTrue(a.classes[0].findAnnotations("@java.lang.Deprecated").isNotEmpty())
     }
 
@@ -59,7 +59,9 @@ abstract class FindAnnotationTest(p: Parser): Parser by p {
             }
         """)
 
-        assertTrue(a.classes[0].methods()[0].findAnnotations("@java.lang.Deprecated").isNotEmpty())
+        val annotation = a.classes[0].methods()[0].findAnnotations("@java.lang.Deprecated").firstOrNull()
+        assertNotNull(annotation)
+        assertEquals("foo", a.cursor(annotation)?.enclosingMethod()?.simpleName)
     }
 
     @Test
