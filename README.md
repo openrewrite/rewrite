@@ -41,7 +41,7 @@ compile 'com.netflix.devinsight:rewrite:0.7.0'
 * Code Search
   - [Finding method invocations](https://github.com/Netflix/rewrite/wiki/Finding-Method-Invocations)
   - [Finding fields](https://github.com/Netflix/rewrite/wiki/Finding-Fields)
-  - Finding annotations
+  - [Finding annotations](https://github.com/Netflix/rewrite/wiki/Finding-Annotations)
   - Has type/has import
 * Refactoring
   - Changing method invocations
