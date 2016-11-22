@@ -59,7 +59,7 @@ class MethodMatcher(signature: String) {
         }.joinToString(",")
 
         return targetTypePattern.matches(targetType) &&
-                methodNamePattern.matches(meth.name.name) &&
+                methodNamePattern.matches(meth.simpleName) &&
                 argumentPattern.matches(resolvedSignaturePattern)
     }
 }

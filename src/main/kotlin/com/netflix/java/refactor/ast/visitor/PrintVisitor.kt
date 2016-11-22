@@ -196,7 +196,7 @@ class PrintVisitor : AstVisitor<String>("") {
     }
 
     override fun visitIdentifier(ident: Tr.Ident): String {
-        return ident.fmt(ident.name)
+        return ident.fmt(ident.simpleName)
     }
 
     override fun visitIf(iff: Tr.If): String {

@@ -18,9 +18,9 @@ package com.netflix.java.refactor.refactor.op;
 import com.netflix.java.refactor.ast.Tr;
 import com.netflix.java.refactor.parse.OracleJdkParser;
 import com.netflix.java.refactor.parse.Parser;
-import com.netflix.java.refactor.refactor.Refactor;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
@@ -58,17 +58,5 @@ public class ChangeMethodNameTestJava {
         }).diff();
 
         System.out.println(diff);
-    }
-
-    @Test
-    public void findFields() {
-        String a = "class A { java.util.List l; }";
-        Tr.ClassDecl clazz = parser.parse(a).getClasses().get(0);
-
-        clazz.findFields(List.class).stream()
-                .filter(f -> f.getModifiers().stream()
-                        .filter(mod -> mod instanceof Tr.VariableDecls.Modifier.Public)
-                        .findAny()
-                        .isPresent());
     }
 }

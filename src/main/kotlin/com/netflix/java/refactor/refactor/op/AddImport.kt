@@ -25,7 +25,7 @@ class AddImport(val cu: Tr.CompilationUnit, val clazz: String, val staticMethod:
     private val classType = Type.Class.build(cu.typeCache(), clazz)
 
     override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
-        val importedType = import.qualid.name.name
+        val importedType = import.qualid.simpleName
 
         if (addingStaticImport()) {
             if (import.matches(clazz) && import.static && (importedType == staticMethod || importedType == "*")) {
@@ -83,7 +83,7 @@ class AddImport(val cu: Tr.CompilationUnit, val clazz: String, val staticMethod:
             val comp = packageComparator.compare(import.qualid.target.printTrimmed(),
                     if(addingStaticImport()) clazz else classType.packageOwner())
             if(comp == 0) {
-                if(import.qualid.name.name < if(addingStaticImport()) staticMethod!! else classType.className()) {
+                if(import.qualid.simpleName < if(addingStaticImport()) staticMethod!! else classType.className()) {
                     true
                 }
                 else false

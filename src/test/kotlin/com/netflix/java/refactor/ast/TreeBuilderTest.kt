@@ -26,7 +26,7 @@ class TreeBuilderTest {
         val name = TreeBuilder.buildName(cache, "java.util.List", Formatting.Reified.Empty) as Tr.FieldAccess
 
         assertEquals("java.util.List", name.printTrimmed())
-        assertEquals("List", name.name.name)
+        assertEquals("List", name.simpleName)
     }
 
     @Test
@@ -34,11 +34,11 @@ class TreeBuilderTest {
         val name = TreeBuilder.buildName(cache, "a.Outer.Inner", Formatting.Reified.Empty) as Tr.FieldAccess
 
         assertEquals("a.Outer.Inner", name.printTrimmed())
-        assertEquals("Inner", name.name.name)
+        assertEquals("Inner", name.simpleName)
         assertEquals("a.Outer.Inner", name.type.asClass()?.fullyQualifiedName)
 
         val outer = name.target as Tr.FieldAccess
-        assertEquals("Outer", outer.name.name)
+        assertEquals("Outer", outer.simpleName)
         assertEquals("a.Outer", outer.type.asClass()?.fullyQualifiedName)
     }
 
@@ -47,6 +47,6 @@ class TreeBuilderTest {
         val name = TreeBuilder.buildName(cache, "a.A.*", Formatting.Reified.Empty) as Tr.FieldAccess
 
         assertEquals("a.A.*", name.printTrimmed())
-        assertEquals("*", name.name.name)
+        assertEquals("*", name.simpleName)
     }
 }

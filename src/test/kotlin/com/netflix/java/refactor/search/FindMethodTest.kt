@@ -34,7 +34,7 @@ abstract class FindMethodTest(p: Parser): Parser by p {
         
         val m = a.classes[0].findMethodCalls("java.util.Collections emptyList()").first()
         
-        assertEquals("emptyList", m.name.name)
+        assertEquals("emptyList", m.simpleName)
         assertEquals("Collections.emptyList()", m.printTrimmed())
     }
 

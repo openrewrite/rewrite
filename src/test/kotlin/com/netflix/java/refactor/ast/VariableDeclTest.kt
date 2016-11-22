@@ -33,7 +33,7 @@ abstract class VariableDeclTest(p: Parser): Parser by p {
         assertTrue(varDecl.typeExpr is Tr.Ident)
 
         val singleVar = varDecl.vars[0]
-        assertEquals("a", singleVar.name.name)
+        assertEquals("a", singleVar.simpleName)
         assertEquals("java.lang.String", singleVar.type.asClass()?.fullyQualifiedName)
         assertEquals((varDecl.typeExpr as Tr.Ident).type, singleVar.type)
         assertTrue(singleVar.initializer is Tr.Literal)
@@ -56,7 +56,7 @@ abstract class VariableDeclTest(p: Parser): Parser by p {
 
         val singleVar = varDecl.vars[0]
         assertEquals("java.lang.String", singleVar.type.asClass()?.fullyQualifiedName)
-        assertEquals("a", singleVar.name.name)
+        assertEquals("a", singleVar.simpleName)
     }
 
     @Test

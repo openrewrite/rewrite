@@ -26,7 +26,7 @@ class ReorderMethodArguments(val meth: Tr.MethodInvocation, vararg val byArgumen
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
         if(meth.id == this.meth.id && meth.type is Type.Method) {
             val paramNames = originalParamNames?.toList() ?: meth.type.paramNames?.toList() ?:
-                    error("There is no source attachment for method ${meth.declaringType?.fullyQualifiedName}.${meth.name.name}(..), " +
+                    error("There is no source attachment for method ${meth.declaringType?.fullyQualifiedName}.${meth.name.simpleName}(..), " +
                             "provide a reference for original parameter names by calling setOriginalParamNames(..)")
 
             val paramTypes = meth.type.resolvedSignature.paramTypes

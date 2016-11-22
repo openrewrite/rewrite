@@ -49,7 +49,7 @@ abstract class ContinueTest(p: Parser): Parser by p {
 
         val whileLoop = (a.firstMethodStatement() as Tr.Label).statement as Tr.WhileLoop
         assertTrue(whileLoop.body is Tr.Continue)
-        assertEquals("labeled", (whileLoop.body as Tr.Continue).label?.name)
+        assertEquals("labeled", (whileLoop.body as Tr.Continue).label?.simpleName)
     }
 
     @Test

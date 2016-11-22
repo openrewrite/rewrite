@@ -313,6 +313,8 @@ sealed class Tr : Serializable, Tree {
         fun isClass() = kind is Kind.Class
         fun isInterface() = kind is Kind.Interface
         fun isAnnotation() = kind is Kind.Annotation
+
+        @Transient val simpleName: String = name.simpleName
     }
 
     data class CompilationUnit(val sourcePath: String,
@@ -386,6 +388,8 @@ sealed class Tr : Serializable, Tree {
         override fun <R> accept(v: AstVisitor<R>): R = v.visitEnumValue(this)
 
         data class Arguments(val args: List<Expression>, override var formatting: Formatting, override val id: String = id()): Tr()
+
+        @Transient val simpleName: String = name.simpleName
     }
 
     data class EnumValueSet(val enums: List<EnumValue>,
@@ -408,6 +412,8 @@ sealed class Tr : Serializable, Tree {
          * Make debugging a bit easier
          */
         override fun toString(): String = "FieldAccess(${printTrimmed()})"
+
+        @Transient val simpleName: String = name.simpleName
     }
 
     data class ForEachLoop(val control: Control,
@@ -437,7 +443,7 @@ sealed class Tr : Serializable, Tree {
                            override val id: String = id()): Tr()
     }
 
-    data class Ident(val name: String,
+    data class Ident(val simpleName: String,
                      override val type: Type?,
                      override var formatting: Formatting,
                      override val id: String = id()) : Expression, NameTree, TypeTree, Tr() {
@@ -470,7 +476,7 @@ sealed class Tr : Serializable, Tree {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitImport(this)
 
-        fun matches(clazz: String): Boolean = when (qualid.name.name) {
+        fun matches(clazz: String): Boolean = when (qualid.simpleName) {
             "*" -> qualid.target.printTrimmed() == clazz.split('.').takeWhile { it[0].isLowerCase() }.joinToString(".")
             else -> qualid.printTrimmed() == clazz
         }
@@ -575,6 +581,10 @@ sealed class Tr : Serializable, Tree {
                 .filterIsInstance<KClass<Modifier>>()
                 .filter { hasModifier(it.java) }
                 .any()
+
+        fun findAnnotations(signature: String): List<Tr.Annotation> = FindAnnotations(signature).visit(this)
+
+        @Transient val simpleName: String = name.simpleName
     }
 
     data class MethodInvocation(val select: Expression?,
@@ -600,6 +610,8 @@ sealed class Tr : Serializable, Tree {
 
         data class Arguments(val args: List<Expression>, override var formatting: Formatting, override val id: String = id()): Tr()
         data class TypeParameters(val params: List<NameTree>, override var formatting: Formatting, override val id: String = id()): Tr()
+
+        @Transient val simpleName: String = name.simpleName
     }
 
     data class MultiCatch(val alternatives: List<NameTree>, override var formatting: Formatting,
@@ -650,8 +662,7 @@ sealed class Tr : Serializable, Tree {
                                  override var formatting: Formatting,
                                  override val id: String = id()): TypeTree, Expression, Tr() {
 
-        @Transient
-        override val type = clazz.type
+        @Transient override val type = clazz.type
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitParameterizedType(this)
 
@@ -836,6 +847,8 @@ sealed class Tr : Serializable, Tree {
                             override val id: String = id()): Tr() {
 
             override fun <R> accept(v: AstVisitor<R>): R = v.visitVariable(this)
+
+            @Transient val simpleName: String = name.simpleName
         }
 
         fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
@@ -845,6 +858,8 @@ sealed class Tr : Serializable, Tree {
                 .filterIsInstance<KClass<Modifier>>()
                 .filter { hasModifier(it.java) }
                 .any()
+
+        fun findAnnotations(signature: String): List<Tr.Annotation> = FindAnnotations(signature).visit(this)
     }
 
     data class WhileLoop(val condition: Parentheses<Expression>,

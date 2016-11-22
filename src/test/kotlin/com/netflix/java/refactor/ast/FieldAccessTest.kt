@@ -38,7 +38,7 @@ abstract class FieldAccessTest(p: Parser): Parser by p {
 
         val cu = parse(a, whichDependsOn = b)
         val acc = cu.fields(1..1)[0].vars[0].initializer as Tr.FieldAccess
-        assertEquals("field", acc.name.name)
+        assertEquals("field", acc.simpleName)
         assertEquals("b", acc.target.printTrimmed())
     }
 }

@@ -51,6 +51,29 @@ abstract class FindAnnotationTest(p: Parser): Parser by p {
     }
 
     @Test
+    fun matchesAnnotationOnMethod() {
+        val a = parse("""
+            public class A {
+                @Deprecated
+                public void foo() {}
+            }
+        """)
+
+        assertTrue(a.classes[0].methods()[0].findAnnotations("@java.lang.Deprecated").isNotEmpty())
+    }
+
+    @Test
+    fun matchesAnnotationOnField() {
+        val a = parse("""
+            public class A {
+                @Deprecated String s;
+            }
+        """)
+
+        assertTrue(a.classes[0].fields()[0].findAnnotations("@java.lang.Deprecated").isNotEmpty())
+    }
+
+    @Test
     fun doesNotMatchNotFullyQualifiedAnnotations() {
         val a = parse("""
             @Deprecated

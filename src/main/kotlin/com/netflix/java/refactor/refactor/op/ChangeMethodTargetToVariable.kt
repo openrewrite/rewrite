@@ -26,7 +26,7 @@ class ChangeMethodTargetToVariable(val meth: Tr.MethodInvocation, val namedVar: 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
         if(meth.id == this.meth.id) {
             return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
-                copy(select = Tr.Ident(namedVar.name.name, namedVar.type, select?.formatting ?: Formatting.Reified.Empty),
+                copy(select = Tr.Ident(namedVar.simpleName, namedVar.type, select?.formatting ?: Formatting.Reified.Empty),
                         declaringType = namedVar.type.asClass())
             })
         }

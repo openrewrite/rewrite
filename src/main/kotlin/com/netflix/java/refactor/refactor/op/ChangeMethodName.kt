@@ -23,9 +23,9 @@ class ChangeMethodName(val meth: Tr.MethodInvocation, val name: String) : Refact
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
         if (meth.id == this.meth.id) {
-            if(meth.name.name != name) {
+            if(meth.simpleName != name) {
                 return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
-                    copy(name = name.copy(name = this@ChangeMethodName.name))
+                    copy(name = name.copy(simpleName = this@ChangeMethodName.name))
                 })
             }
         }

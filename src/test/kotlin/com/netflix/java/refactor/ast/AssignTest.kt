@@ -34,7 +34,7 @@ abstract class AssignTest(p: Parser): Parser by p {
         """)
         
         val assign = a.firstMethodStatement() as Tr.Assign
-        assertEquals("s", (assign.variable as Tr.Ident).name)
+        assertEquals("s", (assign.variable as Tr.Ident).simpleName)
         assertTrue(assign.assignment is Tr.Literal)
     }
     

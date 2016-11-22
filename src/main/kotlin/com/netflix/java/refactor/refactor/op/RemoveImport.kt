@@ -37,7 +37,7 @@ class RemoveImport(val cu: Tr.CompilationUnit, val clazz: String): RefactorVisit
     override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
         if (import.static) {
             if (import.qualid.target.printTrimmed() == clazz) {
-                if (import.qualid.name.name == "*")
+                if (import.qualid.simpleName == "*")
                     staticStarImport = import
                 else
                     staticNamedImports.add(import)
@@ -45,7 +45,7 @@ class RemoveImport(val cu: Tr.CompilationUnit, val clazz: String): RefactorVisit
         } else {
             if (import.qualid.printTrimmed() == clazz) {
                 namedImport = import
-            } else if (import.qualid.name.name == "*" && clazz.startsWith(import.qualid.target.printTrimmed())) {
+            } else if (import.qualid.simpleName == "*" && clazz.startsWith(import.qualid.target.printTrimmed())) {
                 starImport = import
             }
         }
@@ -93,8 +93,8 @@ class RemoveImport(val cu: Tr.CompilationUnit, val clazz: String): RefactorVisit
             staticImportFixes.add(staticStarImport!!.delete())
         }
         staticNamedImports.forEach { staticImport ->
-            val method = staticImport.qualid.name.name
-            if(referencedMethods.none { it.name == method })
+            val method = staticImport.qualid.simpleName
+            if(referencedMethods.none { it.simpleName == method })
                 staticImportFixes.add(staticImport.delete())
         }
         return staticImportFixes

@@ -34,7 +34,7 @@ abstract class LabelTest(p: Parser): Parser by p {
         """)
         
         val labeled = a.firstMethodStatement() as Tr.Label
-        assertEquals("labeled", labeled.label.name)
+        assertEquals("labeled", labeled.label.simpleName)
         assertTrue(labeled.statement is Tr.WhileLoop)
     }
 }

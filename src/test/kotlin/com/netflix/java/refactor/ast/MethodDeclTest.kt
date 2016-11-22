@@ -45,7 +45,7 @@ abstract class MethodDeclTest(p: Parser): Parser by p {
         """)
         
         val meth = a.classes[0].methods()[0]
-        assertEquals("foo", meth.name.name)
+        assertEquals("foo", meth.simpleName)
         assertEquals(3, meth.params.params.size)
         assertEquals(1, meth.body!!.statements.size)
         assertEquals("R", ((meth.returnTypeExpr as Tr.Ident).type as Type.GenericTypeVariable).fullyQualifiedName)

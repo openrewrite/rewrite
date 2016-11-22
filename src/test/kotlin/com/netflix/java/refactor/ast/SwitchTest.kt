@@ -62,7 +62,7 @@ abstract class SwitchTest(p: Parser): Parser by p {
         assertEquals(1, switch.cases.statements.size)
 
         val default = switch.cases.statements[0]
-        assertEquals("default", (default.pattern as Tr.Ident).name)
+        assertEquals("default", (default.pattern as Tr.Ident).simpleName)
         assertTrue(default.statements[0] is Tr.MethodInvocation)
     }
 

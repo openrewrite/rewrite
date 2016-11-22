@@ -29,7 +29,7 @@ abstract class ClassDeclTest(p: Parser): Parser by p {
             class B {}
         """)
 
-        assertEquals(listOf("A", "B"), a.classes.map { it.name.name }.sorted())
+        assertEquals(listOf("A", "B"), a.classes.map { it.simpleName }.sorted())
     }
 
     @Test

@@ -26,7 +26,7 @@ data class ChangeFieldName(val decls: Tr.VariableDecls, val name: String) : Refa
             assert(multiVariable.vars.size == 1) { "Refactor name is not supported on multi-variable declarations" }
 
             val v = multiVariable.vars.first()
-            if(v.name.name != name) {
+            if(v.simpleName != name) {
                 return listOf(AstTransform<Tr.VariableDecls>(cursor()) {
                     decls.copy(vars = listOf(v.copy(name = Tr.Ident(name, v.name.type, v.name.formatting))))
                 })
