@@ -438,7 +438,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         val catches = tryable.catches.mapIfNecessary { visit(it) as Tr.Catch }
 
         val finally = tryable.finally?.let {
-            val block = visit(tryable.finally) as Tr.Block<Statement>
+            val block = visit(it.block) as Tr.Block<Statement>
             if(it.block !== block) it.copy(block) else it
         }
 

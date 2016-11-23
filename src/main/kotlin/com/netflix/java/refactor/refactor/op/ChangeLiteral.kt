@@ -19,7 +19,7 @@ import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 import org.apache.commons.lang.StringEscapeUtils
 
-class ChangeLiteralArgument(val expr: Expression, val transform: (Any?) -> Any?): RefactorVisitor() {
+class ChangeLiteral(val expr: Expression, val transform: (Any?) -> Any?): RefactorVisitor() {
 
     override fun visitExpression(expr: Expression): List<AstTransform<*>> {
         if(expr.id == this.expr.id) {
@@ -32,7 +32,7 @@ class ChangeLiteralArgument(val expr: Expression, val transform: (Any?) -> Any?)
         override fun visitLiteral(literal: Tr.Literal): List<AstTransform<*>> {
             val transformed = transform.invoke(literal.value)
             return if(transformed != literal.value) {
-                listOf(AstTransform<Tr.Literal>(this@ChangeLiteralArgument.cursor().parent() + cursor()) {
+                listOf(AstTransform<Tr.Literal>(this@ChangeLiteral.cursor().parent() + cursor()) {
                     val transformedValueSource = when(literal.typeTag) {
                         TypeTag.Boolean -> transformed.toString()
                         TypeTag.Byte -> transformed.toString()

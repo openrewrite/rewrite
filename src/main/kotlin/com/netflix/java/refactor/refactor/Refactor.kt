@@ -15,10 +15,7 @@
  */
 package com.netflix.java.refactor.refactor
 
-import com.netflix.java.refactor.ast.Expression
-import com.netflix.java.refactor.ast.Formatting
-import com.netflix.java.refactor.ast.Tr
-import com.netflix.java.refactor.ast.asClass
+import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.ast.visitor.FormatVisitor
 import com.netflix.java.refactor.ast.visitor.TransformVisitor
 import com.netflix.java.refactor.refactor.op.*
@@ -113,7 +110,7 @@ class Refactor(val cu: Tr.CompilationUnit) {
     /**
      * Change to a static method invocation on <code>toClass</code>
      */
-    fun changeTarget(target: Tr.MethodInvocation, toClass: String) {
+    fun changeTargetToStatic(target: Tr.MethodInvocation, toClass: String) {
         ops.add(ChangeMethodTargetToStatic(cu, target, toClass))
         ops.add(AddImport(cu, toClass))
         target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(cu, it)) }
@@ -122,12 +119,16 @@ class Refactor(val cu: Tr.CompilationUnit) {
     /**
      * Change to a static method invocation on <code>toClass</code>
      */
-    fun changeTarget(target: Tr.MethodInvocation, toClass: Class<*>) {
-        changeTarget(target, toClass.name)
+    fun changeTargetToStatic(target: Tr.MethodInvocation, toClass: Class<*>) {
+        changeTargetToStatic(target, toClass.name)
     }
 
     fun changeTarget(target: Tr.MethodInvocation, namedVar: Tr.VariableDecls.NamedVar) {
-        ops.add(ChangeMethodTargetToVariable(target, namedVar))
+        changeTarget(target, namedVar.simpleName, namedVar.type.asClass())
+    }
+
+    fun changeTarget(target: Tr.MethodInvocation, namedVar: String, type: Type.Class? = null) {
+        ops.add(ChangeMethodTargetToVariable(target, namedVar, type))
 
         // if the original is a static method invocation, the import on it's type may no longer be needed
         target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(cu, it)) }
@@ -147,8 +148,8 @@ class Refactor(val cu: Tr.CompilationUnit) {
     // Expression Refactoring
     // -------------
 
-    fun changeLiterals(target: Expression, transform: (Any?) -> Any?): Refactor {
-        ops.add(ChangeLiteralArgument(target, transform))
+    fun changeLiteral(target: Expression, transform: (Any?) -> Any?): Refactor {
+        ops.add(ChangeLiteral(target, transform))
         return this
     }
 

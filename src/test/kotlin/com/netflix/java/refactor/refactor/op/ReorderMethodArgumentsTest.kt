@@ -49,7 +49,7 @@ abstract class ReorderMethodArgumentsTest(p: Parser): Parser by p {
         val cu = parse(b, a)
         val fixed = cu.refactor {
             cu.findMethodCalls("a.A foo(..)").forEach {
-                it.args.args.firstOrNull()?.let { changeLiterals(it) { "anotherstring" } }
+                it.args.args.firstOrNull()?.let { changeLiteral(it) { "anotherstring" } }
                 reorderArguments(it, "n", "m", "s")
             }
         }.fix()

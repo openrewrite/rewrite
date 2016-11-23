@@ -50,7 +50,7 @@ abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
         val cu = parse(c, a, b)
         val fixed = cu.refactor() {
             cu.classes[0].findMethodCalls("a.A foo()").forEach {
-                changeTarget(it, "b.B")
+                changeTargetToStatic(it, "b.B")
             }
         }.fix()
 
@@ -93,7 +93,7 @@ abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
         val cu = parse(c, a, b)
         val fixed = cu.refactor() {
             cu.findMethodCalls("a.A foo()").forEach {
-                changeTarget(it, "b.B")
+                changeTargetToStatic(it, "b.B")
             }
         }.fix()
 

@@ -20,7 +20,7 @@ import com.netflix.java.refactor.parse.OracleJdkParser
 import com.netflix.java.refactor.parse.Parser
 import org.junit.Test
 
-abstract class ChangeLiteralArgumentTest(p: Parser): Parser by p {
+abstract class ChangeLiteralTest(p: Parser): Parser by p {
 
     val b: String = """
         |package b;
@@ -44,7 +44,7 @@ abstract class ChangeLiteralArgumentTest(p: Parser): Parser by p {
         val cu = parse(a, b)
         val fixed = cu.refactor() {
             cu.findMethodCalls("b.B singleArg(String)").forEach {
-                changeLiterals(it.args.args[0]) { s -> s?.toString()?.replace("%s", "{}") ?: s }
+                changeLiteral(it.args.args[0]) { s -> s?.toString()?.replace("%s", "{}") ?: s }
             }
         }.fix()
 
@@ -74,7 +74,7 @@ abstract class ChangeLiteralArgumentTest(p: Parser): Parser by p {
         val cu = parse(a, b)
         val fixed = cu.refactor {
             cu.findMethodCalls("b.B singleArg(..)").forEach {
-                changeLiterals(it.args.args[0]) { s -> s?.toString()?.replace("%s", "{}") ?: s }
+                changeLiteral(it.args.args[0]) { s -> s?.toString()?.replace("%s", "{}") ?: s }
             }
         }.fix()
 
@@ -90,4 +90,4 @@ abstract class ChangeLiteralArgumentTest(p: Parser): Parser by p {
     }
 }
 
-class OracleChangeLiteralArgumentTest: ChangeLiteralArgumentTest(OracleJdkParser())
+class OracleChangeLiteralTest : ChangeLiteralTest(OracleJdkParser())
