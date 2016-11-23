@@ -470,8 +470,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         return Tr.Literal(
                 typeTag,
                 when(typeTag) {
-                    Type.Tag.Char -> (node.value as Int).toChar()
-                    Type.Tag.Boolean -> if((node.value as Int) == 0) false else true
+                    com.netflix.java.refactor.ast.TypeTag.Char -> (node.value as Int).toChar()
+                    com.netflix.java.refactor.ast.TypeTag.Boolean -> if((node.value as Int) == 0) false else true
                     else -> node.value
                 },
                 source.substring(node.startPosition, node.endPos()),
@@ -711,15 +711,15 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitPrimitiveType(node: PrimitiveTypeTree, fmt: Formatting.Reified): Tree {
         cursor(node.endPos())
         return Tr.Primitive(when (node.primitiveTypeKind) {
-            TypeKind.BOOLEAN -> Type.Tag.Boolean
-            TypeKind.BYTE -> Type.Tag.Byte
-            TypeKind.CHAR -> Type.Tag.Char
-            TypeKind.DOUBLE -> Type.Tag.Double
-            TypeKind.FLOAT -> Type.Tag.Float
-            TypeKind.INT -> Type.Tag.Int
-            TypeKind.LONG -> Type.Tag.Long
-            TypeKind.SHORT -> Type.Tag.Short
-            TypeKind.VOID -> Type.Tag.Void
+            TypeKind.BOOLEAN -> com.netflix.java.refactor.ast.TypeTag.Boolean
+            TypeKind.BYTE -> com.netflix.java.refactor.ast.TypeTag.Byte
+            TypeKind.CHAR -> com.netflix.java.refactor.ast.TypeTag.Char
+            TypeKind.DOUBLE -> com.netflix.java.refactor.ast.TypeTag.Double
+            TypeKind.FLOAT -> com.netflix.java.refactor.ast.TypeTag.Float
+            TypeKind.INT -> com.netflix.java.refactor.ast.TypeTag.Int
+            TypeKind.LONG -> com.netflix.java.refactor.ast.TypeTag.Long
+            TypeKind.SHORT -> com.netflix.java.refactor.ast.TypeTag.Short
+            TypeKind.VOID -> com.netflix.java.refactor.ast.TypeTag.Void
             else -> throw IllegalArgumentException("Unknown primitive type $this")
         }, node.type(), fmt)
     }
@@ -1050,20 +1050,20 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
     private fun JdkTree.type(): Type? = (this as JCTree).type.type()
 
-    private fun TypeTag.tag(): Type.Tag {
+    private fun TypeTag.tag(): com.netflix.java.refactor.ast.TypeTag {
         return when (this) {
-            TypeTag.BOOLEAN -> Type.Tag.Boolean
-            TypeTag.BYTE -> Type.Tag.Byte
-            TypeTag.CHAR -> Type.Tag.Char
-            TypeTag.DOUBLE -> Type.Tag.Double
-            TypeTag.FLOAT -> Type.Tag.Float
-            TypeTag.INT -> Type.Tag.Int
-            TypeTag.LONG -> Type.Tag.Long
-            TypeTag.SHORT -> Type.Tag.Short
-            TypeTag.VOID -> Type.Tag.Void
-            TypeTag.NONE -> Type.Tag.None
-            TypeTag.CLASS -> Type.Tag.String
-            TypeTag.BOT -> Type.Tag.Null
+            TypeTag.BOOLEAN -> com.netflix.java.refactor.ast.TypeTag.Boolean
+            TypeTag.BYTE -> com.netflix.java.refactor.ast.TypeTag.Byte
+            TypeTag.CHAR -> com.netflix.java.refactor.ast.TypeTag.Char
+            TypeTag.DOUBLE -> com.netflix.java.refactor.ast.TypeTag.Double
+            TypeTag.FLOAT -> com.netflix.java.refactor.ast.TypeTag.Float
+            TypeTag.INT -> com.netflix.java.refactor.ast.TypeTag.Int
+            TypeTag.LONG -> com.netflix.java.refactor.ast.TypeTag.Long
+            TypeTag.SHORT -> com.netflix.java.refactor.ast.TypeTag.Short
+            TypeTag.VOID -> com.netflix.java.refactor.ast.TypeTag.Void
+            TypeTag.NONE -> com.netflix.java.refactor.ast.TypeTag.None
+            TypeTag.CLASS -> com.netflix.java.refactor.ast.TypeTag.String
+            TypeTag.BOT -> com.netflix.java.refactor.ast.TypeTag.Null
             else -> throw IllegalArgumentException("Unknown type tag $this")
         }
     }

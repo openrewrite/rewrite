@@ -514,7 +514,7 @@ sealed class Tr : Serializable, Tree {
         data class Arrow(override var formatting: Formatting, override val id: String = id()): Tr()
     }
 
-    data class Literal(val typeTag: Type.Tag,
+    data class Literal(val typeTag: TypeTag,
                        val value: Any?,
                        val valueSource: String,
                        override val type: Type?,
@@ -687,7 +687,7 @@ sealed class Tr : Serializable, Tree {
                 v.reduce(v.visitParentheses(this), v.visitExpression(this))
     }
 
-    data class Primitive(val typeTag: Type.Tag,
+    data class Primitive(val typeTag: TypeTag,
                          override val type: Type?,
                          override var formatting: Formatting,
                          override val id: String = id()) : Expression, TypeTree, Tr() {

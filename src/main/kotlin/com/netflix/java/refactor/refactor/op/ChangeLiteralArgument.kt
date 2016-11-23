@@ -15,10 +15,7 @@
  */
 package com.netflix.java.refactor.refactor.op
 
-import com.netflix.java.refactor.ast.AstTransform
-import com.netflix.java.refactor.ast.Expression
-import com.netflix.java.refactor.ast.Tr
-import com.netflix.java.refactor.ast.Type
+import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 import org.apache.commons.lang.StringEscapeUtils
 
@@ -37,9 +34,9 @@ class ChangeLiteralArgument(val expr: Expression, val transform: (Any?) -> Any?)
             return if(transformed != literal.value) {
                 listOf(AstTransform<Tr.Literal>(this@ChangeLiteralArgument.cursor().parent() + cursor()) {
                     val transformedValueSource = when(literal.typeTag) {
-                        Type.Tag.Boolean -> transformed.toString()
-                        Type.Tag.Byte -> transformed.toString()
-                        Type.Tag.Char -> {
+                        TypeTag.Boolean -> transformed.toString()
+                        TypeTag.Byte -> transformed.toString()
+                        TypeTag.Char -> {
                             val escaped = StringEscapeUtils.escapeJavaScript(transformed.toString())
 
                             // there are two differences between javascript escaping and character escaping
@@ -49,16 +46,16 @@ class ChangeLiteralArgument(val expr: Expression, val transform: (Any?) -> Any?)
                                 else -> escaped
                             } + "'"
                         }
-                        Type.Tag.Double -> "${transformed}d"
-                        Type.Tag.Float -> "${transformed}f"
-                        Type.Tag.Int -> transformed.toString()
-                        Type.Tag.Long -> "${transformed}L"
-                        Type.Tag.Short -> transformed.toString()
-                        Type.Tag.Void -> transformed.toString()
-                        Type.Tag.String -> "\"${StringEscapeUtils.escapeJava(transformed.toString())}\""
-                        Type.Tag.None -> ""
-                        Type.Tag.Wildcard -> "*"
-                        Type.Tag.Null -> "null"
+                        TypeTag.Double -> "${transformed}d"
+                        TypeTag.Float -> "${transformed}f"
+                        TypeTag.Int -> transformed.toString()
+                        TypeTag.Long -> "${transformed}L"
+                        TypeTag.Short -> transformed.toString()
+                        TypeTag.Void -> transformed.toString()
+                        TypeTag.String -> "\"${StringEscapeUtils.escapeJava(transformed.toString())}\""
+                        TypeTag.None -> ""
+                        TypeTag.Wildcard -> "*"
+                        TypeTag.Null -> "null"
                     }
 
                     copy(value = transformed, valueSource = transformedValueSource)

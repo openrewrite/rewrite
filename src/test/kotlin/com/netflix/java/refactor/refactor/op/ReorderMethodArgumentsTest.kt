@@ -168,8 +168,6 @@ abstract class ReorderMethodArgumentsTest(p: Parser): Parser by p {
             cu.findMethodCalls("a.A foo(..)").forEach {
                 reorderArguments(it, "o", "s")
             }
-//                .whereArgNamesAre("s", "o")
-//                .reorderByArgName("o", "s")
         }.fix()
 
         assertRefactored(fixed, """

@@ -75,7 +75,6 @@ abstract class InsertMethodArgumentTest(p: Parser): Parser by p {
             |   }
             |}
         """)
-
         //             |       b.bar("0", "2", "1");
     }
 }

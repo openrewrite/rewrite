@@ -50,7 +50,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         // check assumptions about the call site
         assertEquals("foo", inv.name.printTrimmed())
         assertEquals("java.lang.Integer", inv.returnType().asClass()?.fullyQualifiedName)
-        assertEquals(listOf(Type.Tag.Int, Type.Tag.Int, Type.Tag.Int),
+        assertEquals(listOf(TypeTag.Int, TypeTag.Int, TypeTag.Int),
                 inv.args.args.filterIsInstance<Tr.Literal>().map { it.typeTag })
 
         val effectParams = inv.type!!.resolvedSignature.paramTypes
@@ -68,7 +68,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         listOf(genericInv, explicitGenericInv).forEach { test ->
             // check assumptions about the call site
             assertEquals("java.lang.Integer", test.returnType().asClass()?.fullyQualifiedName)
-            assertEquals(listOf(Type.Tag.Int, Type.Tag.Int, Type.Tag.Int),
+            assertEquals(listOf(TypeTag.Int, TypeTag.Int, TypeTag.Int),
                     test.args.args.filterIsInstance<Tr.Literal>().map { it.typeTag })
 
             val effectiveParams = test.type!!.resolvedSignature.paramTypes

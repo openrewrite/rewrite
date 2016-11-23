@@ -92,7 +92,7 @@ sealed class Type(): Serializable {
     
     data class Array(val elemType: Type): Type()
     
-    data class Primitive(val typeTag: Tag): Type()
+    data class Primitive(val typeTag: TypeTag): Type()
     
     data class Var(val name: String, val type: Type?, val flags: Long): Type() {
         enum class Flags(val value: Long) {
@@ -112,21 +112,6 @@ sealed class Type(): Serializable {
         fun hasFlags(vararg test: Flags) = test.all { flags and it.value != 0L }
     }
 
-    enum class Tag {
-        Boolean,
-        Byte,
-        Char,
-        Double,
-        Float,
-        Int,
-        Long,
-        Short,
-        Void,
-        String,
-        None,
-        Wildcard,
-        Null
-    }
 }
 
 fun Type?.asClass(): Type.Class? = when(this) {

@@ -307,19 +307,19 @@ class PrintVisitor : AstVisitor<String>("") {
 
     override fun visitPrimitive(primitive: Tr.Primitive): String {
         return primitive.fmt(when (primitive.typeTag) {
-            Type.Tag.Boolean -> "boolean"
-            Type.Tag.Byte -> "byte"
-            Type.Tag.Char -> "char"
-            Type.Tag.Double -> "double"
-            Type.Tag.Float -> "float"
-            Type.Tag.Int -> "int"
-            Type.Tag.Long -> "long"
-            Type.Tag.Short -> "short"
-            Type.Tag.Void -> "void"
-            Type.Tag.String -> "String"
-            Type.Tag.Wildcard -> "*"
-            Type.Tag.None -> throw IllegalStateException("Unable to printTrimmed None primitive")
-            Type.Tag.Null -> throw IllegalStateException("Unable to printTrimmed Null primitive")
+            TypeTag.Boolean -> "boolean"
+            TypeTag.Byte -> "byte"
+            TypeTag.Char -> "char"
+            TypeTag.Double -> "double"
+            TypeTag.Float -> "float"
+            TypeTag.Int -> "int"
+            TypeTag.Long -> "long"
+            TypeTag.Short -> "short"
+            TypeTag.Void -> "void"
+            TypeTag.String -> "String"
+            TypeTag.Wildcard -> "*"
+            TypeTag.None -> throw IllegalStateException("Unable to printTrimmed None primitive")
+            TypeTag.Null -> throw IllegalStateException("Unable to printTrimmed Null primitive")
         })
     }
 

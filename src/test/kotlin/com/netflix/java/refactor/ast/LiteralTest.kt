@@ -31,7 +31,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
 
         val literal = a.fields()[0].vars[0].initializer as Tr.Literal
         assertEquals(0, literal.value)
-        assertEquals(Type.Tag.Int, literal.typeTag)
+        assertEquals(TypeTag.Int, literal.typeTag)
         assertEquals("0", literal.printTrimmed())
     }
 
@@ -45,7 +45,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
 
         val literal = a.fields()[0].vars[0].initializer as Tr.Literal
         assertEquals('a', literal.value)
-        assertEquals(Type.Tag.Char, literal.typeTag)
+        assertEquals(TypeTag.Char, literal.typeTag)
         assertEquals("'a'", literal.printTrimmed())
     }
 
