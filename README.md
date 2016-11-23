@@ -44,12 +44,12 @@ compile 'com.netflix.devinsight:rewrite:0.7.1'
   - [Finding method invocations](https://github.com/Netflix/rewrite/wiki/Finding-Method-Invocations)
   - [Finding fields](https://github.com/Netflix/rewrite/wiki/Finding-Fields)
   - [Finding annotations](https://github.com/Netflix/rewrite/wiki/Finding-Annotations)
-  - Has type/has import
+  - [Has type/has import](https://github.com/Netflix/rewrite/wiki/Has-Type-and-Has-Import)
 * Refactoring
   - Changing method invocations
   - Adding fields
   - Removing fields
-  - Adding and removing imports
+  - [Adding and removing imports](https://github.com/Netflix/rewrite/wiki/Adding-and-Removing-Imports)
 
 ## Example usage
 
