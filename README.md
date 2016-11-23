@@ -9,7 +9,6 @@
 - [Features](#features)
 - [Example usage](#example-usage)
   - [Generating a git-style patch](#generating-a-git-style-patch)
-- [Abstract Syntax Tree (AST) Type Reference](https://github.com/Netflix/rewrite/wiki/Abstract-Syntax-Tree-(AST)-Type-Reference)
 - [License](#license)
 
 ## Purpose
@@ -38,6 +37,9 @@ compile 'com.netflix.devinsight:rewrite:0.7.0'
 
 ## Features
 
+* Building blocks
+  - [Visitors and cursors](https://github.com/Netflix/rewrite/wiki/Visitors-and-Cursors)
+  - [Abstract Syntax Tree (AST) Type Reference](https://github.com/Netflix/rewrite/wiki/Abstract-Syntax-Tree-(AST)-Type-Reference)
 * Code Search
   - [Finding method invocations](https://github.com/Netflix/rewrite/wiki/Finding-Method-Invocations)
   - [Finding fields](https://github.com/Netflix/rewrite/wiki/Finding-Fields)
