@@ -186,6 +186,14 @@ class Refactor(val original: Tr.CompilationUnit) {
     fun insertArgument(target: Tr.MethodInvocation, pos: Int, source: String) =
             insertArgument(listOf(target), pos, source)
 
+    fun deleteArgument(target: Tr.MethodInvocation, pos: Int) =
+            deleteArgument(listOf(target), pos)
+
+    fun deleteArgument(targets: Iterable<Tr.MethodInvocation>, pos: Int): Refactor {
+        targets.forEach { ops.add(DeleteMethodArgument(it, pos)) }
+        return this
+    }
+
     fun reorderArguments(target: Tr.MethodInvocation, vararg byArgumentNames: String): ReorderMethodArguments {
         val reorderOp = ReorderMethodArguments(target, *byArgumentNames)
         ops.add(reorderOp)

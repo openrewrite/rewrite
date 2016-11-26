@@ -1,9 +1,8 @@
 package com.netflix.java.refactor.search
 
-import com.netflix.java.refactor.ast.assertRefactored
 import com.netflix.java.refactor.parse.OracleJdkParser
 import com.netflix.java.refactor.parse.Parser
-import junit.framework.Assert.assertEquals
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 abstract class FindTypeTest(p: Parser): Parser by p {
