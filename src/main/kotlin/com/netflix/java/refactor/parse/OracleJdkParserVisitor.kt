@@ -228,8 +228,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                     Formatting.Reified(genericPrefix))
         } else null
 
-        val extends = node.extendsClause.convertOrNull<Tree>()
-        val implements = node.implementsClause.convertAll<Tree>(COMMA_DELIM, NO_DELIM)
+        val extends = node.extendsClause.convertOrNull<TypeTree>()
+        val implements = node.implementsClause.convertAll<TypeTree>(COMMA_DELIM, NO_DELIM)
 
         val bodyPrefix = sourceBefore("{")
 
@@ -284,7 +284,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         } else null
 
         return Tr.CompilationUnit(
-                path.toString(),
+                path,
                 packageDecl,
                 node.imports.convertAll(SEMI_DELIM, SEMI_DELIM),
                 node.typeDecls.filterIsInstance<JCTree.JCClassDecl>().convertAll(this::whitespace, NO_DELIM),
@@ -540,7 +540,10 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                 else -> signature(genericSymbol.type)
             }
 
-            Type.Method(genericSignature, signature(jcSelect.type), genericSymbol.params().map { it.name.toString() })
+            Type.Method(genericSignature,
+                    signature(jcSelect.type),
+                    genericSymbol.params().map { it.name.toString() },
+                    genericSymbol.filteredFlags())
         } else null
 
         return Tr.MethodInvocation(
@@ -693,7 +696,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
             listOf(Tr.Empty(Formatting.Reified(sourceBefore(">"))))
         } else {
-            node.typeArguments.convertAll<NameTree>(COMMA_DELIM, { sourceBefore(">") })
+            node.typeArguments.convertAll<Expression>(COMMA_DELIM, { sourceBefore(">") })
         }
 
         return Tr.ParameterizedType(
@@ -791,7 +794,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
             val firstPrefix = whitespace()
 
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
-            val bounds = node.bounds.convertAll<Expression>({ sourceBefore("&") }, NO_DELIM)
+            val bounds = node.bounds.convertAll<TypeTree>({ sourceBefore("&") }, NO_DELIM)
             (bounds[0].formatting as Formatting.Reified).prefix = firstPrefix
 
             bounds
@@ -1008,7 +1011,20 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
      * --------------
      */
 
-    private val allFlagsMask = Type.Var.Flags.values().map { it.value }.reduce { f1, f2 -> f1 or f2 }
+    private val flagMasks = mapOf(
+        1L to Flag.Public,
+        1L shl 1 to Flag.Private,
+        1L shl 2 to Flag.Protected,
+        1L shl 3 to Flag.Static,
+        1L shl 4 to Flag.Final,
+        1L shl 5 to Flag.Synchronized,
+        1L shl 6 to Flag.Volatile,
+        1L shl 7 to Flag.Transient,
+        1L shl 10 to Flag.Abstract
+    )
+
+    private fun Symbol.filteredFlags(): List<Flag> =
+            flagMasks.filter { flags() and it.key != 0L }.map { it.value }
 
     private fun Symbol?.type(stack: List<Any?> = emptyList()): Type? {
         return when (this) {
@@ -1019,7 +1035,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                             Type.Var(
                                     it.name.toString(),
                                     it.type.type(stack.plus(this)),
-                                    it.flags() and allFlagsMask
+                                    it.filteredFlags()
                             )
                         }
 

@@ -84,7 +84,13 @@ sealed class Type(): Serializable {
         }
     }
     
-    data class Method(val genericSignature: Signature, val resolvedSignature: Signature, val paramNames: List<String>?): Type() {
+    data class Method(val genericSignature: Signature,
+                      val resolvedSignature: Signature,
+                      val paramNames: List<String>?,
+                      val flags: List<Flag>): Type() {
+
+        fun hasFlags(vararg test: Flag) = test.all { flags.contains(it) }
+
         data class Signature(val returnType: Type?, val paramTypes: List<Type>)
     }
    
@@ -94,24 +100,10 @@ sealed class Type(): Serializable {
     
     data class Primitive(val typeTag: TypeTag): Type()
     
-    data class Var(val name: String, val type: Type?, val flags: Long): Type() {
-        enum class Flags(val value: Long) {
-            Public(1L),
-            Private(1 shl 1),
-            Protected(1 shl 2),
-            Static(1 shl 3),
-            Final(1 shl 4),
-            Synchronized(1 shl 5),
-            Volatile(1 shl 6),
-            Transient(1 shl 7),
-            Native(1 shl 8),
-            Abstract(1 shl 10),
-            StrictFp(1 shl 11);
-        }
-        
-        fun hasFlags(vararg test: Flags) = test.all { flags and it.value != 0L }
-    }
+    data class Var(val name: String, val type: Type?, val flags: List<Flag>): Type() {
 
+        fun hasFlags(vararg test: Flag) = test.all { flags.contains(it) }
+    }
 }
 
 fun Type?.asClass(): Type.Class? = when(this) {

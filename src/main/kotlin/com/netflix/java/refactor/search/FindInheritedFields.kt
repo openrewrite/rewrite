@@ -30,7 +30,7 @@ class FindInheritedFields(val fullyQualifiedClassName: String): AstVisitor<List<
         if (type.supertype == null)
             return emptyList()
 
-        return type.members.filter { !it.hasFlags(Type.Var.Flags.Private) && it.type.hasElementType(fullyQualifiedClassName) } +
+        return type.members.filter { !it.hasFlags(Flag.Private) && it.type.hasElementType(fullyQualifiedClassName) } +
                 superFields(type.supertype)
     }
 }

@@ -19,10 +19,10 @@ import com.netflix.java.refactor.ast.*
 import java.util.ArrayList
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class AddImport(val cu: Tr.CompilationUnit, val clazz: String, val staticMethod: String? = null): RefactorVisitor() {
+class AddImport(val clazz: String, val staticMethod: String? = null): RefactorVisitor() {
     private var coveredByExistingImport = false
     private val packageComparator = PackageComparator()
-    private val classType = Type.Class.build(cu.typeCache(), clazz)
+    private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
     override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
         val importedType = import.qualid.simpleName

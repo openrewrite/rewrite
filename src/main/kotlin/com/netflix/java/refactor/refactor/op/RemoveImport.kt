@@ -20,7 +20,7 @@ import com.netflix.java.refactor.refactor.RefactorVisitor
 import com.netflix.java.refactor.search.MethodMatcher
 import java.util.*
 
-class RemoveImport(val cu: Tr.CompilationUnit, val clazz: String): RefactorVisitor() {
+class RemoveImport(val clazz: String): RefactorVisitor() {
     val methodMatcher = MethodMatcher("$clazz *(..)")
 
     var namedImport: Tr.Import? = null
@@ -32,7 +32,7 @@ class RemoveImport(val cu: Tr.CompilationUnit, val clazz: String): RefactorVisit
     var staticNamedImports = ArrayList<Tr.Import>()
     var staticStarImport: Tr.Import? = null
 
-    val classType = Type.Class.build(cu.typeCache(), clazz)
+    val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
     override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
         if (import.static) {

@@ -32,11 +32,9 @@ public class ChangeMethodNameTestJava {
 
         final Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
-        Tr.CompilationUnit fixed = cu.refactor(refactor -> {
-            for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
-                refactor.changeName(inv, "bar");
-            }
-        }).fix();
+        Tr.CompilationUnit fixed = cu.refactor()
+                .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
+                .fix();
 
         assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
     }
@@ -48,11 +46,9 @@ public class ChangeMethodNameTestJava {
 
         final Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
-        String diff = cu.refactor(refactor -> {
-            for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
-                refactor.changeName(inv, "bar");
-            }
-        }).diff();
+        String diff = cu.refactor()
+                .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
+                .diff();
 
         System.out.println(diff);
     }

@@ -24,6 +24,7 @@ import groovy.lang.Closure
 import java.io.Serializable
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
+import java.nio.file.Path
 import java.util.*
 import java.util.function.Consumer
 import java.util.regex.Pattern
@@ -248,8 +249,8 @@ sealed class Tr : Serializable, Tree {
                          val kind: Kind,
                          val name: Ident,
                          val typeParams: TypeParameters?,
-                         val extends: Tree?,
-                         val implements: List<Tree>,
+                         val extends: TypeTree?,
+                         val implements: List<TypeTree>,
                          val body: Block<Tree>,
                          val type: Type?,
                          override var formatting: Formatting,
@@ -297,6 +298,9 @@ sealed class Tr : Serializable, Tree {
 
         fun findMethodCalls(signature: String): List<Tr.MethodInvocation> = FindMethods(signature).visit(this)
 
+        fun findType(clazz: Class<*>): List<NameTree> = FindType(clazz.name).visit(this)
+        fun findType(clazz: String): List<NameTree> = FindType(clazz).visit(this)
+
         fun findAnnotations(signature: String): List<Tr.Annotation> = FindAnnotations(signature).visit(this)
 
         fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).visit(this)
@@ -318,7 +322,7 @@ sealed class Tr : Serializable, Tree {
         @Transient val simpleName: String = name.simpleName
     }
 
-    data class CompilationUnit(val sourcePath: String,
+    data class CompilationUnit(val sourcePath: Path,
                                val packageDecl: Package?,
                                val imports: List<Import>,
                                val classes: List<ClassDecl>,
@@ -335,6 +339,9 @@ sealed class Tr : Serializable, Tree {
         fun hasType(clazz: String): Boolean = HasType(clazz).visit(this)
 
         fun findMethodCalls(signature: String): List<Tr.MethodInvocation> = FindMethods(signature).visit(this)
+
+        fun findType(clazz: Class<*>): List<NameTree> = FindType(clazz.name).visit(this)
+        fun findType(clazz: String): List<NameTree> = FindType(clazz).visit(this)
 
         fun refactor() = Refactor(this)
 
@@ -574,7 +581,8 @@ sealed class Tr : Serializable, Tree {
         data class Parameters(val params: List<Statement>, override var formatting: Formatting,
                               override val id: String = id()): Tr()
 
-        data class Throws(val exceptions: List<NameTree>, override var formatting: Formatting,
+        data class Throws(val exceptions: List<NameTree>,
+                          override var formatting: Formatting,
                           override val id: String = id()): Tr()
 
         fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
@@ -617,7 +625,8 @@ sealed class Tr : Serializable, Tree {
         @Transient val simpleName: String = name.simpleName
     }
 
-    data class MultiCatch(val alternatives: List<NameTree>, override var formatting: Formatting,
+    data class MultiCatch(val alternatives: List<NameTree>,
+                          override var formatting: Formatting,
                           override val id: String = id()): TypeTree, Tr() {
         override val type: Type by lazy { throw IllegalArgumentException("Multi-catch does not represent a single type") }
 
@@ -669,7 +678,7 @@ sealed class Tr : Serializable, Tree {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitParameterizedType(this)
 
-        data class TypeArguments(val args: List<NameTree>,
+        data class TypeArguments(val args: List<Expression>, /* TypeTree or Wildcard */
                                  override var formatting: Formatting,
                                  override val id: String = id()): Tr()
     }
@@ -690,7 +699,7 @@ sealed class Tr : Serializable, Tree {
     data class Primitive(val typeTag: TypeTag,
                          override val type: Type?,
                          override var formatting: Formatting,
-                         override val id: String = id()) : Expression, TypeTree, Tr() {
+                         override val id: String = id()) : Expression, NameTree, TypeTree, Tr() {
 
         override fun <R> accept(v: AstVisitor<R>): R =
                 v.reduce(v.visitPrimitive(this), v.visitExpression(this))
@@ -765,14 +774,15 @@ sealed class Tr : Serializable, Tree {
 
     data class TypeParameter(val annotations: List<Annotation>,
                              val name: NameTree,
-                             val bounds: List<Expression>,
+                             val bounds: List<TypeTree>,
                              override var formatting: Formatting,
                              override val id: String = id()) : Tr() {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitTypeParameter(this)
     }
 
-    data class TypeParameters(val params: List<TypeParameter>, override var formatting: Formatting,
+    data class TypeParameters(val params: List<TypeParameter>,
+                              override var formatting: Formatting,
                               override val id: String = id()): Tr() {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitTypeParameters(this)
@@ -876,7 +886,9 @@ sealed class Tr : Serializable, Tree {
     data class Wildcard(val bound: Bound?,
                         val boundedType: NameTree?,
                         override var formatting: Formatting,
-                        override val id: String = id()): Tr() {
+                        override val id: String = id()): Tr(), Expression {
+
+        override val type = null
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitWildcard(this)
 

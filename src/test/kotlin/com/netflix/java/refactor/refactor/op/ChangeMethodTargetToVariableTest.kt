@@ -53,7 +53,7 @@ abstract class ChangeMethodTargetToVariableTest(p: Parser): Parser by p {
         val fixed = cu.refactor {
             val f = cu.classes[0].findFields("a.A")[0]
             cu.findMethodCalls("b.B foo()").forEach {
-                changeTarget(it, f.vars[0])
+                changeMethodTarget(it, f.vars[0])
             }
         }.fix()
 
@@ -100,7 +100,7 @@ abstract class ChangeMethodTargetToVariableTest(p: Parser): Parser by p {
         val fixed = cu.refactor {
             val f = cu.classes[0].findFields("a.A")[0]
             cu.findMethodCalls("b.B foo()").forEach {
-                changeTarget(it, f.vars[0])
+                changeMethodTarget(it, f.vars[0])
             }
         }.fix()
 

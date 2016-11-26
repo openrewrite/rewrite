@@ -18,10 +18,23 @@ package com.netflix.java.refactor.refactor.op
 import com.netflix.java.refactor.ast.assertRefactored
 import com.netflix.java.refactor.parse.OracleJdkParser
 import com.netflix.java.refactor.parse.Parser
-import com.netflix.java.refactor.refactor.Refactor
 import org.junit.Test
 
 abstract class AddImportTest(parser: Parser): Parser by parser {
+
+    @Test
+    fun addMultipleImports() {
+        val a = parse("class A {}")
+
+        val fixed = a.refactor().addImport("java.util.List").addImport("java.util.Set").fix()
+
+        assertRefactored(fixed, """
+            |import java.util.List;
+            |import java.util.Set;
+            |
+            |class A {}
+        """)
+    }
 
     @Test
     fun addNamedImport() {
@@ -62,6 +75,7 @@ abstract class AddImportTest(parser: Parser): Parser by parser {
             |package a;
             |
             |import java.util.List;
+            |
             |class A {}
         """)
     }
@@ -172,6 +186,7 @@ abstract class AddImportTest(parser: Parser): Parser by parser {
         assertRefactored(fixed, """
             |import java.util.*;
             |import static java.util.Collections.emptyList;
+            |
             |class A {}
         """)
     }

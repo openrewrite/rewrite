@@ -25,32 +25,42 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository
 import org.eclipse.jgit.lib.Constants
 import org.eclipse.jgit.lib.FileMode
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.nio.file.Path
 import java.util.*
 
-class Refactor(val cu: Tr.CompilationUnit) {
+class Refactor(val original: Tr.CompilationUnit) {
     private val ops = ArrayList<RefactorVisitor>()
 
     // -------------
     // Compilation Unit Refactoring
     // -------------
 
-    fun addImport(clazz: Class<*>, staticMethod: String? = null): Refactor {
+    @JvmOverloads
+    fun addImport(clazz: Class<*>, staticMethod: String? = null): Refactor =
         addImport(clazz.name, staticMethod)
-        return this
-    }
 
+    @JvmOverloads
     fun addImport(clazz: String, staticMethod: String? = null): Refactor {
-        ops.add(AddImport(cu, clazz, staticMethod))
+        ops.add(AddImport(clazz, staticMethod))
         return this
     }
 
-    fun removeImport(clazz: Class<*>): Refactor {
-        removeImport(clazz.name)
-        return this
-    }
+    fun removeImport(clazz: Class<*>): Refactor =
+            removeImport(clazz.name)
 
     fun removeImport(clazz: String): Refactor {
-        ops.add(RemoveImport(cu, clazz))
+        ops.add(RemoveImport(clazz))
+        return this
+    }
+
+    fun changeType(from: Class<*>, to: Class<*>): Refactor =
+            changeType(from.name, to.name)
+
+    fun changeType(from: String, to: String): Refactor {
+        ops.add(ChangeType(from, to))
+        ops.add(AddImport(to))
+        ops.add(RemoveImport(from))
         return this
     }
 
@@ -58,85 +68,123 @@ class Refactor(val cu: Tr.CompilationUnit) {
     // Class Declaration Refactoring
     // -------------
 
-    fun addField(target: Tr.ClassDecl, clazz: Class<*>, name: String, init: String?) {
+    @JvmOverloads
+    fun addField(target: Tr.ClassDecl, clazz: Class<*>, name: String, init: String? = null) =
         addField(target, clazz.name, name, init)
-    }
 
-    fun addField(target: Tr.ClassDecl, clazz: Class<*>, name: String) {
-        addField(target, clazz.name, name, null)
-    }
-
-    fun addField(target: Tr.ClassDecl, clazz: String, name: String) {
-        addField(target, clazz, name, null)
-    }
-
-    fun addField(target: Tr.ClassDecl, clazz: String, name: String, init: String?) {
-        ops.add(AddField(cu, listOf(Tr.VariableDecls.Modifier.Private(Formatting.Reified("", " "))),
+    @JvmOverloads
+    fun addField(target: Tr.ClassDecl, clazz: String, name: String, init: String? = null): Refactor {
+        ops.add(AddField(listOf(Tr.VariableDecls.Modifier.Private(Formatting.Reified("", " "))),
                 target, clazz, name, init))
-        ops.add(AddImport(cu, clazz))
+        ops.add(AddImport(clazz))
+        return this
     }
 
     // -------------
     // Field Refactoring
     // -------------
 
-    fun changeType(target: Tr.VariableDecls, toType: Class<*>) {
-        changeType(target, toType.name)
+    fun changeFieldType(targets: Iterable<Tr.VariableDecls>, toType: String): Refactor {
+        targets.forEach { target ->
+            ops.add(ChangeFieldType(target, toType))
+            target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(it.fullyQualifiedName)) }
+        }
+
+        if(targets.any())
+            ops.add(AddImport(toType))
+
+        return this
     }
 
-    fun changeType(target: Tr.VariableDecls, toType: String) {
-        ops.add(ChangeFieldType(cu, target, toType))
-        ops.add(AddImport(cu, toType))
-        target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(cu, it.fullyQualifiedName)) }
+    fun changeFieldType(target: Tr.VariableDecls, toType: Class<*>) =
+            changeFieldType(target, toType.name)
+
+    fun changeFieldType(target: Tr.VariableDecls, toType: String) =
+            changeFieldType(listOf(target), toType)
+
+    fun changeFieldName(targets: Iterable<Tr.VariableDecls>, toName: String): Refactor {
+        targets.forEach { ops.add(ChangeFieldName(it, toName)) }
+        return this
     }
 
-    fun changeName(target: Tr.VariableDecls, toName: String) {
-        ops.add(ChangeFieldName(target, toName))
+    fun changeFieldName(target: Tr.VariableDecls, toName: String) =
+            changeFieldName(listOf(target), toName)
+
+    fun delete(targets: Iterable<Tr.VariableDecls>): Refactor {
+        targets.forEach { target ->
+            ops.add(DeleteField(target))
+            target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(it.fullyQualifiedName)) }
+        }
+        return this
     }
 
-    fun delete(target: Tr.VariableDecls) {
-        ops.add(DeleteField(target))
-        target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(cu, it.fullyQualifiedName)) }
-    }
+    fun delete(target: Tr.VariableDecls) = delete(listOf(target))
 
     // -------------
     // Method Refactoring
     // -------------
 
-    fun changeName(target: Tr.MethodInvocation, toName: String) {
-        ops.add(ChangeMethodName(target, toName))
+    fun changeMethodName(targets: Iterable<Tr.MethodInvocation>, toName: String): Refactor {
+        targets.forEach { ops.add(ChangeMethodName(it, toName)) }
+        return this
     }
+
+    fun changeMethodName(target: Tr.MethodInvocation, toName: String) =
+            changeMethodName(listOf(target), toName)
 
     /**
      * Change to a static method invocation on <code>toClass</code>
      */
-    fun changeTargetToStatic(target: Tr.MethodInvocation, toClass: String) {
-        ops.add(ChangeMethodTargetToStatic(cu, target, toClass))
-        ops.add(AddImport(cu, toClass))
-        target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(cu, it)) }
+    fun changeMethodTargetToStatic(targets: Iterable<Tr.MethodInvocation>, toClass: String): Refactor {
+        targets.forEach { target ->
+            ops.add(ChangeMethodTargetToStatic(target, toClass))
+            target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(it)) }
+        }
+
+        if(targets.any())
+            ops.add(AddImport(toClass))
+
+        return this
     }
+
+    /**
+     * Change to a static method invocation on <code> toClass
+     */
+    fun changeMethodTargetToStatic(target: Tr.MethodInvocation, toClass: String) =
+            changeMethodTargetToStatic(listOf(target), toClass)
 
     /**
      * Change to a static method invocation on <code>toClass</code>
      */
-    fun changeTargetToStatic(target: Tr.MethodInvocation, toClass: Class<*>) {
-        changeTargetToStatic(target, toClass.name)
+    fun changeMethodTargetToStatic(target: Tr.MethodInvocation, toClass: Class<*>) =
+        changeMethodTargetToStatic(target, toClass.name)
+
+    @JvmOverloads
+    fun changeMethodTarget(targets: Iterable<Tr.MethodInvocation>, namedVar: String, type: Type.Class? = null): Refactor {
+        targets.forEach { target ->
+            ops.add(ChangeMethodTargetToVariable(target, namedVar, type))
+
+            // if the original is a static method invocation, the import on it's type may no longer be needed
+            target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(it)) }
+        }
+
+        return this
     }
 
-    fun changeTarget(target: Tr.MethodInvocation, namedVar: Tr.VariableDecls.NamedVar) {
-        changeTarget(target, namedVar.simpleName, namedVar.type.asClass())
+    fun changeMethodTarget(target: Tr.MethodInvocation, namedVar: Tr.VariableDecls.NamedVar) =
+            changeMethodTarget(target, namedVar.simpleName, namedVar.type.asClass())
+
+    @JvmOverloads
+    fun changeMethodTarget(target: Tr.MethodInvocation, namedVar: String, type: Type.Class? = null) =
+            changeMethodTarget(listOf(target), namedVar, type)
+
+    fun insertArgument(targets: Iterable<Tr.MethodInvocation>, pos: Int, source: String): Refactor {
+        targets.forEach { ops.add(InsertMethodArgument(it, pos, source)) }
+        return this
     }
 
-    fun changeTarget(target: Tr.MethodInvocation, namedVar: String, type: Type.Class? = null) {
-        ops.add(ChangeMethodTargetToVariable(target, namedVar, type))
-
-        // if the original is a static method invocation, the import on it's type may no longer be needed
-        target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(cu, it)) }
-    }
-
-    fun insertArgument(target: Tr.MethodInvocation, pos: Int, source: String) {
-        ops.add(InsertMethodArgument(cu, target, pos, source))
-    }
+    fun insertArgument(target: Tr.MethodInvocation, pos: Int, source: String) =
+            insertArgument(listOf(target), pos, source)
 
     fun reorderArguments(target: Tr.MethodInvocation, vararg byArgumentNames: String): ReorderMethodArguments {
         val reorderOp = ReorderMethodArguments(target, *byArgumentNames)
@@ -148,16 +196,19 @@ class Refactor(val cu: Tr.CompilationUnit) {
     // Expression Refactoring
     // -------------
 
-    fun changeLiteral(target: Expression, transform: (Any?) -> Any?): Refactor {
-        ops.add(ChangeLiteral(target, transform))
+    fun changeLiteral(targets: Iterable<Expression>, transform: (Any?) -> Any?): Refactor {
+        targets.forEach { ops.add(ChangeLiteral(it, transform)) }
         return this
     }
+
+    fun changeLiteral(target: Expression, transform: (Any?) -> Any?): Refactor =
+            changeLiteral(listOf(target), transform)
 
     /**
     * @return Transformed version of the AST after changes are applied
     */
     fun fix(): Tr.CompilationUnit {
-        val fixed = ops.fold(cu) { acc, op ->
+        val fixed = ops.fold(original) { acc, op ->
             // by transforming the AST for each op, we allow for the possibility of overlapping changes
             TransformVisitor(op.visit(acc)).visit(acc) as Tr.CompilationUnit
         }
@@ -168,15 +219,17 @@ class Refactor(val cu: Tr.CompilationUnit) {
     /**
      * @return Git-style patch diff representing the changes to this compilation unit
      */
-    fun diff() = InMemoryDiffEntry(cu.sourcePath, cu.print(), fix().print()).diff
+    @JvmOverloads
+    fun diff(relativeTo: Path? = null) = InMemoryDiffEntry(original.sourcePath, relativeTo, original.print(), fix().print()).diff
 
-    internal class InMemoryDiffEntry(filePath: String, old: String, new: String): DiffEntry() {
+    internal class InMemoryDiffEntry(filePath: Path, relativeTo: Path?, old: String, new: String): DiffEntry() {
         private val repo = InMemoryRepository.Builder().build()
+        private val relativePath = relativeTo?.let { filePath.relativize(relativeTo) } ?: filePath
 
         init {
             changeType = ChangeType.MODIFY
-            oldPath = filePath
-            newPath = filePath
+            oldPath = relativePath.toString()
+            newPath = relativePath.toString()
 
             val inserter = repo.objectDatabase.newInserter()
             oldId = inserter.insert(Constants.OBJ_BLOB, old.toByteArray()).abbreviate(40)

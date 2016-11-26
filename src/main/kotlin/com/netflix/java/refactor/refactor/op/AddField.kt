@@ -21,14 +21,13 @@ import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.ast.Type
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class AddField(val cu: Tr.CompilationUnit,
-               val modifiers: List<Tr.VariableDecls.Modifier>,
+class AddField(val modifiers: List<Tr.VariableDecls.Modifier>,
                val target: Tr.ClassDecl,
                val clazz: String,
                val name: String,
                val init: String?): RefactorVisitor() {
 
-    private val classType = Type.Class.build(cu.typeCache(), clazz)
+    private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
     override fun visitClassDecl(classDecl: Tr.ClassDecl): List<AstTransform<*>> =
         if(classDecl.id == target.id) {

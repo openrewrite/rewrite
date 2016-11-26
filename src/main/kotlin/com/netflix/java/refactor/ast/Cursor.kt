@@ -38,4 +38,5 @@ data class Cursor(val path: List<Tree>) {
 
     fun enclosingMethod(): Tr.MethodDecl? = path.filterIsInstance<Tr.MethodDecl>().lastOrNull()
     fun enclosingClass(): Tr.ClassDecl? = path.filterIsInstance<Tr.ClassDecl>().lastOrNull()
+    fun enclosingCompilationUnit(): Tr.CompilationUnit = path.filterIsInstance<Tr.CompilationUnit>().first()
 }

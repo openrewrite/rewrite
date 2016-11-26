@@ -130,8 +130,8 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     override fun visitClassDecl(classDecl: Tr.ClassDecl): Tree {
         val annotations = classDecl.annotations.mapIfNecessary { visit(it) as Tr.Annotation }
         val name = visit(classDecl.name) as Tr.Ident
-        val extends = visit(classDecl.extends)
-        val implements = classDecl.implements.mapIfNecessary { visit(it) as Tree }
+        val extends = visit(classDecl.extends) as TypeTree?
+        val implements = classDecl.implements.mapIfNecessary { visit(it) as TypeTree }
         val body = visit(classDecl.body) as Tr.Block<Tree>
 
         return (if(annotations !== classDecl.annotations || name !== classDecl.name || body !== classDecl.body ||
@@ -163,6 +163,27 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     }
 
     override fun visitEmpty(empty: Tr.Empty): Tree = empty.transformIfNecessary(cursor())
+
+    override fun visitEnumValue(enum: Tr.EnumValue): Tree? {
+        val name = visit(enum.name) as Tr.Ident
+
+        val initializer = enum.initializer?.let {
+            val args = it.args.mapIfNecessary { visit(it) as Expression }
+            if(it.args !== args) it.copy(args) else it
+        }
+
+        return (if(name !== enum.name || initializer !== enum.initializer) {
+            enum.copy(name = name, initializer = initializer)
+        } else enum).transformIfNecessary(cursor())
+    }
+
+    override fun visitEnumValueSet(enums: Tr.EnumValueSet): Tree? {
+        val enumValues = enums.enums.mapIfNecessary { visit(it) as Tr.EnumValue }
+
+        return (if(enumValues !== enums.enums) {
+            enums.copy(enums = enumValues)
+        } else enums).transformIfNecessary(cursor())
+    }
 
     override fun visitFieldAccess(field: Tr.FieldAccess): Tree {
         val target = visit(field.target) as Expression
@@ -276,7 +297,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         }
 
         @Suppress("UNCHECKED_CAST")
-        val body = visit(method.body) as Tr.Block<Statement>
+        val body = visit(method.body) as Tr.Block<Statement>?
 
         return (if(params !== method.params.params || throws !== method.throws || defaultValue !== method.defaultValue ||
                 body !== method.body || typeParams !== method.typeParameters) {
@@ -316,7 +337,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     }
 
     override fun visitNewArray(newArray: Tr.NewArray): Tree {
-        val typeExpr = visit(newArray.typeExpr) as TypeTree
+        val typeExpr = visit(newArray.typeExpr) as TypeTree?
 
         val dimensions = newArray.dimensions.mapIfNecessary {
             val size = visit(it.size) as Expression
@@ -359,7 +380,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         val clazz = visit(type.clazz) as NameTree
 
         val typeArguments = type.typeArguments?.let {
-            val typeArgs = it.args.mapIfNecessary { visit(it) as NameTree }
+            val typeArgs = it.args.mapIfNecessary { visit(it) as Expression }
             if(it.args !== typeArgs) it.copy(typeArgs) else it
         }
 
@@ -456,6 +477,24 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         return (if(clazz !== typeCast.clazz || expr !== typeCast.expr) {
             typeCast.copy(clazz = clazz, expr = expr)
         } else typeCast).transformIfNecessary(cursor())
+    }
+
+    override fun visitTypeParameter(typeParameter: Tr.TypeParameter): Tree {
+        val name = visit(typeParameter.name) as NameTree
+        val annotations = typeParameter.annotations.mapIfNecessary { visit(it) as Tr.Annotation }
+        val bounds = typeParameter.bounds.map { visit(it) as TypeTree }
+
+        return (if(name !== typeParameter.name || annotations !== typeParameter.annotations || bounds !== typeParameter.bounds) {
+            typeParameter.copy(name = name, annotations = annotations, bounds = bounds)
+        } else typeParameter).transformIfNecessary(cursor())
+    }
+
+    override fun visitTypeParameters(typeParameters: Tr.TypeParameters): Tree {
+        val params = typeParameters.params.mapIfNecessary { visit(it) as Tr.TypeParameter }
+
+        return (if(params !== typeParameters.params) {
+            typeParameters.copy(params = params)
+        } else typeParameters).transformIfNecessary(cursor())
     }
 
     override fun visitUnary(unary: Tr.Unary): Tree {

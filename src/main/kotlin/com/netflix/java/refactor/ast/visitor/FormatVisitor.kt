@@ -32,6 +32,31 @@ class FormatVisitor: AstVisitor<Tree?>({ it }) {
 
     override fun visitCompilationUnit(cu: Tr.CompilationUnit): Tree? {
         this.cu = cu
+
+        cu.imports.forEach { import ->
+            if(import.formatting is Formatting.Infer) {
+                if(import === cu.imports.last()) {
+                    cu.classes.firstOrNull()?.blankLinesBefore(2)
+                    if(cu.imports.size > 1)
+                        import.blankLinesBefore(1)
+                }
+
+                if(import === cu.imports.first()) {
+                    if(cu.packageDecl != null)
+                        import.blankLinesBefore(2)
+
+                    // a previous first import will likely have a multiple line spacing prefix
+                    if(cu.imports.size > 1 && cu.imports[1].formatting !is Formatting.Infer)
+                        cu.imports[1].blankLinesBefore(1)
+                }
+
+                if(import !== cu.imports.last() && import !== cu.imports.first()) {
+                    import.blankLinesBefore(1)
+                    cu.imports[cu.imports.indexOf(import) + 1].blankLinesBefore(1)
+                }
+            }
+        }
+
         return super.visitCompilationUnit(cu)
     }
 
@@ -67,47 +92,20 @@ class FormatVisitor: AstVisitor<Tree?>({ it }) {
         return super.visitMultiVariable(multiVariable)
     }
 
-    override fun visitImport(import: Tr.Import): Tree? {
-        if(import.formatting is Formatting.Infer) {
-            // we are assuming throughout no common indentation of the whole file (including imports and class decls)
-            if (cu.imports.size > 1) {
-                var importPassed = false
-                val firstSubsequentImport = cu.imports.find {
-                    if(it == import) {
-                        importPassed = true
-                        false
-                    }
-                    else importPassed
-                }
-
-                if(firstSubsequentImport != null) {
-                    import.formatting = firstSubsequentImport.formatting
-                    firstSubsequentImport.formatting = Formatting.Reified("\n")
-                }
-                else {
-                    // last import in the list
-                    import.formatting = Formatting.Reified("\n")
-                }
-            } else if(cu.packageDecl != null) {
-                import.blankLinesBefore(2)
-            } else {
-                import.formatting = Formatting.Reified.Empty
-                cu.classes.firstOrNull()?.blankLinesBefore(2)
-            }
-        }
-
-        return super.visitImport(import)
-    }
-
     private fun Tree.blankLinesBefore(n: Int) {
         when(formatting) {
             is Formatting.Reified -> {
                 val reified = formatting as Formatting.Reified
+
+                // add blank lines if necessary
                 val prefix = (1..Math.max(0, n - reified.prefix.takeWhile { it == '\n' }.length)).map { "\n" }.joinToString("")
                 reified.prefix = prefix + reified.prefix
+
+                // remove extra blank lines if necessary
+                reified.prefix = reified.prefix.substring((reified.prefix.takeWhile { it == '\n' }.count() - n))
             }
             is Formatting.Infer ->
-                formatting = Formatting.Reified((1..2).map { "\n" }.joinToString(""))
+                formatting = Formatting.Reified((1..n).map { "\n" }.joinToString(""))
         }
     }
 }

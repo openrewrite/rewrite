@@ -20,8 +20,7 @@ import com.netflix.java.refactor.ast.Formatting
 import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class InsertMethodArgument(val cu: Tr.CompilationUnit,
-                           val meth: Tr.MethodInvocation,
+class InsertMethodArgument(val meth: Tr.MethodInvocation,
                            val pos: Int,
                            val source: String): RefactorVisitor() {
 

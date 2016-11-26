@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M02'
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M03'
         classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:3.5.2'
     }
 }

@@ -33,7 +33,7 @@ abstract class ChangeFieldNameTest(p: Parser): Parser by p {
 
         val fixed = a.refactor() {
             a.classes[0].findFields(List::class.java).forEach {
-                changeName(it, "list")
+                changeFieldName(it, "list")
             }
         }.fix()
 

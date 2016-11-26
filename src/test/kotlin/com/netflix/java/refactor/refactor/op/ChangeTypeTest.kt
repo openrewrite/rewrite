@@ -15,60 +15,264 @@
  */
 package com.netflix.java.refactor.refactor.op
 
+import com.netflix.java.refactor.ast.assertRefactored
 import com.netflix.java.refactor.parse.OracleJdkParser
 import com.netflix.java.refactor.parse.Parser
+import org.junit.Test
 
 abstract class ChangeTypeTest(p: Parser): Parser by p {
-    
-//    @Ignore
-//    @Test
-//    fun refactorType() {
-//        val a1 = """
-//            |package a;
-//            |public class A1 {}
-//        """
-//
-//        val a2 = """
-//            |package a;
-//            |public class A2 {}
-//        """
-//
-//        val b = """
-//            |package b;
-//            |import java.util.*;
-//            |import a.A1;
-//            |
-//            |public class B extends A1 {
-//            |    List<A1> aList = new ArrayList<>();
-//            |    A1 aField = new A1();
-//            |
-//            |    public A1 b(A1 aParam) {
-//            |        A1 aVar = new A1();
-//            |        return aVar;
-//            |    }
-//            |}
-//        """
-//
-//        val cu = parse(b, a1, a2)
-//        cu.refactor().changeType("a.A1", "a.A2").fix()
-//        cu.refactor().removeImport("a.A1").fix()
-//
-//        assertRefactored(cu, """
-//            |package b;
-//            |import java.util.*;
-//            |import a.A2;
-//            |
-//            |public class B extends A2 {
-//            |    List<A2> aList = new ArrayList<>();
-//            |    A2 aField = new A2();
-//            |
-//            |    public A2 b(A2 aParam) {
-//            |        A2 aVar = new A2();
-//            |        return aVar;
-//            |    }
-//            |}
-//        """)
-//    }
+
+    val a1 = """
+        package a;
+        public class A1 extends Exception {
+            public static void stat() {}
+        }
+    """
+
+    val a2 = """
+        package a;
+        public class A2 extends Exception {
+            public static void stat() {}
+        }
+    """
+
+    @Test
+    fun dontAddImportWhenNoChangesWereMade() {
+        val b = parse("public class B {}")
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+        assertRefactored(fixed, "public class B {}")
+    }
+
+    @Test
+    fun simpleName() {
+        val b = parse("""
+            |import a.A1;
+            |
+            |public class B extends A1 {}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B extends A2 {}
+        """)
+    }
+
+    @Test
+    fun fullyQualifiedName() {
+        val b = parse("public class B extends a.A1 {}", a1, a2)
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B extends A2 {}
+        """)
+    }
+
+    @Test
+    fun annotation() {
+        val a1 = "public @interface A1 {}"
+        val a2 = "public @interface A2 {}"
+        val b = parse("@A1 public class B {}", a1, a2)
+        val fixed = b.refactor().changeType("A1", "A2").fix()
+        assertRefactored(fixed, "@A2 public class B {}")
+    }
+
+    @Test
+    fun array() { // array types and new arrays
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   A1[] a = new A1[0];
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   A2[] a = new A2[0];
+            |}
+        """)
+    }
+
+    @Test
+    fun classDecl() {
+        val i1 = "public interface I1 {}"
+        val i2 = "public interface I2 {}"
+
+        val b = parse("""
+            |import a.A1;
+            |public class B extends A1 implements I1 {}
+        """, a1, a2, i1, i2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").changeType("I1", "I2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B extends A2 implements I2 {}
+        """)
+    }
+
+    @Test
+    fun method() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   public A1 foo() throws A1 { return null; }
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   public A2 foo() throws A2 { return null; }
+            |}
+        """)
+    }
+
+    @Test
+    fun methodInvocationTypeParametersAndWildcard() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   public <T extends A1> T generic(T n, List<? super A1> in);
+            |   public void test() {
+            |       A1.stat();
+            |       this.<A1>generic(null, null);
+            |   }
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   public <T extends A2> T generic(T n, List<? super A2> in);
+            |   public void test() {
+            |       A2.stat();
+            |       this.<A2>generic(null, null);
+            |   }
+            |}
+        """)
+    }
+
+    @Test
+    fun multiCatch() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   public void test() {
+            |       try {}
+            |       catch(A1 | RuntimeException e) {}
+            |   }
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   public void test() {
+            |       try {}
+            |       catch(A2 | RuntimeException e) {}
+            |   }
+            |}
+        """)
+    }
+
+    @Test
+    fun multiVariable() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   A1 f1, f2;
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   A2 f1, f2;
+            |}
+        """)
+    }
+
+    @Test
+    fun newClass() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   A1 a = new A1();
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   A2 a = new A2();
+            |}
+        """)
+    }
+
+    @Test
+    fun paramaterizedType() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   Map<A1, A1> m;
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   Map<A2, A2> m;
+            |}
+        """)
+    }
+
+    @Test
+    fun typeCast() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   A1 a = (A1) null;
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   A2 a = (A2) null;
+            |}
+        """)
+    }
 }
 
 class OracleJdkChangeTypeTest: ChangeTypeTest(OracleJdkParser())
