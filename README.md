@@ -35,6 +35,8 @@ or
 compile 'com.netflix.devinsight:rewrite:0.8.0'
 ```
 
+Add the Maven or Gradle classifier `jdkbundle` to fetch a version of the package that package relocates and shades the relevant parts of the JDK needed for parsing into the distribution.
+
 ## Features
 
 * Building blocks
