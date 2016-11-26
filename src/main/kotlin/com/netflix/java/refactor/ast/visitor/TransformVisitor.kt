@@ -445,7 +445,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         val exception = visit(thrown.exception) as Expression
         return (if(exception !== thrown.exception) {
             thrown.copy(exception = exception)
-        } else exception).transformIfNecessary(cursor())
+        } else thrown).transformIfNecessary(cursor())
     }
 
     @Suppress("UNCHECKED_CAST")

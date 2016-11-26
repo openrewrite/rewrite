@@ -18,11 +18,21 @@ package com.netflix.java.refactor.refactor.op
 import com.netflix.java.refactor.ast.*
 import java.util.ArrayList
 import com.netflix.java.refactor.refactor.RefactorVisitor
+import com.netflix.java.refactor.search.FindType
 
-class AddImport(val clazz: String, val staticMethod: String? = null): RefactorVisitor() {
+class AddImport(val clazz: String,
+                val staticMethod: String? = null,
+                val onlyIfReferenced: Boolean = false): RefactorVisitor() {
     private var coveredByExistingImport = false
     private val packageComparator = PackageComparator()
     private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
+
+    private var hasReferences: Boolean = false
+
+    override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<*>> {
+        hasReferences = FindType(clazz).visit(cu).isNotEmpty()
+        return super.visitCompilationUnit(cu)
+    }
 
     override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
         val importedType = import.qualid.simpleName
@@ -44,6 +54,9 @@ class AddImport(val clazz: String, val staticMethod: String? = null): RefactorVi
     }
 
     override fun visitEnd(): List<AstTransform<*>> {
+        if(onlyIfReferenced && !hasReferences)
+            return emptyList()
+
         if(classType.packageOwner().isEmpty())
             return emptyList()
 

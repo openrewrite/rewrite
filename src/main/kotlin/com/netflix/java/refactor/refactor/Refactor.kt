@@ -59,7 +59,7 @@ class Refactor(val original: Tr.CompilationUnit) {
 
     fun changeType(from: String, to: String): Refactor {
         ops.add(ChangeType(from, to))
-        ops.add(AddImport(to))
+        ops.add(AddImport(to, onlyIfReferenced = true))
         ops.add(RemoveImport(from))
         return this
     }
