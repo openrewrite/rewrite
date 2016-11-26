@@ -25,14 +25,14 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight</groupId>
     <artifactId>rewrite</artifactId>
-    <version>0.7.2</version>
+    <version>0.8.0</version>
 </dependency>
 ```
 
 or
 
 ```groovy
-compile 'com.netflix.devinsight:rewrite:0.7.2'
+compile 'com.netflix.devinsight:rewrite:0.8.0'
 ```
 
 ## Features
@@ -64,13 +64,10 @@ public class ChangeMethodNameTestJava {
         String a = "class A {{ B.foo(0); }}";
         String b = "class B { static void foo(int n) {} }";
 
-        final Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
+        Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
-        Refactor refactor = cu.refactor();
-
-        for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
-             refactor.changeName(inv, "bar");
-        }
+        Refactor refactor = cu.refactor()
+          .changeName(cu.findMethodCalls("B foo(int)"), "bar");
 
         Tr.CompilationUnit fixed = refactor.fix();
 
@@ -91,21 +88,17 @@ in the file. Remember that, while usually there is one type per file whose name 
 a single Java source file.
 
 At this point, we can use the `Tr.CompilationUnit` to either do a type-aware deep dive on the code or perform a refactoring operation. Here, we begin a refactoring
-operation by calling `refactor` on our compilation unit. The refactoring operation searches for method invocations matching a certain signature (using the AspectJ pointcut grammar),
-and for each matching invocation, changes the name to a method called `bar`.
+operation by calling `refactor` on our compilation unit. We search for method invocations matching a certain signature (using the AspectJ pointcut grammar),
+and for each matching invocation, change the name to a method called `bar`.
 
 Next, we call `fix` to return a copy of the original AST with the refactoring changes made.
 
 Lastly, we call `print` on the AST to emit the source code for the resulting change. Notice how the original style of the class was preserved!
 
-To cut down a bit on the ceremony, we can shorten the process of setting up and executing a refactor operation into one call:
+To cut down a bit on the ceremony, we can shorten the process of setting up and executing a refactor operation into one call chain:
 
 ```java
-Tr.CompilationUnit fixed = cu.refactor(refactor -> {
-    for (Tr.MethodInvocation inv : cu.findMethodCalls("B foo(int)")) {
-         refactor.changeName(inv, "bar");
-    }
-}).fix();
+Tr.CompilationUnit fixed = cu.refactor().changeName(cu.findMethodCalls("B foo(int)"), "bar").fix();
 ```
 
 ### Generating a git-style patch
