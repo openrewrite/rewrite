@@ -1,21 +1,39 @@
 # Rewrite - Distributed Java Source Refactoring
 
+The Rewrite project is a refactoring tool for Java source code. It contains a custom Abstract Syntax Tree (AST) supporting
+Java 8 language features that encodes the structure and formatting of your source code. The AST is printable to
+reconstitute the source code, including its original formatting.
+
+Rewrite provides high-level search functions and refactoring functions that can transform the AST.
+
+The AST is imbued with information about types (and their type hierarchies)
+of expressions and statements in your code.
+
+Rewrite provides visitor support over its AST. Basic visitors for printing the AST, transforming it with refactoring
+operations, etc. are provided out of the box.
+
+Rewrite provides utilities for unit testing refactoring logic and custom visitors.
+
+At Netflix, we operate on thousands of repositories with refactoring rules written in Rewrite, issuing pull requests
+en masse from an Apache Spark cluster. It is possible to execute these operations as part of your build process,
+to incorporate them into IDE plugins, etc. depending on the needs of your organization.
+
+To maximize the freedom of our engineers to incorporate changes at their convenience, Rewrite's objective is to
+facilitate the incorporation of refactoring changes by the affected team or engineer. In this way, we consider
+these operations to be *distributed refactoring*.
+
+**This is an incubating feature**.
+
+
 [![Build Status](https://travis-ci.org/Netflix/rewrite.svg?branch=master)](https://travis-ci.org/Netflix/rewrite)
 [![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Netflix/rewrite?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Apache 2.0](https://img.shields.io/github/license/Netflix/rewrite.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
-- [Purpose](#purpose)
 - [Installing](#installing)
 - [Features](#features)
 - [Example usage](#example-usage)
   - [Generating a git-style patch](#generating-a-git-style-patch)
 - [License](#license)
-
-## Purpose
-
-The Rewrite project is a pluggable and distributed refactoring tool for Java source code.  **This is an incubating feature**.
-
-It consists of an interface that allows you to perform type-aware searches for code patterns and make style-preserving refactoring changes.
 
 ## Installing
 
