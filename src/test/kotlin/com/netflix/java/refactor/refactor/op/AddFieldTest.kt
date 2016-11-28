@@ -29,9 +29,9 @@ abstract class AddFieldTest(p: Parser): Parser by p {
             |}
         """)
 
-        val fixed = a.refactor {
-            addField(a.classes[0], List::class.java, "list", "new ArrayList<>()")
-        }.fix()
+        val fixed = a.refactor()
+            .addField(a.classes[0], List::class.java, "list", "new ArrayList<>()")
+            .fix()
 
         assertRefactored(fixed, """
             |import java.util.List;
@@ -52,9 +52,9 @@ abstract class AddFieldTest(p: Parser): Parser by p {
             |}
         """)
 
-        val fixed = a.refactor {
-            addField(a.classes[0], List::class.java, "list")
-        }.fix()
+        val fixed = a.refactor()
+            .addField(a.classes[0], List::class.java, "list")
+            .fix()
 
         assertRefactored(fixed, """
             |import java.util.List;
@@ -76,9 +76,9 @@ abstract class AddFieldTest(p: Parser): Parser by p {
             |}
         """)
 
-        val fixed = a.refactor {
-            addField(a.classes[0], List::class.java, "list")
-        }.fix()
+        val fixed = a.refactor()
+            .addField(a.classes[0], List::class.java, "list")
+            .fix()
 
         assertRefactored(fixed, """
             |import java.util.List;

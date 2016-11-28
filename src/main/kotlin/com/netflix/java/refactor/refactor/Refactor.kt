@@ -110,7 +110,7 @@ class Refactor(val original: Tr.CompilationUnit) {
     fun changeFieldName(target: Tr.VariableDecls, toName: String) =
             changeFieldName(listOf(target), toName)
 
-    fun delete(targets: Iterable<Tr.VariableDecls>): Refactor {
+    fun deleteField(targets: Iterable<Tr.VariableDecls>): Refactor {
         targets.forEach { target ->
             ops.add(DeleteField(target))
             target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(it.fullyQualifiedName)) }
@@ -118,7 +118,7 @@ class Refactor(val original: Tr.CompilationUnit) {
         return this
     }
 
-    fun delete(target: Tr.VariableDecls) = delete(listOf(target))
+    fun deleteField(target: Tr.VariableDecls) = deleteField(listOf(target))
 
     // -------------
     // Method Refactoring

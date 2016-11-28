@@ -31,11 +31,9 @@ abstract class DeleteFieldTest(p: Parser): Parser by p {
             |}
         """)
 
-        val fixed = a.refactor {
-            a.classes[0].findFields(List::class.java).forEach {
-                delete(it)
-            }
-        }.fix()
+        val fixed = a.refactor()
+            .deleteField(a.classes[0].findFields(List::class.java))
+            .fix()
 
         assertRefactored(fixed, """
             |public class A {
