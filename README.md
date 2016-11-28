@@ -58,17 +58,18 @@ Add the Maven or Gradle classifier `jdkbundle` to fetch a version of the package
 ## Features
 
 * Building blocks
+  - [Abstract Syntax Tree (AST)](https://github.com/Netflix/rewrite/wiki/Abstract-Syntax-Tree-(AST))
   - [Visitors and cursors](https://github.com/Netflix/rewrite/wiki/Visitors-and-Cursors)
-  - [Abstract Syntax Tree (AST) Type Reference](https://github.com/Netflix/rewrite/wiki/Abstract-Syntax-Tree-(AST)-Type-Reference)
 * Code Search
   - [Finding method invocations](https://github.com/Netflix/rewrite/wiki/Finding-Method-Invocations)
   - [Finding fields](https://github.com/Netflix/rewrite/wiki/Finding-Fields)
+  - [Finding types](https://github.com/Netflix/rewrite/wiki/Finding-Types)
   - [Finding annotations](https://github.com/Netflix/rewrite/wiki/Finding-Annotations)
   - [Has type/has import](https://github.com/Netflix/rewrite/wiki/Has-Type-and-Has-Import)
 * Refactoring
   - [Changing method invocations](https://github.com/Netflix/rewrite/wiki/Changing-Method-Invocations)
-  - Adding fields
-  - Removing fields
+  - [Changing types](https://github.com/Netflix/rewrite/wiki/Changing-Types)
+  - [Adding and deleting fields](https://github.com/Netflix/rewrite/wiki/Adding-and-Deleting-Fields)
   - [Adding and removing imports](https://github.com/Netflix/rewrite/wiki/Adding-and-Removing-Imports)
 
 ## Example usage
