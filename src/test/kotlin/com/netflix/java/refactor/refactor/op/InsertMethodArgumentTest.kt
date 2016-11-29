@@ -46,8 +46,6 @@ abstract class InsertMethodArgumentTest(p: Parser): Parser by p {
             |}
         """
 
-//        |       b.bar("1", "2");
-
         val cu = parse(a, b)
         val fixed = cu.refactor {
             cu.findMethodCalls("B foo(String)").forEach {
@@ -75,7 +73,6 @@ abstract class InsertMethodArgumentTest(p: Parser): Parser by p {
             |   }
             |}
         """)
-        //             |       b.bar("0", "2", "1");
     }
 }
 

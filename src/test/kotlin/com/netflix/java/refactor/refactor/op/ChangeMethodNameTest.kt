@@ -42,11 +42,9 @@ abstract class ChangeMethodNameTest(p: Parser): Parser by p {
 
         val cu = parse(a, b)
 
-        val fixed = cu.refactor {
-            cu.findMethodCalls("B singleArg(String)").forEach {
-                changeMethodName(it, "bar")
-            }
-        }.fix()
+        val fixed = cu.refactor()
+            .changeMethodName(cu.findMethodCalls("B singleArg(String)"), "bar")
+            .fix()
 
         assertRefactored(fixed, """
             |class A {
@@ -69,11 +67,9 @@ abstract class ChangeMethodNameTest(p: Parser): Parser by p {
 
         val cu = parse(a, b)
 
-        val fixed = cu.refactor {
-            cu.findMethodCalls("B arrArg(String[])").forEach {
-                changeMethodName(it, "bar")
-            }
-        }.fix()
+        val fixed = cu.refactor()
+            .changeMethodName(cu.findMethodCalls("B arrArg(String[])"), "bar")
+            .fix()
 
         assertRefactored(fixed, """
             |class A {
@@ -96,11 +92,9 @@ abstract class ChangeMethodNameTest(p: Parser): Parser by p {
 
         val cu = parse(a, b)
 
-        val fixed = cu.refactor {
-            cu.findMethodCalls("B varargArg(String...)").forEach {
-                changeMethodName(it, "bar")
-            }
-        }.fix()
+        val fixed = cu.refactor()
+            .changeMethodName(cu.findMethodCalls("B varargArg(String...)"), "bar")
+            .fix()
 
         assertRefactored(fixed, """
             |class A {
@@ -129,11 +123,9 @@ abstract class ChangeMethodNameTest(p: Parser): Parser by p {
         """
 
         val cu = parse(a, b)
-        val fixed = cu.refactor() {
-            cu.findMethodCalls("B error()").forEach {
-                changeMethodName(it, "foo")
-            }
-        }.fix()
+        val fixed = cu.refactor()
+                .changeMethodName(cu.findMethodCalls("B error()"), "foo")
+                .fix()
 
         assertRefactored(fixed, """
             |class A {
