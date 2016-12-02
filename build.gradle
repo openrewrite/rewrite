@@ -51,6 +51,7 @@ dependencies {
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
+    testCompile 'org.assertj:assertj-core:latest.release'
 }
 
 tasks.withType(Javadoc) {

@@ -79,8 +79,9 @@ abstract class FindTypeTest(p: Parser): Parser by p {
     fun methodInvocationTypeParametersAndWildcard() {
         val b = parse("""
             |import a.A1;
+            |import java.util.List;
             |public class B {
-            |   public <T extends A1> T generic(T n, List<? super A1> in);
+            |   public <T extends A1> T generic(T n, List<? super A1> in) { return null; }
             |   public void test() {
             |       A1.stat();
             |       this.<A1>generic(null, null);

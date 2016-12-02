@@ -16,17 +16,18 @@
 package com.netflix.java.refactor.refactor.op
 
 import com.netflix.java.refactor.ast.AstTransform
+import com.netflix.java.refactor.ast.Expression
 import com.netflix.java.refactor.ast.Formatting
 import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
 class InsertMethodArgument(val meth: Tr.MethodInvocation,
                            val pos: Int,
-                           val source: String): RefactorVisitor() {
+                           val source: String): RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {
-            return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
+            return transform {
                 meth.copy(args = meth.args.let {
                     val modifiedArgs = it.args.toMutableList()
                     modifiedArgs.removeIf { it is Tr.Empty }
@@ -39,12 +40,12 @@ class InsertMethodArgument(val meth: Tr.MethodInvocation,
 
                     if(pos == 0 && modifiedArgs.size > 1) {
                         // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
-                        modifiedArgs[1].formatting = Formatting.Reified(" ")
+                        modifiedArgs[1] = modifiedArgs[1].copy(Formatting.Reified(" ")) as Expression
                     }
 
                     it.copy(args = modifiedArgs)
                 })
-            })
+            }
         }
         return super.visitMethodInvocation(meth)
     }

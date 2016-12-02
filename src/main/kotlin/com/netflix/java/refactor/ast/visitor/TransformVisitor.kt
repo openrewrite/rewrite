@@ -22,8 +22,9 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         return transformations
                 .filterIsInstance<AstTransform<T>>()
                 .filter { it.cursor == cursor }
-                .map { it.mutation }
-                .fold(this) { mutated, mut -> mut(mutated) }
+                .fold(this) { acc, trans ->
+                    trans.mutation(acc)
+                }
     }
 
     private fun <T> List<T>.mapIfNecessary(transform: (T) -> T): List<T> {
@@ -282,6 +283,8 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     override fun visitLiteral(literal: Tr.Literal): Tree = literal.transformIfNecessary(cursor())
 
     override fun visitMethod(method: Tr.MethodDecl): Tree {
+        val returnTypeExpr = visit(method.returnTypeExpr) as TypeTree?
+
         val params = method.params.params.mapIfNecessary { visit(it) as Statement }
 
         val throws = method.throws?.let {
@@ -300,9 +303,9 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         val body = visit(method.body) as Tr.Block<Statement>?
 
         return (if(params !== method.params.params || throws !== method.throws || defaultValue !== method.defaultValue ||
-                body !== method.body || typeParams !== method.typeParameters) {
+                body !== method.body || typeParams !== method.typeParameters || returnTypeExpr !== method.returnTypeExpr) {
             method.copy(params = method.params.copy(params), throws = throws, defaultValue = defaultValue, body = body,
-                    typeParameters = typeParams)
+                    typeParameters = typeParams, returnTypeExpr = returnTypeExpr)
         } else method).transformIfNecessary(cursor())
     }
 
@@ -482,7 +485,10 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     override fun visitTypeParameter(typeParameter: Tr.TypeParameter): Tree {
         val name = visit(typeParameter.name) as NameTree
         val annotations = typeParameter.annotations.mapIfNecessary { visit(it) as Tr.Annotation }
-        val bounds = typeParameter.bounds.map { visit(it) as TypeTree }
+        val bounds = typeParameter.bounds?.let {
+            val types = it.types.mapIfNecessary { visit(it) as TypeTree }
+            if(it.types !== types) it.copy(types = types) else it
+        }
 
         return (if(name !== typeParameter.name || annotations !== typeParameter.annotations || bounds !== typeParameter.bounds) {
             typeParameter.copy(name = name, annotations = annotations, bounds = bounds)

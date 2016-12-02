@@ -18,190 +18,110 @@ package com.netflix.java.refactor.refactor.op
 import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-data class ChangeType(val from: String, val to: String): RefactorVisitor() {
+data class ChangeType(val from: String, val to: String): RefactorVisitor<Tree>() {
     // NOTE: a type change is possible anywhere a Tr.FieldAccess or Tr.Ident is possible, but not every FieldAccess or Ident
     // represents a type (could represent a variable name, etc.)
 
-    override fun visitAnnotation(annotation: Tr.Annotation): List<AstTransform<*>> {
-        val changes = annotation.annotationType.changeName()?.let { change ->
-            AstTransform<Tr.Annotation>(cursor()) { copy(annotationType = change) }
-        }
+    override fun visitAnnotation(annotation: Tr.Annotation): List<AstTransform<Tree>> =
+        super.visitAnnotation(annotation) + annotation.annotationType
+                .transformName<Tr.Annotation> { name, node -> node.copy(annotationType = name) }
 
-        return super.visitAnnotation(annotation) + listOf(changes).filterNotNull()
+    override fun visitArrayType(arrayType: Tr.ArrayType): List<AstTransform<Tree>> =
+            super.visitArrayType(arrayType) + arrayType.elementType
+                    .transformName<Tr.ArrayType> { name, node -> node.copy(elementType = name) }
+
+    override fun visitClassDecl(classDecl: Tr.ClassDecl): List<AstTransform<Tree>> {
+        return super.visitClassDecl(classDecl) +
+                classDecl.extends.transformName<Tr.ClassDecl> { name, node -> node.copy(extends = name) } +
+                classDecl.implements.transformNames { names, node: Tr.ClassDecl -> node.copy(implements = names) }
     }
 
-    override fun visitArrayType(arrayType: Tr.ArrayType): List<AstTransform<*>> {
-        val changes = if (arrayType.elementType is NameTree) {
-            arrayType.elementType.changeName()
-                    ?.let { change -> AstTransform<Tr.ArrayType>(cursor()) { copy(elementType = change) } }
-        } else null
-
-        return super.visitArrayType(arrayType) + listOf(changes).filterNotNull()
+    override fun visitMethod(method: Tr.MethodDecl): List<AstTransform<Tree>> {
+        return super.visitMethod(method) +
+                method.returnTypeExpr.transformName<Tr.MethodDecl> { name, node -> node.copy(returnTypeExpr = name) } +
+                method.throws?.exceptions.transformNames { names, node: Tr.MethodDecl -> node.copy(throws = method.throws!!.copy(exceptions = names)) }
     }
 
-    override fun visitClassDecl(classDecl: Tr.ClassDecl): List<AstTransform<*>> {
-        val extendsChange = if(classDecl.extends is NameTree) {
-            classDecl.extends.changeName()
-        } else null
-
-        var atLeastOneImplementsChanged = false
-        val implementsChanges = classDecl.implements.map {
-            it.changeName()?.let { atLeastOneImplementsChanged = true; it } ?: it
-        }
-
-        val changes = if(extendsChange != null || atLeastOneImplementsChanged) {
-            AstTransform<Tr.ClassDecl>(cursor()) {
-                copy(extends = extendsChange ?: extends, implements = if(atLeastOneImplementsChanged) {
-                    implementsChanges
-                } else implements)
-            }
-        } else null
-
-        return super.visitClassDecl(classDecl) + listOf(changes).filterNotNull()
-    }
-
-    override fun visitMethod(method: Tr.MethodDecl): List<AstTransform<*>> {
-        val returnChange = if(method.returnTypeExpr is NameTree) {
-            method.returnTypeExpr.changeName()
-        } else null
-
-        var atLeastOneThrowsChanged = false
-        val exceptionChanges = method.throws?.exceptions?.map {
-            it.changeName()?.let { atLeastOneThrowsChanged = true; it } ?: it
-        }
-
-        val changes = if(returnChange != null || atLeastOneThrowsChanged) {
-            AstTransform<Tr.MethodDecl>(cursor()) {
-                copy(returnTypeExpr = returnChange ?: returnTypeExpr, throws = if(atLeastOneThrowsChanged) {
-                    throws!!.copy(exceptions = exceptionChanges!!)
-                } else throws)
-            }
-        } else null
-
-        return super.visitMethod(method) + listOf(changes).filterNotNull()
-    }
-
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tree>> {
         val staticTargetChange = if(meth.select is NameTree && meth.type?.hasFlags(Flag.Static) ?: false)
-            meth.select.changeName()
-        else null
+            meth.select.transformName<Tr.MethodInvocation> { name, node -> node.copy(select = name) }
+        else emptyList()
 
-        var atLeastOneTypeParamChanged = false
-        val typeParamChanges = meth.typeParameters?.params?.map {
-            it.changeName()?.let { atLeastOneTypeParamChanged = true; it } ?: it
-        }
-
-        val changes = if(staticTargetChange != null || atLeastOneTypeParamChanged) {
-            AstTransform<Tr.MethodInvocation>(cursor()) {
-                copy(select = staticTargetChange ?: select, typeParameters = if(atLeastOneTypeParamChanged) {
-                    typeParameters!!.copy(params = typeParamChanges!!)
-                } else typeParameters)
-            }
-        } else null
-
-        return super.visitMethodInvocation(meth) + listOf(changes).filterNotNull()
+        return super.visitMethodInvocation(meth) + staticTargetChange +
+                meth.typeParameters?.params.transformNames { names, node: Tr.MethodInvocation -> node.copy(typeParameters = meth.typeParameters!!.copy(params = names)) }
     }
 
-    override fun visitMultiCatch(multiCatch: Tr.MultiCatch): List<AstTransform<*>> {
-        var atLeastOneAlternativeChanged = false
-        val alternativeChanges = multiCatch.alternatives.map {
-            it.changeName()?.let { atLeastOneAlternativeChanged = true; it } ?: it
-        }
-
-        val changes = if(atLeastOneAlternativeChanged) {
-            AstTransform<Tr.MultiCatch>(cursor()) {
-                copy(alternatives = alternativeChanges)
-            }
-        } else null
-
-        return super.visitMultiCatch(multiCatch) + listOf(changes).filterNotNull()
+    override fun visitMultiCatch(multiCatch: Tr.MultiCatch): List<AstTransform<Tree>> {
+        return super.visitMultiCatch(multiCatch) +
+                multiCatch.alternatives.transformNames { names, node: Tr.MultiCatch -> node.copy(alternatives = names) }
     }
 
-    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<*>> {
+    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tree>> {
         if(multiVariable.typeExpr is Tr.MultiCatch)
             return super.visitMultiVariable(multiVariable)
 
-        val changes = if (multiVariable.typeExpr is NameTree) {
-            multiVariable.typeExpr.changeName()
-                    ?.let { change -> AstTransform<Tr.VariableDecls>(cursor()) { copy(typeExpr = change) } }
-        } else null
-
-        return super.visitMultiVariable(multiVariable) + listOf(changes).filterNotNull()
+        return super.visitMultiVariable(multiVariable) +
+                multiVariable.typeExpr.transformName<Tr.VariableDecls> { name, node -> node.copy(typeExpr = name) }
     }
 
-    override fun visitNewArray(newArray: Tr.NewArray): List<AstTransform<*>> {
-        val changes = if (newArray.typeExpr is NameTree) {
-            newArray.typeExpr.changeName()
-                    ?.let { change -> AstTransform<Tr.NewArray>(cursor()) { copy(typeExpr = change) } }
-        } else null
-
-        return super.visitNewArray(newArray) + listOf(changes).filterNotNull()
+    override fun visitNewArray(newArray: Tr.NewArray): List<AstTransform<Tree>> {
+        return super.visitNewArray(newArray) +
+                newArray.typeExpr.transformName<Tr.NewArray> { name, node -> node.copy(typeExpr = name) }
     }
 
-    override fun visitNewClass(newClass: Tr.NewClass): List<AstTransform<*>> {
-        val changes = if (newClass.clazz is NameTree) {
-            newClass.clazz.changeName()
-                    ?.let { change -> AstTransform<Tr.NewClass>(cursor()) { copy(clazz = change) } }
-        } else null
-
-        return super.visitNewClass(newClass) + listOf(changes).filterNotNull()
+    override fun visitNewClass(newClass: Tr.NewClass): List<AstTransform<Tree>> {
+        return super.visitNewClass(newClass) +
+                newClass.clazz.transformName<Tr.NewClass> { name, node -> node.copy(clazz = name) }
     }
 
-    override fun visitParameterizedType(type: Tr.ParameterizedType): List<AstTransform<*>> {
-        val clazzChange = type.clazz.changeName()
+    override fun visitParameterizedType(type: Tr.ParameterizedType): List<AstTransform<Tree>> {
+        return super.visitParameterizedType(type) +
+                type.clazz.transformName<Tr.ParameterizedType> { name, node -> node.copy(clazz = name) } +
+                type.typeArguments?.args.transformNames { names, node: Tr.ParameterizedType -> node.copy(typeArguments = type.typeArguments!!.copy(args = names)) }
+    }
 
-        var atLeastOneParamChanged = false
-        val paramChanges = type.typeArguments?.args?.map<Expression, Expression> {
-            if(it is NameTree) {
-                it.changeName()?.let { atLeastOneParamChanged = true; it } ?: it
+    override fun visitTypeCast(typeCast: Tr.TypeCast): List<AstTransform<Tree>> =
+            super.visitTypeCast(typeCast) +
+                typeCast.clazz.tree.transformName<Tr.TypeCast> { name, node -> node.copy(clazz = typeCast.clazz.copy(tree = name)) }
+
+    override fun visitTypeParameter(typeParameter: Tr.TypeParameter): List<AstTransform<Tree>> {
+        return super.visitTypeParameter(typeParameter) +
+                typeParameter.bounds?.types.transformNames { names, node: Tr.TypeParameter -> node.copy(bounds = typeParameter.bounds!!.copy(types = names)) }
+    }
+
+    override fun visitWildcard(wildcard: Tr.Wildcard): List<AstTransform<Tree>> =
+            super.visitWildcard(wildcard) +
+                wildcard.boundedType.transformName<Tr.Wildcard> { name, node -> node.copy(boundedType = name) }
+
+    fun <T: Tree> NameTree?.transformName(change: (Tr.Ident, T) -> Tree): List<AstTransform<Tree>> {
+        return if (this != null && this.type.asClass()?.fullyQualifiedName == from) {
+            val toType = Type.Class.build(cu.typeCache(), to)
+            val originalFormatting = formatting
+            transform {
+                @Suppress("UNCHECKED_CAST")
+                change(Tr.Ident(toType.className(), toType, originalFormatting), this as T)
+            }
+        } else emptyList()
+    }
+
+    fun <T: Tree, U: Tree> Iterable<T>?.transformNames(change: (List<T>, U) -> Tree): List<AstTransform<Tree>> {
+        if(this == null)
+            return emptyList()
+
+        var atLeastOneChanged = false
+        val transformed = map {
+            if (it is NameTree && it.type.asClass()?.fullyQualifiedName == from) {
+                atLeastOneChanged = true
+                val toType = Type.Class.build(cu.typeCache(), to)
+                Tr.Ident(toType.className(), toType, it.formatting)
             } else it
         }
 
-        val changes = if(clazzChange != null || atLeastOneParamChanged) {
-            AstTransform<Tr.ParameterizedType>(cursor()) {
-                copy(clazz = clazzChange ?: clazz, typeArguments = if(atLeastOneParamChanged) {
-                    typeArguments!!.copy(args = paramChanges!!)
-                } else typeArguments)
+        return if(atLeastOneChanged) {
+            transform {
+                @Suppress("UNCHECKED_CAST")
+                change(transformed as List<T>, this as U)
             }
-        } else null
-
-        return super.visitParameterizedType(type) + listOf(changes).filterNotNull()
-    }
-
-    override fun visitTypeCast(typeCast: Tr.TypeCast): List<AstTransform<*>> {
-        val changes = if (typeCast.clazz.tree is NameTree) {
-            typeCast.clazz.tree.changeName()
-                    ?.let { change -> AstTransform<Tr.Parentheses<TypeTree>>(cursor().plus(typeCast.clazz)) { copy(tree = change) } }
-        } else null
-
-        return super.visitTypeCast(typeCast) + listOf(changes).filterNotNull()
-    }
-
-    override fun visitTypeParameter(typeParameter: Tr.TypeParameter): List<AstTransform<*>> {
-        var atLeastOneBoundChanged = false
-        val boundChanges = typeParameter.bounds.map {
-            it.changeName()?.let { atLeastOneBoundChanged = true; it } ?: it
-        }
-
-        val changes = if(atLeastOneBoundChanged) {
-            AstTransform<Tr.TypeParameter>(cursor()) { copy(bounds = boundChanges) }
-        } else null
-
-        return super.visitTypeParameter(typeParameter) + listOf(changes).filterNotNull()
-    }
-
-    override fun visitWildcard(wildcard: Tr.Wildcard): List<AstTransform<*>> {
-        val changes = wildcard.boundedType?.changeName()?.let { change ->
-            AstTransform<Tr.Wildcard>(cursor()) { copy(boundedType = change) }
-        }
-
-        return super.visitWildcard(wildcard) + listOf(changes).filterNotNull()
-    }
-
-    fun NameTree?.changeName(): Tr.Ident? {
-        return if (this?.type.asClass()?.fullyQualifiedName == from) {
-            val toType = Type.Class.build(cu.typeCache(), to)
-            Tr.Ident(toType.className(), toType, this!!.formatting)
-        } else null
+        } else emptyList()
     }
 }

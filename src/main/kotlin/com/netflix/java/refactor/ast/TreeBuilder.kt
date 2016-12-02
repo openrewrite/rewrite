@@ -42,10 +42,7 @@ object TreeBuilder {
             }
         }
 
-        val outerExpr = expr.first as NameTree
-        outerExpr.formatting = fmt
-
-        return outerExpr
+        return expr.first.copy(fmt) as NameTree
     }
 
     fun buildField(cache: TypeCache, modifiers: List<Tr.VariableDecls.Modifier>, clazz: String, name: String, init: Expression?) {

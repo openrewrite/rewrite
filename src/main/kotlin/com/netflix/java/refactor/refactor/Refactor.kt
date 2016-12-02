@@ -25,12 +25,11 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository
 import org.eclipse.jgit.lib.Constants
 import org.eclipse.jgit.lib.FileMode
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.nio.file.Path
 import java.util.*
 
 class Refactor(val original: Tr.CompilationUnit) {
-    private val ops = ArrayList<RefactorVisitor>()
+    private val ops = ArrayList<RefactorVisitor<*>>()
 
     // -------------
     // Compilation Unit Refactoring
@@ -61,6 +60,11 @@ class Refactor(val original: Tr.CompilationUnit) {
         ops.add(ChangeType(from, to))
         ops.add(AddImport(to, onlyIfReferenced = true))
         ops.add(RemoveImport(from))
+        return this
+    }
+
+    fun run(visitor: RefactorVisitor<*>): Refactor {
+        ops.add(visitor)
         return this
     }
 
@@ -215,14 +219,12 @@ class Refactor(val original: Tr.CompilationUnit) {
     /**
     * @return Transformed version of the AST after changes are applied
     */
-    fun fix(): Tr.CompilationUnit {
-        val fixed = ops.fold(original) { acc, op ->
-            // by transforming the AST for each op, we allow for the possibility of overlapping changes
-            TransformVisitor(op.visit(acc)).visit(acc) as Tr.CompilationUnit
-        }
-        FormatVisitor().visit(fixed)
-        return fixed
-    }
+    fun fix(): Tr.CompilationUnit = ops
+            .fold(original) { acc, op ->
+                // by transforming the AST for each op, we allow for the possibility of overlapping changes
+                TransformVisitor(op.visit(acc)).visit(acc) as Tr.CompilationUnit
+            }
+            .let { TransformVisitor(FormatVisitor().visit(it)).visit(it) as Tr.CompilationUnit }
 
     /**
      * @return Git-style patch diff representing the changes to this compilation unit

@@ -18,12 +18,12 @@ package com.netflix.java.refactor.refactor.op
 import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class ReorderMethodArguments(val meth: Tr.MethodInvocation, vararg val byArgumentNames: String): RefactorVisitor() {
+class ReorderMethodArguments(val meth: Tr.MethodInvocation, vararg val byArgumentNames: String): RefactorVisitor<Tr.MethodInvocation>() {
     private var originalParamNames: Array<out String>? = null
 
     fun setOriginalParamNames(vararg names: String) { originalParamNames = names }
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id && meth.type is Type.Method) {
             val paramNames = originalParamNames?.toList() ?: meth.type.paramNames?.toList() ?:
                     error("There is no source attachment for method ${meth.declaringType?.fullyQualifiedName}.${meth.name.simpleName}(..), " +
@@ -46,11 +46,8 @@ class ReorderMethodArguments(val meth: Tr.MethodInvocation, vararg val byArgumen
                 } else acc
             }
 
-            reordered.forEachIndexed { i, arg -> arg.formatting = formattings[i] }
-
-            return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
-                copy(args = args.copy(args = reordered))
-            })
+            val reorderedFormatted = reordered.mapIndexed { i, arg -> arg.copy(formattings[i]) as Expression }
+            return transform { copy(args = args.copy(args = reorderedFormatted)) }
         }
 
         return super.visitMethodInvocation(meth)

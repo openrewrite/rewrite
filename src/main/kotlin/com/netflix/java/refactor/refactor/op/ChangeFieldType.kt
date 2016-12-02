@@ -20,16 +20,16 @@ import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.ast.Type
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-data class ChangeFieldType(val decls: Tr.VariableDecls, val targetType: String) : RefactorVisitor() {
+data class ChangeFieldType(val decls: Tr.VariableDecls, val targetType: String) : RefactorVisitor<Tr.VariableDecls>() {
 
-    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<*>> {
+    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.VariableDecls>> {
         if(multiVariable.id == decls.id) {
             val classType = Type.Class.build(cu.typeCache(), targetType)
             if(decls.typeExpr.type != classType) {
-                return listOf(AstTransform<Tr.VariableDecls>(cursor()) {
+                return transform {
                     decls.copy(typeExpr = Tr.Ident(classType.className(), classType, decls.typeExpr.formatting),
                             vars = decls.vars.map { it.copy(type = classType, name = it.name.copy(type = classType)) })
-                })
+                }
             }
         }
         return emptyList()

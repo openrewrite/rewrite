@@ -18,14 +18,16 @@ package com.netflix.java.refactor.refactor.op
 import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class ChangeMethodTargetToVariable(val meth: Tr.MethodInvocation, val varName: String, val type: Type.Class?): RefactorVisitor() {
+class ChangeMethodTargetToVariable(val meth: Tr.MethodInvocation,
+                                   val varName: String,
+                                   val type: Type.Class?): RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {
-            return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
+            return transform {
                 val select = Tr.Ident(varName, this@ChangeMethodTargetToVariable.type, select?.formatting ?: Formatting.Reified.Empty)
                 copy(select = select, declaringType = this@ChangeMethodTargetToVariable.type)
-            })
+            }
         }
         return super.visitMethodInvocation(meth)
     }

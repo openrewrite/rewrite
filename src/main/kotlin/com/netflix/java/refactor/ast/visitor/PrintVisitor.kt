@@ -16,7 +16,6 @@
 package com.netflix.java.refactor.ast.visitor
 
 import com.netflix.java.refactor.ast.*
-import org.apache.commons.lang.StringEscapeUtils
 import java.lang.IllegalStateException
 
 class PrintVisitor : AstVisitor<String>("") {
@@ -364,8 +363,8 @@ class PrintVisitor : AstVisitor<String>("") {
     }
 
     override fun visitTypeParameter(typeParameter: Tr.TypeParameter): String {
-        val bounds = if(typeParameter.bounds.isNotEmpty()) {
-            "extends${visit(typeParameter.bounds, "&")}"
+        val bounds = if(typeParameter.bounds != null) {
+            typeParameter.bounds.fmt("extends${visit(typeParameter.bounds.types, "&")}")
         } else ""
 
         return typeParameter.fmt("${visit(typeParameter.annotations, "")}${visit(typeParameter.name)}$bounds")

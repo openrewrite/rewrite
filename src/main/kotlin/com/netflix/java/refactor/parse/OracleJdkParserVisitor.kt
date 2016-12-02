@@ -193,7 +193,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitClass(node: ClassTree, fmt: Formatting.Reified): Tree {
         val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
 
-        val modifiers = node.modifiers.sortedFlags().mapIndexed { i, mod ->
+        val modifiers = node.modifiers.sortedFlags().map { mod ->
             val modPrefix = whitespace()
             cursor += mod.name.length
             val modFormat = Formatting.Reified(modPrefix)
@@ -563,7 +563,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
 
         val modifiers = node.modifiers.sortedFlags()
-                .mapIndexed { i, mod ->
+                .map { mod ->
                     val modFormat = Formatting.Reified(whitespace())
                     cursor += mod.name.length
                     when(mod) {
@@ -787,18 +787,14 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitTypeParameter(node: TypeParameterTree, fmt: Formatting.Reified): Tree {
         val annotations = node.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
 
-        val name = TreeBuilder.buildName(typeCache, node.name.toString(),
-                Formatting.Reified(sourceBefore(node.name.toString()), if(node.bounds.isNotEmpty()) sourceBefore("extends") else ""))
+        val name = TreeBuilder.buildName(typeCache, node.name.toString(), Formatting.Reified(sourceBefore(node.name.toString())))
 
         val bounds = if(node.bounds.isNotEmpty()) {
-            val firstPrefix = whitespace()
-
+            val boundPrefix = if(node.bounds.isNotEmpty()) sourceBefore("extends") else ""
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
-            val bounds = node.bounds.convertAll<TypeTree>({ sourceBefore("&") }, NO_DELIM)
-            (bounds[0].formatting as Formatting.Reified).prefix = firstPrefix
-
-            bounds
-        } else emptyList()
+            Tr.TypeParameter.Bounds(node.bounds.convertAll<TypeTree>({ sourceBefore("&") }, NO_DELIM),
+                    Formatting.Reified(boundPrefix))
+        } else null
 
         return Tr.TypeParameter(annotations, name, bounds, fmt)
     }
@@ -862,7 +858,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val vartype = node.vartype
 
         val modifiers = if((node.modifiers as JCTree.JCModifiers).pos >= 0) {
-            node.modifiers.sortedFlags().mapIndexed { i, mod ->
+            node.modifiers.sortedFlags().map { mod ->
                 val modFormat = Formatting.Reified(whitespace())
                 cursor += mod.name.length
                 when (mod) {
@@ -957,8 +953,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     private fun <T : Tree> JdkTree.convert(suffix: (JdkTree) -> String = { "" }): T {
         val prefix = source.substring(cursor, Math.max((this as JCTree).startPosition, cursor))
         cursor += prefix.length
-        val t = scan(this, Formatting.Reified(prefix)) as T
-        (t.formatting as Formatting.Reified).suffix = suffix(this)
+        var t = scan(this, Formatting.Reified(prefix)) as T
+        t = t.copy((t.formatting as Formatting.Reified).copy(suffix = suffix(this))) as T
         cursor(Math.max(this.endPos(), cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
         return t
     }
@@ -990,15 +986,15 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
             (it as JCTree).startPosition
         }.values
 
-        return groups.mapIndexed { i, treeGroup ->
+        return groups.map { treeGroup ->
             if(treeGroup.size == 1) {
                 treeGroup[0].convert<Tree>(statementDelim)
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the Oracle AST
                 val prefix = source.substring(cursor, Math.max((treeGroup[0] as JCTree).startPosition, cursor))
                 cursor += prefix.length
-                @Suppress("UNCHECKED_CAST") val vars = visitVariables(treeGroup as List<VariableTree>, Formatting.Reified(prefix))
-                (vars.formatting as Formatting.Reified).suffix = SEMI_DELIM(treeGroup.last())
+                @Suppress("UNCHECKED_CAST") var vars = visitVariables(treeGroup as List<VariableTree>, Formatting.Reified(prefix))
+                vars = vars.copy(formatting = (vars.formatting as Formatting.Reified).copy(suffix = SEMI_DELIM(treeGroup.last())))
                 cursor(Math.max(treeGroup.last().endPos(), cursor))
                 vars
             }
@@ -1139,9 +1135,9 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         return if(delimIndex > source.length - untilDelim.length) -1 else delimIndex
     }
 
-    private val SEMI_DELIM = { t: JdkTree -> sourceBefore(";") }
-    private val COMMA_DELIM = { t: JdkTree -> sourceBefore(",") }
-    private val NO_DELIM = { t: JdkTree -> "" }
+    private val SEMI_DELIM = { ignored: JdkTree -> sourceBefore(";") }
+    private val COMMA_DELIM = { ignored: JdkTree -> sourceBefore(",") }
+    private val NO_DELIM = { ignored: JdkTree -> "" }
 
     @Suppress("UNUSED_PARAMETER")
     private fun whitespace(t: JdkTree? = null): String {

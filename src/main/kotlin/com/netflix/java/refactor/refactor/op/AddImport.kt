@@ -22,19 +22,19 @@ import com.netflix.java.refactor.search.FindType
 
 class AddImport(val clazz: String,
                 val staticMethod: String? = null,
-                val onlyIfReferenced: Boolean = false): RefactorVisitor() {
+                val onlyIfReferenced: Boolean = false): RefactorVisitor<Tr.CompilationUnit>() {
     private var coveredByExistingImport = false
     private val packageComparator = PackageComparator()
     private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
     private var hasReferences: Boolean = false
 
-    override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<*>> {
+    override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<Tr.CompilationUnit>> {
         hasReferences = FindType(clazz).visit(cu).isNotEmpty()
         return super.visitCompilationUnit(cu)
     }
 
-    override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
+    override fun visitImport(import: Tr.Import): List<AstTransform<Tr.CompilationUnit>> {
         val importedType = import.qualid.simpleName
 
         if (addingStaticImport()) {
@@ -53,7 +53,7 @@ class AddImport(val clazz: String,
         return emptyList()
     }
 
-    override fun visitEnd(): List<AstTransform<*>> {
+    override fun visitEnd(): List<AstTransform<Tr.CompilationUnit>> {
         if(onlyIfReferenced && !hasReferences)
             return emptyList()
 
@@ -71,15 +71,13 @@ class AddImport(val clazz: String,
             emptyList()
         }
         else if(lastPrior == null) {
-            listOf(AstTransform<Tr.CompilationUnit>(cursor()) {
-                copy(imports = listOf(importStatementToAdd) + cu.imports)
-            })
+            transform { copy(imports = listOf(importStatementToAdd) + cu.imports) }
         }
         else {
-            listOf(AstTransform<Tr.CompilationUnit>(cursor()) {
+            transform {
                 copy(imports = cu.imports.takeWhile { it !== lastPrior } + listOf(lastPrior, importStatementToAdd) +
                         cu.imports.takeLastWhile { it !== lastPrior })
-            })
+            }
         }
     }
 

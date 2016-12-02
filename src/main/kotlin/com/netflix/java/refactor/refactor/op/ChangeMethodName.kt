@@ -19,15 +19,11 @@ import com.netflix.java.refactor.ast.AstTransform
 import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class ChangeMethodName(val meth: Tr.MethodInvocation, val name: String) : RefactorVisitor() {
+class ChangeMethodName(val meth: Tr.MethodInvocation, val name: String) : RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
-        if (meth.id == this.meth.id) {
-            if(meth.simpleName != name) {
-                return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
-                    copy(name = name.copy(simpleName = this@ChangeMethodName.name))
-                })
-            }
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
+        if (meth.id == this.meth.id && meth.simpleName != name) {
+            return transform { copy(name = name.copy(simpleName = this@ChangeMethodName.name)) }
         }
         return super.visitMethodInvocation(meth)
     }

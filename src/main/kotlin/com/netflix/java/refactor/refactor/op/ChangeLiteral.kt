@@ -19,20 +19,20 @@ import com.netflix.java.refactor.ast.*
 import com.netflix.java.refactor.refactor.RefactorVisitor
 import org.apache.commons.lang.StringEscapeUtils
 
-class ChangeLiteral(val expr: Expression, val transform: (Any?) -> Any?): RefactorVisitor() {
+class ChangeLiteral(val expr: Expression, val transform: (Any?) -> Any?): RefactorVisitor<Tr.Literal>() {
 
-    override fun visitExpression(expr: Expression): List<AstTransform<*>> {
+    override fun visitExpression(expr: Expression): List<AstTransform<Tr.Literal>> {
         if(expr.id == this.expr.id) {
             return LiteralVisitor().visit(expr)
         }
         return super.visitExpression(expr)
     }
 
-    private inner class LiteralVisitor(): RefactorVisitor() {
-        override fun visitLiteral(literal: Tr.Literal): List<AstTransform<*>> {
+    private inner class LiteralVisitor(): RefactorVisitor<Tr.Literal>() {
+        override fun visitLiteral(literal: Tr.Literal): List<AstTransform<Tr.Literal>> {
             val transformed = transform.invoke(literal.value)
             return if(transformed != literal.value) {
-                listOf(AstTransform<Tr.Literal>(this@ChangeLiteral.cursor().parent() + cursor()) {
+                transform(this@ChangeLiteral.cursor().parent() + cursor()) {
                     val transformedValueSource = when(literal.typeTag) {
                         TypeTag.Boolean -> transformed.toString()
                         TypeTag.Byte -> transformed.toString()
@@ -59,7 +59,7 @@ class ChangeLiteral(val expr: Expression, val transform: (Any?) -> Any?): Refact
                     }
 
                     copy(value = transformed, valueSource = transformedValueSource)
-                })
+                }
             } else emptyList()
         }
     }

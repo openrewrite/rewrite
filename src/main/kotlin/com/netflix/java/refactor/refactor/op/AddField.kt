@@ -25,11 +25,11 @@ class AddField(val modifiers: List<Tr.VariableDecls.Modifier>,
                val target: Tr.ClassDecl,
                val clazz: String,
                val name: String,
-               val init: String?): RefactorVisitor() {
+               val init: String?): RefactorVisitor<Tr.Block<*>>() {
 
     private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
-    override fun visitClassDecl(classDecl: Tr.ClassDecl): List<AstTransform<*>> =
+    override fun visitClassDecl(classDecl: Tr.ClassDecl): List<AstTransform<Tr.Block<*>>> =
         if(classDecl.id == target.id) {
             val newField = Tr.VariableDecls(
                     emptyList(),
@@ -47,9 +47,9 @@ class AddField(val modifiers: List<Tr.VariableDecls.Modifier>,
                     Formatting.Infer
             )
 
-            listOf(AstTransform<Tr.Block<*>>(cursor().plus(classDecl.body)) {
+            transform(cursor().plus(classDecl.body)) {
                 copy(statements = listOf(newField) + statements)
-            })
+            }
         }
         else super.visitClassDecl(classDecl)
 }

@@ -21,15 +21,15 @@ import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.ast.Type
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-class ChangeMethodTargetToStatic(val meth: Tr.MethodInvocation, val clazz: String): RefactorVisitor() {
+class ChangeMethodTargetToStatic(val meth: Tr.MethodInvocation, val clazz: String): RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {
             val classType = Type.Class.build(cu.typeCache(), clazz)
-            return listOf(AstTransform<Tr.MethodInvocation>(cursor()) {
+            return transform {
                 meth.copy(select = Tr.Ident(classType.className(), classType, meth.select?.formatting ?:
                         Formatting.Reified.Empty), declaringType = classType)
-            })
+            }
         }
         return super.visitMethodInvocation(meth)
     }

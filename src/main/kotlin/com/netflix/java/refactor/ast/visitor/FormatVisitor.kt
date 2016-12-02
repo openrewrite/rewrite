@@ -15,9 +15,8 @@
  */
 package com.netflix.java.refactor.ast.visitor
 
-import com.netflix.java.refactor.ast.Formatting
-import com.netflix.java.refactor.ast.Tr
-import com.netflix.java.refactor.ast.Tree
+import com.netflix.java.refactor.ast.*
+import com.netflix.java.refactor.refactor.RefactorVisitor
 import java.util.*
 
 /**
@@ -26,42 +25,48 @@ import java.util.*
  *
  * Emits a side-effect of mutating formatting on tree nodes as necessary
  */
-class FormatVisitor: AstVisitor<Tree?>({ it }) {
+class FormatVisitor: RefactorVisitor<Tree>() {
 
-    lateinit var cu: Tr.CompilationUnit
+    override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<Tree>> {
+        val changes = mutableListOf<AstTransform<Tree>>()
 
-    override fun visitCompilationUnit(cu: Tr.CompilationUnit): Tree? {
-        this.cu = cu
-
+        // format changes in imports
         cu.imports.forEach { import ->
             if(import.formatting is Formatting.Infer) {
                 if(import === cu.imports.last()) {
-                    cu.classes.firstOrNull()?.blankLinesBefore(2)
+                    cu.classes.firstOrNull()?.let { clazz ->
+                        changes.addAll(clazz.blankLinesBefore(2, cursor().plus(clazz)))
+                    }
                     if(cu.imports.size > 1)
-                        import.blankLinesBefore(1)
+                        changes.addAll(import.blankLinesBefore(1, cursor().plus(import)))
                 }
 
                 if(import === cu.imports.first()) {
                     if(cu.packageDecl != null)
-                        import.blankLinesBefore(2)
+                        changes.addAll(import.blankLinesBefore(2, cursor().plus(import)))
 
                     // a previous first import will likely have a multiple line spacing prefix
                     if(cu.imports.size > 1 && cu.imports[1].formatting !is Formatting.Infer)
-                        cu.imports[1].blankLinesBefore(1)
+                        changes.addAll(cu.imports[1].blankLinesBefore(1, cursor().plus(cu.imports[1])))
                 }
 
                 if(import !== cu.imports.last() && import !== cu.imports.first()) {
-                    import.blankLinesBefore(1)
-                    cu.imports[cu.imports.indexOf(import) + 1].blankLinesBefore(1)
+                    changes.addAll(import.blankLinesBefore(1, cursor().plus(import)))
+                    cu.imports[cu.imports.indexOf(import) + 1].let { nextImport ->
+                        changes.addAll(nextImport.blankLinesBefore(1, cursor().plus(nextImport)))
+                    }
                 }
             }
         }
 
-        return super.visitCompilationUnit(cu)
+        return super.visitCompilationUnit(cu) + changes
     }
 
-    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): Tree? {
-        if(multiVariable.formatting is Formatting.Infer) {
+    /**
+     * Format added fields
+     */
+    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tree>> {
+        val changes = if(multiVariable.formatting is Formatting.Infer) {
             // we make a simplifying assumption here that inferred variable
             // declaration formatting comes only from added fields
             val classBody = cursor().parent().last() as Tr.Block<*>
@@ -79,33 +84,42 @@ class FormatVisitor: AstVisitor<Tree?>({ it }) {
             val spaceIndent = indentWidth(' ')
             val tabIndent = indentWidth('\t')
 
-            if(spaceIndent > 0) {
-                multiVariable.formatting = Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { " " })
-            } else if(tabIndent > 0) {
-                multiVariable.formatting = Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { "\t" })
-            } else {
-                // default formatting of 4 spaces
-                multiVariable.formatting = Formatting.Reified("\n    ")
+            transform {
+                if (spaceIndent > 0) {
+                    copy(Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { " " }))
+                } else if (tabIndent > 0) {
+                    copy(Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { "\t" }))
+                } else {
+                    // default formatting of 4 spaces
+                    copy(Formatting.Reified("\n    "))
+                }
             }
-        }
+        } else emptyList()
 
-        return super.visitMultiVariable(multiVariable)
+        return super.visitMultiVariable(multiVariable) + changes
     }
 
-    private fun Tree.blankLinesBefore(n: Int) {
-        when(formatting) {
+    private fun Tree?.blankLinesBefore(n: Int, cursor: Cursor = cursor()): List<AstTransform<Tree>> {
+        if(this == null)
+            return emptyList()
+
+        return when(formatting) {
             is Formatting.Reified -> {
-                val reified = formatting as Formatting.Reified
+                val (prefix, _) = formatting as Formatting.Reified
 
                 // add blank lines if necessary
-                val prefix = (1..Math.max(0, n - reified.prefix.takeWhile { it == '\n' }.length)).map { "\n" }.joinToString("")
-                reified.prefix = prefix + reified.prefix
+                val addLines = (1..Math.max(0, n - prefix.takeWhile { it == '\n' }.length)).map { "\n" }.joinToString("")
+                var modifiedPrefix = (addLines + prefix)
 
                 // remove extra blank lines if necessary
-                reified.prefix = reified.prefix.substring((reified.prefix.takeWhile { it == '\n' }.count() - n))
+                modifiedPrefix = modifiedPrefix.substring((modifiedPrefix.takeWhile { it == '\n' }.count() - n))
+
+                if(modifiedPrefix != prefix)
+                    transform(cursor) { copy(formatting.withPrefix(modifiedPrefix)) }
+                else emptyList()
             }
-            is Formatting.Infer ->
-                formatting = Formatting.Reified((1..n).map { "\n" }.joinToString(""))
+            is Formatting.Infer, is Formatting.None ->
+                transform(cursor) { copy(Formatting.Reified((1..n).map { "\n" }.joinToString(""))) }
         }
     }
 }

@@ -61,7 +61,7 @@ class FindType(val clazz: String): AstVisitor<List<NameTree>>(emptyList()) {
     }
 
     override fun visitTypeParameter(typeParameter: Tr.TypeParameter): List<NameTree> {
-        return super.visitTypeParameter(typeParameter) + typeParameter.bounds.typeMatches()
+        return super.visitTypeParameter(typeParameter) + typeParameter.bounds?.types.typeMatches()
     }
 
     override fun visitWildcard(wildcard: Tr.Wildcard): List<NameTree> {

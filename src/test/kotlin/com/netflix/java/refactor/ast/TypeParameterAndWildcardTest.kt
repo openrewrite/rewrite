@@ -27,11 +27,11 @@ abstract class TypeParameterAndWildcardTest(p: Parser): Parser by p {
         val a = parse("""
             import java.util.List;
             public class A {
-                public <P extends B> void foo(List<P> out, List<? super C> in) {}
+                public <P  extends B> void foo(List<P> out, List<? super C> in) {}
             }
         """, whichDependOn = bc)
 
-        assertEquals("public <P extends B> void foo(List<P> out, List<? super C> in) {}",
+        assertEquals("public <P  extends B> void foo(List<P> out, List<? super C> in) {}",
                 a.classes[0].methods()[0].printTrimmed())
     }
 

@@ -263,7 +263,7 @@ open class AstVisitor<R> {
     open fun visitTypeParameter(typeParameter: Tr.TypeParameter): R =
             visit(typeParameter.annotations)
                     .andThen(typeParameter.name)
-                    .andThen(typeParameter.bounds)
+                    .andThen(typeParameter.bounds?.types)
 
     open fun visitTypeParameters(typeParameters: Tr.TypeParameters): R =
             visit(typeParameters.params)

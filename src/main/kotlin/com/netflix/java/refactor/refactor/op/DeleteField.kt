@@ -19,12 +19,10 @@ import com.netflix.java.refactor.ast.AstTransform
 import com.netflix.java.refactor.ast.Tr
 import com.netflix.java.refactor.refactor.RefactorVisitor
 
-data class DeleteField(val decls: Tr.VariableDecls) : RefactorVisitor() {
+data class DeleteField(val decls: Tr.VariableDecls) : RefactorVisitor<Tr.Block<*>>() {
 
-    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<*>> =
+    override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.Block<*>>> =
         if(multiVariable.id == decls.id) {
-            listOf(AstTransform<Tr.Block<*>>(cursor().parent()) {
-                copy(statements = statements - decls)
-            })
+            transform(cursor().parent()) { copy(statements = statements - decls) }
         } else emptyList()
 }

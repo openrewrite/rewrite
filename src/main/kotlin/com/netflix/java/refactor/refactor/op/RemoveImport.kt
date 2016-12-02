@@ -20,7 +20,7 @@ import com.netflix.java.refactor.refactor.RefactorVisitor
 import com.netflix.java.refactor.search.MethodMatcher
 import java.util.*
 
-class RemoveImport(val clazz: String): RefactorVisitor() {
+class RemoveImport(val clazz: String): RefactorVisitor<Tr.CompilationUnit>() {
     val methodMatcher = MethodMatcher("$clazz *(..)")
 
     var namedImport: Tr.Import? = null
@@ -34,7 +34,7 @@ class RemoveImport(val clazz: String): RefactorVisitor() {
 
     val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
-    override fun visitImport(import: Tr.Import): List<AstTransform<*>> {
+    override fun visitImport(import: Tr.Import): List<AstTransform<Tr.CompilationUnit>> {
         if (import.static) {
             if (import.qualid.target.printTrimmed() == clazz) {
                 if (import.qualid.simpleName == "*")
@@ -53,13 +53,13 @@ class RemoveImport(val clazz: String): RefactorVisitor() {
         return emptyList()
     }
 
-    override fun visitIdentifier(ident: Tr.Ident): List<AstTransform<*>> {
+    override fun visitIdentifier(ident: Tr.Ident): List<AstTransform<Tr.CompilationUnit>> {
         if(ident.type.asClass()?.packageOwner() == classType.packageOwner())
             ident.type.asClass()?.let { referencedTypes.add(it) }
         return emptyList()
     }
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<*>> {
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.CompilationUnit>> {
         if(methodMatcher.matches(meth)) {
             if(meth.declaringType?.fullyQualifiedName == clazz)
                 referencedMethods.add(meth.name)
@@ -67,16 +67,16 @@ class RemoveImport(val clazz: String): RefactorVisitor() {
         return super.visitMethodInvocation(meth)
     }
 
-    override fun visitEnd(): List<AstTransform<*>> =
+    override fun visitEnd(): List<AstTransform<Tr.CompilationUnit>> =
         classImportDeletions() + staticImportDeletions()
 
-    private fun classImportDeletions() =
+    private fun classImportDeletions(): List<AstTransform<Tr.CompilationUnit>> =
         if (namedImport is Tr.Import && referencedTypes.none { it == classType }) {
-            listOf(namedImport!!.delete())
+            namedImport!!.delete()
         } else if (starImport is Tr.Import && referencedTypes.isEmpty()) {
-            listOf(starImport!!.delete())
+            starImport!!.delete()
         } else if (starImport is Tr.Import && referencedTypes.size == 1) {
-            listOf(AstTransform<Tr.CompilationUnit>(cursor()) {
+            transform {
                 copy(imports = imports.map {
                     if(it == starImport) {
                         val classImportField = TreeBuilder.buildName(cu.typeCache(), referencedTypes.first().fullyQualifiedName, Formatting.Reified(" ")) as Tr.FieldAccess
@@ -84,22 +84,22 @@ class RemoveImport(val clazz: String): RefactorVisitor() {
                     }
                     else it
                 })
-            })
+            }
         } else emptyList()
 
-    private fun staticImportDeletions(): ArrayList<AstTransform<*>> {
-        val staticImportFixes = ArrayList<AstTransform<*>>()
+    private fun staticImportDeletions(): ArrayList<AstTransform<Tr.CompilationUnit>> {
+        val staticImportFixes = ArrayList<AstTransform<Tr.CompilationUnit>>()
         if(staticStarImport is Tr.Import && referencedMethods.isEmpty()) {
-            staticImportFixes.add(staticStarImport!!.delete())
+            staticImportFixes.addAll(staticStarImport!!.delete())
         }
         staticNamedImports.forEach { staticImport ->
             val method = staticImport.qualid.simpleName
             if(referencedMethods.none { it.simpleName == method })
-                staticImportFixes.add(staticImport.delete())
+                staticImportFixes.addAll(staticImport.delete())
         }
         return staticImportFixes
     }
 
-    private fun Tr.Import.delete(): AstTransform<Tr.CompilationUnit> =
-        AstTransform(cursor()) { copy(imports = imports - this@delete) }
+    private fun Tr.Import.delete(): List<AstTransform<Tr.CompilationUnit>> =
+        transform { copy(imports = imports - this@delete) }
 }

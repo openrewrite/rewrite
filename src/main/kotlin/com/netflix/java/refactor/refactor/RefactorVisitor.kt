@@ -16,9 +16,17 @@
 package com.netflix.java.refactor.refactor
 
 import com.netflix.java.refactor.ast.AstTransform
+import com.netflix.java.refactor.ast.Cursor
 import com.netflix.java.refactor.ast.Tree
 import com.netflix.java.refactor.ast.visitor.AstVisitor
 
-abstract class RefactorVisitor: AstVisitor<List<AstTransform<*>>>(emptyList()) {
+abstract class RefactorVisitor<T: Tree>: AstVisitor<List<AstTransform<T>>>(emptyList()) {
     protected val cu by lazy { cursor().enclosingCompilationUnit() }
+
+    @Suppress("UNCHECKED_CAST")
+    fun transform(cursor: Cursor, mutation: T.() -> T): List<AstTransform<T>> =
+            listOf(AstTransform(cursor, mutation as Tree.() -> T))
+
+    fun transform(mutation: T.() -> T): List<AstTransform<T>> =
+            transform(cursor(), mutation)
 }
