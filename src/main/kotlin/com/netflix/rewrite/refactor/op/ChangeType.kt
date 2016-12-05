@@ -18,7 +18,9 @@ package com.netflix.rewrite.refactor.op
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class ChangeType(val from: String, val to: String): RefactorVisitor<Tree>() {
+data class ChangeType(val from: String,
+                      val to: String,
+                      override val ruleName: String = "change-type"): RefactorVisitor<Tree>() {
     // NOTE: a type change is possible anywhere a Tr.FieldAccess or Tr.Ident is possible, but not every FieldAccess or Ident
     // represents a type (could represent a variable name, etc.)
 

@@ -12,6 +12,9 @@ buildscript {
 plugins {
     id 'me.champeau.gradle.antlr4' version '0.1'
     id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '0.9.4'
+    id 'nebula.plugin-plugin' version '4.24.0'
 }
 
 apply plugin: 'nebula.kotlin'
@@ -38,14 +41,15 @@ configurations {
 
 dependencies {
     compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
+    compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
     compile 'commons-lang:commons-lang:2.6'
-    compileOnly 'junit:junit:4.+'
-    compileOnly 'org.codehaus.groovy:groovy-all:2.4.7'
     compile 'org.jetbrains.kotlin:kotlin-reflect'
 
-    compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    // just for Closure-based refactor method on CompilationUnit
+    compileOnly 'org.codehaus.groovy:groovy-all:2.4.7'
 
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
@@ -59,7 +63,6 @@ tasks.withType(Javadoc) {
     options.addStringOption('Xdoclint:none', '-quiet')
 }
 
-// Relocate jgit dependency not available in Maven Central
 // Replaces the main artifact by removing the classifier for the shadow jar, and replacing jar with shadowJar
 // Relocated dependencies are removed from the generated pom
 shadowJar {
@@ -84,33 +87,53 @@ shadowJar {
     }
 }
 
-if(project.rootProject == project) {
-  apply plugin: 'nebula.netflixoss'
+//if(project.rootProject == project) {
+//  apply plugin: 'nebula.netflixoss'
+//
+//  publishing {
+//      publications {
+//          nebula(MavenPublication) {
+//              artifact shadowJar {
+//                  classifier = 'jdkbundle'
+//              }
+//          }
+//
+//          withType(MavenPublication) {
+//              pom.withXml {
+//                  asNode().dependencies.dependency.scope.each {
+//                      it.value = 'compile'
+//                  }
+//              }
+//          }
+//      }
+//  }
+//
+//  license {
+//      header = file('gradle/licenseHeader.txt')
+//      exclude '**/*.tokens'
+//      mapping {
+//          kt = 'JAVADOC_STYLE'
+//      }
+//      sourceSets = project.sourceSets
+//  }
+//}
 
-  publishing {
-      publications {
-          nebula(MavenPublication) {
-              artifact shadowJar {
-                  classifier = 'jdkbundle'
-              }
-          }
+pluginBundle {
+    website = 'https://github.com/Netflix/rewrite'
+    vcsUrl = 'https://github.com/Netflix/rewrite.git'
+    description = 'Pluggable and distributed refactoring tool for Java source code'
 
-          withType(MavenPublication) {
-              pom.withXml {
-                  asNode().dependencies.dependency.scope.each {
-                      it.value = 'compile'
-                  }
-              }
-          }
-      }
-  }
+    plugins {
+        sourceRefactor {
+            id = 'netflix.rewrite'
+            displayName = 'Distributed Java source refactoring plugin'
+            description = 'Pluggable and distributed refactoring tool for Java source code'
+            tags = ['nebula', 'netflix', 'lint', 'refactor']
+        }
+    }
 
-  license {
-      header = file('gradle/licenseHeader.txt')
-      exclude '**/*.tokens'
-      mapping {
-          kt = 'JAVADOC_STYLE'
-      }
-      sourceSets = project.sourceSets
-  }
+    mavenCoordinates {
+        groupId = 'com.netflix.devinsight'
+        artifactId = 'rewrite'
+    }
 }

@@ -19,16 +19,19 @@ import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 import org.apache.commons.lang.StringEscapeUtils
 
-class ChangeLiteral(val expr: Expression, val transform: (Any?) -> Any?): RefactorVisitor<Tr.Literal>() {
+class ChangeLiteral(val expr: Expression,
+                    val transform: (Any?) -> Any?,
+                    override val ruleName: String = "change-literal"): RefactorVisitor<Tr.Literal>() {
 
     override fun visitExpression(expr: Expression): List<AstTransform<Tr.Literal>> {
         if(expr.id == this.expr.id) {
-            return LiteralVisitor().visit(expr)
+            return LiteralVisitor(ruleName).visit(expr)
         }
         return super.visitExpression(expr)
     }
 
-    private inner class LiteralVisitor(): RefactorVisitor<Tr.Literal>() {
+    private inner class LiteralVisitor(override val ruleName: String): RefactorVisitor<Tr.Literal>() {
+
         override fun visitLiteral(literal: Tr.Literal): List<AstTransform<Tr.Literal>> {
             val transformed = transform.invoke(literal.value)
             return if(transformed != literal.value) {

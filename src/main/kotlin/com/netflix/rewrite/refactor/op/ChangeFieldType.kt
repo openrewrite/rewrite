@@ -20,7 +20,9 @@ import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class ChangeFieldType(val decls: Tr.VariableDecls, val targetType: String) : RefactorVisitor<Tr.VariableDecls>() {
+data class ChangeFieldType(val decls: Tr.VariableDecls,
+                           val targetType: String,
+                           override val ruleName: String = "change-field-type") : RefactorVisitor<Tr.VariableDecls>() {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.VariableDecls>> {
         if(multiVariable.id == decls.id) {

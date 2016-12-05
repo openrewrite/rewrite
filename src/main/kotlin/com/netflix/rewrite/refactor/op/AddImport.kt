@@ -16,13 +16,13 @@
 package com.netflix.rewrite.refactor.op
 
 import com.netflix.rewrite.ast.*
-import java.util.ArrayList
 import com.netflix.rewrite.refactor.RefactorVisitor
 import com.netflix.rewrite.search.FindType
 
 class AddImport(val clazz: String,
                 val staticMethod: String? = null,
-                val onlyIfReferenced: Boolean = false): RefactorVisitor<Tr.CompilationUnit>() {
+                val onlyIfReferenced: Boolean = false,
+                override val ruleName: String = "add-import"): RefactorVisitor<Tr.CompilationUnit>() {
     private var coveredByExistingImport = false
     private val packageComparator = PackageComparator()
     private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
@@ -71,10 +71,10 @@ class AddImport(val clazz: String,
             emptyList()
         }
         else if(lastPrior == null) {
-            transform { copy(imports = listOf(importStatementToAdd) + cu.imports) }
+            transform(ruleName) { copy(imports = listOf(importStatementToAdd) + cu.imports) }
         }
         else {
-            transform {
+            transform(ruleName) {
                 copy(imports = cu.imports.takeWhile { it !== lastPrior } + listOf(lastPrior, importStatementToAdd) +
                         cu.imports.takeLastWhile { it !== lastPrior })
             }

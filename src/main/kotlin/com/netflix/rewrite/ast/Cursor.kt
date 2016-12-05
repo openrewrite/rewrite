@@ -27,7 +27,7 @@ data class Cursor(val path: List<Tree>) {
     }
 
     override fun equals(other: Any?): Boolean = if(other is Cursor && path.size == other.path.size) {
-        path.forEachIndexed { i, tree ->
+        path.forEachIndexed { i, _ ->
             if(other.path[i] != path[i])
                 return@equals false
         }

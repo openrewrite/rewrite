@@ -25,7 +25,8 @@ class AddField(val modifiers: List<Tr.VariableDecls.Modifier>,
                val target: Tr.ClassDecl,
                val clazz: String,
                val name: String,
-               val init: String?): RefactorVisitor<Tr.Block<*>>() {
+               val init: String?,
+               override val ruleName: String = "add-field"): RefactorVisitor<Tr.Block<*>>() {
 
     private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
 
@@ -47,7 +48,7 @@ class AddField(val modifiers: List<Tr.VariableDecls.Modifier>,
                     Formatting.Infer
             )
 
-            transform(cursor().plus(classDecl.body)) {
+            transform(cursor().plus(classDecl.body), ruleName) {
                 copy(statements = listOf(newField) + statements)
             }
         }

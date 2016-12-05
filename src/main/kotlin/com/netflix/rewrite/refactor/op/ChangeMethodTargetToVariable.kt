@@ -20,7 +20,8 @@ import com.netflix.rewrite.refactor.RefactorVisitor
 
 class ChangeMethodTargetToVariable(val meth: Tr.MethodInvocation,
                                    val varName: String,
-                                   val type: Type.Class?): RefactorVisitor<Tr.MethodInvocation>() {
+                                   val type: Type.Class?,
+                                   override val ruleName: String = "change-method-target"): RefactorVisitor<Tr.MethodInvocation>() {
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {

@@ -18,7 +18,9 @@ package com.netflix.rewrite.refactor.op
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class ReorderMethodArguments(val meth: Tr.MethodInvocation, vararg val byArgumentNames: String): RefactorVisitor<Tr.MethodInvocation>() {
+class ReorderMethodArguments(val meth: Tr.MethodInvocation,
+                             vararg val byArgumentNames: String,
+                             override val ruleName: String = "reorder-method-arguments"): RefactorVisitor<Tr.MethodInvocation>() {
     private var originalParamNames: Array<out String>? = null
 
     fun setOriginalParamNames(vararg names: String) { originalParamNames = names }

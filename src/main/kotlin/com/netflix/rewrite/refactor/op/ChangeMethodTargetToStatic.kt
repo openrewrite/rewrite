@@ -21,7 +21,9 @@ import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class ChangeMethodTargetToStatic(val meth: Tr.MethodInvocation, val clazz: String): RefactorVisitor<Tr.MethodInvocation>() {
+class ChangeMethodTargetToStatic(val meth: Tr.MethodInvocation,
+                                 val clazz: String,
+                                 override val ruleName: String = "change-method-target"): RefactorVisitor<Tr.MethodInvocation>() {
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {

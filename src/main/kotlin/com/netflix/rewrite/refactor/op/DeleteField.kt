@@ -19,7 +19,8 @@ import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class DeleteField(val decls: Tr.VariableDecls) : RefactorVisitor<Tr.Block<*>>() {
+data class DeleteField(val decls: Tr.VariableDecls,
+                       override val ruleName: String = "delete-field") : RefactorVisitor<Tr.Block<*>>() {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.Block<*>>> =
         if(multiVariable.id == decls.id) {

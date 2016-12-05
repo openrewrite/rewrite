@@ -20,7 +20,8 @@ import com.netflix.rewrite.refactor.RefactorVisitor
 import com.netflix.rewrite.search.MethodMatcher
 import java.util.*
 
-class RemoveImport(val clazz: String): RefactorVisitor<Tr.CompilationUnit>() {
+class RemoveImport(val clazz: String,
+                   override val ruleName: String = "remove-import"): RefactorVisitor<Tr.CompilationUnit>() {
     val methodMatcher = MethodMatcher("$clazz *(..)")
 
     var namedImport: Tr.Import? = null

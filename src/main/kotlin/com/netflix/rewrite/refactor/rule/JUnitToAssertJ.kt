@@ -5,11 +5,13 @@ import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Formatting
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
+import com.netflix.rewrite.auto.Rule
+import com.netflix.rewrite.refactor.Refactor
 import com.netflix.rewrite.refactor.RefactorVisitor
 
 @Rewrite("junit-to-assertj", description = "convert JUnit-style assertions to AssertJ")
-class JUnitToAssertJ {
-    fun fix(cu: Tr.CompilationUnit): Tr.CompilationUnit {
+class JUnitToAssertJ: Rule {
+    override fun refactor(cu: Tr.CompilationUnit): Refactor {
         // TODO what to do with assertEquals with message at beginning?
         val assertEquals = cu.findMethodCalls("org.junit.Assert assertEquals(..)").map { it.id }
 
@@ -21,11 +23,12 @@ class JUnitToAssertJ {
             run(ConvertAssertions(assertEquals))
 
             removeImport("org.junit.Assert")
-        }.fix()
+        }
     }
 }
 
 class ConvertAssertions(val assertEquals: List<String>) : RefactorVisitor<Tr.MethodInvocation>() {
+    override val ruleName: String = "change-junit-assertion"
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(assertEquals.contains(meth.id)) {

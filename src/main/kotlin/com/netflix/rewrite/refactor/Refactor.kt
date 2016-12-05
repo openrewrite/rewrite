@@ -28,7 +28,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.file.Path
 import java.util.*
 
-class Refactor(val original: Tr.CompilationUnit) {
+open class Refactor(val original: Tr.CompilationUnit) {
     private val ops = ArrayList<RefactorVisitor<*>>()
 
     // -------------
@@ -216,9 +216,25 @@ class Refactor(val original: Tr.CompilationUnit) {
     fun changeLiteral(target: Expression, transform: (Any?) -> Any?): Refactor =
             changeLiteral(listOf(target), transform)
 
+    fun stats(): Map<String, Int> {
+        val stats = mutableMapOf<String, Int>()
+
+        ops.fold(original) { acc, op ->
+            // by transforming the AST for each op, we allow for the possibility of overlapping changes
+            val transformations = op.visit(acc)
+            val transformed = TransformVisitor(transformations).visit(acc) as Tr.CompilationUnit
+            transformations.groupBy { it.name }.forEach { name, transformations ->
+                stats.merge(name, transformations.size, Int::plus)
+            }
+            transformed
+        }
+
+        return stats
+    }
+
     /**
-    * @return Transformed version of the AST after changes are applied
-    */
+     * @return Transformed version of the AST after changes are applied
+     */
     fun fix(): Tr.CompilationUnit = ops
             .fold(original) { acc, op ->
                 // by transforming the AST for each op, we allow for the possibility of overlapping changes

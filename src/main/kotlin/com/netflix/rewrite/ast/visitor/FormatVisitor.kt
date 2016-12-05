@@ -17,7 +17,6 @@ package com.netflix.rewrite.ast.visitor
 
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
-import java.util.*
 
 /**
  * Only formatting for nodes that we can ADD so far
@@ -26,6 +25,7 @@ import java.util.*
  * Emits a side-effect of mutating formatting on tree nodes as necessary
  */
 class FormatVisitor: RefactorVisitor<Tree>() {
+    override val ruleName = "format"
 
     override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<Tree>> {
         val changes = mutableListOf<AstTransform<Tree>>()

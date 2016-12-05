@@ -23,7 +23,8 @@ import com.netflix.rewrite.refactor.RefactorVisitor
 
 class InsertMethodArgument(val meth: Tr.MethodInvocation,
                            val pos: Int,
-                           val source: String): RefactorVisitor<Tr.MethodInvocation>() {
+                           val source: String,
+                           override val ruleName: String = "insert-method-argument"): RefactorVisitor<Tr.MethodInvocation>() {
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         if(meth.id == this.meth.id) {

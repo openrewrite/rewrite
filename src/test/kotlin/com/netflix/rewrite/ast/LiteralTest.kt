@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.ast
 
+import com.netflix.rewrite.fields
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test

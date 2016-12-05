@@ -15,7 +15,7 @@
  */
 package com.netflix.rewrite.refactor.op
 
-import com.netflix.rewrite.ast.assertRefactored
+import com.netflix.rewrite.assertRefactored
 import org.junit.Test
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser

@@ -15,4 +15,4 @@
  */
 package com.netflix.rewrite.ast
 
-data class AstTransform<out R: Tree>(val cursor: Cursor, val mutation: Tree.() -> R)
+data class AstTransform<out R: Tree>(val cursor: Cursor, val mutation: Tree.() -> R, val name: String)

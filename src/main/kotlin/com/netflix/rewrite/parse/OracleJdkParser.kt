@@ -28,6 +28,7 @@ import com.sun.tools.javac.util.Context
 import com.sun.tools.javac.util.Log
 import com.sun.tools.javac.util.Options
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.io.PrintWriter
 import java.io.Writer
 import java.nio.charset.Charset

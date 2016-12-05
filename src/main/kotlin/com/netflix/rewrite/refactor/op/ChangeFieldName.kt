@@ -19,7 +19,9 @@ import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class ChangeFieldName(val decls: Tr.VariableDecls, val name: String) : RefactorVisitor<Tr.VariableDecls>() {
+data class ChangeFieldName(val decls: Tr.VariableDecls,
+                           val name: String,
+                           override val ruleName: String = "change-field-name") : RefactorVisitor<Tr.VariableDecls>() {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.VariableDecls>> {
         if(multiVariable.id == decls.id) {
@@ -27,7 +29,7 @@ data class ChangeFieldName(val decls: Tr.VariableDecls, val name: String) : Refa
 
             val v = multiVariable.vars.first()
             if(v.simpleName != name) {
-                return transform { copy(vars = listOf(v.copy(name = Tr.Ident(name, v.name.type, v.name.formatting)))) }
+                return transform(ruleName) { copy(vars = listOf(v.copy(name = Tr.Ident(name, v.name.type, v.name.formatting)))) }
             }
         }
         return emptyList()

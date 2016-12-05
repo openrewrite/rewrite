@@ -1,7 +1,7 @@
 package com.netflix.rewrite.refactor.op
 
 import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.ast.assertRefactored
+import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.assertTrue

@@ -3,7 +3,7 @@ package com.netflix.rewrite.ast.visitor
 import com.netflix.rewrite.ast.Formatting
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.TreeBuilder
-import com.netflix.rewrite.ast.assertRefactored
+import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Test
