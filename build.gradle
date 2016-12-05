@@ -25,8 +25,8 @@ repositories {
     maven { url "http://repository.jetbrains.com/all" }
 }
 
-antlr4.output = new File('src/main/java/com/netflix/java/refactor/aspectj')
-antlr4.extraArgs = ['-package', 'com.netflix.java.refactor.aspectj']
+antlr4.output = new File('src/main/java/com/netflix/rewrite')
+antlr4.extraArgs = ['-package', 'com.netflix.rewrite']
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
