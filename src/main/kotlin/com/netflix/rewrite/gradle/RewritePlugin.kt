@@ -54,16 +54,20 @@ open class RewriteTask : AbstractRewriteTask() {
 
     @TaskAction
     fun refactorSourceStats() {
+        val textOutput = StyledTextService(services)
+
         val stats = run { rule, cu ->
             val refactor = rule.refactor(cu)
-            refactor.stats().values.reduce(Int::plus)
+            refactor.stats().values.sum()
         }
 
         if (stats.isNotEmpty()) {
-            logger.warn("This project requires refactoring. Run ./gradlew fixSourceLint to automatically fix:")
+            textOutput.withStyle(Styling.Red).println("\u2716 Your source code requires refactoring.")
+            textOutput.text("Run").withStyle(Styling.Bold).text("./gradlew fixSourceLint")
+            textOutput.println(" to automatically fix")
 
             stats.entries.forEachIndexed { i, (rewrite, count) ->
-                logger.warn("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
+                textOutput.println("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
             }
 
             throw GradleException("This project requires refactoring. Run ./gradlew fixSourceLint to automatically fix.")
@@ -75,9 +79,11 @@ open class RewriteAndFixTask : AbstractRewriteTask() {
 
     @TaskAction
     fun refactorSource() {
+        val textOutput = StyledTextService(services)
+
         val stats = run { rule, cu ->
             val refactor = rule.refactor(cu)
-            val changes = refactor.stats().values.reduce(Int::plus)
+            val changes = refactor.stats().values.sum()
             if (changes > 0) {
                 Files.newBufferedWriter(cu.sourcePath).use {
                     it.write(refactor.fix().print())
@@ -87,10 +93,9 @@ open class RewriteAndFixTask : AbstractRewriteTask() {
         }
 
         if (stats.isNotEmpty()) {
-            logger.warn("Refactoring operations were performed on this project. Please review and commit changes:")
-
+            textOutput.withStyle(Styling.Red).println("\u2716 Your source code has been affected by refactoring rules. Please review and commit changes.")
             stats.entries.forEachIndexed { i, (rewrite, count) ->
-                logger.warn("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
+                textOutput.println("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
             }
 
             throw GradleException("This project contains uncommitted refactoring changes.")
