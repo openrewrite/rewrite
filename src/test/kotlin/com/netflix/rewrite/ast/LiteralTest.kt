@@ -32,7 +32,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
 
         val literal = a.fields()[0].vars[0].initializer as Tr.Literal
         assertEquals(0, literal.value)
-        assertEquals(TypeTag.Int, literal.typeTag)
+        assertEquals(Type.Primitive.Int, literal.type)
         assertEquals("0", literal.printTrimmed())
     }
 
@@ -46,7 +46,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
 
         val literal = a.fields()[0].vars[0].initializer as Tr.Literal
         assertEquals('a', literal.value)
-        assertEquals(TypeTag.Char, literal.typeTag)
+        assertEquals(Type.Primitive.Char, literal.type)
         assertEquals("'a'", literal.printTrimmed())
     }
 
@@ -82,7 +82,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
         """)
 
         a.fields(0..5).map { it.vars[0].initializer as Tr.Literal }.forEach {
-            assertEquals("expected octal notation for ${it.typeTag}", "01", it.printTrimmed().trimEnd('L'))
+            assertEquals("expected octal notation for ${it.type}", "01", it.printTrimmed().trimEnd('L'))
         }
     }
 
@@ -98,7 +98,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
         """)
 
         a.fields(0..3).map { it.vars[0].initializer as Tr.Literal }.forEach {
-            assertEquals("expected binary notation for ${it.typeTag}", "0b10", it.printTrimmed().trimEnd('L'))
+            assertEquals("expected binary notation for ${it.type}", "0b10", it.printTrimmed().trimEnd('L'))
         }
     }
 
@@ -114,7 +114,7 @@ abstract class LiteralTest(p: Parser): Parser by p {
         """)
 
         a.fields(0..3).map { it.vars[0].initializer as Tr.Literal }.forEach {
-            assertEquals("expected hex notation for ${it.typeTag}", "0xA0", it.printTrimmed().trimEnd('L'))
+            assertEquals("expected hex notation for ${it.type}", "0xA0", it.printTrimmed().trimEnd('L'))
         }
     }
 

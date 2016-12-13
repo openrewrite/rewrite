@@ -18,22 +18,19 @@ package com.netflix.rewrite.refactor.op
 import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
+import com.netflix.rewrite.ast.asClass
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class ChangeFieldType(val decls: Tr.VariableDecls,
-                           val targetType: String,
-                           override val ruleName: String = "change-field-type") : RefactorVisitor<Tr.VariableDecls>() {
+data class ChangeFieldType(val targetType: String, override val ruleName: String = "change-field-type") :
+        RefactorVisitor<Tr.VariableDecls>() {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.VariableDecls>> {
-        if(multiVariable.id == decls.id) {
-            val classType = Type.Class.build(cu.typeCache(), targetType)
-            if(decls.typeExpr.type != classType) {
-                return transform {
-                    decls.copy(typeExpr = Tr.Ident(classType.className(), classType, decls.typeExpr.formatting),
-                            vars = decls.vars.map { it.copy(type = classType, name = it.name.copy(type = classType)) })
-                }
+        return if(multiVariable.typeExpr.type?.asClass()?.fullyQualifiedName != targetType) {
+            val classType = Type.Class.build(targetType)
+            transform {
+                copy(typeExpr = Tr.Ident.build(classType.className(), classType, typeExpr.formatting),
+                        vars = vars.map { it.copy(type = classType, name = it.name.copy(type = classType)) })
             }
-        }
-        return emptyList()
+        } else emptyList()
     }
 }

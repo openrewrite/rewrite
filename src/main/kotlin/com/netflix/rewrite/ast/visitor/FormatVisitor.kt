@@ -35,25 +35,25 @@ class FormatVisitor: RefactorVisitor<Tree>() {
             if(import.formatting is Formatting.Infer) {
                 if(import === cu.imports.last()) {
                     cu.classes.firstOrNull()?.let { clazz ->
-                        changes.addAll(clazz.blankLinesBefore(2, cursor().plus(clazz)))
+                        changes.addAll(clazz.blankLinesBefore(2, clazz))
                     }
                     if(cu.imports.size > 1)
-                        changes.addAll(import.blankLinesBefore(1, cursor().plus(import)))
+                        changes.addAll(import.blankLinesBefore(1, import))
                 }
 
                 if(import === cu.imports.first()) {
                     if(cu.packageDecl != null)
-                        changes.addAll(import.blankLinesBefore(2, cursor().plus(import)))
+                        changes.addAll(import.blankLinesBefore(2, import))
 
                     // a previous first import will likely have a multiple line spacing prefix
                     if(cu.imports.size > 1 && cu.imports[1].formatting !is Formatting.Infer)
-                        changes.addAll(cu.imports[1].blankLinesBefore(1, cursor().plus(cu.imports[1])))
+                        changes.addAll(cu.imports[1].blankLinesBefore(1, cu.imports[1]))
                 }
 
                 if(import !== cu.imports.last() && import !== cu.imports.first()) {
-                    changes.addAll(import.blankLinesBefore(1, cursor().plus(import)))
+                    changes.addAll(import.blankLinesBefore(1, import))
                     cu.imports[cu.imports.indexOf(import) + 1].let { nextImport ->
-                        changes.addAll(nextImport.blankLinesBefore(1, cursor().plus(nextImport)))
+                        changes.addAll(nextImport.blankLinesBefore(1, nextImport))
                     }
                 }
             }
@@ -86,12 +86,12 @@ class FormatVisitor: RefactorVisitor<Tree>() {
 
             transform {
                 if (spaceIndent > 0) {
-                    format(Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { " " }))
+                    changeFormatting(format((1..spaceIndent).joinToString("", prefix = "\n") { " " }))
                 } else if (tabIndent > 0) {
-                    format(Formatting.Reified((1..spaceIndent).joinToString("", prefix = "\n") { "\t" }))
+                    changeFormatting(format((1..spaceIndent).joinToString("", prefix = "\n") { "\t" }))
                 } else {
                     // default formatting of 4 spaces
-                    format(Formatting.Reified("\n    "))
+                    changeFormatting(format("\n    "))
                 }
             }
         } else emptyList()
@@ -99,7 +99,7 @@ class FormatVisitor: RefactorVisitor<Tree>() {
         return super.visitMultiVariable(multiVariable) + changes
     }
 
-    private fun Tree?.blankLinesBefore(n: Int, cursor: Cursor = cursor()): List<AstTransform<Tree>> {
+    private fun Tree?.blankLinesBefore(n: Int, tree: Tree = cursor().last()): List<AstTransform<Tree>> {
         if(this == null)
             return emptyList()
 
@@ -115,11 +115,11 @@ class FormatVisitor: RefactorVisitor<Tree>() {
                 modifiedPrefix = modifiedPrefix.substring((modifiedPrefix.takeWhile { it == '\n' }.count() - n))
 
                 if(modifiedPrefix != prefix)
-                    transform(cursor) { format(formatting.withPrefix(modifiedPrefix)) }
+                    transform(tree) { changeFormatting(formatting.withPrefix(modifiedPrefix)) }
                 else emptyList()
             }
             is Formatting.Infer, is Formatting.None ->
-                transform(cursor) { format(Formatting.Reified((1..n).map { "\n" }.joinToString(""))) }
+                transform(tree) { changeFormatting(format((1..n).map { "\n" }.joinToString(""))) }
         }
     }
 }

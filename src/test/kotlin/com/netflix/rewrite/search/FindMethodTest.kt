@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.search
 
+import com.netflix.rewrite.ast.asClass
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.assertEquals
@@ -24,7 +25,7 @@ import org.junit.Test
 abstract class FindMethodTest(p: Parser): Parser by p {
 
     @Test
-    fun findMethodCalls() {
+    fun findStaticMethodCalls() {
         val a = parse("""
             |import java.util.Collections;
             |public class A {
@@ -36,6 +37,19 @@ abstract class FindMethodTest(p: Parser): Parser by p {
         
         assertEquals("emptyList", m.simpleName)
         assertEquals("Collections.emptyList()", m.printTrimmed())
+    }
+
+    @Test
+    fun findStaticallyImportedMethodCalls() {
+        val a = parse("""
+            |import static java.util.Collections.emptyList;
+            |public class A {
+            |   Object o = emptyList();
+            |}
+        """)
+
+        val m = a.classes[0].findMethodCalls("java.util.Collections emptyList()").firstOrNull()
+        assertEquals("java.util.Collections", m?.type?.declaringType.asClass()?.fullyQualifiedName)
     }
 
     @Test

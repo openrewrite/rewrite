@@ -19,19 +19,15 @@ import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-data class ChangeFieldName(val decls: Tr.VariableDecls,
-                           val name: String,
+data class ChangeFieldName(val name: String,
                            override val ruleName: String = "change-field-name") : RefactorVisitor<Tr.VariableDecls>() {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<AstTransform<Tr.VariableDecls>> {
-        if(multiVariable.id == decls.id) {
-            assert(multiVariable.vars.size == 1) { "Refactor name is not supported on multi-variable declarations" }
+        assert(multiVariable.vars.size == 1) { "Refactor name is not supported on multi-variable declarations" }
 
-            val v = multiVariable.vars.first()
-            if(v.simpleName != name) {
-                return transform(ruleName) { copy(vars = listOf(v.copy(name = Tr.Ident(name, v.name.type, v.name.formatting)))) }
-            }
-        }
-        return emptyList()
+        val v = multiVariable.vars.first()
+        return if (v.simpleName != name) {
+            return transform(ruleName) { copy(vars = listOf(v.copy(name = Tr.Ident.build(name, v.name.type, v.name.formatting)))) }
+        } else emptyList()
     }
 }

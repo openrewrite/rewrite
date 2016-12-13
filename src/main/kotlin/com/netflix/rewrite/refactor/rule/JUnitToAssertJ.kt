@@ -13,7 +13,7 @@ import com.netflix.rewrite.refactor.RefactorVisitor
 class JUnitToAssertJ: Rule {
     override fun refactor(cu: Tr.CompilationUnit): Refactor {
         // TODO what to do with assertEquals with message at beginning?
-        val assertEquals = cu.findMethodCalls("org.junit.Assert assertEquals(..)").map { it.id }
+        val assertEquals = cu.findMethodCalls("org.junit.Assert assertEquals(..)")
 
         return cu.refactor {
             if(assertEquals.isNotEmpty()) {
@@ -27,23 +27,20 @@ class JUnitToAssertJ: Rule {
     }
 }
 
-class ConvertAssertions(val assertEquals: List<String>) : RefactorVisitor<Tr.MethodInvocation>() {
+class ConvertAssertions(val assertEquals: List<Tr.MethodInvocation>) : RefactorVisitor<Tr.MethodInvocation>() {
     override val ruleName: String = "change-junit-assertion"
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
-        if(assertEquals.contains(meth.id)) {
-            val assertionsClass = Type.Class.build(cu.typeCache(), "org.assertj.core.api.Assertions")
+        if(assertEquals.contains(meth)) {
             return transform {
                 val assertThat = Tr.MethodInvocation(null, null,
-                        Tr.Ident("assertThat", null),
-                        Tr.MethodInvocation.Arguments(listOf(meth.args.args[1].format(Formatting.Reified.Empty))),
-                        assertionsClass,
+                        Tr.Ident.build("assertThat", null),
+                        Tr.MethodInvocation.Arguments(listOf(meth.args.args[1].changeFormatting(Formatting.Empty))),
                         null)
 
                 Tr.MethodInvocation(assertThat, null,
-                        Tr.Ident("isEqualTo", null),
-                        Tr.MethodInvocation.Arguments(listOf(meth.args.args[0].format(Formatting.Reified.Empty))),
-                        null,
+                        Tr.Ident.build("isEqualTo", null),
+                        Tr.MethodInvocation.Arguments(listOf(meth.args.args[0].changeFormatting(Formatting.Empty))),
                         null,
                         meth.formatting)
             }

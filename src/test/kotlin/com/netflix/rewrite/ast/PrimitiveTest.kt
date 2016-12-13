@@ -31,6 +31,6 @@ abstract class PrimitiveTest(p: Parser): Parser by p {
         """)
         
         val primitive = a.fields()[0].typeExpr as Tr.Primitive
-        assertEquals(TypeTag.Int, primitive.typeTag)
+        assertEquals(Type.Primitive.Int, primitive.type)
     }
 }

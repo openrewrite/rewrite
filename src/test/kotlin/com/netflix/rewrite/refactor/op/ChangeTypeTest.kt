@@ -15,10 +15,14 @@
  */
 package com.netflix.rewrite.refactor.op
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
+import org.junit.Before
 import org.junit.Test
+import org.slf4j.LoggerFactory
 
 abstract class ChangeTypeTest(p: Parser): Parser by p {
 

@@ -20,20 +20,21 @@ import com.netflix.rewrite.refactor.RefactorVisitor
 import com.netflix.rewrite.search.MethodMatcher
 import java.util.*
 
-class RemoveImport(val clazz: String,
-                   override val ruleName: String = "remove-import"): RefactorVisitor<Tr.CompilationUnit>() {
+class RemoveImport(val clazz: String, override val ruleName: String = "remove-import"):
+        RefactorVisitor<Tr.CompilationUnit>() {
+
     val methodMatcher = MethodMatcher("$clazz *(..)")
 
     var namedImport: Tr.Import? = null
     var starImport: Tr.Import? = null
 
-    var referencedTypes = HashSet<Type.Class>()
-    var referencedMethods = HashSet<Tr.Ident>()
+    val referencedTypes = HashSet<String>()
+    val referencedMethods = HashSet<Tr.Ident>()
 
-    var staticNamedImports = ArrayList<Tr.Import>()
+    val staticNamedImports = ArrayList<Tr.Import>()
     var staticStarImport: Tr.Import? = null
 
-    val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
+    val classType = Type.Class.build(clazz)
 
     override fun visitImport(import: Tr.Import): List<AstTransform<Tr.CompilationUnit>> {
         if (import.static) {
@@ -55,14 +56,14 @@ class RemoveImport(val clazz: String,
     }
 
     override fun visitIdentifier(ident: Tr.Ident): List<AstTransform<Tr.CompilationUnit>> {
-        if(ident.type.asClass()?.packageOwner() == classType.packageOwner())
-            ident.type.asClass()?.let { referencedTypes.add(it) }
+        if(ident.type.asClass()?.packageName() == classType.packageName())
+            ident.type.asClass()?.let { referencedTypes.add(it.fullyQualifiedName) }
         return emptyList()
     }
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.CompilationUnit>> {
         if(methodMatcher.matches(meth)) {
-            if(meth.declaringType?.fullyQualifiedName == clazz)
+            if(meth.type?.declaringType?.fullyQualifiedName == clazz)
                 referencedMethods.add(meth.name)
         }
         return super.visitMethodInvocation(meth)
@@ -72,7 +73,7 @@ class RemoveImport(val clazz: String,
         classImportDeletions() + staticImportDeletions()
 
     private fun classImportDeletions(): List<AstTransform<Tr.CompilationUnit>> =
-        if (namedImport is Tr.Import && referencedTypes.none { it == classType }) {
+        if (namedImport is Tr.Import && referencedTypes.none { it == clazz }) {
             namedImport!!.delete()
         } else if (starImport is Tr.Import && referencedTypes.isEmpty()) {
             starImport!!.delete()
@@ -80,7 +81,7 @@ class RemoveImport(val clazz: String,
             transform {
                 copy(imports = imports.map {
                     if(it == starImport) {
-                        val classImportField = TreeBuilder.buildName(cu.typeCache(), referencedTypes.first().fullyQualifiedName, Formatting.Reified(" ")) as Tr.FieldAccess
+                        val classImportField = TreeBuilder.buildName(referencedTypes.first(), format(" ")) as Tr.FieldAccess
                         Tr.Import(classImportField, false, it.formatting)
                     }
                     else it

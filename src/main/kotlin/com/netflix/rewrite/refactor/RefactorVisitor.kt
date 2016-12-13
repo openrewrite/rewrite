@@ -17,20 +17,20 @@ package com.netflix.rewrite.refactor
 
 import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Cursor
+import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Tree
 import com.netflix.rewrite.ast.visitor.AstVisitor
 
 abstract class RefactorVisitor<T: Tree>: AstVisitor<List<AstTransform<T>>>(emptyList()) {
-    protected val cu by lazy { cursor().enclosingCompilationUnit() }
     abstract val ruleName: String
 
     @Suppress("UNCHECKED_CAST")
-    fun transform(cursor: Cursor, name: String, mutation: T.() -> T): List<AstTransform<T>> =
-            listOf(AstTransform(cursor, mutation as Tree.() -> T, name))
+    fun transform(target: Tree, name: String, mutation: T.() -> T): List<AstTransform<T>> =
+            listOf(AstTransform(target.id, mutation as Tree.() -> T, name))
 
     fun transform(name: String, mutation: T.() -> T): List<AstTransform<T>> =
-            transform(cursor(), name, mutation)
+            transform(cursor().last(), name, mutation)
 
-    fun transform(cursor: Cursor, mutation: T.() -> T) = transform(cursor, ruleName, mutation)
-    fun transform(mutation: T.() -> T) = transform(cursor(), ruleName, mutation)
+    fun transform(target: Tree, mutation: T.() -> T) = transform(target, ruleName, mutation)
+    fun transform(mutation: T.() -> T) = transform(cursor().last(), ruleName, mutation)
 }

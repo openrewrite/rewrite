@@ -17,25 +17,21 @@ package com.netflix.rewrite.parse
 
 import com.netflix.rewrite.ast.Formatting
 import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.ast.TypeCache
 import com.sun.tools.javac.comp.Check
 import com.sun.tools.javac.comp.Enter
 import com.sun.tools.javac.main.JavaCompiler
-import com.sun.tools.javac.main.Option
 import com.sun.tools.javac.nio.JavacPathFileManager
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import com.sun.tools.javac.util.Log
 import com.sun.tools.javac.util.Options
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.io.PrintWriter
 import java.io.Writer
 import java.nio.charset.Charset
 import java.nio.file.Path
 import java.nio.file.Paths
 import javax.tools.JavaFileManager
-import javax.tools.JavaFileObject
 import javax.tools.StandardLocation
 
 /**
@@ -43,7 +39,6 @@ import javax.tools.StandardLocation
  */
 class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath) {
     val context = Context()
-    val typeCache = TypeCache.new()
 
     // Both of these must be declared before compiler, so that compiler doesn't attempt to register alternate
     // instances with context
@@ -90,7 +85,6 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         compilerLog.reset()
         pfm.flush()
         Check.instance(context).compiled.clear()
-        typeCache.reset()
     }
 
     override fun parse(sourceFiles: List<Path>): List<Tr.CompilationUnit> {
@@ -113,7 +107,7 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         return cus.map {
             val (path, cu) = it
             logger.trace("Building AST for {}", path.toAbsolutePath().fileName)
-            OracleJdkParserVisitor(typeCache, path, path.toFile().readText()).scan(cu, Formatting.Reified.Empty) as Tr.CompilationUnit
+            OracleJdkParserVisitor(path, path.toFile().readText()).scan(cu, Formatting.Empty) as Tr.CompilationUnit
         }
     }
 

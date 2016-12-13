@@ -17,6 +17,7 @@ package com.netflix.rewrite.refactor
 
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.ast.visitor.FormatVisitor
+import com.netflix.rewrite.ast.visitor.RetrieveTreeVisitor
 import com.netflix.rewrite.ast.visitor.TransformVisitor
 import com.netflix.rewrite.refactor.op.*
 import org.eclipse.jgit.diff.DiffEntry
@@ -29,7 +30,19 @@ import java.nio.file.Path
 import java.util.*
 
 open class Refactor(val original: Tr.CompilationUnit) {
-    private val ops = ArrayList<RefactorVisitor<*>>()
+    /**
+     * The operation's target may change if another operation transforms the original target first
+     */
+    private data class RefactorOperation(var id: Long, val visitor: RefactorVisitor<*>)
+    private val ops = ArrayList<RefactorOperation>()
+
+    private fun addOp(target: Tree, visitor: RefactorVisitor<*>) {
+        ops.add(RefactorOperation(target.id, visitor))
+    }
+
+    private fun addOp(visitor: RefactorVisitor<*>) {
+        ops.add(RefactorOperation(original.id, visitor))
+    }
 
     // -------------
     // Compilation Unit Refactoring
@@ -41,30 +54,33 @@ open class Refactor(val original: Tr.CompilationUnit) {
 
     @JvmOverloads
     fun addImport(clazz: String, staticMethod: String? = null): Refactor {
-        ops.add(AddImport(clazz, staticMethod))
+        addOp(AddImport(clazz, staticMethod))
         return this
     }
 
-    fun removeImport(clazz: Class<*>): Refactor =
-            removeImport(clazz.name)
+    fun removeImport(clazz: Class<*>): Refactor = removeImport(clazz.name)
 
     fun removeImport(clazz: String): Refactor {
-        ops.add(RemoveImport(clazz))
+        addOp(RemoveImport(clazz))
         return this
     }
 
-    fun changeType(from: Class<*>, to: Class<*>): Refactor =
-            changeType(from.name, to.name)
+    fun changeType(from: Class<*>, to: Class<*>): Refactor = changeType(from.name, to.name)
 
     fun changeType(from: String, to: String): Refactor {
-        ops.add(ChangeType(from, to))
-        ops.add(AddImport(to, onlyIfReferenced = true))
-        ops.add(RemoveImport(from))
+        addOp(ChangeType(from, to))
+        addOp(AddImport(to, onlyIfReferenced = true))
+        addOp(RemoveImport(from))
+        return this
+    }
+
+    fun run(t: Tree, visitor: RefactorVisitor<*>): Refactor {
+        addOp(t, visitor)
         return this
     }
 
     fun run(visitor: RefactorVisitor<*>): Refactor {
-        ops.add(visitor)
+        addOp(visitor)
         return this
     }
 
@@ -78,9 +94,8 @@ open class Refactor(val original: Tr.CompilationUnit) {
 
     @JvmOverloads
     fun addField(target: Tr.ClassDecl, clazz: String, name: String, init: String? = null): Refactor {
-        ops.add(AddField(listOf(Tr.VariableDecls.Modifier.Private(Formatting.Reified("", " "))),
-                target, clazz, name, init))
-        ops.add(AddImport(clazz))
+        addOp(target, AddField(listOf(Tr.VariableDecls.Modifier.Private(format("", " "))), clazz, name, init))
+        addOp(AddImport(clazz))
         return this
     }
 
@@ -90,12 +105,12 @@ open class Refactor(val original: Tr.CompilationUnit) {
 
     fun changeFieldType(targets: Iterable<Tr.VariableDecls>, toType: String): Refactor {
         targets.forEach { target ->
-            ops.add(ChangeFieldType(target, toType))
-            target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(it.fullyQualifiedName)) }
+            addOp(target, ChangeFieldType(toType))
+            target.typeExpr.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
         }
 
         if(targets.any())
-            ops.add(AddImport(toType))
+            addOp(AddImport(toType))
 
         return this
     }
@@ -107,7 +122,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
             changeFieldType(listOf(target), toType)
 
     fun changeFieldName(targets: Iterable<Tr.VariableDecls>, toName: String): Refactor {
-        targets.forEach { ops.add(ChangeFieldName(it, toName)) }
+        targets.forEach { target -> addOp(target, ChangeFieldName(toName)) }
         return this
     }
 
@@ -115,10 +130,14 @@ open class Refactor(val original: Tr.CompilationUnit) {
             changeFieldName(listOf(target), toName)
 
     fun deleteField(targets: Iterable<Tr.VariableDecls>): Refactor {
-        targets.forEach { target ->
-            ops.add(DeleteField(target))
-            target.typeExpr.type?.asClass()?.let { ops.add(RemoveImport(it.fullyQualifiedName)) }
-        }
+        targets.groupBy { original.cursor(it.id)!!.enclosingClass() }
+                .forEach { clazz, variables ->
+                    addOp(clazz!!, DeleteField(variables))
+                    variables.forEach { (_, _, typeExpr) ->
+                        typeExpr.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
+                    }
+                }
+
         return this
     }
 
@@ -129,7 +148,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
     // -------------
 
     fun changeMethodName(targets: Iterable<Tr.MethodInvocation>, toName: String): Refactor {
-        targets.forEach { ops.add(ChangeMethodName(it, toName)) }
+        targets.forEach { target -> addOp(target, ChangeMethodName(toName)) }
         return this
     }
 
@@ -141,12 +160,12 @@ open class Refactor(val original: Tr.CompilationUnit) {
      */
     fun changeMethodTargetToStatic(targets: Iterable<Tr.MethodInvocation>, toClass: String): Refactor {
         targets.forEach { target ->
-            ops.add(ChangeMethodTargetToStatic(target, toClass))
-            target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(it)) }
+            addOp(target, ChangeMethodTargetToStatic(toClass))
+            target.type?.declaringType?.fullyQualifiedName?.let { addOp(RemoveImport(it)) }
         }
 
         if(targets.any())
-            ops.add(AddImport(toClass))
+            addOp(AddImport(toClass))
 
         return this
     }
@@ -166,10 +185,10 @@ open class Refactor(val original: Tr.CompilationUnit) {
     @JvmOverloads
     fun changeMethodTarget(targets: Iterable<Tr.MethodInvocation>, namedVar: String, type: Type.Class? = null): Refactor {
         targets.forEach { target ->
-            ops.add(ChangeMethodTargetToVariable(target, namedVar, type))
+            addOp(target, ChangeMethodTargetToVariable(namedVar, type))
 
             // if the original is a static method invocation, the import on it's type may no longer be needed
-            target.declaringType?.fullyQualifiedName?.let { ops.add(RemoveImport(it)) }
+            target.type?.declaringType?.fullyQualifiedName?.let { addOp(RemoveImport(it)) }
         }
 
         return this
@@ -183,7 +202,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
             changeMethodTarget(listOf(target), namedVar, type)
 
     fun insertArgument(targets: Iterable<Tr.MethodInvocation>, pos: Int, source: String): Refactor {
-        targets.forEach { ops.add(InsertMethodArgument(it, pos, source)) }
+        targets.forEach { target -> addOp(target, InsertMethodArgument(pos, source)) }
         return this
     }
 
@@ -194,13 +213,13 @@ open class Refactor(val original: Tr.CompilationUnit) {
             deleteArgument(listOf(target), pos)
 
     fun deleteArgument(targets: Iterable<Tr.MethodInvocation>, pos: Int): Refactor {
-        targets.forEach { ops.add(DeleteMethodArgument(it, pos)) }
+        targets.forEach { target -> addOp(target, DeleteMethodArgument(pos)) }
         return this
     }
 
     fun reorderArguments(target: Tr.MethodInvocation, vararg byArgumentNames: String): ReorderMethodArguments {
-        val reorderOp = ReorderMethodArguments(target, *byArgumentNames)
-        ops.add(reorderOp)
+        val reorderOp = ReorderMethodArguments(byArgumentNames.toList())
+        addOp(target, reorderOp)
         return reorderOp
     }
 
@@ -209,7 +228,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
     // -------------
 
     fun changeLiteral(targets: Iterable<Expression>, transform: (Any?) -> Any?): Refactor {
-        targets.forEach { ops.add(ChangeLiteral(it, transform)) }
+        targets.forEach { target -> addOp(target, ChangeLiteral(transform)) }
         return this
     }
 
@@ -219,9 +238,10 @@ open class Refactor(val original: Tr.CompilationUnit) {
     fun stats(): Map<String, Int> {
         val stats = mutableMapOf<String, Int>()
 
-        ops.fold(original) { acc, op ->
+        ops.fold(original) { acc, (targetId, visitor) ->
             // by transforming the AST for each op, we allow for the possibility of overlapping changes
-            val transformations = op.visit(acc)
+            val target = RetrieveTreeVisitor(targetId).visit(acc)
+            val transformations = visitor.visit(target)
             val transformed = TransformVisitor(transformations).visit(acc) as Tr.CompilationUnit
             transformations.groupBy { it.name }.forEach { name, transformations ->
                 stats.merge(name, transformations.size, Int::plus)
@@ -236,11 +256,13 @@ open class Refactor(val original: Tr.CompilationUnit) {
      * @return Transformed version of the AST after changes are applied
      */
     fun fix(): Tr.CompilationUnit = ops
-            .fold(original) { acc, op ->
+            .fold(original) { acc, (targetId, visitor) ->
+                val target = RetrieveTreeVisitor(targetId).visit(acc)
+
                 // by transforming the AST for each op, we allow for the possibility of overlapping changes
-                TransformVisitor(op.visit(acc)).visit(acc) as Tr.CompilationUnit
+                TransformVisitor(visitor.visit(target)).visit(acc) as Tr.CompilationUnit
             }
-            .let { TransformVisitor(FormatVisitor().visit(it)).visit(it) as Tr.CompilationUnit }
+            .let { cu -> TransformVisitor(FormatVisitor().visit(cu)).visit(cu) as Tr.CompilationUnit }
 
     /**
      * @return Git-style patch diff representing the changes to this compilation unit

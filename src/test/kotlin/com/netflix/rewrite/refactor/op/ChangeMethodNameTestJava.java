@@ -18,10 +18,6 @@ package com.netflix.rewrite.refactor.op;
 import com.netflix.rewrite.ast.Tr;
 import com.netflix.rewrite.parse.OracleJdkParser;
 import com.netflix.rewrite.parse.Parser;
-import com.netflix.rewrite.ast.Tr;
-import com.netflix.rewrite.parse.OracleJdkParser;
-import com.netflix.rewrite.parse.Parser;
-import org.junit.Assert;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -40,7 +36,7 @@ public class ChangeMethodNameTestJava {
                 .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
                 .fix();
 
-        Assert.assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
+        assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
     }
 
     @Test

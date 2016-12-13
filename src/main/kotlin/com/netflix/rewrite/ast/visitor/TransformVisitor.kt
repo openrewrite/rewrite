@@ -16,14 +16,27 @@
 package com.netflix.rewrite.ast.visitor
 
 import com.netflix.rewrite.ast.*
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisitor<Tree?>({ it }) {
+
+    val logger: Logger = LoggerFactory.getLogger(TransformVisitor::class.java)
+
     private fun <T : Tree> T.transformIfNecessary(cursor: Cursor): T {
         return transformations
                 .filterIsInstance<AstTransform<T>>()
-                .filter { it.cursor == cursor }
+                .filter { it.id == cursor.last().id }
                 .fold(this) { acc, trans ->
-                    trans.mutation(acc)
+                    val mutation = trans.mutation(acc)
+                    if(logger.isDebugEnabled) {
+                        logger.debug("Transforming ${acc.javaClass.simpleName} with ${trans.name}")
+                        logger.debug("Original:")
+                        logger.debug(acc.printTrimmed())
+                        logger.debug("Transformed:")
+                        logger.debug(mutation.printTrimmed() + "\n")
+                    }
+                    mutation
                 }
     }
 

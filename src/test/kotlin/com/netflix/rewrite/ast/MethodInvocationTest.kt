@@ -51,8 +51,8 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         // check assumptions about the call site
         assertEquals("foo", inv.name.printTrimmed())
         assertEquals("java.lang.Integer", inv.returnType().asClass()?.fullyQualifiedName)
-        assertEquals(listOf(TypeTag.Int, TypeTag.Int, TypeTag.Int),
-                inv.args.args.filterIsInstance<Tr.Literal>().map { it.typeTag })
+        assertEquals(listOf(Type.Primitive.Int, Type.Primitive.Int, Type.Primitive.Int),
+                inv.args.args.filterIsInstance<Tr.Literal>().map { it.type })
 
         val effectParams = inv.type!!.resolvedSignature.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
@@ -61,7 +61,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         // for non-generic method signatures, resolvedSignature and genericSignature match
         assertEquals(inv.type!!.resolvedSignature, inv.type!!.genericSignature)
 
-        assertEquals("A", inv.declaringType?.fullyQualifiedName)
+        assertEquals("A", inv.type?.declaringType?.fullyQualifiedName)
     }
 
     @Test
@@ -69,8 +69,8 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         listOf(genericInv, explicitGenericInv).forEach { test ->
             // check assumptions about the call site
             assertEquals("java.lang.Integer", test.returnType().asClass()?.fullyQualifiedName)
-            assertEquals(listOf(TypeTag.Int, TypeTag.Int, TypeTag.Int),
-                    test.args.args.filterIsInstance<Tr.Literal>().map { it.typeTag })
+            assertEquals(listOf(Type.Primitive.Int, Type.Primitive.Int, Type.Primitive.Int),
+                    test.args.args.filterIsInstance<Tr.Literal>().map { it.type })
 
             val effectiveParams = test.type!!.resolvedSignature.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)
@@ -88,7 +88,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
     @Test
     fun staticMethodInvocation() {
         assertEquals("staticFoo", staticInv.name.printTrimmed())
-        assertEquals("A", staticInv.declaringType?.fullyQualifiedName)
+        assertEquals("A", staticInv.type?.declaringType?.fullyQualifiedName)
     }
 
     @Test
@@ -108,7 +108,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         """)
 
         val inv = a.fields()[0].vars[0].initializer as Tr.MethodInvocation
-        assertNull(inv.declaringType)
+        assertNull(inv.type?.declaringType)
         assertNull(inv.type)
         assertNull(inv.type)
     }

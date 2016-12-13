@@ -34,9 +34,8 @@ import java.util.*
 import java.util.regex.Pattern
 import javax.lang.model.element.Modifier
 import javax.lang.model.type.TypeKind
-import kotlin.properties.Delegates
 
-class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val source: String): TreeScanner<Tree, Formatting.Reified>() {
+class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tree, Formatting.Reified>() {
     private typealias JdkTree = com.sun.source.tree.Tree
 
     private lateinit var endPosTable: EndPosTable
@@ -66,7 +65,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                 node.arguments.convertAll(COMMA_DELIM, { sourceBefore(")") })
             }
 
-            Tr.Annotation.Arguments(args, Formatting.Reified(argsPrefix))
+            Tr.Annotation.Arguments(args, format(argsPrefix))
         } else null
 
         return Tr.Annotation(name, args, node.type(), fmt)
@@ -77,7 +76,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val dimensionPrefix = sourceBefore("[")
         val dimension = Tr.ArrayAccess.Dimension(node.index.convert<Expression> { sourceBefore("]") },
-                Formatting.Reified(dimensionPrefix))
+                format(dimensionPrefix))
 
         return Tr.ArrayAccess(indexed, dimension, node.type(), fmt)
     }
@@ -94,7 +93,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val dimensions = (1..dimCount).map {
             val dimPrefix = sourceBefore("[")
-            Tr.ArrayType.Dimension(Tr.Empty(Formatting.Reified(sourceBefore("]"))), Formatting.Reified(dimPrefix))
+            Tr.ArrayType.Dimension(Tr.Empty(format(sourceBefore("]"))), format(dimPrefix))
         }
 
         return Tr.ArrayType(elemType, dimensions, fmt)
@@ -109,7 +108,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitBinary(node: BinaryTree, fmt: Formatting.Reified): Tree {
         val left = node.leftOperand.convert<Expression>()
 
-        val opPrefix = Formatting.Reified(whitespace())
+        val opPrefix = format(whitespace())
         val op = when ((node as JCTree.JCBinary).tag) {
             JCTree.Tag.PLUS -> { skip("+"); Tr.Binary.Operator.Addition(opPrefix) }
             JCTree.Tag.MINUS -> { skip("-"); Tr.Binary.Operator.Subtraction(opPrefix) }
@@ -141,7 +140,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitBlock(node: BlockTree, fmt: Formatting.Reified): Tree {
         val static = if((node as JCTree.JCBlock).flags and Flags.STATIC.toLong() != 0L) {
             skip("static")
-            Tr.Empty(Formatting.Reified("", sourceBefore("{")))
+            Tr.Empty(format("", sourceBefore("{")))
         } else {
             skip("{")
             null
@@ -162,7 +161,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitBreak(node: BreakTree, fmt: Formatting.Reified): Tree {
         skip("break")
         val label = node.label?.toString()?.let { name ->
-            val label = Tr.Ident(name, null, Formatting.Reified(sourceBefore(name)))
+            val label = Tr.Ident.build(name, null, format(sourceBefore(name)))
             skip(name)
             label
         }
@@ -172,7 +171,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     @Suppress("UNCHECKED_CAST")
     override fun visitCase(node: CaseTree, fmt: Formatting.Reified): Tree {
         val pattern = node.expression.convertOrNull<Expression> { sourceBefore(":") } ?:
-            Tr.Ident(skip("default")!!, null, Formatting.Reified(sourceBefore(":")))
+            Tr.Ident.build(skip("default")!!, null, format(sourceBefore(":")))
         return Tr.Case(
                 pattern,
                 node.statements.convertBlockContents() as List<Statement>,
@@ -185,7 +184,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val paramPrefix = sourceBefore("(")
         val paramDecl = node.parameter.convert<Tr.VariableDecls> { sourceBefore(")") }
-        val param = Tr.Parentheses(paramDecl, Formatting.Reified(paramPrefix))
+        val param = Tr.Parentheses(paramDecl, format(paramPrefix))
 
         return Tr.Catch(param, node.block.convert(), fmt)
     }
@@ -196,7 +195,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val modifiers = node.modifiers.sortedFlags().map { mod ->
             val modPrefix = whitespace()
             cursor += mod.name.length
-            val modFormat = Formatting.Reified(modPrefix)
+            val modFormat = format(modPrefix)
             when (mod) {
                 Modifier.PUBLIC -> Tr.ClassDecl.Modifier.Public(modFormat)
                 Modifier.PROTECTED -> Tr.ClassDecl.Modifier.Protected(modFormat)
@@ -209,23 +208,23 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         }
 
         val kind = if(node.modifiers.hasFlag(Flags.ENUM)) {
-            Tr.ClassDecl.Kind.Enum(Formatting.Reified(sourceBefore("enum")))
+            Tr.ClassDecl.Kind.Enum(format(sourceBefore("enum")))
         } else if(node.modifiers.hasFlag(Flags.ANNOTATION)) {
             // note that annotations ALSO have the INTERFACE flag
-            Tr.ClassDecl.Kind.Annotation(Formatting.Reified(sourceBefore("@interface")))
+            Tr.ClassDecl.Kind.Annotation(format(sourceBefore("@interface")))
         } else if(node.modifiers.hasFlag(Flags.INTERFACE)) {
-            Tr.ClassDecl.Kind.Interface(Formatting.Reified(sourceBefore("interface")))
+            Tr.ClassDecl.Kind.Interface(format(sourceBefore("interface")))
         } else {
-            Tr.ClassDecl.Kind.Class(Formatting.Reified(sourceBefore("class")))
+            Tr.ClassDecl.Kind.Class(format(sourceBefore("class")))
         }
 
-        val name = Tr.Ident((node as JCTree.JCClassDecl).simpleName.toString(), node.type(),
-                Formatting.Reified(sourceBefore(node.simpleName.toString())))
+        val name = Tr.Ident.build((node as JCTree.JCClassDecl).simpleName.toString(), node.type(),
+                format(sourceBefore(node.simpleName.toString())))
 
         val typeParams = if(node.typeParameters.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
             Tr.TypeParameters(node.typeParameters.convertAll(COMMA_DELIM, { sourceBefore(">") }),
-                    Formatting.Reified(genericPrefix))
+                    format(genericPrefix))
         } else null
 
         val extends = node.extendsClause.convertOrNull<TypeTree>()
@@ -250,7 +249,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                     if (semicolonPresent) sourceBefore(";", stop = '}') else ""
                 })
 
-            Tr.EnumValueSet(enumValues, semicolonPresent, Formatting.Reified.Empty)
+            Tr.EnumValueSet(enumValues, semicolonPresent, Formatting.Empty)
         } else null
 
         val members = listOf(enumSet).filterNotNull() + node.members
@@ -265,7 +264,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                 }
                 .convertBlockContents()
 
-        val body = Tr.Block<Tree>(null, members, Formatting.Reified(bodyPrefix), sourceBefore("}"))
+        val body = Tr.Block<Tree>(null, members, format(bodyPrefix), sourceBefore("}"))
 
         return Tr.ClassDecl(annotations, modifiers, kind, name, typeParams, extends, implements, body, node.type(), fmt)
     }
@@ -278,7 +277,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val packageDecl = if (node.packageName != null) {
             skip("package")
-            val pkg = Tr.Package(node.packageName.convert(), Formatting.Reified.Empty)
+            val pkg = Tr.Package(node.packageName.convert(), Formatting.Empty)
             skip(";")
             pkg
         } else null
@@ -288,15 +287,14 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                 packageDecl,
                 node.imports.convertAll(SEMI_DELIM, SEMI_DELIM),
                 node.typeDecls.filterIsInstance<JCTree.JCClassDecl>().convertAll(this::whitespace, NO_DELIM),
-                typeCache.key,
-                Formatting.Reified(prefix, source.substring(cursor))
+                format(prefix, source.substring(cursor))
         )
     }
 
     override fun visitCompoundAssignment(node: CompoundAssignmentTree, fmt: Formatting.Reified): Tree {
         val left = (node as JCTree.JCAssignOp).lhs.convert<Expression>()
 
-        val opPrefix = Formatting.Reified(whitespace())
+        val opPrefix = format(whitespace())
         val op = when (node.tag) {
             JCTree.Tag.PLUS_ASG -> { skip("+="); Tr.AssignOp.Operator.Addition(opPrefix) }
             JCTree.Tag.MINUS_ASG -> { skip("-="); Tr.AssignOp.Operator.Subtraction(opPrefix) }
@@ -334,7 +332,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitContinue(node: ContinueTree, fmt: Formatting.Reified): Tree {
         skip("continue")
         return Tr.Continue(
-                node.label?.toString()?.let { lbl -> Tr.Ident(lbl, null, Formatting.Reified(sourceBefore(lbl))) },
+                node.label?.toString()?.let { lbl -> Tr.Ident.build(lbl, null, format(sourceBefore(lbl))) },
                 fmt
         )
     }
@@ -360,7 +358,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val expression = node.expression.convert<Expression> { sourceBefore(")") }
 
         return Tr.ForEachLoop(
-                Tr.ForEachLoop.Control(variable, expression, Formatting.Reified(ctrlPrefix)),
+                Tr.ForEachLoop.Control(variable, expression, format(ctrlPrefix)),
                 node.statement.convert(statementDelim),
                 fmt
         )
@@ -368,14 +366,14 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
     fun visitEnumVariable(node: VariableTree, fmt: Formatting.Reified): Tree {
         skip(node.name.toString())
-        val name = Tr.Ident(node.name.toString(), node.type(), Formatting.Reified.Empty)
+        val name = Tr.Ident.build(node.name.toString(), node.type(), Formatting.Empty)
 
         val initializer = if(source[node.endPos()-1] == ')') {
             val initPrefix = sourceBefore("(")
             var args = (node.initializer as JCTree.JCNewClass).args.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
             if((node.initializer as JCTree.JCNewClass).args.isEmpty())
-                args = listOf(Tr.Empty(Formatting.Reified(sourceBefore(")"))))
-            Tr.EnumValue.Arguments(args, Formatting.Reified(initPrefix))
+                args = listOf(Tr.Empty(format(sourceBefore(")"))))
+            Tr.EnumValue.Arguments(args, format(initPrefix))
         } else null
 
         return Tr.EnumValue(name, initializer, fmt)
@@ -388,7 +386,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         fun List<JdkTree>.convertAllOrEmpty(innerSuffix: (JdkTree) -> String = { "" },
                                                     suffix: (JdkTree) -> String = { "" }): List<Statement> {
             return when (size) {
-                0 -> listOf(Tr.Empty(Formatting.Reified("", suffix(object : JCTree.JCSkip() {}))))
+                0 -> listOf(Tr.Empty(format("", suffix(object : JCTree.JCSkip() {}))))
                 else -> mapIndexed { i, tree ->
                     tree.convert<Statement>(if (i == size - 1) suffix else innerSuffix)
                 }
@@ -396,14 +394,14 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         }
 
         val init: Statement = node.initializer.convertBlockContents().filterIsInstance<Tr.VariableDecls>().firstOrNull() ?:
-                Tr.Empty(Formatting.Reified("", sourceBefore(";")))
+                Tr.Empty(format("", sourceBefore(";")))
 
         val condition = node.condition.convertOrNull<Expression>(SEMI_DELIM) ?:
-                Tr.Empty(Formatting.Reified("", sourceBefore(";")))
+                Tr.Empty(format("", sourceBefore(";")))
         val update = node.update.convertAllOrEmpty(COMMA_DELIM, { sourceBefore(")") })
 
         return Tr.ForLoop(
-                Tr.ForLoop.Control(init, condition, update, Formatting.Reified(ctrlPrefix)),
+                Tr.ForLoop.Control(init, condition, update, format(ctrlPrefix)),
                 node.statement.convert(statementDelim),
                 fmt
         )
@@ -411,7 +409,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
     override fun visitIdentifier(node: IdentifierTree, fmt: Formatting.Reified): Tree {
         cursor += node.name.toString().length
-        return Tr.Ident(node.name.toString(), node.type(), fmt)
+        return Tr.Ident.build(node.name.toString(), node.type(), fmt)
     }
 
     override fun visitIf(node: IfTree, fmt: Formatting.Reified): Tree {
@@ -422,7 +420,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val elsePart = if(node.elseStatement is JCTree.JCStatement) {
             val elsePrefix = sourceBefore("else")
-            Tr.If.Else(node.elseStatement.convert<Statement>(statementDelim), Formatting.Reified(elsePrefix))
+            Tr.If.Else(node.elseStatement.convert<Statement>(statementDelim), format(elsePrefix))
         } else null
 
         return Tr.If(ifPart, then, elsePart, fmt)
@@ -446,7 +444,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitLabeledStatement(node: LabeledStatementTree, fmt: Formatting.Reified): Tree {
         skip(node.label.toString())
         return Tr.Label(
-                Tr.Ident(node.label.toString(), null, Formatting.Reified("", sourceBefore(":"))),
+                Tr.Ident.build(node.label.toString(), null, format("", sourceBefore(":"))),
                 node.statement.convert(),
                 fmt
         )
@@ -456,7 +454,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         skip("(")
         return Tr.Lambda(
                 node.parameters.convertAll(COMMA_DELIM, { sourceBefore(")") }),
-                Tr.Lambda.Arrow(Formatting.Reified(sourceBefore("->"))),
+                Tr.Lambda.Arrow(format(sourceBefore("->"))),
                 node.body.convert(),
                 node.type(),
                 fmt
@@ -465,17 +463,16 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
     override fun visitLiteral(node: LiteralTree, fmt: Formatting.Reified): Tree {
         cursor(node.endPos())
-        val typeTag = (node as JCTree.JCLiteral).typetag.tag()
+        val type = (node as JCTree.JCLiteral).typetag.primitive()
 
         return Tr.Literal(
-                typeTag,
-                when(typeTag) {
-                    com.netflix.rewrite.ast.TypeTag.Char -> (node.value as Int).toChar()
-                    com.netflix.rewrite.ast.TypeTag.Boolean -> if((node.value as Int) == 0) false else true
+                when(type) {
+                    Type.Primitive.Char -> (node.value as Int).toChar()
+                    Type.Primitive.Boolean -> if((node.value as Int) == 0) false else true
                     else -> node.value
                 },
                 source.substring(node.startPosition, node.endPos()),
-                node.type(),
+                type,
                 fmt
         )
     }
@@ -483,7 +480,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitMemberSelect(node: MemberSelectTree, fmt: Formatting.Reified): Tree {
         val target = (node as JCTree.JCFieldAccess).selected.convert<Expression>()
         skip(".")
-        val name = Tr.Ident(node.name.toString(), null, Formatting.Reified(sourceBefore(node.name.toString())))
+        val name = Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString())))
         return Tr.FieldAccess(target, name, node.type(), fmt)
     }
 
@@ -500,11 +497,11 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val typeParams = if(node.typeargs.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
             val genericParams = node.typeargs.convertAll<NameTree>(COMMA_DELIM, { sourceBefore(">") })
-            Tr.MethodInvocation.TypeParameters(genericParams, Formatting.Reified(genericPrefix))
+            Tr.MethodInvocation.TypeParameters(genericParams, format(genericPrefix))
         } else null
 
         val name = when(jcSelect) {
-            is JCTree.JCFieldAccess ->  Tr.Ident(jcSelect.name.toString(), null, Formatting.Reified(sourceBefore(jcSelect.name.toString())))
+            is JCTree.JCFieldAccess ->  Tr.Ident.build(jcSelect.name.toString(), null, format(sourceBefore(jcSelect.name.toString())))
             is JCTree.JCIdent -> jcSelect.convert<Tr.Ident>()
             else -> throw IllegalStateException("Unexpected method select type ${jcSelect.javaClass}")
         }
@@ -512,11 +509,11 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val argsPrefix = sourceBefore("(")
         val args = Tr.MethodInvocation.Arguments(
                 if(node.args.isEmpty()) {
-                    listOf(Tr.Empty(Formatting.Reified(sourceBefore(")"))))
+                    listOf(Tr.Empty(format(sourceBefore(")"))))
                 } else {
                     node.args.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
                 },
-                Formatting.Reified(argsPrefix))
+                format(argsPrefix))
 
         val genericSymbol = when (jcSelect) {
             null -> null
@@ -543,18 +540,11 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
             Type.Method(genericSignature,
                     signature(jcSelect.type),
                     genericSymbol.params().map { it.name.toString() },
-                    genericSymbol.filteredFlags())
+                    genericSymbol.filteredFlags(),
+                    genericSymbol.owner?.type().asClass())
         } else null
 
-        return Tr.MethodInvocation(
-                select,
-                typeParams,
-                name,
-                args,
-                genericSymbol?.owner?.type().asClass(),
-                type,
-                fmt
-        )
+        return Tr.MethodInvocation(select, typeParams, name, args, type, fmt)
     }
 
     override fun visitMethod(node: MethodTree, fmt: Formatting.Reified): Tree {
@@ -564,7 +554,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val modifiers = node.modifiers.sortedFlags()
                 .map { mod ->
-                    val modFormat = Formatting.Reified(whitespace())
+                    val modFormat = format(whitespace())
                     cursor += mod.name.length
                     when(mod) {
                         Modifier.DEFAULT -> Tr.MethodDecl.Modifier.Default(modFormat)
@@ -583,29 +573,29 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val typeParams = if(node.typeParameters.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
             Tr.TypeParameters(node.typeParameters.convertAll(COMMA_DELIM, { sourceBefore(">") }),
-                    Formatting.Reified(genericPrefix))
+                    format(genericPrefix))
         } else null
 
         val returnType = node.returnType.convertOrNull<TypeTree>()
 
         val name = if(node.name.toString() == "<init>") {
             val owner = ((node as JCTree.JCMethodDecl).sym.owner as Symbol.ClassSymbol).name.toString()
-            Tr.Ident(owner, null, Formatting.Reified(sourceBefore(owner)))
+            Tr.Ident.build(owner, null, format(sourceBefore(owner)))
         } else {
-            Tr.Ident(node.name.toString(), null, Formatting.Reified(sourceBefore(node.name.toString())))
+            Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString())))
         }
 
-        val paramFmt = Formatting.Reified(sourceBefore("("))
+        val paramFmt = format(sourceBefore("("))
         val params = if(node.parameters.isNotEmpty()) {
             Tr.MethodDecl.Parameters(node.parameters.convertAll<Tr.VariableDecls>(COMMA_DELIM, { sourceBefore(")") }), paramFmt)
         } else {
-            Tr.MethodDecl.Parameters(listOf(Tr.Empty(Formatting.Reified(sourceBefore(")")))), paramFmt)
+            Tr.MethodDecl.Parameters(listOf(Tr.Empty(format(sourceBefore(")")))), paramFmt)
         }
 
 
         val throws = if(node.throws.isNotEmpty()) {
             val throwsPrefix = sourceBefore("throws")
-            Tr.MethodDecl.Throws(node.throws.convertAll<NameTree>(COMMA_DELIM, NO_DELIM), Formatting.Reified(throwsPrefix))
+            Tr.MethodDecl.Throws(node.throws.convertAll<NameTree>(COMMA_DELIM, NO_DELIM), format(throwsPrefix))
         } else null
 
         val body = node.body.convertOrNull<Tr.Block<Statement>>()
@@ -633,7 +623,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val dimensions = if(node.dimensions.isNotEmpty()) {
             node.dimensions.mapIndexed { i, dim ->
                 val dimensionPrefix = sourceBefore("[")
-                Tr.NewArray.Dimension(dim.convert { sourceBefore("]") }, Formatting.Reified(dimensionPrefix,
+                Tr.NewArray.Dimension(dim.convert { sourceBefore("]") }, format(dimensionPrefix,
                         if(i == node.dimensions.size - 1 && node.initializers != null) sourceBefore("}") else ""))
             }.toMutableList()
         } else {
@@ -643,18 +633,18 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)\\]").matcher(source)
         while(matcher.find(cursor)) {
             cursor(matcher.end())
-            val ws = Tr.Empty(Formatting.Reified(matcher.group(2)))
-            dimensions.add(Tr.NewArray.Dimension(ws, Formatting.Reified(matcher.group(1))))
+            val ws = Tr.Empty(format(matcher.group(2)))
+            dimensions.add(Tr.NewArray.Dimension(ws, format(matcher.group(1))))
         }
 
         val initializer = if(node.initializers != null) {
             val initPrefix = sourceBefore("{")
             val initializers = if(node.initializers.isEmpty()) {
-                listOf(Tr.Empty(Formatting.Reified(sourceBefore("}"))))
+                listOf(Tr.Empty(format(sourceBefore("}"))))
             } else {
                 node.initializers.convertAll<Expression>(COMMA_DELIM, { sourceBefore("}") })
             }
-            Tr.NewArray.Initializer(initializers, Formatting.Reified(initPrefix))
+            Tr.NewArray.Initializer(initializers, format(initPrefix))
         } else null
 
         return Tr.NewArray(typeExpr, dimensions, initializer, node.type(), fmt)
@@ -667,11 +657,11 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val argPrefix = sourceBefore("(")
         val args = Tr.NewClass.Arguments(
                 if(node.arguments.isEmpty()) {
-                    listOf(Tr.Empty(Formatting.Reified(sourceBefore(")"))))
+                    listOf(Tr.Empty(format(sourceBefore(")"))))
                 } else {
                     node.arguments.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
                 },
-                Formatting.Reified(argPrefix))
+                format(argPrefix))
 
         val body = node.classBody?.let {
             val bodyPrefix = sourceBefore("{")
@@ -682,7 +672,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                     .filter { it !is JCTree.JCMethodDecl || it.modifiers.flags and Flags.GENERATEDCONSTR == 0L }
                     .convertAll<Tree>(NO_DELIM, NO_DELIM)
 
-            Tr.Block(null, members, Formatting.Reified(bodyPrefix), sourceBefore("}"))
+            Tr.Block(null, members, format(bodyPrefix), sourceBefore("}"))
         }
 
         return Tr.NewClass(clazz, args, body, (node as JCTree.JCNewClass).type.type(), fmt)
@@ -694,14 +684,14 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val typeArgPrefix = sourceBefore("<")
         val typeArgs = if(node.typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
-            listOf(Tr.Empty(Formatting.Reified(sourceBefore(">"))))
+            listOf(Tr.Empty(format(sourceBefore(">"))))
         } else {
             node.typeArguments.convertAll<Expression>(COMMA_DELIM, { sourceBefore(">") })
         }
 
         return Tr.ParameterizedType(
                 clazz,
-                Tr.ParameterizedType.TypeArguments(typeArgs, Formatting.Reified(typeArgPrefix)),
+                Tr.ParameterizedType.TypeArguments(typeArgs, format(typeArgPrefix)),
                 fmt
         )
     }
@@ -714,17 +704,17 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitPrimitiveType(node: PrimitiveTypeTree, fmt: Formatting.Reified): Tree {
         cursor(node.endPos())
         return Tr.Primitive(when (node.primitiveTypeKind) {
-            TypeKind.BOOLEAN -> com.netflix.rewrite.ast.TypeTag.Boolean
-            TypeKind.BYTE -> com.netflix.rewrite.ast.TypeTag.Byte
-            TypeKind.CHAR -> com.netflix.rewrite.ast.TypeTag.Char
-            TypeKind.DOUBLE -> com.netflix.rewrite.ast.TypeTag.Double
-            TypeKind.FLOAT -> com.netflix.rewrite.ast.TypeTag.Float
-            TypeKind.INT -> com.netflix.rewrite.ast.TypeTag.Int
-            TypeKind.LONG -> com.netflix.rewrite.ast.TypeTag.Long
-            TypeKind.SHORT -> com.netflix.rewrite.ast.TypeTag.Short
-            TypeKind.VOID -> com.netflix.rewrite.ast.TypeTag.Void
+            TypeKind.BOOLEAN -> Type.Primitive.Boolean
+            TypeKind.BYTE -> Type.Primitive.Byte
+            TypeKind.CHAR -> Type.Primitive.Char
+            TypeKind.DOUBLE -> Type.Primitive.Double
+            TypeKind.FLOAT -> Type.Primitive.Float
+            TypeKind.INT -> Type.Primitive.Int
+            TypeKind.LONG -> Type.Primitive.Long
+            TypeKind.SHORT -> Type.Primitive.Short
+            TypeKind.VOID -> Type.Primitive.Void
             else -> throw IllegalArgumentException("Unknown primitive type $this")
-        }, node.type(), fmt)
+        }, fmt)
     }
 
     override fun visitReturn(node: ReturnTree, fmt: Formatting.Reified): Tree {
@@ -739,7 +729,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val casePrefix = sourceBefore("{")
         val cases = node.cases.convertAll<Tr.Case>(NO_DELIM, NO_DELIM)
 
-        return Tr.Switch(selector, Tr.Block(null, cases, Formatting.Reified(casePrefix), sourceBefore("}")), fmt)
+        return Tr.Switch(selector, Tr.Block(null, cases, format(casePrefix), sourceBefore("}")), fmt)
     }
 
     override fun visitSynchronized(node: SynchronizedTree, fmt: Formatting.Reified): Tree {
@@ -761,7 +751,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val resources = if(node.resources.isNotEmpty()) {
             val resourcesPrefix = sourceBefore("(")
             val decls = node.resources.convertAll<Tr.VariableDecls>(SEMI_DELIM, { sourceBefore(")") })
-            Tr.Try.Resources(decls, Formatting.Reified(resourcesPrefix))
+            Tr.Try.Resources(decls, format(resourcesPrefix))
         } else null
 
         val block = node.block.convert<Tr.Block<Statement>>()
@@ -770,7 +760,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val finally = if(node.finallyBlock != null) {
             val finallyPrefix = sourceBefore("finally")
             Tr.Try.Finally(node.finallyBlock.convert<Tr.Block<Statement>>(),
-                    Formatting.Reified(finallyPrefix))
+                    format(finallyPrefix))
         } else null
 
         return Tr.Try(resources, block, catches, finally, fmt)
@@ -779,7 +769,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitTypeCast(node: TypeCastTree, fmt: Formatting.Reified): Tree {
         val clazzPrefix = sourceBefore("(")
         val clazz = Tr.Parentheses(node.type.convert<TypeTree> { sourceBefore(")") },
-                Formatting.Reified(clazzPrefix))
+                format(clazzPrefix))
 
         return Tr.TypeCast(clazz, node.expression.convert(), fmt)
     }
@@ -787,13 +777,13 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     override fun visitTypeParameter(node: TypeParameterTree, fmt: Formatting.Reified): Tree {
         val annotations = node.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
 
-        val name = TreeBuilder.buildName(typeCache, node.name.toString(), Formatting.Reified(sourceBefore(node.name.toString())))
+        val name = TreeBuilder.buildName(node.name.toString(), format(sourceBefore(node.name.toString())))
 
         val bounds = if(node.bounds.isNotEmpty()) {
             val boundPrefix = if(node.bounds.isNotEmpty()) sourceBefore("extends") else ""
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
             Tr.TypeParameter.Bounds(node.bounds.convertAll<TypeTree>({ sourceBefore("&") }, NO_DELIM),
-                    Formatting.Reified(boundPrefix))
+                    format(boundPrefix))
         } else null
 
         return Tr.TypeParameter(annotations, name, bounds, fmt)
@@ -807,35 +797,35 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val (op: Tr.Unary.Operator, expr: Expression) = when((node as JCTree.JCUnary).tag) {
             JCTree.Tag.POS -> {
                 skip("+")
-                Tr.Unary.Operator.Positive(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Positive(Formatting.Empty) to node.arg.convert<Expression>()
             }
             JCTree.Tag.NEG -> {
                 skip("-")
-                Tr.Unary.Operator.Negative(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Negative(Formatting.Empty) to node.arg.convert<Expression>()
             }
             JCTree.Tag.PREDEC -> {
                 skip("--")
-                Tr.Unary.Operator.PreDecrement(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreDecrement(Formatting.Empty) to node.arg.convert<Expression>()
             }
             JCTree.Tag.PREINC -> {
                 skip("++")
-                Tr.Unary.Operator.PreIncrement(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreIncrement(Formatting.Empty) to node.arg.convert<Expression>()
             }
             JCTree.Tag.POSTDEC -> {
                 val expr = node.arg.convert<Expression>()
-                Tr.Unary.Operator.PostDecrement(Formatting.Reified(sourceBefore("--"))) to expr
+                Tr.Unary.Operator.PostDecrement(format(sourceBefore("--"))) to expr
             }
             JCTree.Tag.POSTINC -> {
                 val expr = node.arg.convert<Expression>()
-                Tr.Unary.Operator.PostIncrement(Formatting.Reified(sourceBefore("++"))) to expr
+                Tr.Unary.Operator.PostIncrement(format(sourceBefore("++"))) to expr
             }
             JCTree.Tag.COMPL -> {
                 skip("~")
-                Tr.Unary.Operator.Complement(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Complement(Formatting.Empty) to node.arg.convert<Expression>()
             }
             JCTree.Tag.NOT -> {
                 skip("!")
-                Tr.Unary.Operator.Not(Formatting.Reified.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Not(Formatting.Empty) to node.arg.convert<Expression>()
             }
             else -> throw IllegalArgumentException("Unexpected unary tag ${node.tag}")
         }
@@ -859,7 +849,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
         val modifiers = if((node.modifiers as JCTree.JCModifiers).pos >= 0) {
             node.modifiers.sortedFlags().map { mod ->
-                val modFormat = Formatting.Reified(whitespace())
+                val modFormat = format(whitespace())
                 cursor += mod.name.length
                 when (mod) {
                     Modifier.PUBLIC -> Tr.VariableDecls.Modifier.Public(modFormat)
@@ -894,8 +884,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
             val dimensions = ArrayList<Tr.VariableDecls.Dimension>()
             while(matcher.find(cursor)) {
                 cursor(matcher.end())
-                val ws = Tr.Empty(Formatting.Reified(matcher.group(2)))
-                dimensions.add(Tr.VariableDecls.Dimension(ws, Formatting.Reified(matcher.group(1))))
+                val ws = Tr.Empty(format(matcher.group(2)))
+                dimensions.add(Tr.VariableDecls.Dimension(ws, format(matcher.group(1))))
             }
             return dimensions
         }
@@ -905,17 +895,17 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         val varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(source.substring(node.vartype.startPosition, node.vartype.endPos()))
         val varargs = if(varargMatcher.find()) {
             skipPattern("(\\s*)\\.{3}")
-            Tr.VariableDecls.Varargs(Formatting.Reified(varargMatcher.group(1)))
+            Tr.VariableDecls.Varargs(format(varargMatcher.group(1)))
         } else null
 
         val vars = nodes.mapIndexed { i, n ->
             val namedVarPrefix = sourceBefore(n.name.toString())
             Tr.VariableDecls.NamedVar(
-                    Tr.Ident(n.name.toString(), node.type(), Formatting.Reified("", if (node.init is JCTree.JCExpression) sourceBefore("=") else "")),
+                    Tr.Ident.build(n.name.toString(), node.type(), format("", if (node.init is JCTree.JCExpression) sourceBefore("=") else "")),
                     dimensions(),
                     (n as JCTree.JCVariableDecl).init.convertOrNull(),
                     n.type(),
-                    if(i == nodes.size - 1) Formatting.Reified(namedVarPrefix) else Formatting.Reified(namedVarPrefix, sourceBefore(","))
+                    if(i == nodes.size - 1) format(namedVarPrefix) else format(namedVarPrefix, sourceBefore(","))
             )
         }
 
@@ -935,8 +925,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
         skip("?")
 
         val bound = when((node as JCTree.JCWildcard).kind.kind!!) {
-            BoundKind.EXTENDS -> Tr.Wildcard.Bound.Extends(Formatting.Reified(sourceBefore("extends")))
-            BoundKind.SUPER -> Tr.Wildcard.Bound.Super(Formatting.Reified(sourceBefore("super")))
+            BoundKind.EXTENDS -> Tr.Wildcard.Bound.Extends(format(sourceBefore("extends")))
+            BoundKind.SUPER -> Tr.Wildcard.Bound.Super(format(sourceBefore("super")))
             BoundKind.UNBOUND -> null
         }
 
@@ -953,8 +943,8 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     private fun <T : Tree> JdkTree.convert(suffix: (JdkTree) -> String = { "" }): T {
         val prefix = source.substring(cursor, Math.max((this as JCTree).startPosition, cursor))
         cursor += prefix.length
-        var t = scan(this, Formatting.Reified(prefix)) as T
-        t = t.format<T>((t.formatting as Formatting.Reified).copy(suffix = suffix(this)))
+        var t = scan(this, format(prefix)) as T
+        t = t.changeFormatting<T>((t.formatting as Formatting.Reified).copy(suffix = suffix(this)))
         cursor(Math.max(this.endPos(), cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
         return t
     }
@@ -993,7 +983,7 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the Oracle AST
                 val prefix = source.substring(cursor, Math.max((treeGroup[0] as JCTree).startPosition, cursor))
                 cursor += prefix.length
-                @Suppress("UNCHECKED_CAST") var vars = visitVariables(treeGroup as List<VariableTree>, Formatting.Reified(prefix))
+                @Suppress("UNCHECKED_CAST") var vars = visitVariables(treeGroup as List<VariableTree>, format(prefix))
                 vars = vars.copy(formatting = (vars.formatting as Formatting.Reified).copy(suffix = SEMI_DELIM(treeGroup.last())))
                 cursor(Math.max(treeGroup.last().endPos(), cursor))
                 vars
@@ -1022,39 +1012,38 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
     private fun Symbol.filteredFlags(): List<Flag> =
             flagMasks.filter { flags() and it.key != 0L }.map { it.value }
 
-    private fun Symbol?.type(stack: List<Any?> = emptyList()): Type? {
+    private fun Symbol?.type(): Type? {
         return when (this) {
-            is Symbol.ClassSymbol -> {
-                val fields = (this.members_field?.elements ?: emptyList())
-                        .filterIsInstance<Symbol.VarSymbol>()
-                        .map {
-                            Type.Var(
-                                    it.name.toString(),
-                                    it.type.type(stack.plus(this)),
-                                    it.filteredFlags()
-                            )
-                        }
-
-                Type.Class.build(typeCache, this.className(), fields, null)
-            }
-            is Symbol.PackageSymbol -> Type.Package.build(typeCache, this.fullname.toString())
+            is Symbol.ClassSymbol -> this.type.type()
             is Symbol.VarSymbol -> Type.GenericTypeVariable(this.name.toString(), null)
             else -> null
         }
     }
 
-    private fun com.sun.tools.javac.code.Type?.type(stack: List<Any?> = emptyList()): Type? {
-        if (stack.contains(this))
-            return Type.Class.Cyclic
-
+    private fun com.sun.tools.javac.code.Type?.type(stack: List<Symbol.ClassSymbol?> = emptyList()): Type? {
         return when (this) {
-            is com.sun.tools.javac.code.Type.PackageType -> this.tsym.type(stack.plus(this))
             is com.sun.tools.javac.code.Type.ClassType -> {
-                this.tsym.type(stack.plus(this)).asClass()?.copy(supertype = supertype_field.type(stack.plus(this)).asClass())
+                val sym = this.tsym as Symbol.ClassSymbol
+
+                if (stack.contains(sym))
+                    Type.Cyclic(sym.className())
+                else {
+                    val fields = (sym.members_field?.elements ?: emptyList())
+                            .filterIsInstance<Symbol.VarSymbol>()
+                            .map {
+                                Type.Var(
+                                        it.name.toString(),
+                                        it.type.type(stack.plus(sym)),
+                                        it.filteredFlags()
+                                )
+                            }
+
+                    Type.Class.build(sym.className(), fields, supertype_field.type(stack.plus(sym)).asClass())
+                }
             }
-            is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(this.tsym.name.toString(), this.bound.type(stack.plus(this)).asClass())
-            is com.sun.tools.javac.code.Type.JCPrimitiveType -> Type.Primitive(this.tag.tag())
-            is com.sun.tools.javac.code.Type.ArrayType -> Type.Array(this.elemtype.type(stack.plus(this))!!)
+            is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(this.tsym.name.toString(), this.bound.type(stack).asClass())
+            is com.sun.tools.javac.code.Type.JCPrimitiveType -> this.tag.primitive()
+            is com.sun.tools.javac.code.Type.ArrayType -> Type.Array(this.elemtype.type(stack)!!)
             com.sun.tools.javac.code.Type.noType -> null
             else -> null
         }
@@ -1062,20 +1051,20 @@ class OracleJdkParserVisitor(val typeCache: TypeCache, val path: Path, val sourc
 
     private fun JdkTree.type(): Type? = (this as JCTree).type.type()
 
-    private fun TypeTag.tag(): com.netflix.rewrite.ast.TypeTag {
+    private fun TypeTag.primitive(): Type.Primitive {
         return when (this) {
-            TypeTag.BOOLEAN -> com.netflix.rewrite.ast.TypeTag.Boolean
-            TypeTag.BYTE -> com.netflix.rewrite.ast.TypeTag.Byte
-            TypeTag.CHAR -> com.netflix.rewrite.ast.TypeTag.Char
-            TypeTag.DOUBLE -> com.netflix.rewrite.ast.TypeTag.Double
-            TypeTag.FLOAT -> com.netflix.rewrite.ast.TypeTag.Float
-            TypeTag.INT -> com.netflix.rewrite.ast.TypeTag.Int
-            TypeTag.LONG -> com.netflix.rewrite.ast.TypeTag.Long
-            TypeTag.SHORT -> com.netflix.rewrite.ast.TypeTag.Short
-            TypeTag.VOID -> com.netflix.rewrite.ast.TypeTag.Void
-            TypeTag.NONE -> com.netflix.rewrite.ast.TypeTag.None
-            TypeTag.CLASS -> com.netflix.rewrite.ast.TypeTag.String
-            TypeTag.BOT -> com.netflix.rewrite.ast.TypeTag.Null
+            TypeTag.BOOLEAN -> Type.Primitive.Boolean
+            TypeTag.BYTE -> Type.Primitive.Byte
+            TypeTag.CHAR -> Type.Primitive.Char
+            TypeTag.DOUBLE -> Type.Primitive.Double
+            TypeTag.FLOAT -> Type.Primitive.Float
+            TypeTag.INT -> Type.Primitive.Int
+            TypeTag.LONG -> Type.Primitive.Long
+            TypeTag.SHORT -> Type.Primitive.Short
+            TypeTag.VOID -> Type.Primitive.Void
+            TypeTag.NONE -> Type.Primitive.None
+            TypeTag.CLASS -> Type.Primitive.String
+            TypeTag.BOT -> Type.Primitive.Null
             else -> throw IllegalArgumentException("Unknown type tag $this")
         }
     }

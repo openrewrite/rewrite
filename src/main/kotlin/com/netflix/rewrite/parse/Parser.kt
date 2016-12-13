@@ -16,7 +16,6 @@
 package com.netflix.rewrite.parse
 
 import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.ast.TypeCache
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path

@@ -15,19 +15,18 @@
  */
 package com.netflix.rewrite.refactor.op
 
-import com.netflix.rewrite.ast.*
+import com.netflix.rewrite.ast.AstTransform
+import com.netflix.rewrite.ast.Expression
+import com.netflix.rewrite.ast.Tr
+import com.netflix.rewrite.ast.Type
 import com.netflix.rewrite.refactor.RefactorVisitor
 import org.apache.commons.lang.StringEscapeUtils
 
-class ChangeLiteral(val expr: Expression,
-                    val transform: (Any?) -> Any?,
+class ChangeLiteral(val transform: (Any?) -> Any?,
                     override val ruleName: String = "change-literal"): RefactorVisitor<Tr.Literal>() {
 
     override fun visitExpression(expr: Expression): List<AstTransform<Tr.Literal>> {
-        if(expr.id == this.expr.id) {
-            return LiteralVisitor(ruleName).visit(expr)
-        }
-        return super.visitExpression(expr)
+        return LiteralVisitor(ruleName).visit(expr)
     }
 
     private inner class LiteralVisitor(override val ruleName: String): RefactorVisitor<Tr.Literal>() {
@@ -35,11 +34,11 @@ class ChangeLiteral(val expr: Expression,
         override fun visitLiteral(literal: Tr.Literal): List<AstTransform<Tr.Literal>> {
             val transformed = transform.invoke(literal.value)
             return if(transformed != literal.value) {
-                transform(this@ChangeLiteral.cursor().parent() + cursor()) {
-                    val transformedValueSource = when(literal.typeTag) {
-                        TypeTag.Boolean -> transformed.toString()
-                        TypeTag.Byte -> transformed.toString()
-                        TypeTag.Char -> {
+                transform(literal) {
+                    val transformedValueSource = when(literal.type) {
+                        Type.Primitive.Boolean -> transformed.toString()
+                        Type.Primitive.Byte -> transformed.toString()
+                        Type.Primitive.Char -> {
                             val escaped = StringEscapeUtils.escapeJavaScript(transformed.toString())
 
                             // there are two differences between javascript escaping and character escaping
@@ -49,16 +48,17 @@ class ChangeLiteral(val expr: Expression,
                                 else -> escaped
                             } + "'"
                         }
-                        TypeTag.Double -> "${transformed}d"
-                        TypeTag.Float -> "${transformed}f"
-                        TypeTag.Int -> transformed.toString()
-                        TypeTag.Long -> "${transformed}L"
-                        TypeTag.Short -> transformed.toString()
-                        TypeTag.Void -> transformed.toString()
-                        TypeTag.String -> "\"${StringEscapeUtils.escapeJava(transformed.toString())}\""
-                        TypeTag.None -> ""
-                        TypeTag.Wildcard -> "*"
-                        TypeTag.Null -> "null"
+                        Type.Primitive.Double -> "${transformed}d"
+                        Type.Primitive.Float -> "${transformed}f"
+                        Type.Primitive.Int -> transformed.toString()
+                        Type.Primitive.Long -> "${transformed}L"
+                        Type.Primitive.Short -> transformed.toString()
+                        Type.Primitive.Void -> transformed.toString()
+                        Type.Primitive.String -> "\"${StringEscapeUtils.escapeJava(transformed.toString())}\""
+                        Type.Primitive.None -> ""
+                        Type.Primitive.Wildcard -> "*"
+                        Type.Primitive.Null -> "null"
+                        else -> throw IllegalStateException("Undefined primitive")
                     }
 
                     copy(value = transformed, valueSource = transformedValueSource)

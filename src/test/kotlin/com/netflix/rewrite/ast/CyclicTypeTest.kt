@@ -21,9 +21,62 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 abstract class CyclicTypeTest(p: Parser): Parser by p {
-    
+
+    @Test
+    fun genericNesting() {
+        parse("""
+            import java.util.*;
+
+            public class A {
+                B b;
+            }
+
+            class B extends G<C> { }
+
+            class C {
+                A a;
+            }
+
+            class G<T> {}
+        """)
+    }
+
+    @Test
+    fun nestedTypes() {
+        parse("""
+            public class A {
+                B b;
+                public static class B {
+                    A a;
+                }
+            }
+        """)
+    }
+
+    @Test
+    fun interdependentTypes() {
+        parse("""
+            public class A {
+                B b;
+            }
+
+            class B {
+                A a;
+            }
+        """)
+    }
+
     @Test
     fun cyclicType() {
+        parse("""
+            public class A<T> {
+                A<?> a;
+            }
+        """)
+    }
+
+    @Test
+    fun cyclicTypeInArray() {
         val a = parse("""
             public class A {
                 A[] nested = new A[0];
@@ -36,6 +89,6 @@ abstract class CyclicTypeTest(p: Parser): Parser by p {
         val elemType = fieldType!!.elemType.asClass()
         assertTrue(elemType is Type.Class)
 
-        assertTrue(elemType!!.members[0].type?.asClass()?.isCyclicRef() ?: false)
+        assertTrue(elemType!!.members[0].type?.asArray()?.elemType is Type.Cyclic)
     }
 }

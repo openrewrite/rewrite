@@ -15,13 +15,15 @@
  */
 package com.netflix.rewrite.ast
 
+@Suppress("UNCHECKED_CAST")
 data class Cursor(val path: List<Tree>) {
-    fun plus(t: Tree) = copy(path + t)
+    fun plus(t: Tree): Cursor = copy(path + t)
+
     operator fun plus(cursor: Cursor) = copy(path + cursor.path)
 
     fun parent() = copy(path.dropLast(1))
-    fun last() = path.last()
-    
+    fun last(): Tree = path.last()
+
     companion object {
         val Empty = Cursor(emptyList())
     }

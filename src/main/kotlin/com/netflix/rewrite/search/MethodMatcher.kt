@@ -16,8 +16,6 @@
 package com.netflix.rewrite.search
 
 import com.netflix.rewrite.aspectj.AspectJLexer
-import com.netflix.rewrite.aspectj.RefactorMethodSignatureParser
-import com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBaseVisitor
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
 import org.antlr.v4.runtime.ANTLRInputStream
@@ -47,10 +45,10 @@ class MethodMatcher(signature: String) {
     }
 
     fun matches(meth: Tr.MethodInvocation): Boolean {
-        val targetType = meth.declaringType?.fullyQualifiedName ?: return false
-        val resolvedSignaturePattern = (meth.type ?: return false).resolvedSignature.paramTypes.map { type ->
+        val targetType = meth.type?.declaringType?.fullyQualifiedName ?: return false
+        val resolvedSignaturePattern = meth.type.resolvedSignature.paramTypes.map { type ->
             fun typePattern(type: Type): String? = when (type) {
-                is Type.Primitive -> type.typeTag.name.toLowerCase()
+                is Type.Primitive -> type.keyword
                 is Type.Class -> type.fullyQualifiedName
                 is Type.Array -> typePattern(type.elemType) + "[]"
                 else -> null

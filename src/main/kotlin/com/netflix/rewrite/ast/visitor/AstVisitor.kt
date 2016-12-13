@@ -50,7 +50,7 @@ open class AstVisitor<R> {
     fun visit(tree: Tree?): R =
             if (tree != null) {
                 cursorStack.push(tree)
-                val t = tree.accept(this)
+                val t = reduce(tree.accept(this), visitTree(tree))
                 cursorStack.pop()
                 t
             } else default(tree)
@@ -70,6 +70,8 @@ open class AstVisitor<R> {
                 }
                 r
             } ?: default(null)
+
+    open fun visitTree(t: Tree): R = default(t)
 
     open fun visitAnnotation(annotation: Tr.Annotation): R =
             visit(annotation.annotationType)

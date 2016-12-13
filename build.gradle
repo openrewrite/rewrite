@@ -43,10 +43,14 @@ dependencies {
     compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
     compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
 
+    compile 'com.google.guava:guava:19.0'
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
     compile 'commons-lang:commons-lang:2.6'
     compile 'org.jetbrains.kotlin:kotlin-reflect'
+
+    compile 'com.koloboke:koloboke-api-jdk8:latest.release'
+    compile 'com.koloboke:koloboke-impl-jdk8:latest.release'
 
     // just for Closure-based refactor method on CompilationUnit
     compileOnly 'org.codehaus.groovy:groovy-all:2.4.7'

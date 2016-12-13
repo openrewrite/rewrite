@@ -18,17 +18,17 @@ package com.netflix.rewrite.refactor.op
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class ReorderMethodArguments(val meth: Tr.MethodInvocation,
-                             vararg val byArgumentNames: String,
+class ReorderMethodArguments(val byArgumentNames: List<String>,
                              override val ruleName: String = "reorder-method-arguments"): RefactorVisitor<Tr.MethodInvocation>() {
+
     private var originalParamNames: Array<out String>? = null
 
     fun setOriginalParamNames(vararg names: String) { originalParamNames = names }
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
-        if(meth.id == this.meth.id && meth.type is Type.Method) {
-            val paramNames = originalParamNames?.toList() ?: meth.type.paramNames?.toList() ?:
-                    error("There is no source attachment for method ${meth.declaringType?.fullyQualifiedName}.${meth.name.simpleName}(..), " +
+        if(meth.type is Type.Method) {
+            val paramNames = originalParamNames?.toList() ?: meth.type.paramNames ?:
+                    error("There is no source attachment for method ${meth.type.declaringType?.fullyQualifiedName}.${meth.name.simpleName}(..), " +
                             "provide a reference for original parameter names by calling setOriginalParamNames(..)")
 
             val paramTypes = meth.type.resolvedSignature.paramTypes
@@ -48,7 +48,7 @@ class ReorderMethodArguments(val meth: Tr.MethodInvocation,
                 } else acc
             }
 
-            val reorderedFormatted = reordered.mapIndexed { i, arg -> arg.format<Expression>(formattings[i]) }
+            val reorderedFormatted = reordered.mapIndexed { i, arg -> arg.changeFormatting<Expression>(formattings[i]) }
             return transform { copy(args = args.copy(args = reorderedFormatted)) }
         }
 

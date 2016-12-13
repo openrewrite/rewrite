@@ -19,14 +19,9 @@ import com.netflix.rewrite.ast.AstTransform
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class ChangeMethodName(val meth: Tr.MethodInvocation,
-                       val name: String,
+class ChangeMethodName(val name: String,
                        override val ruleName: String = "change-method-name") : RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
-        if (meth.id == this.meth.id && meth.simpleName != name) {
-            return transform { copy(name = name.copy(simpleName = this@ChangeMethodName.name)) }
-        }
-        return super.visitMethodInvocation(meth)
-    }
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> =
+            transform { copy(name = name.copy(simpleName = this@ChangeMethodName.name)) }
 }

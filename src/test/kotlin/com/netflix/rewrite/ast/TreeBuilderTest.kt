@@ -19,11 +19,9 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class TreeBuilderTest {
-    val cache = TypeCache.new()
-
     @Test
     fun buildFullyQualifiedClassName() {
-        val name = TreeBuilder.buildName(cache, "java.util.List", Formatting.Reified.Empty) as Tr.FieldAccess
+        val name = TreeBuilder.buildName("java.util.List", Formatting.Empty) as Tr.FieldAccess
 
         assertEquals("java.util.List", name.printTrimmed())
         assertEquals("List", name.simpleName)
@@ -31,7 +29,7 @@ class TreeBuilderTest {
 
     @Test
     fun buildFullyQualifiedInnerClassName() {
-        val name = TreeBuilder.buildName(cache, "a.Outer.Inner", Formatting.Reified.Empty) as Tr.FieldAccess
+        val name = TreeBuilder.buildName("a.Outer.Inner", Formatting.Empty) as Tr.FieldAccess
 
         assertEquals("a.Outer.Inner", name.printTrimmed())
         assertEquals("Inner", name.simpleName)
@@ -44,7 +42,7 @@ class TreeBuilderTest {
 
     @Test
     fun buildStaticImport() {
-        val name = TreeBuilder.buildName(cache, "a.A.*", Formatting.Reified.Empty) as Tr.FieldAccess
+        val name = TreeBuilder.buildName("a.A.*", Formatting.Empty) as Tr.FieldAccess
 
         assertEquals("a.A.*", name.printTrimmed())
         assertEquals("*", name.simpleName)

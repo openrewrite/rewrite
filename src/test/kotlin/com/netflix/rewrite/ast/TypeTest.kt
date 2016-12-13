@@ -15,22 +15,63 @@
  */
 package com.netflix.rewrite.ast
 
+import com.netflix.rewrite.parse.OracleJdkParser
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TypeTest {
-    val cache = TypeCache.new()
 
     @Test
     fun innerClassType() {
-        val t = Type.Class.build(cache, "com.foo.Foo.Bar")
-        assertEquals("com.foo.Foo", t.owner.asClass()?.fullyQualifiedName)
-        assertEquals("com.foo", t.owner.asClass()?.owner.asPackage()?.fullName)
+        val t = Type.Class.build("com.foo.Foo.Bar")
+        assertEquals("com.foo.Foo.Bar", t.fullyQualifiedName)
+        assertEquals("com.foo", t.packageName())
     }
 
     @Test
-    fun classType() {
-        val t = Type.Class.build(cache, "com.foo.Foo")
-        assertEquals("com.foo", t.owner.asPackage()?.fullName)
+    fun packageName() {
+        val t = Type.Class.build("com.foo.Foo")
+        assertEquals("com.foo", t.packageName())
+
+        val a = Type.Class.build("a.A1")
+        assertEquals("a", a.packageName())
+
+        val b = Type.Class.build("a.A.B")
+        assertEquals("a", b.packageName())
+
+        val c = Type.Class.build("A.C")
+        assertEquals("", c.packageName())
+    }
+
+    @Test
+    fun typeFlyweightsAreSharedBetweenParsers() {
+        val a = OracleJdkParser().parse("public class A {}")
+        val a2 = OracleJdkParser().parse("public class A {}")
+
+        assertTrue(a.firstClass()?.type === a2.firstClass()?.type)
+    }
+
+    @Test
+    fun sameFullyQualifiedNameWithDifferentMembers() {
+        val a = OracleJdkParser().parse("public class A { String foo; }")
+        val a2 = OracleJdkParser().parse("public class A { String bar; }")
+
+        assertTrue(a.firstClass()?.type !== a2.firstClass()?.type)
+    }
+
+    @Test
+    fun sameFullyQualifiedNameWithDifferentTypeHierarchy() {
+        val a = OracleJdkParser().parse("""
+            public class A extends B {}
+            class B {}
+        """)
+
+        val a2 = OracleJdkParser().parse("""
+            public class A {}
+            class B {}
+        """)
+
+        assertTrue(a.firstClass()?.type !== a2.firstClass()?.type)
     }
 }

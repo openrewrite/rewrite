@@ -23,13 +23,17 @@ class AddImport(val clazz: String,
                 val staticMethod: String? = null,
                 val onlyIfReferenced: Boolean = false,
                 override val ruleName: String = "add-import"): RefactorVisitor<Tr.CompilationUnit>() {
+
     private var coveredByExistingImport = false
     private val packageComparator = PackageComparator()
-    private val classType by lazy { Type.Class.build(cu.typeCache(), clazz) }
+
+    private lateinit var cu: Tr.CompilationUnit
+    private val classType by lazy { Type.Class.build(clazz) }
 
     private var hasReferences: Boolean = false
 
     override fun visitCompilationUnit(cu: Tr.CompilationUnit): List<AstTransform<Tr.CompilationUnit>> {
+        this.cu = cu
         hasReferences = FindType(clazz).visit(cu).isNotEmpty()
         return super.visitCompilationUnit(cu)
     }
@@ -45,7 +49,7 @@ class AddImport(val clazz: String,
         else {
             if (import.matches(clazz)) {
                 coveredByExistingImport = true
-            } else if (import.qualid.target.printTrimmed() == classType.packageOwner() && importedType == "*") {
+            } else if (import.qualid.target.printTrimmed() == classType.packageName() && importedType == "*") {
                 coveredByExistingImport = true
             }
         }
@@ -57,14 +61,14 @@ class AddImport(val clazz: String,
         if(onlyIfReferenced && !hasReferences)
             return emptyList()
 
-        if(classType.packageOwner().isEmpty())
+        if(classType.packageName().isEmpty())
             return emptyList()
 
         val lastPrior = lastPriorImport()
-        val classImportField = TreeBuilder.buildName(cu.typeCache(), clazz, Formatting.Reified(" ")) as Tr.FieldAccess
+        val classImportField = TreeBuilder.buildName(clazz, format(" ")) as Tr.FieldAccess
 
         val importStatementToAdd = if(addingStaticImport()) {
-            Tr.Import(Tr.FieldAccess(classImportField, Tr.Ident(staticMethod!!, null, Formatting.Reified.Empty), null, Formatting.Reified.Empty), true, Formatting.Infer)
+            Tr.Import(Tr.FieldAccess(classImportField, Tr.Ident.build(staticMethod!!, null, Formatting.Empty), null, Formatting.Empty), true, Formatting.Infer)
         } else Tr.Import(classImportField, false, Formatting.Infer)
 
         return if(coveredByExistingImport) {
@@ -92,7 +96,7 @@ class AddImport(val clazz: String,
                 return@lastOrNull false
 
             val comp = packageComparator.compare(import.qualid.target.printTrimmed(),
-                    if(addingStaticImport()) clazz else classType.packageOwner())
+                    if(addingStaticImport()) clazz else classType.packageName())
             if(comp == 0) {
                 if(import.qualid.simpleName < if(addingStaticImport()) staticMethod!! else classType.className()) {
                     true

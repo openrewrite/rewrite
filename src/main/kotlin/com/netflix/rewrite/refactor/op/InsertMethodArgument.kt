@@ -16,38 +16,34 @@
 package com.netflix.rewrite.refactor.op
 
 import com.netflix.rewrite.ast.AstTransform
-import com.netflix.rewrite.ast.Expression
 import com.netflix.rewrite.ast.Formatting
 import com.netflix.rewrite.ast.Tr
+import com.netflix.rewrite.ast.format
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class InsertMethodArgument(val meth: Tr.MethodInvocation,
-                           val pos: Int,
+class InsertMethodArgument(val pos: Int,
                            val source: String,
                            override val ruleName: String = "insert-method-argument"): RefactorVisitor<Tr.MethodInvocation>() {
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
-        if(meth.id == this.meth.id) {
-            return transform {
-                meth.copy(args = meth.args.let {
-                    val modifiedArgs = it.args.toMutableList()
-                    modifiedArgs.removeIf { it is Tr.Empty }
+        return transform {
+            meth.copy(args = meth.args.let {
+                val modifiedArgs = it.args.toMutableList()
+                modifiedArgs.removeIf { it is Tr.Empty }
 
-                    modifiedArgs.add(pos, Tr.UnparsedSource(source,
-                            if (pos == 0) {
-                                modifiedArgs.firstOrNull()?.formatting ?: Formatting.Reified.Empty
-                            } else Formatting.Reified(" "))
-                    )
+                modifiedArgs.add(pos, Tr.UnparsedSource(source,
+                        if (pos == 0) {
+                            modifiedArgs.firstOrNull()?.formatting ?: Formatting.Empty
+                        } else format(" "))
+                )
 
-                    if(pos == 0 && modifiedArgs.size > 1) {
-                        // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
-                        modifiedArgs[1] = modifiedArgs[1].format(Formatting.Reified(" "))
-                    }
+                if(pos == 0 && modifiedArgs.size > 1) {
+                    // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
+                    modifiedArgs[1] = modifiedArgs[1].changeFormatting(format(" "))
+                }
 
-                    it.copy(args = modifiedArgs)
-                })
-            }
+                it.copy(args = modifiedArgs)
+            })
         }
-        return super.visitMethodInvocation(meth)
     }
 }

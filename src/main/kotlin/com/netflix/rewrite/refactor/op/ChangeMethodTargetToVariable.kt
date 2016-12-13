@@ -15,21 +15,18 @@
  */
 package com.netflix.rewrite.refactor.op
 
-import com.netflix.rewrite.ast.*
+import com.netflix.rewrite.ast.AstTransform
+import com.netflix.rewrite.ast.Formatting
+import com.netflix.rewrite.ast.Tr
+import com.netflix.rewrite.ast.Type
 import com.netflix.rewrite.refactor.RefactorVisitor
 
-class ChangeMethodTargetToVariable(val meth: Tr.MethodInvocation,
-                                   val varName: String,
+class ChangeMethodTargetToVariable(val varName: String,
                                    val type: Type.Class?,
                                    override val ruleName: String = "change-method-target"): RefactorVisitor<Tr.MethodInvocation>() {
 
-    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
-        if(meth.id == this.meth.id) {
-            return transform {
-                val select = Tr.Ident(varName, this@ChangeMethodTargetToVariable.type, select?.formatting ?: Formatting.Reified.Empty)
-                copy(select = select, declaringType = this@ChangeMethodTargetToVariable.type)
-            }
-        }
-        return super.visitMethodInvocation(meth)
+    override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> = transform {
+        val select = Tr.Ident.build(varName, this@ChangeMethodTargetToVariable.type, select?.formatting ?: Formatting.Empty)
+        copy(select = select, type = type?.copy(declaringType = this@ChangeMethodTargetToVariable.type))
     }
 }
