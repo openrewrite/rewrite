@@ -67,7 +67,9 @@ open class RewriteTask : AbstractRewriteTask() {
             textOutput.println(" to automatically fix")
 
             stats.entries.forEachIndexed { i, (rewrite, count) ->
-                textOutput.println("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
+                textOutput.text("   ${i + 1}. ")
+                textOutput.withStyle(Styling.Bold).text(rewrite.value)
+                textOutput.println(" required $count changes to ${rewrite.description}")
             }
 
             throw GradleException("This project requires refactoring. Run ./gradlew fixSourceLint to automatically fix.")
@@ -93,9 +95,14 @@ open class RewriteAndFixTask : AbstractRewriteTask() {
         }
 
         if (stats.isNotEmpty()) {
-            textOutput.withStyle(Styling.Red).println("\u2716 Your source code has been affected by refactoring rules. Please review and commit changes.")
+            textOutput.withStyle(Styling.Red).text("\u2716 Your source code requires refactoring. ")
+            textOutput.text("Please run ")
+            textOutput.withStyle(Styling.Bold).text("git diff")
+            textOutput.println(", review, and commit changes.")
             stats.entries.forEachIndexed { i, (rewrite, count) ->
-                textOutput.println("${i + 1}. ${rewrite.value} required $count changes to ${rewrite.description}")
+                textOutput.text("   ${i + 1}. ")
+                textOutput.withStyle(Styling.Bold).text(rewrite.value)
+                textOutput.println(" required $count changes to ${rewrite.description}")
             }
 
             throw GradleException("This project contains uncommitted refactoring changes.")

@@ -6,11 +6,15 @@ enum class Styling { Bold, Green, Yellow, Red }
 
 class VersionNeutralTextOutput(val gradleTextOutput: Any) {
     fun text(v: Any) {
-        gradleTextOutput.javaClass.getDeclaredMethod("text", Any::class.java).invoke(gradleTextOutput, v)
+        val text = gradleTextOutput.javaClass.getMethod("text", Any::class.java)
+        text.isAccessible = true
+        text.invoke(gradleTextOutput, v)
     }
 
     fun println(v: Any) {
-        gradleTextOutput.javaClass.getDeclaredMethod("println", Any::class.java).invoke(gradleTextOutput, v)
+        val println = gradleTextOutput.javaClass.getMethod("println", Any::class.java)
+        println.isAccessible = true
+        println.invoke(gradleTextOutput, v)
     }
 }
 
@@ -30,7 +34,8 @@ class StyledTextService(registry: ServiceRegistry) {
         }
 
         val textOutputFactory = registry.get(factoryClass)
-        textOutput = textOutputFactory.javaClass.getDeclaredMethod("create", String::class.java).invoke("rewrite")
+        val create = textOutputFactory.javaClass.getMethod("create", String::class.java)
+        textOutput = create.invoke(textOutputFactory, "rewrite")
     }
 
     fun withStyle(styling: Styling): VersionNeutralTextOutput {
@@ -41,8 +46,12 @@ class StyledTextService(registry: ServiceRegistry) {
             styleClass = Class.forName("org.gradle.logging.StyledTextOutput\$Style")
         }
 
-        fun styleByName(name: String) =
-            VersionNeutralTextOutput(styleClass.getDeclaredMethod("valueOf", String::class.java).invoke(null, name))
+        fun styleByName(name: String): VersionNeutralTextOutput {
+            val style = styleClass.getDeclaredMethod("valueOf", String::class.java).invoke(null, name)
+            return VersionNeutralTextOutput(textOutput.javaClass.methods
+                    .first { it.name == "withStyle" }
+                    .invoke(textOutput, style))
+        }
 
         return when(styling) {
             Styling.Bold -> styleByName("UserInput")
@@ -53,12 +62,12 @@ class StyledTextService(registry: ServiceRegistry) {
     }
 
     fun text(text: String): StyledTextService {
-        textOutput.javaClass.getDeclaredMethod("text", Any::class.java).invoke(textOutput, text)
+        textOutput.javaClass.getMethod("text", Any::class.java).invoke(textOutput, text)
         return this
     }
 
     fun println(text: String): StyledTextService {
-        textOutput.javaClass.getDeclaredMethod("println", Any::class.java).invoke(textOutput, text)
+        textOutput.javaClass.getMethod("println", Any::class.java).invoke(textOutput, text)
         return this
     }
 }
