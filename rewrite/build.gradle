@@ -1,0 +1,99 @@
+plugins {
+    id 'me.champeau.gradle.antlr4' version '0.1'
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'nebula.optional-base' version '3.0.3'
+}
+
+antlr4.output = new File('src/main/java/com/netflix/rewrite')
+antlr4.extraArgs = ['-package', 'com.netflix.rewrite']
+
+configurations {
+    compile.extendsFrom antlr4
+    compile.extendsFrom compileShaded
+}
+
+dependencies {
+    compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
+    compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+
+    compile 'com.google.guava:guava:19.0'
+    compile 'eu.infomas:annotation-detector:latest.release'
+    compile 'org.slf4j:slf4j-api:1.7.+'
+    compile 'commons-lang:commons-lang:2.6'
+    compile 'org.jetbrains.kotlin:kotlin-reflect'
+
+    compile 'com.koloboke:koloboke-api-jdk8:latest.release'
+    compile 'com.koloboke:koloboke-impl-jdk8:latest.release'
+
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5', optional
+    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5', optional
+
+    // just for Closure-based refactor method on CompilationUnit
+    compile 'org.codehaus.groovy:groovy-all:2.4.7', optional
+
+    testCompile 'junit:junit:4.+'
+    testCompile 'org.ow2.asm:asm:latest.release'
+    testCompile 'org.ow2.asm:asm-util:latest.release'
+    testCompile 'ch.qos.logback:logback-classic:1.0.13'
+    testCompile 'org.assertj:assertj-core:latest.release'
+}
+
+tasks.withType(Javadoc) {
+    // generated ANTLR sources violate doclint
+    options.addStringOption('Xdoclint:none', '-quiet')
+}
+
+// Replaces the main artifact by removing the classifier for the shadow jar, and replacing jar with shadowJar
+// Relocated dependencies are removed from the generated pom
+shadowJar {
+    configurations = [project.configurations.compileShaded]
+    classifier = 'jdkbundle'
+
+    exclude 'sun/**/*'
+    exclude 'org/relaxng/**/*'
+    exclude 'META-INF/services/*'
+    exclude 'com/sun/xml/**/*'
+    exclude 'com/sun/jarsigner/**/*'
+    exclude 'com/sun/javadoc/**/*'
+    exclude 'com/sun/istack/**/*'
+    exclude 'com/sun/xml/**/*'
+
+    relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
+    relocate 'org.eclipse.jgit', 'com.netflix.devinsight.shaded.org.eclipse.jgit'
+    relocate 'org.apache.http', 'com.netflix.devinsight.shaded.org.apache.http'
+
+    mergeServiceFiles {
+        exclude 'META-INF/services/com.sun.*'
+    }
+}
+
+if(project.rootProject == project) {
+  apply plugin: 'nebula.netflixoss'
+
+  publishing {
+      publications {
+          nebula(MavenPublication) {
+              artifact shadowJar {
+                  classifier = 'jdkbundle'
+              }
+          }
+
+          withType(MavenPublication) {
+              pom.withXml {
+                  asNode().dependencies.dependency.scope.each {
+                      it.value = 'compile'
+                  }
+              }
+          }
+      }
+  }
+
+  license {
+      header = file('gradle/licenseHeader.txt')
+      exclude '**/*.tokens'
+      mapping {
+          kt = 'JAVADOC_STYLE'
+      }
+      sourceSets = project.sourceSets
+  }
+}

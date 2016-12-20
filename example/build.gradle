@@ -6,7 +6,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.netflix.devinsight:rewrite:latest.release'
+        classpath 'com.netflix.devinsight:rewrite-gradle:latest.integration'
     }
 
     configurations.classpath.resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'

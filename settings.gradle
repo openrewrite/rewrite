@@ -14,4 +14,5 @@
  * limitations under the License.
  */
 
-rootProject.name = 'rewrite'
+rootProject.name = 'rewrite-all'
+include 'rewrite'/*, 'rewrite-gradle'*/

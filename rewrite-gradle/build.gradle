@@ -1,0 +1,31 @@
+plugins {
+    id 'java-gradle-plugin'
+    id 'com.gradle.plugin-publish' version '0.9.4'
+    id 'nebula.plugin-plugin' version '4.24.0'
+}
+
+dependencies {
+    compile project(':rewrite')
+
+    testCompile 'junit:junit:4.+'
+}
+
+pluginBundle {
+    website = 'https://github.com/Netflix/rewrite'
+    vcsUrl = 'https://github.com/Netflix/rewrite.git'
+    description = 'Pluggable and distributed refactoring tool for Java source code'
+
+    plugins {
+        sourceRefactor {
+            id = 'netflix.rewrite'
+            displayName = 'Distributed Java source refactoring plugin'
+            description = 'Pluggable and distributed refactoring tool for Java source code'
+            tags = ['nebula', 'netflix', 'lint', 'refactor']
+        }
+    }
+
+    mavenCoordinates {
+        groupId = 'com.netflix.devinsight'
+        artifactId = 'rewrite'
+    }
+}
