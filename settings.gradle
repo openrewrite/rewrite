@@ -15,4 +15,4 @@
  */
 
 rootProject.name = 'rewrite-all'
-include 'rewrite'/*, 'rewrite-gradle'*/
+include 'rewrite', 'rewrite-jackson'

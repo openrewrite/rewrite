@@ -52,8 +52,6 @@ dependencies {
     compile 'com.koloboke:koloboke-impl-jdk8:latest.release'
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5', optional
-    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5', optional
-    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.5', optional
 
     // just for Closure-based refactor method on CompilationUnit
     compile 'org.codehaus.groovy:groovy-all:2.4.7', optional

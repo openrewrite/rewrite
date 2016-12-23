@@ -1,0 +1,53 @@
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
+    }
+
+    dependencies {
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
+        classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
+        classpath 'gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1'
+    }
+}
+
+apply plugin: 'nebula.kotlin'
+apply plugin: 'nebula.maven-resolved-dependencies'
+apply plugin: 'com.github.hierynomus.license'
+
+repositories {
+    mavenCentral()
+}
+
+group = 'com.netflix.devinsight'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+dependencies {
+    // only needed because IntelliJ Gradle composites do not support file dependencies
+    runtime files("${System.getProperty('java.home')}/../lib/tools.jar")
+
+    if(project == project.rootProject) {
+        compile 'com.netflix.devinsight:rewrite:latest.release'
+    } else {
+        compile project(':rewrite')
+    }
+
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
+    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5'
+    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.5'
+
+    testCompile 'junit:junit:4.+'
+    testCompile 'ch.qos.logback:logback-classic:1.0.13'
+}
+
+license {
+    header = file('../gradle/licenseHeader.txt')
+    exclude '**/*.tokens'
+    mapping {
+        kt = 'JAVADOC_STYLE'
+    }
+    sourceSets = project.sourceSets
+    strictCheck = true
+}
