@@ -10,7 +10,7 @@ buildscript {
         classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
         classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
-        classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.10.0'
+        classpath 'gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1'
     }
 }
 
@@ -19,7 +19,7 @@ apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'nebula.optional-base'
 apply plugin: 'nebula.kotlin'
 apply plugin: 'nebula.maven-resolved-dependencies'
-apply plugin: 'license'
+apply plugin: 'com.github.hierynomus.license'
 
 repositories {
     mavenCentral()
@@ -113,10 +113,11 @@ publishing {
 }
 
 license {
-    header = file('gradle/licenseHeader.txt')
+    header = file('../gradle/licenseHeader.txt')
     exclude '**/*.tokens'
     mapping {
         kt = 'JAVADOC_STYLE'
     }
     sourceSets = project.sourceSets
+    strictCheck = true
 }

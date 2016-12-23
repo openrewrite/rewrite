@@ -1,8 +1,8 @@
 buildscript {
     repositories {
         jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
         maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
-        mavenCentral()
     }
     dependencies {
         classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
