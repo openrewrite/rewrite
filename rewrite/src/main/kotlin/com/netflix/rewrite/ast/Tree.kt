@@ -288,10 +288,10 @@ sealed class Tr : Serializable, Tree {
                 .filter { hasModifier(it.java) }
                 .any()
 
-        @JsonIgnore fun isEnum() = kind is Kind.Enum
-        @JsonIgnore fun isClass() = kind is Kind.Class
-        @JsonIgnore fun isInterface() = kind is Kind.Interface
-        @JsonIgnore fun isAnnotation() = kind is Kind.Annotation
+        val isEnum: Boolean @JsonIgnore get() = kind is Kind.Enum
+        val isClass: Boolean @JsonIgnore get() = kind is Kind.Class
+        val isInterface: Boolean @JsonIgnore get() = kind is Kind.Interface
+        val isAnnotation: Boolean @JsonIgnore get() = kind is Kind.Annotation
 
         @Transient val simpleName: String = name.simpleName
     }
@@ -341,6 +341,13 @@ sealed class Tr : Serializable, Tree {
 
         fun cursor(t: Tree?): Cursor? = RetrieveCursorVisitor(t).visit(this)
         fun cursor(id: Long): Cursor? = RetrieveCursorVisitor(id).visit(this)
+
+        /**
+         * Because Jackson will not place a polymorphic type tag on the root of the AST when we are serializing a list of ASTs together
+         */
+        @Suppress("ProtectedInFinal")
+        @get:JsonProperty("@c")
+        protected val jacksonPolymorphicTypeTag = ".Tr\$CompilationUnit"
     }
 
     data class Continue(val label: Ident?,
@@ -367,6 +374,7 @@ sealed class Tr : Serializable, Tree {
                          val initializer: Arguments?,
                          override val formatting: Formatting = Formatting.Empty,
                          override val id: Long = id()): Statement, Tr() {
+
         override fun <R> accept(v: AstVisitor<R>): R = v.visitEnumValue(this)
 
         data class Arguments(val args: List<Expression>, override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Tr()
@@ -429,11 +437,8 @@ sealed class Tr : Serializable, Tree {
                                          override val formatting: Formatting,
                                          override val id: Long) : Expression, NameTree, TypeTree, Tr() {
 
-        override val type: Type?
-            get() = ident.type
-
-        val simpleName: String
-            get() = ident.simpleName
+        override val type: Type? get() = ident.type
+        val simpleName: String get() = ident.simpleName
 
         fun copy(simpleName: String = this.simpleName, type: Type? = this.type, formatting: Formatting = this.formatting, id: Long = this.id) =
             copy(ident.copy(simpleName, type), formatting, id)
@@ -621,6 +626,7 @@ sealed class Tr : Serializable, Tree {
     data class MultiCatch(val alternatives: List<NameTree>,
                           override val formatting: Formatting = Formatting.Empty,
                           override val id: Long = id()): TypeTree, Tr() {
+        @get:JsonIgnore
         override val type: Type by lazy { throw IllegalArgumentException("Multi-catch does not represent a single type") }
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitMultiCatch(this)
@@ -680,6 +686,7 @@ sealed class Tr : Serializable, Tree {
                                         override val formatting: Formatting = Formatting.Empty,
                                         override val id: Long = id()) : Expression, Tr() {
 
+        @Transient
         override val type = when(tree) {
             is Expression -> tree.type
             else -> null
@@ -759,6 +766,7 @@ sealed class Tr : Serializable, Tree {
                         override val formatting: Formatting = Formatting.Empty,
                         override val id: Long = id()): Expression, Tr() {
 
+        @Transient
         override val type = clazz.type
 
         override fun <R> accept(v: AstVisitor<R>): R = v.reduce(v.visitTypeCast(this), v.visitExpression(this))
@@ -814,6 +822,8 @@ sealed class Tr : Serializable, Tree {
 
     data class UnparsedSource(val source: String, override val formatting: Formatting = Formatting.Empty,
                               override val id: Long = id()): Expression, Statement, Tr() {
+
+        @Transient
         override val type: Type? = null
 
         override fun <R> accept(v: AstVisitor<R>): R =
@@ -873,6 +883,7 @@ sealed class Tr : Serializable, Tree {
                         override val formatting: Formatting = Formatting.Empty,
                         override val id: Long = id()): Tr(), Expression {
 
+        @Transient
         override val type = null
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitWildcard(this)

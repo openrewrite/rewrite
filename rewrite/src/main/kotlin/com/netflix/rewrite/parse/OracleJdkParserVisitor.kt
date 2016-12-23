@@ -35,9 +35,9 @@ import java.util.regex.Pattern
 import javax.lang.model.element.Modifier
 import javax.lang.model.type.TypeKind
 
-class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tree, Formatting.Reified>() {
-    private typealias JdkTree = com.sun.source.tree.Tree
+private typealias JdkTree = com.sun.source.tree.Tree
 
+class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tree, Formatting.Reified>() {
     private lateinit var endPosTable: EndPosTable
     private lateinit var docTable: DocCommentTable
     private var cursor: Int = 0
@@ -53,15 +53,23 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
         val args = if(node.arguments.size > 0) {
             val argsPrefix = sourceBefore("(")
             val args: List<Expression> = if (node.arguments.size == 1) {
-                val arg = node.arguments[0] as JCTree.JCAssign
-                listOf(if (arg.endPos() < 0) {
-                    // this is the "value" argument, but without an explicit "value = ..."
-                    arg.rhs.convert { sourceBefore(")") }
-                } else {
-                    // this is either an explicit "value" argument or is assigning some other property
-                    arg.convert { sourceBefore(")") }
-                })
-            } else {
+                val arg = node.arguments[0]
+                when(arg) {
+                    is JCTree.JCAssign -> {
+                        listOf(if (arg.endPos() < 0) {
+                            // this is the "value" argument, but without an explicit "value = ..."
+                            arg.rhs.convert { sourceBefore(")") }
+                        } else {
+                            // this is either an explicit "value" argument or is assigning some other property
+                            arg.convert { sourceBefore(")") }
+                        })
+                    }
+                    is JCTree.JCFieldAccess -> {
+                        listOf(arg.convert { sourceBefore(")") })
+                    }
+                    else -> throw IllegalStateException("Unexpected annotation argument type ${arg.javaClass}")
+                }
+             } else {
                 node.arguments.convertAll(COMMA_DELIM, { sourceBefore(")") })
             }
 
@@ -270,6 +278,8 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
     }
 
     override fun visitCompilationUnit(node: CompilationUnitTree, fmt: Formatting.Reified): Tree {
+        logger.debug("$path: building Rewrite AST from Oracle AST")
+
         endPosTable = (node as JCTree.JCCompilationUnit).endPositions
         docTable = node.docComments // TODO when we want to implement refactoring into doc comments as well, refer to this table by JCTree node
         val prefix = source.substring(0, node.startPosition)

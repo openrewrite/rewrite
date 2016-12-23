@@ -2,7 +2,15 @@ plugins {
     id 'java-gradle-plugin'
     id 'com.gradle.plugin-publish' version '0.9.4'
     id 'nebula.plugin-plugin' version '4.24.0'
+    id 'nebula.kotlin' version '1.1.0-M03'
 }
+
+repositories {
+    mavenCentral()
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 dependencies {
     compile project(':rewrite')

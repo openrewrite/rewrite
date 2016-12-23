@@ -5,27 +5,15 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M03'
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
+        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
+        classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:3.5.2'
     }
-}
-
-plugins {
-    id "nebula.netflixoss" version "3.5.2"
 }
 
 allprojects {
+    apply plugin: 'nebula.netflixoss'
+
     group = 'com.netflix.devinsight'
     description 'Pluggable and distributed refactoring tool for Java source code'
-}
-
-subprojects {
-    apply plugin: 'nebula.kotlin'
-
-    repositories {
-        mavenCentral()
-        maven { url "http://repository.jetbrains.com/all" }
-    }
-
-    sourceCompatibility = 1.8
-    targetCompatibility = 1.8
 }

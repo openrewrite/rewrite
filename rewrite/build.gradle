@@ -1,8 +1,34 @@
-plugins {
-    id 'me.champeau.gradle.antlr4' version '0.1'
-    id 'com.github.johnrengelman.shadow' version '1.2.3'
-    id 'nebula.optional-base' version '3.0.3'
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
+    }
+
+    dependencies {
+        classpath 'me.champeau.gradle:antlr4-gradle-plugin:0.1'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.4'
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
+        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
+        classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
+        classpath 'nl.javadude.gradle.plugins:license-gradle-plugin:0.10.0'
+    }
 }
+
+apply plugin: 'me.champeau.gradle.antlr4'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'nebula.optional-base'
+apply plugin: 'nebula.kotlin'
+apply plugin: 'nebula.maven-resolved-dependencies'
+apply plugin: 'license'
+
+repositories {
+    mavenCentral()
+}
+
+group = 'com.netflix.devinsight'
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
 
 antlr4.output = new File('src/main/java/com/netflix/rewrite')
 antlr4.extraArgs = ['-package', 'com.netflix.rewrite']
@@ -27,6 +53,7 @@ dependencies {
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5', optional
     compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5', optional
+    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.5', optional
 
     // just for Closure-based refactor method on CompilationUnit
     compile 'org.codehaus.groovy:groovy-all:2.4.7', optional
@@ -67,33 +94,29 @@ shadowJar {
     }
 }
 
-if(project.rootProject == project) {
-  apply plugin: 'nebula.netflixoss'
+publishing {
+    publications {
+        nebula(MavenPublication) {
+            artifact shadowJar {
+                classifier = 'jdkbundle'
+            }
+        }
 
-  publishing {
-      publications {
-          nebula(MavenPublication) {
-              artifact shadowJar {
-                  classifier = 'jdkbundle'
-              }
-          }
+        withType(MavenPublication) {
+            pom.withXml {
+                asNode().dependencies.dependency.scope.each {
+                    it.value = 'compile'
+                }
+            }
+        }
+    }
+}
 
-          withType(MavenPublication) {
-              pom.withXml {
-                  asNode().dependencies.dependency.scope.each {
-                      it.value = 'compile'
-                  }
-              }
-          }
-      }
-  }
-
-  license {
-      header = file('gradle/licenseHeader.txt')
-      exclude '**/*.tokens'
-      mapping {
-          kt = 'JAVADOC_STYLE'
-      }
-      sourceSets = project.sourceSets
-  }
+license {
+    header = file('gradle/licenseHeader.txt')
+    exclude '**/*.tokens'
+    mapping {
+        kt = 'JAVADOC_STYLE'
+    }
+    sourceSets = project.sourceSets
 }
