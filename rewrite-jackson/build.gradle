@@ -24,6 +24,10 @@ group = 'com.netflix.devinsight'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
+configurations.all {
+    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+}
+
 dependencies {
     // only needed because IntelliJ Gradle composites do not support file dependencies
     runtime files("${System.getProperty('java.home')}/../lib/tools.jar")

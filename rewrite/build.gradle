@@ -53,9 +53,6 @@ dependencies {
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5', optional
 
-    // just for Closure-based refactor method on CompilationUnit
-    compile 'org.codehaus.groovy:groovy-all:2.4.7', optional
-
     testCompile 'junit:junit:4.+'
     testCompile 'org.ow2.asm:asm:latest.release'
     testCompile 'org.ow2.asm:asm-util:latest.release'

@@ -22,7 +22,6 @@ import com.netflix.rewrite.ast.visitor.PrintVisitor
 import com.netflix.rewrite.ast.visitor.RetrieveCursorVisitor
 import com.netflix.rewrite.refactor.Refactor
 import com.netflix.rewrite.search.*
-import groovy.lang.Closure
 import java.io.Serializable
 import java.lang.IllegalArgumentException
 import java.lang.IllegalStateException
@@ -327,13 +326,6 @@ sealed class Tr : Serializable, Tree {
         fun refactor(ops: Consumer<Refactor>): Refactor {
             val r = refactor()
             ops.accept(r)
-            return r
-        }
-
-        fun refactor(ops: Closure<Refactor>): Refactor {
-            val r = refactor()
-            ops.delegate = r
-            ops.call(r)
             return r
         }
 
