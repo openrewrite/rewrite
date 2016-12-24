@@ -180,7 +180,7 @@ open class AstVisitor<R> {
                     .andThen(label.statement)
 
     open fun visitLambda(lambda: Tr.Lambda): R =
-            visit(lambda.params)
+            visit(lambda.paramSet.params)
                     .andThen(lambda.body)
 
     open fun visitLiteral(literal: Tr.Literal): R = default(literal)

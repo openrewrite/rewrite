@@ -500,7 +500,7 @@ sealed class Tr : Serializable, Tree {
         override fun <R> accept(v: AstVisitor<R>): R = v.visitLabel(this)
     }
 
-    data class Lambda(val params: List<VariableDecls>,
+    data class Lambda(val paramSet: Parameters,
                       val arrow: Arrow,
                       val body: Tree,
                       override val type: Type?,
@@ -510,6 +510,11 @@ sealed class Tr : Serializable, Tree {
         override fun <R> accept(v: AstVisitor<R>): R = v.reduce(v.visitLambda(this), v.visitExpression(this))
 
         data class Arrow(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Tr()
+
+        data class Parameters(val parenthesized: Boolean,
+                              val params: List<VariableDecls>,
+                              override val formatting: Formatting = Formatting.Empty,
+                              override val id: Long = id()): Tr()
     }
 
     data class Literal(val value: Any?,
@@ -825,7 +830,7 @@ sealed class Tr : Serializable, Tree {
     data class VariableDecls(
             val annotations: List<Annotation>,
             val modifiers: List<Modifier>,
-            val typeExpr: TypeTree,
+            val typeExpr: TypeTree?, // can be null when this is a lambda parameter with an inferred type expression
             val varArgs: Varargs?,
             val dimensionsBeforeName: List<Dimension>,
             val vars: List<NamedVar>,
@@ -966,6 +971,7 @@ sealed class Tr : Serializable, Tree {
             is Tr.InstanceOf -> copy(formatting = fmt)
             is Tr.Label -> copy(formatting = fmt)
             is Tr.Lambda -> copy(formatting = fmt)
+            is Tr.Lambda.Parameters -> copy(formatting = fmt)
             is Tr.Lambda.Arrow -> copy(formatting = fmt)
             is Tr.Literal -> copy(formatting = fmt)
             is Tr.MethodDecl -> copy(formatting = fmt)
@@ -995,6 +1001,7 @@ sealed class Tr : Serializable, Tree {
             is Tr.Try.Finally -> copy(formatting = fmt)
             is Tr.TypeCast -> copy(formatting = fmt)
             is Tr.TypeParameter -> copy(formatting = fmt)
+            is Tr.TypeParameter.Bounds -> copy(formatting = fmt)
             is Tr.TypeParameters -> copy(formatting = fmt)
             is Tr.Unary -> copy(formatting = fmt)
             is Tr.Unary.Operator -> when(this) {
@@ -1030,7 +1037,6 @@ sealed class Tr : Serializable, Tree {
                 is Tr.Wildcard.Bound.Super -> copy(formatting = fmt)
                 is Tr.Wildcard.Bound.Extends -> copy(formatting = fmt)
             }
-            is Tr.TypeParameter.Bounds -> copy(formatting = fmt)
         } as T
     }
 }

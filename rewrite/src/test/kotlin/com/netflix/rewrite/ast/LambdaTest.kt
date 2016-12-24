@@ -36,12 +36,44 @@ abstract class LambdaTest(p: Parser): Parser by p {
 
     @Test
     fun lambda() {
-        assertEquals(1, lambda.params.size)
+        assertEquals(1, lambda.paramSet.params.size)
         assertTrue(lambda.body is Tr.Literal)
     }
 
     @Test
     fun format() {
         assertEquals("(String s) -> \"\"", lambda.printTrimmed())
+    }
+
+    @Test
+    fun untypedLambdaParameter() {
+        val a = parse("""
+            import java.util.*;
+            public class A {
+                List<String> list = new ArrayList<>();
+                public void test() {
+                    list.stream().filter(s -> s.isEmpty());
+                }
+            }
+        """)
+
+        assertEquals("list.stream().filter(s -> s.isEmpty())",
+                a.classes[0].methods()[0].body!!.statements[0].printTrimmed())
+    }
+
+    @Test
+    fun optionalSingleParameterParentheses() {
+        val a = parse("""
+            import java.util.*;
+            public class A {
+                List<String> list = new ArrayList<>();
+                public void test() {
+                    list.stream().filter((s) -> s.isEmpty());
+                }
+            }
+        """)
+
+        assertEquals("list.stream().filter((s) -> s.isEmpty())",
+                a.classes[0].methods()[0].body!!.statements[0].printTrimmed())
     }
 }

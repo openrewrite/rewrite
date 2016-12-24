@@ -461,9 +461,12 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
     }
 
     override fun visitLambdaExpression(node: LambdaExpressionTree, fmt: Formatting.Reified): Tree {
+        val parenthesized = source[cursor] == '('
         skip("(")
         return Tr.Lambda(
-                node.parameters.convertAll(COMMA_DELIM, { sourceBefore(")") }),
+                Tr.Lambda.Parameters(parenthesized, node.parameters.convertAll(COMMA_DELIM, {
+                    if(parenthesized) sourceBefore(")") else ""
+                })),
                 Tr.Lambda.Arrow(format(sourceBefore("->"))),
                 node.body.convert(),
                 node.type(),
@@ -879,16 +882,21 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
             emptyList() // these are implicit modifiers, like "final" on try-with-resources variable declarations
         }
 
-        val typeExpr = when(vartype) {
-            is JCTree.JCArrayTypeTree -> {
-                // we'll capture the array dimensions in a bit, just convert the element type
-                var elementType = vartype.elemtype
-                while(elementType is JCTree.JCArrayTypeTree) {
-                    elementType = elementType.elemtype
+        val typeExpr = if(vartype.endPos() < 0) {
+            null // this is a lambda parameter with an inferred type expression
+        }
+        else {
+            when (vartype) {
+                is JCTree.JCArrayTypeTree -> {
+                    // we'll capture the array dimensions in a bit, just convert the element type
+                    var elementType = vartype.elemtype
+                    while (elementType is JCTree.JCArrayTypeTree) {
+                        elementType = elementType.elemtype
+                    }
+                    elementType.convert<TypeTree>()
                 }
-                elementType.convert<TypeTree>()
+                else -> vartype.convert<TypeTree>()
             }
-            else -> vartype.convert<TypeTree>()
         }
 
         fun dimensions(): List<Tr.VariableDecls.Dimension> {
@@ -904,7 +912,8 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
 
         val beforeDimensions = dimensions()
 
-        val varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(source.substring(node.vartype.startPosition, node.vartype.endPos()))
+        val vartypeString = if(typeExpr != null) source.substring(vartype.startPosition, vartype.endPos()) else ""
+        val varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString)
         val varargs = if(varargMatcher.find()) {
             skipPattern("(\\s*)\\.{3}")
             Tr.VariableDecls.Varargs(format(varargMatcher.group(1)))

@@ -48,7 +48,7 @@ class TypeTest {
     fun selfReferentialTypeIsShared() {
         val a = OracleJdkParser().parse("public class A { A a; }")
         val outerType = a.firstClass()?.type
-        val fieldType = a.classes[0].fields()[0].typeExpr.type
+        val fieldType = a.classes[0].fields()[0].typeExpr?.type
         assertTrue(outerType === fieldType)
     }
 

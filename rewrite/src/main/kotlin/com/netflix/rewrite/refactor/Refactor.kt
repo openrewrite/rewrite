@@ -107,7 +107,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
     fun changeFieldType(targets: Iterable<Tr.VariableDecls>, toType: String): Refactor {
         targets.forEach { target ->
             addOp(target, ChangeFieldType(toType))
-            target.typeExpr.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
+            target.typeExpr?.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
         }
 
         if(targets.any())
@@ -135,7 +135,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
                 .forEach { clazz, variables ->
                     addOp(clazz!!, DeleteField(variables))
                     variables.forEach { (_, _, typeExpr) ->
-                        typeExpr.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
+                        typeExpr?.type?.asClass()?.let { addOp(RemoveImport(it.fullyQualifiedName)) }
                     }
                 }
 

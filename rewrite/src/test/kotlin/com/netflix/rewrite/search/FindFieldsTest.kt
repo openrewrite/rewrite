@@ -38,7 +38,7 @@ abstract class FindFieldsTest(p: Parser): Parser by p {
 
         assertEquals(1, fields.size)
         assertEquals("list", fields[0].vars[0].name.printTrimmed())
-        assertTrue(fields[0].typeExpr.type.hasElementType("java.util.List"))
+        assertTrue(fields[0].typeExpr?.type.hasElementType("java.util.List"))
     }
     
     @Test
@@ -54,7 +54,7 @@ abstract class FindFieldsTest(p: Parser): Parser by p {
 
         assertEquals(1, fields.size)
         assertEquals("s", fields[0].vars[0].name.printTrimmed())
-        assertTrue(fields[0].typeExpr.type.hasElementType("java.lang.String"))
+        assertTrue(fields[0].typeExpr?.type.hasElementType("java.lang.String"))
     }
 }
 
