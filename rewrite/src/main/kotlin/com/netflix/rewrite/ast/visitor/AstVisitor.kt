@@ -185,6 +185,10 @@ open class AstVisitor<R> {
 
     open fun visitLiteral(literal: Tr.Literal): R = default(literal)
 
+    open fun visitMemberReference(memberRef: Tr.MemberReference): R =
+            visit(memberRef.containing)
+                    .andThen(memberRef.reference)
+
     open fun visitMethod(method: Tr.MethodDecl): R =
             visit(method.annotations)
                     .andThen(method.modifiers)

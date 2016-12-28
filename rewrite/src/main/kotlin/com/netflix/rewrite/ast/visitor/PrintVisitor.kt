@@ -218,6 +218,10 @@ class PrintVisitor : AstVisitor<String>("") {
         return literal.fmt(literal.valueSource)
     }
 
+    override fun visitMemberReference(memberRef: Tr.MemberReference): String {
+        return memberRef.fmt("${visit(memberRef.containing)}::${visit(memberRef.reference)}")
+    }
+
     override fun visitMethod(method: Tr.MethodDecl): String {
         val modifiers = visitModifiers(method.modifiers)
         val typeParams = method.typeParameters?.let { it.fmt("<${visit(it.params, ",")}>") } ?: ""

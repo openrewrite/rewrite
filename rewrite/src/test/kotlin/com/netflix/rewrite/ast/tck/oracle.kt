@@ -60,3 +60,4 @@ class OracleTypeParameterAndWildcardTest : TypeParameterAndWildcardTest(OracleJd
 class OracleTypeCastTest: TypeCastTest(OracleJdkParser())
 class OracleArrayTypeTest: ArrayTypeTest(OracleJdkParser())
 class OracleCommentTest: CommentTest(OracleJdkParser())
+class OracleMemberReferenceTest: MemberReferenceTest(OracleJdkParser())

@@ -545,6 +545,14 @@ sealed class Tr : Serializable, Tree {
         }
     }
 
+    data class MemberReference(val containing: Expression,
+                               val reference: Ident,
+                               override val formatting: Formatting = Formatting.Empty,
+                               override val id: Long = id()): Tr() {
+
+        override fun <R> accept(v: AstVisitor<R>): R = v.visitMemberReference(this)
+    }
+
     data class MethodDecl(val annotations: List<Annotation>,
                           val modifiers: List<Modifier>,
                           val typeParameters: TypeParameters?,
@@ -974,6 +982,7 @@ sealed class Tr : Serializable, Tree {
             is Tr.Lambda.Parameters -> copy(formatting = fmt)
             is Tr.Lambda.Arrow -> copy(formatting = fmt)
             is Tr.Literal -> copy(formatting = fmt)
+            is Tr.MemberReference -> copy(formatting = fmt)
             is Tr.MethodDecl -> copy(formatting = fmt)
             is Tr.MethodDecl.Parameters -> copy(formatting = fmt)
             is Tr.MethodDecl.Throws -> copy(formatting = fmt)

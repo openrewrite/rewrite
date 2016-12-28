@@ -481,11 +481,19 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return Tr.Literal(
                 when(type) {
                     Type.Primitive.Char -> (node.value as Int).toChar()
-                    Type.Primitive.Boolean -> if((node.value as Int) == 0) false else true
+                    Type.Primitive.Boolean -> node.value as Int != 0
                     else -> node.value
                 },
                 source.substring(node.startPosition, node.endPos()),
                 type,
+                fmt
+        )
+    }
+
+    override fun visitMemberReference(node: MemberReferenceTree, fmt: Formatting.Reified): Tree {
+        return Tr.MemberReference(
+                (node as JCTree.JCMemberReference).expr.convert { sourceBefore("::") },
+                Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString()))),
                 fmt
         )
     }

@@ -299,6 +299,15 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
 
     override fun visitLiteral(literal: Tr.Literal): Tree = literal.transformIfNecessary(cursor())
 
+    override fun visitMemberReference(memberRef: Tr.MemberReference): Tree {
+        val containing = visit(memberRef.containing) as Expression
+        val reference = visit(memberRef.reference) as Tr.Ident
+
+        return (if(containing !== memberRef.containing || reference !== memberRef.reference) {
+            memberRef.copy(containing = containing, reference = reference)
+        } else memberRef).transformIfNecessary(cursor())
+    }
+
     override fun visitMethod(method: Tr.MethodDecl): Tree {
         val returnTypeExpr = visit(method.returnTypeExpr) as TypeTree?
 
