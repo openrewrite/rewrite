@@ -226,3 +226,8 @@ fun Type?.hasElementType(fullyQualifiedName: String): Boolean = when(this) {
     is Type.GenericTypeVariable -> this.fullyQualifiedName == fullyQualifiedName
     else -> false
 }
+
+fun Type?.asPrimitive(): Type.Primitive? = when(this) {
+    is Type.Primitive -> this
+    else -> null
+}

@@ -499,6 +499,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return Tr.MemberReference(
                 (node as JCTree.JCMemberReference).expr.convert { sourceBefore("::") },
                 Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString()))),
+                node.type(),
                 fmt
         )
     }

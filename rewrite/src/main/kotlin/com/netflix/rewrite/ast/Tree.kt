@@ -554,8 +554,9 @@ sealed class Tr : Serializable, Tree {
 
     data class MemberReference(val containing: Expression,
                                val reference: Ident,
+                               override val type: Type?,
                                override val formatting: Formatting = Formatting.Empty,
-                               override val id: Long = id()): Tr() {
+                               override val id: Long = id()): Expression, Tr() {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitMemberReference(this)
     }

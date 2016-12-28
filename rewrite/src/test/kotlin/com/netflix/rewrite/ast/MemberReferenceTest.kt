@@ -1,8 +1,10 @@
 package com.netflix.rewrite.ast
 
+import com.netflix.rewrite.ast.visitor.AstVisitor
 import com.netflix.rewrite.parse.Parser
-import org.junit.Assert
+import org.junit.Assert.assertEquals
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
 
 abstract class MemberReferenceTest(p: Parser): Parser by p {
 
@@ -13,7 +15,7 @@ abstract class MemberReferenceTest(p: Parser): Parser by p {
 
             public class StaticLambdaRef {
                 void test() {
-                    Stream.of("s").forEach(A::func);
+                    Stream.of("s").forEach(A :: func);
                 }
             }
 
@@ -22,6 +24,17 @@ abstract class MemberReferenceTest(p: Parser): Parser by p {
             }
         """)
 
-        Assert.assertEquals("Stream.of(\"s\").forEach(A::func)", a.classes[0].methods()[0].body!!.statements[0].printTrimmed())
+        val memberRefLatch = CountDownLatch(1)
+
+        object: AstVisitor<Unit?>(null) {
+            override fun visitMemberReference(memberRef: Tr.MemberReference): Unit? {
+                memberRefLatch.countDown()
+                assertEquals("java.util.function.Consumer", memberRef.type.asClass()?.fullyQualifiedName)
+                assertEquals("A :: func", memberRef.printTrimmed())
+                return null
+            }
+        }.visit(a)
+
+        assertEquals(0L, memberRefLatch.count)
     }
 }
