@@ -18,7 +18,7 @@ package com.netflix.rewrite.parse
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.ast.Tree
 import com.sun.source.tree.*
-import com.sun.source.util.TreeScanner
+import com.sun.source.util.TreePathScanner
 import com.sun.tools.javac.code.BoundKind
 import com.sun.tools.javac.code.Flags
 import com.sun.tools.javac.code.Symbol
@@ -37,7 +37,7 @@ import javax.lang.model.type.TypeKind
 
 private typealias JdkTree = com.sun.source.tree.Tree
 
-class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tree, Formatting.Reified>() {
+class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanner<Tree, Formatting.Reified>() {
     private lateinit var endPosTable: EndPosTable
     private lateinit var docTable: DocCommentTable
     private var cursor: Int = 0
@@ -962,12 +962,34 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreeScanner<Tr
 
     @Suppress("UNCHECKED_CAST")
     private fun <T : Tree> JdkTree.convert(suffix: (JdkTree) -> String = { "" }): T {
-        val prefix = source.substring(cursor, Math.max((this as JCTree).startPosition, cursor))
-        cursor += prefix.length
-        var t = scan(this, format(prefix)) as T
-        t = t.changeFormatting<T>(t.formatting.withSuffix(suffix(this)))
-        cursor(Math.max(this.endPos(), cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
-        return t
+        try {
+            val prefix = source.substring(cursor, Math.max((this as JCTree).startPosition, cursor))
+            cursor += prefix.length
+            var t = scan(this, format(prefix)) as T
+            t = t.changeFormatting<T>(t.formatting.withSuffix(suffix(this)))
+            cursor(Math.max(this.endPos(), cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
+            return t
+        } catch(t: Throwable) {
+            // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
+            logger.error("Failed to convert ${this.javaClass.simpleName} for the following cursor stack:")
+            logCurrentPathAsError()
+            throw t
+        }
+    }
+
+    private fun logCurrentPathAsError() {
+        logger.error("--- BEGIN PATH ---")
+        currentPath.reversed().forEach {
+            val lineNumber by lazy { source.substring(0, (it as JCTree).startPosition).count { it == '\n' } + 1 }
+            logger.error(when(it) {
+                is JCTree.JCCompilationUnit -> "JCCompilationUnit(sourceFile = ${it.sourcefile.name})"
+                is JCTree.JCClassDecl -> "JCClassDecl(name = ${it.name})"
+                is JCTree.JCMethodDecl -> "JCMethodDecl(name = ${it.name}, line = $lineNumber)"
+                is JCTree.JCVariableDecl -> "JCVariableDecl(name = ${it.name}, line = $lineNumber)"
+                else -> "${it.javaClass.simpleName}(line = $lineNumber)"
+            })
+        }
+        logger.error("--- END PATH ---")
     }
 
     @Suppress("UNCHECKED_CAST")
