@@ -85,6 +85,14 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
         } else arrayType).transformIfNecessary(cursor())
     }
 
+    override fun visitAssert(assert: Tr.Assert): Tree? {
+        val condition = visit(assert.condition) as Expression
+
+        return (if(condition !== assert.condition) {
+            assert.copy(condition = condition)
+        } else assert).transformIfNecessary(cursor())
+    }
+
     override fun visitAssign(assign: Tr.Assign): Tree {
         val variable = visit(assign.variable) as Expression
         val assignment = visit(assign.assignment) as Expression

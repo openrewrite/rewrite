@@ -64,6 +64,10 @@ class PrintVisitor : AstVisitor<String>("") {
         return arrayType.fmt("${visit(arrayType.elementType)}$dim")
     }
 
+    override fun visitAssert(assert: Tr.Assert): String {
+        return assert.fmt("assert${visit(assert.condition)}")
+    }
+
     override fun visitAssign(assign: Tr.Assign): String {
         return assign.fmt("${visit(assign.variable)}=${visit(assign.assignment)}")
     }

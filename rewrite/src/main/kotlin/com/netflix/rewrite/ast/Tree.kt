@@ -117,6 +117,13 @@ sealed class Tr : Serializable, Tree {
                              override val id: Long = id()): Tr()
     }
 
+    data class Assert(val condition: Expression,
+                      override val formatting: Formatting = Formatting.Empty,
+                      override val id: Long = id()): Statement, Tr() {
+
+        override fun <R> accept(v: AstVisitor<R>): R = v.visitAssert(this)
+    }
+
     data class Assign(val variable: Expression,
                       val assignment: Expression,
                       override val type: Type?,
@@ -912,6 +919,7 @@ sealed class Tr : Serializable, Tree {
             is Tr.ArrayAccess.Dimension -> copy(formatting = fmt)
             is Tr.ArrayType -> copy(formatting = fmt)
             is Tr.ArrayType.Dimension -> copy(formatting = fmt)
+            is Tr.Assert -> copy(formatting = fmt)
             is Tr.Assign -> copy(formatting = fmt)
             is Tr.AssignOp -> copy(formatting = fmt)
             is Tr.AssignOp.Operator -> when(this) {

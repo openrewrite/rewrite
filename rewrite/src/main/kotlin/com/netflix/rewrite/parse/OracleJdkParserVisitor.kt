@@ -107,6 +107,11 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return Tr.ArrayType(elemType, dimensions, fmt)
     }
 
+    override fun visitAssert(node: AssertTree, fmt: Formatting.Reified): Tree {
+        skip("assert")
+        return Tr.Assert((node as JCTree.JCAssert).cond.convert())
+    }
+
     override fun visitAssignment(node: AssignmentTree, fmt: Formatting.Reified): Tree {
         val variable = node.variable.convert<Expression> { sourceBefore("=") }
         val assignment = node.expression.convert<Expression>()

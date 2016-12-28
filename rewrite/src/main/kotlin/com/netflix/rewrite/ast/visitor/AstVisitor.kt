@@ -84,6 +84,9 @@ open class AstVisitor<R> {
     open fun visitArrayType(arrayType: Tr.ArrayType): R =
             visit(arrayType.elementType)
 
+    open fun visitAssert(assert: Tr.Assert): R =
+            visit(assert.condition)
+
     open fun visitAssign(assign: Tr.Assign): R =
             visit(assign.variable)
                     .andThen(assign.assignment)
