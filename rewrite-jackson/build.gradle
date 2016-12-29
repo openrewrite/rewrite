@@ -14,6 +14,7 @@ buildscript {
 apply plugin: 'nebula.kotlin'
 apply plugin: 'nebula.maven-resolved-dependencies'
 apply plugin: 'com.github.hierynomus.license'
+apply plugin: 'nebula.optional-base'
 
 repositories {
     mavenCentral()
@@ -33,9 +34,9 @@ dependencies {
     runtime files("${System.getProperty('java.home')}/../lib/tools.jar")
 
     if(project == project.rootProject) {
-        compile 'com.netflix.devinsight:rewrite:latest.release'
+        compile 'com.netflix.devinsight:rewrite:latest.release', optional
     } else {
-        compile project(':rewrite')
+        compile project(':rewrite'), optional
     }
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
