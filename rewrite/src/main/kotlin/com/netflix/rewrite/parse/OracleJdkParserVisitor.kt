@@ -896,7 +896,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             emptyList() // these are implicit modifiers, like "final" on try-with-resources variable declarations
         }
 
-        val typeExpr = if(vartype.endPos() < 0) {
+        val typeExpr = if(vartype == null || vartype.endPos() < 0) {
             null // this is a lambda parameter with an inferred type expression
         }
         else {
