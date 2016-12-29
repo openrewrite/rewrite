@@ -243,7 +243,7 @@ sealed class Tr : Serializable, Tree {
                          val body: Block<Tree>,
                          val type: Type?,
                          override val formatting: Formatting = Formatting.Empty,
-                         override val id: Long = id()) : Tr() {
+                         override val id: Long = id()) : Statement, Tr() {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitClassDecl(this)
 
@@ -447,9 +447,11 @@ sealed class Tr : Serializable, Tree {
 
             @JvmStatic @JsonCreator
             fun build(simpleName: String, type: Type? = null, formatting: Formatting = Formatting.Empty, id: Long = id()): Ident {
-                val fly = flyweights
-                        .getOrPut(simpleName, { HashObjObjMaps.newMutableMap<Type?, IdentFlyweight>(mapOf(type to IdentFlyweight(simpleName, type))) })
-                        .getOrPut(type, { IdentFlyweight(simpleName, type) })
+                val fly = synchronized(flyweights) {
+                    flyweights
+                            .getOrPut(simpleName, { HashObjObjMaps.newMutableMap<Type?, IdentFlyweight>(mapOf(type to IdentFlyweight(simpleName, type))) })
+                            .getOrPut(type, { IdentFlyweight(simpleName, type) })
+                }
                 return Ident(fly, formatting, id)
             }
         }

@@ -58,8 +58,11 @@ sealed class Formatting {
 
             @JvmStatic @JsonCreator
             fun build(prefix: String, suffix: String): Reified {
-                val matchingPrefixes = flyweights.getOrPut(prefix, { HashObjObjMaps.newMutableMap<String, Reified>(mapOf(suffix to Reified(prefix, suffix))) })
-                return matchingPrefixes.getOrPut(suffix, { Reified(prefix, suffix) })
+                return synchronized(flyweights) {
+                    flyweights
+                        .getOrPut(prefix, { HashObjObjMaps.newMutableMap<String, Reified>(mapOf(suffix to Reified(prefix, suffix))) })
+                        .getOrPut(suffix, { Reified(prefix, suffix) })
+                }
             }
         }
     }

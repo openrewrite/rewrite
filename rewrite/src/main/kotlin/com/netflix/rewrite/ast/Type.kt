@@ -81,14 +81,16 @@ sealed class Type: Serializable {
                 // whether the supertype hierarchy and members through the entire supertype hierarchy are equal
                 val test = Class(fullyQualifiedName, members, supertype)
 
-                val variants = flyweights.getOrPut(fullyQualifiedName) {
-                    HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype)))
-                }
+                return synchronized(flyweights) {
+                    val variants = flyweights.getOrPut(fullyQualifiedName) {
+                        HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype)))
+                    }
 
-                return variants.find { it.deepEquals(test) } ?: {
-                    variants.add(test)
-                    test
-                }()
+                    variants.find { it.deepEquals(test) } ?: {
+                        variants.add(test)
+                        test
+                    }()
+                }
             }
         }
     }
@@ -130,19 +132,21 @@ sealed class Type: Serializable {
                       paramNames: List<String>, flags: List<Flag>): Type.Method {
                 val test = Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flags)
 
-                val methods = flyweights
-                        .getOrPut(declaringType, { HashObjObjMaps.newMutableMap(mapOf(name to HashObjSets.newMutableSet(listOf(test)))) })
-                        .getOrPut(name, { HashObjSets.newMutableSet(listOf(test)) })
+                return synchronized(flyweights) {
+                    val methods = flyweights
+                            .getOrPut(declaringType, { HashObjObjMaps.newMutableMap(mapOf(name to HashObjSets.newMutableSet(listOf(test)))) })
+                            .getOrPut(name, { HashObjSets.newMutableSet(listOf(test)) })
 
-                return methods.find { m ->
-                    paramNames == m.paramNames &&
-                            genericSignature.deepEquals(m.genericSignature) &&
-                            resolvedSignature.deepEquals(m.resolvedSignature) &&
-                            flags.all { m.flags.contains(it) }
-                } ?: {
-                    methods.add(test)
-                    test
-                }()
+                    methods.find { m ->
+                        paramNames == m.paramNames &&
+                                genericSignature.deepEquals(m.genericSignature) &&
+                                resolvedSignature.deepEquals(m.resolvedSignature) &&
+                                flags.all { m.flags.contains(it) }
+                    } ?: {
+                        methods.add(test)
+                        test
+                    }()
+                }
             }
         }
     }

@@ -12,6 +12,10 @@ import java.io.OutputStream
 
 class TreeJacksonSerializer {
 
+    companion object {
+        val cuListType = object : TypeReference<List<Tr.CompilationUnit>>() {}
+    }
+
     val mapper: ObjectMapper by lazy {
         val f = SmileFactory()
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true)
@@ -39,11 +43,12 @@ class TreeJacksonSerializer {
 
     fun write(cu: Tr.CompilationUnit): ByteArray = mapper.writeValueAsBytes(cu)
 
-    fun readList(input: InputStream): List<Tr.CompilationUnit> =
-        mapper.readValue<List<Tr.CompilationUnit>>(input, object: TypeReference<List<Tr.CompilationUnit>>() {})
+    fun readList(input: InputStream): List<Tr.CompilationUnit> {
+        return mapper.readValue<List<Tr.CompilationUnit>>(input, cuListType)
+    }
 
     fun readList(bytes: ByteArray): List<Tr.CompilationUnit> =
-            mapper.readValue<List<Tr.CompilationUnit>>(bytes, object: TypeReference<List<Tr.CompilationUnit>>() {})
+            mapper.readValue<List<Tr.CompilationUnit>>(bytes, cuListType)
 
     fun read(input: InputStream): Tr.CompilationUnit = mapper.readValue(input, Tr.CompilationUnit::class.java)
 
