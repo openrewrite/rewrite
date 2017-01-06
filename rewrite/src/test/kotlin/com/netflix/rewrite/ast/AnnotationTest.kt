@@ -45,4 +45,15 @@ abstract class AnnotationTest(p: Parser): Parser by p {
         
         assertEquals("@SuppressWarnings(\"ALL\")", ann.printTrimmed())
     }
+
+    @Test
+    fun default() {
+        val a = parse("""
+            public @interface A {
+                Integer foo() default 0;
+            }
+        """)
+
+        assertEquals("Integer foo() default 0", a.classes[0].methods()[0].printTrimmed())
+    }
 }

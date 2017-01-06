@@ -326,7 +326,10 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
             if(it.exceptions !== exceptions) it.copy(exceptions) else it
         }
 
-        val defaultValue = visit(method.defaultValue) as Expression?
+        val defaultValue = method.defaultValue?.let {
+            val value = visit(it.value) as Expression
+            if(it.value !== value) it.copy(value) else it
+        }
 
         val typeParams = method.typeParameters?.let {
             val generics = it.params.mapIfNecessary { visit(it) as Tr.TypeParameter }

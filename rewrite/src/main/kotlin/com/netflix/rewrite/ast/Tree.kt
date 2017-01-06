@@ -571,7 +571,7 @@ sealed class Tr : Serializable, Tree {
                           val params: Parameters,
                           val throws: Throws?,
                           val body: Block<Statement>?,
-                          val defaultValue: Expression?,
+                          val defaultValue: Default?,
                           override val formatting: Formatting = Formatting.Empty,
                           override val id: Long = id()) : Tr() {
 
@@ -586,6 +586,10 @@ sealed class Tr : Serializable, Tree {
         data class Throws(val exceptions: List<NameTree>,
                           override val formatting: Formatting = Formatting.Empty,
                           override val id: Long = id()): Tr()
+
+        data class Default(val value: Expression,
+                           override val formatting: Formatting = Formatting.Empty,
+                           override val id: Long = id()): Tr()
 
         fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
 
@@ -995,6 +999,7 @@ sealed class Tr : Serializable, Tree {
             is Tr.Literal -> copy(formatting = fmt)
             is Tr.MemberReference -> copy(formatting = fmt)
             is Tr.MethodDecl -> copy(formatting = fmt)
+            is Tr.MethodDecl.Default -> copy(formatting = fmt)
             is Tr.MethodDecl.Parameters -> copy(formatting = fmt)
             is Tr.MethodDecl.Throws -> copy(formatting = fmt)
             is Tr.MethodInvocation -> copy(formatting = fmt)

@@ -230,12 +230,13 @@ class PrintVisitor : AstVisitor<String>("") {
         val modifiers = visitModifiers(method.modifiers)
         val typeParams = method.typeParameters?.let { it.fmt("<${visit(it.params, ",")}>") } ?: ""
         val params = method.params.fmt("(${visit(method.params.params, ",")}") + ")"
+        val default = method.defaultValue?.let { it.fmt("default${visit(it.value)}") } ?: ""
 
         val throws = method.throws?.let {
             it.fmt("throws${visit(method.throws.exceptions, ",")}")
         } ?: ""
 
-        return method.fmt("${visit(method.annotations)}$modifiers$typeParams${visit(method.returnTypeExpr)}${visit(method.name)}$params$throws${visit(method.body)}")
+        return method.fmt("${visit(method.annotations)}$modifiers$typeParams${visit(method.returnTypeExpr)}${visit(method.name)}$params$throws${visit(method.body)}$default")
     }
 
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): String {

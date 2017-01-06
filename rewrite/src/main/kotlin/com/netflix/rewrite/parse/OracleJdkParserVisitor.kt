@@ -621,14 +621,17 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             Tr.MethodDecl.Parameters(listOf(Tr.Empty(format(sourceBefore(")")))), paramFmt)
         }
 
-
         val throws = if(node.throws.isNotEmpty()) {
             val throwsPrefix = sourceBefore("throws")
             Tr.MethodDecl.Throws(node.throws.convertAll<NameTree>(COMMA_DELIM, NO_DELIM), format(throwsPrefix))
         } else null
 
         val body = node.body.convertOrNull<Tr.Block<Statement>>()
-        val defaultValue = node.defaultValue.convertOrNull<Expression> { sourceBefore(";") }
+
+        val defaultValue = if(node.defaultValue != null) {
+            val defaultFmt = format(sourceBefore("default"))
+            Tr.MethodDecl.Default(node.defaultValue.convert<Expression>(), defaultFmt)
+        } else null
 
         return Tr.MethodDecl(annotations, modifiers, typeParams, returnType, name, params, throws, body, defaultValue, fmt)
     }
