@@ -7,6 +7,7 @@ buildscript {
     dependencies {
         classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
         classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
+        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
         classpath 'gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1'
     }
 }

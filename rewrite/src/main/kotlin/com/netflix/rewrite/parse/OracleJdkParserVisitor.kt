@@ -552,7 +552,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             if(it is Symbol.MethodSymbol) it else null
         }
 
-        val type = if(genericSymbol != null) {
+        val type = if(genericSymbol != null && jcSelect.type != null) {
             fun signature(t: com.sun.tools.javac.code.Type) = Type.Method.Signature(
                     (t as com.sun.tools.javac.code.Type.MethodType).restype?.type(),
                     t.argtypes.map { it.type() }.filterNotNull()

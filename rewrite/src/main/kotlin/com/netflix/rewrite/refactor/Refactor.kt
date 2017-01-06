@@ -271,7 +271,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
 
     internal class InMemoryDiffEntry(filePath: Path, relativeTo: Path?, old: String, new: String): DiffEntry() {
         private val repo = InMemoryRepository.Builder().build()
-        private val relativePath = relativeTo?.let { filePath.relativize(relativeTo) } ?: filePath
+        private val relativePath = relativeTo?.relativize(filePath) ?: filePath
 
         init {
             changeType = ChangeType.MODIFY
