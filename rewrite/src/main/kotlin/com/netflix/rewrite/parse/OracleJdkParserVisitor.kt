@@ -216,6 +216,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 Modifier.ABSTRACT -> Tr.Modifier.Abstract(modFormat)
                 Modifier.STATIC -> Tr.Modifier.Static(modFormat)
                 Modifier.FINAL -> Tr.Modifier.Final(modFormat)
+                Modifier.STRICTFP -> Tr.Modifier.Strictfp(modFormat)
                 else -> throw IllegalArgumentException("Unexpected modifier $mod")
             }
         }

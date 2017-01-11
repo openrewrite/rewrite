@@ -254,6 +254,7 @@ class PrintVisitor : AstVisitor<String>("") {
             is Tr.Modifier.Abstract -> "abstract"
             is Tr.Modifier.Native -> "native"
             is Tr.Modifier.Static -> "static"
+            is Tr.Modifier.Strictfp -> "strictfp"
             is Tr.Modifier.Final -> "final"
             is Tr.Modifier.Transient -> "transient"
             is Tr.Modifier.Volatile -> "volatile"

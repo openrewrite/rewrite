@@ -162,4 +162,10 @@ abstract class ClassDeclTest(p: Parser): Parser by p {
 
         assertEquals(aSrc, parse(aSrc).printTrimmed())
     }
+
+    @Test
+    fun strictfpClass() {
+        val a = parse("public strictfp class A {}")
+        assertEquals(a.classes[0].printTrimmed(), "public strictfp class A {}")
+    }
 }
