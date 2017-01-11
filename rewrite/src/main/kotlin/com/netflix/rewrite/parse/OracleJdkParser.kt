@@ -87,7 +87,8 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         Check.instance(context).compiled.clear()
     }
 
-    override fun parse(sourceFiles: List<Path>): List<Tr.CompilationUnit> {
+    override fun parse(sourceFiles: List<Path>, relativeTo: Path?): List<Tr.CompilationUnit> {
+
         if (classpath != null) { // override classpath
             assert(context.get(JavaFileManager::class.java) === pfm)
             pfm.setLocation(StandardLocation.CLASS_PATH, classpath)
@@ -107,7 +108,7 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         return cus.map {
             val (path, cu) = it
             logger.trace("Building AST for {}", path.toAbsolutePath().fileName)
-            OracleJdkParserVisitor(path, path.toFile().readText()).scan(cu, Formatting.Empty) as Tr.CompilationUnit
+            OracleJdkParserVisitor(relativeTo?.relativize(path) ?: path, path.toFile().readText()).scan(cu, Formatting.Empty) as Tr.CompilationUnit
         }
     }
 

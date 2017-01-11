@@ -28,6 +28,7 @@ interface Parser {
      */
     fun reset(): Unit
 
+    fun parse(sourceFiles: List<Path>, relativeTo: Path?): List<Tr.CompilationUnit>
     fun parse(sourceFiles: List<Path>): List<Tr.CompilationUnit>
 
     fun parse(source: String, whichDependsOn: String) =
@@ -64,4 +65,6 @@ interface Parser {
 abstract class AbstractParser(val classpath: List<Path>?): Parser {
     protected fun filterSourceFiles(sourceFiles: List<Path>) =
             sourceFiles.filter { it.fileName.toString().endsWith(".java") }.toList()
+
+    override fun parse(sourceFiles: List<Path>) = parse(sourceFiles, null)
 }

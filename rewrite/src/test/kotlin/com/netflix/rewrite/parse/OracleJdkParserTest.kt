@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import java.io.File
 import java.net.URL
 
 class OracleJdkParserTest {
@@ -41,5 +42,17 @@ class OracleJdkParserTest {
         """)
 
         assertEquals("org.testng.annotations.Test", a.classes[0].methods()[0].annotations[0].type.asClass()?.fullyQualifiedName)
+    }
+
+    @Test
+    fun relativizeSourcePaths() {
+        val packageFolder = File(temp.root, "src/main/java/com/netflix/test")
+        packageFolder.mkdirs()
+
+        val aSrc = File(packageFolder, "A.java")
+        aSrc.writeText("public class A {}")
+
+        val a = OracleJdkParser().parse(listOf(aSrc.toPath()), temp.root.toPath())
+        assertEquals("src/main/java/com/netflix/test/A.java", a.first().sourcePath)
     }
 }

@@ -368,7 +368,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     }
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): Tree {
-        val typeExpr = visit(multiVariable.typeExpr) as TypeTree
+        val typeExpr = visit(multiVariable.typeExpr) as TypeTree?
         val vars = multiVariable.vars.mapIfNecessary { visit(it) as Tr.VariableDecls.NamedVar }
 
         return (if(typeExpr !== multiVariable.typeExpr || vars !== multiVariable.vars) {
@@ -572,7 +572,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     }
 
     override fun visitWildcard(wildcard: Tr.Wildcard): Tree? {
-        val boundedType = visit(wildcard.boundedType) as NameTree
+        val boundedType = visit(wildcard.boundedType) as NameTree?
 
         return (if(boundedType !== wildcard.boundedType) {
             wildcard.copy(boundedType = boundedType)
