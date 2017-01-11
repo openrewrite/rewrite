@@ -252,6 +252,7 @@ class PrintVisitor : AstVisitor<String>("") {
             is Tr.Modifier.Protected -> "protected"
             is Tr.Modifier.Private -> "private"
             is Tr.Modifier.Abstract -> "abstract"
+            is Tr.Modifier.Native -> "native"
             is Tr.Modifier.Static -> "static"
             is Tr.Modifier.Final -> "final"
             is Tr.Modifier.Transient -> "transient"

@@ -101,4 +101,16 @@ abstract class MethodDeclTest(p: Parser): Parser by p {
         val meth = a.classes[0].methods()[0]
         assertEquals("public A() { }", meth.printTrimmed())
     }
+
+    @Test
+    fun nativeModifier() {
+        val a = parse("""
+            public class A {
+                public native void foo();
+            }
+        """)
+
+        val meth = a.classes[0].methods()[0]
+        assertEquals("public native void foo()", meth.printTrimmed())
+    }
 }
