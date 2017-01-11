@@ -608,7 +608,10 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val returnType = node.returnType.convertOrNull<TypeTree>()
 
         val name = if(node.name.toString() == "<init>") {
-            val owner = ((node as JCTree.JCMethodDecl).sym.owner as Symbol.ClassSymbol).name.toString()
+            val owner = when((node as JCTree.JCMethodDecl).sym) {
+                null -> currentPath.filterIsInstance<JCTree.JCClassDecl>().last().simpleName.toString()
+                else -> (node.sym.owner as Symbol.ClassSymbol).name.toString()
+            }
             Tr.Ident.build(owner, null, format(sourceBefore(owner)))
         } else {
             Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString())))
