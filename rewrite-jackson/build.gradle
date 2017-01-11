@@ -41,6 +41,7 @@ dependencies {
     }
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.8.5'
     compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5'
     compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.5'
 
