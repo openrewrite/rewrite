@@ -50,10 +50,23 @@ abstract class AnnotationTest(p: Parser): Parser by p {
     fun default() {
         val a = parse("""
             public @interface A {
-                Integer foo() default 0;
+                String foo() default "foo";
             }
         """)
 
-        assertEquals("Integer foo() default 0", a.classes[0].methods()[0].printTrimmed())
+        assertEquals("""String foo() default "foo"""", a.classes[0].methods()[0].printTrimmed())
+    }
+
+    @Test
+    fun newArrayArgument() {
+        val a = parse("""
+            import java.lang.annotation.Target;
+            import static java.lang.annotation.ElementType.*;
+
+            @Target({ FIELD, PARAMETER })
+            public @interface Annotation {}
+        """)
+
+        assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[1].printTrimmed())
     }
 }

@@ -54,21 +54,21 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             val argsPrefix = sourceBefore("(")
             val args: List<Expression> = if (node.arguments.size == 1) {
                 val arg = node.arguments[0]
-                when(arg) {
+                listOf(when(arg) {
                     is JCTree.JCAssign -> {
-                        listOf(if (arg.endPos() < 0) {
+                        if (arg.endPos() < 0) {
                             // this is the "value" argument, but without an explicit "value = ..."
                             arg.rhs.convert { sourceBefore(")") }
                         } else {
                             // this is either an explicit "value" argument or is assigning some other property
                             arg.convert { sourceBefore(")") }
-                        })
+                        }
                     }
                     is JCTree.JCFieldAccess -> {
-                        listOf(arg.convert { sourceBefore(")") })
+                        arg.convert { sourceBefore(")") }
                     }
-                    else -> throw IllegalStateException("Unexpected annotation argument type ${arg.javaClass}")
-                }
+                    else -> arg.convert { sourceBefore(")") }
+                })
              } else {
                 node.arguments.convertAll(COMMA_DELIM, { sourceBefore(")") })
             }
@@ -611,7 +611,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
         val name = if(node.name.toString() == "<init>") {
             val owner = when((node as JCTree.JCMethodDecl).sym) {
-                null -> currentPath.filterIsInstance<JCTree.JCClassDecl>().last().simpleName.toString()
+                null -> currentPath.filterIsInstance<JCTree.JCClassDecl>().first().simpleName.toString()
                 else -> (node.sym.owner as Symbol.ClassSymbol).name.toString()
             }
             Tr.Ident.build(owner, null, format(sourceBefore(owner)))
