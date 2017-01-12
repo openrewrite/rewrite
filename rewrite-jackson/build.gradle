@@ -49,6 +49,18 @@ dependencies {
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
 }
 
+publishing {
+    publications {
+        withType(MavenPublication) {
+            pom.withXml {
+                asNode().dependencies.dependency.scope.each {
+                    it.value = 'compile'
+                }
+            }
+        }
+    }
+}
+
 license {
     header = file('../gradle/licenseHeader.txt')
     exclude '**/*.tokens'
