@@ -165,7 +165,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                     // filter out synthetic super() invocations and the like
                     it.endPos() > 0
                 }
-                .convertBlockContents() as List<Statement>
+                .convertPossibleMultiVariable() as List<Statement>
 
         return Tr.Block<Statement>(static, statements, fmt, sourceBefore("}"))
     }
@@ -186,7 +186,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             Tr.Ident.build(skip("default")!!, null, format(sourceBefore(":")))
         return Tr.Case(
                 pattern,
-                node.statements.convertBlockContents() as List<Statement>,
+                node.statements.convertPossibleMultiVariable() as List<Statement>,
                 fmt
         )
     }
@@ -275,7 +275,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                         else -> true
                     }
                 }
-                .convertBlockContents()
+                .convertPossibleMultiVariable()
 
         val body = Tr.Block<Tree>(null, members, format(bodyPrefix), sourceBefore("}"))
 
@@ -408,7 +408,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             }
         }
 
-        val init: Statement = node.initializer.convertBlockContents().filterIsInstance<Tr.VariableDecls>().firstOrNull() ?:
+        val init: Statement = node.initializer.convertPossibleMultiVariable().filterIsInstance<Statement>().firstOrNull() ?:
                 Tr.Empty(format("", sourceBefore(";")))
 
         val condition = node.condition.convertOrNull<Expression>(SEMI_DELIM) ?:
@@ -943,10 +943,12 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
         val vars = nodes.mapIndexed { i, n ->
             val namedVarPrefix = sourceBefore(n.name.toString())
+            val name = Tr.Ident.build(n.name.toString(), node.type(),
+                    format("", if ((n as JCTree.JCVariableDecl).init is JCTree.JCExpression) sourceBefore("=") else ""))
             Tr.VariableDecls.NamedVar(
-                    Tr.Ident.build(n.name.toString(), node.type(), format("", if (node.init is JCTree.JCExpression) sourceBefore("=") else "")),
+                    name,
                     dimensions(),
-                    (n as JCTree.JCVariableDecl).init.convertOrNull(),
+                    n.init.convertOrNull(),
                     n.type(),
                     if(i == nodes.size - 1) format(namedVarPrefix) else format(namedVarPrefix, sourceBefore(","))
             )
@@ -1032,7 +1034,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         })
     }
 
-    private fun List<JdkTree>?.convertBlockContents(): List<Tree> {
+    private fun List<JdkTree>?.convertPossibleMultiVariable(): List<Tree> {
         if(this == null)
             return emptyList()
 

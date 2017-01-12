@@ -424,7 +424,7 @@ sealed class Tr : Serializable, Tree {
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitForLoop(this)
 
-        data class Control(val init: Statement, // either Tr.Empty or Tr.VariableDecls
+        data class Control(val init: Statement, // either Tr.Empty, Tr.VariableDecls, or Tr.Assign
                            val condition: Expression,
                            val update: List<Statement>,
                            override val formatting: Formatting = Formatting.Empty,

@@ -21,7 +21,7 @@ import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
-abstract class VariableDeclTest(p: Parser): Parser by p {
+abstract class VariableDeclsTest(p: Parser): Parser by p {
     
     @Test
     fun fieldDefinition() {
@@ -102,6 +102,17 @@ abstract class VariableDeclTest(p: Parser): Parser by p {
         assertEquals("String s [ ] [ ]", s.printTrimmed())
         assertEquals("int [ ] n2", n2.printTrimmed())
         assertEquals("String [ ] [ ] s2", s2.printTrimmed())
+    }
+
+    @Test
+    fun multipleDeclarationOneAssignment() {
+        val a = parse("""
+            public class A {
+                int i, j = 0;
+            }
+        """)
+
+        assertEquals("int i, j = 0", a.classes[0].fields()[0].printTrimmed())
     }
 
     @Suppress("UNCHECKED_CAST")

@@ -129,4 +129,33 @@ abstract class ForLoopTest(p: Parser): Parser by p {
         val forLoop = a.classes[0].methods()[0].body!!.statements[0] as Tr.ForLoop
         assertEquals("for(;;) test();", forLoop.printTrimmed())
     }
+
+    @Test
+    fun initializerIsAnAssignment() {
+        val a = parse("""
+            public class A {
+                int[] a;
+                public void test() {
+                    int i=0;
+                    for(i=0; i<a.length; i++) {}
+                }
+            }
+        """)
+
+        val forLoop = a.classes[0].methods()[0].body!!.statements[1]
+        assertEquals("for(i=0; i<a.length; i++) {}", forLoop.printTrimmed())
+    }
+
+    @Test
+    fun multiVariableInitialization() {
+        val a = parse("""
+            public class A {
+                public void test() {
+                    for(int i, j = 0;;) {}
+                }
+            }
+        """)
+
+        assertEquals("for(int i, j = 0;;) {}", a.classes[0].methods()[0].body!!.statements[0].printTrimmed())
+    }
 }
