@@ -28,7 +28,6 @@ import com.sun.tools.javac.tree.EndPosTable
 import com.sun.tools.javac.tree.JCTree
 import org.slf4j.LoggerFactory
 import java.lang.IllegalArgumentException
-import java.lang.IllegalStateException
 import java.nio.file.Path
 import java.util.*
 import java.util.regex.Pattern
@@ -518,7 +517,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val select = when(jcSelect) {
             is JCTree.JCFieldAccess -> jcSelect.selected.convert<Expression> { sourceBefore(".") }
             is JCTree.JCIdent -> null
-            else -> throw IllegalStateException("Unexpected method select type ${jcSelect.javaClass}")
+            else -> error("Unexpected method select type ${jcSelect.javaClass}")
         }
 
         // generic type parameters can only exist on qualified targets
@@ -531,7 +530,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val name = when(jcSelect) {
             is JCTree.JCFieldAccess ->  Tr.Ident.build(jcSelect.name.toString(), null, format(sourceBefore(jcSelect.name.toString())))
             is JCTree.JCIdent -> jcSelect.convert<Tr.Ident>()
-            else -> throw IllegalStateException("Unexpected method select type ${jcSelect.javaClass}")
+            else -> error("Unexpected method select type ${jcSelect.javaClass}")
         }
 
         val argsPrefix = sourceBefore("(")
@@ -554,10 +553,11 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         }
 
         val type = if(genericSymbol != null && jcSelect.type != null) {
-            fun signature(t: com.sun.tools.javac.code.Type) = Type.Method.Signature(
-                    (t as com.sun.tools.javac.code.Type.MethodType).restype?.type(),
-                    t.argtypes.map { it.type() }.filterNotNull()
-            )
+            fun signature(t: com.sun.tools.javac.code.Type): Type.Method.Signature? = when(t) {
+                is com.sun.tools.javac.code.Type.MethodType ->
+                    Type.Method.Signature(t.restype?.type(), t.argtypes.map { it.type() }.filterNotNull())
+                else -> null
+            }
 
             val genericSignature = when (genericSymbol.type) {
                 is com.sun.tools.javac.code.Type.ForAll ->

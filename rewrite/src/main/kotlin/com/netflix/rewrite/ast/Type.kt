@@ -99,8 +99,8 @@ sealed class Type: Serializable {
 
     data class Method private constructor(val declaringType: Class,
                                           val name: String,
-                                          val genericSignature: Signature,
-                                          val resolvedSignature: Signature,
+                                          val genericSignature: Signature?,
+                                          val resolvedSignature: Signature?,
                                           val paramNames: List<String>?,
                                           val flags: List<Flag>): Type() {
 
@@ -122,13 +122,19 @@ sealed class Type: Serializable {
         companion object {
             val flyweights = HashObjObjMaps.newMutableMap<Class, HashObjObjMap<String, HashObjSet<Method>>>()
 
-            private fun Signature.deepEquals(signature: Signature) =
-                    returnType.deepEquals(signature.returnType) &&
-                            paramTypes.size == signature.paramTypes.size &&
-                            (paramTypes.isEmpty() || paramTypes.zip(signature.paramTypes).map { (p1, p2) -> p1.deepEquals(p2) }.reduce(Boolean::and))
+            private fun Signature?.deepEquals(signature: Signature?): Boolean {
+                if(this == null)
+                    return signature == null
+                if(signature == null)
+                    return false
+
+                return returnType.deepEquals(signature.returnType) &&
+                        paramTypes.size == signature.paramTypes.size &&
+                        (paramTypes.isEmpty() || paramTypes.zip(signature.paramTypes).map { (p1, p2) -> p1.deepEquals(p2) }.reduce(Boolean::and))
+            }
 
             @JvmStatic @JsonCreator
-            fun build(declaringType: Class, name: String, genericSignature: Signature, resolvedSignature: Signature,
+            fun build(declaringType: Class, name: String, genericSignature: Signature?, resolvedSignature: Signature?,
                       paramNames: List<String>, flags: List<Flag>): Type.Method {
                 val test = Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flags)
 

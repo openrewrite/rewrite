@@ -16,7 +16,6 @@
 package com.netflix.rewrite.ast.visitor
 
 import com.netflix.rewrite.ast.*
-import java.lang.IllegalStateException
 
 class PrintVisitor : AstVisitor<String>("") {
     override fun reduce(r1: String, r2: String): String = r1 + r2
@@ -316,9 +315,9 @@ class PrintVisitor : AstVisitor<String>("") {
             Type.Primitive.Void -> "void"
             Type.Primitive.String -> "String"
             Type.Primitive.Wildcard -> "*"
-            Type.Primitive.None -> throw IllegalStateException("Unable to print None primitive")
-            Type.Primitive.Null -> throw IllegalStateException("Unable to print Null primitive")
-            else -> throw IllegalStateException("Unable to print non-primitive type")
+            Type.Primitive.None -> error("Unable to print None primitive")
+            Type.Primitive.Null -> error("Unable to print Null primitive")
+            else -> error("Unable to print non-primitive type")
         })
     }
 

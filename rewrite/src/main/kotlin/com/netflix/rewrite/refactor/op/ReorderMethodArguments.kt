@@ -17,11 +17,13 @@ package com.netflix.rewrite.refactor.op
 
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
+import org.slf4j.LoggerFactory
 
 class ReorderMethodArguments(val byArgumentNames: List<String>,
                              override val ruleName: String = "reorder-method-arguments"): RefactorVisitor<Tr.MethodInvocation>() {
 
     private var originalParamNames: Array<out String>? = null
+    private val logger = LoggerFactory.getLogger(ReorderMethodArguments::class.java)
 
     fun setOriginalParamNames(vararg names: String) { originalParamNames = names }
 
@@ -31,12 +33,19 @@ class ReorderMethodArguments(val byArgumentNames: List<String>,
                     error("There is no source attachment for method ${meth.type.declaringType.fullyQualifiedName}.${meth.name.simpleName}(..), " +
                             "provide a reference for original parameter names by calling setOriginalParamNames(..)")
 
-            val paramTypes = meth.type.resolvedSignature.paramTypes
+            val resolvedParamCount = when(meth.type.resolvedSignature) {
+                null -> {
+                    logger.warn("Unable to verify the provided parameter size because the method's resolved signature could not be determined. Original call was: " +
+                        meth.printTrimmed())
+                    meth.args.args.size
+                }
+                else -> meth.type.resolvedSignature.paramTypes.size
+            }
 
             var i = 0
             val (reordered, formattings) = byArgumentNames.fold(emptyList<Expression>() to emptyList<Formatting>()) { acc, name ->
                 val fromPos = paramNames.indexOf(name)
-                if(meth.args.args.size > paramTypes.size && fromPos == paramTypes.size - 1) {
+                if(meth.args.args.size > resolvedParamCount && fromPos == resolvedParamCount - 1) {
                     // this is a varargs argument
                     val varargs = meth.args.args.drop(fromPos)
                     val formatting = meth.args.args.subList(i, (i++) + varargs.size).map(Expression::formatting)

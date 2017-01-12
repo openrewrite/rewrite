@@ -46,6 +46,10 @@ class MethodMatcher(signature: String) {
 
     fun matches(meth: Tr.MethodInvocation): Boolean {
         val targetType = meth.type?.declaringType?.fullyQualifiedName ?: return false
+        if(meth.type.resolvedSignature == null) {
+            // no way to verify the parameter list
+            return false
+        }
         val resolvedSignaturePattern = meth.type.resolvedSignature.paramTypes.map { type ->
             fun typePattern(type: Type): String? = when (type) {
                 is Type.Primitive -> type.keyword

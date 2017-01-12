@@ -24,7 +24,6 @@ import com.netflix.rewrite.refactor.Refactor
 import com.netflix.rewrite.search.*
 import java.io.Serializable
 import java.lang.IllegalArgumentException
-import java.lang.IllegalStateException
 import java.util.concurrent.atomic.AtomicLong
 import java.util.function.Consumer
 import java.util.regex.Pattern
@@ -547,9 +546,7 @@ sealed class Tr : Serializable, Tree {
                     @Suppress("UNCHECKED_CAST")
                     return "$prefix${transform(value as T)}$suffix"
                 }
-                else -> {
-                    throw IllegalStateException("Encountered a literal `$this` that could not be transformed")
-                }
+                else -> error("Encountered a literal `$this` that could not be transformed")
             }
         }
     }

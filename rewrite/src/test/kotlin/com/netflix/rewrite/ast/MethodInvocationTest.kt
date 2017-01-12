@@ -54,7 +54,7 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
         assertEquals(listOf(Type.Primitive.Int, Type.Primitive.Int, Type.Primitive.Int),
                 inv.args.args.filterIsInstance<Tr.Literal>().map { it.type })
 
-        val effectParams = inv.type!!.resolvedSignature.paramTypes
+        val effectParams = inv.type!!.resolvedSignature!!.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
         assertTrue(effectParams[1].hasElementType("java.lang.Integer"))
 
@@ -72,13 +72,13 @@ abstract class MethodInvocationTest(p: Parser) : Parser by p {
             assertEquals(listOf(Type.Primitive.Int, Type.Primitive.Int, Type.Primitive.Int),
                     test.args.args.filterIsInstance<Tr.Literal>().map { it.type })
 
-            val effectiveParams = test.type!!.resolvedSignature.paramTypes
+            val effectiveParams = test.type!!.resolvedSignature!!.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)
             assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
 
             // check assumptions about the target method
             // notice how, in the case of generic arguments, the generics are concretized to match the call site
-            val methType = test.type!!.genericSignature
+            val methType = test.type!!.genericSignature!!
             assertEquals("T", methType.returnType.asGeneric()?.fullyQualifiedName)
             assertEquals("T", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
             assertTrue(methType.paramTypes[1].hasElementType("T"))

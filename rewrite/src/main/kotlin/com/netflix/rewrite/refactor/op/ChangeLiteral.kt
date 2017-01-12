@@ -58,7 +58,7 @@ class ChangeLiteral(val transform: (Any?) -> Any?,
                         Type.Primitive.None -> ""
                         Type.Primitive.Wildcard -> "*"
                         Type.Primitive.Null -> "null"
-                        else -> throw IllegalStateException("Undefined primitive")
+                        else -> error("Undefined primitive")
                     }
 
                     copy(value = transformed, valueSource = transformedValueSource)

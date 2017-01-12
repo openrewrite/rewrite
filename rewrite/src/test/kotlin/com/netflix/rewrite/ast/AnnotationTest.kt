@@ -67,6 +67,6 @@ abstract class AnnotationTest(p: Parser): Parser by p {
             public @interface Annotation {}
         """)
 
-        assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[1].printTrimmed())
+        assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[0].printTrimmed())
     }
 }
