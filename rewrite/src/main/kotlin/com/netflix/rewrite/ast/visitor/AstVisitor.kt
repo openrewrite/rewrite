@@ -15,10 +15,7 @@
  */
 package com.netflix.rewrite.ast.visitor
 
-import com.netflix.rewrite.ast.Cursor
-import com.netflix.rewrite.ast.Expression
-import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.ast.Tree
+import com.netflix.rewrite.ast.*
 import java.util.*
 
 open class AstVisitor<R> {
@@ -73,16 +70,20 @@ open class AstVisitor<R> {
 
     open fun visitTree(t: Tree): R = default(t)
 
-    open fun visitAnnotation(annotation: Tr.Annotation): R =
-            visit(annotation.annotationType)
-                    .andThen(annotation.args?.args)
+    open fun visitAnnotation(annotation: Tr.Annotation): R {
+        visitTypeName(annotation.annotationType)
+        return visit(annotation.annotationType)
+                .andThen(annotation.args?.args)
+    }
 
     open fun visitArrayAccess(arrayAccess: Tr.ArrayAccess): R =
             visit(arrayAccess.indexed)
                     .andThen(arrayAccess.dimension.index)
 
-    open fun visitArrayType(arrayType: Tr.ArrayType): R =
-            visit(arrayType.elementType)
+    open fun visitArrayType(arrayType: Tr.ArrayType): R {
+        visitTypeName(arrayType.elementType)
+        return visit(arrayType.elementType)
+    }
 
     open fun visitAssert(assert: Tr.Assert): R =
             visit(assert.condition)
@@ -113,14 +114,17 @@ open class AstVisitor<R> {
             visit(catch.param)
                     .andThen(catch.body)
 
-    open fun visitClassDecl(classDecl: Tr.ClassDecl): R =
-            visit(classDecl.annotations)
-                    .andThen(classDecl.modifiers)
-                    .andThen(classDecl.name)
-                    .andThen(classDecl.typeParams?.params)
-                    .andThen(classDecl.extends)
-                    .andThen(classDecl.implements)
-                    .andThen(classDecl.body)
+    open fun visitClassDecl(classDecl: Tr.ClassDecl): R {
+        visitTypeNameIfNonNull(classDecl.extends)
+        classDecl.implements.forEach { visitTypeName(it) }
+        return visit(classDecl.annotations)
+                .andThen(classDecl.modifiers)
+                .andThen(classDecl.name)
+                .andThen(classDecl.typeParams?.params)
+                .andThen(classDecl.extends)
+                .andThen(classDecl.implements)
+                .andThen(classDecl.body)
+    }
 
     open fun visitCompilationUnit(cu: Tr.CompilationUnit): R = reduce(
             visit(cu.imports)
@@ -192,48 +196,70 @@ open class AstVisitor<R> {
             visit(memberRef.containing)
                     .andThen(memberRef.reference)
 
-    open fun visitMethod(method: Tr.MethodDecl): R =
-            visit(method.annotations)
-                    .andThen(method.modifiers)
-                    .andThen(method.typeParameters?.params)
-                    .andThen(method.returnTypeExpr)
-                    .andThen(method.name)
-                    .andThen(method.params.params)
-                    .andThen(method.throws?.exceptions)
-                    .andThen(method.body)
-                    .andThen(method.defaultValue)
+    open fun visitMethod(method: Tr.MethodDecl): R {
+        visitTypeNameIfNonNull(method.returnTypeExpr)
+        method.throws?.exceptions?.forEach { visitTypeName(it) }
+        return visit(method.annotations)
+                .andThen(method.modifiers)
+                .andThen(method.typeParameters?.params)
+                .andThen(method.returnTypeExpr)
+                .andThen(method.name)
+                .andThen(method.params.params)
+                .andThen(method.throws?.exceptions)
+                .andThen(method.body)
+                .andThen(method.defaultValue)
+    }
 
-    open fun visitMethodInvocation(meth: Tr.MethodInvocation): R =
-            visit(meth.select)
-                    .andThen(meth.typeParameters?.params)
-                    .andThen(meth.name)
-                    .andThen(meth.args.args)
+    open fun visitMethodInvocation(meth: Tr.MethodInvocation): R {
+        if (meth.select is NameTree && meth.type?.hasFlags(Flag.Static) ?: false)
+            visitTypeName(meth.select)
+        meth.typeParameters?.params?.forEach { visitTypeName(it) }
 
-    open fun visitMultiCatch(multiCatch: Tr.MultiCatch): R =
-            visit(multiCatch.alternatives)
+        return visit(meth.select)
+                .andThen(meth.typeParameters?.params)
+                .andThen(meth.name)
+                .andThen(meth.args.args)
+    }
 
-    open fun visitMultiVariable(multiVariable: Tr.VariableDecls): R =
-            visit(multiVariable.annotations)
-                    .andThen(multiVariable.modifiers)
-                    .andThen(multiVariable.typeExpr)
-                    .andThen(multiVariable.vars)
+    open fun visitMultiCatch(multiCatch: Tr.MultiCatch): R {
+        multiCatch.alternatives.forEach { visitTypeName(it) }
+        return visit(multiCatch.alternatives)
+    }
 
-    open fun visitNewArray(newArray: Tr.NewArray): R =
-            visit(newArray.typeExpr)
-                    .andThen(newArray.dimensions.map { it.size })
-                    .andThen(newArray.initializer?.elements)
+    open fun visitMultiVariable(multiVariable: Tr.VariableDecls): R {
+        if(multiVariable.typeExpr !is Tr.MultiCatch) {
+            visitTypeNameIfNonNull(multiVariable.typeExpr)
+        }
 
-    open fun visitNewClass(newClass: Tr.NewClass): R =
-            visit(newClass.clazz)
-                    .andThen(newClass.args.args)
-                    .andThen(newClass.classBody)
+        return visit(multiVariable.annotations)
+                .andThen(multiVariable.modifiers)
+                .andThen(multiVariable.typeExpr)
+                .andThen(multiVariable.vars)
+    }
+
+    open fun visitNewArray(newArray: Tr.NewArray): R {
+        visitTypeNameIfNonNull(newArray.typeExpr)
+        return visit(newArray.typeExpr)
+                .andThen(newArray.dimensions.map { it.size })
+                .andThen(newArray.initializer?.elements)
+    }
+
+    open fun visitNewClass(newClass: Tr.NewClass): R {
+        visitTypeName(newClass.clazz)
+        return visit(newClass.clazz)
+                .andThen(newClass.args.args)
+                .andThen(newClass.classBody)
+    }
 
     open fun visitPackage(pkg: Tr.Package): R =
             visit(pkg.expr)
 
-    open fun visitParameterizedType(type: Tr.ParameterizedType): R =
-            visit(type.clazz)
-                    .andThen(type.typeArguments?.args)
+    open fun visitParameterizedType(type: Tr.ParameterizedType): R {
+        visitTypeName(type.clazz)
+        type.typeArguments?.args?.filterIsInstance<NameTree>()?.forEach { visitTypeName(it) }
+        return visit(type.clazz)
+                .andThen(type.typeArguments?.args)
+    }
 
     open fun <T: Tree> visitParentheses(parens: Tr.Parentheses<T>): R =
             visit(parens.tree)
@@ -265,17 +291,26 @@ open class AstVisitor<R> {
                     .andThen(tryable.catches)
                     .andThen(tryable.finally?.block)
 
-    open fun visitTypeCast(typeCast: Tr.TypeCast): R =
-            visit(typeCast.clazz)
-                    .andThen(typeCast.expr)
+    open fun visitTypeCast(typeCast: Tr.TypeCast): R {
+        visitTypeName(typeCast.clazz.tree)
+        return visit(typeCast.clazz)
+                .andThen(typeCast.expr)
+    }
 
-    open fun visitTypeParameter(typeParameter: Tr.TypeParameter): R =
-            visit(typeParameter.annotations)
-                    .andThen(typeParameter.name)
-                    .andThen(typeParameter.bounds?.types)
+    open fun visitTypeParameter(typeParameter: Tr.TypeParameter): R {
+        typeParameter.bounds?.types?.forEach { visitTypeName(it) }
+        return visit(typeParameter.annotations)
+                .andThen(typeParameter.name)
+                .andThen(typeParameter.bounds?.types)
+    }
 
     open fun visitTypeParameters(typeParameters: Tr.TypeParameters): R =
             visit(typeParameters.params)
+
+    private fun visitTypeNameIfNonNull(name: NameTree?): R =
+            name?.let { visitTypeName(it) } ?: default(null)
+
+    open fun visitTypeName(name: NameTree): R = default(null)
 
     open fun visitUnary(unary: Tr.Unary): R = visit(unary.expr)
 
@@ -291,7 +326,9 @@ open class AstVisitor<R> {
             visit(whileLoop.condition)
                     .andThen(whileLoop.body)
 
-    open fun visitWildcard(wildcard: Tr.Wildcard): R =
-            visit(wildcard.bound)
-                    .andThen(wildcard.boundedType)
+    open fun visitWildcard(wildcard: Tr.Wildcard): R {
+        visitTypeNameIfNonNull(wildcard.boundedType)
+        return visit(wildcard.bound)
+                .andThen(wildcard.boundedType)
+    }
 }

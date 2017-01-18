@@ -1208,17 +1208,17 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 if(source.length > delimIndex + 1) {
                     when(source.substring(delimIndex, delimIndex + 2)) {
                         "//" -> {
-                            inSingleLineComment = true;
+                            inSingleLineComment = true
                             delimIndex += 2
                             continue@loop
                         }
                         "/*" -> {
-                            inMultiLineComment = true;
+                            inMultiLineComment = true
                             delimIndex += 2
                             continue@loop
                         }
                         "*/" -> {
-                            inMultiLineComment = false;
+                            inMultiLineComment = false
                             delimIndex += 2
                             continue@loop
                         }

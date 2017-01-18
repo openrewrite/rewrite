@@ -15,14 +15,10 @@
  */
 package com.netflix.rewrite.refactor.op
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
-import org.junit.Before
 import org.junit.Test
-import org.slf4j.LoggerFactory
 
 abstract class ChangeTypeTest(p: Parser): Parser by p {
 
@@ -30,6 +26,7 @@ abstract class ChangeTypeTest(p: Parser): Parser by p {
         package a;
         public class A1 extends Exception {
             public static void stat() {}
+            public void foo() {}
         }
     """
 
@@ -37,6 +34,7 @@ abstract class ChangeTypeTest(p: Parser): Parser by p {
         package a;
         public class A2 extends Exception {
             public static void stat() {}
+            public void foo() {}
         }
     """
 
@@ -274,6 +272,31 @@ abstract class ChangeTypeTest(p: Parser): Parser by p {
             |
             |public class B {
             |   A2 a = (A2) null;
+            |}
+        """)
+    }
+
+    @Test
+    fun `even though references to original type remain in the ast, the original type's import is removed`() {
+        val b = parse("""
+            |import a.A1;
+            |public class B {
+            |   A1 a = null;
+            |   public void test() { a.foo(); }
+            |}
+        """, a1, a2)
+
+        val fixed = b.refactor().changeType("a.A1", "a.A2").fix()
+
+        val inv = fixed.classes[0].methods()[0].body!!.statements[0]
+        println(inv)
+
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class B {
+            |   A2 a = null;
+            |   public void test() { a.foo(); }
             |}
         """)
     }

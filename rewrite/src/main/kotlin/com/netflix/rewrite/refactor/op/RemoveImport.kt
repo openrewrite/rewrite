@@ -55,9 +55,9 @@ class RemoveImport(val clazz: String, override val ruleName: String = "remove-im
         return emptyList()
     }
 
-    override fun visitIdentifier(ident: Tr.Ident): List<AstTransform<Tr.CompilationUnit>> {
-        if(ident.type.asClass()?.packageName() == classType.packageName())
-            ident.type.asClass()?.let { referencedTypes.add(it.fullyQualifiedName) }
+    override fun visitTypeName(name: NameTree): List<AstTransform<Tr.CompilationUnit>> {
+        if(name.type.asClass()?.packageName() == classType.packageName())
+            name.type.asClass()?.let { referencedTypes.add(it.fullyQualifiedName) }
         return emptyList()
     }
 

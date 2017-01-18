@@ -42,7 +42,7 @@ abstract class ChangeLiteralTest(p: Parser): Parser by p {
         """
 
         val cu = parse(a, b)
-        val fixed = cu.refactor() {
+        val fixed = cu.refactor {
             cu.findMethodCalls("b.B singleArg(String)").forEach {
                 changeLiteral(it.args.args[0]) { s -> s?.toString()?.replace("%s", "{}") ?: s }
             }

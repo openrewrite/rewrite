@@ -98,13 +98,9 @@ class AddImport(val clazz: String,
             val comp = packageComparator.compare(import.qualid.target.printTrimmed(),
                     if(addingStaticImport()) clazz else classType.packageName())
             if(comp == 0) {
-                if(import.qualid.simpleName < if(addingStaticImport()) staticMethod!! else classType.className()) {
-                    true
-                }
-                else false
+                import.qualid.simpleName < (if(addingStaticImport()) staticMethod!! else classType.className())
             }
-            else if(comp < 0) true
-            else false
+            else comp < 0
         }
     }
 

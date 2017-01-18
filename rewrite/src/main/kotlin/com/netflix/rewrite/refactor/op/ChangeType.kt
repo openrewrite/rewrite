@@ -18,11 +18,20 @@ package com.netflix.rewrite.refactor.op
 import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 
+/**
+ * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
+ * For example, a method invocation select might refer to field `A a` whose type has now changed to `A2`, and so the type
+ * on the select should change as well. But how do we identify the set of all method selects which refer to `a`? Suppose
+ * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
+ * is defined on the super class.
+ */
 data class ChangeType(val from: String,
                       val to: String,
                       override val ruleName: String = "change-type"): RefactorVisitor<Tree>() {
     // NOTE: a type change is possible anywhere a Tr.FieldAccess or Tr.Ident is possible, but not every FieldAccess or Ident
     // represents a type (could represent a variable name, etc.)
+
+    private val toClassType by lazy { Type.Class.build(to) }
 
     override fun visitAnnotation(annotation: Tr.Annotation): List<AstTransform<Tree>> =
         super.visitAnnotation(annotation) + annotation.annotationType
@@ -64,8 +73,8 @@ data class ChangeType(val from: String,
 
         return super.visitMultiVariable(multiVariable) +
                 multiVariable.typeExpr.transformName<Tr.VariableDecls> { name, node -> node.copy(typeExpr = name) } +
-                multiVariable.vars.mapIndexed { i, namedVar ->
-                    namedVar.name.transformName<Tr.VariableDecls> { name, node ->
+                multiVariable.vars.mapIndexed { i, (name) ->
+                    name.transformName<Tr.VariableDecls> { name, node ->
                         node.copy(vars = node.vars.mapIndexed { j, originalVar ->
                             if(i == j)
                                 originalVar.copy(name = originalVar.name.copy(type = name.type))
@@ -106,11 +115,10 @@ data class ChangeType(val from: String,
 
     fun <T: Tree> NameTree?.transformName(change: (Tr.Ident, T) -> Tree): List<AstTransform<Tree>> {
         return if (this != null && this.type.asClass()?.fullyQualifiedName == from) {
-            val classType = Type.Class.build(to)
             val originalFormatting = formatting
             transform {
                 @Suppress("UNCHECKED_CAST")
-                change(Tr.Ident.build(classType.className(), classType, originalFormatting), this as T)
+                change(Tr.Ident.build(toClassType.className(), toClassType, originalFormatting), this as T)
             }
         } else emptyList()
     }
