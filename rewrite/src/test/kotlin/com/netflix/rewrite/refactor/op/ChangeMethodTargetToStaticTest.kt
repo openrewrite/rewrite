@@ -16,8 +16,12 @@
 package com.netflix.rewrite.refactor.op
 
 import com.netflix.rewrite.assertRefactored
+import com.netflix.rewrite.ast.Flag
+import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.parse.OracleJdkParser
 import com.netflix.rewrite.parse.Parser
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 
 abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
@@ -27,7 +31,7 @@ abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
         val a = """
             |package a;
             |public class A {
-            |   public void foo() {}
+            |   public void nonStatic() {}
             |}
         """
 
@@ -42,14 +46,16 @@ abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
             |import a.*;
             |class C {
             |   public void test() {
-            |       new A().foo();
+            |       new A().nonStatic();
             |   }
             |}
         """
 
         val cu = parse(c, a, b)
+        val targets = cu.findMethodCalls("a.A nonStatic()")
         val fixed = cu.refactor()
-            .changeMethodTargetToStatic(cu.findMethodCalls("a.A foo()"), "b.B")
+            .changeMethodTargetToStatic(targets, "b.B")
+            .changeMethodName(targets, "foo")
             .fix()
 
         assertRefactored(fixed, """
@@ -61,6 +67,9 @@ abstract class ChangeMethodTargetToStaticTest(p: Parser): Parser by p {
             |   }
             |}
         """)
+
+        val refactoredInv = fixed.classes[0].methods()[0].body!!.statements[0] as Tr.MethodInvocation
+        assertTrue(refactoredInv.type?.hasFlags(Flag.Static) ?: false)
     }
 
     @Test

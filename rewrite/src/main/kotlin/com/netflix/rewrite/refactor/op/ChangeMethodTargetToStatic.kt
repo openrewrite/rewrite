@@ -15,10 +15,7 @@
  */
 package com.netflix.rewrite.refactor.op
 
-import com.netflix.rewrite.ast.AstTransform
-import com.netflix.rewrite.ast.Formatting
-import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.ast.Type
+import com.netflix.rewrite.ast.*
 import com.netflix.rewrite.refactor.RefactorVisitor
 
 class ChangeMethodTargetToStatic(val clazz: String,
@@ -27,8 +24,11 @@ class ChangeMethodTargetToStatic(val clazz: String,
     override fun visitMethodInvocation(meth: Tr.MethodInvocation): List<AstTransform<Tr.MethodInvocation>> {
         val classType = Type.Class.build(clazz)
         return transform {
+            val transformedType = type?.let { t ->
+                t.copy(declaringType = classType, flags = if(t.hasFlags(Flag.Static)) t.flags else t.flags + Flag.Static)
+            }
             meth.copy(select = Tr.Ident.build(classType.className(), classType, meth.select?.formatting ?:
-                    Formatting.Empty), type = type?.copy(declaringType = classType))
+                    Formatting.Empty), type = transformedType)
         }
     }
 }
