@@ -47,11 +47,15 @@ Install the dependency from Maven Central or JCenter with:
 </dependency>
 ```
 
+For now you will need to add https://dl.bintray.com/kotlin/kotlin-eap-1.1 as a repository to resolve against, as Rewrite is written (ironically perhaps) in a Kotlin 1.1 Milestone.
+
 or
 
 ```groovy
-compile 'com.netflix.devinsight:rewrite:0.8.0'
+compile 'com.netflix.devinsight:rewrite:0.13.2'
 ```
+
+(Again, you will need to add the kotlin-eap-1.1 repository mentioned above)
 
 Add the Maven or Gradle classifier `jdkbundle` to fetch a version of the package that package relocates and shades the relevant parts of the JDK needed for parsing into the distribution.
 
