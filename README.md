@@ -43,7 +43,7 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight</groupId>
     <artifactId>rewrite</artifactId>
-    <version>0.8.0</version>
+    <version>0.13.2</version>
 </dependency>
 ```
 
