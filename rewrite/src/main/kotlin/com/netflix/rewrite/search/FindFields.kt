@@ -21,7 +21,9 @@ import com.netflix.rewrite.ast.visitor.AstVisitor
 class FindFields(val fullyQualifiedName: String) : AstVisitor<List<Tr.VariableDecls>>(emptyList()) {
 
     override fun visitMultiVariable(multiVariable: Tr.VariableDecls): List<Tr.VariableDecls> {
-        return if(multiVariable.typeExpr?.type.hasElementType(fullyQualifiedName))
+        return if(multiVariable.typeExpr is Tr.MultiCatch)
+            emptyList()
+        else if(multiVariable.typeExpr?.type.hasElementType(fullyQualifiedName))
             listOf(multiVariable)
         else emptyList()
     }

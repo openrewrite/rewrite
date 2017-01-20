@@ -56,6 +56,22 @@ abstract class FindFieldsTest(p: Parser): Parser by p {
         assertEquals("s", fields[0].vars[0].name.printTrimmed())
         assertTrue(fields[0].typeExpr?.type.hasElementType("java.lang.String"))
     }
+
+    @Test
+    fun skipsMultiCatches() {
+        val a = parse("""
+            import java.io.*;
+            public class A {
+                File f;
+                public void test() {
+                    try(FileInputStream fis = new FileInputStream(f)) {}
+                    catch(FileNotFoundException | RuntimeException e) {}
+                }
+            }
+        """)
+
+        assertEquals(1, a.classes[0].findFields("java.io.File").size)
+    }
 }
 
 class OracleJdkFindFieldsTest: FindFieldsTest(OracleJdkParser())
