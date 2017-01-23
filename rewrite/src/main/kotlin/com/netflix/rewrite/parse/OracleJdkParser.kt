@@ -19,8 +19,8 @@ import com.netflix.rewrite.ast.Formatting
 import com.netflix.rewrite.ast.Tr
 import com.sun.tools.javac.comp.Check
 import com.sun.tools.javac.comp.Enter
+import com.sun.tools.javac.file.JavacFileManager
 import com.sun.tools.javac.main.JavaCompiler
-import com.sun.tools.javac.nio.JavacPathFileManager
 import com.sun.tools.javac.tree.JCTree
 import com.sun.tools.javac.util.Context
 import com.sun.tools.javac.util.Log
@@ -48,7 +48,7 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         }
     }
 
-    private val pfm = JavacPathFileManager(context, true, Charset.defaultCharset())
+    private val pfm = JavacFileManager(context, true, Charset.defaultCharset())
 
     private val compiler = JavaCompiler(context)
 
@@ -91,18 +91,19 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
 
         if (classpath != null) { // override classpath
             assert(context.get(JavaFileManager::class.java) === pfm)
-            pfm.setLocation(StandardLocation.CLASS_PATH, classpath)
+            pfm.setLocation(StandardLocation.CLASS_PATH, classpath.map { it.toFile() })
         }
 
-        val fileObjects = pfm.getJavaFileObjects(*filterSourceFiles(sourceFiles).toTypedArray())
+        val fileObjects = pfm.getJavaFileObjects(*filterSourceFiles(sourceFiles).map { it.toFile() }.toTypedArray())
         val cus = fileObjects.map { Paths.get(it.toUri()) to compiler.parse(it) }.toMap()
 
         try {
             cus.values.enterAll()
             compiler.attribute(compiler.todo)
-        } catch(ignore: Throwable) {
+        } catch(t: Throwable) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
+            logger.warn("Failed symbol entering or attribution", t)
         }
 
         return cus.map {
