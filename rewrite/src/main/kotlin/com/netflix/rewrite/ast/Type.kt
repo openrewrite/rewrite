@@ -47,6 +47,8 @@ sealed class Type: Serializable {
 
         fun className() = fullyQualifiedName.split('.').dropWhile { it[0].isLowerCase() }.joinToString(".")
 
+        override fun hashCode() = fullyQualifiedName.hashCode()
+
         fun packageName(): String {
             fun packageNameInternal(fqn: String): String {
                 if(!fqn.contains("."))
@@ -204,6 +206,8 @@ sealed class Type: Serializable {
 
     data class Var(val name: String, val type: Type?, val flags: List<Flag>): Type() {
         fun hasFlags(vararg test: Flag) = test.all { flags.contains(it) }
+
+        override fun hashCode() = name.hashCode()
 
         internal fun deepEquals(v: Var): Boolean =
                 name == v.name && type.deepEquals(v.type) && flags.all { v.flags.contains(it) }
