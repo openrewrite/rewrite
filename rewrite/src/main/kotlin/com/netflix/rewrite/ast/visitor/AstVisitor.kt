@@ -173,7 +173,7 @@ open class AstVisitor<R> {
     open fun visitIf(iff: Tr.If): R =
             visit(iff.ifCondition)
                     .andThen(iff.thenPart)
-                    .andThen(iff.elsePart)
+                    .andThen(iff.elsePart?.statement)
 
     open fun visitImport(import: Tr.Import): R =
             visit(import.qualid)
