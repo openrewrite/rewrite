@@ -24,6 +24,7 @@ import com.netflix.rewrite.refactor.Refactor
 import com.netflix.rewrite.search.*
 import java.io.Serializable
 import java.lang.IllegalArgumentException
+import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import java.util.function.Consumer
 import java.util.regex.Pattern
@@ -73,10 +74,8 @@ interface TypeTree: NameTree
 sealed class Tr : Serializable, Tree {
     
     companion object {
-        private val idSeq = AtomicLong()
-        fun id(): Long = idSeq.andIncrement
+        fun id(): Long = UUID.randomUUID().leastSignificantBits
     }
-    
     data class Annotation(var annotationType: NameTree,
                           var args: Arguments?,
                           override val type: Type?,
