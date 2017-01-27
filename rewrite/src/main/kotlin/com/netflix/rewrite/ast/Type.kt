@@ -41,7 +41,8 @@ sealed class Type: Serializable {
 
     data class Class private constructor(val fullyQualifiedName: String,
                                          val members: List<Var>,
-                                         val supertype: Class?): Type() {
+                                         val supertype: Class?,
+                                         val typeParameters: List<Type>): Type() {
 
         override fun toString(): String = fullyQualifiedName
 
@@ -70,7 +71,9 @@ sealed class Type: Serializable {
                 return false
             val membersEqual = members.size == c.members.size && members.all { m -> c.members.firstOrNull { it.name == m.name }?.deepEquals(m) ?: false }
             val supertypeEqual = supertype.deepEquals(c.supertype)
-            return membersEqual && supertypeEqual
+            val typeParametersEqual = typeParameters.size == c.typeParameters.size &&
+                    typeParameters.mapIndexed { i, param -> c.typeParameters[i].deepEquals(param) }.all { it }
+            return membersEqual && supertypeEqual && typeParametersEqual
         }
 
         companion object {
@@ -78,14 +81,14 @@ sealed class Type: Serializable {
             val flyweights = HashObjObjMaps.newMutableMap<String, HashObjSet<Class>>()
 
             @JvmStatic @JsonCreator
-            fun build(fullyQualifiedName: String, members: List<Var> = emptyList(), supertype: Class? = null): Type.Class {
+            fun build(fullyQualifiedName: String, members: List<Var> = emptyList(), supertype: Class? = null, typeParameters: List<Type> = emptyList()): Type.Class {
                 // the variants are the various versions of this fully qualified name, where equality is determined by
                 // whether the supertype hierarchy and members through the entire supertype hierarchy are equal
-                val test = Class(fullyQualifiedName, members, supertype)
+                val test = Class(fullyQualifiedName, members, supertype, typeParameters)
 
                 return synchronized(flyweights) {
                     val variants = flyweights.getOrPut(fullyQualifiedName) {
-                        HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype)))
+                        HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype, typeParameters)))
                     }
 
                     variants.find { it.deepEquals(test) } ?: {

@@ -47,6 +47,14 @@ data class ChangeType(val from: String,
                 classDecl.implements.transformNames { names, node: Tr.ClassDecl -> node.copy(implements = names) }
     }
 
+    override fun visitFieldAccess(field: Tr.FieldAccess): List<AstTransform<Tree>> {
+        return super.visitFieldAccess(field) +
+                field.asClassReference().transformName<Tr.FieldAccess> { name, node ->
+                    val type = node.type.asClass()!!.copy()
+                    node.copy(target = name)
+                }
+    }
+
     override fun visitMethod(method: Tr.MethodDecl): List<AstTransform<Tree>> {
         return super.visitMethod(method) +
                 method.returnTypeExpr.transformName<Tr.MethodDecl> { name, node -> node.copy(returnTypeExpr = name) } +

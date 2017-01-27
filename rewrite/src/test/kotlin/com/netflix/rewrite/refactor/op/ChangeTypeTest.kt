@@ -277,6 +277,25 @@ abstract class ChangeTypeTest(p: Parser): Parser by p {
     }
 
     @Test
+    fun classReference() {
+        val a = parse("""
+            |import a.A1;
+            |public class A {
+            |    Class<?> clazz = A1.class;
+            |}
+        """, a1, a2)
+
+        val fixed = a.refactor().changeType("a.A1", "a.A2").fix()
+        assertRefactored(fixed, """
+            |import a.A2;
+            |
+            |public class A {
+            |    Class<?> clazz = A2.class;
+            |}
+        """)
+    }
+
+    @Test
     fun `even though references to original type remain in the ast, the original type's import is removed`() {
         val b = parse("""
             |import a.A1;

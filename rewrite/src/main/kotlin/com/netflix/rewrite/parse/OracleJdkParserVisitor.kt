@@ -1083,11 +1083,12 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return when (this) {
             is Symbol.ClassSymbol -> this.type.type()
             is Symbol.VarSymbol -> Type.GenericTypeVariable(this.name.toString(), null)
+            is Symbol.TypeVariableSymbol -> this.type.type()
             else -> null
         }
     }
 
-    private fun com.sun.tools.javac.code.Type?.type(stack: List<Symbol.ClassSymbol?> = emptyList()): Type? {
+    private fun com.sun.tools.javac.code.Type?.type(stack: List<Symbol?> = emptyList()): Type? {
         return when (this) {
             is com.sun.tools.javac.code.Type.ClassType -> {
                 val sym = this.tsym as Symbol.ClassSymbol
@@ -1105,7 +1106,8 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                                 )
                             }
 
-                    Type.Class.build(sym.className(), fields, supertype_field.type(stack.plus(sym)).asClass())
+                    Type.Class.build(sym.className(), fields, supertype_field.type(stack.plus(sym)).asClass(),
+                            typarams_field.map { tParam -> tParam.type(stack.plus(sym)) }.filterNotNull())
                 }
             }
             is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(this.tsym.name.toString(), this.bound.type(stack).asClass())
