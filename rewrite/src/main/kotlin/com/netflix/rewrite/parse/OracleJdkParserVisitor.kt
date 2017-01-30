@@ -555,7 +555,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val type = if(genericSymbol != null && jcSelect.type != null) {
             fun signature(t: com.sun.tools.javac.code.Type): Type.Method.Signature? = when(t) {
                 is com.sun.tools.javac.code.Type.MethodType ->
-                    Type.Method.Signature(t.restype?.type(), t.argtypes.map { it.type() }.filterNotNull())
+                    Type.Method.Signature(type(t.restype), t.argtypes.map { type(it) }.filterNotNull())
                 else -> null
             }
 
@@ -566,7 +566,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             }
 
             Type.Method.build(
-                    genericSymbol.owner.type().asClass()!!,
+                    type(genericSymbol.owner).asClass()!!,
                     name.simpleName,
                     genericSignature,
                     signature(jcSelect.type),
@@ -712,7 +712,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             Tr.Block(null, members, format(bodyPrefix), sourceBefore("}"))
         }
 
-        return Tr.NewClass(clazz, args, body, (node as JCTree.JCNewClass).type.type(), fmt)
+        return Tr.NewClass(clazz, args, body, type((node as JCTree.JCNewClass).type), fmt)
     }
 
     override fun visitParameterizedType(node: ParameterizedTypeTree, fmt: Formatting.Reified): Tree {
@@ -1079,19 +1079,19 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     private fun Symbol.filteredFlags(): List<Flag> =
             flagMasks.filter { flags() and it.key != 0L }.map { it.value }
 
-    private fun Symbol?.type(): Type? {
-        return when (this) {
-            is Symbol.ClassSymbol -> this.type.type()
-            is Symbol.VarSymbol -> Type.GenericTypeVariable(this.name.toString(), null)
-            is Symbol.TypeVariableSymbol -> this.type.type()
+    private fun type(symbol: Symbol?): Type? {
+        return when (symbol) {
+            is Symbol.ClassSymbol -> type(symbol.type)
+            is Symbol.VarSymbol -> Type.GenericTypeVariable(symbol.name.toString(), null)
+            is Symbol.TypeVariableSymbol -> type(symbol.type)
             else -> null
         }
     }
 
-    private fun com.sun.tools.javac.code.Type?.type(stack: List<Symbol?> = emptyList()): Type? {
-        return when (this) {
+    private fun type(type: com.sun.tools.javac.code.Type?, stack: List<Symbol?> = emptyList()): Type? {
+        return when (type) {
             is com.sun.tools.javac.code.Type.ClassType -> {
-                val sym = this.tsym as Symbol.ClassSymbol
+                val sym = type.tsym as Symbol.ClassSymbol
 
                 if (stack.contains(sym))
                     Type.Cyclic(sym.className())
@@ -1101,24 +1101,24 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                             .map {
                                 Type.Var(
                                         it.name.toString(),
-                                        it.type.type(stack.plus(sym)),
+                                        type(it.type, stack.plus(sym)),
                                         it.filteredFlags()
                                 )
                             }
 
-                    Type.Class.build(sym.className(), fields, supertype_field.type(stack.plus(sym)).asClass(),
-                            typarams_field.map { tParam -> tParam.type(stack.plus(sym)) }.filterNotNull())
+                    Type.Class.build(sym.className(), fields, type(type.supertype_field, stack.plus(sym)).asClass(),
+                            type.typarams_field?.map { tParam -> type(tParam, stack.plus(sym)) }?.filterNotNull() ?: emptyList())
                 }
             }
-            is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(this.tsym.name.toString(), this.bound.type(stack).asClass())
-            is com.sun.tools.javac.code.Type.JCPrimitiveType -> this.tag.primitive()
-            is com.sun.tools.javac.code.Type.ArrayType -> Type.Array(this.elemtype.type(stack)!!)
+            is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(type.tsym.name.toString(), type(type.bound, stack).asClass())
+            is com.sun.tools.javac.code.Type.JCPrimitiveType -> type.tag.primitive()
+            is com.sun.tools.javac.code.Type.ArrayType -> Type.Array(type(type.elemtype, stack)!!)
             com.sun.tools.javac.code.Type.noType -> null
             else -> null
         }
     }
 
-    private fun JdkTree.type(): Type? = (this as JCTree).type.type()
+    private fun JdkTree.type(): Type? = type((this as JCTree).type)
 
     private fun TypeTag.primitive(): Type.Primitive {
         return when (this) {
