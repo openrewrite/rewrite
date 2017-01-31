@@ -407,10 +407,17 @@ sealed class Tr : Serializable, Tree {
          * @return For expressions like String.class, this casts target expression to a `NameTree`.
          * If the field access is not * a reference to a class type, returns null.
          */
-        fun asClassReference(): NameTree? =
-                if (type.asClass()?.fullyQualifiedName == "java.lang.Class") {
-                    target as NameTree
-                } else null
+        fun asClassReference(): NameTree? {
+            val fqn = when (type) {
+                is Type.Class -> type.fullyQualifiedName
+                is Type.ShallowClass -> type.fullyQualifiedName
+                else -> null
+            }
+
+            return if (fqn == "java.lang.Class") {
+                target as NameTree
+            } else null
+        }
     }
 
     data class ForEachLoop(val control: Control,

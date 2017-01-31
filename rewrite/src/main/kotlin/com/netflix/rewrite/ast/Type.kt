@@ -36,11 +36,26 @@ sealed class Type: Serializable {
             is Method -> t is Method && this.deepEquals(t)
             is Primitive -> t is Primitive && this == t
             is Var -> t is Var && this.deepEquals(t)
+            is ShallowClass -> t is ShallowClass && fullyQualifiedName == t.fullyQualifiedName
+        }
+    }
+
+    /**
+     * Reduces memory and CPU footprint when deep class insight isn't necessary, such as
+     * for the type parameters of a Type.Class
+     */
+    data class ShallowClass private constructor(val fullyQualifiedName: String): Type() {
+        companion object {
+            val flyweights = HashObjObjMaps.newMutableMap<String, ShallowClass>()
+
+            @JvmStatic @JsonCreator
+            fun build(fullyQualifiedName: String): ShallowClass =
+                flyweights.getOrPut(fullyQualifiedName) { ShallowClass(fullyQualifiedName) }
         }
     }
 
     data class Class private constructor(val fullyQualifiedName: String,
-                                         val members: List<Var>,
+                                         val members: List<Var>, // will always be sorted by name by build(..)
                                          val supertype: Class?,
                                          val typeParameters: List<Type>): Type() {
 
@@ -69,10 +84,31 @@ sealed class Type: Serializable {
         fun deepEquals(c: Class?): Boolean {
             if(c == null || fullyQualifiedName != c.fullyQualifiedName)
                 return false
-            val membersEqual = members.size == c.members.size && members.all { m -> c.members.firstOrNull { it.name == m.name }?.deepEquals(m) ?: false }
+
+            val membersEqual = if(members.size == c.members.size) {
+                var equal = true
+                members.forEachIndexed { i, m ->
+                    if(!c.members[i].deepEquals(m)) {
+                        equal = false
+                        return@forEachIndexed
+                    }
+                }
+                equal
+            } else false
+
             val supertypeEqual = supertype.deepEquals(c.supertype)
-            val typeParametersEqual = typeParameters.size == c.typeParameters.size &&
-                    typeParameters.mapIndexed { i, param -> c.typeParameters[i].deepEquals(param) }.all { it }
+
+            val typeParametersEqual = if(typeParameters.size == c.typeParameters.size) {
+                var equal = true
+                typeParameters.forEachIndexed { i, param ->
+                    if(!c.typeParameters[i].deepEquals(param)) {
+                        equal = false
+                        return@forEachIndexed
+                    }
+                }
+                equal
+            } else false
+
             return membersEqual && supertypeEqual && typeParametersEqual
         }
 
@@ -84,7 +120,7 @@ sealed class Type: Serializable {
             fun build(fullyQualifiedName: String, members: List<Var> = emptyList(), supertype: Class? = null, typeParameters: List<Type> = emptyList()): Type.Class {
                 // the variants are the various versions of this fully qualified name, where equality is determined by
                 // whether the supertype hierarchy and members through the entire supertype hierarchy are equal
-                val test = Class(fullyQualifiedName, members, supertype, typeParameters)
+                val test = Class(fullyQualifiedName, members.sortedBy { it.name }, supertype, typeParameters)
 
                 return synchronized(flyweights) {
                     val variants = flyweights.getOrPut(fullyQualifiedName) {

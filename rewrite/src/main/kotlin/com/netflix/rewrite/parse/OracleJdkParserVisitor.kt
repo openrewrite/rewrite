@@ -1088,7 +1088,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         }
     }
 
-    private fun type(type: com.sun.tools.javac.code.Type?, stack: List<Symbol?> = emptyList()): Type? {
+    private fun type(type: com.sun.tools.javac.code.Type?, stack: List<Symbol?> = emptyList(), shallow: Boolean = false): Type? {
         return when (type) {
             is com.sun.tools.javac.code.Type.ClassType -> {
                 val sym = type.tsym as Symbol.ClassSymbol
@@ -1096,18 +1096,22 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 if (stack.contains(sym))
                     Type.Cyclic(sym.className())
                 else {
-                    val fields = (sym.members_field?.elements ?: emptyList())
-                            .filterIsInstance<Symbol.VarSymbol>()
-                            .map {
-                                Type.Var(
-                                        it.name.toString(),
-                                        type(it.type, stack.plus(sym)),
-                                        it.filteredFlags()
-                                )
-                            }
+                    if(shallow) {
+                        Type.ShallowClass.build(sym.className())
+                    } else {
+                        val fields = (sym.members_field?.elements ?: emptyList())
+                                .filterIsInstance<Symbol.VarSymbol>()
+                                .map {
+                                    Type.Var(
+                                            it.name.toString(),
+                                            type(it.type, stack.plus(sym)),
+                                            it.filteredFlags()
+                                    )
+                                }
 
-                    Type.Class.build(sym.className(), fields, type(type.supertype_field, stack.plus(sym)).asClass(),
-                            type.typarams_field?.map { tParam -> type(tParam, stack.plus(sym)) }?.filterNotNull() ?: emptyList())
+                        Type.Class.build(sym.className(), fields, type(type.supertype_field, stack.plus(sym)).asClass(),
+                                type.typarams_field?.map { tParam -> type(tParam, stack.plus(sym), shallow = true) }?.filterNotNull() ?: emptyList())
+                    }
                 }
             }
             is com.sun.tools.javac.code.Type.TypeVar -> Type.GenericTypeVariable(type.tsym.name.toString(), type(type.bound, stack).asClass())
