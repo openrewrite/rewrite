@@ -1097,7 +1097,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                     Type.Cyclic(sym.className())
                 else {
                     if(shallow) {
-                        Type.ShallowClass.build(sym.className())
+                        Type.ShallowClass(sym.className())
                     } else {
                         val fields = (sym.members_field?.elements ?: emptyList())
                                 .filterIsInstance<Symbol.VarSymbol>()

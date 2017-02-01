@@ -44,15 +44,7 @@ sealed class Type: Serializable {
      * Reduces memory and CPU footprint when deep class insight isn't necessary, such as
      * for the type parameters of a Type.Class
      */
-    data class ShallowClass private constructor(val fullyQualifiedName: String): Type() {
-        companion object {
-            val flyweights = HashObjObjMaps.newMutableMap<String, ShallowClass>()
-
-            @JvmStatic @JsonCreator
-            fun build(fullyQualifiedName: String): ShallowClass =
-                flyweights.getOrPut(fullyQualifiedName) { ShallowClass(fullyQualifiedName) }
-        }
-    }
+    data class ShallowClass(val fullyQualifiedName: String): Type()
 
     data class Class private constructor(val fullyQualifiedName: String,
                                          val members: List<Var>, // will always be sorted by name by build(..)
@@ -113,6 +105,8 @@ sealed class Type: Serializable {
         }
 
         companion object {
+            var classVersionDependentComparison = true
+
             // there shouldn't be too many distinct types represented by the same fully qualified name
             val flyweights = HashObjObjMaps.newMutableMap<String, HashObjSet<Class>>()
 
@@ -127,7 +121,7 @@ sealed class Type: Serializable {
                         HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype, typeParameters)))
                     }
 
-                    variants.find { it.deepEquals(test) } ?: {
+                    (if(classVersionDependentComparison) variants.find { it.deepEquals(test) } else variants.firstOrNull()) ?: {
                         variants.add(test)
                         test
                     }()
