@@ -76,4 +76,20 @@ abstract class LambdaTest(p: Parser): Parser by p {
         assertEquals("list.stream().filter((s) -> s.isEmpty())",
                 a.classes[0].methods()[0].body!!.statements[0].printTrimmed())
     }
+
+    @Test
+    fun lambdaWithBlock() {
+        val a = parse("""
+            public class A {
+                Action a = ( ) -> { };
+            }
+
+            interface Action {
+                void call();
+            }
+        """)
+
+        val lambda = a.classes[0].fields()[0].vars[0].initializer!!
+        assertEquals("( ) -> { }", lambda.printTrimmed())
+    }
 }

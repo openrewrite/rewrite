@@ -293,7 +293,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
     }
 
     override fun visitLambda(lambda: Tr.Lambda): Tree {
-        val params = lambda.paramSet.params.mapIfNecessary { visit(it) as Tr.VariableDecls }
+        val params = lambda.paramSet.params.mapIfNecessary { visit(it) as Tree }
         val paramSet = if(params !== lambda.paramSet.params) {
             lambda.paramSet.copy(params = params)
         } else lambda.paramSet

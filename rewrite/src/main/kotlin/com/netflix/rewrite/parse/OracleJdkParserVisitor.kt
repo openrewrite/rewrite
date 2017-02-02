@@ -468,12 +468,34 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     override fun visitLambdaExpression(node: LambdaExpressionTree, fmt: Formatting.Reified): Tree {
         val parenthesized = source[cursor] == '('
         skip("(")
+
+        val paramList = if(parenthesized && node.parameters.isEmpty()) {
+            listOf(Tr.Empty(format(sourceBefore(")"))))
+        } else {
+            node.parameters.convertAll(COMMA_DELIM, { if (parenthesized) sourceBefore(")") else "" })
+        }
+
+        val params = Tr.Lambda.Parameters(parenthesized, paramList)
+        val arrow = Tr.Lambda.Arrow(format(sourceBefore("->")))
+
+        val body = when(node.body) {
+            is JCTree.JCBlock -> {
+                // This compensates for a bug in the Oracle AST in which the startPos of JCBlock statements
+                // that are on the right side of lambda expressions evaluates at the start of the lambda expression.
+                // All other AST elements that can occur at the right side of lambda expressions correctly evluate startPos
+                // after the arrow.
+                val prefix = sourceBefore("{")
+                cursor--
+                val blockBody = node.body.convert<Tr.Block<*>>()
+                blockBody.changeFormatting(blockBody.formatting.withPrefix(prefix))
+            }
+            else -> node.body.convert<Tree>()
+        }
+
         return Tr.Lambda(
-                Tr.Lambda.Parameters(parenthesized, node.parameters.convertAll(COMMA_DELIM, {
-                    if(parenthesized) sourceBefore(")") else ""
-                })),
-                Tr.Lambda.Arrow(format(sourceBefore("->"))),
-                node.body.convert(),
+                params,
+                arrow,
+                body,
                 node.type(),
                 fmt
         )

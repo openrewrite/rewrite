@@ -536,7 +536,7 @@ sealed class Tr : Serializable, Tree {
         data class Arrow(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Tr()
 
         data class Parameters(val parenthesized: Boolean,
-                              val params: List<VariableDecls>,
+                              val params: List<Tree>, // Tr.VariableDecls or Tr.Empty
                               override val formatting: Formatting = Formatting.Empty,
                               override val id: Long = id()): Tr()
     }
