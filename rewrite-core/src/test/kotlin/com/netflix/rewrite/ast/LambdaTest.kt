@@ -92,4 +92,5 @@ abstract class LambdaTest(p: Parser): Parser by p {
         val lambda = a.classes[0].fields()[0].vars[0].initializer!!
         assertEquals("( ) -> { }", lambda.printTrimmed())
     }
+
 }

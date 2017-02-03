@@ -5,16 +5,58 @@ buildscript {
         maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
     }
     dependencies {
-        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-M04'
+        classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-beta-38'
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
         classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:3.5.2'
         classpath 'org.apache.ant:ant:1.9.4' // otherwise shadowJar blows up in subproject
+        classpath 'gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1'
     }
 }
 
 allprojects {
     apply plugin: 'nebula.netflixoss'
 
-    group = 'com.netflix.devinsight'
+    group = 'com.netflix.devinsight.rewrite'
     description 'Pluggable and distributed refactoring tool for Java source code'
+}
+
+subprojects {
+    apply plugin: 'nebula.kotlin'
+    apply plugin: 'nebula.maven-resolved-dependencies'
+    apply plugin: 'com.github.hierynomus.license'
+    apply plugin: 'nebula.optional-base'
+
+    repositories {
+        mavenCentral()
+    }
+
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
+
+    configurations.all {
+        resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+    }
+
+    publishing {
+        publications {
+            withType(MavenPublication) {
+                pom.withXml {
+                    asNode().dependencies.dependency.scope.each {
+                        it.value = 'compile'
+                    }
+                }
+            }
+        }
+    }
+
+    license {
+        header = file('../gradle/licenseHeader.txt')
+        exclude '**/*.tokens'
+        mapping {
+            kt = 'JAVADOC_STYLE'
+        }
+        sourceSets = project.sourceSets
+        strictCheck = true
+    }
 }

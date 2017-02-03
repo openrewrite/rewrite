@@ -1,72 +1,18 @@
-buildscript {
-    repositories {
-        maven { url "https://plugins.gradle.org/m2/" }
-        maven { url 'https://dl.bintray.com/kotlin/kotlin-eap-1.1' }
-    }
-
-    dependencies {
-        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-beta-22'
-        classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
-        classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
-        classpath 'gradle.plugin.nl.javadude.gradle.plugins:license-gradle-plugin:0.13.1'
-    }
-}
-
-apply plugin: 'nebula.kotlin'
-apply plugin: 'nebula.maven-resolved-dependencies'
-apply plugin: 'com.github.hierynomus.license'
-apply plugin: 'nebula.optional-base'
-
-repositories {
-    mavenCentral()
-}
-
-group = 'com.netflix.devinsight'
-
-sourceCompatibility = 1.8
-targetCompatibility = 1.8
-
-configurations.all {
-    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
-}
-
 dependencies {
     // only needed because IntelliJ Gradle composites do not support file dependencies
     runtime files("${System.getProperty('java.home')}/../lib/tools.jar")
 
     if(project == project.rootProject) {
-        compile 'com.netflix.devinsight:rewrite:latest.release', optional
+        compile 'com.netflix.devinsight.rewrite:rewrite-core:latest.release', optional
     } else {
-        compile project(':rewrite'), optional
+        compile project(':rewrite-core'), optional
     }
 
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.5'
-    compile 'com.fasterxml.jackson.core:jackson-annotations:2.8.5'
-    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.5'
-    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.5'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.6'
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.8.6'
+    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.6'
+    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.6'
 
     testCompile 'junit:junit:4.+'
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
-}
-
-publishing {
-    publications {
-        withType(MavenPublication) {
-            pom.withXml {
-                asNode().dependencies.dependency.scope.each {
-                    it.value = 'compile'
-                }
-            }
-        }
-    }
-}
-
-license {
-    header = file('../gradle/licenseHeader.txt')
-    exclude '**/*.tokens'
-    mapping {
-        kt = 'JAVADOC_STYLE'
-    }
-    sourceSets = project.sourceSets
-    strictCheck = true
 }
