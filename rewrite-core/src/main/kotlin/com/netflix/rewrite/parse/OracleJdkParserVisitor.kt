@@ -518,12 +518,14 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     override fun visitMemberReference(node: MemberReferenceTree, fmt: Formatting.Reified): Tree {
-        return Tr.MemberReference(
-                (node as JCTree.JCMemberReference).expr.convert { sourceBefore("::") },
-                Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString()))),
-                node.type(),
-                fmt
-        )
+        val expr = (node as JCTree.JCMemberReference).expr.convert<Expression> { sourceBefore("::") }
+        val referenceName = when(node.mode!!) {
+            MemberReferenceTree.ReferenceMode.NEW -> "new"
+            MemberReferenceTree.ReferenceMode.INVOKE -> node.name.toString()
+        }
+        val reference = Tr.Ident.build(referenceName, null, format(sourceBefore(referenceName)))
+
+        return Tr.MemberReference(expr, reference, node.type(), fmt)
     }
 
     override fun visitMemberSelect(node: MemberSelectTree, fmt: Formatting.Reified): Tree {

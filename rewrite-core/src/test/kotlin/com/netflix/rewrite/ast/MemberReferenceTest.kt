@@ -37,4 +37,19 @@ abstract class MemberReferenceTest(p: Parser): Parser by p {
 
         assertEquals(0L, memberRefLatch.count)
     }
+
+    @Test
+    fun constructorMethodReference() {
+        val a = parse("""
+            import java.util.*;
+            import java.util.stream.*;
+            public class A {
+                Stream<Integer> n = Stream.of(1, 2);
+                Set<Integer> n2 = n.collect(HashSet<Integer>::new, HashSet::add);
+            }
+        """)
+
+        val collect = a.classes[0].fields()[1].vars[0].initializer!!
+        assertEquals("n.collect(HashSet<Integer>::new, HashSet::add)", collect.printTrimmed())
+    }
 }
