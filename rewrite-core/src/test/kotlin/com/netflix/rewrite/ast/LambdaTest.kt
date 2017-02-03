@@ -78,7 +78,7 @@ abstract class LambdaTest(p: Parser): Parser by p {
     }
 
     @Test
-    fun lambdaWithBlock() {
+    fun rightSideBlock() {
         val a = parse("""
             public class A {
                 Action a = ( ) -> { };
@@ -93,4 +93,16 @@ abstract class LambdaTest(p: Parser): Parser by p {
         assertEquals("( ) -> { }", lambda.printTrimmed())
     }
 
+    @Test
+    fun multipleParameters() {
+        val a = parse("""
+            import java.util.function.BiConsumer;
+            public class A {
+                BiConsumer<String, String> a = (s1, s2) -> { };
+            }
+        """)
+
+        val lambda = a.classes[0].fields()[0].vars[0].initializer!!
+        assertEquals("(s1, s2) -> { }", lambda.printTrimmed())
+    }
 }

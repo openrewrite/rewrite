@@ -212,7 +212,7 @@ class PrintVisitor : AstVisitor<String>("") {
     }
 
     override fun visitLambda(lambda: Tr.Lambda): String {
-        val params = visit(lambda.paramSet.params)
+        val params = visit(lambda.paramSet.params, ",")
         val paramSet = lambda.paramSet.fmt(if(lambda.paramSet.parenthesized) "($params)" else params)
         return lambda.fmt("$paramSet${lambda.arrow.fmt("->")}${visit(lambda.body)}")
     }
@@ -413,7 +413,6 @@ class PrintVisitor : AstVisitor<String>("") {
         return if (this == null || code == null)
             ""
         else {
-//            println("${this.javaClass.simpleName} = [" + formatting.prefix() + "," + code + "," + formatting.suffix() + "]")
             formatting.prefix() + code + formatting.suffix()
         }
     }
