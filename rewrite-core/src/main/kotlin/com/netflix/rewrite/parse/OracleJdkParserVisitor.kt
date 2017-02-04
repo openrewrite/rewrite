@@ -108,7 +108,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
     override fun visitAssert(node: AssertTree, fmt: Formatting.Reified): Tree {
         skip("assert")
-        return Tr.Assert((node as JCTree.JCAssert).cond.convert())
+        return Tr.Assert((node as JCTree.JCAssert).cond.convert(), fmt)
     }
 
     override fun visitAssignment(node: AssignmentTree, fmt: Formatting.Reified): Tree {

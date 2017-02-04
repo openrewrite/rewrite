@@ -33,7 +33,7 @@ class PrintVisitor : AstVisitor<String>("") {
         return visit(statement) + when(statement) {
             is Tr.Assign, is Tr.AssignOp, is Tr.Break, is Tr.Continue, is Tr.MethodInvocation -> ";"
             is Tr.NewClass, is Tr.Return, is Tr.Throw, is Tr.Unary, is Tr.VariableDecls -> ";"
-            is Tr.DoWhileLoop, is Tr.Empty -> ";"
+            is Tr.DoWhileLoop, is Tr.Empty, is Tr.Assert -> ";"
             is Tr.Label -> ":"
             is Tr.MethodDecl -> if(statement.body == null) ";" else ""
             else -> ""
