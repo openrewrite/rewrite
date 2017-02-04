@@ -43,7 +43,7 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight.rewrite</groupId>
     <artifactId>rewrite-core</artifactId>
-    <version>0.18.0</version>
+    <version>0.18.2</version>
 </dependency>
 ```
 
@@ -52,7 +52,7 @@ For now you will need to add https://dl.bintray.com/kotlin/kotlin-eap-1.1 as a r
 or
 
 ```groovy
-compile 'com.netflix.devinsight.rewrite:rewrite-core:0.18.0'
+compile 'com.netflix.devinsight.rewrite:rewrite-core:0.18.2'
 ```
 
 (Again, you will need to add the kotlin-eap-1.1 repository mentioned above)
