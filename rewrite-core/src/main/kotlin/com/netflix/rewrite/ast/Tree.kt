@@ -838,13 +838,16 @@ sealed class Tr : Serializable, Tree {
         override fun <R> accept(v: AstVisitor<R>): R = v.reduce(v.visitUnary(this), v.visitExpression(this))
 
         sealed class Operator: Tr() {
+            // only PostIncrement and PostDecrement may have non-empty formatting
+            override val formatting: Formatting = Formatting.Empty
+
             // Arithmetic
-            data class PreIncrement(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
-            data class PreDecrement(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
+            data class PreIncrement(override val id: Long = id()): Operator()
+            data class PreDecrement(override val id: Long = id()): Operator()
             data class PostIncrement(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
             data class PostDecrement(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
-            data class Positive(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
-            data class Negative(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
+            data class Positive(override val id: Long = id()): Operator()
+            data class Negative(override val id: Long = id()): Operator()
 
             // Bitwise
             data class Complement(override val formatting: Formatting = Formatting.Empty, override val id: Long = id()): Operator()
@@ -1045,12 +1048,12 @@ sealed class Tr : Serializable, Tree {
             is Tr.TypeParameters -> copy(formatting = fmt)
             is Tr.Unary -> copy(formatting = fmt)
             is Tr.Unary.Operator -> when(this) {
-                is Tr.Unary.Operator.PreIncrement -> copy(formatting = fmt)
-                is Tr.Unary.Operator.PreDecrement -> copy(formatting = fmt)
+                is Tr.Unary.Operator.PreIncrement -> copy() // do nothing
+                is Tr.Unary.Operator.PreDecrement -> copy() // do nothing
                 is Tr.Unary.Operator.PostIncrement -> copy(formatting = fmt)
                 is Tr.Unary.Operator.PostDecrement -> copy(formatting = fmt)
-                is Tr.Unary.Operator.Positive -> copy(formatting = fmt)
-                is Tr.Unary.Operator.Negative -> copy(formatting = fmt)
+                is Tr.Unary.Operator.Positive -> copy() // do nothing
+                is Tr.Unary.Operator.Negative -> copy() // do nothing
                 is Tr.Unary.Operator.Complement -> copy(formatting = fmt)
                 is Tr.Unary.Operator.Not -> copy(formatting = fmt)
             }

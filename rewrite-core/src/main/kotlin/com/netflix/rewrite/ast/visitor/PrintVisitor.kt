@@ -373,8 +373,8 @@ class PrintVisitor : AstVisitor<String>("") {
         return unary.fmt(when (unary.operator) {
             is Tr.Unary.Operator.PreIncrement -> "++${visit(unary.expr)}"
             is Tr.Unary.Operator.PreDecrement -> "--${visit(unary.expr)}"
-            is Tr.Unary.Operator.PostIncrement -> "${visit(unary.expr)}++"
-            is Tr.Unary.Operator.PostDecrement -> "${visit(unary.expr)}--"
+            is Tr.Unary.Operator.PostIncrement -> "${visit(unary.expr)}${unary.operator.fmt("++")}"
+            is Tr.Unary.Operator.PostDecrement -> "${visit(unary.expr)}${unary.operator.fmt("--")}"
             is Tr.Unary.Operator.Positive -> "+${visit(unary.expr)}"
             is Tr.Unary.Operator.Negative -> "-${visit(unary.expr)}"
             is Tr.Unary.Operator.Complement -> "~${visit(unary.expr)}"

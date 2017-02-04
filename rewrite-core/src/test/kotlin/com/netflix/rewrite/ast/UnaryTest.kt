@@ -42,12 +42,12 @@ abstract class UnaryTest(p: Parser): Parser by p {
             public class A {
                 int i = 0;
                 int j = ++i;
-                int k = i++;
+                int k = i ++;
             }
         """)
 
-        val (prefix, postfix) = a.classes[0].fields().subList(1, 3).map { it.vars[0].initializer as Tr.Unary }
-        assertEquals("++i", prefix.printTrimmed())
-        assertEquals("i++", postfix.printTrimmed())
+        val (prefix, postfix) = a.classes[0].fields().subList(1, 3)
+        assertEquals("int j = ++i", prefix.printTrimmed())
+        assertEquals("int k = i ++", postfix.printTrimmed())
     }
 }

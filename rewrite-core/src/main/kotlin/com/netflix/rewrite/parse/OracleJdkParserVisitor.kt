@@ -858,19 +858,19 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val (op: Tr.Unary.Operator, expr: Expression) = when((node as JCTree.JCUnary).tag) {
             JCTree.Tag.POS -> {
                 skip("+")
-                Tr.Unary.Operator.Positive(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Positive() to node.arg.convert<Expression>()
             }
             JCTree.Tag.NEG -> {
                 skip("-")
-                Tr.Unary.Operator.Negative(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Negative() to node.arg.convert<Expression>()
             }
             JCTree.Tag.PREDEC -> {
                 skip("--")
-                Tr.Unary.Operator.PreDecrement(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreDecrement() to node.arg.convert<Expression>()
             }
             JCTree.Tag.PREINC -> {
                 skip("++")
-                Tr.Unary.Operator.PreIncrement(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreIncrement() to node.arg.convert<Expression>()
             }
             JCTree.Tag.POSTDEC -> {
                 val expr = node.arg.convert<Expression>()
