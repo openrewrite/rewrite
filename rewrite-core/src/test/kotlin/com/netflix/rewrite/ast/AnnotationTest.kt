@@ -47,6 +47,18 @@ abstract class AnnotationTest(p: Parser): Parser by p {
     }
 
     @Test
+    fun preserveOptionalEmptyParentheses() {
+        val a = parse("""
+            |@Deprecated ( )
+            |public class A {}
+        """)
+
+        val ann = a.classes[0].annotations[0]
+
+        assertEquals("@Deprecated ( )", ann.printTrimmed())
+    }
+
+    @Test
     fun default() {
         val a = parse("""
             public @interface A {

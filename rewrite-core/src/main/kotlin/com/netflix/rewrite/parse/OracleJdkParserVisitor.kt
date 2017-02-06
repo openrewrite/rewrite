@@ -73,7 +73,17 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             }
 
             Tr.Annotation.Arguments(args, format(argsPrefix))
-        } else null
+        } else {
+            val remaining = source.substring(cursor, node.endPos())
+
+            // NOTE: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
+            // @MyAnnotation /* Comment () that contains parentheses */ ()
+
+            if(remaining.contains("(") && remaining.contains(")")) {
+                val parenPrefix = sourceBefore("(")
+                Tr.Annotation.Arguments(listOf(Tr.Empty(format(sourceBefore(")")))), format(parenPrefix))
+            } else null
+        }
 
         return Tr.Annotation(name, args, node.type(), fmt)
     }
@@ -1178,7 +1188,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
      * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
      * <code>untilDelim</code> return the empty String.
      */
-    private fun sourceBefore(untilDelim: String, stop: Char? = null): String {
+    private fun sourceBefore(untilDelim: String, stop: Char? = null, stopIndex: Int? = null): String {
         val delimIndex = positionOfNext(untilDelim, stop)
         if(delimIndex < 0) {
             return "" // unable to find this delimiter
@@ -1189,7 +1199,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return prefix
     }
 
-    private fun positionOfNext(untilDelim: String, stop: Char? = null): Int {
+    private fun positionOfNext(untilDelim: String, stop: Char? = null, stopIndex: Int? = null): Int {
         var delimIndex = cursor
         var inMultiLineComment = false
         var inSingleLineComment = false
