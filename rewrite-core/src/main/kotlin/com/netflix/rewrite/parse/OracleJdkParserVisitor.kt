@@ -529,8 +529,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     override fun visitMemberSelect(node: MemberSelectTree, fmt: Formatting.Reified): Tree {
-        val target = (node as JCTree.JCFieldAccess).selected.convert<Expression>()
-        skip(".")
+        val target = (node as JCTree.JCFieldAccess).selected.convert<Expression> { sourceBefore(".") }
         val name = Tr.Ident.build(node.name.toString(), null, format(sourceBefore(node.name.toString())))
         return Tr.FieldAccess(target, name, node.type(), fmt)
     }
