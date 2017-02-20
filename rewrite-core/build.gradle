@@ -34,9 +34,10 @@ dependencies {
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.6', optional
 
+    compile 'org.ow2.asm:asm:latest.release'
+    compile 'org.ow2.asm:asm-util:latest.release'
+
     testCompile 'junit:junit:4.+'
-    testCompile 'org.ow2.asm:asm:latest.release'
-    testCompile 'org.ow2.asm:asm-util:latest.release'
     testCompile 'ch.qos.logback:logback-classic:1.0.13'
     testCompile 'org.assertj:assertj-core:latest.release'
 }

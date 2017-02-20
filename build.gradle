@@ -6,7 +6,7 @@ buildscript {
     }
     dependencies {
         classpath 'com.netflix.nebula:nebula-publishing-plugin:4.9.1'
-        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-beta-38'
+        classpath 'com.netflix.nebula:nebula-kotlin-plugin:1.1.0-rc-91'
         classpath 'com.netflix.nebula:gradle-extra-configurations-plugin:3.0.3'
         classpath 'com.netflix.nebula:gradle-netflixoss-project-plugin:3.5.2'
         classpath 'org.apache.ant:ant:1.9.4' // otherwise shadowJar blows up in subproject

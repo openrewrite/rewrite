@@ -30,7 +30,7 @@ class TransformVisitor(val transformations: Iterable<AstTransform<*>>) : AstVisi
                 .fold(this) { acc, trans ->
                     val mutation = trans.mutation(acc)
                     if(logger.isDebugEnabled) {
-                        logger.debug("Transforming ${acc.javaClass.simpleName} with ${trans.name}")
+                        logger.debug("Transforming ${acc::class.java.simpleName} with ${trans.name}")
                         logger.debug("Original:")
                         logger.debug(acc.printTrimmed())
                         logger.debug("Transformed:")

@@ -32,7 +32,7 @@ class RewriteScanner(classpath: Iterable<Path>) {
 
     fun rewriteRulesOnClasspath(): Map<Rewrite, Rule> {
         val scanners = HashMap<Rewrite, Rule>()
-        val classLoader = URLClassLoader(filteredClasspath.map { it.toFile().toURI().toURL() }.toTypedArray(), javaClass.classLoader)
+        val classLoader = URLClassLoader(filteredClasspath.map { it.toFile().toURI().toURL() }.toTypedArray(), this::class.java.classLoader)
 
         val reporter = object: AnnotationDetector.TypeReporter {
             override fun annotations() = arrayOf(Rewrite::class.java)

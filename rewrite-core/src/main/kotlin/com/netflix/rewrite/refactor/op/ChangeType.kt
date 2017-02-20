@@ -50,7 +50,6 @@ data class ChangeType(val from: String,
     override fun visitFieldAccess(field: Tr.FieldAccess): List<AstTransform<Tree>> {
         return super.visitFieldAccess(field) +
                 field.asClassReference().transformName<Tr.FieldAccess> { name, node ->
-                    val type = node.type.asClass()!!.copy()
                     node.copy(target = name)
                 }
     }

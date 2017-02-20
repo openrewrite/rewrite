@@ -38,7 +38,7 @@ class TreeJacksonSerializer {
     fun write(cus: List<Tr.CompilationUnit>): ByteArray = mapper.writeValueAsBytes(cus)
 
     fun write(cu: Tr.CompilationUnit, out: OutputStream) {
-        mapper.writeValue(out, this)
+        mapper.writeValue(out, cu)
     }
 
     fun write(cu: Tr.CompilationUnit): ByteArray = mapper.writeValueAsBytes(cu)

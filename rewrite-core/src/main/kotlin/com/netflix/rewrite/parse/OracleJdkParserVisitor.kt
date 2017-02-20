@@ -550,7 +550,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val select = when(jcSelect) {
             is JCTree.JCFieldAccess -> jcSelect.selected.convert<Expression> { sourceBefore(".") }
             is JCTree.JCIdent -> null
-            else -> error("Unexpected method select type ${jcSelect.javaClass}")
+            else -> error("Unexpected method select type ${jcSelect::class.java}")
         }
 
         // generic type parameters can only exist on qualified targets
@@ -563,7 +563,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val name = when(jcSelect) {
             is JCTree.JCFieldAccess ->  Tr.Ident.build(jcSelect.name.toString(), null, format(sourceBefore(jcSelect.name.toString())))
             is JCTree.JCIdent -> jcSelect.convert<Tr.Ident>()
-            else -> error("Unexpected method select type ${jcSelect.javaClass}")
+            else -> error("Unexpected method select type ${jcSelect::class.java}")
         }
 
         val argsPrefix = sourceBefore("(")
@@ -1028,7 +1028,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             return t
         } catch(t: Throwable) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
-            logger.error("Failed to convert ${this.javaClass.simpleName} for the following cursor stack:")
+            logger.error("Failed to convert ${this::class.java.simpleName} for the following cursor stack:")
             logCurrentPathAsError()
             throw t
         }
@@ -1043,7 +1043,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 is JCTree.JCClassDecl -> "JCClassDecl(name = ${it.name})"
                 is JCTree.JCMethodDecl -> "JCMethodDecl(name = ${it.name}, line = $lineNumber)"
                 is JCTree.JCVariableDecl -> "JCVariableDecl(name = ${it.name}, line = $lineNumber)"
-                else -> "${it.javaClass.simpleName}(line = $lineNumber)"
+                else -> "${it::class.java.simpleName}(line = $lineNumber)"
             })
         }
         logger.error("--- END PATH ---")
@@ -1188,7 +1188,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
      * and if not found in the remaining source, the empty String. If <code>stop</code> is reached before
      * <code>untilDelim</code> return the empty String.
      */
-    private fun sourceBefore(untilDelim: String, stop: Char? = null, stopIndex: Int? = null): String {
+    private fun sourceBefore(untilDelim: String, stop: Char? = null): String {
         val delimIndex = positionOfNext(untilDelim, stop)
         if(delimIndex < 0) {
             return "" // unable to find this delimiter
@@ -1199,7 +1199,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return prefix
     }
 
-    private fun positionOfNext(untilDelim: String, stop: Char? = null, stopIndex: Int? = null): Int {
+    private fun positionOfNext(untilDelim: String, stop: Char? = null): Int {
         var delimIndex = cursor
         var inMultiLineComment = false
         var inSingleLineComment = false

@@ -285,7 +285,7 @@ sealed class Tr : Serializable, Tree {
         fun hasType(clazz: Class<*>): Boolean = HasType(clazz.name).visit(this)
         fun hasType(clazz: String): Boolean = HasType(clazz).visit(this)
 
-        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it::class.java == modifier }
 
         fun hasModifier(modifier: String) = Modifier::class.nestedClasses
                 .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
@@ -604,7 +604,7 @@ sealed class Tr : Serializable, Tree {
                            override val formatting: Formatting = Formatting.Empty,
                            override val id: Long = id()): Tr()
 
-        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it::class.java == modifier }
 
         fun hasModifier(modifier: String) = Modifier::class.nestedClasses
                 .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
@@ -896,7 +896,7 @@ sealed class Tr : Serializable, Tree {
             @Transient val simpleName: String = name.simpleName
         }
 
-        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it.javaClass == modifier }
+        fun <M: Modifier> hasModifier(modifier: Class<M>) = modifiers.any { it::class.java == modifier }
 
         fun hasModifier(modifier: String) = Modifier::class.nestedClasses
                 .filter { it.simpleName?.toLowerCase() == modifier.toLowerCase() }
