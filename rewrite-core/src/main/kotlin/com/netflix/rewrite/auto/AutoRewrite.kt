@@ -1,5 +1,5 @@
-/**
- * Copyright 2016 Netflix, Inc.
+/*
+ * Copyright 2015-2016 Netflix, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.netflix.rewrite.auto
+package com.netflix.rewrite.auto;
 
-import com.netflix.rewrite.ast.Tr
-import com.netflix.rewrite.refactor.Refactor
+/**
+ * Marks a method as defining a refactoring rule.
+ * Library authors should use this to annotate methods that define refactoring operations and release with new versions of their libraries.
+ * Build tool plugins then scan for the annotation in the classpath and apply the operations to the codebase.
+ */
 
-interface Rule {
-    fun refactor(cu: Tr.CompilationUnit): Refactor
-}
+@Retention(AnnotationRetention.BINARY)
+@Target(AnnotationTarget.FUNCTION)
+annotation class AutoRewrite(val value: String, val description: String)
