@@ -21,6 +21,5 @@ package com.netflix.rewrite.auto;
  * Build tool plugins then scan for the annotation in the classpath and apply the operations to the codebase.
  */
 
-@Retention(AnnotationRetention.BINARY)
 @Target(AnnotationTarget.FUNCTION)
 annotation class AutoRewrite(val value: String, val description: String)
