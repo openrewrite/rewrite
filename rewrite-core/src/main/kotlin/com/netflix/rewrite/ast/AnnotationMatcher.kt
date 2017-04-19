@@ -15,13 +15,13 @@
  */
 package com.netflix.rewrite.ast
 
-import com.netflix.rewrite.aspectj.AnnotationSignatureParser
-import com.netflix.rewrite.aspectj.AspectJLexer
-import org.antlr.v4.runtime.ANTLRInputStream
+import com.netflix.rewrite.grammar.AnnotationSignatureParser
+import com.netflix.rewrite.grammar.AspectJLexer
+import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 
 class AnnotationMatcher(signature: String) {
-    val parser = com.netflix.rewrite.aspectj.AnnotationSignatureParser(CommonTokenStream(com.netflix.rewrite.aspectj.AspectJLexer(ANTLRInputStream(signature))))
+    val parser = AnnotationSignatureParser(CommonTokenStream(AspectJLexer(CharStreams.fromString(signature))))
     var match = parser.annotation()
 
     private data class AnnotationParameter(val id: String, val value: String)

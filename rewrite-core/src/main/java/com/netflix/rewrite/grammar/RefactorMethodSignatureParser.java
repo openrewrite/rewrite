@@ -1,20 +1,5 @@
-/**
- * Copyright 2016 Netflix, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/joschneider/Projects/github/jkschneider/java-source-refactor/src/main/antlr4/RefactorMethodSignatureParser.g4 by ANTLR 4.2.2
-package com.netflix.rewrite.aspectj;
+// Generated from /Users/jschneider/Projects/github/Netflix-Skunkworks/Rewrite/rewrite-core/src/main/antlr/RefactorMethodSignatureParser.g4 by ANTLR 4.7
+package com.netflix.rewrite.grammar;
 import org.antlr.v4.runtime.atn.*;
 import org.antlr.v4.runtime.dfa.DFA;
 import org.antlr.v4.runtime.*;
@@ -26,43 +11,28 @@ import java.util.ArrayList;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class RefactorMethodSignatureParser extends Parser {
+	static { RuntimeMetaData.checkVersion("4.7", RuntimeMetaData.VERSION); }
+
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
 		new PredictionContextCache();
 	public static final int
-		THROW=46, STATIC=40, INTERFACE=30, AND_ASSIGN=95, BREAK=6, BYTE=7, ELSE=17, 
-		IF=24, ENUM=18, SUB=84, BANG=71, LPAREN=59, DOT=67, CASE=8, AT=103, LINE_COMMENT=107, 
-		StringLiteral=57, ELLIPSIS=104, LBRACK=63, PUBLIC=37, THROWS=47, NullLiteral=58, 
-		RSHIFT_ASSIGN=100, LBRACE=61, GOTO=25, SUB_ASSIGN=92, SEMI=65, CHAR=10, 
-		ASSIGN=68, COMMENT=106, SPACE=2, IMPORT=27, BITOR=88, CATCH=9, MUL_ASSIGN=93, 
-		DOUBLE=16, PROTECTED=36, LONG=31, COMMA=66, BITAND=87, PRIVATE=35, CONTINUE=13, 
-		DIV=86, FloatingPointLiteral=54, LE=76, CharacterLiteral=56, VOLATILE=51, 
-		EXTENDS=19, INSTANCEOF=28, NEW=33, ADD=83, LT=70, CLASS=11, DO=15, FINALLY=21, 
-		Identifier=102, CONST=12, PACKAGE=34, OR_ASSIGN=96, TRY=49, IntegerLiteral=53, 
-		SYNCHRONIZED=44, MUL=85, FOR=23, FINAL=20, RPAREN=60, CARET=89, URSHIFT_ASSIGN=101, 
-		BOOLEAN=5, NOTEQUAL=78, RBRACK=64, RBRACE=62, AND=79, THIS=45, SWITCH=43, 
-		VOID=50, TRANSIENT=48, INC=81, FLOAT=22, NATIVE=32, DIV_ASSIGN=94, BooleanLiteral=55, 
-		ABSTRACT=3, STRICTFP=41, INT=29, QUESTION=73, RETURN=38, LSHIFT_ASSIGN=99, 
-		ADD_ASSIGN=91, WS=105, GE=77, SUPER=42, OR=80, DEC=82, MOD=90, XOR_ASSIGN=97, 
-		ASSERT=4, EQUAL=75, DOTDOT=1, IMPLEMENTS=26, COLON=74, GT=69, SHORT=39, 
-		MOD_ASSIGN=98, WHILE=52, TILDE=72, DEFAULT=14;
-	public static final String[] tokenNames = {
-		"<INVALID>", "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
-		"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
-		"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
-		"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
-		"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
-		"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
-		"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
-		"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
-		"'while'", "IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", 
-		"CharacterLiteral", "StringLiteral", "'null'", "'('", "')'", "'{'", "'}'", 
-		"'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", "'~'", 
-		"'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", "'++'", 
-		"'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", "'+='", 
-		"'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", "'>>='", 
-		"'>>>='", "Identifier", "'@'", "'...'", "WS", "COMMENT", "LINE_COMMENT"
-	};
+		DOTDOT=1, SPACE=2, ABSTRACT=3, ASSERT=4, BOOLEAN=5, BREAK=6, BYTE=7, CASE=8, 
+		CATCH=9, CHAR=10, CLASS=11, CONST=12, CONTINUE=13, DEFAULT=14, DO=15, 
+		DOUBLE=16, ELSE=17, ENUM=18, EXTENDS=19, FINAL=20, FINALLY=21, FLOAT=22, 
+		FOR=23, IF=24, GOTO=25, IMPLEMENTS=26, IMPORT=27, INSTANCEOF=28, INT=29, 
+		INTERFACE=30, LONG=31, NATIVE=32, NEW=33, PACKAGE=34, PRIVATE=35, PROTECTED=36, 
+		PUBLIC=37, RETURN=38, SHORT=39, STATIC=40, STRICTFP=41, SUPER=42, SWITCH=43, 
+		SYNCHRONIZED=44, THIS=45, THROW=46, THROWS=47, TRANSIENT=48, TRY=49, VOID=50, 
+		VOLATILE=51, WHILE=52, IntegerLiteral=53, FloatingPointLiteral=54, BooleanLiteral=55, 
+		CharacterLiteral=56, StringLiteral=57, NullLiteral=58, LPAREN=59, RPAREN=60, 
+		LBRACE=61, RBRACE=62, LBRACK=63, RBRACK=64, SEMI=65, COMMA=66, DOT=67, 
+		ASSIGN=68, GT=69, LT=70, BANG=71, TILDE=72, QUESTION=73, COLON=74, EQUAL=75, 
+		LE=76, GE=77, NOTEQUAL=78, AND=79, OR=80, INC=81, DEC=82, ADD=83, SUB=84, 
+		MUL=85, DIV=86, BITAND=87, BITOR=88, CARET=89, MOD=90, ADD_ASSIGN=91, 
+		SUB_ASSIGN=92, MUL_ASSIGN=93, DIV_ASSIGN=94, AND_ASSIGN=95, OR_ASSIGN=96, 
+		XOR_ASSIGN=97, MOD_ASSIGN=98, LSHIFT_ASSIGN=99, RSHIFT_ASSIGN=100, URSHIFT_ASSIGN=101, 
+		Identifier=102, AT=103, ELLIPSIS=104, WS=105, COMMENT=106, LINE_COMMENT=107;
 	public static final int
 		RULE_methodPattern = 0, RULE_formalParametersPattern = 1, RULE_formalsPattern = 2, 
 		RULE_dotDot = 3, RULE_formalsPatternAfterDotDot = 4, RULE_optionalParensTypePattern = 5, 
@@ -134,11 +104,74 @@ public class RefactorMethodSignatureParser extends Parser {
 		"explicitGenericInvocationSuffix", "arguments"
 	};
 
-	@Override
-	public String getGrammarFileName() { return "RefactorMethodSignatureParser.g4"; }
+	private static final String[] _LITERAL_NAMES = {
+		null, "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
+		"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
+		"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
+		"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
+		"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
+		"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
+		"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
+		"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
+		"'while'", null, null, null, null, null, "'null'", "'('", "')'", "'{'", 
+		"'}'", "'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", 
+		"'~'", "'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", "'++'", 
+		"'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", "'+='", 
+		"'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", "'>>='", 
+		"'>>>='", null, "'@'", "'...'"
+	};
+	private static final String[] _SYMBOLIC_NAMES = {
+		null, "DOTDOT", "SPACE", "ABSTRACT", "ASSERT", "BOOLEAN", "BREAK", "BYTE", 
+		"CASE", "CATCH", "CHAR", "CLASS", "CONST", "CONTINUE", "DEFAULT", "DO", 
+		"DOUBLE", "ELSE", "ENUM", "EXTENDS", "FINAL", "FINALLY", "FLOAT", "FOR", 
+		"IF", "GOTO", "IMPLEMENTS", "IMPORT", "INSTANCEOF", "INT", "INTERFACE", 
+		"LONG", "NATIVE", "NEW", "PACKAGE", "PRIVATE", "PROTECTED", "PUBLIC", 
+		"RETURN", "SHORT", "STATIC", "STRICTFP", "SUPER", "SWITCH", "SYNCHRONIZED", 
+		"THIS", "THROW", "THROWS", "TRANSIENT", "TRY", "VOID", "VOLATILE", "WHILE", 
+		"IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
+		"StringLiteral", "NullLiteral", "LPAREN", "RPAREN", "LBRACE", "RBRACE", 
+		"LBRACK", "RBRACK", "SEMI", "COMMA", "DOT", "ASSIGN", "GT", "LT", "BANG", 
+		"TILDE", "QUESTION", "COLON", "EQUAL", "LE", "GE", "NOTEQUAL", "AND", 
+		"OR", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "BITAND", "BITOR", "CARET", 
+		"MOD", "ADD_ASSIGN", "SUB_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "AND_ASSIGN", 
+		"OR_ASSIGN", "XOR_ASSIGN", "MOD_ASSIGN", "LSHIFT_ASSIGN", "RSHIFT_ASSIGN", 
+		"URSHIFT_ASSIGN", "Identifier", "AT", "ELLIPSIS", "WS", "COMMENT", "LINE_COMMENT"
+	};
+	public static final Vocabulary VOCABULARY = new VocabularyImpl(_LITERAL_NAMES, _SYMBOLIC_NAMES);
+
+	/**
+	 * @deprecated Use {@link #VOCABULARY} instead.
+	 */
+	@Deprecated
+	public static final String[] tokenNames;
+	static {
+		tokenNames = new String[_SYMBOLIC_NAMES.length];
+		for (int i = 0; i < tokenNames.length; i++) {
+			tokenNames[i] = VOCABULARY.getLiteralName(i);
+			if (tokenNames[i] == null) {
+				tokenNames[i] = VOCABULARY.getSymbolicName(i);
+			}
+
+			if (tokenNames[i] == null) {
+				tokenNames[i] = "<INVALID>";
+			}
+		}
+	}
 
 	@Override
-	public String[] getTokenNames() { return tokenNames; }
+	@Deprecated
+	public String[] getTokenNames() {
+		return tokenNames;
+	}
+
+	@Override
+
+	public Vocabulary getVocabulary() {
+		return VOCABULARY;
+	}
+
+	@Override
+	public String getGrammarFileName() { return "RefactorMethodSignatureParser.g4"; }
 
 	@Override
 	public String[] getRuleNames() { return ruleNames; }
@@ -154,15 +187,15 @@ public class RefactorMethodSignatureParser extends Parser {
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
 	public static class MethodPatternContext extends ParserRuleContext {
-		public FormalParametersPatternContext formalParametersPattern() {
-			return getRuleContext(FormalParametersPatternContext.class,0);
-		}
-		public TerminalNode SPACE() { return getToken(RefactorMethodSignatureParser.SPACE, 0); }
 		public TargetTypePatternContext targetTypePattern() {
 			return getRuleContext(TargetTypePatternContext.class,0);
 		}
+		public TerminalNode SPACE() { return getToken(RefactorMethodSignatureParser.SPACE, 0); }
 		public SimpleNamePatternContext simpleNamePattern() {
 			return getRuleContext(SimpleNamePatternContext.class,0);
+		}
+		public FormalParametersPatternContext formalParametersPattern() {
+			return getRuleContext(FormalParametersPatternContext.class,0);
 		}
 		public MethodPatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -189,10 +222,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(222); targetTypePattern(0);
-			setState(223); match(SPACE);
-			setState(224); simpleNamePattern();
-			setState(225); formalParametersPattern();
+			setState(222);
+			targetTypePattern(0);
+			setState(223);
+			match(SPACE);
+			setState(224);
+			simpleNamePattern();
+			setState(225);
+			formalParametersPattern();
 			}
 		}
 		catch (RecognitionException re) {
@@ -236,16 +273,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(227); match(LPAREN);
+			setState(227);
+			match(LPAREN);
 			setState(229);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << DOTDOT) | (1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << SHORT) | (1L << LPAREN))) != 0) || ((((_la - 67)) & ~0x3f) == 0 && ((1L << (_la - 67)) & ((1L << (DOT - 67)) | (1L << (BANG - 67)) | (1L << (MUL - 67)) | (1L << (Identifier - 67)))) != 0)) {
 				{
-				setState(228); formalsPattern();
+				setState(228);
+				formalsPattern();
 				}
 			}
 
-			setState(231); match(RPAREN);
+			setState(231);
+			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
@@ -260,8 +301,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalsPatternContext extends ParserRuleContext {
-		public FormalsPatternContext formalsPattern(int i) {
-			return getRuleContext(FormalsPatternContext.class,i);
+		public DotDotContext dotDot() {
+			return getRuleContext(DotDotContext.class,0);
 		}
 		public List<FormalsPatternAfterDotDotContext> formalsPatternAfterDotDot() {
 			return getRuleContexts(FormalsPatternAfterDotDotContext.class);
@@ -269,21 +310,21 @@ public class RefactorMethodSignatureParser extends Parser {
 		public FormalsPatternAfterDotDotContext formalsPatternAfterDotDot(int i) {
 			return getRuleContext(FormalsPatternAfterDotDotContext.class,i);
 		}
-		public DotDotContext dotDot() {
-			return getRuleContext(DotDotContext.class,0);
-		}
+		public List<TerminalNode> SPACE() { return getTokens(RefactorMethodSignatureParser.SPACE); }
 		public TerminalNode SPACE(int i) {
 			return getToken(RefactorMethodSignatureParser.SPACE, i);
 		}
-		public FormalTypePatternContext formalTypePattern() {
-			return getRuleContext(FormalTypePatternContext.class,0);
+		public OptionalParensTypePatternContext optionalParensTypePattern() {
+			return getRuleContext(OptionalParensTypePatternContext.class,0);
 		}
-		public List<TerminalNode> SPACE() { return getTokens(RefactorMethodSignatureParser.SPACE); }
 		public List<FormalsPatternContext> formalsPattern() {
 			return getRuleContexts(FormalsPatternContext.class);
 		}
-		public OptionalParensTypePatternContext optionalParensTypePattern() {
-			return getRuleContext(OptionalParensTypePatternContext.class,0);
+		public FormalsPatternContext formalsPattern(int i) {
+			return getRuleContext(FormalsPatternContext.class,i);
+		}
+		public FormalTypePatternContext formalTypePattern() {
+			return getRuleContext(FormalTypePatternContext.class,0);
 		}
 		public FormalsPatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -311,33 +352,38 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(264);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,5,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(233); dotDot();
+				setState(233);
+				dotDot();
 				setState(244);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,2,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(234); match(COMMA);
+						setState(234);
+						match(COMMA);
 						setState(238);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 						while (_la==SPACE) {
 							{
 							{
-							setState(235); match(SPACE);
+							setState(235);
+							match(SPACE);
 							}
 							}
 							setState(240);
 							_errHandler.sync(this);
 							_la = _input.LA(1);
 						}
-						setState(241); formalsPatternAfterDotDot();
+						setState(241);
+						formalsPatternAfterDotDot();
 						}
 						} 
 					}
@@ -347,33 +393,36 @@ public class RefactorMethodSignatureParser extends Parser {
 				}
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(247); optionalParensTypePattern();
+				setState(247);
+				optionalParensTypePattern();
 				setState(258);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,4,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(248); match(COMMA);
+						setState(248);
+						match(COMMA);
 						setState(252);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 						while (_la==SPACE) {
 							{
 							{
-							setState(249); match(SPACE);
+							setState(249);
+							match(SPACE);
 							}
 							}
 							setState(254);
 							_errHandler.sync(this);
 							_la = _input.LA(1);
 						}
-						setState(255); formalsPattern();
+						setState(255);
+						formalsPattern();
 						}
 						} 
 					}
@@ -383,12 +432,13 @@ public class RefactorMethodSignatureParser extends Parser {
 				}
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(261); formalTypePattern(0);
-				setState(262); match(ELLIPSIS);
+				setState(261);
+				formalTypePattern(0);
+				setState(262);
+				match(ELLIPSIS);
 				}
 				break;
 			}
@@ -430,7 +480,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(266); match(DOTDOT);
+			setState(266);
+			match(DOTDOT);
 			}
 		}
 		catch (RecognitionException re) {
@@ -445,21 +496,21 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalsPatternAfterDotDotContext extends ParserRuleContext {
+		public OptionalParensTypePatternContext optionalParensTypePattern() {
+			return getRuleContext(OptionalParensTypePatternContext.class,0);
+		}
 		public List<FormalsPatternAfterDotDotContext> formalsPatternAfterDotDot() {
 			return getRuleContexts(FormalsPatternAfterDotDotContext.class);
 		}
 		public FormalsPatternAfterDotDotContext formalsPatternAfterDotDot(int i) {
 			return getRuleContext(FormalsPatternAfterDotDotContext.class,i);
 		}
+		public List<TerminalNode> SPACE() { return getTokens(RefactorMethodSignatureParser.SPACE); }
 		public TerminalNode SPACE(int i) {
 			return getToken(RefactorMethodSignatureParser.SPACE, i);
 		}
 		public FormalTypePatternContext formalTypePattern() {
 			return getRuleContext(FormalTypePatternContext.class,0);
-		}
-		public List<TerminalNode> SPACE() { return getTokens(RefactorMethodSignatureParser.SPACE); }
-		public OptionalParensTypePatternContext optionalParensTypePattern() {
-			return getRuleContext(OptionalParensTypePatternContext.class,0);
 		}
 		public FormalsPatternAfterDotDotContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -487,33 +538,38 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(285);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,8,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(268); optionalParensTypePattern();
+				setState(268);
+				optionalParensTypePattern();
 				setState(279);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,7,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(269); match(COMMA);
+						setState(269);
+						match(COMMA);
 						setState(273);
 						_errHandler.sync(this);
 						_la = _input.LA(1);
 						while (_la==SPACE) {
 							{
 							{
-							setState(270); match(SPACE);
+							setState(270);
+							match(SPACE);
 							}
 							}
 							setState(275);
 							_errHandler.sync(this);
 							_la = _input.LA(1);
 						}
-						setState(276); formalsPatternAfterDotDot();
+						setState(276);
+						formalsPatternAfterDotDot();
 						}
 						} 
 					}
@@ -523,12 +579,13 @@ public class RefactorMethodSignatureParser extends Parser {
 				}
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(282); formalTypePattern(0);
-				setState(283); match(ELLIPSIS);
+				setState(282);
+				formalTypePattern(0);
+				setState(283);
+				match(ELLIPSIS);
 				}
 				break;
 			}
@@ -572,13 +629,17 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 10, RULE_optionalParensTypePattern);
 		try {
 			setState(292);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LPAREN:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(287); match(LPAREN);
-				setState(288); formalTypePattern(0);
-				setState(289); match(RPAREN);
+				setState(287);
+				match(LPAREN);
+				setState(288);
+				formalTypePattern(0);
+				setState(289);
+				match(RPAREN);
 				}
 				break;
 			case DOTDOT:
@@ -596,7 +657,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(291); formalTypePattern(0);
+				setState(291);
+				formalTypePattern(0);
 				}
 				break;
 			default:
@@ -615,14 +677,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TargetTypePatternContext extends ParserRuleContext {
-		public TargetTypePatternContext targetTypePattern(int i) {
-			return getRuleContext(TargetTypePatternContext.class,i);
-		}
 		public ClassNameOrInterfaceContext classNameOrInterface() {
 			return getRuleContext(ClassNameOrInterfaceContext.class,0);
 		}
 		public List<TargetTypePatternContext> targetTypePattern() {
 			return getRuleContexts(TargetTypePatternContext.class);
+		}
+		public TargetTypePatternContext targetTypePattern(int i) {
+			return getRuleContext(TargetTypePatternContext.class,i);
 		}
 		public TargetTypePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -659,19 +721,23 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(298);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
-			case BANG:
-				{
-				setState(295); match(BANG);
-				setState(296); targetTypePattern(3);
-				}
-				break;
 			case DOTDOT:
 			case DOT:
 			case MUL:
 			case Identifier:
 				{
-				setState(297); classNameOrInterface();
+				setState(295);
+				classNameOrInterface();
+				}
+				break;
+			case BANG:
+				{
+				setState(296);
+				match(BANG);
+				setState(297);
+				targetTypePattern(3);
 				}
 				break;
 			default:
@@ -681,12 +747,13 @@ public class RefactorMethodSignatureParser extends Parser {
 			setState(308);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,12,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
 					{
 					setState(306);
+					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,11,_ctx) ) {
 					case 1:
 						{
@@ -694,19 +761,22 @@ public class RefactorMethodSignatureParser extends Parser {
 						pushNewRecursionContext(_localctx, _startState, RULE_targetTypePattern);
 						setState(300);
 						if (!(precpred(_ctx, 2))) throw new FailedPredicateException(this, "precpred(_ctx, 2)");
-						setState(301); match(AND);
-						setState(302); targetTypePattern(3);
+						setState(301);
+						match(AND);
+						setState(302);
+						targetTypePattern(3);
 						}
 						break;
-
 					case 2:
 						{
 						_localctx = new TargetTypePatternContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_targetTypePattern);
 						setState(303);
 						if (!(precpred(_ctx, 1))) throw new FailedPredicateException(this, "precpred(_ctx, 1)");
-						setState(304); match(OR);
-						setState(305); targetTypePattern(2);
+						setState(304);
+						match(OR);
+						setState(305);
+						targetTypePattern(2);
 						}
 						break;
 					}
@@ -730,17 +800,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalTypePatternContext extends ParserRuleContext {
+		public ClassNameOrInterfaceContext classNameOrInterface() {
+			return getRuleContext(ClassNameOrInterfaceContext.class,0);
+		}
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
-		}
-		public FormalTypePatternContext formalTypePattern(int i) {
-			return getRuleContext(FormalTypePatternContext.class,i);
 		}
 		public List<FormalTypePatternContext> formalTypePattern() {
 			return getRuleContexts(FormalTypePatternContext.class);
 		}
-		public ClassNameOrInterfaceContext classNameOrInterface() {
-			return getRuleContext(ClassNameOrInterfaceContext.class,0);
+		public FormalTypePatternContext formalTypePattern(int i) {
+			return getRuleContext(FormalTypePatternContext.class,i);
 		}
 		public FormalTypePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -777,19 +847,15 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(316);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
-			case BANG:
-				{
-				setState(312); match(BANG);
-				setState(313); formalTypePattern(3);
-				}
-				break;
 			case DOTDOT:
 			case DOT:
 			case MUL:
 			case Identifier:
 				{
-				setState(314); classNameOrInterface();
+				setState(312);
+				classNameOrInterface();
 				}
 				break;
 			case BOOLEAN:
@@ -801,7 +867,16 @@ public class RefactorMethodSignatureParser extends Parser {
 			case LONG:
 			case SHORT:
 				{
-				setState(315); primitiveType();
+				setState(313);
+				primitiveType();
+				}
+				break;
+			case BANG:
+				{
+				setState(314);
+				match(BANG);
+				setState(315);
+				formalTypePattern(3);
 				}
 				break;
 			default:
@@ -811,12 +886,13 @@ public class RefactorMethodSignatureParser extends Parser {
 			setState(326);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,15,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
 					{
 					setState(324);
+					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,14,_ctx) ) {
 					case 1:
 						{
@@ -824,19 +900,22 @@ public class RefactorMethodSignatureParser extends Parser {
 						pushNewRecursionContext(_localctx, _startState, RULE_formalTypePattern);
 						setState(318);
 						if (!(precpred(_ctx, 2))) throw new FailedPredicateException(this, "precpred(_ctx, 2)");
-						setState(319); match(AND);
-						setState(320); formalTypePattern(3);
+						setState(319);
+						match(AND);
+						setState(320);
+						formalTypePattern(3);
 						}
 						break;
-
 					case 2:
 						{
 						_localctx = new FormalTypePatternContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_formalTypePattern);
 						setState(321);
 						if (!(precpred(_ctx, 1))) throw new FailedPredicateException(this, "precpred(_ctx, 1)");
-						setState(322); match(OR);
-						setState(323); formalTypePattern(2);
+						setState(322);
+						match(OR);
+						setState(323);
+						formalTypePattern(2);
 						}
 						break;
 					}
@@ -904,7 +983,11 @@ public class RefactorMethodSignatureParser extends Parser {
 					if ( !(_la==DOTDOT || ((((_la - 67)) & ~0x3f) == 0 && ((1L << (_la - 67)) & ((1L << (DOT - 67)) | (1L << (MUL - 67)) | (1L << (Identifier - 67)))) != 0)) ) {
 					_errHandler.recoverInline(this);
 					}
-					consume();
+					else {
+						if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+						_errHandler.reportMatch(this);
+						consume();
+					}
 					}
 					}
 					break;
@@ -914,16 +997,18 @@ public class RefactorMethodSignatureParser extends Parser {
 				setState(332); 
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,16,_ctx);
-			} while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER );
+			} while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER );
 			setState(338);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,17,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(334); match(LBRACK);
-					setState(335); match(RBRACK);
+					setState(334);
+					match(LBRACK);
+					setState(335);
+					match(RBRACK);
 					}
 					} 
 				}
@@ -975,20 +1060,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(363);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(341); match(Identifier);
+				setState(341);
+				match(Identifier);
 				setState(346);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(342); match(MUL);
-						setState(343); match(Identifier);
+						setState(342);
+						match(MUL);
+						setState(343);
+						match(Identifier);
 						}
 						} 
 					}
@@ -997,10 +1086,12 @@ public class RefactorMethodSignatureParser extends Parser {
 					_alt = getInterpreter().adaptivePredict(_input,18,_ctx);
 				}
 				setState(350);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==MUL) {
 					{
-					setState(349); match(MUL);
+					setState(349);
+					match(MUL);
 					}
 				}
 
@@ -1009,16 +1100,19 @@ public class RefactorMethodSignatureParser extends Parser {
 			case MUL:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(352); match(MUL);
+				setState(352);
+				match(MUL);
 				setState(357);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,20,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(353); match(Identifier);
-						setState(354); match(MUL);
+						setState(353);
+						match(Identifier);
+						setState(354);
+						match(MUL);
 						}
 						} 
 					}
@@ -1027,10 +1121,12 @@ public class RefactorMethodSignatureParser extends Parser {
 					_alt = getInterpreter().adaptivePredict(_input,20,_ctx);
 				}
 				setState(361);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==Identifier) {
 					{
-					setState(360); match(Identifier);
+					setState(360);
+					match(Identifier);
 					}
 				}
 
@@ -1052,21 +1148,21 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class CompilationUnitContext extends ParserRuleContext {
-		public TypeDeclarationContext typeDeclaration(int i) {
-			return getRuleContext(TypeDeclarationContext.class,i);
-		}
-		public ImportDeclarationContext importDeclaration(int i) {
-			return getRuleContext(ImportDeclarationContext.class,i);
-		}
-		public List<ImportDeclarationContext> importDeclaration() {
-			return getRuleContexts(ImportDeclarationContext.class);
-		}
 		public TerminalNode EOF() { return getToken(RefactorMethodSignatureParser.EOF, 0); }
 		public PackageDeclarationContext packageDeclaration() {
 			return getRuleContext(PackageDeclarationContext.class,0);
 		}
+		public List<ImportDeclarationContext> importDeclaration() {
+			return getRuleContexts(ImportDeclarationContext.class);
+		}
+		public ImportDeclarationContext importDeclaration(int i) {
+			return getRuleContext(ImportDeclarationContext.class,i);
+		}
 		public List<TypeDeclarationContext> typeDeclaration() {
 			return getRuleContexts(TypeDeclarationContext.class);
+		}
+		public TypeDeclarationContext typeDeclaration(int i) {
+			return getRuleContext(TypeDeclarationContext.class,i);
 		}
 		public CompilationUnitContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1095,10 +1191,12 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(366);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,23,_ctx) ) {
 			case 1:
 				{
-				setState(365); packageDeclaration();
+				setState(365);
+				packageDeclaration();
 				}
 				break;
 			}
@@ -1108,7 +1206,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==IMPORT) {
 				{
 				{
-				setState(368); importDeclaration();
+				setState(368);
+				importDeclaration();
 				}
 				}
 				setState(373);
@@ -1121,14 +1220,16 @@ public class RefactorMethodSignatureParser extends Parser {
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << CLASS) | (1L << ENUM) | (1L << FINAL) | (1L << INTERFACE) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << STATIC) | (1L << STRICTFP))) != 0) || _la==SEMI || _la==AT) {
 				{
 				{
-				setState(374); typeDeclaration();
+				setState(374);
+				typeDeclaration();
 				}
 				}
 				setState(379);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(380); match(EOF);
+			setState(380);
+			match(EOF);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1143,11 +1244,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class PackageDeclarationContext extends ParserRuleContext {
-		public List<AnnotationContext> annotation() {
-			return getRuleContexts(AnnotationContext.class);
-		}
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
+		}
+		public List<AnnotationContext> annotation() {
+			return getRuleContexts(AnnotationContext.class);
 		}
 		public AnnotationContext annotation(int i) {
 			return getRuleContext(AnnotationContext.class,i);
@@ -1184,16 +1285,20 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==AT) {
 				{
 				{
-				setState(382); annotation();
+				setState(382);
+				annotation();
 				}
 				}
 				setState(387);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(388); match(PACKAGE);
-			setState(389); qualifiedName();
-			setState(390); match(SEMI);
+			setState(388);
+			match(PACKAGE);
+			setState(389);
+			qualifiedName();
+			setState(390);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1237,26 +1342,34 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(392); match(IMPORT);
+			setState(392);
+			match(IMPORT);
 			setState(394);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==STATIC) {
 				{
-				setState(393); match(STATIC);
+				setState(393);
+				match(STATIC);
 				}
 			}
 
-			setState(396); qualifiedName();
+			setState(396);
+			qualifiedName();
 			setState(399);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==DOT) {
 				{
-				setState(397); match(DOT);
-				setState(398); match(MUL);
+				setState(397);
+				match(DOT);
+				setState(398);
+				match(MUL);
 				}
 			}
 
-			setState(401); match(SEMI);
+			setState(401);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1271,23 +1384,23 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeDeclarationContext extends ParserRuleContext {
+		public ClassDeclarationContext classDeclaration() {
+			return getRuleContext(ClassDeclarationContext.class,0);
+		}
+		public List<ClassOrInterfaceModifierContext> classOrInterfaceModifier() {
+			return getRuleContexts(ClassOrInterfaceModifierContext.class);
+		}
 		public ClassOrInterfaceModifierContext classOrInterfaceModifier(int i) {
 			return getRuleContext(ClassOrInterfaceModifierContext.class,i);
 		}
 		public EnumDeclarationContext enumDeclaration() {
 			return getRuleContext(EnumDeclarationContext.class,0);
 		}
-		public ClassDeclarationContext classDeclaration() {
-			return getRuleContext(ClassDeclarationContext.class,0);
+		public InterfaceDeclarationContext interfaceDeclaration() {
+			return getRuleContext(InterfaceDeclarationContext.class,0);
 		}
 		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
 			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
-		}
-		public List<ClassOrInterfaceModifierContext> classOrInterfaceModifier() {
-			return getRuleContexts(ClassOrInterfaceModifierContext.class);
-		}
-		public InterfaceDeclarationContext interfaceDeclaration() {
-			return getRuleContext(InterfaceDeclarationContext.class,0);
 		}
 		public TypeDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1315,6 +1428,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(432);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,33,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
@@ -1325,17 +1439,18 @@ public class RefactorMethodSignatureParser extends Parser {
 				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << FINAL) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << STATIC) | (1L << STRICTFP))) != 0) || _la==AT) {
 					{
 					{
-					setState(403); classOrInterfaceModifier();
+					setState(403);
+					classOrInterfaceModifier();
 					}
 					}
 					setState(408);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(409); classDeclaration();
+				setState(409);
+				classDeclaration();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
@@ -1345,17 +1460,18 @@ public class RefactorMethodSignatureParser extends Parser {
 				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << FINAL) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << STATIC) | (1L << STRICTFP))) != 0) || _la==AT) {
 					{
 					{
-					setState(410); classOrInterfaceModifier();
+					setState(410);
+					classOrInterfaceModifier();
 					}
 					}
 					setState(415);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(416); enumDeclaration();
+				setState(416);
+				enumDeclaration();
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
@@ -1365,28 +1481,30 @@ public class RefactorMethodSignatureParser extends Parser {
 				while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << FINAL) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << STATIC) | (1L << STRICTFP))) != 0) || _la==AT) {
 					{
 					{
-					setState(417); classOrInterfaceModifier();
+					setState(417);
+					classOrInterfaceModifier();
 					}
 					}
 					setState(422);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(423); interfaceDeclaration();
+				setState(423);
+				interfaceDeclaration();
 				}
 				break;
-
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
 				setState(427);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(424); classOrInterfaceModifier();
+						setState(424);
+						classOrInterfaceModifier();
 						}
 						} 
 					}
@@ -1394,14 +1512,15 @@ public class RefactorMethodSignatureParser extends Parser {
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,32,_ctx);
 				}
-				setState(430); annotationTypeDeclaration();
+				setState(430);
+				annotationTypeDeclaration();
 				}
 				break;
-
 			case 5:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(431); match(SEMI);
+				setState(431);
+				match(SEMI);
 				}
 				break;
 			}
@@ -1446,6 +1565,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		int _la;
 		try {
 			setState(436);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case ABSTRACT:
 			case FINAL:
@@ -1457,7 +1577,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			case AT:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(434); classOrInterfaceModifier();
+				setState(434);
+				classOrInterfaceModifier();
 				}
 				break;
 			case NATIVE:
@@ -1471,7 +1592,11 @@ public class RefactorMethodSignatureParser extends Parser {
 				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << NATIVE) | (1L << SYNCHRONIZED) | (1L << TRANSIENT) | (1L << VOLATILE))) != 0)) ) {
 				_errHandler.recoverInline(this);
 				}
-				consume();
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 				}
 				break;
 			default:
@@ -1518,11 +1643,13 @@ public class RefactorMethodSignatureParser extends Parser {
 		int _la;
 		try {
 			setState(440);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case AT:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(438); annotation();
+				setState(438);
+				annotation();
 				}
 				break;
 			case ABSTRACT:
@@ -1539,7 +1666,11 @@ public class RefactorMethodSignatureParser extends Parser {
 				if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << FINAL) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << STATIC) | (1L << STRICTFP))) != 0)) ) {
 				_errHandler.recoverInline(this);
 				}
-				consume();
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
 				}
 				break;
 			default:
@@ -1585,17 +1716,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 32, RULE_variableModifier);
 		try {
 			setState(444);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case FINAL:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(442); match(FINAL);
+				setState(442);
+				match(FINAL);
 				}
 				break;
 			case AT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(443); annotation();
+				setState(443);
+				annotation();
 				}
 				break;
 			default:
@@ -1618,14 +1752,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ClassBodyContext classBody() {
 			return getRuleContext(ClassBodyContext.class,0);
 		}
-		public TypeListContext typeList() {
-			return getRuleContext(TypeListContext.class,0);
-		}
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
 		}
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
+		}
+		public TypeListContext typeList() {
+			return getRuleContext(TypeListContext.class,0);
 		}
 		public ClassDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1653,35 +1787,46 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(446); match(CLASS);
-			setState(447); match(Identifier);
+			setState(446);
+			match(CLASS);
+			setState(447);
+			match(Identifier);
 			setState(449);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LT) {
 				{
-				setState(448); typeParameters();
+				setState(448);
+				typeParameters();
 				}
 			}
 
 			setState(453);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==EXTENDS) {
 				{
-				setState(451); match(EXTENDS);
-				setState(452); type();
+				setState(451);
+				match(EXTENDS);
+				setState(452);
+				type();
 				}
 			}
 
 			setState(457);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==IMPLEMENTS) {
 				{
-				setState(455); match(IMPLEMENTS);
-				setState(456); typeList();
+				setState(455);
+				match(IMPLEMENTS);
+				setState(456);
+				typeList();
 				}
 			}
 
-			setState(459); classBody();
+			setState(459);
+			classBody();
 			}
 		}
 		catch (RecognitionException re) {
@@ -1728,23 +1873,28 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(461); match(LT);
-			setState(462); typeParameter();
+			setState(461);
+			match(LT);
+			setState(462);
+			typeParameter();
 			setState(467);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(463); match(COMMA);
-				setState(464); typeParameter();
+				setState(463);
+				match(COMMA);
+				setState(464);
+				typeParameter();
 				}
 				}
 				setState(469);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(470); match(GT);
+			setState(470);
+			match(GT);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1789,13 +1939,17 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(472); match(Identifier);
+			setState(472);
+			match(Identifier);
 			setState(475);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==EXTENDS) {
 				{
-				setState(473); match(EXTENDS);
-				setState(474); typeBound();
+				setState(473);
+				match(EXTENDS);
+				setState(474);
+				typeBound();
 				}
 			}
 
@@ -1813,11 +1967,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeBoundContext extends ParserRuleContext {
-		public TypeContext type(int i) {
-			return getRuleContext(TypeContext.class,i);
-		}
 		public List<TypeContext> type() {
 			return getRuleContexts(TypeContext.class);
+		}
+		public TypeContext type(int i) {
+			return getRuleContext(TypeContext.class,i);
 		}
 		public TypeBoundContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1845,15 +1999,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(477); type();
+			setState(477);
+			type();
 			setState(482);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==BITAND) {
 				{
 				{
-				setState(478); match(BITAND);
-				setState(479); type();
+				setState(478);
+				match(BITAND);
+				setState(479);
+				type();
 				}
 				}
 				setState(484);
@@ -1874,16 +2031,16 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class EnumDeclarationContext extends ParserRuleContext {
-		public EnumBodyDeclarationsContext enumBodyDeclarations() {
-			return getRuleContext(EnumBodyDeclarationsContext.class,0);
-		}
+		public TerminalNode ENUM() { return getToken(RefactorMethodSignatureParser.ENUM, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
-		public TerminalNode ENUM() { return getToken(RefactorMethodSignatureParser.ENUM, 0); }
 		public EnumConstantsContext enumConstants() {
 			return getRuleContext(EnumConstantsContext.class,0);
+		}
+		public EnumBodyDeclarationsContext enumBodyDeclarations() {
+			return getRuleContext(EnumBodyDeclarationsContext.class,0);
 		}
 		public EnumDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1911,43 +2068,56 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(485); match(ENUM);
-			setState(486); match(Identifier);
+			setState(485);
+			match(ENUM);
+			setState(486);
+			match(Identifier);
 			setState(489);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==IMPLEMENTS) {
 				{
-				setState(487); match(IMPLEMENTS);
-				setState(488); typeList();
+				setState(487);
+				match(IMPLEMENTS);
+				setState(488);
+				typeList();
 				}
 			}
 
-			setState(491); match(LBRACE);
+			setState(491);
+			match(LBRACE);
 			setState(493);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==Identifier || _la==AT) {
 				{
-				setState(492); enumConstants();
+				setState(492);
+				enumConstants();
 				}
 			}
 
 			setState(496);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==COMMA) {
 				{
-				setState(495); match(COMMA);
+				setState(495);
+				match(COMMA);
 				}
 			}
 
 			setState(499);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==SEMI) {
 				{
-				setState(498); enumBodyDeclarations();
+				setState(498);
+				enumBodyDeclarations();
 				}
 			}
 
-			setState(501); match(RBRACE);
+			setState(501);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -1994,16 +2164,19 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(503); enumConstant();
+			setState(503);
+			enumConstant();
 			setState(508);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,47,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(504); match(COMMA);
-					setState(505); enumConstant();
+					setState(504);
+					match(COMMA);
+					setState(505);
+					enumConstant();
 					}
 					} 
 				}
@@ -2029,14 +2202,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		public List<AnnotationContext> annotation() {
 			return getRuleContexts(AnnotationContext.class);
 		}
-		public ClassBodyContext classBody() {
-			return getRuleContext(ClassBodyContext.class,0);
-		}
 		public AnnotationContext annotation(int i) {
 			return getRuleContext(AnnotationContext.class,i);
 		}
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
+		}
+		public ClassBodyContext classBody() {
+			return getRuleContext(ClassBodyContext.class,0);
 		}
 		public EnumConstantContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2070,27 +2243,33 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==AT) {
 				{
 				{
-				setState(511); annotation();
+				setState(511);
+				annotation();
 				}
 				}
 				setState(516);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(517); match(Identifier);
+			setState(517);
+			match(Identifier);
 			setState(519);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LPAREN) {
 				{
-				setState(518); arguments();
+				setState(518);
+				arguments();
 				}
 			}
 
 			setState(522);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LBRACE) {
 				{
-				setState(521); classBody();
+				setState(521);
+				classBody();
 				}
 			}
 
@@ -2140,14 +2319,16 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(524); match(SEMI);
+			setState(524);
+			match(SEMI);
 			setState(528);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << CLASS) | (1L << DOUBLE) | (1L << ENUM) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << INTERFACE) | (1L << LONG) | (1L << NATIVE) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << SHORT) | (1L << STATIC) | (1L << STRICTFP) | (1L << SYNCHRONIZED) | (1L << TRANSIENT) | (1L << VOID) | (1L << VOLATILE) | (1L << LBRACE))) != 0) || ((((_la - 65)) & ~0x3f) == 0 && ((1L << (_la - 65)) & ((1L << (SEMI - 65)) | (1L << (LT - 65)) | (1L << (Identifier - 65)) | (1L << (AT - 65)))) != 0)) {
 				{
 				{
-				setState(525); classBodyDeclaration();
+				setState(525);
+				classBodyDeclaration();
 				}
 				}
 				setState(530);
@@ -2172,11 +2353,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public InterfaceBodyContext interfaceBody() {
 			return getRuleContext(InterfaceBodyContext.class,0);
 		}
-		public TypeListContext typeList() {
-			return getRuleContext(TypeListContext.class,0);
-		}
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
+		}
+		public TypeListContext typeList() {
+			return getRuleContext(TypeListContext.class,0);
 		}
 		public InterfaceDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2204,26 +2385,34 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(531); match(INTERFACE);
-			setState(532); match(Identifier);
+			setState(531);
+			match(INTERFACE);
+			setState(532);
+			match(Identifier);
 			setState(534);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LT) {
 				{
-				setState(533); typeParameters();
+				setState(533);
+				typeParameters();
 				}
 			}
 
 			setState(538);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==EXTENDS) {
 				{
-				setState(536); match(EXTENDS);
-				setState(537); typeList();
+				setState(536);
+				match(EXTENDS);
+				setState(537);
+				typeList();
 				}
 			}
 
-			setState(540); interfaceBody();
+			setState(540);
+			interfaceBody();
 			}
 		}
 		catch (RecognitionException re) {
@@ -2238,11 +2427,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeListContext extends ParserRuleContext {
-		public TypeContext type(int i) {
-			return getRuleContext(TypeContext.class,i);
-		}
 		public List<TypeContext> type() {
 			return getRuleContexts(TypeContext.class);
+		}
+		public TypeContext type(int i) {
+			return getRuleContext(TypeContext.class,i);
 		}
 		public TypeListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2270,15 +2459,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(542); type();
+			setState(542);
+			type();
 			setState(547);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(543); match(COMMA);
-				setState(544); type();
+				setState(543);
+				match(COMMA);
+				setState(544);
+				type();
 				}
 				}
 				setState(549);
@@ -2331,21 +2523,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(550); match(LBRACE);
+			setState(550);
+			match(LBRACE);
 			setState(554);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << CLASS) | (1L << DOUBLE) | (1L << ENUM) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << INTERFACE) | (1L << LONG) | (1L << NATIVE) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << SHORT) | (1L << STATIC) | (1L << STRICTFP) | (1L << SYNCHRONIZED) | (1L << TRANSIENT) | (1L << VOID) | (1L << VOLATILE) | (1L << LBRACE))) != 0) || ((((_la - 65)) & ~0x3f) == 0 && ((1L << (_la - 65)) & ((1L << (SEMI - 65)) | (1L << (LT - 65)) | (1L << (Identifier - 65)) | (1L << (AT - 65)))) != 0)) {
 				{
 				{
-				setState(551); classBodyDeclaration();
+				setState(551);
+				classBodyDeclaration();
 				}
 				}
 				setState(556);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(557); match(RBRACE);
+			setState(557);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -2392,21 +2587,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(559); match(LBRACE);
+			setState(559);
+			match(LBRACE);
 			setState(563);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << CLASS) | (1L << DOUBLE) | (1L << ENUM) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << INTERFACE) | (1L << LONG) | (1L << NATIVE) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << SHORT) | (1L << STATIC) | (1L << STRICTFP) | (1L << SYNCHRONIZED) | (1L << TRANSIENT) | (1L << VOID) | (1L << VOLATILE))) != 0) || ((((_la - 65)) & ~0x3f) == 0 && ((1L << (_la - 65)) & ((1L << (SEMI - 65)) | (1L << (LT - 65)) | (1L << (Identifier - 65)) | (1L << (AT - 65)))) != 0)) {
 				{
 				{
-				setState(560); interfaceBodyDeclaration();
+				setState(560);
+				interfaceBodyDeclaration();
 				}
 				}
 				setState(565);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(566); match(RBRACE);
+			setState(566);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -2421,17 +2619,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassBodyDeclarationContext extends ParserRuleContext {
-		public List<ModifierContext> modifier() {
-			return getRuleContexts(ModifierContext.class);
+		public BlockContext block() {
+			return getRuleContext(BlockContext.class,0);
 		}
 		public MemberDeclarationContext memberDeclaration() {
 			return getRuleContext(MemberDeclarationContext.class,0);
 		}
+		public List<ModifierContext> modifier() {
+			return getRuleContexts(ModifierContext.class);
+		}
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
-		}
-		public BlockContext block() {
-			return getRuleContext(BlockContext.class,0);
 		}
 		public ClassBodyDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2459,40 +2657,44 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(580);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,59,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(568); match(SEMI);
+				setState(568);
+				match(SEMI);
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(570);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==STATIC) {
 					{
-					setState(569); match(STATIC);
+					setState(569);
+					match(STATIC);
 					}
 				}
 
-				setState(572); block();
+				setState(572);
+				block();
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
 				setState(576);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,58,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(573); modifier();
+						setState(573);
+						modifier();
 						}
 						} 
 					}
@@ -2500,7 +2702,8 @@ public class RefactorMethodSignatureParser extends Parser {
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,58,_ctx);
 				}
-				setState(579); memberDeclaration();
+				setState(579);
+				memberDeclaration();
 				}
 				break;
 			}
@@ -2517,20 +2720,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class MemberDeclarationContext extends ParserRuleContext {
-		public GenericMethodDeclarationContext genericMethodDeclaration() {
-			return getRuleContext(GenericMethodDeclarationContext.class,0);
-		}
 		public MethodDeclarationContext methodDeclaration() {
 			return getRuleContext(MethodDeclarationContext.class,0);
 		}
-		public EnumDeclarationContext enumDeclaration() {
-			return getRuleContext(EnumDeclarationContext.class,0);
+		public GenericMethodDeclarationContext genericMethodDeclaration() {
+			return getRuleContext(GenericMethodDeclarationContext.class,0);
 		}
-		public ClassDeclarationContext classDeclaration() {
-			return getRuleContext(ClassDeclarationContext.class,0);
+		public FieldDeclarationContext fieldDeclaration() {
+			return getRuleContext(FieldDeclarationContext.class,0);
 		}
-		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
-			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
+		public ConstructorDeclarationContext constructorDeclaration() {
+			return getRuleContext(ConstructorDeclarationContext.class,0);
 		}
 		public GenericConstructorDeclarationContext genericConstructorDeclaration() {
 			return getRuleContext(GenericConstructorDeclarationContext.class,0);
@@ -2538,11 +2738,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		public InterfaceDeclarationContext interfaceDeclaration() {
 			return getRuleContext(InterfaceDeclarationContext.class,0);
 		}
-		public ConstructorDeclarationContext constructorDeclaration() {
-			return getRuleContext(ConstructorDeclarationContext.class,0);
+		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
+			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
 		}
-		public FieldDeclarationContext fieldDeclaration() {
-			return getRuleContext(FieldDeclarationContext.class,0);
+		public ClassDeclarationContext classDeclaration() {
+			return getRuleContext(ClassDeclarationContext.class,0);
+		}
+		public EnumDeclarationContext enumDeclaration() {
+			return getRuleContext(EnumDeclarationContext.class,0);
 		}
 		public MemberDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2568,67 +2771,69 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 60, RULE_memberDeclaration);
 		try {
 			setState(591);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,60,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(582); methodDeclaration();
+				setState(582);
+				methodDeclaration();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(583); genericMethodDeclaration();
+				setState(583);
+				genericMethodDeclaration();
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(584); fieldDeclaration();
+				setState(584);
+				fieldDeclaration();
 				}
 				break;
-
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(585); constructorDeclaration();
+				setState(585);
+				constructorDeclaration();
 				}
 				break;
-
 			case 5:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(586); genericConstructorDeclaration();
+				setState(586);
+				genericConstructorDeclaration();
 				}
 				break;
-
 			case 6:
 				enterOuterAlt(_localctx, 6);
 				{
-				setState(587); interfaceDeclaration();
+				setState(587);
+				interfaceDeclaration();
 				}
 				break;
-
 			case 7:
 				enterOuterAlt(_localctx, 7);
 				{
-				setState(588); annotationTypeDeclaration();
+				setState(588);
+				annotationTypeDeclaration();
 				}
 				break;
-
 			case 8:
 				enterOuterAlt(_localctx, 8);
 				{
-				setState(589); classDeclaration();
+				setState(589);
+				classDeclaration();
 				}
 				break;
-
 			case 9:
 				enterOuterAlt(_localctx, 9);
 				{
-				setState(590); enumDeclaration();
+				setState(590);
+				enumDeclaration();
 				}
 				break;
 			}
@@ -2646,17 +2851,17 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class MethodDeclarationContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
-		public MethodBodyContext methodBody() {
-			return getRuleContext(MethodBodyContext.class,0);
-		}
-		public QualifiedNameListContext qualifiedNameList() {
-			return getRuleContext(QualifiedNameListContext.class,0);
-		}
 		public FormalParametersContext formalParameters() {
 			return getRuleContext(FormalParametersContext.class,0);
 		}
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
+		}
+		public MethodBodyContext methodBody() {
+			return getRuleContext(MethodBodyContext.class,0);
+		}
+		public QualifiedNameListContext qualifiedNameList() {
+			return getRuleContext(QualifiedNameListContext.class,0);
 		}
 		public MethodDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2685,6 +2890,7 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(595);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case BOOLEAN:
 			case BYTE:
@@ -2696,27 +2902,33 @@ public class RefactorMethodSignatureParser extends Parser {
 			case SHORT:
 			case Identifier:
 				{
-				setState(593); type();
+				setState(593);
+				type();
 				}
 				break;
 			case VOID:
 				{
-				setState(594); match(VOID);
+				setState(594);
+				match(VOID);
 				}
 				break;
 			default:
 				throw new NoViableAltException(this);
 			}
-			setState(597); match(Identifier);
-			setState(598); formalParameters();
+			setState(597);
+			match(Identifier);
+			setState(598);
+			formalParameters();
 			setState(603);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==LBRACK) {
 				{
 				{
-				setState(599); match(LBRACK);
-				setState(600); match(RBRACK);
+				setState(599);
+				match(LBRACK);
+				setState(600);
+				match(RBRACK);
 				}
 				}
 				setState(605);
@@ -2724,24 +2936,30 @@ public class RefactorMethodSignatureParser extends Parser {
 				_la = _input.LA(1);
 			}
 			setState(608);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==THROWS) {
 				{
-				setState(606); match(THROWS);
-				setState(607); qualifiedNameList();
+				setState(606);
+				match(THROWS);
+				setState(607);
+				qualifiedNameList();
 				}
 			}
 
 			setState(612);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LBRACE:
 				{
-				setState(610); methodBody();
+				setState(610);
+				methodBody();
 				}
 				break;
 			case SEMI:
 				{
-				setState(611); match(SEMI);
+				setState(611);
+				match(SEMI);
 				}
 				break;
 			default:
@@ -2761,11 +2979,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class GenericMethodDeclarationContext extends ParserRuleContext {
-		public MethodDeclarationContext methodDeclaration() {
-			return getRuleContext(MethodDeclarationContext.class,0);
-		}
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
+		}
+		public MethodDeclarationContext methodDeclaration() {
+			return getRuleContext(MethodDeclarationContext.class,0);
 		}
 		public GenericMethodDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2792,8 +3010,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(614); typeParameters();
-			setState(615); methodDeclaration();
+			setState(614);
+			typeParameters();
+			setState(615);
+			methodDeclaration();
 			}
 		}
 		catch (RecognitionException re) {
@@ -2809,14 +3029,14 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class ConstructorDeclarationContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public FormalParametersContext formalParameters() {
+			return getRuleContext(FormalParametersContext.class,0);
+		}
 		public ConstructorBodyContext constructorBody() {
 			return getRuleContext(ConstructorBodyContext.class,0);
 		}
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
-		}
-		public FormalParametersContext formalParameters() {
-			return getRuleContext(FormalParametersContext.class,0);
 		}
 		public ConstructorDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2844,18 +3064,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(617); match(Identifier);
-			setState(618); formalParameters();
+			setState(617);
+			match(Identifier);
+			setState(618);
+			formalParameters();
 			setState(621);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==THROWS) {
 				{
-				setState(619); match(THROWS);
-				setState(620); qualifiedNameList();
+				setState(619);
+				match(THROWS);
+				setState(620);
+				qualifiedNameList();
 				}
 			}
 
-			setState(623); constructorBody();
+			setState(623);
+			constructorBody();
 			}
 		}
 		catch (RecognitionException re) {
@@ -2901,8 +3127,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(625); typeParameters();
-			setState(626); constructorDeclaration();
+			setState(625);
+			typeParameters();
+			setState(626);
+			constructorDeclaration();
 			}
 		}
 		catch (RecognitionException re) {
@@ -2917,11 +3145,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FieldDeclarationContext extends ParserRuleContext {
-		public VariableDeclaratorsContext variableDeclarators() {
-			return getRuleContext(VariableDeclaratorsContext.class,0);
-		}
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
+		}
+		public VariableDeclaratorsContext variableDeclarators() {
+			return getRuleContext(VariableDeclaratorsContext.class,0);
 		}
 		public FieldDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2948,9 +3176,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(628); type();
-			setState(629); variableDeclarators();
-			setState(630); match(SEMI);
+			setState(628);
+			type();
+			setState(629);
+			variableDeclarators();
+			setState(630);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -2965,14 +3196,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class InterfaceBodyDeclarationContext extends ParserRuleContext {
+		public InterfaceMemberDeclarationContext interfaceMemberDeclaration() {
+			return getRuleContext(InterfaceMemberDeclarationContext.class,0);
+		}
 		public List<ModifierContext> modifier() {
 			return getRuleContexts(ModifierContext.class);
 		}
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
-		}
-		public InterfaceMemberDeclarationContext interfaceMemberDeclaration() {
-			return getRuleContext(InterfaceMemberDeclarationContext.class,0);
 		}
 		public InterfaceBodyDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2999,6 +3230,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(640);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case ABSTRACT:
 			case BOOLEAN:
@@ -3031,11 +3263,12 @@ public class RefactorMethodSignatureParser extends Parser {
 				setState(635);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,66,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(632); modifier();
+						setState(632);
+						modifier();
 						}
 						} 
 					}
@@ -3043,13 +3276,15 @@ public class RefactorMethodSignatureParser extends Parser {
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,66,_ctx);
 				}
-				setState(638); interfaceMemberDeclaration();
+				setState(638);
+				interfaceMemberDeclaration();
 				}
 				break;
 			case SEMI:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(639); match(SEMI);
+				setState(639);
+				match(SEMI);
 				}
 				break;
 			default:
@@ -3068,26 +3303,26 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class InterfaceMemberDeclarationContext extends ParserRuleContext {
-		public EnumDeclarationContext enumDeclaration() {
-			return getRuleContext(EnumDeclarationContext.class,0);
-		}
-		public ClassDeclarationContext classDeclaration() {
-			return getRuleContext(ClassDeclarationContext.class,0);
-		}
-		public GenericInterfaceMethodDeclarationContext genericInterfaceMethodDeclaration() {
-			return getRuleContext(GenericInterfaceMethodDeclarationContext.class,0);
-		}
-		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
-			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
-		}
-		public InterfaceDeclarationContext interfaceDeclaration() {
-			return getRuleContext(InterfaceDeclarationContext.class,0);
-		}
 		public ConstDeclarationContext constDeclaration() {
 			return getRuleContext(ConstDeclarationContext.class,0);
 		}
 		public InterfaceMethodDeclarationContext interfaceMethodDeclaration() {
 			return getRuleContext(InterfaceMethodDeclarationContext.class,0);
+		}
+		public GenericInterfaceMethodDeclarationContext genericInterfaceMethodDeclaration() {
+			return getRuleContext(GenericInterfaceMethodDeclarationContext.class,0);
+		}
+		public InterfaceDeclarationContext interfaceDeclaration() {
+			return getRuleContext(InterfaceDeclarationContext.class,0);
+		}
+		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
+			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
+		}
+		public ClassDeclarationContext classDeclaration() {
+			return getRuleContext(ClassDeclarationContext.class,0);
+		}
+		public EnumDeclarationContext enumDeclaration() {
+			return getRuleContext(EnumDeclarationContext.class,0);
 		}
 		public InterfaceMemberDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3113,53 +3348,55 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 74, RULE_interfaceMemberDeclaration);
 		try {
 			setState(649);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,68,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(642); constDeclaration();
+				setState(642);
+				constDeclaration();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(643); interfaceMethodDeclaration();
+				setState(643);
+				interfaceMethodDeclaration();
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(644); genericInterfaceMethodDeclaration();
+				setState(644);
+				genericInterfaceMethodDeclaration();
 				}
 				break;
-
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(645); interfaceDeclaration();
+				setState(645);
+				interfaceDeclaration();
 				}
 				break;
-
 			case 5:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(646); annotationTypeDeclaration();
+				setState(646);
+				annotationTypeDeclaration();
 				}
 				break;
-
 			case 6:
 				enterOuterAlt(_localctx, 6);
 				{
-				setState(647); classDeclaration();
+				setState(647);
+				classDeclaration();
 				}
 				break;
-
 			case 7:
 				enterOuterAlt(_localctx, 7);
 				{
-				setState(648); enumDeclaration();
+				setState(648);
+				enumDeclaration();
 				}
 				break;
 			}
@@ -3176,14 +3413,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ConstDeclarationContext extends ParserRuleContext {
-		public ConstantDeclaratorContext constantDeclarator(int i) {
-			return getRuleContext(ConstantDeclaratorContext.class,i);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public List<ConstantDeclaratorContext> constantDeclarator() {
 			return getRuleContexts(ConstantDeclaratorContext.class);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
+		public ConstantDeclaratorContext constantDeclarator(int i) {
+			return getRuleContext(ConstantDeclaratorContext.class,i);
 		}
 		public ConstDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3211,23 +3448,28 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(651); type();
-			setState(652); constantDeclarator();
+			setState(651);
+			type();
+			setState(652);
+			constantDeclarator();
 			setState(657);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(653); match(COMMA);
-				setState(654); constantDeclarator();
+				setState(653);
+				match(COMMA);
+				setState(654);
+				constantDeclarator();
 				}
 				}
 				setState(659);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(660); match(SEMI);
+			setState(660);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3272,23 +3514,28 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(662); match(Identifier);
+			setState(662);
+			match(Identifier);
 			setState(667);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==LBRACK) {
 				{
 				{
-				setState(663); match(LBRACK);
-				setState(664); match(RBRACK);
+				setState(663);
+				match(LBRACK);
+				setState(664);
+				match(RBRACK);
 				}
 				}
 				setState(669);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(670); match(ASSIGN);
-			setState(671); variableInitializer();
+			setState(670);
+			match(ASSIGN);
+			setState(671);
+			variableInitializer();
 			}
 		}
 		catch (RecognitionException re) {
@@ -3304,14 +3551,14 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class InterfaceMethodDeclarationContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
-		public QualifiedNameListContext qualifiedNameList() {
-			return getRuleContext(QualifiedNameListContext.class,0);
-		}
 		public FormalParametersContext formalParameters() {
 			return getRuleContext(FormalParametersContext.class,0);
 		}
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
+		}
+		public QualifiedNameListContext qualifiedNameList() {
+			return getRuleContext(QualifiedNameListContext.class,0);
 		}
 		public InterfaceMethodDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3340,6 +3587,7 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(675);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case BOOLEAN:
 			case BYTE:
@@ -3351,27 +3599,33 @@ public class RefactorMethodSignatureParser extends Parser {
 			case SHORT:
 			case Identifier:
 				{
-				setState(673); type();
+				setState(673);
+				type();
 				}
 				break;
 			case VOID:
 				{
-				setState(674); match(VOID);
+				setState(674);
+				match(VOID);
 				}
 				break;
 			default:
 				throw new NoViableAltException(this);
 			}
-			setState(677); match(Identifier);
-			setState(678); formalParameters();
+			setState(677);
+			match(Identifier);
+			setState(678);
+			formalParameters();
 			setState(683);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==LBRACK) {
 				{
 				{
-				setState(679); match(LBRACK);
-				setState(680); match(RBRACK);
+				setState(679);
+				match(LBRACK);
+				setState(680);
+				match(RBRACK);
 				}
 				}
 				setState(685);
@@ -3379,15 +3633,19 @@ public class RefactorMethodSignatureParser extends Parser {
 				_la = _input.LA(1);
 			}
 			setState(688);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==THROWS) {
 				{
-				setState(686); match(THROWS);
-				setState(687); qualifiedNameList();
+				setState(686);
+				match(THROWS);
+				setState(687);
+				qualifiedNameList();
 				}
 			}
 
-			setState(690); match(SEMI);
+			setState(690);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3433,8 +3691,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(692); typeParameters();
-			setState(693); interfaceMethodDeclaration();
+			setState(692);
+			typeParameters();
+			setState(693);
+			interfaceMethodDeclaration();
 			}
 		}
 		catch (RecognitionException re) {
@@ -3481,15 +3741,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(695); variableDeclarator();
+			setState(695);
+			variableDeclarator();
 			setState(700);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(696); match(COMMA);
-				setState(697); variableDeclarator();
+				setState(696);
+				match(COMMA);
+				setState(697);
+				variableDeclarator();
 				}
 				}
 				setState(702);
@@ -3510,11 +3773,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class VariableDeclaratorContext extends ParserRuleContext {
-		public VariableInitializerContext variableInitializer() {
-			return getRuleContext(VariableInitializerContext.class,0);
-		}
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
+		}
+		public VariableInitializerContext variableInitializer() {
+			return getRuleContext(VariableInitializerContext.class,0);
 		}
 		public VariableDeclaratorContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3542,13 +3805,17 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(703); variableDeclaratorId();
+			setState(703);
+			variableDeclaratorId();
 			setState(706);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==ASSIGN) {
 				{
-				setState(704); match(ASSIGN);
-				setState(705); variableInitializer();
+				setState(704);
+				match(ASSIGN);
+				setState(705);
+				variableInitializer();
 				}
 			}
 
@@ -3593,15 +3860,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(708); match(Identifier);
+			setState(708);
+			match(Identifier);
 			setState(713);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==LBRACK) {
 				{
 				{
-				setState(709); match(LBRACK);
-				setState(710); match(RBRACK);
+				setState(709);
+				match(LBRACK);
+				setState(710);
+				match(RBRACK);
 				}
 				}
 				setState(715);
@@ -3652,11 +3922,13 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 90, RULE_variableInitializer);
 		try {
 			setState(718);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LBRACE:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(716); arrayInitializer();
+				setState(716);
+				arrayInitializer();
 				}
 				break;
 			case BOOLEAN:
@@ -3688,7 +3960,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(717); expression(0);
+				setState(717);
+				expression(0);
 				}
 				break;
 			default:
@@ -3740,21 +4013,26 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(720); match(LBRACE);
+			setState(720);
+			match(LBRACE);
 			setState(732);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN) | (1L << LBRACE))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 				{
-				setState(721); variableInitializer();
+				setState(721);
+				variableInitializer();
 				setState(726);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,78,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(722); match(COMMA);
-						setState(723); variableInitializer();
+						setState(722);
+						match(COMMA);
+						setState(723);
+						variableInitializer();
 						}
 						} 
 					}
@@ -3763,17 +4041,20 @@ public class RefactorMethodSignatureParser extends Parser {
 					_alt = getInterpreter().adaptivePredict(_input,78,_ctx);
 				}
 				setState(730);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==COMMA) {
 					{
-					setState(729); match(COMMA);
+					setState(729);
+					match(COMMA);
 					}
 				}
 
 				}
 			}
 
-			setState(734); match(RBRACE);
+			setState(734);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3814,7 +4095,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(736); match(Identifier);
+			setState(736);
+			match(Identifier);
 			}
 		}
 		catch (RecognitionException re) {
@@ -3829,11 +4111,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeContext extends ParserRuleContext {
-		public PrimitiveTypeContext primitiveType() {
-			return getRuleContext(PrimitiveTypeContext.class,0);
-		}
 		public ClassOrInterfaceTypeContext classOrInterfaceType() {
 			return getRuleContext(ClassOrInterfaceTypeContext.class,0);
+		}
+		public PrimitiveTypeContext primitiveType() {
+			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
 		public TypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3860,20 +4142,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(754);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(738); classOrInterfaceType();
+				setState(738);
+				classOrInterfaceType();
 				setState(743);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,81,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(739); match(LBRACK);
-						setState(740); match(RBRACK);
+						setState(739);
+						match(LBRACK);
+						setState(740);
+						match(RBRACK);
 						}
 						} 
 					}
@@ -3893,16 +4179,19 @@ public class RefactorMethodSignatureParser extends Parser {
 			case SHORT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(746); primitiveType();
+				setState(746);
+				primitiveType();
 				setState(751);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,82,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(747); match(LBRACK);
-						setState(748); match(RBRACK);
+						setState(747);
+						match(LBRACK);
+						setState(748);
+						match(RBRACK);
 						}
 						} 
 					}
@@ -3928,12 +4217,12 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassOrInterfaceTypeContext extends ParserRuleContext {
-		public List<TypeArgumentsContext> typeArguments() {
-			return getRuleContexts(TypeArgumentsContext.class);
-		}
 		public List<TerminalNode> Identifier() { return getTokens(RefactorMethodSignatureParser.Identifier); }
 		public TerminalNode Identifier(int i) {
 			return getToken(RefactorMethodSignatureParser.Identifier, i);
+		}
+		public List<TypeArgumentsContext> typeArguments() {
+			return getRuleContexts(TypeArgumentsContext.class);
 		}
 		public TypeArgumentsContext typeArguments(int i) {
 			return getRuleContext(TypeArgumentsContext.class,i);
@@ -3964,29 +4253,36 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(756); match(Identifier);
+			setState(756);
+			match(Identifier);
 			setState(758);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,84,_ctx) ) {
 			case 1:
 				{
-				setState(757); typeArguments();
+				setState(757);
+				typeArguments();
 				}
 				break;
 			}
 			setState(767);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,86,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(760); match(DOT);
-					setState(761); match(Identifier);
+					setState(760);
+					match(DOT);
+					setState(761);
+					match(Identifier);
 					setState(763);
+					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,85,_ctx) ) {
 					case 1:
 						{
-						setState(762); typeArguments();
+						setState(762);
+						typeArguments();
 						}
 						break;
 					}
@@ -4042,7 +4338,11 @@ public class RefactorMethodSignatureParser extends Parser {
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << SHORT))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
-			consume();
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -4089,23 +4389,28 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(772); match(LT);
-			setState(773); typeArgument();
+			setState(772);
+			match(LT);
+			setState(773);
+			typeArgument();
 			setState(778);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(774); match(COMMA);
-				setState(775); typeArgument();
+				setState(774);
+				match(COMMA);
+				setState(775);
+				typeArgument();
 				}
 				}
 				setState(780);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(781); match(GT);
+			setState(781);
+			match(GT);
 			}
 		}
 		catch (RecognitionException re) {
@@ -4148,6 +4453,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		int _la;
 		try {
 			setState(789);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case BOOLEAN:
 			case BYTE:
@@ -4160,14 +4466,17 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(783); type();
+				setState(783);
+				type();
 				}
 				break;
 			case QUESTION:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(784); match(QUESTION);
+				setState(784);
+				match(QUESTION);
 				setState(787);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==EXTENDS || _la==SUPER) {
 					{
@@ -4176,8 +4485,13 @@ public class RefactorMethodSignatureParser extends Parser {
 					if ( !(_la==EXTENDS || _la==SUPER) ) {
 					_errHandler.recoverInline(this);
 					}
-					consume();
-					setState(786); type();
+					else {
+						if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+						_errHandler.reportMatch(this);
+						consume();
+					}
+					setState(786);
+					type();
 					}
 				}
 
@@ -4231,15 +4545,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(791); qualifiedName();
+			setState(791);
+			qualifiedName();
 			setState(796);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(792); match(COMMA);
-				setState(793); qualifiedName();
+				setState(792);
+				match(COMMA);
+				setState(793);
+				qualifiedName();
 				}
 				}
 				setState(798);
@@ -4289,16 +4606,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(799); match(LPAREN);
+			setState(799);
+			match(LPAREN);
 			setState(801);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << SHORT))) != 0) || _la==Identifier || _la==AT) {
 				{
-				setState(800); formalParameterList();
+				setState(800);
+				formalParameterList();
 				}
 			}
 
-			setState(803); match(RPAREN);
+			setState(803);
+			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
@@ -4316,11 +4637,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public List<FormalParameterContext> formalParameter() {
 			return getRuleContexts(FormalParameterContext.class);
 		}
-		public LastFormalParameterContext lastFormalParameter() {
-			return getRuleContext(LastFormalParameterContext.class,0);
-		}
 		public FormalParameterContext formalParameter(int i) {
 			return getRuleContext(FormalParameterContext.class,i);
+		}
+		public LastFormalParameterContext lastFormalParameter() {
+			return getRuleContext(LastFormalParameterContext.class,0);
 		}
 		public FormalParameterListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4348,20 +4669,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(818);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,94,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(805); formalParameter();
+				setState(805);
+				formalParameter();
 				setState(810);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,92,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(806); match(COMMA);
-						setState(807); formalParameter();
+						setState(806);
+						match(COMMA);
+						setState(807);
+						formalParameter();
 						}
 						} 
 					}
@@ -4370,21 +4695,24 @@ public class RefactorMethodSignatureParser extends Parser {
 					_alt = getInterpreter().adaptivePredict(_input,92,_ctx);
 				}
 				setState(815);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==COMMA) {
 					{
-					setState(813); match(COMMA);
-					setState(814); lastFormalParameter();
+					setState(813);
+					match(COMMA);
+					setState(814);
+					lastFormalParameter();
 					}
 				}
 
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(817); lastFormalParameter();
+				setState(817);
+				lastFormalParameter();
 				}
 				break;
 			}
@@ -4401,17 +4729,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalParameterContext extends ParserRuleContext {
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
-		}
-		public List<VariableModifierContext> variableModifier() {
-			return getRuleContexts(VariableModifierContext.class);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
+		public List<VariableModifierContext> variableModifier() {
+			return getRuleContexts(VariableModifierContext.class);
+		}
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public FormalParameterContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4445,15 +4773,18 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(820); variableModifier();
+				setState(820);
+				variableModifier();
 				}
 				}
 				setState(825);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(826); type();
-			setState(827); variableDeclaratorId();
+			setState(826);
+			type();
+			setState(827);
+			variableDeclaratorId();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4468,17 +4799,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class LastFormalParameterContext extends ParserRuleContext {
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
-		}
-		public List<VariableModifierContext> variableModifier() {
-			return getRuleContexts(VariableModifierContext.class);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
+		public List<VariableModifierContext> variableModifier() {
+			return getRuleContexts(VariableModifierContext.class);
+		}
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public LastFormalParameterContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4512,16 +4843,20 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(829); variableModifier();
+				setState(829);
+				variableModifier();
 				}
 				}
 				setState(834);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(835); type();
-			setState(836); match(ELLIPSIS);
-			setState(837); variableDeclaratorId();
+			setState(835);
+			type();
+			setState(836);
+			match(ELLIPSIS);
+			setState(837);
+			variableDeclaratorId();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4564,7 +4899,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(839); block();
+			setState(839);
+			block();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4607,7 +4943,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(841); block();
+			setState(841);
+			block();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4652,16 +4989,19 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(843); match(Identifier);
+			setState(843);
+			match(Identifier);
 			setState(848);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,97,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(844); match(DOT);
-					setState(845); match(Identifier);
+					setState(844);
+					match(DOT);
+					setState(845);
+					match(Identifier);
 					}
 					} 
 				}
@@ -4683,11 +5023,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class LiteralContext extends ParserRuleContext {
-		public TerminalNode StringLiteral() { return getToken(RefactorMethodSignatureParser.StringLiteral, 0); }
 		public TerminalNode IntegerLiteral() { return getToken(RefactorMethodSignatureParser.IntegerLiteral, 0); }
 		public TerminalNode FloatingPointLiteral() { return getToken(RefactorMethodSignatureParser.FloatingPointLiteral, 0); }
-		public TerminalNode BooleanLiteral() { return getToken(RefactorMethodSignatureParser.BooleanLiteral, 0); }
 		public TerminalNode CharacterLiteral() { return getToken(RefactorMethodSignatureParser.CharacterLiteral, 0); }
+		public TerminalNode StringLiteral() { return getToken(RefactorMethodSignatureParser.StringLiteral, 0); }
+		public TerminalNode BooleanLiteral() { return getToken(RefactorMethodSignatureParser.BooleanLiteral, 0); }
 		public LiteralContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4719,7 +5059,11 @@ public class RefactorMethodSignatureParser extends Parser {
 			if ( !((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral))) != 0)) ) {
 			_errHandler.recoverInline(this);
 			}
-			consume();
+			else {
+				if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+				_errHandler.reportMatch(this);
+				consume();
+			}
 			}
 		}
 		catch (RecognitionException re) {
@@ -4734,11 +5078,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationContext extends ParserRuleContext {
-		public ElementValuePairsContext elementValuePairs() {
-			return getRuleContext(ElementValuePairsContext.class,0);
-		}
 		public AnnotationNameContext annotationName() {
 			return getRuleContext(AnnotationNameContext.class,0);
+		}
+		public ElementValuePairsContext elementValuePairs() {
+			return getRuleContext(ElementValuePairsContext.class,0);
 		}
 		public ElementValueContext elementValue() {
 			return getRuleContext(ElementValueContext.class,0);
@@ -4769,28 +5113,35 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(853); match(AT);
-			setState(854); annotationName();
+			setState(853);
+			match(AT);
+			setState(854);
+			annotationName();
 			setState(861);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LPAREN) {
 				{
-				setState(855); match(LPAREN);
+				setState(855);
+				match(LPAREN);
 				setState(858);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,98,_ctx) ) {
 				case 1:
 					{
-					setState(856); elementValuePairs();
+					setState(856);
+					elementValuePairs();
 					}
 					break;
-
 				case 2:
 					{
-					setState(857); elementValue();
+					setState(857);
+					elementValue();
 					}
 					break;
 				}
-				setState(860); match(RPAREN);
+				setState(860);
+				match(RPAREN);
 				}
 			}
 
@@ -4836,7 +5187,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(863); qualifiedName();
+			setState(863);
+			qualifiedName();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4851,11 +5203,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ElementValuePairsContext extends ParserRuleContext {
-		public ElementValuePairContext elementValuePair(int i) {
-			return getRuleContext(ElementValuePairContext.class,i);
-		}
 		public List<ElementValuePairContext> elementValuePair() {
 			return getRuleContexts(ElementValuePairContext.class);
+		}
+		public ElementValuePairContext elementValuePair(int i) {
+			return getRuleContext(ElementValuePairContext.class,i);
 		}
 		public ElementValuePairsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4883,15 +5235,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(865); elementValuePair();
+			setState(865);
+			elementValuePair();
 			setState(870);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(866); match(COMMA);
-				setState(867); elementValuePair();
+				setState(866);
+				match(COMMA);
+				setState(867);
+				elementValuePair();
 				}
 				}
 				setState(872);
@@ -4941,9 +5296,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(873); match(Identifier);
-			setState(874); match(ASSIGN);
-			setState(875); elementValue();
+			setState(873);
+			match(Identifier);
+			setState(874);
+			match(ASSIGN);
+			setState(875);
+			elementValue();
 			}
 		}
 		catch (RecognitionException re) {
@@ -4958,14 +5316,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ElementValueContext extends ParserRuleContext {
-		public ElementValueArrayInitializerContext elementValueArrayInitializer() {
-			return getRuleContext(ElementValueArrayInitializerContext.class,0);
+		public ExpressionContext expression() {
+			return getRuleContext(ExpressionContext.class,0);
 		}
 		public AnnotationContext annotation() {
 			return getRuleContext(AnnotationContext.class,0);
 		}
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
+		public ElementValueArrayInitializerContext elementValueArrayInitializer() {
+			return getRuleContext(ElementValueArrayInitializerContext.class,0);
 		}
 		public ElementValueContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4991,6 +5349,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 132, RULE_elementValue);
 		try {
 			setState(880);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case BOOLEAN:
 			case BYTE:
@@ -5021,19 +5380,22 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(877); expression(0);
+				setState(877);
+				expression(0);
 				}
 				break;
 			case AT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(878); annotation();
+				setState(878);
+				annotation();
 				}
 				break;
 			case LBRACE:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(879); elementValueArrayInitializer();
+				setState(879);
+				elementValueArrayInitializer();
 				}
 				break;
 			default:
@@ -5052,11 +5414,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ElementValueArrayInitializerContext extends ParserRuleContext {
-		public ElementValueContext elementValue(int i) {
-			return getRuleContext(ElementValueContext.class,i);
-		}
 		public List<ElementValueContext> elementValue() {
 			return getRuleContexts(ElementValueContext.class);
+		}
+		public ElementValueContext elementValue(int i) {
+			return getRuleContext(ElementValueContext.class,i);
 		}
 		public ElementValueArrayInitializerContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5085,21 +5447,26 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(882); match(LBRACE);
+			setState(882);
+			match(LBRACE);
 			setState(891);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN) | (1L << LBRACE))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)) | (1L << (AT - 70)))) != 0)) {
 				{
-				setState(883); elementValue();
+				setState(883);
+				elementValue();
 				setState(888);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,102,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(884); match(COMMA);
-						setState(885); elementValue();
+						setState(884);
+						match(COMMA);
+						setState(885);
+						elementValue();
 						}
 						} 
 					}
@@ -5111,14 +5478,17 @@ public class RefactorMethodSignatureParser extends Parser {
 			}
 
 			setState(894);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==COMMA) {
 				{
-				setState(893); match(COMMA);
+				setState(893);
+				match(COMMA);
 				}
 			}
 
-			setState(896); match(RBRACE);
+			setState(896);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -5162,10 +5532,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(898); match(AT);
-			setState(899); match(INTERFACE);
-			setState(900); match(Identifier);
-			setState(901); annotationTypeBody();
+			setState(898);
+			match(AT);
+			setState(899);
+			match(INTERFACE);
+			setState(900);
+			match(Identifier);
+			setState(901);
+			annotationTypeBody();
 			}
 		}
 		catch (RecognitionException re) {
@@ -5212,21 +5586,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(903); match(LBRACE);
+			setState(903);
+			match(LBRACE);
 			setState(907);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << CLASS) | (1L << DOUBLE) | (1L << ENUM) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << INTERFACE) | (1L << LONG) | (1L << NATIVE) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << SHORT) | (1L << STATIC) | (1L << STRICTFP) | (1L << SYNCHRONIZED) | (1L << TRANSIENT) | (1L << VOLATILE))) != 0) || ((((_la - 65)) & ~0x3f) == 0 && ((1L << (_la - 65)) & ((1L << (SEMI - 65)) | (1L << (Identifier - 65)) | (1L << (AT - 65)))) != 0)) {
 				{
 				{
-				setState(904); annotationTypeElementDeclaration();
+				setState(904);
+				annotationTypeElementDeclaration();
 				}
 				}
 				setState(909);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(910); match(RBRACE);
+			setState(910);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -5241,11 +5618,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeElementDeclarationContext extends ParserRuleContext {
-		public List<ModifierContext> modifier() {
-			return getRuleContexts(ModifierContext.class);
-		}
 		public AnnotationTypeElementRestContext annotationTypeElementRest() {
 			return getRuleContext(AnnotationTypeElementRestContext.class,0);
+		}
+		public List<ModifierContext> modifier() {
+			return getRuleContexts(ModifierContext.class);
 		}
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
@@ -5275,6 +5652,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(920);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case ABSTRACT:
 			case BOOLEAN:
@@ -5305,11 +5683,12 @@ public class RefactorMethodSignatureParser extends Parser {
 				setState(915);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,106,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(912); modifier();
+						setState(912);
+						modifier();
 						}
 						} 
 					}
@@ -5317,13 +5696,15 @@ public class RefactorMethodSignatureParser extends Parser {
 					_errHandler.sync(this);
 					_alt = getInterpreter().adaptivePredict(_input,106,_ctx);
 				}
-				setState(918); annotationTypeElementRest();
+				setState(918);
+				annotationTypeElementRest();
 				}
 				break;
 			case SEMI:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(919); match(SEMI);
+				setState(919);
+				match(SEMI);
 				}
 				break;
 			default:
@@ -5342,23 +5723,23 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeElementRestContext extends ParserRuleContext {
-		public EnumDeclarationContext enumDeclaration() {
-			return getRuleContext(EnumDeclarationContext.class,0);
-		}
-		public ClassDeclarationContext classDeclaration() {
-			return getRuleContext(ClassDeclarationContext.class,0);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public AnnotationMethodOrConstantRestContext annotationMethodOrConstantRest() {
 			return getRuleContext(AnnotationMethodOrConstantRestContext.class,0);
 		}
-		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
-			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
+		public ClassDeclarationContext classDeclaration() {
+			return getRuleContext(ClassDeclarationContext.class,0);
 		}
 		public InterfaceDeclarationContext interfaceDeclaration() {
 			return getRuleContext(InterfaceDeclarationContext.class,0);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
+		public EnumDeclarationContext enumDeclaration() {
+			return getRuleContext(EnumDeclarationContext.class,0);
+		}
+		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
+			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
 		}
 		public AnnotationTypeElementRestContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5384,6 +5765,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 142, RULE_annotationTypeElementRest);
 		try {
 			setState(942);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case BOOLEAN:
 			case BYTE:
@@ -5396,20 +5778,26 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(922); type();
-				setState(923); annotationMethodOrConstantRest();
-				setState(924); match(SEMI);
+				setState(922);
+				type();
+				setState(923);
+				annotationMethodOrConstantRest();
+				setState(924);
+				match(SEMI);
 				}
 				break;
 			case CLASS:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(926); classDeclaration();
+				setState(926);
+				classDeclaration();
 				setState(928);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,108,_ctx) ) {
 				case 1:
 					{
-					setState(927); match(SEMI);
+					setState(927);
+					match(SEMI);
 					}
 					break;
 				}
@@ -5418,12 +5806,15 @@ public class RefactorMethodSignatureParser extends Parser {
 			case INTERFACE:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(930); interfaceDeclaration();
+				setState(930);
+				interfaceDeclaration();
 				setState(932);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,109,_ctx) ) {
 				case 1:
 					{
-					setState(931); match(SEMI);
+					setState(931);
+					match(SEMI);
 					}
 					break;
 				}
@@ -5432,12 +5823,15 @@ public class RefactorMethodSignatureParser extends Parser {
 			case ENUM:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(934); enumDeclaration();
+				setState(934);
+				enumDeclaration();
 				setState(936);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,110,_ctx) ) {
 				case 1:
 					{
-					setState(935); match(SEMI);
+					setState(935);
+					match(SEMI);
 					}
 					break;
 				}
@@ -5446,12 +5840,15 @@ public class RefactorMethodSignatureParser extends Parser {
 			case AT:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(938); annotationTypeDeclaration();
+				setState(938);
+				annotationTypeDeclaration();
 				setState(940);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,111,_ctx) ) {
 				case 1:
 					{
-					setState(939); match(SEMI);
+					setState(939);
+					match(SEMI);
 					}
 					break;
 				}
@@ -5503,18 +5900,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 144, RULE_annotationMethodOrConstantRest);
 		try {
 			setState(946);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,113,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(944); annotationMethodRest();
+				setState(944);
+				annotationMethodRest();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(945); annotationConstantRest();
+				setState(945);
+				annotationConstantRest();
 				}
 				break;
 			}
@@ -5561,14 +5960,19 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(948); match(Identifier);
-			setState(949); match(LPAREN);
-			setState(950); match(RPAREN);
+			setState(948);
+			match(Identifier);
+			setState(949);
+			match(LPAREN);
+			setState(950);
+			match(RPAREN);
 			setState(952);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==DEFAULT) {
 				{
-				setState(951); defaultValue();
+				setState(951);
+				defaultValue();
 				}
 			}
 
@@ -5614,7 +6018,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(954); variableDeclarators();
+			setState(954);
+			variableDeclarators();
 			}
 		}
 		catch (RecognitionException re) {
@@ -5657,8 +6062,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(956); match(DEFAULT);
-			setState(957); elementValue();
+			setState(956);
+			match(DEFAULT);
+			setState(957);
+			elementValue();
 			}
 		}
 		catch (RecognitionException re) {
@@ -5705,21 +6112,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(959); match(LBRACE);
+			setState(959);
+			match(LBRACE);
 			setState(963);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << ABSTRACT) | (1L << ASSERT) | (1L << BOOLEAN) | (1L << BREAK) | (1L << BYTE) | (1L << CHAR) | (1L << CLASS) | (1L << CONTINUE) | (1L << DO) | (1L << DOUBLE) | (1L << ENUM) | (1L << FINAL) | (1L << FLOAT) | (1L << FOR) | (1L << IF) | (1L << INT) | (1L << INTERFACE) | (1L << LONG) | (1L << NEW) | (1L << PRIVATE) | (1L << PROTECTED) | (1L << PUBLIC) | (1L << RETURN) | (1L << SHORT) | (1L << STATIC) | (1L << STRICTFP) | (1L << SUPER) | (1L << SWITCH) | (1L << SYNCHRONIZED) | (1L << THIS) | (1L << THROW) | (1L << TRY) | (1L << VOID) | (1L << WHILE) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN) | (1L << LBRACE))) != 0) || ((((_la - 65)) & ~0x3f) == 0 && ((1L << (_la - 65)) & ((1L << (SEMI - 65)) | (1L << (LT - 65)) | (1L << (BANG - 65)) | (1L << (TILDE - 65)) | (1L << (INC - 65)) | (1L << (DEC - 65)) | (1L << (ADD - 65)) | (1L << (SUB - 65)) | (1L << (Identifier - 65)) | (1L << (AT - 65)))) != 0)) {
 				{
 				{
-				setState(960); blockStatement();
+				setState(960);
+				blockStatement();
 				}
 				}
 				setState(965);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(966); match(RBRACE);
+			setState(966);
+			match(RBRACE);
 			}
 		}
 		catch (RecognitionException re) {
@@ -5734,14 +6144,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class BlockStatementContext extends ParserRuleContext {
-		public TypeDeclarationContext typeDeclaration() {
-			return getRuleContext(TypeDeclarationContext.class,0);
+		public LocalVariableDeclarationStatementContext localVariableDeclarationStatement() {
+			return getRuleContext(LocalVariableDeclarationStatementContext.class,0);
 		}
 		public StatementContext statement() {
 			return getRuleContext(StatementContext.class,0);
 		}
-		public LocalVariableDeclarationStatementContext localVariableDeclarationStatement() {
-			return getRuleContext(LocalVariableDeclarationStatementContext.class,0);
+		public TypeDeclarationContext typeDeclaration() {
+			return getRuleContext(TypeDeclarationContext.class,0);
 		}
 		public BlockStatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5767,25 +6177,27 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 154, RULE_blockStatement);
 		try {
 			setState(971);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,116,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(968); localVariableDeclarationStatement();
+				setState(968);
+				localVariableDeclarationStatement();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(969); statement();
+				setState(969);
+				statement();
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(970); typeDeclaration();
+				setState(970);
+				typeDeclaration();
 				}
 				break;
 			}
@@ -5830,8 +6242,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(973); localVariableDeclaration();
-			setState(974); match(SEMI);
+			setState(973);
+			localVariableDeclaration();
+			setState(974);
+			match(SEMI);
 			}
 		}
 		catch (RecognitionException re) {
@@ -5846,17 +6260,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class LocalVariableDeclarationContext extends ParserRuleContext {
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
-		}
-		public List<VariableModifierContext> variableModifier() {
-			return getRuleContexts(VariableModifierContext.class);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public VariableDeclaratorsContext variableDeclarators() {
 			return getRuleContext(VariableDeclaratorsContext.class,0);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
+		public List<VariableModifierContext> variableModifier() {
+			return getRuleContexts(VariableModifierContext.class);
+		}
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public LocalVariableDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5890,15 +6304,18 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(976); variableModifier();
+				setState(976);
+				variableModifier();
 				}
 				}
 				setState(981);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(982); type();
-			setState(983); variableDeclarators();
+			setState(982);
+			type();
+			setState(983);
+			variableDeclarators();
 			}
 		}
 		catch (RecognitionException re) {
@@ -5913,23 +6330,30 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class StatementContext extends ParserRuleContext {
+		public BlockContext block() {
+			return getRuleContext(BlockContext.class,0);
+		}
+		public TerminalNode ASSERT() { return getToken(RefactorMethodSignatureParser.ASSERT, 0); }
+		public List<ExpressionContext> expression() {
+			return getRuleContexts(ExpressionContext.class);
+		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
-		public StatementExpressionContext statementExpression() {
-			return getRuleContext(StatementExpressionContext.class,0);
+		public ParExpressionContext parExpression() {
+			return getRuleContext(ParExpressionContext.class,0);
+		}
+		public List<StatementContext> statement() {
+			return getRuleContexts(StatementContext.class);
 		}
 		public StatementContext statement(int i) {
 			return getRuleContext(StatementContext.class,i);
 		}
-		public List<SwitchLabelContext> switchLabel() {
-			return getRuleContexts(SwitchLabelContext.class);
+		public ForControlContext forControl() {
+			return getRuleContext(ForControlContext.class,0);
 		}
-		public List<SwitchBlockStatementGroupContext> switchBlockStatementGroup() {
-			return getRuleContexts(SwitchBlockStatementGroupContext.class);
-		}
-		public ParExpressionContext parExpression() {
-			return getRuleContext(ParExpressionContext.class,0);
+		public FinallyBlockContext finallyBlock() {
+			return getRuleContext(FinallyBlockContext.class,0);
 		}
 		public List<CatchClauseContext> catchClause() {
 			return getRuleContexts(CatchClauseContext.class);
@@ -5937,31 +6361,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		public CatchClauseContext catchClause(int i) {
 			return getRuleContext(CatchClauseContext.class,i);
 		}
-		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
-		public FinallyBlockContext finallyBlock() {
-			return getRuleContext(FinallyBlockContext.class,0);
+		public ResourceSpecificationContext resourceSpecification() {
+			return getRuleContext(ResourceSpecificationContext.class,0);
+		}
+		public List<SwitchBlockStatementGroupContext> switchBlockStatementGroup() {
+			return getRuleContexts(SwitchBlockStatementGroupContext.class);
 		}
 		public SwitchBlockStatementGroupContext switchBlockStatementGroup(int i) {
 			return getRuleContext(SwitchBlockStatementGroupContext.class,i);
 		}
-		public ForControlContext forControl() {
-			return getRuleContext(ForControlContext.class,0);
-		}
-		public TerminalNode ASSERT() { return getToken(RefactorMethodSignatureParser.ASSERT, 0); }
-		public ResourceSpecificationContext resourceSpecification() {
-			return getRuleContext(ResourceSpecificationContext.class,0);
-		}
-		public List<StatementContext> statement() {
-			return getRuleContexts(StatementContext.class);
-		}
-		public BlockContext block() {
-			return getRuleContext(BlockContext.class,0);
-		}
-		public List<ExpressionContext> expression() {
-			return getRuleContexts(ExpressionContext.class);
+		public List<SwitchLabelContext> switchLabel() {
+			return getRuleContexts(SwitchLabelContext.class);
 		}
 		public SwitchLabelContext switchLabel(int i) {
 			return getRuleContext(SwitchLabelContext.class,i);
+		}
+		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public StatementExpressionContext statementExpression() {
+			return getRuleContext(StatementExpressionContext.class,0);
 		}
 		public StatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5989,87 +6406,111 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			int _alt;
 			setState(1089);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,130,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(985); block();
+				setState(985);
+				block();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(986); match(ASSERT);
-				setState(987); expression(0);
+				setState(986);
+				match(ASSERT);
+				setState(987);
+				expression(0);
 				setState(990);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==COLON) {
 					{
-					setState(988); match(COLON);
-					setState(989); expression(0);
+					setState(988);
+					match(COLON);
+					setState(989);
+					expression(0);
 					}
 				}
 
-				setState(992); match(SEMI);
+				setState(992);
+				match(SEMI);
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(994); match(IF);
-				setState(995); parExpression();
-				setState(996); statement();
+				setState(994);
+				match(IF);
+				setState(995);
+				parExpression();
+				setState(996);
+				statement();
 				setState(999);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,119,_ctx) ) {
 				case 1:
 					{
-					setState(997); match(ELSE);
-					setState(998); statement();
+					setState(997);
+					match(ELSE);
+					setState(998);
+					statement();
 					}
 					break;
 				}
 				}
 				break;
-
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(1001); match(FOR);
-				setState(1002); match(LPAREN);
-				setState(1003); forControl();
-				setState(1004); match(RPAREN);
-				setState(1005); statement();
+				setState(1001);
+				match(FOR);
+				setState(1002);
+				match(LPAREN);
+				setState(1003);
+				forControl();
+				setState(1004);
+				match(RPAREN);
+				setState(1005);
+				statement();
 				}
 				break;
-
 			case 5:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(1007); match(WHILE);
-				setState(1008); parExpression();
-				setState(1009); statement();
+				setState(1007);
+				match(WHILE);
+				setState(1008);
+				parExpression();
+				setState(1009);
+				statement();
 				}
 				break;
-
 			case 6:
 				enterOuterAlt(_localctx, 6);
 				{
-				setState(1011); match(DO);
-				setState(1012); statement();
-				setState(1013); match(WHILE);
-				setState(1014); parExpression();
-				setState(1015); match(SEMI);
+				setState(1011);
+				match(DO);
+				setState(1012);
+				statement();
+				setState(1013);
+				match(WHILE);
+				setState(1014);
+				parExpression();
+				setState(1015);
+				match(SEMI);
 				}
 				break;
-
 			case 7:
 				enterOuterAlt(_localctx, 7);
 				{
-				setState(1017); match(TRY);
-				setState(1018); block();
+				setState(1017);
+				match(TRY);
+				setState(1018);
+				block();
 				setState(1028);
+				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case CATCH:
 					{
@@ -6079,7 +6520,8 @@ public class RefactorMethodSignatureParser extends Parser {
 					do {
 						{
 						{
-						setState(1019); catchClause();
+						setState(1019);
+						catchClause();
 						}
 						}
 						setState(1022); 
@@ -6087,10 +6529,12 @@ public class RefactorMethodSignatureParser extends Parser {
 						_la = _input.LA(1);
 					} while ( _la==CATCH );
 					setState(1025);
+					_errHandler.sync(this);
 					_la = _input.LA(1);
 					if (_la==FINALLY) {
 						{
-						setState(1024); finallyBlock();
+						setState(1024);
+						finallyBlock();
 						}
 					}
 
@@ -6098,7 +6542,8 @@ public class RefactorMethodSignatureParser extends Parser {
 					break;
 				case FINALLY:
 					{
-					setState(1027); finallyBlock();
+					setState(1027);
+					finallyBlock();
 					}
 					break;
 				default:
@@ -6106,20 +6551,23 @@ public class RefactorMethodSignatureParser extends Parser {
 				}
 				}
 				break;
-
 			case 8:
 				enterOuterAlt(_localctx, 8);
 				{
-				setState(1030); match(TRY);
-				setState(1031); resourceSpecification();
-				setState(1032); block();
+				setState(1030);
+				match(TRY);
+				setState(1031);
+				resourceSpecification();
+				setState(1032);
+				block();
 				setState(1036);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while (_la==CATCH) {
 					{
 					{
-					setState(1033); catchClause();
+					setState(1033);
+					catchClause();
 					}
 					}
 					setState(1038);
@@ -6127,30 +6575,35 @@ public class RefactorMethodSignatureParser extends Parser {
 					_la = _input.LA(1);
 				}
 				setState(1040);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==FINALLY) {
 					{
-					setState(1039); finallyBlock();
+					setState(1039);
+					finallyBlock();
 					}
 				}
 
 				}
 				break;
-
 			case 9:
 				enterOuterAlt(_localctx, 9);
 				{
-				setState(1042); match(SWITCH);
-				setState(1043); parExpression();
-				setState(1044); match(LBRACE);
+				setState(1042);
+				match(SWITCH);
+				setState(1043);
+				parExpression();
+				setState(1044);
+				match(LBRACE);
 				setState(1048);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,125,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(1045); switchBlockStatementGroup();
+						setState(1045);
+						switchBlockStatementGroup();
 						}
 						} 
 					}
@@ -6164,104 +6617,122 @@ public class RefactorMethodSignatureParser extends Parser {
 				while (_la==CASE || _la==DEFAULT) {
 					{
 					{
-					setState(1051); switchLabel();
+					setState(1051);
+					switchLabel();
 					}
 					}
 					setState(1056);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(1057); match(RBRACE);
+				setState(1057);
+				match(RBRACE);
 				}
 				break;
-
 			case 10:
 				enterOuterAlt(_localctx, 10);
 				{
-				setState(1059); match(SYNCHRONIZED);
-				setState(1060); parExpression();
-				setState(1061); block();
+				setState(1059);
+				match(SYNCHRONIZED);
+				setState(1060);
+				parExpression();
+				setState(1061);
+				block();
 				}
 				break;
-
 			case 11:
 				enterOuterAlt(_localctx, 11);
 				{
-				setState(1063); match(RETURN);
+				setState(1063);
+				match(RETURN);
 				setState(1065);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 					{
-					setState(1064); expression(0);
+					setState(1064);
+					expression(0);
 					}
 				}
 
-				setState(1067); match(SEMI);
+				setState(1067);
+				match(SEMI);
 				}
 				break;
-
 			case 12:
 				enterOuterAlt(_localctx, 12);
 				{
-				setState(1068); match(THROW);
-				setState(1069); expression(0);
-				setState(1070); match(SEMI);
+				setState(1068);
+				match(THROW);
+				setState(1069);
+				expression(0);
+				setState(1070);
+				match(SEMI);
 				}
 				break;
-
 			case 13:
 				enterOuterAlt(_localctx, 13);
 				{
-				setState(1072); match(BREAK);
+				setState(1072);
+				match(BREAK);
 				setState(1074);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==Identifier) {
 					{
-					setState(1073); match(Identifier);
+					setState(1073);
+					match(Identifier);
 					}
 				}
 
-				setState(1076); match(SEMI);
+				setState(1076);
+				match(SEMI);
 				}
 				break;
-
 			case 14:
 				enterOuterAlt(_localctx, 14);
 				{
-				setState(1077); match(CONTINUE);
+				setState(1077);
+				match(CONTINUE);
 				setState(1079);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==Identifier) {
 					{
-					setState(1078); match(Identifier);
+					setState(1078);
+					match(Identifier);
 					}
 				}
 
-				setState(1081); match(SEMI);
+				setState(1081);
+				match(SEMI);
 				}
 				break;
-
 			case 15:
 				enterOuterAlt(_localctx, 15);
 				{
-				setState(1082); match(SEMI);
+				setState(1082);
+				match(SEMI);
 				}
 				break;
-
 			case 16:
 				enterOuterAlt(_localctx, 16);
 				{
-				setState(1083); statementExpression();
-				setState(1084); match(SEMI);
+				setState(1083);
+				statementExpression();
+				setState(1084);
+				match(SEMI);
 				}
 				break;
-
 			case 17:
 				enterOuterAlt(_localctx, 17);
 				{
-				setState(1086); match(Identifier);
-				setState(1087); match(COLON);
-				setState(1088); statement();
+				setState(1086);
+				match(Identifier);
+				setState(1087);
+				match(COLON);
+				setState(1088);
+				statement();
 				}
 				break;
 			}
@@ -6282,14 +6753,14 @@ public class RefactorMethodSignatureParser extends Parser {
 			return getRuleContext(CatchTypeContext.class,0);
 		}
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
+		public BlockContext block() {
+			return getRuleContext(BlockContext.class,0);
 		}
 		public List<VariableModifierContext> variableModifier() {
 			return getRuleContexts(VariableModifierContext.class);
 		}
-		public BlockContext block() {
-			return getRuleContext(BlockContext.class,0);
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public CatchClauseContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6317,25 +6788,32 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1091); match(CATCH);
-			setState(1092); match(LPAREN);
+			setState(1091);
+			match(CATCH);
+			setState(1092);
+			match(LPAREN);
 			setState(1096);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(1093); variableModifier();
+				setState(1093);
+				variableModifier();
 				}
 				}
 				setState(1098);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(1099); catchType();
-			setState(1100); match(Identifier);
-			setState(1101); match(RPAREN);
-			setState(1102); block();
+			setState(1099);
+			catchType();
+			setState(1100);
+			match(Identifier);
+			setState(1101);
+			match(RPAREN);
+			setState(1102);
+			block();
 			}
 		}
 		catch (RecognitionException re) {
@@ -6382,15 +6860,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1104); qualifiedName();
+			setState(1104);
+			qualifiedName();
 			setState(1109);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==BITOR) {
 				{
 				{
-				setState(1105); match(BITOR);
-				setState(1106); qualifiedName();
+				setState(1105);
+				match(BITOR);
+				setState(1106);
+				qualifiedName();
 				}
 				}
 				setState(1111);
@@ -6439,8 +6920,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1112); match(FINALLY);
-			setState(1113); block();
+			setState(1112);
+			match(FINALLY);
+			setState(1113);
+			block();
 			}
 		}
 		catch (RecognitionException re) {
@@ -6484,17 +6967,22 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1115); match(LPAREN);
-			setState(1116); resources();
+			setState(1115);
+			match(LPAREN);
+			setState(1116);
+			resources();
 			setState(1118);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==SEMI) {
 				{
-				setState(1117); match(SEMI);
+				setState(1117);
+				match(SEMI);
 				}
 			}
 
-			setState(1120); match(RPAREN);
+			setState(1120);
+			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
@@ -6509,11 +6997,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ResourcesContext extends ParserRuleContext {
-		public ResourceContext resource(int i) {
-			return getRuleContext(ResourceContext.class,i);
-		}
 		public List<ResourceContext> resource() {
 			return getRuleContexts(ResourceContext.class);
+		}
+		public ResourceContext resource(int i) {
+			return getRuleContext(ResourceContext.class,i);
 		}
 		public ResourcesContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6541,16 +7029,19 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1122); resource();
+			setState(1122);
+			resource();
 			setState(1127);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,134,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					{
 					{
-					setState(1123); match(SEMI);
-					setState(1124); resource();
+					setState(1123);
+					match(SEMI);
+					setState(1124);
+					resource();
 					}
 					} 
 				}
@@ -6572,12 +7063,6 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ResourceContext extends ParserRuleContext {
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
-		}
-		public List<VariableModifierContext> variableModifier() {
-			return getRuleContexts(VariableModifierContext.class);
-		}
 		public ClassOrInterfaceTypeContext classOrInterfaceType() {
 			return getRuleContext(ClassOrInterfaceTypeContext.class,0);
 		}
@@ -6586,6 +7071,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		}
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
+		}
+		public List<VariableModifierContext> variableModifier() {
+			return getRuleContexts(VariableModifierContext.class);
+		}
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public ResourceContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6619,17 +7110,22 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(1130); variableModifier();
+				setState(1130);
+				variableModifier();
 				}
 				}
 				setState(1135);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(1136); classOrInterfaceType();
-			setState(1137); variableDeclaratorId();
-			setState(1138); match(ASSIGN);
-			setState(1139); expression(0);
+			setState(1136);
+			classOrInterfaceType();
+			setState(1137);
+			variableDeclaratorId();
+			setState(1138);
+			match(ASSIGN);
+			setState(1139);
+			expression(0);
 			}
 		}
 		catch (RecognitionException re) {
@@ -6644,17 +7140,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class SwitchBlockStatementGroupContext extends ParserRuleContext {
-		public List<BlockStatementContext> blockStatement() {
-			return getRuleContexts(BlockStatementContext.class);
-		}
 		public List<SwitchLabelContext> switchLabel() {
 			return getRuleContexts(SwitchLabelContext.class);
 		}
-		public BlockStatementContext blockStatement(int i) {
-			return getRuleContext(BlockStatementContext.class,i);
-		}
 		public SwitchLabelContext switchLabel(int i) {
 			return getRuleContext(SwitchLabelContext.class,i);
+		}
+		public List<BlockStatementContext> blockStatement() {
+			return getRuleContexts(BlockStatementContext.class);
+		}
+		public BlockStatementContext blockStatement(int i) {
+			return getRuleContext(BlockStatementContext.class,i);
 		}
 		public SwitchBlockStatementGroupContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6688,7 +7184,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			do {
 				{
 				{
-				setState(1141); switchLabel();
+				setState(1141);
+				switchLabel();
 				}
 				}
 				setState(1144); 
@@ -6701,7 +7198,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			do {
 				{
 				{
-				setState(1146); blockStatement();
+				setState(1146);
+				blockStatement();
 				}
 				}
 				setState(1149); 
@@ -6752,30 +7250,37 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 176, RULE_switchLabel);
 		try {
 			setState(1161);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,138,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1151); match(CASE);
-				setState(1152); constantExpression();
-				setState(1153); match(COLON);
+				setState(1151);
+				match(CASE);
+				setState(1152);
+				constantExpression();
+				setState(1153);
+				match(COLON);
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1155); match(CASE);
-				setState(1156); enumConstantName();
-				setState(1157); match(COLON);
+				setState(1155);
+				match(CASE);
+				setState(1156);
+				enumConstantName();
+				setState(1157);
+				match(COLON);
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(1159); match(DEFAULT);
-				setState(1160); match(COLON);
+				setState(1159);
+				match(DEFAULT);
+				setState(1160);
+				match(COLON);
 				}
 				break;
 			}
@@ -6792,17 +7297,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ForControlContext extends ParserRuleContext {
-		public ForUpdateContext forUpdate() {
-			return getRuleContext(ForUpdateContext.class,0);
+		public EnhancedForControlContext enhancedForControl() {
+			return getRuleContext(EnhancedForControlContext.class,0);
 		}
 		public ForInitContext forInit() {
 			return getRuleContext(ForInitContext.class,0);
 		}
-		public EnhancedForControlContext enhancedForControl() {
-			return getRuleContext(EnhancedForControlContext.class,0);
-		}
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
+		}
+		public ForUpdateContext forUpdate() {
+			return getRuleContext(ForUpdateContext.class,0);
 		}
 		public ForControlContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6829,40 +7334,49 @@ public class RefactorMethodSignatureParser extends Parser {
 		int _la;
 		try {
 			setState(1175);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,142,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1163); enhancedForControl();
+				setState(1163);
+				enhancedForControl();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
 				setState(1165);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FINAL) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)) | (1L << (AT - 70)))) != 0)) {
 					{
-					setState(1164); forInit();
+					setState(1164);
+					forInit();
 					}
 				}
 
-				setState(1167); match(SEMI);
+				setState(1167);
+				match(SEMI);
 				setState(1169);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 					{
-					setState(1168); expression(0);
+					setState(1168);
+					expression(0);
 					}
 				}
 
-				setState(1171); match(SEMI);
+				setState(1171);
+				match(SEMI);
 				setState(1173);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 					{
-					setState(1172); forUpdate();
+					setState(1172);
+					forUpdate();
 					}
 				}
 
@@ -6912,18 +7426,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 180, RULE_forInit);
 		try {
 			setState(1179);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,143,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1177); localVariableDeclaration();
+				setState(1177);
+				localVariableDeclaration();
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1178); expressionList();
+				setState(1178);
+				expressionList();
 				}
 				break;
 			}
@@ -6940,20 +7456,20 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class EnhancedForControlContext extends ParserRuleContext {
-		public VariableModifierContext variableModifier(int i) {
-			return getRuleContext(VariableModifierContext.class,i);
-		}
-		public List<VariableModifierContext> variableModifier() {
-			return getRuleContexts(VariableModifierContext.class);
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
 		}
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
-		}
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
+		}
+		public List<VariableModifierContext> variableModifier() {
+			return getRuleContexts(VariableModifierContext.class);
+		}
+		public VariableModifierContext variableModifier(int i) {
+			return getRuleContext(VariableModifierContext.class,i);
 		}
 		public EnhancedForControlContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6987,17 +7503,22 @@ public class RefactorMethodSignatureParser extends Parser {
 			while (_la==FINAL || _la==AT) {
 				{
 				{
-				setState(1181); variableModifier();
+				setState(1181);
+				variableModifier();
 				}
 				}
 				setState(1186);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 			}
-			setState(1187); type();
-			setState(1188); variableDeclaratorId();
-			setState(1189); match(COLON);
-			setState(1190); expression(0);
+			setState(1187);
+			type();
+			setState(1188);
+			variableDeclaratorId();
+			setState(1189);
+			match(COLON);
+			setState(1190);
+			expression(0);
 			}
 		}
 		catch (RecognitionException re) {
@@ -7040,7 +7561,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1192); expressionList();
+			setState(1192);
+			expressionList();
 			}
 		}
 		catch (RecognitionException re) {
@@ -7083,9 +7605,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1194); match(LPAREN);
-			setState(1195); expression(0);
-			setState(1196); match(RPAREN);
+			setState(1194);
+			match(LPAREN);
+			setState(1195);
+			expression(0);
+			setState(1196);
+			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
@@ -7100,11 +7625,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ExpressionListContext extends ParserRuleContext {
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
-		}
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
+		}
+		public ExpressionContext expression(int i) {
+			return getRuleContext(ExpressionContext.class,i);
 		}
 		public ExpressionListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7132,15 +7657,18 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1198); expression(0);
+			setState(1198);
+			expression(0);
 			setState(1203);
 			_errHandler.sync(this);
 			_la = _input.LA(1);
 			while (_la==COMMA) {
 				{
 				{
-				setState(1199); match(COMMA);
-				setState(1200); expression(0);
+				setState(1199);
+				match(COMMA);
+				setState(1200);
+				expression(0);
 				}
 				}
 				setState(1205);
@@ -7189,7 +7717,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1206); expression(0);
+			setState(1206);
+			expression(0);
 			}
 		}
 		catch (RecognitionException re) {
@@ -7232,7 +7761,8 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1208); expression(0);
+			setState(1208);
+			expression(0);
 			}
 		}
 		catch (RecognitionException re) {
@@ -7247,27 +7777,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ExpressionContext extends ParserRuleContext {
-		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
-		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
-			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
-		}
-		public ExplicitGenericInvocationContext explicitGenericInvocation() {
-			return getRuleContext(ExplicitGenericInvocationContext.class,0);
-		}
-		public ExpressionListContext expressionList() {
-			return getRuleContext(ExpressionListContext.class,0);
-		}
-		public InnerCreatorContext innerCreator() {
-			return getRuleContext(InnerCreatorContext.class,0);
-		}
-		public SuperSuffixContext superSuffix() {
-			return getRuleContext(SuperSuffixContext.class,0);
-		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
-		}
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
+		}
+		public CreatorContext creator() {
+			return getRuleContext(CreatorContext.class,0);
 		}
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
@@ -7275,8 +7789,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
 		}
-		public CreatorContext creator() {
-			return getRuleContext(CreatorContext.class,0);
+		public ExpressionContext expression(int i) {
+			return getRuleContext(ExpressionContext.class,i);
+		}
+		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public InnerCreatorContext innerCreator() {
+			return getRuleContext(InnerCreatorContext.class,0);
+		}
+		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
+			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
+		}
+		public SuperSuffixContext superSuffix() {
+			return getRuleContext(SuperSuffixContext.class,0);
+		}
+		public ExplicitGenericInvocationContext explicitGenericInvocation() {
+			return getRuleContext(ExplicitGenericInvocationContext.class,0);
+		}
+		public ExpressionListContext expressionList() {
+			return getRuleContext(ExpressionListContext.class,0);
 		}
 		public ExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7314,50 +7844,64 @@ public class RefactorMethodSignatureParser extends Parser {
 			enterOuterAlt(_localctx, 1);
 			{
 			setState(1223);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,146,_ctx) ) {
 			case 1:
 				{
-				setState(1211); match(LPAREN);
-				setState(1212); type();
-				setState(1213); match(RPAREN);
-				setState(1214); expression(17);
+				setState(1211);
+				primary();
 				}
 				break;
-
 			case 2:
 				{
+				setState(1212);
+				match(NEW);
+				setState(1213);
+				creator();
+				}
+				break;
+			case 3:
+				{
+				setState(1214);
+				match(LPAREN);
+				setState(1215);
+				type();
 				setState(1216);
+				match(RPAREN);
+				setState(1217);
+				expression(17);
+				}
+				break;
+			case 4:
+				{
+				setState(1219);
 				_la = _input.LA(1);
 				if ( !(((((_la - 81)) & ~0x3f) == 0 && ((1L << (_la - 81)) & ((1L << (INC - 81)) | (1L << (DEC - 81)) | (1L << (ADD - 81)) | (1L << (SUB - 81)))) != 0)) ) {
 				_errHandler.recoverInline(this);
 				}
-				consume();
-				setState(1217); expression(15);
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
+				}
+				setState(1220);
+				expression(15);
 				}
 				break;
-
-			case 3:
+			case 5:
 				{
-				setState(1218);
+				setState(1221);
 				_la = _input.LA(1);
 				if ( !(_la==BANG || _la==TILDE) ) {
 				_errHandler.recoverInline(this);
 				}
-				consume();
-				setState(1219); expression(14);
+				else {
+					if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+					_errHandler.reportMatch(this);
+					consume();
 				}
-				break;
-
-			case 4:
-				{
-				setState(1220); primary();
-				}
-				break;
-
-			case 5:
-				{
-				setState(1221); match(NEW);
-				setState(1222); creator();
+				setState(1222);
+				expression(14);
 				}
 				break;
 			}
@@ -7365,12 +7909,13 @@ public class RefactorMethodSignatureParser extends Parser {
 			setState(1310);
 			_errHandler.sync(this);
 			_alt = getInterpreter().adaptivePredict(_input,151,_ctx);
-			while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+			while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 				if ( _alt==1 ) {
 					if ( _parseListeners!=null ) triggerExitRuleEvent();
 					_prevctx = _localctx;
 					{
 					setState(1308);
+					_errHandler.sync(this);
 					switch ( getInterpreter().adaptivePredict(_input,150,_ctx) ) {
 					case 1:
 						{
@@ -7383,11 +7928,15 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(((((_la - 85)) & ~0x3f) == 0 && ((1L << (_la - 85)) & ((1L << (MUL - 85)) | (1L << (DIV - 85)) | (1L << (MOD - 85)))) != 0)) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
-						setState(1227); expression(14);
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
+						setState(1227);
+						expression(14);
 						}
 						break;
-
 					case 2:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7399,11 +7948,15 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(_la==ADD || _la==SUB) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
-						setState(1230); expression(13);
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
+						setState(1230);
+						expression(13);
 						}
 						break;
-
 					case 3:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7411,33 +7964,39 @@ public class RefactorMethodSignatureParser extends Parser {
 						setState(1231);
 						if (!(precpred(_ctx, 11))) throw new FailedPredicateException(this, "precpred(_ctx, 11)");
 						setState(1239);
+						_errHandler.sync(this);
 						switch ( getInterpreter().adaptivePredict(_input,147,_ctx) ) {
 						case 1:
 							{
-							setState(1232); match(LT);
-							setState(1233); match(LT);
+							setState(1232);
+							match(LT);
+							setState(1233);
+							match(LT);
 							}
 							break;
-
 						case 2:
 							{
-							setState(1234); match(GT);
-							setState(1235); match(GT);
-							setState(1236); match(GT);
+							setState(1234);
+							match(GT);
+							setState(1235);
+							match(GT);
+							setState(1236);
+							match(GT);
 							}
 							break;
-
 						case 3:
 							{
-							setState(1237); match(GT);
-							setState(1238); match(GT);
+							setState(1237);
+							match(GT);
+							setState(1238);
+							match(GT);
 							}
 							break;
 						}
-						setState(1241); expression(12);
+						setState(1241);
+						expression(12);
 						}
 						break;
-
 					case 4:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7449,11 +8008,15 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(((((_la - 69)) & ~0x3f) == 0 && ((1L << (_la - 69)) & ((1L << (GT - 69)) | (1L << (LT - 69)) | (1L << (LE - 69)) | (1L << (GE - 69)))) != 0)) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
-						setState(1244); expression(11);
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
+						setState(1244);
+						expression(11);
 						}
 						break;
-
 					case 5:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7465,79 +8028,91 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(_la==EQUAL || _la==NOTEQUAL) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
-						setState(1247); expression(9);
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
+						setState(1247);
+						expression(9);
 						}
 						break;
-
 					case 6:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1248);
 						if (!(precpred(_ctx, 7))) throw new FailedPredicateException(this, "precpred(_ctx, 7)");
-						setState(1249); match(BITAND);
-						setState(1250); expression(8);
+						setState(1249);
+						match(BITAND);
+						setState(1250);
+						expression(8);
 						}
 						break;
-
 					case 7:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1251);
 						if (!(precpred(_ctx, 6))) throw new FailedPredicateException(this, "precpred(_ctx, 6)");
-						setState(1252); match(CARET);
-						setState(1253); expression(7);
+						setState(1252);
+						match(CARET);
+						setState(1253);
+						expression(7);
 						}
 						break;
-
 					case 8:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1254);
 						if (!(precpred(_ctx, 5))) throw new FailedPredicateException(this, "precpred(_ctx, 5)");
-						setState(1255); match(BITOR);
-						setState(1256); expression(6);
+						setState(1255);
+						match(BITOR);
+						setState(1256);
+						expression(6);
 						}
 						break;
-
 					case 9:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1257);
 						if (!(precpred(_ctx, 4))) throw new FailedPredicateException(this, "precpred(_ctx, 4)");
-						setState(1258); match(AND);
-						setState(1259); expression(5);
+						setState(1258);
+						match(AND);
+						setState(1259);
+						expression(5);
 						}
 						break;
-
 					case 10:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1260);
 						if (!(precpred(_ctx, 3))) throw new FailedPredicateException(this, "precpred(_ctx, 3)");
-						setState(1261); match(OR);
-						setState(1262); expression(4);
+						setState(1261);
+						match(OR);
+						setState(1262);
+						expression(4);
 						}
 						break;
-
 					case 11:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1263);
 						if (!(precpred(_ctx, 2))) throw new FailedPredicateException(this, "precpred(_ctx, 2)");
-						setState(1264); match(QUESTION);
-						setState(1265); expression(0);
-						setState(1266); match(COLON);
-						setState(1267); expression(3);
+						setState(1264);
+						match(QUESTION);
+						setState(1265);
+						expression(0);
+						setState(1266);
+						match(COLON);
+						setState(1267);
+						expression(3);
 						}
 						break;
-
 					case 12:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7549,107 +8124,125 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(((((_la - 68)) & ~0x3f) == 0 && ((1L << (_la - 68)) & ((1L << (ASSIGN - 68)) | (1L << (ADD_ASSIGN - 68)) | (1L << (SUB_ASSIGN - 68)) | (1L << (MUL_ASSIGN - 68)) | (1L << (DIV_ASSIGN - 68)) | (1L << (AND_ASSIGN - 68)) | (1L << (OR_ASSIGN - 68)) | (1L << (XOR_ASSIGN - 68)) | (1L << (MOD_ASSIGN - 68)) | (1L << (LSHIFT_ASSIGN - 68)) | (1L << (RSHIFT_ASSIGN - 68)) | (1L << (URSHIFT_ASSIGN - 68)))) != 0)) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
-						setState(1271); expression(1);
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
+						setState(1271);
+						expression(1);
 						}
 						break;
-
 					case 13:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1272);
 						if (!(precpred(_ctx, 25))) throw new FailedPredicateException(this, "precpred(_ctx, 25)");
-						setState(1273); match(DOT);
-						setState(1274); match(Identifier);
+						setState(1273);
+						match(DOT);
+						setState(1274);
+						match(Identifier);
 						}
 						break;
-
 					case 14:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1275);
 						if (!(precpred(_ctx, 24))) throw new FailedPredicateException(this, "precpred(_ctx, 24)");
-						setState(1276); match(DOT);
-						setState(1277); match(THIS);
+						setState(1276);
+						match(DOT);
+						setState(1277);
+						match(THIS);
 						}
 						break;
-
 					case 15:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1278);
 						if (!(precpred(_ctx, 23))) throw new FailedPredicateException(this, "precpred(_ctx, 23)");
-						setState(1279); match(DOT);
-						setState(1280); match(NEW);
+						setState(1279);
+						match(DOT);
+						setState(1280);
+						match(NEW);
 						setState(1282);
+						_errHandler.sync(this);
 						_la = _input.LA(1);
 						if (_la==LT) {
 							{
-							setState(1281); nonWildcardTypeArguments();
+							setState(1281);
+							nonWildcardTypeArguments();
 							}
 						}
 
-						setState(1284); innerCreator();
+						setState(1284);
+						innerCreator();
 						}
 						break;
-
 					case 16:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1285);
 						if (!(precpred(_ctx, 22))) throw new FailedPredicateException(this, "precpred(_ctx, 22)");
-						setState(1286); match(DOT);
-						setState(1287); match(SUPER);
-						setState(1288); superSuffix();
+						setState(1286);
+						match(DOT);
+						setState(1287);
+						match(SUPER);
+						setState(1288);
+						superSuffix();
 						}
 						break;
-
 					case 17:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1289);
 						if (!(precpred(_ctx, 21))) throw new FailedPredicateException(this, "precpred(_ctx, 21)");
-						setState(1290); match(DOT);
-						setState(1291); explicitGenericInvocation();
+						setState(1290);
+						match(DOT);
+						setState(1291);
+						explicitGenericInvocation();
 						}
 						break;
-
 					case 18:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1292);
 						if (!(precpred(_ctx, 20))) throw new FailedPredicateException(this, "precpred(_ctx, 20)");
-						setState(1293); match(LBRACK);
-						setState(1294); expression(0);
-						setState(1295); match(RBRACK);
+						setState(1293);
+						match(LBRACK);
+						setState(1294);
+						expression(0);
+						setState(1295);
+						match(RBRACK);
 						}
 						break;
-
 					case 19:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1297);
 						if (!(precpred(_ctx, 19))) throw new FailedPredicateException(this, "precpred(_ctx, 19)");
-						setState(1298); match(LPAREN);
+						setState(1298);
+						match(LPAREN);
 						setState(1300);
+						_errHandler.sync(this);
 						_la = _input.LA(1);
 						if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 							{
-							setState(1299); expressionList();
+							setState(1299);
+							expressionList();
 							}
 						}
 
-						setState(1302); match(RPAREN);
+						setState(1302);
+						match(RPAREN);
 						}
 						break;
-
 					case 20:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
@@ -7661,18 +8254,23 @@ public class RefactorMethodSignatureParser extends Parser {
 						if ( !(_la==INC || _la==DEC) ) {
 						_errHandler.recoverInline(this);
 						}
-						consume();
+						else {
+							if ( _input.LA(1)==Token.EOF ) matchedEOF = true;
+							_errHandler.reportMatch(this);
+							consume();
+						}
 						}
 						break;
-
 					case 21:
 						{
 						_localctx = new ExpressionContext(_parentctx, _parentState);
 						pushNewRecursionContext(_localctx, _startState, RULE_expression);
 						setState(1305);
 						if (!(precpred(_ctx, 9))) throw new FailedPredicateException(this, "precpred(_ctx, 9)");
-						setState(1306); match(INSTANCEOF);
-						setState(1307); type();
+						setState(1306);
+						match(INSTANCEOF);
+						setState(1307);
+						type();
 						}
 						break;
 					}
@@ -7696,24 +8294,24 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class PrimaryContext extends ParserRuleContext {
+		public ExpressionContext expression() {
+			return getRuleContext(ExpressionContext.class,0);
+		}
+		public LiteralContext literal() {
+			return getRuleContext(LiteralContext.class,0);
+		}
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TypeContext type() {
+			return getRuleContext(TypeContext.class,0);
+		}
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
 		public ExplicitGenericInvocationSuffixContext explicitGenericInvocationSuffix() {
 			return getRuleContext(ExplicitGenericInvocationSuffixContext.class,0);
 		}
-		public LiteralContext literal() {
-			return getRuleContext(LiteralContext.class,0);
-		}
-		public TypeContext type() {
-			return getRuleContext(TypeContext.class,0);
-		}
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
-		}
-		public ExpressionContext expression() {
-			return getRuleContext(ExpressionContext.class,0);
 		}
 		public PrimaryContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7739,78 +8337,90 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 196, RULE_primary);
 		try {
 			setState(1334);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,153,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1313); match(LPAREN);
-				setState(1314); expression(0);
-				setState(1315); match(RPAREN);
+				setState(1313);
+				match(LPAREN);
+				setState(1314);
+				expression(0);
+				setState(1315);
+				match(RPAREN);
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1317); match(THIS);
+				setState(1317);
+				match(THIS);
 				}
 				break;
-
 			case 3:
 				enterOuterAlt(_localctx, 3);
 				{
-				setState(1318); match(SUPER);
+				setState(1318);
+				match(SUPER);
 				}
 				break;
-
 			case 4:
 				enterOuterAlt(_localctx, 4);
 				{
-				setState(1319); literal();
+				setState(1319);
+				literal();
 				}
 				break;
-
 			case 5:
 				enterOuterAlt(_localctx, 5);
 				{
-				setState(1320); match(Identifier);
+				setState(1320);
+				match(Identifier);
 				}
 				break;
-
 			case 6:
 				enterOuterAlt(_localctx, 6);
 				{
-				setState(1321); type();
-				setState(1322); match(DOT);
-				setState(1323); match(CLASS);
+				setState(1321);
+				type();
+				setState(1322);
+				match(DOT);
+				setState(1323);
+				match(CLASS);
 				}
 				break;
-
 			case 7:
 				enterOuterAlt(_localctx, 7);
 				{
-				setState(1325); match(VOID);
-				setState(1326); match(DOT);
-				setState(1327); match(CLASS);
+				setState(1325);
+				match(VOID);
+				setState(1326);
+				match(DOT);
+				setState(1327);
+				match(CLASS);
 				}
 				break;
-
 			case 8:
 				enterOuterAlt(_localctx, 8);
 				{
-				setState(1328); nonWildcardTypeArguments();
+				setState(1328);
+				nonWildcardTypeArguments();
 				setState(1332);
+				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case SUPER:
 				case Identifier:
 					{
-					setState(1329); explicitGenericInvocationSuffix();
+					setState(1329);
+					explicitGenericInvocationSuffix();
 					}
 					break;
 				case THIS:
 					{
-					setState(1330); match(THIS);
-					setState(1331); arguments();
+					setState(1330);
+					match(THIS);
+					setState(1331);
+					arguments();
 					}
 					break;
 				default:
@@ -7832,17 +8442,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class CreatorContext extends ParserRuleContext {
-		public ArrayCreatorRestContext arrayCreatorRest() {
-			return getRuleContext(ArrayCreatorRestContext.class,0);
-		}
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
+		}
+		public CreatedNameContext createdName() {
+			return getRuleContext(CreatedNameContext.class,0);
 		}
 		public ClassCreatorRestContext classCreatorRest() {
 			return getRuleContext(ClassCreatorRestContext.class,0);
 		}
-		public CreatedNameContext createdName() {
-			return getRuleContext(CreatedNameContext.class,0);
+		public ArrayCreatorRestContext arrayCreatorRest() {
+			return getRuleContext(ArrayCreatorRestContext.class,0);
 		}
 		public CreatorContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7868,13 +8478,17 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 198, RULE_creator);
 		try {
 			setState(1345);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LT:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1336); nonWildcardTypeArguments();
-				setState(1337); createdName();
-				setState(1338); classCreatorRest();
+				setState(1336);
+				nonWildcardTypeArguments();
+				setState(1337);
+				createdName();
+				setState(1338);
+				classCreatorRest();
 				}
 				break;
 			case BOOLEAN:
@@ -7888,17 +8502,21 @@ public class RefactorMethodSignatureParser extends Parser {
 			case Identifier:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1340); createdName();
+				setState(1340);
+				createdName();
 				setState(1343);
+				_errHandler.sync(this);
 				switch (_input.LA(1)) {
 				case LBRACK:
 					{
-					setState(1341); arrayCreatorRest();
+					setState(1341);
+					arrayCreatorRest();
 					}
 					break;
 				case LPAREN:
 					{
-					setState(1342); classCreatorRest();
+					setState(1342);
+					classCreatorRest();
 					}
 					break;
 				default:
@@ -7929,11 +8547,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public List<TypeArgumentsOrDiamondContext> typeArgumentsOrDiamond() {
 			return getRuleContexts(TypeArgumentsOrDiamondContext.class);
 		}
-		public PrimitiveTypeContext primitiveType() {
-			return getRuleContext(PrimitiveTypeContext.class,0);
-		}
 		public TypeArgumentsOrDiamondContext typeArgumentsOrDiamond(int i) {
 			return getRuleContext(TypeArgumentsOrDiamondContext.class,i);
+		}
+		public PrimitiveTypeContext primitiveType() {
+			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
 		public CreatedNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7960,16 +8578,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		int _la;
 		try {
 			setState(1362);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case Identifier:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1347); match(Identifier);
+				setState(1347);
+				match(Identifier);
 				setState(1349);
+				_errHandler.sync(this);
 				_la = _input.LA(1);
 				if (_la==LT) {
 					{
-					setState(1348); typeArgumentsOrDiamond();
+					setState(1348);
+					typeArgumentsOrDiamond();
 					}
 				}
 
@@ -7979,13 +8601,17 @@ public class RefactorMethodSignatureParser extends Parser {
 				while (_la==DOT) {
 					{
 					{
-					setState(1351); match(DOT);
-					setState(1352); match(Identifier);
+					setState(1351);
+					match(DOT);
+					setState(1352);
+					match(Identifier);
 					setState(1354);
+					_errHandler.sync(this);
 					_la = _input.LA(1);
 					if (_la==LT) {
 						{
-						setState(1353); typeArgumentsOrDiamond();
+						setState(1353);
+						typeArgumentsOrDiamond();
 						}
 					}
 
@@ -8007,7 +8633,8 @@ public class RefactorMethodSignatureParser extends Parser {
 			case SHORT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1361); primitiveType();
+				setState(1361);
+				primitiveType();
 				}
 				break;
 			default:
@@ -8059,16 +8686,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1364); match(Identifier);
+			setState(1364);
+			match(Identifier);
 			setState(1366);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if (_la==LT) {
 				{
-				setState(1365); nonWildcardTypeArgumentsOrDiamond();
+				setState(1365);
+				nonWildcardTypeArgumentsOrDiamond();
 				}
 			}
 
-			setState(1368); classCreatorRest();
+			setState(1368);
+			classCreatorRest();
 			}
 		}
 		catch (RecognitionException re) {
@@ -8086,11 +8717,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ArrayInitializerContext arrayInitializer() {
 			return getRuleContext(ArrayInitializerContext.class,0);
 		}
-		public ExpressionContext expression(int i) {
-			return getRuleContext(ExpressionContext.class,i);
-		}
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
+		}
+		public ExpressionContext expression(int i) {
+			return getRuleContext(ExpressionContext.class,i);
 		}
 		public ArrayCreatorRestContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -8119,27 +8750,33 @@ public class RefactorMethodSignatureParser extends Parser {
 			int _alt;
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1370); match(LBRACK);
+			setState(1370);
+			match(LBRACK);
 			setState(1398);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case RBRACK:
 				{
-				setState(1371); match(RBRACK);
+				setState(1371);
+				match(RBRACK);
 				setState(1376);
 				_errHandler.sync(this);
 				_la = _input.LA(1);
 				while (_la==LBRACK) {
 					{
 					{
-					setState(1372); match(LBRACK);
-					setState(1373); match(RBRACK);
+					setState(1372);
+					match(LBRACK);
+					setState(1373);
+					match(RBRACK);
 					}
 					}
 					setState(1378);
 					_errHandler.sync(this);
 					_la = _input.LA(1);
 				}
-				setState(1379); arrayInitializer();
+				setState(1379);
+				arrayInitializer();
 				}
 				break;
 			case BOOLEAN:
@@ -8170,18 +8807,23 @@ public class RefactorMethodSignatureParser extends Parser {
 			case SUB:
 			case Identifier:
 				{
-				setState(1380); expression(0);
-				setState(1381); match(RBRACK);
+				setState(1380);
+				expression(0);
+				setState(1381);
+				match(RBRACK);
 				setState(1388);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,162,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(1382); match(LBRACK);
-						setState(1383); expression(0);
-						setState(1384); match(RBRACK);
+						setState(1382);
+						match(LBRACK);
+						setState(1383);
+						expression(0);
+						setState(1384);
+						match(RBRACK);
 						}
 						} 
 					}
@@ -8192,12 +8834,14 @@ public class RefactorMethodSignatureParser extends Parser {
 				setState(1395);
 				_errHandler.sync(this);
 				_alt = getInterpreter().adaptivePredict(_input,163,_ctx);
-				while ( _alt!=2 && _alt!=ATN.INVALID_ALT_NUMBER ) {
+				while ( _alt!=2 && _alt!=org.antlr.v4.runtime.atn.ATN.INVALID_ALT_NUMBER ) {
 					if ( _alt==1 ) {
 						{
 						{
-						setState(1391); match(LBRACK);
-						setState(1392); match(RBRACK);
+						setState(1391);
+						match(LBRACK);
+						setState(1392);
+						match(RBRACK);
 						}
 						} 
 					}
@@ -8224,11 +8868,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassCreatorRestContext extends ParserRuleContext {
-		public ClassBodyContext classBody() {
-			return getRuleContext(ClassBodyContext.class,0);
-		}
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
+		}
+		public ClassBodyContext classBody() {
+			return getRuleContext(ClassBodyContext.class,0);
 		}
 		public ClassCreatorRestContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -8255,12 +8899,15 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1400); arguments();
+			setState(1400);
+			arguments();
 			setState(1402);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,165,_ctx) ) {
 			case 1:
 				{
-				setState(1401); classBody();
+				setState(1401);
+				classBody();
 				}
 				break;
 			}
@@ -8309,8 +8956,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1404); nonWildcardTypeArguments();
-			setState(1405); explicitGenericInvocationSuffix();
+			setState(1404);
+			nonWildcardTypeArguments();
+			setState(1405);
+			explicitGenericInvocationSuffix();
 			}
 		}
 		catch (RecognitionException re) {
@@ -8353,9 +9002,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1407); match(LT);
-			setState(1408); typeList();
-			setState(1409); match(GT);
+			setState(1407);
+			match(LT);
+			setState(1408);
+			typeList();
+			setState(1409);
+			match(GT);
 			}
 		}
 		catch (RecognitionException re) {
@@ -8397,19 +9049,22 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 212, RULE_typeArgumentsOrDiamond);
 		try {
 			setState(1414);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,166,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1411); match(LT);
-				setState(1412); match(GT);
+				setState(1411);
+				match(LT);
+				setState(1412);
+				match(GT);
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1413); typeArguments();
+				setState(1413);
+				typeArguments();
 				}
 				break;
 			}
@@ -8453,19 +9108,22 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 214, RULE_nonWildcardTypeArgumentsOrDiamond);
 		try {
 			setState(1419);
+			_errHandler.sync(this);
 			switch ( getInterpreter().adaptivePredict(_input,167,_ctx) ) {
 			case 1:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1416); match(LT);
-				setState(1417); match(GT);
+				setState(1416);
+				match(LT);
+				setState(1417);
+				match(GT);
 				}
 				break;
-
 			case 2:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1418); nonWildcardTypeArguments();
+				setState(1418);
+				nonWildcardTypeArguments();
 				}
 				break;
 			}
@@ -8482,10 +9140,10 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class SuperSuffixContext extends ParserRuleContext {
-		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
 		}
+		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public SuperSuffixContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -8510,23 +9168,29 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 216, RULE_superSuffix);
 		try {
 			setState(1427);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case LPAREN:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1421); arguments();
+				setState(1421);
+				arguments();
 				}
 				break;
 			case DOT:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1422); match(DOT);
-				setState(1423); match(Identifier);
+				setState(1422);
+				match(DOT);
+				setState(1423);
+				match(Identifier);
 				setState(1425);
+				_errHandler.sync(this);
 				switch ( getInterpreter().adaptivePredict(_input,168,_ctx) ) {
 				case 1:
 					{
-					setState(1424); arguments();
+					setState(1424);
+					arguments();
 					}
 					break;
 				}
@@ -8548,10 +9212,10 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ExplicitGenericInvocationSuffixContext extends ParserRuleContext {
-		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public SuperSuffixContext superSuffix() {
 			return getRuleContext(SuperSuffixContext.class,0);
 		}
+		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
 		}
@@ -8579,19 +9243,24 @@ public class RefactorMethodSignatureParser extends Parser {
 		enterRule(_localctx, 218, RULE_explicitGenericInvocationSuffix);
 		try {
 			setState(1433);
+			_errHandler.sync(this);
 			switch (_input.LA(1)) {
 			case SUPER:
 				enterOuterAlt(_localctx, 1);
 				{
-				setState(1429); match(SUPER);
-				setState(1430); superSuffix();
+				setState(1429);
+				match(SUPER);
+				setState(1430);
+				superSuffix();
 				}
 				break;
 			case Identifier:
 				enterOuterAlt(_localctx, 2);
 				{
-				setState(1431); match(Identifier);
-				setState(1432); arguments();
+				setState(1431);
+				match(Identifier);
+				setState(1432);
+				arguments();
 				}
 				break;
 			default:
@@ -8639,16 +9308,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		try {
 			enterOuterAlt(_localctx, 1);
 			{
-			setState(1435); match(LPAREN);
+			setState(1435);
+			match(LPAREN);
 			setState(1437);
+			_errHandler.sync(this);
 			_la = _input.LA(1);
 			if ((((_la) & ~0x3f) == 0 && ((1L << _la) & ((1L << BOOLEAN) | (1L << BYTE) | (1L << CHAR) | (1L << DOUBLE) | (1L << FLOAT) | (1L << INT) | (1L << LONG) | (1L << NEW) | (1L << SHORT) | (1L << SUPER) | (1L << THIS) | (1L << VOID) | (1L << IntegerLiteral) | (1L << FloatingPointLiteral) | (1L << BooleanLiteral) | (1L << CharacterLiteral) | (1L << StringLiteral) | (1L << NullLiteral) | (1L << LPAREN))) != 0) || ((((_la - 70)) & ~0x3f) == 0 && ((1L << (_la - 70)) & ((1L << (LT - 70)) | (1L << (BANG - 70)) | (1L << (TILDE - 70)) | (1L << (INC - 70)) | (1L << (DEC - 70)) | (1L << (ADD - 70)) | (1L << (SUB - 70)) | (1L << (Identifier - 70)))) != 0)) {
 				{
-				setState(1436); expressionList();
+				setState(1436);
+				expressionList();
 				}
 			}
 
-			setState(1439); match(RPAREN);
+			setState(1439);
+			match(RPAREN);
 			}
 		}
 		catch (RecognitionException re) {
@@ -8664,79 +9337,83 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public boolean sempred(RuleContext _localctx, int ruleIndex, int predIndex) {
 		switch (ruleIndex) {
-		case 6: return targetTypePattern_sempred((TargetTypePatternContext)_localctx, predIndex);
-
-		case 7: return formalTypePattern_sempred((FormalTypePatternContext)_localctx, predIndex);
-
-		case 97: return expression_sempred((ExpressionContext)_localctx, predIndex);
-		}
-		return true;
-	}
-	private boolean expression_sempred(ExpressionContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 4: return precpred(_ctx, 13);
-
-		case 5: return precpred(_ctx, 12);
-
-		case 6: return precpred(_ctx, 11);
-
-		case 7: return precpred(_ctx, 10);
-
-		case 8: return precpred(_ctx, 8);
-
-		case 9: return precpred(_ctx, 7);
-
-		case 10: return precpred(_ctx, 6);
-
-		case 11: return precpred(_ctx, 5);
-
-		case 12: return precpred(_ctx, 4);
-
-		case 13: return precpred(_ctx, 3);
-
-		case 14: return precpred(_ctx, 2);
-
-		case 15: return precpred(_ctx, 1);
-
-		case 16: return precpred(_ctx, 25);
-
-		case 17: return precpred(_ctx, 24);
-
-		case 18: return precpred(_ctx, 23);
-
-		case 19: return precpred(_ctx, 22);
-
-		case 20: return precpred(_ctx, 21);
-
-		case 21: return precpred(_ctx, 20);
-
-		case 22: return precpred(_ctx, 19);
-
-		case 23: return precpred(_ctx, 16);
-
-		case 24: return precpred(_ctx, 9);
-		}
-		return true;
-	}
-	private boolean formalTypePattern_sempred(FormalTypePatternContext _localctx, int predIndex) {
-		switch (predIndex) {
-		case 2: return precpred(_ctx, 2);
-
-		case 3: return precpred(_ctx, 1);
+		case 6:
+			return targetTypePattern_sempred((TargetTypePatternContext)_localctx, predIndex);
+		case 7:
+			return formalTypePattern_sempred((FormalTypePatternContext)_localctx, predIndex);
+		case 97:
+			return expression_sempred((ExpressionContext)_localctx, predIndex);
 		}
 		return true;
 	}
 	private boolean targetTypePattern_sempred(TargetTypePatternContext _localctx, int predIndex) {
 		switch (predIndex) {
-		case 0: return precpred(_ctx, 2);
-
-		case 1: return precpred(_ctx, 1);
+		case 0:
+			return precpred(_ctx, 2);
+		case 1:
+			return precpred(_ctx, 1);
+		}
+		return true;
+	}
+	private boolean formalTypePattern_sempred(FormalTypePatternContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 2:
+			return precpred(_ctx, 2);
+		case 3:
+			return precpred(_ctx, 1);
+		}
+		return true;
+	}
+	private boolean expression_sempred(ExpressionContext _localctx, int predIndex) {
+		switch (predIndex) {
+		case 4:
+			return precpred(_ctx, 13);
+		case 5:
+			return precpred(_ctx, 12);
+		case 6:
+			return precpred(_ctx, 11);
+		case 7:
+			return precpred(_ctx, 10);
+		case 8:
+			return precpred(_ctx, 8);
+		case 9:
+			return precpred(_ctx, 7);
+		case 10:
+			return precpred(_ctx, 6);
+		case 11:
+			return precpred(_ctx, 5);
+		case 12:
+			return precpred(_ctx, 4);
+		case 13:
+			return precpred(_ctx, 3);
+		case 14:
+			return precpred(_ctx, 2);
+		case 15:
+			return precpred(_ctx, 1);
+		case 16:
+			return precpred(_ctx, 25);
+		case 17:
+			return precpred(_ctx, 24);
+		case 18:
+			return precpred(_ctx, 23);
+		case 19:
+			return precpred(_ctx, 22);
+		case 20:
+			return precpred(_ctx, 21);
+		case 21:
+			return precpred(_ctx, 20);
+		case 22:
+			return precpred(_ctx, 19);
+		case 23:
+			return precpred(_ctx, 16);
+		case 24:
+			return precpred(_ctx, 9);
 		}
 		return true;
 	}
 
 	public static final String _serializedATN =
-		"\3\u0430\ud6d1\u8206\uad2d\u4417\uaef1\u8d80\uaadd\3m\u05a4\4\2\t\2\4"+
+		"\3\u608b\ua72a\u8133\ub9ed\u417c\u3be7\u7786\u5964\3m\u05a4\4\2\t\2\4"+
 		"\3\t\3\4\4\t\4\4\5\t\5\4\6\t\6\4\7\t\7\4\b\t\b\4\t\t\t\4\n\t\n\4\13\t"+
 		"\13\4\f\t\f\4\r\t\r\4\16\t\16\4\17\t\17\4\20\t\20\4\21\t\21\4\22\t\22"+
 		"\4\23\t\23\4\24\t\24\4\25\t\25\4\26\t\26\4\27\t\27\4\30\t\30\4\31\t\31"+
@@ -8841,7 +9518,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		"\u00be\u00c0\u00c2\u00c4\u00c6\u00c8\u00ca\u00cc\u00ce\u00d0\u00d2\u00d4"+
 		"\u00d6\u00d8\u00da\u00dc\u00de\2\20\6\2\3\3EEWWhh\6\2\"\"..\62\62\65\65"+
 		"\6\2\5\5\26\26%\'*+\n\2\7\7\t\t\f\f\22\22\30\30\37\37!!))\4\2\25\25,,"+
-		"\3\2\67<\3\2SV\3\2IJ\4\2WX\\\\\3\2UV\4\2GHNO\4\2MMPP\4\2FF]g\3\2ST\u0625"+
+		"\3\2\67<\3\2SV\3\2IJ\4\2WX\\\\\3\2UV\4\2GHNO\4\2MMPP\4\2FF]g\3\2ST\2\u0625"+
 		"\2\u00e0\3\2\2\2\4\u00e5\3\2\2\2\6\u010a\3\2\2\2\b\u010c\3\2\2\2\n\u011f"+
 		"\3\2\2\2\f\u0126\3\2\2\2\16\u012c\3\2\2\2\20\u013e\3\2\2\2\22\u014c\3"+
 		"\2\2\2\24\u016d\3\2\2\2\26\u0170\3\2\2\2\30\u0183\3\2\2\2\32\u018a\3\2"+
@@ -8893,14 +9570,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		"\u010e\3\2\2\2\u011f\u011c\3\2\2\2\u0120\13\3\2\2\2\u0121\u0122\7=\2\2"+
 		"\u0122\u0123\5\20\t\2\u0123\u0124\7>\2\2\u0124\u0127\3\2\2\2\u0125\u0127"+
 		"\5\20\t\2\u0126\u0121\3\2\2\2\u0126\u0125\3\2\2\2\u0127\r\3\2\2\2\u0128"+
-		"\u0129\b\b\1\2\u0129\u012a\7I\2\2\u012a\u012d\5\16\b\5\u012b\u012d\5\22"+
-		"\n\2\u012c\u0128\3\2\2\2\u012c\u012b\3\2\2\2\u012d\u0136\3\2\2\2\u012e"+
+		"\u0129\b\b\1\2\u0129\u012d\5\22\n\2\u012a\u012b\7I\2\2\u012b\u012d\5\16"+
+		"\b\5\u012c\u0128\3\2\2\2\u012c\u012a\3\2\2\2\u012d\u0136\3\2\2\2\u012e"+
 		"\u012f\f\4\2\2\u012f\u0130\7Q\2\2\u0130\u0135\5\16\b\5\u0131\u0132\f\3"+
 		"\2\2\u0132\u0133\7R\2\2\u0133\u0135\5\16\b\4\u0134\u012e\3\2\2\2\u0134"+
 		"\u0131\3\2\2\2\u0135\u0138\3\2\2\2\u0136\u0134\3\2\2\2\u0136\u0137\3\2"+
-		"\2\2\u0137\17\3\2\2\2\u0138\u0136\3\2\2\2\u0139\u013a\b\t\1\2\u013a\u013b"+
-		"\7I\2\2\u013b\u013f\5\20\t\5\u013c\u013f\5\22\n\2\u013d\u013f\5f\64\2"+
-		"\u013e\u0139\3\2\2\2\u013e\u013c\3\2\2\2\u013e\u013d\3\2\2\2\u013f\u0148"+
+		"\2\2\u0137\17\3\2\2\2\u0138\u0136\3\2\2\2\u0139\u013a\b\t\1\2\u013a\u013f"+
+		"\5\22\n\2\u013b\u013f\5f\64\2\u013c\u013d\7I\2\2\u013d\u013f\5\20\t\5"+
+		"\u013e\u0139\3\2\2\2\u013e\u013b\3\2\2\2\u013e\u013c\3\2\2\2\u013f\u0148"+
 		"\3\2\2\2\u0140\u0141\f\4\2\2\u0141\u0142\7Q\2\2\u0142\u0147\5\20\t\5\u0143"+
 		"\u0144\f\3\2\2\u0144\u0145\7R\2\2\u0145\u0147\5\20\t\4\u0146\u0140\3\2"+
 		"\2\2\u0146\u0143\3\2\2\2\u0147\u014a\3\2\2\2\u0148\u0146\3\2\2\2\u0148"+
@@ -9198,12 +9875,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		"\u04b2\7D\2\2\u04b2\u04b4\5\u00c4c\2\u04b3\u04b1\3\2\2\2\u04b4\u04b7\3"+
 		"\2\2\2\u04b5\u04b3\3\2\2\2\u04b5\u04b6\3\2\2\2\u04b6\u00bf\3\2\2\2\u04b7"+
 		"\u04b5\3\2\2\2\u04b8\u04b9\5\u00c4c\2\u04b9\u00c1\3\2\2\2\u04ba\u04bb"+
-		"\5\u00c4c\2\u04bb\u00c3\3\2\2\2\u04bc\u04bd\bc\1\2\u04bd\u04be\7=\2\2"+
-		"\u04be\u04bf\5b\62\2\u04bf\u04c0\7>\2\2\u04c0\u04c1\5\u00c4c\23\u04c1"+
-		"\u04ca\3\2\2\2\u04c2\u04c3\t\b\2\2\u04c3\u04ca\5\u00c4c\21\u04c4\u04c5"+
-		"\t\t\2\2\u04c5\u04ca\5\u00c4c\20\u04c6\u04ca\5\u00c6d\2\u04c7\u04c8\7"+
-		"#\2\2\u04c8\u04ca\5\u00c8e\2\u04c9\u04bc\3\2\2\2\u04c9\u04c2\3\2\2\2\u04c9"+
-		"\u04c4\3\2\2\2\u04c9\u04c6\3\2\2\2\u04c9\u04c7\3\2\2\2\u04ca\u0520\3\2"+
+		"\5\u00c4c\2\u04bb\u00c3\3\2\2\2\u04bc\u04bd\bc\1\2\u04bd\u04ca\5\u00c6"+
+		"d\2\u04be\u04bf\7#\2\2\u04bf\u04ca\5\u00c8e\2\u04c0\u04c1\7=\2\2\u04c1"+
+		"\u04c2\5b\62\2\u04c2\u04c3\7>\2\2\u04c3\u04c4\5\u00c4c\23\u04c4\u04ca"+
+		"\3\2\2\2\u04c5\u04c6\t\b\2\2\u04c6\u04ca\5\u00c4c\21\u04c7\u04c8\t\t\2"+
+		"\2\u04c8\u04ca\5\u00c4c\20\u04c9\u04bc\3\2\2\2\u04c9\u04be\3\2\2\2\u04c9"+
+		"\u04c0\3\2\2\2\u04c9\u04c5\3\2\2\2\u04c9\u04c7\3\2\2\2\u04ca\u0520\3\2"+
 		"\2\2\u04cb\u04cc\f\17\2\2\u04cc\u04cd\t\n\2\2\u04cd\u051f\5\u00c4c\20"+
 		"\u04ce\u04cf\f\16\2\2\u04cf\u04d0\t\13\2\2\u04d0\u051f\5\u00c4c\17\u04d1"+
 		"\u04d9\f\r\2\2\u04d2\u04d3\7H\2\2\u04d3\u04da\7H\2\2\u04d4\u04d5\7G\2"+

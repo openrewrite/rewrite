@@ -4,25 +4,34 @@ buildscript {
     }
 
     dependencies {
-        classpath 'me.champeau.gradle:antlr4-gradle-plugin:0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.4'
     }
 }
 
-apply plugin: 'me.champeau.gradle.antlr4'
 apply plugin: 'com.github.johnrengelman.shadow'
 
-antlr4.output = new File('src/main/java/com/netflix/rewrite')
-antlr4.extraArgs = ['-package', 'com.netflix.rewrite']
-
 configurations {
-    compile.extendsFrom antlr4
     compile.extendsFrom compileShaded
+}
+
+// run manually with -x compileKotlin when you need to regenerate
+task generateAntlrSources(type: JavaExec) {
+    main = 'org.antlr.v4.Tool'
+
+    args = [
+            '-o', 'src/main/java/com/netflix/rewrite/grammar',
+            '-package', 'com.netflix.rewrite.grammar',
+            '-visitor'
+    ] + project.fileTree(dir: 'src/main/antlr', include: '**/*.g4').collect { it.path }
+
+    classpath = sourceSets.main.runtimeClasspath
 }
 
 dependencies {
     compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
     compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+
+    compile 'org.antlr:antlr4:4.7'
 
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'

@@ -36,6 +36,7 @@ import javax.lang.model.type.TypeKind
 
 private typealias JdkTree = com.sun.source.tree.Tree
 
+@Suppress("UNUSED_PARAMETER")
 class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanner<Tree, Formatting.Reified>() {
     private lateinit var endPosTable: EndPosTable
     private lateinit var docTable: DocCommentTable

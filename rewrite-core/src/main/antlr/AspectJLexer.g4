@@ -1,4 +1,3 @@
-	
 /*
  [The "BSD licence"]
  Copyright (c) 2015 Adam Taylor

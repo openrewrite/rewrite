@@ -1,21 +1,5 @@
-/**
- * Copyright 2016 Netflix, Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-// Generated from /Users/ben/src/stash.netflix.com/dev/java-source-refactor/src/main/antlr4/AnnotationSignatureParser.g4 by ANTLR 4.2.2
-package com.netflix.rewrite.aspectj;
-import org.antlr.v4.runtime.misc.NotNull;
+// Generated from /Users/jschneider/Projects/github/Netflix-Skunkworks/Rewrite/rewrite-core/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.7
+package com.netflix.rewrite.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 
 /**
@@ -33,805 +17,705 @@ public class AnnotationSignatureParserBaseVisitor<T> extends AbstractParseTreeVi
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMemberDeclaration(@NotNull AnnotationSignatureParser.MemberDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotation(AnnotationSignatureParser.AnnotationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitDefaultValue(@NotNull AnnotationSignatureParser.DefaultValueContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitCompilationUnit(AnnotationSignatureParser.CompilationUnitContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationTypeElementDeclaration(@NotNull AnnotationSignatureParser.AnnotationTypeElementDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitPackageDeclaration(AnnotationSignatureParser.PackageDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitType(@NotNull AnnotationSignatureParser.TypeContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitImportDeclaration(AnnotationSignatureParser.ImportDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationTypeBody(@NotNull AnnotationSignatureParser.AnnotationTypeBodyContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeDeclaration(AnnotationSignatureParser.TypeDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitGenericInterfaceMethodDeclaration(@NotNull AnnotationSignatureParser.GenericInterfaceMethodDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitModifier(AnnotationSignatureParser.ModifierContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassBodyDeclaration(@NotNull AnnotationSignatureParser.ClassBodyDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassOrInterfaceModifier(AnnotationSignatureParser.ClassOrInterfaceModifierContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitBlock(@NotNull AnnotationSignatureParser.BlockContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitVariableModifier(AnnotationSignatureParser.VariableModifierContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnumBodyDeclarations(@NotNull AnnotationSignatureParser.EnumBodyDeclarationsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassDeclaration(AnnotationSignatureParser.ClassDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitForUpdate(@NotNull AnnotationSignatureParser.ForUpdateContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeParameters(AnnotationSignatureParser.TypeParametersContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnhancedForControl(@NotNull AnnotationSignatureParser.EnhancedForControlContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeParameter(AnnotationSignatureParser.TypeParameterContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationConstantRest(@NotNull AnnotationSignatureParser.AnnotationConstantRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeBound(AnnotationSignatureParser.TypeBoundContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExplicitGenericInvocation(@NotNull AnnotationSignatureParser.ExplicitGenericInvocationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnumDeclaration(AnnotationSignatureParser.EnumDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitNonWildcardTypeArgumentsOrDiamond(@NotNull AnnotationSignatureParser.NonWildcardTypeArgumentsOrDiamondContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnumConstants(AnnotationSignatureParser.EnumConstantsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExpressionList(@NotNull AnnotationSignatureParser.ExpressionListContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnumConstant(AnnotationSignatureParser.EnumConstantContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationTypeElementRest(@NotNull AnnotationSignatureParser.AnnotationTypeElementRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnumBodyDeclarations(AnnotationSignatureParser.EnumBodyDeclarationsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassOrInterfaceType(@NotNull AnnotationSignatureParser.ClassOrInterfaceTypeContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInterfaceDeclaration(AnnotationSignatureParser.InterfaceDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeBound(@NotNull AnnotationSignatureParser.TypeBoundContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeList(AnnotationSignatureParser.TypeListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVariableDeclaratorId(@NotNull AnnotationSignatureParser.VariableDeclaratorIdContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassBody(AnnotationSignatureParser.ClassBodyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPrimary(@NotNull AnnotationSignatureParser.PrimaryContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInterfaceBody(AnnotationSignatureParser.InterfaceBodyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassCreatorRest(@NotNull AnnotationSignatureParser.ClassCreatorRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassBodyDeclaration(AnnotationSignatureParser.ClassBodyDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInterfaceBodyDeclaration(@NotNull AnnotationSignatureParser.InterfaceBodyDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitMemberDeclaration(AnnotationSignatureParser.MemberDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeArguments(@NotNull AnnotationSignatureParser.TypeArgumentsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitMethodDeclaration(AnnotationSignatureParser.MethodDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationName(@NotNull AnnotationSignatureParser.AnnotationNameContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitGenericMethodDeclaration(AnnotationSignatureParser.GenericMethodDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFinallyBlock(@NotNull AnnotationSignatureParser.FinallyBlockContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitConstructorDeclaration(AnnotationSignatureParser.ConstructorDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeParameters(@NotNull AnnotationSignatureParser.TypeParametersContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitGenericConstructorDeclaration(AnnotationSignatureParser.GenericConstructorDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLastFormalParameter(@NotNull AnnotationSignatureParser.LastFormalParameterContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitFieldDeclaration(AnnotationSignatureParser.FieldDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitConstructorBody(@NotNull AnnotationSignatureParser.ConstructorBodyContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInterfaceBodyDeclaration(AnnotationSignatureParser.InterfaceBodyDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLiteral(@NotNull AnnotationSignatureParser.LiteralContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInterfaceMemberDeclaration(AnnotationSignatureParser.InterfaceMemberDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationMethodOrConstantRest(@NotNull AnnotationSignatureParser.AnnotationMethodOrConstantRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitConstDeclaration(AnnotationSignatureParser.ConstDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCatchClause(@NotNull AnnotationSignatureParser.CatchClauseContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitConstantDeclarator(AnnotationSignatureParser.ConstantDeclaratorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVariableDeclarator(@NotNull AnnotationSignatureParser.VariableDeclaratorContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInterfaceMethodDeclaration(AnnotationSignatureParser.InterfaceMethodDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeList(@NotNull AnnotationSignatureParser.TypeListContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitGenericInterfaceMethodDeclaration(AnnotationSignatureParser.GenericInterfaceMethodDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnumConstants(@NotNull AnnotationSignatureParser.EnumConstantsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitVariableDeclarators(AnnotationSignatureParser.VariableDeclaratorsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassBody(@NotNull AnnotationSignatureParser.ClassBodyContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitVariableDeclarator(AnnotationSignatureParser.VariableDeclaratorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCreatedName(@NotNull AnnotationSignatureParser.CreatedNameContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitVariableDeclaratorId(AnnotationSignatureParser.VariableDeclaratorIdContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnumDeclaration(@NotNull AnnotationSignatureParser.EnumDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitVariableInitializer(AnnotationSignatureParser.VariableInitializerContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFormalParameter(@NotNull AnnotationSignatureParser.FormalParameterContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitArrayInitializer(AnnotationSignatureParser.ArrayInitializerContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitParExpression(@NotNull AnnotationSignatureParser.ParExpressionContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnumConstantName(AnnotationSignatureParser.EnumConstantNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotation(@NotNull AnnotationSignatureParser.AnnotationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitType(AnnotationSignatureParser.TypeContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVariableInitializer(@NotNull AnnotationSignatureParser.VariableInitializerContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassOrInterfaceType(AnnotationSignatureParser.ClassOrInterfaceTypeContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitElementValueArrayInitializer(@NotNull AnnotationSignatureParser.ElementValueArrayInitializerContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitPrimitiveType(AnnotationSignatureParser.PrimitiveTypeContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCreator(@NotNull AnnotationSignatureParser.CreatorContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeArguments(AnnotationSignatureParser.TypeArgumentsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArrayCreatorRest(@NotNull AnnotationSignatureParser.ArrayCreatorRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeArgument(AnnotationSignatureParser.TypeArgumentContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExpression(@NotNull AnnotationSignatureParser.ExpressionContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitQualifiedNameList(AnnotationSignatureParser.QualifiedNameListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitConstantExpression(@NotNull AnnotationSignatureParser.ConstantExpressionContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitFormalParameters(AnnotationSignatureParser.FormalParametersContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitQualifiedNameList(@NotNull AnnotationSignatureParser.QualifiedNameListContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitFormalParameterList(AnnotationSignatureParser.FormalParameterListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitConstructorDeclaration(@NotNull AnnotationSignatureParser.ConstructorDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitFormalParameter(AnnotationSignatureParser.FormalParameterContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitForControl(@NotNull AnnotationSignatureParser.ForControlContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitLastFormalParameter(AnnotationSignatureParser.LastFormalParameterContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSuperSuffix(@NotNull AnnotationSignatureParser.SuperSuffixContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitMethodBody(AnnotationSignatureParser.MethodBodyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVariableDeclarators(@NotNull AnnotationSignatureParser.VariableDeclaratorsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitConstructorBody(AnnotationSignatureParser.ConstructorBodyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCatchType(@NotNull AnnotationSignatureParser.CatchTypeContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitQualifiedName(AnnotationSignatureParser.QualifiedNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassOrInterfaceModifier(@NotNull AnnotationSignatureParser.ClassOrInterfaceModifierContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitLiteral(AnnotationSignatureParser.LiteralContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnumConstantName(@NotNull AnnotationSignatureParser.EnumConstantNameContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationName(AnnotationSignatureParser.AnnotationNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitModifier(@NotNull AnnotationSignatureParser.ModifierContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitElementValuePairs(AnnotationSignatureParser.ElementValuePairsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInnerCreator(@NotNull AnnotationSignatureParser.InnerCreatorContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitElementValuePair(AnnotationSignatureParser.ElementValuePairContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitExplicitGenericInvocationSuffix(@NotNull AnnotationSignatureParser.ExplicitGenericInvocationSuffixContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitElementValue(AnnotationSignatureParser.ElementValueContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitVariableModifier(@NotNull AnnotationSignatureParser.VariableModifierContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitElementValueArrayInitializer(AnnotationSignatureParser.ElementValueArrayInitializerContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitElementValuePair(@NotNull AnnotationSignatureParser.ElementValuePairContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationTypeDeclaration(AnnotationSignatureParser.AnnotationTypeDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArrayInitializer(@NotNull AnnotationSignatureParser.ArrayInitializerContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationTypeBody(AnnotationSignatureParser.AnnotationTypeBodyContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitElementValue(@NotNull AnnotationSignatureParser.ElementValueContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationTypeElementDeclaration(AnnotationSignatureParser.AnnotationTypeElementDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitConstDeclaration(@NotNull AnnotationSignatureParser.ConstDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationTypeElementRest(AnnotationSignatureParser.AnnotationTypeElementRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitResource(@NotNull AnnotationSignatureParser.ResourceContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationMethodOrConstantRest(AnnotationSignatureParser.AnnotationMethodOrConstantRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitQualifiedName(@NotNull AnnotationSignatureParser.QualifiedNameContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationMethodRest(AnnotationSignatureParser.AnnotationMethodRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitResourceSpecification(@NotNull AnnotationSignatureParser.ResourceSpecificationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitAnnotationConstantRest(AnnotationSignatureParser.AnnotationConstantRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFormalParameterList(@NotNull AnnotationSignatureParser.FormalParameterListContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitDefaultValue(AnnotationSignatureParser.DefaultValueContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationTypeDeclaration(@NotNull AnnotationSignatureParser.AnnotationTypeDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitBlock(AnnotationSignatureParser.BlockContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitCompilationUnit(@NotNull AnnotationSignatureParser.CompilationUnitContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitBlockStatement(AnnotationSignatureParser.BlockStatementContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitAnnotationMethodRest(@NotNull AnnotationSignatureParser.AnnotationMethodRestContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitLocalVariableDeclarationStatement(AnnotationSignatureParser.LocalVariableDeclarationStatementContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSwitchBlockStatementGroup(@NotNull AnnotationSignatureParser.SwitchBlockStatementGroupContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitLocalVariableDeclaration(AnnotationSignatureParser.LocalVariableDeclarationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeParameter(@NotNull AnnotationSignatureParser.TypeParameterContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitStatement(AnnotationSignatureParser.StatementContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInterfaceBody(@NotNull AnnotationSignatureParser.InterfaceBodyContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitCatchClause(AnnotationSignatureParser.CatchClauseContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMethodDeclaration(@NotNull AnnotationSignatureParser.MethodDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitCatchType(AnnotationSignatureParser.CatchTypeContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitMethodBody(@NotNull AnnotationSignatureParser.MethodBodyContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitFinallyBlock(AnnotationSignatureParser.FinallyBlockContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeArgument(@NotNull AnnotationSignatureParser.TypeArgumentContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitResourceSpecification(AnnotationSignatureParser.ResourceSpecificationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeDeclaration(@NotNull AnnotationSignatureParser.TypeDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitResources(AnnotationSignatureParser.ResourcesContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitGenericConstructorDeclaration(@NotNull AnnotationSignatureParser.GenericConstructorDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitResource(AnnotationSignatureParser.ResourceContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitClassDeclaration(@NotNull AnnotationSignatureParser.ClassDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitSwitchBlockStatementGroup(AnnotationSignatureParser.SwitchBlockStatementGroupContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitEnumConstant(@NotNull AnnotationSignatureParser.EnumConstantContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitSwitchLabel(AnnotationSignatureParser.SwitchLabelContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStatement(@NotNull AnnotationSignatureParser.StatementContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitForControl(AnnotationSignatureParser.ForControlContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitImportDeclaration(@NotNull AnnotationSignatureParser.ImportDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitForInit(AnnotationSignatureParser.ForInitContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPrimitiveType(@NotNull AnnotationSignatureParser.PrimitiveTypeContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitEnhancedForControl(AnnotationSignatureParser.EnhancedForControlContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInterfaceDeclaration(@NotNull AnnotationSignatureParser.InterfaceDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitForUpdate(AnnotationSignatureParser.ForUpdateContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLocalVariableDeclarationStatement(@NotNull AnnotationSignatureParser.LocalVariableDeclarationStatementContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitParExpression(AnnotationSignatureParser.ParExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitBlockStatement(@NotNull AnnotationSignatureParser.BlockStatementContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitExpressionList(AnnotationSignatureParser.ExpressionListContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFieldDeclaration(@NotNull AnnotationSignatureParser.FieldDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitStatementExpression(AnnotationSignatureParser.StatementExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitConstantDeclarator(@NotNull AnnotationSignatureParser.ConstantDeclaratorContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitConstantExpression(AnnotationSignatureParser.ConstantExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitResources(@NotNull AnnotationSignatureParser.ResourcesContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitExpression(AnnotationSignatureParser.ExpressionContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitStatementExpression(@NotNull AnnotationSignatureParser.StatementExpressionContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitPrimary(AnnotationSignatureParser.PrimaryContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInterfaceMethodDeclaration(@NotNull AnnotationSignatureParser.InterfaceMethodDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitCreator(AnnotationSignatureParser.CreatorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitPackageDeclaration(@NotNull AnnotationSignatureParser.PackageDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitCreatedName(AnnotationSignatureParser.CreatedNameContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitElementValuePairs(@NotNull AnnotationSignatureParser.ElementValuePairsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitInnerCreator(AnnotationSignatureParser.InnerCreatorContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitLocalVariableDeclaration(@NotNull AnnotationSignatureParser.LocalVariableDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitArrayCreatorRest(AnnotationSignatureParser.ArrayCreatorRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitNonWildcardTypeArguments(@NotNull AnnotationSignatureParser.NonWildcardTypeArgumentsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitClassCreatorRest(AnnotationSignatureParser.ClassCreatorRestContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitInterfaceMemberDeclaration(@NotNull AnnotationSignatureParser.InterfaceMemberDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitExplicitGenericInvocation(AnnotationSignatureParser.ExplicitGenericInvocationContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitSwitchLabel(@NotNull AnnotationSignatureParser.SwitchLabelContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitNonWildcardTypeArguments(AnnotationSignatureParser.NonWildcardTypeArgumentsContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitForInit(@NotNull AnnotationSignatureParser.ForInitContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitTypeArgumentsOrDiamond(AnnotationSignatureParser.TypeArgumentsOrDiamondContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitFormalParameters(@NotNull AnnotationSignatureParser.FormalParametersContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitNonWildcardTypeArgumentsOrDiamond(AnnotationSignatureParser.NonWildcardTypeArgumentsOrDiamondContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitArguments(@NotNull AnnotationSignatureParser.ArgumentsContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitSuperSuffix(AnnotationSignatureParser.SuperSuffixContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitGenericMethodDeclaration(@NotNull AnnotationSignatureParser.GenericMethodDeclarationContext ctx) { return visitChildren(ctx); }
-
+	@Override public T visitExplicitGenericInvocationSuffix(AnnotationSignatureParser.ExplicitGenericInvocationSuffixContext ctx) { return visitChildren(ctx); }
 	/**
 	 * {@inheritDoc}
 	 *
 	 * <p>The default implementation returns the result of calling
 	 * {@link #visitChildren} on {@code ctx}.</p>
 	 */
-	@Override public T visitTypeArgumentsOrDiamond(@NotNull AnnotationSignatureParser.TypeArgumentsOrDiamondContext ctx) { return visitChildren(ctx); }
+	@Override public T visitArguments(AnnotationSignatureParser.ArgumentsContext ctx) { return visitChildren(ctx); }
 }

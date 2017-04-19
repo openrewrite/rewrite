@@ -15,10 +15,12 @@
  */
 package com.netflix.rewrite.search
 
-import com.netflix.rewrite.aspectj.AspectJLexer
 import com.netflix.rewrite.ast.Tr
 import com.netflix.rewrite.ast.Type
-import org.antlr.v4.runtime.ANTLRInputStream
+import com.netflix.rewrite.grammar.AspectJLexer
+import com.netflix.rewrite.grammar.RefactorMethodSignatureParser
+import com.netflix.rewrite.grammar.RefactorMethodSignatureParserBaseVisitor
+import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.TerminalNode
 import java.util.*
@@ -29,10 +31,10 @@ class MethodMatcher(signature: String) {
     lateinit var argumentPattern: Regex
 
     init {
-        val parser = com.netflix.rewrite.aspectj.RefactorMethodSignatureParser(CommonTokenStream(AspectJLexer(ANTLRInputStream(signature))))
+        val parser = RefactorMethodSignatureParser(CommonTokenStream(AspectJLexer(CharStreams.fromString(signature))))
 
-        object: com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBaseVisitor<Void>() {
-            override fun visitMethodPattern(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.MethodPatternContext): Void? {
+        object: RefactorMethodSignatureParserBaseVisitor<Void>() {
+            override fun visitMethodPattern(ctx: RefactorMethodSignatureParser.MethodPatternContext): Void? {
                 targetTypePattern = TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()).toRegex()
                 methodNamePattern = ctx.simpleNamePattern().children // all TerminalNode instances
                         .map { it.toString().aspectjNameToRegexSyntax() }
@@ -82,8 +84,8 @@ fun String.aspectjNameToRegexSyntax() = this
         .replace("*", "[^\\.]*")
         .replace("..", "\\.(.+\\.)?")
 
-class TypeVisitor : com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBaseVisitor<String>() {
-    override fun visitClassNameOrInterface(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
+class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
+    override fun visitClassNameOrInterface(ctx: RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
         return ctx.children // all TerminalNode instances
                 .map { it.text.aspectjNameToRegexSyntax() }
                 .joinToString("")
@@ -99,7 +101,7 @@ class TypeVisitor : com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBas
                 }
     }
 
-    override fun visitPrimitiveType(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.PrimitiveTypeContext): String {
+    override fun visitPrimitiveType(ctx: RefactorMethodSignatureParser.PrimitiveTypeContext): String {
         return ctx.text
     }
 }
@@ -113,7 +115,7 @@ class TypeVisitor : com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBas
  * <code>execution(void m(.., int))</code>
  * picks out execution join points for void methods named m whose last parameter is of type int.
  */
-class FormalParameterVisitor: com.netflix.rewrite.aspectj.RefactorMethodSignatureParserBaseVisitor<String>() {
+class FormalParameterVisitor: RefactorMethodSignatureParserBaseVisitor<String>() {
     private val arguments = ArrayList<Argument>()
 
     private sealed class Argument {
@@ -123,7 +125,7 @@ class FormalParameterVisitor: com.netflix.rewrite.aspectj.RefactorMethodSignatur
             override val regex = "([^,]+,)*([^,]+)"
         }
 
-        class FormalType(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.FormalTypePatternContext): Argument() {
+        class FormalType(ctx: RefactorMethodSignatureParser.FormalTypePatternContext): Argument() {
             override val regex: String by lazy {
                 val baseType = TypeVisitor().visitFormalTypePattern(ctx)
                 if(variableArgs) "$baseType..." else baseType
@@ -139,17 +141,17 @@ class FormalParameterVisitor: com.netflix.rewrite.aspectj.RefactorMethodSignatur
         return super.visitTerminal(node)
     }
 
-    override fun visitDotDot(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.DotDotContext): String? {
+    override fun visitDotDot(ctx: RefactorMethodSignatureParser.DotDotContext): String? {
         arguments.add(Argument.DotDot)
         return super.visitDotDot(ctx)
     }
 
-    override fun visitFormalTypePattern(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.FormalTypePatternContext): String? {
+    override fun visitFormalTypePattern(ctx: RefactorMethodSignatureParser.FormalTypePatternContext): String? {
         arguments.add(Argument.FormalType(ctx))
         return super.visitFormalTypePattern(ctx)
     }
 
-    override fun visitFormalParametersPattern(ctx: com.netflix.rewrite.aspectj.RefactorMethodSignatureParser.FormalParametersPatternContext): String {
+    override fun visitFormalParametersPattern(ctx: RefactorMethodSignatureParser.FormalParametersPatternContext): String {
         super.visitFormalParametersPattern(ctx)
         return arguments.mapIndexed { i, argument ->
             // Note: the AspectJ grammar doesn't allow for multiple ..'s in one formal parameter pattern
