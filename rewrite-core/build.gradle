@@ -34,6 +34,12 @@ dependencies {
 
     compile 'com.fasterxml.jackson.core:jackson-databind:2.8.7', optional
 
+    // To avoid "warning: unknown enum constant JsonTypeInfo$As.PROPERTY" type warnings
+    // when using rewrite but not needing serialization functionality. We pick an old version
+    // of this library so that if the user depends on an older version of Jackson, we don't 
+    // inadvertently upgrade their version.
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.0.0'
+
     compile 'org.ow2.asm:asm:latest.release'
     compile 'org.ow2.asm:asm-util:latest.release'
 
