@@ -1,8 +1,8 @@
 # Rewrite - Distributed Java Source Refactoring
 
-[![Build Status](https://travis-ci.org/Netflix/rewrite.svg?branch=master)](https://travis-ci.org/Netflix/rewrite)
-[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Netflix/rewrite?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
-[![Apache 2.0](https://img.shields.io/github/license/Netflix/rewrite.svg)](http://www.apache.org/licenses/LICENSE-2.0)
+[![Build Status](https://travis-ci.org/Netflix-Skunkworks/rewrite.svg?branch=master)](https://travis-ci.org/Netflix-Skunkworks/rewrite)
+[![Gitter](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/Netflix-Skunkworks/rewrite?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
+[![Apache 2.0](https://img.shields.io/github/license/Netflix-Skunkworks/rewrite.svg)](http://www.apache.org/licenses/LICENSE-2.0)
 
 - [Installing](#installing)
 - [Features](#features)
