@@ -42,14 +42,14 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight.rewrite</groupId>
     <artifactId>rewrite-core</artifactId>
-    <version>0.18.4</version>
+    <version>1.2.0</version>
 </dependency>
 ```
 
 or
 
 ```groovy
-compile 'com.netflix.devinsight.rewrite:rewrite-core:0.18.4'
+compile 'com.netflix.devinsight.rewrite:rewrite-core:1.2.0'
 ```
 
 Add the Maven or Gradle classifier `jdkbundle` to fetch a version of the package that package relocates and shades the relevant parts of the JDK needed for parsing into the distribution.
