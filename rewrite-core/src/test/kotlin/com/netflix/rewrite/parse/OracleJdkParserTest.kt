@@ -17,6 +17,7 @@ package com.netflix.rewrite.parse
 
 import com.netflix.rewrite.ast.asClass
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -54,5 +55,35 @@ class OracleJdkParserTest {
 
         val a = OracleJdkParser().parse(listOf(aSrc.toPath()), temp.root.toPath())
         assertEquals("src/main/java/com/netflix/test/A.java", a.first().sourcePath)
+    }
+
+    @Test
+    fun partialTypeAttribution() {
+        // DNE = does not exist
+        val a = OracleJdkParser().parse("""
+            |package a;
+            |import b.B;
+            |import dne.DNE;
+            |public class A extends DNE {
+            |    B b = new B();
+            |
+            |    public DNE foo() {
+            |        B b2 = new B();
+            |    }
+            |
+            |    public Consumer<DNE> bar() {
+            |        return dne -> {
+            |            B b = new B();
+            |        };
+            |    }
+            |
+            |    class C extends DNE {
+            |        B b = new B();
+            |    }
+            |}
+        """, "package b; public class B {}")
+
+        // still able to find references to B even when "cannot find symbols" abound!
+        assertTrue(a.findType("b.B").map { a.cursor(it)?.enclosingVariableDecl() }.filterNotNull().size >= 4)
     }
 }
