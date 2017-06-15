@@ -20,13 +20,14 @@ import com.fasterxml.jackson.annotation.JsonIdentityInfo
 import com.fasterxml.jackson.annotation.JsonTypeInfo
 import com.fasterxml.jackson.annotation.ObjectIdGenerators
 import com.koloboke.collect.map.hash.HashObjObjMaps
+import java.io.Serializable
 
 /**
  * The stylistic surroundings of a tree element
  */
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator::class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, include = JsonTypeInfo.As.PROPERTY, property = "@c")
-sealed class Formatting {
+sealed class Formatting: Serializable {
     companion object {
         val Empty by lazy { format("") }
     }
