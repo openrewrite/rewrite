@@ -471,7 +471,7 @@ sealed class Tr : Serializable, Tree {
             }
         }
 
-        private data class IdentFlyweight(val simpleName: String, val type: Type?)
+        private data class IdentFlyweight(val simpleName: String, val type: Type?): Serializable
 
         override fun <R> accept(v: AstVisitor<R>): R = v.reduce(v.visitIdentifier(this), v.visitExpression(this))
 
