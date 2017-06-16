@@ -28,13 +28,13 @@ data class Cursor(val path: List<Tree>) {
         val Empty = Cursor(emptyList())
     }
 
-    override fun equals(other: Any?): Boolean = if(other is Cursor && path.size == other.path.size) {
-        path.forEachIndexed { i, _ ->
-            if(other.path[i] != path[i])
-                return@equals false
+    override fun equals(other: Any?): Boolean = other is Cursor && path.size == other.path.size && path.let { p ->
+        for(i in p.indices) {
+            if(p[i] != other.path[i])
+                return false
         }
-        true
-    } else false
+        return true
+    }
 
     override fun hashCode(): Int = path.hashCode()
 

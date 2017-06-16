@@ -20,6 +20,7 @@ import com.koloboke.collect.map.hash.HashObjObjMap
 import com.koloboke.collect.map.hash.HashObjObjMaps
 import com.koloboke.collect.set.hash.HashObjSet
 import com.koloboke.collect.set.hash.HashObjSets
+import com.netflix.rewrite.ast.Type.Companion.deepEquals
 import java.io.Serializable
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator::class, property = "@ref")
@@ -37,8 +38,12 @@ sealed class Type: Serializable {
             is Primitive -> t is Primitive && this == t
             is Var -> t is Var && this.deepEquals(t)
             is ShallowClass -> t is ShallowClass && fullyQualifiedName == t.fullyQualifiedName
+            is MultiCatchType -> t is MultiCatchType && throwableTypes.size == t.throwableTypes.size &&
+                    throwableTypes.indices.all { i -> throwableTypes[i].deepEquals(t.throwableTypes[i]) }
         }
     }
+
+    data class MultiCatchType(val throwableTypes: List<Type>): Type()
 
     /**
      * Reduces memory and CPU footprint when deep class insight isn't necessary, such as
@@ -77,31 +82,22 @@ sealed class Type: Serializable {
             if(c == null || fullyQualifiedName != c.fullyQualifiedName)
                 return false
 
-            val membersEqual = if(members.size == c.members.size) {
-                var equal = true
-                members.forEachIndexed { i, m ->
-                    if(!c.members[i].deepEquals(m)) {
-                        equal = false
-                        return@forEachIndexed
-                    }
-                }
-                equal
-            } else false
+            if(members.size != c.members.size)
+                return false
+            members.indices.forEach {
+                if(!members[it].deepEquals(c.members[it])) return@deepEquals false
+            }
 
-            val supertypeEqual = supertype.deepEquals(c.supertype)
+            if(!supertype.deepEquals(c.supertype))
+                return false
 
-            val typeParametersEqual = if(typeParameters.size == c.typeParameters.size) {
-                var equal = true
-                typeParameters.forEachIndexed { i, param ->
-                    if(!c.typeParameters[i].deepEquals(param)) {
-                        equal = false
-                        return@forEachIndexed
-                    }
-                }
-                equal
-            } else false
+            if(typeParameters.size != c.typeParameters.size)
+                return false
+            typeParameters.indices.forEach {
+                if(!typeParameters[it].deepEquals(c.typeParameters[it])) return@deepEquals false
+            }
 
-            return membersEqual && supertypeEqual && typeParametersEqual
+            return true
         }
 
         companion object {
