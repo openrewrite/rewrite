@@ -141,7 +141,7 @@ sealed class Type: Serializable {
 
         fun hasFlags(vararg test: Flag) = test.all { flags.contains(it) }
 
-        data class Signature(val returnType: Type?, val paramTypes: List<Type>)
+        data class Signature(val returnType: Type?, val paramTypes: List<Type>): Serializable
 
         internal fun deepEquals(method: Method?): Boolean {
             if(method == null)
