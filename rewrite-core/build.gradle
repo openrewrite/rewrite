@@ -30,8 +30,7 @@ task generateAntlrSources(type: JavaExec) {
 dependencies {
     compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
     compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
-
-    compile 'org.antlr:antlr4:4.7'
+    compileShaded 'org.antlr:antlr4:4.7'
 
     compile 'eu.infomas:annotation-detector:latest.release'
     compile 'org.slf4j:slf4j-api:1.7.+'
@@ -80,6 +79,7 @@ shadowJar {
     relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
     relocate 'org.eclipse.jgit', 'com.netflix.devinsight.shaded.org.eclipse.jgit'
     relocate 'org.apache.http', 'com.netflix.devinsight.shaded.org.apache.http'
+    relocate 'org.antlr.v4', 'com.netflix.devinsight.shaded.org.antlr4.v4'
 
     mergeServiceFiles {
         exclude 'META-INF/services/com.sun.*'
