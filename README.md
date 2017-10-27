@@ -87,7 +87,7 @@ public class ChangeMethodNameTestJava {
         Tr.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
         Refactor refactor = cu.refactor()
-          .changeName(cu.findMethodCalls("B foo(int)"), "bar");
+          .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar");
 
         Tr.CompilationUnit fixed = refactor.fix();
 
