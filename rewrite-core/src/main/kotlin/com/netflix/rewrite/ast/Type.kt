@@ -54,7 +54,8 @@ sealed class Type: Serializable {
     data class Class private constructor(val fullyQualifiedName: String,
                                          val members: List<Var>, // will always be sorted by name by build(..)
                                          val supertype: Class?,
-                                         val typeParameters: List<Type>): Type() {
+                                         val typeParameters: List<Type>,
+                                         val interfaces: List<Type>): Type() {
 
         override fun toString(): String = fullyQualifiedName
 
@@ -107,14 +108,18 @@ sealed class Type: Serializable {
             val flyweights = HashObjObjMaps.newMutableMap<String, HashObjSet<Class>>()
 
             @JvmStatic @JsonCreator
-            fun build(fullyQualifiedName: String, members: List<Var> = emptyList(), supertype: Class? = null, typeParameters: List<Type> = emptyList()): Type.Class {
+            fun build(fullyQualifiedName: String,
+                      members: List<Var> = emptyList(),
+                      supertype: Class? = null,
+                      typeParameters: List<Type> = emptyList(),
+                      interfaces: List<Type> = emptyList()): Type.Class {
                 // the variants are the various versions of this fully qualified name, where equality is determined by
                 // whether the supertype hierarchy and members through the entire supertype hierarchy are equal
-                val test = Class(fullyQualifiedName, members.sortedBy { it.name }, supertype, typeParameters)
+                val test = Class(fullyQualifiedName, members.sortedBy { it.name }, supertype, typeParameters, interfaces)
 
                 return synchronized(flyweights) {
                     val variants = flyweights.getOrPut(fullyQualifiedName) {
-                        HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype, typeParameters)))
+                        HashObjSets.newMutableSet<Class>(arrayOf(Class(fullyQualifiedName, members, supertype, typeParameters, interfaces)))
                     }
 
                     (if(classVersionDependentComparison) variants.find { it.deepEquals(test) } else variants.firstOrNull()) ?: {
@@ -192,12 +197,12 @@ sealed class Type: Serializable {
         internal fun deepEquals(generic: GenericTypeVariable?): Boolean =
                 generic != null && fullyQualifiedName == generic.fullyQualifiedName && bound.deepEquals(generic.bound)
     }
-    
+
     data class Array(val elemType: Type): Type() {
         internal fun deepEquals(array: Array?): Boolean =
                 array != null && elemType.deepEquals(array.elemType)
     }
-    
+
     data class Primitive(val keyword: String): Type() {
         companion object {
             val Boolean = Primitive("boolean")

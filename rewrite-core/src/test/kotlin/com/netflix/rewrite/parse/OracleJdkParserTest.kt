@@ -15,9 +15,9 @@
  */
 package com.netflix.rewrite.parse
 
+import com.netflix.rewrite.ast.Type
 import com.netflix.rewrite.ast.asClass
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -85,5 +85,21 @@ class OracleJdkParserTest {
 
         // still able to find references to B even when "cannot find symbols" abound!
         assertTrue(a.findType("b.B").map { a.cursor(it)?.enclosingVariableDecl() }.filterNotNull().size >= 4)
+    }
+
+    @Test
+    fun parserIncludesTypeInterfaces() {
+        val a = OracleJdkParser().parse("""
+            |package a;
+            |import java.util.HashSet;
+            |import java.util.Set;
+            |public class A {
+            |   Set<String> set = new HashSet<String>();
+            }
+        """)
+
+        val hashSet = a.findType("java.util.HashSet")[1]    // first element is the import
+        assertNotNull(hashSet.type.asClass())
+        assertTrue(hashSet.type.asClass()!!.interfaces.any { (it as Type.ShallowClass).fullyQualifiedName == "java.util.Set" })
     }
 }

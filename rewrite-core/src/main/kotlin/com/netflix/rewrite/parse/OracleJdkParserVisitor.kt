@@ -1143,8 +1143,10 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                                     )
                                 }
 
+                        val symType = sym.type as com.sun.tools.javac.code.Type.ClassType
                         Type.Class.build(sym.className(), fields, type(type.supertype_field, stack.plus(sym)).asClass(),
-                                type.typarams_field?.map { tParam -> type(tParam, stack.plus(sym), shallow = true) }?.filterNotNull() ?: emptyList())
+                                type.typarams_field?.mapNotNull { tParam -> type(tParam, stack.plus(sym), shallow = true) } ?: emptyList(),
+                                symType.interfaces_field?.mapNotNull { i -> type(i, stack.plus(sym), shallow = true) } ?: emptyList())
                     }
                 }
             }
