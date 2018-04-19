@@ -25,17 +25,41 @@ abstract class LabelTest(p: Parser): Parser by p {
     
     @Test
     fun labeledWhileLoop() {
-        val a = parse("""
-            public class A {
-                public void test() {
-                    labeled: while(true) {
-                    }
-                }
-            }
-        """)
+        var orig = """
+            |public class A {
+            |    public void test() {
+            |        labeled: while(true) {
+            |        }
+            |    }
+            |}
+        """.trimMargin()
+        val a = parse(orig)
         
         val labeled = a.firstMethodStatement() as Tr.Label
         assertEquals("labeled", labeled.label.simpleName)
         assertTrue(labeled.statement is Tr.WhileLoop)
+        assertEquals("Should recreate original", orig, a.print())
+    }
+
+    @Test
+    fun nonEmptyLabeledWhileLoop() {
+        val orig = """
+            |public class A {
+            |    public void test() {
+            |        outer: while(true) {
+            |            while(true) {
+            |                break outer;
+            |            }
+            |        }
+            |    }
+            |}
+        """.trimMargin()
+
+        val a = parse(orig)
+
+        val labeled = a.firstMethodStatement() as Tr.Label
+        assertEquals("outer", labeled.label.simpleName)
+        assertTrue(labeled.statement is Tr.WhileLoop)
+        assertEquals("Should recreate original", orig, a.print())
     }
 }
