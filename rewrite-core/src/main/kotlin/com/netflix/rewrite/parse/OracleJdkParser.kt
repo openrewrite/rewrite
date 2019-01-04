@@ -37,7 +37,7 @@ import javax.tools.StandardLocation
 /**
  * This parser is NOT thread-safe, as the Oracle parser maintains in-memory caches in static state.
  */
-class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath) {
+class OracleJdkParser(classpath: List<Path>? = null,val charset: Charset= Charset.defaultCharset()) : AbstractParser(classpath) {
     val context = Context()
 
     // Both of these must be declared before compiler, so that compiler doesn't attempt to register alternate
@@ -48,7 +48,7 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         }
     }
 
-    private val pfm = JavacFileManager(context, true, Charset.defaultCharset())
+    private val pfm = JavacFileManager(context, true, charset)
 
     private val compiler = JavaCompiler(context)
 
@@ -109,7 +109,7 @@ class OracleJdkParser(classpath: List<Path>? = null) : AbstractParser(classpath)
         return cus.map {
             val (path, cu) = it
             logger.trace("Building AST for {}", path.toAbsolutePath().fileName)
-            OracleJdkParserVisitor(relativeTo?.relativize(path) ?: path, path.toFile().readText()).scan(cu, Formatting.Empty) as Tr.CompilationUnit
+            OracleJdkParserVisitor(relativeTo?.relativize(path) ?: path, path.toFile().readText(charset)).scan(cu, Formatting.Empty) as Tr.CompilationUnit
         }
     }
 
