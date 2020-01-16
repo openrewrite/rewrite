@@ -1,5 +1,6 @@
 language: java
 sudo: true
+dist: trusty
 jdk:
 - oraclejdk8
 install: true
