@@ -52,10 +52,13 @@ subprojects {
     license {
         header = file('../gradle/licenseHeader.txt')
         exclude '**/*.tokens'
+        exclude '**/grammar/*.java'
         mapping {
             kt = 'JAVADOC_STYLE'
         }
         sourceSets = project.sourceSets
         strictCheck = true
+        ext.year = Calendar.getInstance().get(Calendar.YEAR)
+        skipExistingHeaders = true
     }
 }
