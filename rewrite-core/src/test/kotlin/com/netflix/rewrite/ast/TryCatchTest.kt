@@ -37,7 +37,6 @@ abstract class TryCatchTest(p: Parser): Parser by p {
         """)
         
         val tryable = a.firstMethodStatement() as Tr.Try
-        assertTrue(tryable.body is Tr.Block)
         assertEquals(0, tryable.catches.size)
         assertTrue(tryable.finally is Tr.Try.Finally)
     }

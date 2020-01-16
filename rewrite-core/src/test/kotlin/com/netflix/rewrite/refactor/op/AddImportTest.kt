@@ -110,7 +110,7 @@ abstract class AddImportTest(parser: Parser): Parser by parser {
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
-            assertRefactored(fixed, "package a;\n\n${expectedImports.map { "import $it;" }.joinToString("\n")}\n\nclass A {}")
+            assertRefactored(fixed, "package a;\n\n${expectedImports.joinToString("\n") { "import $it;" }}\n\nclass A {}")
 
             reset()
         }

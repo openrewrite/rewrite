@@ -48,7 +48,7 @@ abstract class TypeParameterAndWildcardTest(p: Parser): Parser by p {
             public class A {
                 List< ?  extends  B > bs;
             }
-        """, whichDependOn = "public class B {}")
+        """, whichDependOn = *arrayOf("public class B {}"))
 
         val typeParam = a.classes[0].fields()[0].typeExpr as Tr.ParameterizedType
         assertEquals("List< ?  extends  B >", typeParam.print())

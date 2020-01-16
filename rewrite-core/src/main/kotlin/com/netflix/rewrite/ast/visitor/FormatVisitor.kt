@@ -108,7 +108,7 @@ class FormatVisitor: RefactorVisitor<Tree>() {
                 val (prefix, _) = formatting as Formatting.Reified
 
                 // add blank lines if necessary
-                val addLines = (1..Math.max(0, n - prefix.takeWhile { it == '\n' }.length)).map { "\n" }.joinToString("")
+                val addLines = (1..Math.max(0, n - prefix.takeWhile { it == '\n' }.length)).joinToString("") { "\n" }
                 var modifiedPrefix = (addLines + prefix)
 
                 // remove extra blank lines if necessary
@@ -119,7 +119,7 @@ class FormatVisitor: RefactorVisitor<Tree>() {
                 else emptyList()
             }
             is Formatting.Infer, is Formatting.None ->
-                transform(tree) { changeFormatting(format((1..n).map { "\n" }.joinToString(""))) }
+                transform(tree) { changeFormatting(format((1..n).joinToString("") { "\n" })) }
         }
     }
 }

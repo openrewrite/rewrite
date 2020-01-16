@@ -33,11 +33,12 @@ import java.util.*
 import java.util.regex.Pattern
 import javax.lang.model.element.Modifier
 import javax.lang.model.type.TypeKind
+import kotlin.math.max
 
 private typealias JdkTree = com.sun.source.tree.Tree
 
 @Suppress("UNUSED_PARAMETER")
-class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanner<Tree, Formatting.Reified>() {
+class OracleJdkParserVisitor(private val path: Path, private val source: String): TreePathScanner<Tree, Formatting.Reified>() {
     private lateinit var endPosTable: EndPosTable
     private lateinit var docTable: DocCommentTable
     private var cursor: Int = 0
@@ -70,7 +71,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                     else -> arg.convert { sourceBefore(")") }
                 })
              } else {
-                node.arguments.convertAll(COMMA_DELIM, { sourceBefore(")") })
+                node.arguments.convertAll(commaDelim, { sourceBefore(")") })
             }
 
             Tr.Annotation.Arguments(args, format(argsPrefix))
@@ -93,7 +94,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val indexed = node.expression.convert<Expression>()
 
         val dimensionPrefix = sourceBefore("[")
-        val dimension = Tr.ArrayAccess.Dimension(node.index.convert<Expression> { sourceBefore("]") },
+        val dimension = Tr.ArrayAccess.Dimension(node.index.convert { sourceBefore("]") },
                 format(dimensionPrefix))
 
         return Tr.ArrayAccess(indexed, dimension, node.type(), fmt)
@@ -178,7 +179,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 }
                 .convertPossibleMultiVariable() as List<Statement>
 
-        return Tr.Block<Statement>(static, statements, fmt, sourceBefore("}"))
+        return Tr.Block(static, statements, fmt, sourceBefore("}"))
     }
 
     override fun visitBreak(node: BreakTree, fmt: Formatting.Reified): Tree {
@@ -213,7 +214,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     override fun visitClass(node: ClassTree, fmt: Formatting.Reified): Tree {
-        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
+        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(noDelim, noDelim)
 
         val modifiers = node.modifiers.sortedFlags().map { mod ->
             val modPrefix = whitespace()
@@ -247,12 +248,12 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
         val typeParams = if(node.typeParameters.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
-            Tr.TypeParameters(node.typeParameters.convertAll(COMMA_DELIM, { sourceBefore(">") }),
+            Tr.TypeParameters(node.typeParameters.convertAll(commaDelim, { sourceBefore(">") }),
                     format(genericPrefix))
         } else null
 
         val extends = node.extendsClause.convertOrNull<TypeTree>()
-        val implements = node.implementsClause.convertAll<TypeTree>(COMMA_DELIM, NO_DELIM)
+        val implements = node.implementsClause.convertAll<TypeTree>(commaDelim, noDelim)
 
         val bodyPrefix = sourceBefore("{")
 
@@ -266,7 +267,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             var semicolonPresent = false
 
             val enumValues = jcEnums
-                .convertAll<Tr.EnumValue>(COMMA_DELIM, {
+                .convertAll<Tr.EnumValue>(commaDelim, {
                     // this semicolon is required when there are non-value members, but can still
                     // be present when there are not
                     semicolonPresent = positionOfNext(";", stop = '}') > 0
@@ -276,7 +277,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             Tr.EnumValueSet(enumValues, semicolonPresent, Formatting.Empty)
         } else null
 
-        val members = listOf(enumSet).filterNotNull() + node.members
+        val members = listOfNotNull(enumSet) + node.members
                 // we don't care about the compiler-inserted default constructor,
                 // since it will never be subject to refactoring
                 .filter {
@@ -288,7 +289,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 }
                 .convertPossibleMultiVariable()
 
-        val body = Tr.Block<Tree>(null, members, format(bodyPrefix), sourceBefore("}"))
+        val body = Tr.Block(null, members, format(bodyPrefix), sourceBefore("}"))
 
         return Tr.ClassDecl(annotations, modifiers, kind, name, typeParams, extends, implements, body, node.type(), fmt)
     }
@@ -311,8 +312,8 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return Tr.CompilationUnit(
                 path.toString(),
                 packageDecl,
-                node.imports.convertAll(SEMI_DELIM, SEMI_DELIM),
-                node.typeDecls.filterIsInstance<JCTree.JCClassDecl>().convertAll(this::whitespace, NO_DELIM),
+                node.imports.convertAll(semiDelim, semiDelim),
+                node.typeDecls.filterIsInstance<JCTree.JCClassDecl>().convertAll(this::whitespace, noDelim),
                 format(prefix, source.substring(cursor))
         )
     }
@@ -390,13 +391,13 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         )
     }
 
-    fun visitEnumVariable(node: VariableTree, fmt: Formatting.Reified): Tree {
+    private fun visitEnumVariable(node: VariableTree, fmt: Formatting.Reified): Tree {
         skip(node.name.toString())
         val name = Tr.Ident.build(node.name.toString(), node.type(), Formatting.Empty)
 
         val initializer = if(source[node.endPos()-1] == ')') {
             val initPrefix = sourceBefore("(")
-            var args = (node.initializer as JCTree.JCNewClass).args.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
+            var args = (node.initializer as JCTree.JCNewClass).args.convertAll<Expression>(commaDelim, { sourceBefore(")") })
             if((node.initializer as JCTree.JCNewClass).args.isEmpty())
                 args = listOf(Tr.Empty(format(sourceBefore(")"))))
             Tr.EnumValue.Arguments(args, format(initPrefix))
@@ -422,9 +423,9 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val init: Statement = node.initializer.convertPossibleMultiVariable().filterIsInstance<Statement>().firstOrNull() ?:
                 Tr.Empty(format("", sourceBefore(";")))
 
-        val condition = node.condition.convertOrNull<Expression>(SEMI_DELIM) ?:
+        val condition = node.condition.convertOrNull<Expression>(semiDelim) ?:
                 Tr.Empty(format("", sourceBefore(";")))
-        val update = node.update.convertAllOrEmpty(COMMA_DELIM, { sourceBefore(")") })
+        val update = node.update.convertAllOrEmpty(commaDelim, { sourceBefore(")") })
 
         return Tr.ForLoop(
                 Tr.ForLoop.Control(init, condition, update, format(ctrlPrefix)),
@@ -446,7 +447,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
         val elsePart = if(node.elseStatement is JCTree.JCStatement) {
             val elsePrefix = sourceBefore("else")
-            Tr.If.Else(node.elseStatement.convert<Statement>(statementDelim), format(elsePrefix))
+            Tr.If.Else(node.elseStatement.convert(statementDelim), format(elsePrefix))
         } else null
 
         return Tr.If(ifPart, then, elsePart, fmt)
@@ -460,7 +461,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
     override fun visitInstanceOf(node: InstanceOfTree, fmt: Formatting.Reified): Tree {
         return Tr.InstanceOf(
-                node.expression.convert<Expression> { sourceBefore("instanceof") },
+                node.expression.convert { sourceBefore("instanceof") },
                 node.type.convert(),
                 node.type(),
                 fmt
@@ -483,7 +484,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val paramList = if(parenthesized && node.parameters.isEmpty()) {
             listOf(Tr.Empty(format(sourceBefore(")"))))
         } else {
-            node.parameters.convertAll(COMMA_DELIM, { if (parenthesized) sourceBefore(")") else "" })
+            node.parameters.convertAll(commaDelim, { if (parenthesized) sourceBefore(")") else "" })
         }
 
         val params = Tr.Lambda.Parameters(parenthesized, paramList)
@@ -557,13 +558,13 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         // generic type parameters can only exist on qualified targets
         val typeParams = if(node.typeargs.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
-            val genericParams = node.typeargs.convertAll<NameTree>(COMMA_DELIM, { sourceBefore(">") })
+            val genericParams = node.typeargs.convertAll<NameTree>(commaDelim, { sourceBefore(">") })
             Tr.MethodInvocation.TypeParameters(genericParams, format(genericPrefix))
         } else null
 
         val name = when(jcSelect) {
             is JCTree.JCFieldAccess ->  Tr.Ident.build(jcSelect.name.toString(), null, format(sourceBefore(jcSelect.name.toString())))
-            is JCTree.JCIdent -> jcSelect.convert<Tr.Ident>()
+            is JCTree.JCIdent -> jcSelect.convert()
             else -> error("Unexpected method select type ${jcSelect::class.java}")
         }
 
@@ -572,7 +573,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 if(node.args.isEmpty()) {
                     listOf(Tr.Empty(format(sourceBefore(")"))))
                 } else {
-                    node.args.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
+                    node.args.convertAll<Expression>(commaDelim, { sourceBefore(")") })
                 },
                 format(argsPrefix))
 
@@ -589,7 +590,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val type = if(genericSymbol != null && jcSelect.type != null) {
             fun signature(t: com.sun.tools.javac.code.Type): Type.Method.Signature? = when(t) {
                 is com.sun.tools.javac.code.Type.MethodType ->
-                    Type.Method.Signature(type(t.restype), t.argtypes.map { type(it) }.filterNotNull())
+                    Type.Method.Signature(type(t.restype), t.argtypes.mapNotNull { type(it) })
                 else -> null
             }
 
@@ -614,7 +615,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     override fun visitMethod(node: MethodTree, fmt: Formatting.Reified): Tree {
         logger.trace("Visiting method {}", node.name)
 
-        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
+        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(noDelim, noDelim)
 
         val modifiers = node.modifiers.sortedFlags()
                 .map { mod ->
@@ -637,7 +638,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         // see https://docs.oracle.com/javase/tutorial/java/generics/methods.html
         val typeParams = if(node.typeParameters.isNotEmpty()) {
             val genericPrefix = sourceBefore("<")
-            Tr.TypeParameters(node.typeParameters.convertAll(COMMA_DELIM, { sourceBefore(">") }),
+            Tr.TypeParameters(node.typeParameters.convertAll(commaDelim, { sourceBefore(">") }),
                     format(genericPrefix))
         } else null
 
@@ -655,21 +656,21 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
 
         val paramFmt = format(sourceBefore("("))
         val params = if(node.parameters.isNotEmpty()) {
-            Tr.MethodDecl.Parameters(node.parameters.convertAll<Tr.VariableDecls>(COMMA_DELIM, { sourceBefore(")") }), paramFmt)
+            Tr.MethodDecl.Parameters(node.parameters.convertAll<Tr.VariableDecls>(commaDelim, { sourceBefore(")") }), paramFmt)
         } else {
             Tr.MethodDecl.Parameters(listOf(Tr.Empty(format(sourceBefore(")")))), paramFmt)
         }
 
         val throws = if(node.throws.isNotEmpty()) {
             val throwsPrefix = sourceBefore("throws")
-            Tr.MethodDecl.Throws(node.throws.convertAll<NameTree>(COMMA_DELIM, NO_DELIM), format(throwsPrefix))
+            Tr.MethodDecl.Throws(node.throws.convertAll(commaDelim, noDelim), format(throwsPrefix))
         } else null
 
         val body = node.body.convertOrNull<Tr.Block<Statement>>()
 
         val defaultValue = if(node.defaultValue != null) {
             val defaultFmt = format(sourceBefore("default"))
-            Tr.MethodDecl.Default(node.defaultValue.convert<Expression>(), defaultFmt)
+            Tr.MethodDecl.Default(node.defaultValue.convert(), defaultFmt)
         } else null
 
         return Tr.MethodDecl(annotations, modifiers, typeParams, returnType, name, params, throws, body, defaultValue, fmt)
@@ -688,7 +689,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 }
                 elementType.convertOrNull<TypeTree>()
             }
-            else -> jcVarType.convertOrNull<TypeTree>()
+            else -> jcVarType.convertOrNull()
         }
 
         val dimensions = if(node.dimensions.isNotEmpty()) {
@@ -713,7 +714,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             val initializers = if(node.initializers.isEmpty()) {
                 listOf(Tr.Empty(format(sourceBefore("}"))))
             } else {
-                node.initializers.convertAll<Expression>(COMMA_DELIM, { sourceBefore("}") })
+                node.initializers.convertAll<Expression>(commaDelim, { sourceBefore("}") })
             }
             Tr.NewArray.Initializer(initializers, format(initPrefix))
         } else null
@@ -730,7 +731,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 if(node.arguments.isEmpty()) {
                     listOf(Tr.Empty(format(sourceBefore(")"))))
                 } else {
-                    node.arguments.convertAll<Expression>(COMMA_DELIM, { sourceBefore(")") })
+                    node.arguments.convertAll<Expression>(commaDelim, { sourceBefore(")") })
                 },
                 format(argPrefix))
 
@@ -741,7 +742,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                     // we don't care about the compiler-inserted default constructor,
                     // since it will never be subject to refactoring
                     .filter { it !is JCTree.JCMethodDecl || it.modifiers.flags and Flags.GENERATEDCONSTR == 0L }
-                    .convertAll<Tree>(NO_DELIM, NO_DELIM)
+                    .convertAll<Tree>(noDelim, noDelim)
 
             Tr.Block(null, members, format(bodyPrefix), sourceBefore("}"))
         }
@@ -757,7 +758,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
             listOf(Tr.Empty(format(sourceBefore(">"))))
         } else {
-            node.typeArguments.convertAll<Expression>(COMMA_DELIM, { sourceBefore(">") })
+            node.typeArguments.convertAll<Expression>(commaDelim, { sourceBefore(">") })
         }
 
         return Tr.ParameterizedType(
@@ -798,7 +799,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         val selector = node.expression.convert<Tr.Parentheses<Expression>>()
 
         val casePrefix = sourceBefore("{")
-        val cases = node.cases.convertAll<Tr.Case>(NO_DELIM, NO_DELIM)
+        val cases = node.cases.convertAll<Tr.Case>(noDelim, noDelim)
 
         return Tr.Switch(selector, Tr.Block(null, cases, format(casePrefix), sourceBefore("}")), fmt)
     }
@@ -821,16 +822,16 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         skip("try")
         val resources = if(node.resources.isNotEmpty()) {
             val resourcesPrefix = sourceBefore("(")
-            val decls = node.resources.convertAll<Tr.VariableDecls>(SEMI_DELIM, { sourceBefore(")") })
+            val decls = node.resources.convertAll<Tr.VariableDecls>(semiDelim, { sourceBefore(")") })
             Tr.Try.Resources(decls, format(resourcesPrefix))
         } else null
 
         val block = node.block.convert<Tr.Block<Statement>>()
-        val catches = node.catches.convertAll<Tr.Catch>(NO_DELIM, NO_DELIM)
+        val catches = node.catches.convertAll<Tr.Catch>(noDelim, noDelim)
 
         val finally = if(node.finallyBlock != null) {
             val finallyPrefix = sourceBefore("finally")
-            Tr.Try.Finally(node.finallyBlock.convert<Tr.Block<Statement>>(),
+            Tr.Try.Finally(node.finallyBlock.convert(),
                     format(finallyPrefix))
         } else null
 
@@ -846,14 +847,14 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     override fun visitTypeParameter(node: TypeParameterTree, fmt: Formatting.Reified): Tree {
-        val annotations = node.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
+        val annotations = node.annotations.convertAll<Tr.Annotation>(noDelim, noDelim)
 
         val name = TreeBuilder.buildName(node.name.toString(), format(sourceBefore(node.name.toString())))
 
         val bounds = if(node.bounds.isNotEmpty()) {
             val boundPrefix = if(node.bounds.isNotEmpty()) sourceBefore("extends") else ""
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
-            Tr.TypeParameter.Bounds(node.bounds.convertAll<TypeTree>({ sourceBefore("&") }, NO_DELIM),
+            Tr.TypeParameter.Bounds(node.bounds.convertAll({ sourceBefore("&") }, noDelim),
                     format(boundPrefix))
         } else null
 
@@ -861,26 +862,26 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     override fun visitUnionType(node: UnionTypeTree, fmt: Formatting.Reified): Tree {
-        return Tr.MultiCatch(node.typeAlternatives.convertAll({ sourceBefore("|") }, NO_DELIM), fmt)
+        return Tr.MultiCatch(node.typeAlternatives.convertAll({ sourceBefore("|") }, noDelim), fmt)
     }
 
     override fun visitUnary(node: UnaryTree, fmt: Formatting.Reified): Tree {
         val (op: Tr.Unary.Operator, expr: Expression) = when((node as JCTree.JCUnary).tag) {
             JCTree.Tag.POS -> {
                 skip("+")
-                Tr.Unary.Operator.Positive() to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Positive() to node.arg.convert()
             }
             JCTree.Tag.NEG -> {
                 skip("-")
-                Tr.Unary.Operator.Negative() to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Negative() to node.arg.convert()
             }
             JCTree.Tag.PREDEC -> {
                 skip("--")
-                Tr.Unary.Operator.PreDecrement() to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreDecrement() to node.arg.convert()
             }
             JCTree.Tag.PREINC -> {
                 skip("++")
-                Tr.Unary.Operator.PreIncrement() to node.arg.convert<Expression>()
+                Tr.Unary.Operator.PreIncrement() to node.arg.convert()
             }
             JCTree.Tag.POSTDEC -> {
                 val expr = node.arg.convert<Expression>()
@@ -892,11 +893,11 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             }
             JCTree.Tag.COMPL -> {
                 skip("~")
-                Tr.Unary.Operator.Complement(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Complement(Formatting.Empty) to node.arg.convert()
             }
             JCTree.Tag.NOT -> {
                 skip("!")
-                Tr.Unary.Operator.Not(Formatting.Empty) to node.arg.convert<Expression>()
+                Tr.Unary.Operator.Not(Formatting.Empty) to node.arg.convert()
             }
             else -> throw IllegalArgumentException("Unexpected unary tag ${node.tag}")
         }
@@ -912,9 +913,9 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         }
     }
 
-    fun visitVariables(nodes: List<VariableTree>, fmt: Formatting.Reified): Tr.VariableDecls {
+    private fun visitVariables(nodes: List<VariableTree>, fmt: Formatting.Reified): Tr.VariableDecls {
         val node = nodes[0] as JCTree.JCVariableDecl
-        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(NO_DELIM, NO_DELIM)
+        val annotations = node.modifiers.annotations.convertAll<Tr.Annotation>(noDelim, noDelim)
 
         val vartype = node.vartype
 
@@ -951,7 +952,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                     }
                     elementType.convert<TypeTree>()
                 }
-                else -> vartype.convert<TypeTree>()
+                else -> vartype.convert()
             }
         }
 
@@ -1009,7 +1010,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
             BoundKind.UNBOUND -> null
         }
 
-        return Tr.Wildcard(bound, node.inner.convertOrNull<NameTree>(), fmt)
+        return Tr.Wildcard(bound, node.inner.convertOrNull(), fmt)
     }
 
     /**
@@ -1021,12 +1022,12 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     @Suppress("UNCHECKED_CAST")
     private fun <T : Tree> JdkTree.convert(suffix: (JdkTree) -> String = { "" }): T {
         try {
-            val prefix = source.substring(cursor, Math.max((this as JCTree).startPosition, cursor))
+            val prefix = source.substring(cursor, max((this as JCTree).startPosition, cursor))
             cursor += prefix.length
             var t = scan(this, format(prefix)) as T
-            t = t.changeFormatting<T>(t.formatting.withSuffix(suffix(this)))
-            cursor(Math.max(this.endPos(), cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
-            return t
+            t = t.changeFormatting(t.formatting.withSuffix(suffix(this)))
+            cursor(max(this.endPos() ?: 0, cursor)) // if there is a non-empty suffix, the cursor may have already moved past it
+            return t as T
         } catch(t: Throwable) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
             logger.error("Failed to convert ${this::class.java.simpleName} for the following cursor stack:")
@@ -1038,7 +1039,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     private fun logCurrentPathAsError() {
         logger.error("--- BEGIN PATH ---")
         currentPath.reversed().forEach {
-            val lineNumber by lazy { source.substring(0, (it as JCTree).startPosition).count { it == '\n' } + 1 }
+            val lineNumber by lazy { source.substring(0, (it as JCTree).startPosition).count { ch -> ch == '\n' } + 1 }
             logger.error(when(it) {
                 is JCTree.JCCompilationUnit -> "JCCompilationUnit(sourceFile = ${it.sourcefile.name})"
                 is JCTree.JCClassDecl -> "JCClassDecl(name = ${it.name})"
@@ -1051,13 +1052,13 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun <T : Tree> JdkTree.convertOrNull(suffix: (JdkTree) -> String = { "" }): T? =
-            if (this is JdkTree) convert<T>(suffix) else null
+    private fun <T : Tree> JdkTree?.convertOrNull(suffix: (JdkTree) -> String = { "" }): T? =
+            if (this is JdkTree) convert(suffix) else null
 
     private fun <T: Tree> List<JdkTree>.convertAll(innerSuffix: (JdkTree) -> String, suffix: (JdkTree) -> String): List<T> =
             mapIndexed { i, tree -> tree.convert<T>(if (i == size - 1) suffix else innerSuffix) }
 
-    val statementDelim = { t: JdkTree ->
+    private val statementDelim = { t: JdkTree? ->
         sourceBefore(when (t) {
             is JCTree.JCThrow, is JCTree.JCBreak, is JCTree.JCAssert, is JCTree.JCContinue -> ";"
             is JCTree.JCExpressionStatement, is JCTree.JCReturn, is JCTree.JCVariableDecl -> ";"
@@ -1082,11 +1083,11 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 treeGroup[0].convert<Tree>(statementDelim)
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the Oracle AST
-                val prefix = source.substring(cursor, Math.max((treeGroup[0] as JCTree).startPosition, cursor))
+                val prefix = source.substring(cursor, kotlin.math.max((treeGroup[0] as JCTree).startPosition, cursor))
                 cursor += prefix.length
                 @Suppress("UNCHECKED_CAST") var vars = visitVariables(treeGroup as List<VariableTree>, format(prefix))
-                vars = vars.copy(formatting = vars.formatting.withSuffix(SEMI_DELIM(treeGroup.last())))
-                cursor(Math.max(treeGroup.last().endPos(), cursor))
+                vars = vars.copy(formatting = vars.formatting.withSuffix(semiDelim(treeGroup.last())))
+                cursor(kotlin.math.max(treeGroup.last().endPos(), cursor))
                 vars
             }
         }
@@ -1233,9 +1234,9 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
         return if(delimIndex > source.length - untilDelim.length) -1 else delimIndex
     }
 
-    private val SEMI_DELIM = { ignored: JdkTree -> sourceBefore(";") }
-    private val COMMA_DELIM = { ignored: JdkTree -> sourceBefore(",") }
-    private val NO_DELIM = { ignored: JdkTree -> "" }
+    private val semiDelim = { _: JdkTree? -> sourceBefore(";") }
+    private val commaDelim = { _: JdkTree? -> sourceBefore(",") }
+    private val noDelim = { _: JdkTree? -> "" }
 
     @Suppress("UNUSED_PARAMETER")
     private fun whitespace(t: JdkTree? = null): String {
@@ -1317,7 +1318,7 @@ class OracleJdkParserVisitor(val path: Path, val source: String): TreePathScanne
                 }
                 .map { it.name to it.get(null) as Number }
 
-        return allFlags.fold(emptyList<String>()) { all, f ->
+        return allFlags.fold(emptyList()) { all, f ->
             if(f.second.toLong() and this.toLong() != 0L)
                 all + f.first
             else all

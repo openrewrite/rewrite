@@ -38,6 +38,6 @@ class RetrieveCursorVisitorTest: Parser by OracleJdkParser()  {
         val cursor = a.cursor(s)
         assertNotNull(cursor)
         assertEquals("CompilationUnit,ClassDecl,Block,MethodDecl,Block,VariableDecls",
-                cursor!!.path.map { it::class.java.simpleName }.joinToString(","))
+                cursor!!.path.joinToString(",") { it::class.java.simpleName })
     }
 }

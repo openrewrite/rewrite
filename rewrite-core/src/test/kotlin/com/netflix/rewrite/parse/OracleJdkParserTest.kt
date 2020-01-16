@@ -29,7 +29,7 @@ class OracleJdkParserTest {
 
     @Test
     fun parserIsAbleToIdentifyTypesFromExternalDependencies() {
-        val testngDownloaded = URL("http://repo1.maven.org/maven2/org/testng/testng/6.9.9/testng-6.9.9.jar").openStream().readBytes()
+        val testngDownloaded = URL("https://repo1.maven.org/maven2/org/testng/testng/6.9.9/testng-6.9.9.jar").openStream().readBytes()
         val testng = temp.newFile("testng-6.9.9.jar")
         testng.outputStream().use { it.write(testngDownloaded) }
 
@@ -84,7 +84,7 @@ class OracleJdkParserTest {
         """, "package b; public class B {}")
 
         // still able to find references to B even when "cannot find symbols" abound!
-        assertTrue(a.findType("b.B").map { a.cursor(it)?.enclosingVariableDecl() }.filterNotNull().size >= 4)
+        assertTrue(a.findType("b.B").mapNotNull { a.cursor(it)?.enclosingVariableDecl() }.size >= 4)
     }
 
     @Test

@@ -81,10 +81,10 @@ data class ChangeType(val from: String,
         return super.visitMultiVariable(multiVariable) +
                 multiVariable.typeExpr.transformName<Tr.VariableDecls> { name, node -> node.copy(typeExpr = name) } +
                 multiVariable.vars.mapIndexed { i, (name) ->
-                    name.transformName<Tr.VariableDecls> { name, node ->
+                    name.transformName<Tr.VariableDecls> { transformedName, node ->
                         node.copy(vars = node.vars.mapIndexed { j, originalVar ->
                             if(i == j)
-                                originalVar.copy(name = originalVar.name.copy(type = name.type))
+                                originalVar.copy(name = originalVar.name.copy(type = transformedName.type))
                             else originalVar
                         })
                     }

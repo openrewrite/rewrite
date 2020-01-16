@@ -8,10 +8,10 @@ dependencies {
         compile project(':rewrite-core'), optional
     }
 
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.7'
-    compile 'com.fasterxml.jackson.core:jackson-annotations:2.8.7'
-    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.8.7'
-    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.8.7'
+    compile 'com.fasterxml.jackson.core:jackson-databind:2.10.2'
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.10.2'
+    compile 'com.fasterxml.jackson.module:jackson-module-kotlin:2.10.2'
+    compile 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.10.2'
 
     testCompile 'junit:junit:4.+'
     testCompile 'ch.qos.logback:logback-classic:1.0.13'

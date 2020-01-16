@@ -242,7 +242,7 @@ open class Refactor(val original: Tr.CompilationUnit) {
             val target = RetrieveTreeVisitor(targetId).visit(acc)
             val transformations = visitor.visit(target)
             val transformed = TransformVisitor(transformations).visit(acc) as Tr.CompilationUnit
-            transformations.groupBy { it.name }.forEach { name, transformations ->
+            transformations.groupBy { it.name }.forEach { (name, transformations) ->
                 stats.merge(name, transformations.size, Int::plus)
             }
             transformed

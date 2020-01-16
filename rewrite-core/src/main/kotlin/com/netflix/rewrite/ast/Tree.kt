@@ -661,7 +661,7 @@ sealed class Tr : Serializable, Tree {
                           override val formatting: Formatting = Formatting.Empty,
                           override val id: Long = id()): TypeTree, Tr() {
         @get:JsonIgnore
-        override val type: Type by lazy { Type.MultiCatchType(alternatives.map { it.type }.filterNotNull()) }
+        override val type: Type by lazy { Type.MultiCatchType(alternatives.mapNotNull { it.type }) }
 
         override fun <R> accept(v: AstVisitor<R>): R = v.visitMultiCatch(this)
     }

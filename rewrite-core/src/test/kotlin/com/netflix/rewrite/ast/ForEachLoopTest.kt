@@ -33,13 +33,7 @@ abstract class ForEachLoopTest(p: Parser): Parser by p {
         """)
     }
 
-    val forEachLoop by lazy { a.firstMethodStatement() as Tr.ForEachLoop }
-
-    @Test
-    fun forEachLoop() {
-        assertTrue(forEachLoop.control.variable is Tr.VariableDecls)
-        assertTrue(forEachLoop.control.iterable is Expression)
-    }
+    private val forEachLoop by lazy { a.firstMethodStatement() as Tr.ForEachLoop }
 
     @Test
     fun format() {

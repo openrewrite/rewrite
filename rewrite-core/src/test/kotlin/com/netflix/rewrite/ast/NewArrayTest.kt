@@ -100,7 +100,7 @@ abstract class NewArrayTest(p: Parser): Parser by p {
             }
         """
 
-        val a = parse("""@Produces({"something"}) class A {}""", whichDependOn = produces)
+        val a = parse("""@Produces({"something"}) class A {}""", whichDependOn = *arrayOf(produces))
         val arr = a.classes[0].annotations[0].args!!.args[0] as Tr.NewArray
 
         assertNull(arr.typeExpr)

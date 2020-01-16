@@ -57,7 +57,7 @@ class ReorderMethodArguments(val byArgumentNames: List<String>,
                 } else acc
             }
 
-            val reorderedFormatted = reordered.mapIndexed { i, arg -> arg.changeFormatting<Expression>(formattings[i]) }
+            val reorderedFormatted = reordered.mapIndexed { j, arg -> arg.changeFormatting<Expression>(formattings[j]) }
             return transform { copy(args = args.copy(args = reorderedFormatted)) }
         }
 

@@ -36,9 +36,7 @@ class MethodMatcher(signature: String) {
         object: RefactorMethodSignatureParserBaseVisitor<Void>() {
             override fun visitMethodPattern(ctx: RefactorMethodSignatureParser.MethodPatternContext): Void? {
                 targetTypePattern = TypeVisitor().visitTargetTypePattern(ctx.targetTypePattern()).toRegex()
-                methodNamePattern = ctx.simpleNamePattern().children // all TerminalNode instances
-                        .map { it.toString().aspectjNameToRegexSyntax() }
-                        .joinToString("")
+                methodNamePattern = ctx.simpleNamePattern().children.joinToString("") { it.toString().aspectjNameToRegexSyntax() }
                         .toRegex()
                 argumentPattern = FormalParameterVisitor().visitFormalParametersPattern(ctx.formalParametersPattern()).toRegex()
                 return null
@@ -86,9 +84,7 @@ fun String.aspectjNameToRegexSyntax() = this
 
 class TypeVisitor : RefactorMethodSignatureParserBaseVisitor<String>() {
     override fun visitClassNameOrInterface(ctx: RefactorMethodSignatureParser.ClassNameOrInterfaceContext): String {
-        return ctx.children // all TerminalNode instances
-                .map { it.text.aspectjNameToRegexSyntax() }
-                .joinToString("")
+        return ctx.children.joinToString("") { it.text.aspectjNameToRegexSyntax() }
                 .let { className ->
                     if(!className.contains('.')) {
                         try {
