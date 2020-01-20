@@ -15,7 +15,7 @@
  */
 package com.netflix.rewrite.jackson
 
-import com.netflix.rewrite.parse.OracleJdkParser
+import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -24,11 +24,11 @@ import org.junit.Test
 /**
  * Test that flyweights survive a serialization/deserialization cycle
  */
-class TreeJacksonSerializerTest : Parser by OracleJdkParser() {
+class TreeJacksonSerializerTest : Parser by OpenJdkParser() {
 
-    val serializer = TreeJacksonSerializer()
+    private val serializer = TreeJacksonSerializer()
 
-    val a = parse("""
+    private val a = parse("""
             public class A {
                 A a = foo();
                 A a2 = foo();
@@ -44,7 +44,7 @@ class TreeJacksonSerializerTest : Parser by OracleJdkParser() {
 
         assertEquals(a, aDeser)
         assertTrue(a.classes[0].type === aDeser.classes[0].type)
-        assertTrue((a.classes[0].fields() + aDeser.classes[0].fields())
+        assertTrue((a.classes[0].fields + aDeser.classes[0].fields)
                 .map { it.vars[0].initializer?.type }
                 .toSet()
                 .size == 1)

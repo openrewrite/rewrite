@@ -1,10 +1,14 @@
 plugins {
-    id "com.github.johnrengelman.plugin-shadow" version "2.0.3"
+    id 'org.jetbrains.kotlin.jvm' version '1.3.61'
 }
 
-configurations {
-    compile.extendsFrom compileShaded
-}
+//plugins {
+//    id "com.github.johnrengelman.shadow" version "5.2.0"
+//}
+//
+//configurations {
+//    implementation.extendsFrom shadow
+//}
 
 // run manually with -x compileKotlin when you need to regenerate
 task generateAntlrSources(type: JavaExec) {
@@ -20,32 +24,44 @@ task generateAntlrSources(type: JavaExec) {
 }
 
 dependencies {
-    compileShaded files("${System.getProperty('java.home')}/../lib/tools.jar")
-    compileShaded 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
-    compileShaded 'org.antlr:antlr4:4.7'
+//    shadow files("${System.getProperty('java.home')}/jmods/java.compiler.jmod")
+//    shadow files("${System.getProperty('java.home')}/jmods/jdk.compiler.jmod")
 
-    compile 'eu.infomas:annotation-detector:latest.release'
-    compile 'org.slf4j:slf4j-api:1.7.+'
-    compile 'commons-lang:commons-lang:2.6'
-    compile 'org.jetbrains.kotlin:kotlin-reflect'
+//    shadow 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+//    shadow 'org.antlr:antlr4:4.7'
 
-    compile 'com.koloboke:koloboke-api-jdk8:latest.release'
-    compile 'com.koloboke:koloboke-impl-jdk8:latest.release'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    implementation 'org.antlr:antlr4:4.7'
 
-    compile 'com.fasterxml.jackson.core:jackson-databind:2.8.7', optional
+    implementation 'eu.infomas:annotation-detector:latest.release'
+    implementation 'org.slf4j:slf4j-api:1.7.+'
+    implementation 'commons-lang:commons-lang:2.6'
+
+    compileOnly 'org.projectlombok:lombok:1.18.10'
+    annotationProcessor 'org.projectlombok:lombok:1.18.10'
+
+    implementation 'com.koloboke:koloboke-api-jdk8:latest.release'
+    implementation 'com.koloboke:koloboke-impl-jdk8:latest.release'
+
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.2', optional
 
     // To avoid "warning: unknown enum constant JsonTypeInfo$As.PROPERTY" type warnings
     // when using rewrite but not needing serialization functionality. We pick an old version
     // of this library so that if the user depends on an older version of Jackson, we don't 
     // inadvertently upgrade their version.
-    compile 'com.fasterxml.jackson.core:jackson-annotations:2.0.0'
+    implementation'com.fasterxml.jackson.core:jackson-annotations:2.0.0'
 
-    compile 'org.ow2.asm:asm:latest.release'
-    compile 'org.ow2.asm:asm-util:latest.release'
+    implementation'org.ow2.asm:asm:latest.release'
+    implementation'org.ow2.asm:asm-util:latest.release'
 
-    testCompile 'junit:junit:4.+'
-    testCompile 'ch.qos.logback:logback-classic:1.0.13'
-    testCompile 'org.assertj:assertj-core:latest.release'
+    implementation 'com.google.code.findbugs:jsr305:latest.release'
+
+    testImplementation 'org.jetbrains.kotlin:kotlin-reflect'
+    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+
+    testImplementation 'junit:junit:4.+'
+    testImplementation 'ch.qos.logback:logback-classic:1.0.13'
+    testImplementation 'org.assertj:assertj-core:latest.release'
 }
 
 tasks.withType(Javadoc) {
@@ -55,36 +71,53 @@ tasks.withType(Javadoc) {
 
 // Replaces the main artifact by removing the classifier for the shadow jar, and replacing jar with shadowJar
 // Relocated dependencies are removed from the generated pom
-shadowJar {
-    configurations = [project.configurations.compileShaded]
-    classifier = 'jdkbundle'
+//shadowJar {
+//    configurations = [project.configurations.shadow]
+//    archiveClassifier.set('jdkbundle')
+//
+////    minimize()
+//
+//    exclude 'sun/**/*'
+//    exclude 'org/relaxng/**/*'
+//    exclude 'META-INF/services/*'
+//    exclude 'com/sun/xml/**/*'
+//    exclude 'com/sun/jarsigner/**/*'
+//    exclude 'com/sun/javadoc/**/*'
+//    exclude 'com/sun/istack/**/*'
+//    exclude 'com/sun/xml/**/*'
+//
+//    relocate 'com.sun', 'com.netflix.rewrite.shaded.com.sun'
+//    relocate 'org.eclipse.jgit', 'com.netflix.rewrite.shaded.org.eclipse.jgit'
+//    relocate 'org.apache.http', 'com.netflix.rewrite.shaded.org.apache.http'
+//    relocate 'org.antlr', 'com.netflix.rewrite.shaded.org.antlr4'
+//    relocate 'com.ibm.icu', 'com.netflix.rewrite.shaded.com.ibm.icu'
+//    relocate 'org.stringtemplate', 'com.netflix.rewrite.shaded.org.stringtemplate'
+//    relocate 'org.glassfish', 'com.netflix.rewrite.shaded.org.glassfish'
+//
+//    mergeServiceFiles {
+//        exclude 'META-INF/services/com.sun.*'
+//    }
+//}
 
-    exclude 'sun/**/*'
-    exclude 'org/relaxng/**/*'
-    exclude 'META-INF/services/*'
-    exclude 'com/sun/xml/**/*'
-    exclude 'com/sun/jarsigner/**/*'
-    exclude 'com/sun/javadoc/**/*'
-    exclude 'com/sun/istack/**/*'
-    exclude 'com/sun/xml/**/*'
+//publishing {
+//    publications {
+//        nebula(MavenPublication) {
+//            artifact shadowJar {
+//                archiveClassifier.set('jdkbundle')
+//            }
+//        }
+//    }
+//}
 
-    relocate 'com.sun', 'com.netflix.devinsight.shaded.com.sun'
-    relocate 'org.eclipse.jgit', 'com.netflix.devinsight.shaded.org.eclipse.jgit'
-    relocate 'org.apache.http', 'com.netflix.devinsight.shaded.org.apache.http'
-    relocate 'org.antlr.v4', 'com.netflix.devinsight.shaded.org.antlr4.v4'
-
-    mergeServiceFiles {
-        exclude 'META-INF/services/com.sun.*'
-    }
+compileJava {
+    options.setFork(true)
+    options.forkOptions.executable = "javac"
+    options.compilerArgs.addAll([
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+            '--add-exports', 'jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED'
+    ])
 }
-
-publishing {
-    publications {
-        nebula(MavenPublication) {
-            artifact shadowJar {
-                classifier = 'jdkbundle'
-            }
-        }
-    }
-}
-

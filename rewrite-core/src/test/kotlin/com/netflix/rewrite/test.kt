@@ -15,18 +15,29 @@
  */
 package com.netflix.rewrite
 
-import com.netflix.rewrite.ast.Tr
+import com.netflix.rewrite.tree.Statement
+import com.netflix.rewrite.tree.Tr
+import com.netflix.rewrite.tree.Type
+import com.netflix.rewrite.tree.TypeUtils
 import org.junit.Assert.assertEquals
 
 /**
  * The first statement of the first method in the first class declaration
  */
-fun Tr.CompilationUnit.firstMethodStatement() =
-        classes[0].methods()[0].body!!.statements[0]
+fun Tr.CompilationUnit.firstMethodStatement(): Statement =
+        classes[0].methods[0].body!!.statements[0]
 
 fun Tr.CompilationUnit.fields(ns: IntRange = 0..0) =
-        classes[0].fields().subList(ns.start, ns.endInclusive + 1)
+        classes[0].fields.subList(ns.first, ns.last + 1)
 
 fun assertRefactored(cu: Tr.CompilationUnit, refactored: String) {
-    assertEquals(refactored.trimMargin(), cu.printTrimmed())
+    assertEquals(refactored.trimIndent(), cu.printTrimmed())
 }
+
+fun Type?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
+
+fun Type?.asClass(): Type.Class? = TypeUtils.asClass(this)
+
+fun Type?.asArray(): Type.Array? = TypeUtils.asArray(this)
+
+fun Type?.asGeneric(): Type.GenericTypeVariable? = TypeUtils.asGeneric(this)

@@ -42,14 +42,14 @@ Install the dependency from Maven Central or JCenter with:
 <dependency>
     <groupId>com.netflix.devinsight.rewrite</groupId>
     <artifactId>rewrite-core</artifactId>
-    <version>1.2.0</version>
+    <version>1.5.0</version>
 </dependency>
 ```
 
 or
 
 ```groovy
-compile 'com.netflix.devinsight.rewrite:rewrite-core:1.2.0'
+compile 'com.netflix.devinsight.rewrite:rewrite-core:1.5.0'
 ```
 
 Add the Maven or Gradle classifier `jdkbundle` to fetch a version of the package that package relocates and shades the relevant parts of the JDK needed for parsing into the distribution.
@@ -77,7 +77,7 @@ Below is a simple example of a refactoring operation that changes the name of a 
 
 ```java
 public class ChangeMethodNameTestJava {
-    Parser parser = new OracleJdkParser(); // pass binary dependencies to this constructor on a real project
+    Parser parser = new OpenJdkParser(); // pass binary dependencies to this constructor on a real project
 
     @Test
     public void refactorMethodName() {
@@ -96,9 +96,9 @@ public class ChangeMethodNameTestJava {
 }
 ```
 
-First, we construct a `Parser` instance, in this case an `OracleJdkParser` which will tightly control the parsing and type attribution phases of the standard
-Oracle JDK to produce an abstract syntax tree (AST) that we can work with. If we were working with a real project, we would pass a `List<Path>` of the binary
-dependencies of the project to the `OracleJdkParser` constructor.
+First, we construct a `Parser` instance, in this case an `OpenJdkParser` which will tightly control the parsing and type attribution phases of the standard
+Open JDK to produce an abstract syntax tree (AST) that we can work with. If we were working with a real project, we would pass a `List<Path>` of the binary
+dependencies of the project to the `OpenJdkParser` constructor.
 
 Next, we use the parser to parse some source code. Typically, you would pass a `List<Path>` of all the source files in the project, and `parse` would return
 a `List<Tr.CompilationUnit>` representing the ASTs of each source file in order. Here we are using a convenience utility that is especially handy while writing
