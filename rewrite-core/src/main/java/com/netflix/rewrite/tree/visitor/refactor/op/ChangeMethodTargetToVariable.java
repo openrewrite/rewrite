@@ -19,7 +19,6 @@ import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import com.sun.tools.javac.code.Flags;
 import lombok.AllArgsConstructor;
 
 import java.util.LinkedHashSet;

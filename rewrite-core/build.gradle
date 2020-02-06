@@ -121,3 +121,7 @@ compileJava {
             '--add-exports', 'jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED'
     ])
 }
+
+javadoc {
+    exclude '**/OpenJdkParser**'
+}
