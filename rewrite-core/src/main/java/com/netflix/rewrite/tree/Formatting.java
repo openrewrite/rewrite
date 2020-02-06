@@ -44,7 +44,7 @@ public abstract class Formatting implements Serializable {
     /**
      * Formatting should be inferred and reified from surrounding context
      */
-    public static Formatting INFER = new Formatting() {
+    public static final Formatting INFER = new Formatting() {
         @Override
         public Reified withPrefix(String prefix) {
             return format(prefix);
@@ -56,7 +56,7 @@ public abstract class Formatting implements Serializable {
         }
     };
 
-    public static Formatting NONE = new Formatting() {
+    public static final Formatting NONE = new Formatting() {
         @Override
         public Reified withPrefix(String prefix) {
             return format(prefix);

@@ -25,7 +25,7 @@ abstract class LabelTest(p: Parser): Parser by p {
     
     @Test
     fun labeledWhileLoop() {
-        var orig = """
+        val orig = """
             |public class A {
             |    public void test() {
             |        labeled: while(true) {

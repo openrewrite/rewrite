@@ -33,7 +33,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 public class TransformVisitor extends CursorAstVisitor<Tree> {
-    private static Logger logger = LoggerFactory.getLogger(TransformVisitor.class);
+    private static final Logger logger = LoggerFactory.getLogger(TransformVisitor.class);
 
     Iterable<AstTransform<?>> transformations;
 

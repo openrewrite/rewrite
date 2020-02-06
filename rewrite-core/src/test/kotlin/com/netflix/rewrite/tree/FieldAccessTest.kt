@@ -18,7 +18,6 @@ package com.netflix.rewrite.tree
 import com.netflix.rewrite.fields
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.*
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
 abstract class FieldAccessTest(p: Parser): Parser by p {

@@ -49,7 +49,7 @@ open class ReorderMethodArgumentsTest : Parser by OpenJdkParser() {
         val cu = parse(b, a)
         val fixed = cu.refactor().apply {
             cu.findMethodCalls("a.A foo(..)").forEach {
-                it.args.args.firstOrNull()?.let { changeLiteral(listOf(it)) { "anotherstring" } }
+                it.args.args.firstOrNull()?.let { arg -> changeLiteral(listOf(arg)) { "anotherstring" } }
                 reorderArguments(it, "n", "m", "s")
             }
         }.fix()

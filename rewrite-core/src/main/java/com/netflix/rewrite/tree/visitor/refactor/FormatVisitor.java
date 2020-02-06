@@ -53,9 +53,8 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
 
             if (im.getFormatting() == Formatting.INFER) {
                 if (im == lastImport) {
-                    cu.getClasses().stream().findAny().ifPresent(clazz -> {
-                        changes.addAll(blankLinesBefore(clazz, 2));
-                    });
+                    cu.getClasses().stream().findAny().ifPresent(clazz ->
+                            changes.addAll(blankLinesBefore(clazz, 2)));
                     if (cu.getImports().size() > 1) {
                         changes.addAll(blankLinesBefore(im, 1));
                     }

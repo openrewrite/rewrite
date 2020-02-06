@@ -43,7 +43,7 @@ abstract class MemberReferenceTest(p: Parser): Parser by p {
         val memberRefLatch = CountDownLatch(1)
 
         object: AstVisitor<Unit?>() {
-            override fun defaultTo(t: Tree?) = null
+            override fun defaultTo(t: Tree?): Nothing? = null
 
             override fun visitMemberReference(memberRef: Tr.MemberReference): Unit? {
                 memberRefLatch.countDown()

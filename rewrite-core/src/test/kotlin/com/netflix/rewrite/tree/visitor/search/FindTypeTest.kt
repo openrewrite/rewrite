@@ -22,7 +22,7 @@ import org.junit.Test
 
 open class FindTypeTest : Parser by OpenJdkParser() {
 
-    val a1 = """
+    private val a1 = """
         package a;
         public class A1 extends Exception {
             public static void stat() {}

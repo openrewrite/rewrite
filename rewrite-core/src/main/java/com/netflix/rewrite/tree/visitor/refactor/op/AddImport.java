@@ -33,7 +33,7 @@ import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
 public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
-    static Comparator<String> packageComparator = (p1, p2) -> {
+    static final Comparator<String> packageComparator = (p1, p2) -> {
         var p1s = p1.split("\\.");
         var p2s = p2.split("\\.");
 
@@ -67,6 +67,7 @@ public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
     Tr.CompilationUnit cu;
 
     @NonFinal
+    final
     Type.Class classType;
 
     public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {

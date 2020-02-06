@@ -46,7 +46,6 @@ import java.util.stream.Stream;
 
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.AssignOp.Operator.*;
-import static com.netflix.rewrite.tree.Tr.VariableDecls;
 import static com.netflix.rewrite.tree.Type.Primitive.Method;
 import static com.netflix.rewrite.tree.TypeUtils.asClass;
 import static java.lang.Math.max;
@@ -57,7 +56,7 @@ import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 
 public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tree.Tree, Formatting.Reified> {
-    private static Logger logger = LoggerFactory.getLogger(OpenJdkParserVisitor.class);
+    private static final Logger logger = LoggerFactory.getLogger(OpenJdkParserVisitor.class);
 
     private final Path path;
     private final String source;
@@ -863,7 +862,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                     format(dimensionPrefix, (i == node.getDimensions().size() - 1 && node.getInitializers() != null) ? sourceBefore("}") : "")));
         }
 
-        var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)\\]").matcher(source);
+        var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
             var ws = new Tr.Empty(randomId(), format(matcher.group(2)));
@@ -1151,7 +1150,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         }
 
         Supplier<List<VariableDecls.Dimension>> dimensions = () -> {
-            var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)\\]").matcher(source);
+            var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
             List<Tr.VariableDecls.Dimension> dims = new ArrayList<>();
             while (matcher.find(cursor)) {
                 cursor(matcher.end());
@@ -1349,7 +1348,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
      * --------------
      */
 
-    private Map<Long, Flag> flagMasks = Map.of(
+    private final Map<Long, Flag> flagMasks = Map.of(
             1L, Flag.Public,
             1L << 1, Flag.Private,
             1L << 2, Flag.Protected,

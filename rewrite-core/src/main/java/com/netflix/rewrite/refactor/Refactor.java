@@ -226,12 +226,10 @@ public class Refactor {
         for (RefactorOperation op : ops) {
             var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
             List<AstTransform<?>> transformations = new ArrayList<>(op.getVisitor().visit(target));
-            var transformed = new TransformVisitor(transformations).visit(acc);
+            acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
             transformations.stream()
                     .collect(Collectors.groupingBy(AstTransform::getName, counting()))
-                    .forEach((name, count) -> {
-                        stats.merge(name, count, Long::sum);
-                    });
+                    .forEach((name, count) -> stats.merge(name, count, Long::sum));
         }
 
         return stats;

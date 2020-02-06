@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.tree.visitor.refactor.op;
 
+import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.TypeUtils;
@@ -46,6 +47,7 @@ public class ChangeFieldType extends RefactorVisitor<Tr.VariableDecls> {
         Type.Class originalType = TypeUtils.asClass(multiVariable.getTypeExpr().getType());
 
         return originalType != null && originalType.getFullyQualifiedName().equals(targetType) ? emptyList() :
-                transform(mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type, mv.getTypeExpr().getFormatting())));
+                transform(mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
+                        mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting())));
     }
 }
