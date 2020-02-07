@@ -24,9 +24,9 @@ import java.util.function.Function;
 
 @FieldDefaults(makeFinal = true)
 @Data
-public class AstTransform<T extends Tree> {
+public class AstTransform {
     UUID id;
     String name;
-    Class<T> treeType;
-    Function<T, T> mutation;
+    Class<Tree> treeType;
+    Function<Tree, Tree> mutation;
 }

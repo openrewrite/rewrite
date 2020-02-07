@@ -28,7 +28,7 @@ import java.util.Set;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 @AllArgsConstructor
-public class ChangeMethodTargetToVariable extends RefactorVisitor<Tr.MethodInvocation> {
+public class ChangeMethodTargetToVariable extends RefactorVisitor {
     String varName;
 
     @Nullable
@@ -40,8 +40,8 @@ public class ChangeMethodTargetToVariable extends RefactorVisitor<Tr.MethodInvoc
     }
 
     @Override
-    public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(m -> {
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
+        return transform(method, m -> {
             Expression select = m.getSelect();
 
             Type.Method type = null;

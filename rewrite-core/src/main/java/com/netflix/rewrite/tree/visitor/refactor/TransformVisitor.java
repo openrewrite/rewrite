@@ -35,9 +35,9 @@ import static java.util.stream.StreamSupport.stream;
 public class TransformVisitor extends CursorAstVisitor<Tree> {
     private static final Logger logger = LoggerFactory.getLogger(TransformVisitor.class);
 
-    Iterable<AstTransform<?>> transformations;
+    Iterable<AstTransform> transformations;
 
-    public TransformVisitor(Iterable<AstTransform<?>> transformations) {
+    public TransformVisitor(Iterable<AstTransform> transformations) {
         this.transformations = transformations;
     }
 
@@ -448,15 +448,15 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
      * Apply transformations at just this level of the tree. It is the responsibility of each visitXX method to determine
      * which nested levels we should attempt transformations on as well.
      */
+    @SuppressWarnings("unchecked")
     private <T extends Tree> T transformShallow(T tree) {
-        @SuppressWarnings("unchecked") List<AstTransform<T>> filteredTransforms = stream(transformations.spliterator(), false)
+        List<AstTransform> filteredTransforms = stream(transformations.spliterator(), false)
                 .filter(t -> t.getId().equals(getCursor().getTree().getId()))
                 .filter(t -> t.getTreeType().isInstance(tree))
-                .map(t -> (AstTransform<T>) t)
                 .collect(toList());
 
-        T mutation = tree;
-        for (AstTransform<T> trans : filteredTransforms) {
+        Tree mutation = tree;
+        for (AstTransform trans : filteredTransforms) {
             if (logger.isDebugEnabled()) {
                 logger.debug("Transforming " + mutation.getClass().getSimpleName() + " with " + trans.getName());
                 logger.debug("Original: ");
@@ -471,7 +471,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
             }
         }
 
-        return mutation;
+        return (T) mutation;
     }
 
     @SuppressWarnings("unchecked")

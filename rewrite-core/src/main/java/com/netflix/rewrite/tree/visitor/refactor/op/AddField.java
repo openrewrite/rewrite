@@ -29,7 +29,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 @AllArgsConstructor
-public class AddField extends RefactorVisitor<Tr.Block<? extends Tree>> {
+public class AddField extends RefactorVisitor {
     List<Tr.Modifier> modifiers;
     String clazz;
     String name;
@@ -42,9 +42,8 @@ public class AddField extends RefactorVisitor<Tr.Block<? extends Tree>> {
         return "add-field";
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
-    public List<AstTransform<Tr.Block<? extends Tree>>> visitClassDecl(Tr.ClassDecl classDecl) {
+    public List<AstTransform> visitClassDecl(Tr.ClassDecl classDecl) {
         var classType = Type.Class.build(clazz);
         var newField = new Tr.VariableDecls(randomId(),
                 emptyList(),
@@ -63,7 +62,7 @@ public class AddField extends RefactorVisitor<Tr.Block<? extends Tree>> {
         );
 
         return transform(classDecl.getBody(), block -> {
-            List statements = new ArrayList<>(block.getStatements().size() + 1);
+            List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
             statements.add(newField);
             statements.addAll(block.getStatements());
             return block.withStatements(statements);

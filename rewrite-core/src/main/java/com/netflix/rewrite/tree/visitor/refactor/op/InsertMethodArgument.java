@@ -31,7 +31,7 @@ import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 @AllArgsConstructor
-public class InsertMethodArgument extends RefactorVisitor<Tr.MethodInvocation> {
+public class InsertMethodArgument extends RefactorVisitor {
     int pos;
     String source;
 
@@ -41,8 +41,8 @@ public class InsertMethodArgument extends RefactorVisitor<Tr.MethodInvocation> {
     }
 
     @Override
-    public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(m -> {
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
+        return transform(method, m -> {
             List<Expression> modifiedArgs = m.getArgs().getArgs().stream()
                     .filter(a -> !(a instanceof Tr.Empty))
                     .collect(Collectors.toCollection(ArrayList::new));

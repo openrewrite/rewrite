@@ -40,6 +40,17 @@ public class Cursor {
         return new CursorIterator(this);
     }
 
+    public Tr.CompilationUnit getParentCompilationUnit() {
+        Iterator<Tree> path = getPath();
+        while(path.hasNext()) {
+            Tree next = path.next();
+            if(next instanceof Tr.CompilationUnit) {
+                return (Tr.CompilationUnit) next;
+            }
+        }
+        throw new IllegalStateException("Expected to find a Tr.CompilationUnit in " + this);
+    }
+
     private static class CursorIterator implements Iterator<Tree> {
         @NonFinal
         Cursor cursor;

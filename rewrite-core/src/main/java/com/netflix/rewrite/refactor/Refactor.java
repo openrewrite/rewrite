@@ -61,12 +61,12 @@ public class Refactor {
     // Custom refactoring visitors
     // -------------
 
-    public <T extends Tree> Refactor run(T t, RefactorVisitor<T> visitor) {
+    public Refactor run(Tree t, RefactorVisitor visitor) {
         addOp(t, visitor);
         return this;
     }
 
-    public <T extends Tree> Refactor run(RefactorVisitor<T> visitor) {
+    public Refactor run(RefactorVisitor visitor) {
         addOp(visitor);
         return this;
     }
@@ -229,7 +229,7 @@ public class Refactor {
         Tr.CompilationUnit acc = original;
         for (RefactorOperation op : ops) {
             var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
-            List<AstTransform<?>> transformations = new ArrayList<>(op.getVisitor().visit(target));
+            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
             acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
             transformations.stream()
                     .collect(Collectors.groupingBy(AstTransform::getName, counting()))
@@ -248,7 +248,7 @@ public class Refactor {
             var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
 
             // by transforming the AST for each op, we allow for the possibility of overlapping changes
-            List<AstTransform<?>> transformations = new ArrayList<>(op.getVisitor().visit(target));
+            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
             acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
         }
 
@@ -311,11 +311,11 @@ public class Refactor {
         }
     }
 
-    private void addOp(Tree target, RefactorVisitor<?> visitor) {
+    private void addOp(Tree target, RefactorVisitor visitor) {
         ops.add(new RefactorOperation(target.getId(), visitor));
     }
 
-    private void addOp(RefactorVisitor<?> visitor) {
+    private void addOp(RefactorVisitor visitor) {
         ops.add(new RefactorOperation(original.getId(), visitor));
     }
 
@@ -327,6 +327,6 @@ public class Refactor {
 
         @Getter
         @Setter
-        RefactorVisitor<?> visitor;
+        RefactorVisitor visitor;
     }
 }

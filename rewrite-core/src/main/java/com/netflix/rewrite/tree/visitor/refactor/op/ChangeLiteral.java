@@ -17,6 +17,7 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Expression;
 import com.netflix.rewrite.tree.Tr;
+import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import lombok.AllArgsConstructor;
@@ -28,7 +29,7 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 
 @AllArgsConstructor
-public class ChangeLiteral extends RefactorVisitor<Tr.Literal> {
+public class ChangeLiteral extends RefactorVisitor {
     Function<Object, Object> transform;
 
     @Override
@@ -37,18 +38,18 @@ public class ChangeLiteral extends RefactorVisitor<Tr.Literal> {
     }
 
     @Override
-    public List<AstTransform<Tr.Literal>> visitExpression(Expression expr) {
+    public List<AstTransform> visitExpression(Expression expr) {
         return nested.visit(expr);
     }
 
-    private RefactorVisitor<Tr.Literal> nested = new RefactorVisitor<>() {
+    private RefactorVisitor nested = new RefactorVisitor() {
         @Override
         protected String getRuleName() {
             return ChangeLiteral.this.getRuleName();
         }
 
         @Override
-        public List<AstTransform<Tr.Literal>> visitLiteral(Tr.Literal literal) {
+        public List<AstTransform> visitLiteral(Tr.Literal literal) {
             var transformed = transform.apply(literal.getValue());
             if(transformed == literal.getValue() || literal.getType() == null) {
                 return emptyList();
@@ -101,7 +102,7 @@ public class ChangeLiteral extends RefactorVisitor<Tr.Literal> {
                     transformedSource = "";
             }
 
-            return transform(l -> l.withValue(transformed).withValueSource(transformedSource));
+            return transform(literal, l -> l.withValue(transformed).withValueSource(transformedSource));
         }
     };
 }

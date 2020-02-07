@@ -29,7 +29,7 @@ import java.util.List;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 @AllArgsConstructor
-public class DeleteMethodArgument extends RefactorVisitor<Tr.MethodInvocation> {
+public class DeleteMethodArgument extends RefactorVisitor {
     int pos;
 
     @Override
@@ -38,10 +38,10 @@ public class DeleteMethodArgument extends RefactorVisitor<Tr.MethodInvocation> {
     }
 
     @Override
-    public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
         if(method.getArgs().getArgs().stream().filter(arg -> !(arg instanceof Tr.Empty)).count() > pos) {
-            return transform(m -> {
-                List<Expression> args = new ArrayList<>(method.getArgs().getArgs());
+            return transform(method, m -> {
+                List<Expression> args = new ArrayList<>(m.getArgs().getArgs());
                 args.remove(pos);
                 if(args.isEmpty()) {
                     args = Collections.singletonList(new Tr.Empty(randomId(), Formatting.EMPTY));

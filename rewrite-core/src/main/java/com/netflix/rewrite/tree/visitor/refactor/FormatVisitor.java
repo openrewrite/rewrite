@@ -35,7 +35,7 @@ import static java.util.stream.IntStream.range;
  * <p>
  * Emits a side-effect of mutating formatting on tree nodes as necessary
  */
-public class FormatVisitor extends RefactorVisitor<Tree> {
+public class FormatVisitor extends RefactorVisitor {
     private FindIndentVisitor wholeSourceIndentVisitor = new FindIndentVisitor(0);
 
     @Override
@@ -44,11 +44,11 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
     }
 
     @Override
-    public List<AstTransform<Tree>> visitCompilationUnit(Tr.CompilationUnit cu) {
+    public List<AstTransform> visitCompilationUnit(Tr.CompilationUnit cu) {
         wholeSourceIndentVisitor.reset();
         wholeSourceIndentVisitor.visit(cu);
 
-        List<AstTransform<Tree>> changes = new ArrayList<>();
+        List<AstTransform> changes = new ArrayList<>();
 
         List<Tr.Import> imports = cu.getImports();
         for (int i = 0; i < imports.size(); i++) {
@@ -83,14 +83,14 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
             }
         }
 
-        List<AstTransform<Tree>> all = new ArrayList<>(super.visitCompilationUnit(cu));
+        List<AstTransform> all = new ArrayList<>(super.visitCompilationUnit(cu));
         all.addAll(changes);
         return all;
     }
 
     @Override
-    public List<AstTransform<Tree>> visitBlock(Tr.Block<Tree> block) {
-        List<AstTransform<Tree>> changes = super.visitBlock(block);
+    public List<AstTransform> visitBlock(Tr.Block<Tree> block) {
+        List<AstTransform> changes = super.visitBlock(block);
 
         if (block.getStatements().stream().anyMatch(t -> t.getFormatting() == INFER)) {
             Function<Tree, Tree> indentTransform = indentStatements(block.getStatements(), blockEnclosingIndent(block));
@@ -105,13 +105,13 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
     }
 
     @Override
-    public List<AstTransform<Tree>> visitMultiVariable(Tr.VariableDecls multiVariable) {
+    public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
         if (multiVariable.getFormatting() == Formatting.INFER) {
             // we make a simplifying assumption here that inferred variable
             // declaration formatting comes only from added fields
             @SuppressWarnings("ConstantConditions") Tr.Block<?> classBody = (Tr.Block<?>) getCursor().getParent().getTree();
-            List<AstTransform<Tree>> all = new ArrayList<>(super.visitMultiVariable(multiVariable));
-            all.addAll(transform(indentStatements(classBody.getStatements(), blockEnclosingIndent(classBody))));
+            List<AstTransform> all = new ArrayList<>(super.visitMultiVariable(multiVariable));
+            all.addAll(transform(multiVariable, indentStatements(classBody.getStatements(), blockEnclosingIndent(classBody))));
             return all;
         }
 
@@ -134,7 +134,7 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
                 t.withFormatting(format("\n    ")); // default formatting of 4 spaces
     }
 
-    private List<AstTransform<Tree>> blankLinesBefore(Tree t, int n) {
+    private List<AstTransform> blankLinesBefore(Tree t, int n) {
         if (t == null) {
             return emptyList();
         }

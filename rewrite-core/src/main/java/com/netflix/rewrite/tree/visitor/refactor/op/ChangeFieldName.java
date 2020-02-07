@@ -22,11 +22,11 @@ import lombok.AllArgsConstructor;
 
 import java.util.List;
 
-import static com.netflix.rewrite.tree.Tr.randomId;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 
 @AllArgsConstructor
-public class ChangeFieldName extends RefactorVisitor<Tr.VariableDecls> {
+public class ChangeFieldName extends RefactorVisitor {
     String name;
 
     @Override
@@ -36,7 +36,7 @@ public class ChangeFieldName extends RefactorVisitor<Tr.VariableDecls> {
 
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
-    public List<AstTransform<Tr.VariableDecls>> visitMultiVariable(Tr.VariableDecls multiVariable) {
+    public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
         if(multiVariable.getVars().size() > 1) {
             // change field name is not supported on multi-variable declarations
             return emptyList();
@@ -45,6 +45,6 @@ public class ChangeFieldName extends RefactorVisitor<Tr.VariableDecls> {
         var v = multiVariable.getVars().stream().findAny().get();
         return v.getSimpleName().equals(name) ?
                 emptyList() :
-                transform(mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
+                transform(multiVariable, mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
     }
 }

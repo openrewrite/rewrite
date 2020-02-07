@@ -31,7 +31,7 @@ import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
-public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
+public class RemoveImport extends RefactorVisitor {
     String clazz;
     MethodMatcher methodMatcher;
     Type.Class classType;
@@ -62,7 +62,7 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitImport(Tr.Import impoort) {
+    public List<AstTransform> visitImport(Tr.Import impoort) {
         if (impoort.isStatic()) {
             if (impoort.getQualid().getTarget().printTrimmed().equals(clazz)) {
                 if ("*".equals(impoort.getQualid().getSimpleName())) {
@@ -83,7 +83,7 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitTypeName(NameTree name) {
+    public List<AstTransform> visitTypeName(NameTree name) {
         Type.Class asClass = TypeUtils.asClass(name.getType());
         if (asClass != null && asClass.getPackageName().equals(classType.getPackageName())) {
             referencedTypes.add(asClass.getFullyQualifiedName());
@@ -92,7 +92,7 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitMethodInvocation(Tr.MethodInvocation method) {
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
         if (methodMatcher.matches(method) && method.getType() != null &&
                 method.getType().getDeclaringType().getFullyQualifiedName().equals(clazz)) {
             referencedMethods.add(method.getName());
@@ -101,20 +101,20 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitEnd() {
-        List<AstTransform<Tr.CompilationUnit>> deletes = new ArrayList<>();
+    public List<AstTransform> visitEnd() {
+        List<AstTransform> deletes = new ArrayList<>();
         classImportDeletions(deletes);
         staticImportDeletions(deletes);
         return deletes;
     }
 
-    private void classImportDeletions(List<AstTransform<Tr.CompilationUnit>> deletes) {
+    private void classImportDeletions(List<AstTransform> deletes) {
         if (namedImport != null && referencedTypes.stream().noneMatch(t -> t.equals(clazz))) {
             deletes.addAll(delete(namedImport));
         } else if (starImport != null && referencedTypes.isEmpty()) {
             deletes.addAll(delete(starImport));
         } else if (starImport != null && referencedTypes.size() == 1) {
-            deletes.addAll(transform(cu -> cu
+            deletes.addAll(transform(getCursor().getParentCompilationUnit(), cu -> cu
                     .withImports(cu.getImports().stream()
                             .map(i -> i == starImport ?
                                     new Tr.Import(randomId(), (Tr.FieldAccess) TreeBuilder.buildName(referencedTypes.iterator().next(), format(" ")), false, i.getFormatting()) :
@@ -126,7 +126,7 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
         }
     }
 
-    private void staticImportDeletions(List<AstTransform<Tr.CompilationUnit>> deletes) {
+    private void staticImportDeletions(List<AstTransform> deletes) {
         if(staticStarImport != null && referencedMethods.isEmpty()) {
             deletes.addAll(delete(staticStarImport));
         }
@@ -138,8 +138,8 @@ public class RemoveImport extends RefactorVisitor<Tr.CompilationUnit> {
         }
     }
 
-    private List<AstTransform<Tr.CompilationUnit>> delete(Tr.Import impoort) {
-        return transform(cu -> cu.withImports(cu.getImports().stream()
+    private List<AstTransform> delete(Tr.Import impoort) {
+        return transform(getCursor().getParentCompilationUnit(), cu -> cu.withImports(cu.getImports().stream()
                 .filter(i -> i != impoort)
                 .collect(toList())));
     }

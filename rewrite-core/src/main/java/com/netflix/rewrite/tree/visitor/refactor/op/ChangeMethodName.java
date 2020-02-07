@@ -25,7 +25,7 @@ import java.util.List;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 @AllArgsConstructor
-public class ChangeMethodName extends RefactorVisitor<Tr.MethodInvocation> {
+public class ChangeMethodName extends RefactorVisitor {
     String name;
 
     @Override
@@ -34,7 +34,7 @@ public class ChangeMethodName extends RefactorVisitor<Tr.MethodInvocation> {
     }
 
     @Override
-    public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(m -> m.withName(m.getName().withName(name)));
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
+        return transform(method, m -> m.withName(m.getName().withName(name)));
     }
 }

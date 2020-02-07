@@ -25,7 +25,7 @@ import java.util.List;
 import static java.util.stream.Collectors.toList;
 
 @AllArgsConstructor
-public class DeleteField extends RefactorVisitor<Tr.ClassDecl> {
+public class DeleteField extends RefactorVisitor {
     Iterable<Tr.VariableDecls> deletes;
 
     @Override
@@ -34,8 +34,8 @@ public class DeleteField extends RefactorVisitor<Tr.ClassDecl> {
     }
 
     @Override
-    public List<AstTransform<Tr.ClassDecl>> visitClassDecl(Tr.ClassDecl classDecl) {
-        return transform(cd -> cd.withBody(cd.getBody().withStatements(cd.getBody().getStatements().stream()
+    public List<AstTransform> visitClassDecl(Tr.ClassDecl classDecl) {
+        return transform(classDecl, cd -> cd.withBody(cd.getBody().withStatements(cd.getBody().getStatements().stream()
                 .filter(s -> {
                     for (Tr.VariableDecls delete : deletes) {
                         if (delete == s) {

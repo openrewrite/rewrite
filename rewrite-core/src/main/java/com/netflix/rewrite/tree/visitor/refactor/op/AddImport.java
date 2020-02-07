@@ -32,7 +32,7 @@ import java.util.List;
 import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
-public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
+public class AddImport extends RefactorVisitor {
     static final Comparator<String> packageComparator = (p1, p2) -> {
         var p1s = p1.split("\\.");
         var p2s = p2.split("\\.");
@@ -83,14 +83,14 @@ public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitCompilationUnit(Tr.CompilationUnit cu) {
+    public List<AstTransform> visitCompilationUnit(Tr.CompilationUnit cu) {
         this.cu = cu;
         this.hasReferences = !new FindType(clazz).visit(cu).isEmpty();
         return super.visitCompilationUnit(cu);
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitImport(Tr.Import impoort) {
+    public List<AstTransform> visitImport(Tr.Import impoort) {
         var importedType = impoort.getQualid().getSimpleName();
 
         if (staticMethod != null) {
@@ -109,7 +109,7 @@ public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
     }
 
     @Override
-    public List<AstTransform<Tr.CompilationUnit>> visitEnd() {
+    public List<AstTransform> visitEnd() {
         if (coveredByExistingImport) {
             return emptyList();
         }
@@ -130,13 +130,13 @@ public class AddImport extends RefactorVisitor<Tr.CompilationUnit> {
                 new Tr.Import(randomId(), new Tr.FieldAccess(randomId(), classImportField, Tr.Ident.build(randomId(), staticMethod, null, Formatting.EMPTY), null, Formatting.EMPTY), true, Formatting.INFER);
 
         return lastPrior == null ?
-                transform(cu -> {
+                transform(getCursor().getParentCompilationUnit(), cu -> {
                     List<Tr.Import> imports = new ArrayList<>(cu.getImports().size() + 1);
                     imports.add(importStatementToAdd);
                     imports.addAll(cu.getImports());
                     return cu.withImports(imports);
                 }) :
-                transform(cu -> {
+                transform(getCursor().getParentCompilationUnit(), cu -> {
                     List<Tr.Import> imports = new ArrayList<>(cu.getImports().size() + 1);
                     for (Tr.Import im : cu.getImports()) {
                         imports.add(im);

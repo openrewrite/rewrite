@@ -20,7 +20,6 @@ import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
 import com.netflix.rewrite.tree.Tr
 import org.junit.Test
-import java.util.*
 
 class TransformVisitorTest : Parser by OpenJdkParser() {
     @Test
@@ -35,11 +34,11 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
         val method = a.classes[0].methods[0]
 
         val changeMethodName = { to: String ->
-            object : RefactorVisitor<Tr.MethodDecl>() {
+            object : RefactorVisitor() {
                 override fun getRuleName(): String = "rename s"
 
-                override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform<Tr.MethodDecl>> =
-                        transform { m: Tr.MethodDecl -> m.withName(m.name.withName(to)) }
+                override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform> =
+                        transform(method) { m: Tr.MethodDecl -> m.withName(m.name.withName(to)) }
             }
         }
 

@@ -29,7 +29,7 @@ import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
 @AllArgsConstructor
-public class ChangeFieldType extends RefactorVisitor<Tr.VariableDecls> {
+public class ChangeFieldType extends RefactorVisitor {
     String targetType;
 
     @Override
@@ -38,7 +38,7 @@ public class ChangeFieldType extends RefactorVisitor<Tr.VariableDecls> {
     }
 
     @Override
-    public List<AstTransform<Tr.VariableDecls>> visitMultiVariable(Tr.VariableDecls multiVariable) {
+    public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
         if(multiVariable.getTypeExpr() == null) {
             return emptyList();
         }
@@ -47,7 +47,7 @@ public class ChangeFieldType extends RefactorVisitor<Tr.VariableDecls> {
         Type.Class originalType = TypeUtils.asClass(multiVariable.getTypeExpr().getType());
 
         return originalType != null && originalType.getFullyQualifiedName().equals(targetType) ? emptyList() :
-                transform(mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
+                transform(multiVariable, mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
                         mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting())));
     }
 }

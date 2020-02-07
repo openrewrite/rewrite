@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.tree.visitor.refactor;
 
+import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 
@@ -23,30 +24,36 @@ import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.toList;
 
-public abstract class RefactorVisitor<T extends Tree> extends CursorAstVisitor<List<AstTransform<T>>> {
+public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform>> {
     @Override
-    public List<AstTransform<T>> defaultTo(Tree t) {
+    public List<AstTransform> defaultTo(Tree t) {
         return emptyList();
     }
 
     protected abstract String getRuleName();
 
-    protected List<AstTransform<T>> transform(Function<T, T> mutation) {
-        return transform(getRuleName(), mutation);
-    }
-
     @SuppressWarnings("unchecked")
-    protected List<AstTransform<T>> transform(String name, Function<T, T> mutation) {
-        return transform((T) getCursor().getTree(), name, mutation);
+    protected List<AstTransform> deleteStatementFromParentBlock(Tree t) {
+        return transform(getCursor().getParentOrThrow().getTree(),
+                containing -> {
+                    Tr.Block<Tree> block = (Tr.Block<Tree>) containing;
+                    return block
+                            .withStatements(block.getStatements().stream()
+                                    .filter(s -> s != t)
+                                    .collect(toList())
+                            );
+                }
+        );
     }
 
-    protected <U extends T> List<AstTransform<T>> transform(U target, Function<U, U> mutation) {
+    protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
         return transform(target, getRuleName(), mutation);
     }
 
     @SuppressWarnings("unchecked")
-    protected <U extends T> List<AstTransform<T>> transform(U target, String name, Function<U, U> mutation) {
-        return singletonList(new AstTransform<>(target.getId(), name, (Class<T>) target.getClass(), t -> mutation.apply((U) t)));
+    protected <U extends Tree> List<AstTransform> transform(U target, String name, Function<U, U> mutation) {
+        return singletonList(new AstTransform(target.getId(), name, (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
     }
 }

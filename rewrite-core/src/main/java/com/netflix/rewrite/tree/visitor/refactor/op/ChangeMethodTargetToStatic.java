@@ -30,7 +30,7 @@ import java.util.Set;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 @AllArgsConstructor
-public class ChangeMethodTargetToStatic extends RefactorVisitor<Tr.MethodInvocation> {
+public class ChangeMethodTargetToStatic extends RefactorVisitor {
     String clazz;
 
     @Override
@@ -39,12 +39,12 @@ public class ChangeMethodTargetToStatic extends RefactorVisitor<Tr.MethodInvocat
     }
 
     @Override
-    public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
+    public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
         var classType = Type.Class.build(clazz);
-        return transform(m -> {
+        return transform(method, m -> {
             Tr.MethodInvocation transformedMethodInvocation = m
-                    .withSelect(Tr.Ident.build(randomId(), classType.getClassName(), classType, method.getSelect() == null ?
-                            Formatting.EMPTY : method.getSelect().getFormatting()));
+                    .withSelect(Tr.Ident.build(randomId(), classType.getClassName(), classType, m.getSelect() == null ?
+                            Formatting.EMPTY : m.getSelect().getFormatting()));
 
             Type.Method transformedType = null;
             if (m.getType() != null) {
