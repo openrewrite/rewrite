@@ -16,14 +16,17 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.tree.Formatting;
+import com.netflix.rewrite.tree.Statement;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
+import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+import static com.netflix.rewrite.tree.Formatting.INFER;
 import static com.netflix.rewrite.tree.Formatting.format;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.*;
@@ -36,6 +39,11 @@ import static java.util.stream.IntStream.range;
  * Emits a side-effect of mutating formatting on tree nodes as necessary
  */
 public class FormatVisitor extends RefactorVisitor<Tree> {
+    private FindIndentVisitor wholeSourceIndentVisitor = new FindIndentVisitor();
+
+    @NonFinal
+    private boolean commonIndentIsSpaces = true;
+
     @Override
     protected String getRuleName() {
         return "format";
@@ -43,6 +51,9 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
 
     @Override
     public List<AstTransform<Tree>> visitCompilationUnit(Tr.CompilationUnit cu) {
+        wholeSourceIndentVisitor.reset();
+        wholeSourceIndentVisitor.visit(cu);
+
         List<AstTransform<Tree>> changes = new ArrayList<>();
 
         List<Tr.Import> imports = cu.getImports();
@@ -71,7 +82,7 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
                     }
                 }
 
-                if(im != firstImport && im != lastImport) {
+                if (im != firstImport && im != lastImport) {
                     changes.addAll(blankLinesBefore(im, 1));
                     changes.addAll(blankLinesBefore(imports.get(i + 1), 1));
                 }
@@ -84,52 +95,49 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
     }
 
     @Override
+    public List<AstTransform<Tree>> visitBlock(Tr.Block<Tree> block) {
+        List<AstTransform<Tree>> changes = super.visitBlock(block);
+
+        if (block.getStatements().stream().anyMatch(t -> t.getFormatting() == INFER)) {
+            Function<Tree, Tree> indentTransform = indentStatements(block.getStatements(), blockEnclosingIndent(block));
+            changes.addAll(
+                    block.getStatements().stream()
+                            .filter(t -> t.getFormatting() == INFER)
+                            .flatMap(t -> transform(t, indentTransform).stream())
+                            .collect(toList())
+            );
+        }
+        return changes;
+    }
+
+    @Override
     public List<AstTransform<Tree>> visitMultiVariable(Tr.VariableDecls multiVariable) {
         if (multiVariable.getFormatting() == Formatting.INFER) {
             // we make a simplifying assumption here that inferred variable
             // declaration formatting comes only from added fields
             @SuppressWarnings("ConstantConditions") Tr.Block<?> classBody = (Tr.Block<?>) getCursor().getParent().getTree();
-
-            var indents = classBody.getStatements().stream()
-                    .map(Tree::getFormatting)
-                    .filter(Formatting.Reified.class::isInstance)
-                    .map(Formatting.Reified.class::cast)
-                    .map(f -> {
-                        int lastNewline = f.getPrefix().lastIndexOf('\n');
-                        return lastNewline == -1 ? f.getPrefix() : f.getPrefix().substring(lastNewline);
-                    })
-                    .collect(toList());
-
-            Function<Character, Integer> indentWidth = c -> indents.stream()
-                    .collect(groupingBy(prefix -> (int) prefix.chars().filter(p -> p == c).count(), counting()))
-                    .entrySet()
-                    .stream()
-                    .max(Map.Entry.comparingByValue())
-                    .map(Map.Entry::getKey)
-                    .orElse(0);
-
-            var spaceIndent = indentWidth.apply(' ');
-            var tabIndent = indentWidth.apply('\t');
-
             List<AstTransform<Tree>> all = new ArrayList<>(super.visitMultiVariable(multiVariable));
-            all.addAll(transform(t -> {
-                        if (spaceIndent > 0) {
-                            return t.withFormatting(format(range(0, spaceIndent).mapToObj(i -> " ")
-                                    .collect(joining("", "\n", ""))));
-                        } else if (tabIndent > 0) {
-                            return t.withFormatting(format(range(0, tabIndent).mapToObj(i -> "\t")
-                                    .collect(joining("", "\n", ""))));
-                        }
-
-                        // default formatting of 4 spaces
-                        return t.withFormatting(format("\n    "));
-                    })
-            );
-
+            all.addAll(transform(indentStatements(classBody.getStatements(), blockEnclosingIndent(classBody))));
             return all;
         }
 
         return super.visitMultiVariable(multiVariable);
+    }
+
+    private Function<Tree, Tree> indentStatements(Iterable<? extends Tree> tree, int enclosingIndent) {
+        final var findIndentVisitor = new FindIndentVisitor();
+        tree.forEach(findIndentVisitor::visit);
+
+        var indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?
+                findIndentVisitor.getMostCommonIndent() : wholeSourceIndentVisitor.getMostCommonIndent();
+        var indentIsSpaces = findIndentVisitor.getTotalLines() > 0 ? findIndentVisitor.isIndentedWithSpaces() :
+                wholeSourceIndentVisitor.isIndentedWithSpaces();
+
+        return t -> indentToUse > 0 ?
+                t.withFormatting(format(range(0, indentToUse + enclosingIndent)
+                        .mapToObj(i -> indentIsSpaces ? " " : "\t")
+                        .collect(joining("", "\n", "")))) :
+                t.withFormatting(format("\n    ")); // default formatting of 4 spaces
     }
 
     private List<AstTransform<Tree>> blankLinesBefore(Tree t, int n) {
@@ -155,6 +163,10 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
         } else { // INFER, NONE
             return transform(t, t2 -> t2.withFormatting(format(blankLines(n))));
         }
+    }
+
+    private int blockEnclosingIndent(Tr.Block<?> block) {
+        return (int) block.getEndOfBlockSuffix().chars().dropWhile(c -> c == '\n' || c == '\r').count();
     }
 
     private String blankLines(Integer n) {

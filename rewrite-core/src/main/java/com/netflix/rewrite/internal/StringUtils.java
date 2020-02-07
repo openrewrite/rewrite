@@ -54,7 +54,10 @@ public class StringUtils {
                 .dropWhile(String::isEmpty)
                 .map(l -> (int) l.chars().takeWhile(Character::isWhitespace).count())
                 .collect(groupingBy(identity(), TreeMap::new, counting()));
+        return mostCommonIndent(indentFrequencies);
+    }
 
+    public static int mostCommonIndent(SortedMap<Integer, Long> indentFrequencies) {
         // the frequency with which each indent level is an integral divisor of longer indent levels
         SortedMap<Integer, Integer> indentFrequencyAsDivisors = new TreeMap<>();
         for (Map.Entry<Integer, Long> indentFrequency : indentFrequencies.entrySet()) {
