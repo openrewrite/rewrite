@@ -194,12 +194,11 @@ public class ChangeType extends RefactorVisitor<Tree> {
         return changes;
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends Tree> List<AstTransform<Tree>> transformName(T containsName, @Nullable Tree nameField, BiFunction<T, Tr.Ident, Tree> change) {
+    private <T extends Tree> List<AstTransform<Tree>> transformName(T containsName, @Nullable Tree nameField, BiFunction<T, Tr.Ident, T> change) {
         if (nameField instanceof NameTree) {
             Type.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
             if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(from)) {
-                return transform(containsName, t -> change.apply((T) t,
+                return transform(containsName, t -> change.apply(t,
                         Tr.Ident.build(randomId(), toClassType.getClassName(), toClassType, nameField.getFormatting())));
             }
         }
@@ -226,6 +225,6 @@ public class ChangeType extends RefactorVisitor<Tree> {
             transformed.add(node);
         }
 
-        return atLeastOneChanged ? transform(containsName, t -> change.apply((T) t, transformed)) : emptyList();
+        return atLeastOneChanged ? transform(containsName, t -> (T) change.apply(t, transformed)) : emptyList();
     }
 }

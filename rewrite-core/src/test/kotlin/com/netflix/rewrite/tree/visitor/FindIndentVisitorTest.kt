@@ -17,28 +17,32 @@ package com.netflix.rewrite.tree.visitor
 
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.tree.Tr
 import com.netflix.rewrite.tree.visitor.refactor.FindIndentVisitor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 open class FindIndentVisitorTest : Parser by OpenJdkParser() {
-    @Test
-    fun findIndent() {
-        val a = parse("""
-            public class A {
-                public void test() {
-                    String s;
-                }
+    val a = """
+        public class A {
+            public void test() {
+                String s;
             }
-        """.trimIndent())
+        }
+    """.trimIndent()
 
-        val findIndentVisitor = FindIndentVisitor()
-        assertEquals(4, findIndentVisitor.visit(a))
+    @Test
+    fun findIndentWholeClass() {
+        val findIndentVisitor = FindIndentVisitor(0);
+        assertEquals(4, findIndentVisitor.visit(parse(a)))
         assertTrue(findIndentVisitor.isIndentedWithSpaces)
+    }
 
-        findIndentVisitor.reset()
-        findIndentVisitor.visit(a.classes[0].methods[0])
+    @Test
+    fun findIndentInBlock() {
+        val findIndentVisitor = FindIndentVisitor(4)
+        findIndentVisitor.visit(parse(a).classes[0].methods[0])
         assertEquals(4, findIndentVisitor.mostCommonIndent)
         assertTrue(findIndentVisitor.isIndentedWithSpaces)
     }

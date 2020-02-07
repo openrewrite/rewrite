@@ -16,14 +16,11 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.tree.Formatting;
-import com.netflix.rewrite.tree.Statement;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
-import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 import static com.netflix.rewrite.tree.Formatting.INFER;
@@ -39,10 +36,7 @@ import static java.util.stream.IntStream.range;
  * Emits a side-effect of mutating formatting on tree nodes as necessary
  */
 public class FormatVisitor extends RefactorVisitor<Tree> {
-    private FindIndentVisitor wholeSourceIndentVisitor = new FindIndentVisitor();
-
-    @NonFinal
-    private boolean commonIndentIsSpaces = true;
+    private FindIndentVisitor wholeSourceIndentVisitor = new FindIndentVisitor(0);
 
     @Override
     protected String getRuleName() {
@@ -125,7 +119,7 @@ public class FormatVisitor extends RefactorVisitor<Tree> {
     }
 
     private Function<Tree, Tree> indentStatements(Iterable<? extends Tree> tree, int enclosingIndent) {
-        final var findIndentVisitor = new FindIndentVisitor();
+        final var findIndentVisitor = new FindIndentVisitor(enclosingIndent);
         tree.forEach(findIndentVisitor::visit);
 
         var indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?

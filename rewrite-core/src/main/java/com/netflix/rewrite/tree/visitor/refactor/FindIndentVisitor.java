@@ -19,6 +19,8 @@ import com.netflix.rewrite.internal.StringUtils;
 import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
+import lombok.AllArgsConstructor;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 
 import java.util.Map;
@@ -32,8 +34,11 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
+@RequiredArgsConstructor
 public class FindIndentVisitor extends CursorAstVisitor<Integer> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
+
+    private int enclosingIndent;
 
     @NonFinal
     private int linesWithSpaceIndents = 0;
@@ -54,7 +59,7 @@ public class FindIndentVisitor extends CursorAstVisitor<Integer> {
                 indentFrequencies.merge((int) prefix.chars()
                         .dropWhile(c -> c == '\n' || c == '\r')
                         .takeWhile(Character::isWhitespace)
-                        .count(),
+                        .count() - enclosingIndent,
                         1L, Long::sum);
 
                 Map<Boolean, Long> indentTypeCounts = prefix.chars().dropWhile(c -> c == '\n' || c == '\r')
@@ -84,6 +89,7 @@ public class FindIndentVisitor extends CursorAstVisitor<Integer> {
     }
 
     public int getMostCommonIndent() {
+        indentFrequencies.remove(0);
         return StringUtils.mostCommonIndent(indentFrequencies);
     }
 

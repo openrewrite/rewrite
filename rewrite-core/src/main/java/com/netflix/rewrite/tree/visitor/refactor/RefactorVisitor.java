@@ -41,12 +41,12 @@ public abstract class RefactorVisitor<T extends Tree> extends CursorAstVisitor<L
         return transform((T) getCursor().getTree(), name, mutation);
     }
 
-    protected List<AstTransform<T>> transform(T target, Function<T, T> mutation) {
+    protected <U extends T> List<AstTransform<T>> transform(U target, Function<U, U> mutation) {
         return transform(target, getRuleName(), mutation);
     }
 
     @SuppressWarnings("unchecked")
-    protected List<AstTransform<T>> transform(T target, String name, Function<T, T> mutation) {
-        return singletonList(new AstTransform<>(target.getId(), name, (Class<T>) target.getClass(), mutation));
+    protected <U extends T> List<AstTransform<T>> transform(U target, String name, Function<U, U> mutation) {
+        return singletonList(new AstTransform<>(target.getId(), name, (Class<T>) target.getClass(), t -> mutation.apply((U) t)));
     }
 }

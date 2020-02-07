@@ -16,12 +16,20 @@
 package com.netflix.rewrite.tree;
 
 import com.netflix.rewrite.internal.lang.Nullable;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.experimental.NonFinal;
 
 import java.util.Iterator;
+import java.util.Spliterators;
+import java.util.stream.Collectors;
 
-@Data
+import static java.util.stream.StreamSupport.stream;
+
+@EqualsAndHashCode
+@AllArgsConstructor
 public class Cursor {
     @Nullable
     Cursor parent;
@@ -79,5 +87,31 @@ public class Cursor {
             }
         }
         return null;
+    }
+
+    @Override
+    public String toString() {
+        return "Cursor{" +
+                stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
+                    .map(t -> t.getClass().getSimpleName())
+                    .collect(Collectors.joining("->"))
+                + "}";
+    }
+
+    @Nullable
+    public Cursor getParent() {
+        return parent;
+    }
+
+    public Cursor getParentOrThrow() {
+        if(parent == null) {
+            throw new IllegalStateException("Expected to find a parent for " + this);
+        }
+        return parent;
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Tree> T getTree() {
+        return (T) tree;
     }
 }

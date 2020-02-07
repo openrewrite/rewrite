@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.netflix.rewrite.internal.StringUtils;
 import com.netflix.rewrite.internal.lang.Nullable;
@@ -22,7 +23,11 @@ import com.netflix.rewrite.tree.visitor.AstVisitor;
 import com.netflix.rewrite.tree.visitor.PrintVisitor;
 import com.netflix.rewrite.tree.visitor.RetrieveCursorVisitor;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
+
+import static java.util.Collections.emptyList;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface Tree {

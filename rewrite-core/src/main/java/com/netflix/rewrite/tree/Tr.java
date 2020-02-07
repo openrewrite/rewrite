@@ -31,6 +31,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -187,6 +189,11 @@ public abstract class Tr implements Serializable, Tree {
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitAssign(this), v.visitExpression(this));
         }
+
+        @Override
+        public List<Tree> getSideEffects() {
+            return singletonList(this);
+        }
     }
 
     @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
@@ -211,6 +218,11 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitAssignOp(this), v.visitExpression(this));
+        }
+
+        @Override
+        public List<Tree> getSideEffects() {
+            return singletonList(this);
         }
 
         @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
@@ -338,6 +350,14 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitBinary(this), v.visitExpression(this));
+        }
+
+        @Override
+        public List<Tree> getSideEffects() {
+            List<Tree> sideEffects = new ArrayList<>(2);
+            sideEffects.addAll(left.getSideEffects());
+            sideEffects.addAll(right.getSideEffects());
+            return sideEffects;
         }
 
         @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
@@ -978,6 +998,11 @@ public abstract class Tr implements Serializable, Tree {
             return name.getSimpleName();
         }
 
+        @Override
+        public List<Tree> getSideEffects() {
+            return target.getSideEffects();
+        }
+
         /**
          * Make debugging a bit easier
          */
@@ -1535,6 +1560,11 @@ public abstract class Tr implements Serializable, Tree {
             return name.getSimpleName();
         }
 
+        @Override
+        public List<Tree> getSideEffects() {
+            return singletonList(this);
+        }
+
         @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -1761,6 +1791,11 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitNewClass(this), v.visitExpression(this));
         }
 
+        @Override
+        public List<Tree> getSideEffects() {
+            return singletonList(this);
+        }
+
         @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -1846,6 +1881,11 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitParentheses(this), v.visitExpression(this));
+        }
+
+        @Override
+        public List<Tree> getSideEffects() {
+            return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
         }
 
         @Override
@@ -2136,6 +2176,11 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitUnary(this), v.visitExpression(this));
+        }
+
+        @Override
+        public List<Tree> getSideEffects() {
+            return expr.getSideEffects();
         }
 
         @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)

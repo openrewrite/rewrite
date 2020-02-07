@@ -35,4 +35,13 @@ public abstract class CursorAstVisitor<R> extends AstVisitor<R> {
         cursor = cursor.getParent();
         return t;
     }
+
+    public <T extends Tree> T retrieve(T original) {
+        return retrieve(original, cursor.getParentOrThrow().getTree());
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T extends Tree> T retrieve(T original, Tree containedWithin) {
+        return (T) new RetrieveTreeVisitor(original.getId()).visit(containedWithin);
+    }
 }

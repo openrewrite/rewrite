@@ -80,7 +80,11 @@ public class Refactor {
     }
 
     public Refactor addImport(String clazz, @Nullable String staticMethod) {
-        addOp(new AddImport(clazz, staticMethod, false));
+        return addImport(clazz, staticMethod, false);
+    }
+
+    public Refactor addImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
+        addOp(new AddImport(clazz, staticMethod, onlyIfReferenced));
         return this;
     }
 
