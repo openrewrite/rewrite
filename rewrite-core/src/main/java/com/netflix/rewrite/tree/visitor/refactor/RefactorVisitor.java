@@ -32,6 +32,14 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         return emptyList();
     }
 
+    /**
+     * Used to build up pipelines of RefactorVisitors.
+     * @return Other visitors that are run after all transformations from this visitor have taken place.
+     */
+    public List<RefactorVisitor> andThen() {
+        return emptyList();
+    }
+
     protected abstract String getRuleName();
 
     @SuppressWarnings("unchecked")

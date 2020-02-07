@@ -19,7 +19,6 @@ import com.netflix.rewrite.internal.lang.NonNullApi;
 import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.RetrieveTreeVisitor;
-import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.FormatVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
@@ -38,13 +37,15 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
-import static java.util.stream.Collectors.counting;
 import static java.util.stream.StreamSupport.stream;
 
 @NonNullApi
@@ -223,21 +224,21 @@ public class Refactor {
         return this;
     }
 
-    public Map<String, Long> stats() {
-        Map<String, Long> stats = new HashMap<>();
-
-        Tr.CompilationUnit acc = original;
-        for (RefactorOperation op : ops) {
-            var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
-            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
-            acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
-            transformations.stream()
-                    .collect(Collectors.groupingBy(AstTransform::getName, counting()))
-                    .forEach((name, count) -> stats.merge(name, count, Long::sum));
-        }
-
-        return stats;
-    }
+//    public Map<String, Long> stats() {
+//        Map<String, Long> stats = new HashMap<>();
+//
+//        Tr.CompilationUnit acc = original;
+//        for (RefactorOperation op : ops) {
+//            var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
+//            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
+//            acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
+//            transformations.stream()
+//                    .collect(Collectors.groupingBy(AstTransform::getName, counting()))
+//                    .forEach((name, count) -> stats.merge(name, count, Long::sum));
+//        }
+//
+//        return stats;
+//    }
 
     /**
      * @return Transformed version of the AST after changes are applied
@@ -245,15 +246,19 @@ public class Refactor {
     public Tr.CompilationUnit fix() {
         Tr.CompilationUnit acc = original;
         for (RefactorOperation op : ops) {
-            var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
-
-            // by transforming the AST for each op, we allow for the possibility of overlapping changes
-            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
-            acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
+            acc = transformRecursive(op.getId(), acc, op.getVisitor());
         }
 
-        return (Tr.CompilationUnit) new TransformVisitor(new ArrayList<>(new FormatVisitor().visit(acc)))
-                .visit(acc);
+        return (Tr.CompilationUnit) new TransformVisitor(new FormatVisitor().visit(acc)).visit(acc);
+    }
+
+    private Tr.CompilationUnit transformRecursive(UUID id, Tr.CompilationUnit acc, RefactorVisitor visitor) {
+        // by transforming the AST for each op, we allow for the possibility of overlapping changes
+        acc = (Tr.CompilationUnit) new TransformVisitor(visitor.visit(new RetrieveTreeVisitor(id).visit(acc))).visit(acc);
+        for (RefactorVisitor vis : visitor.andThen()) {
+            acc = transformRecursive(id, acc, vis);
+        }
+        return acc;
     }
 
     public String diff() {
