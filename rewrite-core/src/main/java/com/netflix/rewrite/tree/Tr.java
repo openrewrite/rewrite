@@ -1111,6 +1111,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitIdentifier(this), v.visitExpression(this));
         }
 
+        public Ident withName(String name) {
+            return build(id, name, getType(), formatting);
+        }
+
         @JsonCreator
         public static Ident build(@JsonProperty("id") UUID id,
                                   @JsonProperty("simpleName") String simpleName,

@@ -45,7 +45,6 @@ public class ChangeFieldName extends RefactorVisitor<Tr.VariableDecls> {
         var v = multiVariable.getVars().stream().findAny().get();
         return v.getSimpleName().equals(name) ?
                 emptyList() :
-                transform(mv -> mv.withVars(singletonList(v.withName(
-                        Tr.Ident.build(randomId(), name, v.getName().getType(), v.getName().getFormatting())))));
+                transform(mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
     }
 }

@@ -35,6 +35,6 @@ public class ChangeMethodName extends RefactorVisitor<Tr.MethodInvocation> {
 
     @Override
     public List<AstTransform<Tr.MethodInvocation>> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(m -> m.withName(Tr.Ident.build(randomId(), name, m.getName().getType(), m.getName().getFormatting())));
+        return transform(m -> m.withName(m.getName().withName(name)));
     }
 }

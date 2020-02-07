@@ -16,7 +16,7 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.parse.Parser
-import junit.framework.Assert.assertEquals
+import org.junit.Assert.assertEquals
 import org.junit.Test
 
 abstract class BodyTest(p: Parser): Parser by p {

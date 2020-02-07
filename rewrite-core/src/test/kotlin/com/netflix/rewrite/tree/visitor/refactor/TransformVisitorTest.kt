@@ -39,7 +39,7 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
                 override fun getRuleName(): String = "rename s"
 
                 override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform<Tr.MethodDecl>> =
-                        transform { m: Tr.MethodDecl -> m.withName(Tr.Ident.build(UUID.randomUUID(), to, m.name.type, m.name.formatting)) }
+                        transform { m: Tr.MethodDecl -> m.withName(m.name.withName(to)) }
             }
         }
 
