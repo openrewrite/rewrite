@@ -31,6 +31,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -50,34 +52,44 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
 
     /**
      * Used to build up pipelines of RefactorVisitors.
+     *
      * @return Other visitors that are run after all transformations from this visitor have taken place.
      */
     public Iterable<RefactorVisitor> andThen() {
         return andThen.get();
     }
 
+    protected List<AstTransform> maybeTransform(boolean shouldTransform,
+                                                List<AstTransform> callSuper,
+                                                List<AstTransform> transform) {
+        if (shouldTransform) {
+            callSuper.addAll(transform);
+        }
+        return callSuper;
+    }
+
     protected void maybeAddImport(@Nullable Type.Class clazz) {
-        if(clazz != null) {
+        if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
     }
 
     protected void maybeAddImport(String fullyQualifiedName) {
         AddImport op = new AddImport(fullyQualifiedName, null, true);
-        if(!andThen.get().contains(op)) {
+        if (!andThen.get().contains(op)) {
             andThen.get().add(op);
         }
     }
 
     protected void maybeRemoveImport(@Nullable Type.Class clazz) {
-        if(clazz != null) {
+        if (clazz != null) {
             maybeRemoveImport(clazz.getFullyQualifiedName());
         }
     }
 
     protected void maybeRemoveImport(String fullyQualifiedName) {
         RemoveImport op = new RemoveImport(fullyQualifiedName);
-        if(!andThen.get().contains(op)) {
+        if (!andThen.get().contains(op)) {
             andThen.get().add(op);
         }
     }
@@ -88,7 +100,7 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
 
     @Override
     public List<AstTransform> defaultTo(Tree t) {
-        return emptyList();
+        return new ArrayList<>();
     }
 
     protected abstract String getRuleName();
