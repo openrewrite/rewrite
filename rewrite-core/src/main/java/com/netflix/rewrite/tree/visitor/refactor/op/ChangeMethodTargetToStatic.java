@@ -21,17 +21,23 @@ import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import lombok.AllArgsConstructor;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 
-@AllArgsConstructor
-public class ChangeMethodTargetToStatic extends RefactorVisitor {
+public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
     String clazz;
+
+    public ChangeMethodTargetToStatic(UUID scope, String clazz) {
+        super(scope);
+        this.clazz = clazz;
+    }
 
     @Override
     protected String getRuleName() {
@@ -40,6 +46,10 @@ public class ChangeMethodTargetToStatic extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
+        if(!isInScope(method)) {
+            return super.visitMethodInvocation(method);
+        }
+
         var classType = Type.Class.build(clazz);
         return transform(method, m -> {
             Tr.MethodInvocation transformedMethodInvocation = m
@@ -48,6 +58,7 @@ public class ChangeMethodTargetToStatic extends RefactorVisitor {
 
             Type.Method transformedType = null;
             if (m.getType() != null) {
+                maybeRemoveImport(m.getType().getDeclaringType());
                 transformedType = m.getType().withDeclaringType(classType);
                 if (!m.getType().hasFlags(Flag.Static)) {
                     Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
@@ -58,5 +69,11 @@ public class ChangeMethodTargetToStatic extends RefactorVisitor {
 
             return transformedMethodInvocation.withType(transformedType);
         });
+    }
+
+    @Override
+    public List<AstTransform> visitEnd() {
+        maybeAddImport(clazz);
+        return super.visitEnd();
     }
 }

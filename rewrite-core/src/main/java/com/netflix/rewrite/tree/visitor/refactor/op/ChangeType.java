@@ -52,6 +52,13 @@ public class ChangeType extends RefactorVisitor {
     }
 
     @Override
+    public List<AstTransform> visitEnd() {
+        maybeAddImport(toClassType);
+        maybeRemoveImport(from);
+        return super.visitEnd();
+    }
+
+    @Override
     public List<AstTransform> visitAnnotation(Tr.Annotation annotation) {
         List<AstTransform> changes = super.visitAnnotation(annotation);
         changes.addAll(transformName(annotation, annotation.getAnnotationType(), Tr.Annotation::withAnnotationType));

@@ -18,14 +18,10 @@ package com.netflix.rewrite.refactor;
 import com.netflix.rewrite.internal.lang.NonNullApi;
 import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
-import com.netflix.rewrite.tree.visitor.RetrieveTreeVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.FormatVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
@@ -40,19 +36,16 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
-import static java.util.stream.StreamSupport.stream;
 
 @NonNullApi
 public class Refactor {
     private final Tr.CompilationUnit original;
 
-    private final List<RefactorOperation> ops = new ArrayList<>();
+    private final List<RefactorVisitor> ops = new ArrayList<>();
 
     public Refactor(Tr.CompilationUnit original) {
         this.original = original;
@@ -62,13 +55,8 @@ public class Refactor {
     // Custom refactoring visitors
     // -------------
 
-    public Refactor run(Tree t, RefactorVisitor visitor) {
-        addOp(t, visitor);
-        return this;
-    }
-
     public Refactor run(RefactorVisitor visitor) {
-        addOp(visitor);
+        ops.add(visitor);
         return this;
     }
 
@@ -85,12 +73,12 @@ public class Refactor {
     }
 
     public Refactor addImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
-        addOp(new AddImport(clazz, staticMethod, onlyIfReferenced));
+        ops.add(new AddImport(clazz, staticMethod, onlyIfReferenced));
         return this;
     }
 
     public Refactor removeImport(String clazz) {
-        addOp(new RemoveImport(clazz));
+        ops.add(new RemoveImport(clazz));
         return this;
     }
 
@@ -103,8 +91,8 @@ public class Refactor {
     }
 
     public Refactor addField(Tr.ClassDecl target, String clazz, String name, @Nullable String init) {
-        addOp(target, new AddField(Collections.singletonList(new Tr.Modifier.Private(randomId(), format("", " "))), clazz, name, init));
-        addOp(new AddImport(clazz, null, false));
+        ops.add(new AddField(target.getId(), Collections.singletonList(new Tr.Modifier.Private(randomId(), format("", " "))), clazz, name, init));
+        ops.add(new AddImport(clazz, null, false));
         return this;
     }
 
@@ -113,41 +101,32 @@ public class Refactor {
     // -------------
 
     public Refactor changeFieldType(Iterable<Tr.VariableDecls> targets, String toType) {
-        for (Tr.VariableDecls target : targets) {
-            addOp(target, new ChangeFieldType(toType));
-            if (target.getTypeExpr() != null) {
-                Type.Class asClass = TypeUtils.asClass(target.getTypeExpr().getType());
-                if (asClass != null) {
-                    removeImport(asClass.getFullyQualifiedName());
-                }
-            }
-        }
+        targets.forEach(t -> changeFieldType(t, toType));
+        return this;
+    }
 
-        if (targets.iterator().hasNext()) {
-            addImport(toType);
-        }
-
+    public Refactor changeFieldType(Tr.VariableDecls target, String toType) {
+        ops.add(new ChangeFieldType(target.getId(), toType));
         return this;
     }
 
     public Refactor changeFieldName(Iterable<Tr.VariableDecls> targets, String toName) {
-        for (Tr.VariableDecls target : targets) {
-            addOp(target, new ChangeFieldName(toName));
-        }
+        targets.forEach(t -> changeFieldName(t, toName));
         return this;
     }
 
-    @SuppressWarnings("ConstantConditions")
-    public Refactor deleteField(Iterable<Tr.VariableDecls> targets) {
-        stream(targets.spliterator(), false)
-                .filter(variable -> original.cursor(variable) != null)
-                .collect(Collectors.groupingBy(variable -> original.cursor(variable).enclosingClass()))
-                .forEach((clazz, variables) -> {
-                    addOp(clazz, new DeleteField(variables));
-                    for (Tr.VariableDecls variable : variables) {
-                        variable.getTypeAsClass().ifPresent(varType -> removeImport(varType.getFullyQualifiedName()));
-                    }
-                });
+    public Refactor changeFieldName(Tr.VariableDecls target, String toName) {
+        ops.add(new ChangeFieldName(target.getId(), toName));
+        return this;
+    }
+
+    public Refactor deleteStatement(Iterable<Statement> targets) {
+        targets.forEach(this::deleteStatement);
+        return this;
+    }
+
+    public Refactor deleteStatement(Statement statement) {
+        ops.add(new DeleteStatement(statement.getId()));
         return this;
     }
 
@@ -155,56 +134,68 @@ public class Refactor {
     // Method Refactoring
     // -------------
 
-    public Refactor changeMethodName(Iterable<Tr.MethodInvocation> targets, String toName) {
-        targets.forEach(t -> addOp(t, new ChangeMethodName(toName)));
+    public Refactor changeMethodName(Iterable<Tr.MethodInvocation> targets, String name) {
+        targets.forEach(t -> changeMethodName(t, name));
+        return this;
+    }
+
+    public Refactor changeMethodName(Tr.MethodInvocation target, String toName) {
+        ops.add(new ChangeMethodName(target.getId(), toName));
         return this;
     }
 
     public Refactor changeMethodTargetToStatic(Iterable<Tr.MethodInvocation> targets, String toClass) {
-        targets.forEach(t -> {
-            addOp(t, new ChangeMethodTargetToStatic(toClass));
-            if (t.getType() != null) {
-                removeImport(t.getType().getDeclaringType().getFullyQualifiedName());
-            }
-        });
+        targets.forEach(t -> changeMethodTargetToStatic(t, toClass));
+        return this;
+    }
 
-        if (targets.iterator().hasNext()) {
-            addImport(toClass);
-        }
-
+    public Refactor changeMethodTargetToStatic(Tr.MethodInvocation target, String toClass) {
+        ops.add(new ChangeMethodTargetToStatic(target.getId(), toClass));
         return this;
     }
 
     public Refactor changeMethodTarget(Iterable<Tr.MethodInvocation> targets, Tr.VariableDecls.NamedVar namedVar) {
-        return changeMethodTarget(targets, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
+        targets.forEach(t -> changeMethodTarget(t, namedVar));
+        return this;
+    }
+
+    public Refactor changeMethodTarget(Tr.MethodInvocation target, Tr.VariableDecls.NamedVar namedVar) {
+        return changeMethodTarget(target, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
     }
 
     public Refactor changeMethodTarget(Iterable<Tr.MethodInvocation> targets, String namedVar, @Nullable Type.Class clazz) {
-        targets.forEach(t -> {
-            addOp(t, new ChangeMethodTargetToVariable(namedVar, clazz));
+        targets.forEach(t -> changeMethodTarget(t, namedVar, clazz));
+        return this;
+    }
 
-            // if the original is a static method invocation, the import on it's type may no longer be needed
-            if (t.getType() != null) {
-                removeImport(t.getType().getDeclaringType().getFullyQualifiedName());
-            }
-        });
-
+    public Refactor changeMethodTarget(Tr.MethodInvocation target, String namedVar, @Nullable Type.Class clazz) {
+        ops.add(new ChangeMethodTargetToVariable(target.getId(), namedVar, clazz));
         return this;
     }
 
     public Refactor insertArgument(Iterable<Tr.MethodInvocation> targets, int pos, String source) {
-        targets.forEach(t -> addOp(t, new InsertMethodArgument(pos, source)));
+        targets.forEach(t -> insertArgument(t, pos, source));
+        return this;
+    }
+
+    public Refactor insertArgument(Tr.MethodInvocation target, int pos, String source) {
+        ops.add(new InsertMethodArgument(target.getId(), pos, source));
         return this;
     }
 
     public Refactor deleteArgument(Iterable<Tr.MethodInvocation> targets, int pos) {
-        targets.forEach(t -> addOp(t, new DeleteMethodArgument(pos)));
+        targets.forEach(t -> deleteArgument(t, pos));
+        return this;
+    }
+
+    public Refactor deleteArgument(Tr.MethodInvocation target, int pos) {
+        ops.add(new DeleteMethodArgument(target.getId(), pos));
         return this;
     }
 
     public ReorderMethodArguments reorderArguments(Tr.MethodInvocation target, String... byArgumentNames) {
-        ReorderMethodArguments reorder = new ReorderMethodArguments(byArgumentNames, new String[0]);
-        addOp(target, reorder);
+        ReorderMethodArguments reorder = new ReorderMethodArguments(target.getId(), byArgumentNames);
+        ops.add(reorder);
         return reorder;
     }
 
@@ -213,17 +204,21 @@ public class Refactor {
     // -------------
 
     public Refactor changeLiteral(Iterable<Expression> targets, Function<Object, Object> transform) {
-        targets.forEach(t -> addOp(t, new ChangeLiteral(transform)));
+        targets.forEach(t -> changeLiteral(t, transform));
+        return this;
+    }
+
+    public Refactor changeLiteral(Expression target, Function<Object, Object> transform) {
+        ops.add(new ChangeLiteral(target.getId(), transform));
         return this;
     }
 
     public Refactor changeType(String from, String to) {
-        addOp(new ChangeType(from, to));
-        addOp(new AddImport(to, null, true));
-        addOp(new RemoveImport(from));
+        ops.add(new ChangeType(from, to));
         return this;
     }
 
+    // TODO rework this to make it more useful (and don't forget to recurse through pipelined visitors!)
 //    public Map<String, Long> stats() {
 //        Map<String, Long> stats = new HashMap<>();
 //
@@ -245,18 +240,18 @@ public class Refactor {
      */
     public Tr.CompilationUnit fix() {
         Tr.CompilationUnit acc = original;
-        for (RefactorOperation op : ops) {
-            acc = transformRecursive(op.getId(), acc, op.getVisitor());
+        for (RefactorVisitor visitor : ops) {
+            acc = transformRecursive(acc, visitor);
         }
 
         return (Tr.CompilationUnit) new TransformVisitor(new FormatVisitor().visit(acc)).visit(acc);
     }
 
-    private Tr.CompilationUnit transformRecursive(UUID id, Tr.CompilationUnit acc, RefactorVisitor visitor) {
+    private Tr.CompilationUnit transformRecursive(Tr.CompilationUnit acc, RefactorVisitor visitor) {
         // by transforming the AST for each op, we allow for the possibility of overlapping changes
-        acc = (Tr.CompilationUnit) new TransformVisitor(visitor.visit(new RetrieveTreeVisitor(id).visit(acc))).visit(acc);
+        acc = (Tr.CompilationUnit) new TransformVisitor(visitor.visit(acc)).visit(acc);
         for (RefactorVisitor vis : visitor.andThen()) {
-            acc = transformRecursive(id, acc, vis);
+            acc = transformRecursive(acc, vis);
         }
         return acc;
     }
@@ -314,24 +309,5 @@ public class Refactor {
             }
             return new String(patch.toByteArray());
         }
-    }
-
-    private void addOp(Tree target, RefactorVisitor visitor) {
-        ops.add(new RefactorOperation(target.getId(), visitor));
-    }
-
-    private void addOp(RefactorVisitor visitor) {
-        ops.add(new RefactorOperation(original.getId(), visitor));
-    }
-
-    @AllArgsConstructor
-    private static class RefactorOperation {
-        @Getter
-        @Setter
-        UUID id;
-
-        @Getter
-        @Setter
-        RefactorVisitor visitor;
     }
 }

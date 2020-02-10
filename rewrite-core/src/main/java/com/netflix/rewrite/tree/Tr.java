@@ -36,15 +36,15 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-@EqualsAndHashCode
 public abstract class Tr implements Serializable, Tree {
     public static UUID randomId() {
         return UUID.randomUUID();
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Annotation extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -68,9 +68,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitAnnotation(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -81,9 +82,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ArrayAccess extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -103,9 +105,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitArrayAccess(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -116,9 +119,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ArrayType extends Tr implements TypeTree, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -139,9 +143,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitArrayType(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             Empty inner;
@@ -151,9 +156,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Assert extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -164,13 +170,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitAssert(this);
+            return v.reduce(v.visitAssert(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Assign extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -187,7 +194,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAssign(this), v.visitExpression(this));
+            return v.reduce(v.visitAssign(this), v.visitExpression(this), v.visitStatement(this));
         }
 
         @Override
@@ -196,9 +203,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class AssignOp extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -217,7 +225,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAssignOp(this), v.visitExpression(this));
+            return v.reduce(v.visitAssignOp(this), v.visitExpression(this), v.visitStatement(this));
         }
 
         @Override
@@ -225,101 +233,112 @@ public abstract class Tr implements Serializable, Tree {
             return singletonList(this);
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Operator extends Tr {
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Addition extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Subtraction extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Multiplication extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Division extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Modulo extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitAnd extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitOr extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitXor extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LeftShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class RightShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class UnsignedRightShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
@@ -328,9 +347,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Binary extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -360,173 +380,192 @@ public abstract class Tr implements Serializable, Tree {
             return sideEffects;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Operator extends Tr {
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Addition extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Subtraction extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Multiplication extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Division extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Modulo extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LessThan extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class GreaterThan extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LessThanOrEqual extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class GreaterThanOrEqual extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Equal extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class NotEqual extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitAnd extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitOr extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitXor extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LeftShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class RightShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class UnsignedRightShift extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Or extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class And extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
@@ -535,10 +574,11 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Block<T extends Tree> extends Tr implements Statement {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         @Nullable
@@ -563,13 +603,14 @@ public abstract class Tr implements Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitBlock((Block<Tree>) this);
+            return v.reduce(v.visitBlock((Block<Tree>) this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Break extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @Nullable
@@ -580,13 +621,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitBreak(this);
+            return v.reduce(v.visitBreak(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Case extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -601,13 +643,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitCase(this);
+            return v.reduce(v.visitCase(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Catch extends Tr {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -625,10 +668,11 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class ClassDecl extends Tr implements Statement {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -681,7 +725,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitClassDecl(this);
+            return v.reduce(v.visitClassDecl(this), v.visitStatement(this));
         }
 
         @JsonIgnore
@@ -714,38 +758,42 @@ public abstract class Tr implements Serializable, Tree {
                     .collect(toList());
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Kind extends Tr {
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Class extends Kind {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Enum extends Kind {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Interface extends Kind {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Annotation extends Kind {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
@@ -808,9 +856,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class CompilationUnit extends Tr {
+        @EqualsAndHashCode.Include
         UUID id;
 
         String sourcePath;
@@ -864,9 +913,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Continue extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @Nullable
@@ -877,13 +927,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitContinue(this);
+            return v.reduce(v.visitContinue(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class DoWhileLoop extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -897,13 +948,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitDoWhileLoop(this);
+            return v.reduce(v.visitDoWhileLoop(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Empty extends Tr implements Statement, Expression, TypeTree {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -916,13 +968,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitEmpty(this), v.visitExpression(this));
+            return v.reduce(v.visitEmpty(this), v.visitExpression(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class EnumValue extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -937,12 +990,13 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitEnumValue(this);
+            return v.reduce(v.visitEnumValue(this), v.visitStatement(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -953,9 +1007,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class EnumValueSet extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -968,13 +1023,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitEnumValueSet(this);
+            return v.reduce(v.visitEnumValueSet(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class FieldAccess extends Tr implements TypeTree, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1030,9 +1086,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ForEachLoop extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1046,12 +1103,13 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitForEachLoop(this);
+            return v.reduce(v.visitForEachLoop(this), v.visitStatement(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Control extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1065,9 +1123,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ForLoop extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1081,12 +1140,13 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitForLoop(this);
+            return v.reduce(v.visitForLoop(this), v.visitStatement(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Control extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1103,11 +1163,12 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
     public static class Ident extends Tr implements TypeTree, Expression {
         private static final Map<String, Map<Type, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
 
+        @EqualsAndHashCode.Include
         UUID id;
 
         IdentFlyweight ident;
@@ -1172,9 +1233,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class If extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1192,12 +1254,13 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitIf(this);
+            return v.reduce(v.visitIf(this), v.visitStatement(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Else extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1208,10 +1271,11 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Import extends Tr {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1244,9 +1308,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class InstanceOf extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1267,9 +1332,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Label extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         Ident label;
@@ -1282,13 +1348,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitLabel(this);
+            return v.reduce(v.visitLabel(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Lambda extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1310,18 +1377,20 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitLambda(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arrow extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Parameters extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             boolean parenthesized;
@@ -1339,9 +1408,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Literal extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1375,9 +1445,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MemberReference extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1398,10 +1469,11 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     public static class MethodDecl extends Tr {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         @Getter
@@ -1471,9 +1543,10 @@ public abstract class Tr implements Serializable, Tree {
             return new FindAnnotations(signature).visit(this);
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Parameters extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1483,9 +1556,10 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Throws extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1495,9 +1569,10 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Default extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1517,9 +1592,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MethodInvocation extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1545,7 +1621,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitMethodInvocation(this), v.visitExpression(this));
+            return v.reduce(v.visitMethodInvocation(this), v.visitExpression(this), v.visitStatement(this));
         }
 
         @JsonIgnore
@@ -1565,9 +1641,10 @@ public abstract class Tr implements Serializable, Tree {
             return singletonList(this);
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1578,110 +1655,122 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     public static abstract class Modifier extends Tr {
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Default extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Public extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Protected extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Private extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Abstract extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Static extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Final extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Native extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Strictfp extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Synchronized extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Transient extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Volatile extends Modifier {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1689,9 +1778,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MultiCatch extends Tr implements TypeTree {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1715,9 +1805,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class NewArray extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1742,9 +1833,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitNewArray(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             Expression size;
@@ -1753,9 +1845,10 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Initializer extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             List<Expression> elements;
@@ -1765,9 +1858,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class NewClass extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1788,7 +1882,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitNewClass(this), v.visitExpression(this));
+            return v.reduce(v.visitNewClass(this), v.visitExpression(this), v.visitStatement(this));
         }
 
         @Override
@@ -1796,9 +1890,10 @@ public abstract class Tr implements Serializable, Tree {
             return singletonList(this);
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -1809,9 +1904,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Package extends Tr {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1826,9 +1922,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ParameterizedType extends Tr implements TypeTree, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1851,9 +1948,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitParameterizedType(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class TypeArguments extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             /**
@@ -1867,9 +1965,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Parentheses<T extends Tree> extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1894,10 +1993,11 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Primitive extends Tr implements TypeTree, Expression {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         Type.Primitive type;
@@ -1908,7 +2008,8 @@ public abstract class Tr implements Serializable, Tree {
             return type;
         }
 
-        @Getter @With
+        @Getter
+        @With
         Formatting formatting;
 
         @Override
@@ -1917,9 +2018,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Return extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1931,13 +2033,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitReturn(this);
+            return v.reduce(v.visitReturn(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Switch extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1951,13 +2054,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitSwitch(this);
+            return v.reduce(v.visitSwitch(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Synchronized extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -1971,13 +2075,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitSynchronized(this);
+            return v.reduce(v.visitSynchronized(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Ternary extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2001,9 +2106,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Throw extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2014,14 +2120,15 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitThrow(this);
+            return v.reduce(v.visitThrow(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Try extends Tr implements Statement {
         @Getter
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2052,12 +2159,13 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitTry(this);
+            return v.reduce(v.visitTry(this), v.visitStatement(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Resources extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -2067,9 +2175,10 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Finally extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             Block<Statement> block;
@@ -2079,9 +2188,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeCast extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2104,9 +2214,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeParameter extends Tr {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2127,9 +2238,10 @@ public abstract class Tr implements Serializable, Tree {
             return v.visitTypeParameter(this);
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Bounds extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -2140,9 +2252,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeParameters extends Tr {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2157,9 +2270,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Unary extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         Operator operator;
@@ -2175,7 +2289,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitUnary(this), v.visitExpression(this));
+            return v.reduce(v.visitUnary(this), v.visitExpression(this), v.visitStatement(this));
         }
 
         @Override
@@ -2183,14 +2297,15 @@ public abstract class Tr implements Serializable, Tree {
             return expr.getSideEffects();
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public abstract static class Operator extends Tr {
             // NOTE: only some operators may have empty formatting
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PreIncrement extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 Formatting formatting = Formatting.EMPTY;
@@ -2202,9 +2317,10 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PreDecrement extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 Formatting formatting = Formatting.EMPTY;
@@ -2216,27 +2332,30 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PostIncrement extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PostDecrement extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Positive extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 Formatting formatting = Formatting.EMPTY;
@@ -2248,9 +2367,10 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Negative extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 Formatting formatting = Formatting.EMPTY;
@@ -2262,18 +2382,20 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Complement extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Not extends Operator {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
@@ -2282,9 +2404,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class UnparsedSource extends Tr implements Statement, Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         String source;
@@ -2299,13 +2422,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitUnparsedSource(this), v.visitExpression(this));
+            return v.reduce(v.visitUnparsedSource(this), v.visitExpression(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class VariableDecls extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         List<Annotation> annotations;
@@ -2328,7 +2452,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitMultiVariable(this);
+            return v.reduce(v.visitMultiVariable(this), v.visitStatement(this));
         }
 
         public List<Annotation> findAnnotations(String signature) {
@@ -2340,18 +2464,20 @@ public abstract class Tr implements Serializable, Tree {
             return Optional.ofNullable(typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType()));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Varargs extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             Empty whitespace;
@@ -2360,9 +2486,10 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class NamedVar extends Tr {
+            @EqualsAndHashCode.Include
             UUID id;
 
             @With
@@ -2396,9 +2523,10 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class WhileLoop extends Tr implements Statement {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @With
@@ -2412,13 +2540,14 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
-            return v.visitWhileLoop(this);
+            return v.reduce(v.visitWhileLoop(this), v.visitStatement(this));
         }
     }
 
-    @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Wildcard extends Tr implements Expression {
+        @EqualsAndHashCode.Include
         UUID id;
 
         @Nullable
@@ -2441,20 +2570,22 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitWildcard(this), v.visitExpression(this));
         }
 
-        @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public abstract static class Bound extends Tr {
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Extends extends Bound {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With
                 Formatting formatting;
             }
 
-            @EqualsAndHashCode(callSuper = true, onlyExplicitlyIncluded = true)
+            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Super extends Bound {
+                @EqualsAndHashCode.Include
                 UUID id;
 
                 @With

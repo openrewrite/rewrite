@@ -31,8 +31,6 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
             }
         """)
 
-        val method = a.classes[0].methods[0]
-
         val changeMethodName = { to: String ->
             object : RefactorVisitor() {
                 override fun getRuleName(): String = "rename s"
@@ -43,8 +41,8 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
         }
 
         assertRefactored(a.refactor()
-                .run(method, changeMethodName("test2"))
-                .run(method, changeMethodName("test3"))
+                .run(changeMethodName("test2"))
+                .run(changeMethodName("test3"))
                 .fix(),
                 """
                     public class A {

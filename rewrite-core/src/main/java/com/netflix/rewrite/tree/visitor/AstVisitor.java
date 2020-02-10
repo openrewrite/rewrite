@@ -53,6 +53,15 @@ public abstract class AstVisitor<R> {
         return r1 == null ? r2 : r1;
     }
 
+    @SafeVarargs
+    public final R reduce(R r1, R r2, R... rs) {
+        R acc = reduce(r1, r2);
+        for (R r : rs) {
+            acc = reduce(acc, r);
+        }
+        return acc;
+    }
+
     public R visit(Tree tree) {
         return tree == null ? defaultTo(null) :
                 reduce(tree.accept(this), visitTree(tree));
@@ -99,6 +108,10 @@ public abstract class AstVisitor<R> {
 
     public R visitExpression(Expression expr) {
         return defaultTo(expr);
+    }
+
+    public R visitStatement(Statement statement) {
+        return defaultTo(statement);
     }
 
     public R visitTypeName(NameTree name) {

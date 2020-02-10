@@ -17,20 +17,24 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Expression;
 import com.netflix.rewrite.tree.Tr;
-import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import org.apache.commons.lang.StringEscapeUtils;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 
-@AllArgsConstructor
-public class ChangeLiteral extends RefactorVisitor {
+public class ChangeLiteral extends ScopedRefactorVisitor {
     Function<Object, Object> transform;
+
+    public ChangeLiteral(UUID scope, Function<Object, Object> transform) {
+        super(scope);
+        this.transform = transform;
+    }
 
     @Override
     protected String getRuleName() {
@@ -50,7 +54,12 @@ public class ChangeLiteral extends RefactorVisitor {
 
         @Override
         public List<AstTransform> visitLiteral(Tr.Literal literal) {
+            if(!isInScope(literal)) {
+                return emptyList();
+            }
+
             var transformed = transform.apply(literal.getValue());
+
             if(transformed == literal.getValue() || literal.getType() == null) {
                 return emptyList();
             }

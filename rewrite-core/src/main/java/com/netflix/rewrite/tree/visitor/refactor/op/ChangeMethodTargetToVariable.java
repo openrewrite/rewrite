@@ -18,21 +18,26 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 
-@AllArgsConstructor
-public class ChangeMethodTargetToVariable extends RefactorVisitor {
+public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
     String varName;
 
     @Nullable
     Type.Class type;
+
+    public ChangeMethodTargetToVariable(UUID scope, String varName, @Nullable Type.Class type) {
+        super(scope);
+        this.varName = varName;
+        this.type = type;
+    }
 
     @Override
     protected String getRuleName() {
@@ -41,20 +46,30 @@ public class ChangeMethodTargetToVariable extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(method, m -> {
-            Expression select = m.getSelect();
+        List<AstTransform> changes = super.visitMethodInvocation(method);
 
-            Type.Method type = null;
-            if (m.getType() != null) {
-                Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
-                flags.remove(Flag.Static);
-                type = m.getType().withDeclaringType(this.type).withFlags(flags);
-            }
+        if (isInScope(method)) {
+            changes.addAll(transform(method, m -> {
+                        Expression select = m.getSelect();
 
-            return m
-                    .withSelect(Tr.Ident.build(randomId(), varName, select == null ? null : select.getType(),
-                            select == null ? Formatting.EMPTY : select.getFormatting()))
-                    .withType(type);
-        });
+                        Type.Method type = null;
+                        if (m.getType() != null) {
+                            // if the original is a static method invocation, the import on it's type may no longer be needed
+                            maybeRemoveImport(m.getType().getDeclaringType());
+
+                            Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
+                            flags.remove(Flag.Static);
+                            type = m.getType().withDeclaringType(this.type).withFlags(flags);
+                        }
+
+                        return m
+                                .withSelect(Tr.Ident.build(randomId(), varName, select == null ? null : select.getType(),
+                                        select == null ? Formatting.EMPTY : select.getFormatting()))
+                                .withType(type);
+                    })
+            );
+        }
+
+        return changes;
     }
 }

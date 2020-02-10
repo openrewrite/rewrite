@@ -19,6 +19,7 @@ import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.MethodMatcher;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import lombok.EqualsAndHashCode;
 import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
@@ -31,9 +32,13 @@ import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport extends RefactorVisitor {
+    @EqualsAndHashCode.Include
     String clazz;
+
     MethodMatcher methodMatcher;
+
     Type.Class classType;
 
     @NonFinal

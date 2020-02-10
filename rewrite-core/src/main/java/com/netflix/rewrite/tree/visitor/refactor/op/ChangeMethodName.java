@@ -18,15 +18,21 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import lombok.AllArgsConstructor;
 
 import java.util.List;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 
-@AllArgsConstructor
-public class ChangeMethodName extends RefactorVisitor {
+public class ChangeMethodName extends ScopedRefactorVisitor {
     String name;
+
+    public ChangeMethodName(UUID scope, String name) {
+        super(scope);
+        this.name = name;
+    }
 
     @Override
     protected String getRuleName() {
@@ -35,6 +41,10 @@ public class ChangeMethodName extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(method, m -> m.withName(m.getName().withName(name)));
+        List<AstTransform> changes = super.visitMethodInvocation(method);
+        if(isInScope(method)) {
+            changes.addAll(transform(method, m -> m.withName(m.getName().withName(name))));
+        }
+        return changes;
     }
 }

@@ -20,7 +20,7 @@ import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Test
 
-open class DeleteFieldTest : Parser by OpenJdkParser() {
+open class DeleteStatementTest : Parser by OpenJdkParser() {
 
     @Test
     fun deleteField() {
@@ -32,7 +32,7 @@ open class DeleteFieldTest : Parser by OpenJdkParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-            .deleteField(a.classes[0].findFields("java.util.List"))
+            .deleteStatement(a.classes[0].findFields("java.util.List"))
             .fix()
 
         assertRefactored(fixed, """

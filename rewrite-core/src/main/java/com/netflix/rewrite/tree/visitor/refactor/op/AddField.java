@@ -16,26 +16,36 @@
 package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.tree.*;
+import com.netflix.rewrite.tree.Formatting;
+import com.netflix.rewrite.tree.Tr;
+import com.netflix.rewrite.tree.Tree;
+import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-@AllArgsConstructor
-public class AddField extends RefactorVisitor {
+public class AddField extends ScopedRefactorVisitor {
     List<Tr.Modifier> modifiers;
     String clazz;
     String name;
 
     @Nullable
     String init;
+
+    public AddField(UUID scope, List<Tr.Modifier> modifiers, String clazz, String name, @Nullable String init) {
+        super(scope);
+        this.modifiers = modifiers;
+        this.clazz = clazz;
+        this.name = name;
+        this.init = init;
+    }
 
     @Override
     protected String getRuleName() {
@@ -44,28 +54,37 @@ public class AddField extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitClassDecl(Tr.ClassDecl classDecl) {
-        var classType = Type.Class.build(clazz);
-        var newField = new Tr.VariableDecls(randomId(),
-                emptyList(),
-                modifiers,
-                Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
-                null,
-                emptyList(),
-                singletonList(new Tr.VariableDecls.NamedVar(randomId(),
-                        Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
-                        emptyList(),
-                        init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
-                        classType,
-                        Formatting.format(" ")
-                )),
-                Formatting.INFER
-        );
+        List<AstTransform> changes = super.visitClassDecl(classDecl);
 
-        return transform(classDecl.getBody(), block -> {
-            List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
-            statements.add(newField);
-            statements.addAll(block.getStatements());
-            return block.withStatements(statements);
-        });
+        if (isInScope(classDecl)) {
+
+            var classType = Type.Class.build(clazz);
+            var newField = new Tr.VariableDecls(randomId(),
+                    emptyList(),
+                    modifiers,
+                    Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
+                    null,
+                    emptyList(),
+                    singletonList(new Tr.VariableDecls.NamedVar(randomId(),
+                            Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
+                            emptyList(),
+                            init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
+                            classType,
+                            Formatting.format(" ")
+                    )),
+                    Formatting.INFER
+            );
+
+            changes.addAll(
+                    transform(classDecl.getBody(), block -> {
+                        List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
+                        statements.add(newField);
+                        statements.addAll(block.getStatements());
+                        return block.withStatements(statements);
+                    })
+            );
+        }
+
+        return changes;
     }
 }

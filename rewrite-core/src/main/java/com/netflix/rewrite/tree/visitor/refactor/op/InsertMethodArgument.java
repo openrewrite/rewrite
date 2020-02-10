@@ -20,20 +20,25 @@ import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
-@AllArgsConstructor
-public class InsertMethodArgument extends RefactorVisitor {
+public class InsertMethodArgument extends ScopedRefactorVisitor {
     int pos;
     String source;
+
+    public InsertMethodArgument(UUID scope, int pos, String source) {
+        super(scope);
+        this.pos = pos;
+        this.source = source;
+    }
 
     @Override
     protected String getRuleName() {
@@ -42,25 +47,33 @@ public class InsertMethodArgument extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        return transform(method, m -> {
-            List<Expression> modifiedArgs = m.getArgs().getArgs().stream()
-                    .filter(a -> !(a instanceof Tr.Empty))
-                    .collect(Collectors.toCollection(ArrayList::new));
-            modifiedArgs.add(pos,
-                    new Tr.UnparsedSource(randomId(),
-                            source,
-                            pos == 0 ?
-                                    modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
-                                    format(" ")
-                    )
+        List<AstTransform> changes = super.visitMethodInvocation(method);
+
+        if (isInScope(method)) {
+            changes.addAll(
+                    transform(method, m -> {
+                        List<Expression> modifiedArgs = m.getArgs().getArgs().stream()
+                                .filter(a -> !(a instanceof Tr.Empty))
+                                .collect(Collectors.toCollection(ArrayList::new));
+                        modifiedArgs.add(pos,
+                                new Tr.UnparsedSource(randomId(),
+                                        source,
+                                        pos == 0 ?
+                                                modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
+                                                format(" ")
+                                )
+                        );
+
+                        if (pos == 0 && modifiedArgs.size() > 1) {
+                            // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
+                            modifiedArgs.set(1, modifiedArgs.get(1).withFormatting(format(" ")));
+                        }
+
+                        return m.withArgs(m.getArgs().withArgs(modifiedArgs));
+                    })
             );
+        }
 
-            if(pos == 0 && modifiedArgs.size() > 1) {
-                // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
-                modifiedArgs.set(1, modifiedArgs.get(1).withFormatting(format(" ")));
-            }
-
-            return m.withArgs(m.getArgs().withArgs(modifiedArgs));
-        });
+        return changes;
     }
 }

@@ -19,18 +19,23 @@ import com.netflix.rewrite.tree.Expression;
 import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import lombok.AllArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 
-@AllArgsConstructor
-public class DeleteMethodArgument extends RefactorVisitor {
+public class DeleteMethodArgument extends ScopedRefactorVisitor {
     int pos;
+
+    public DeleteMethodArgument(UUID scope, int pos) {
+        super(scope);
+        this.pos = pos;
+    }
 
     @Override
     protected String getRuleName() {
@@ -39,16 +44,20 @@ public class DeleteMethodArgument extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        if(method.getArgs().getArgs().stream().filter(arg -> !(arg instanceof Tr.Empty)).count() > pos) {
-            return transform(method, m -> {
-                List<Expression> args = new ArrayList<>(m.getArgs().getArgs());
-                args.remove(pos);
-                if(args.isEmpty()) {
-                    args = Collections.singletonList(new Tr.Empty(randomId(), Formatting.EMPTY));
-                }
-                return m.withArgs(m.getArgs().withArgs(args));
-            });
+        List<AstTransform> changes = super.visitMethodInvocation(method);
+
+        if (isInScope(method) && method.getArgs().getArgs().stream().filter(arg -> !(arg instanceof Tr.Empty)).count() > pos) {
+            changes.addAll(transform(method, m -> {
+                        List<Expression> args = new ArrayList<>(m.getArgs().getArgs());
+                        args.remove(pos);
+                        if (args.isEmpty()) {
+                            args = Collections.singletonList(new Tr.Empty(randomId(), Formatting.EMPTY));
+                        }
+                        return m.withArgs(m.getArgs().withArgs(args));
+                    })
+            );
         }
-        return super.visitMethodInvocation(method);
+
+        return changes;
     }
 }

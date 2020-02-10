@@ -20,17 +20,21 @@ import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.List;
+import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
-@AllArgsConstructor
-public class ChangeFieldType extends RefactorVisitor {
+public class ChangeFieldType extends ScopedRefactorVisitor {
     String targetType;
+
+    public ChangeFieldType(UUID scope, String targetType) {
+        super(scope);
+        this.targetType = targetType;
+    }
 
     @Override
     protected String getRuleName() {
@@ -39,15 +43,22 @@ public class ChangeFieldType extends RefactorVisitor {
 
     @Override
     public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
-        if(multiVariable.getTypeExpr() == null) {
+        if(!isInScope(multiVariable) || multiVariable.getTypeExpr() == null) {
             return emptyList();
         }
 
         Type.Class type = Type.Class.build(targetType);
         Type.Class originalType = TypeUtils.asClass(multiVariable.getTypeExpr().getType());
+        maybeRemoveImport(originalType);
 
         return originalType != null && originalType.getFullyQualifiedName().equals(targetType) ? emptyList() :
                 transform(multiVariable, mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
                         mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting())));
+    }
+
+    @Override
+    public List<AstTransform> visitEnd() {
+        maybeAddImport(targetType);
+        return super.visitEnd();
     }
 }

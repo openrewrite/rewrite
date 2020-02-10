@@ -19,20 +19,25 @@ import com.netflix.rewrite.tree.Expression;
 import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.UUID;
 
-@AllArgsConstructor
-public class ReorderMethodArguments extends RefactorVisitor {
+public class ReorderMethodArguments extends ScopedRefactorVisitor {
     String[] byArgumentNames;
 
     @NonFinal
     String[] originalParamNames;
+
+    public ReorderMethodArguments(UUID scope, String[] byArgumentNames) {
+        super(scope);
+        this.byArgumentNames = byArgumentNames;
+        this.originalParamNames = new String[0];
+    }
 
     public void setOriginalParamNames(String... originalParamNames) {
         this.originalParamNames = originalParamNames;
@@ -47,7 +52,7 @@ public class ReorderMethodArguments extends RefactorVisitor {
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
         List<AstTransform> changes = super.visitMethodInvocation(method);
 
-        if(method.getType() != null) {
+        if(isInScope(method) && method.getType() != null) {
             changes.addAll(transform(method, m -> {
                 if(m.getType() == null) {
                     return m;
@@ -57,7 +62,7 @@ public class ReorderMethodArguments extends RefactorVisitor {
                         Arrays.asList(originalParamNames);
 
                 if(paramNames == null) {
-                    throw new IllegalStateException("There is no source attachment for method " + method.getType().getDeclaringType().getFullyQualifiedName() +
+                    throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
                             "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
                 }
 

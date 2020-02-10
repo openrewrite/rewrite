@@ -52,11 +52,11 @@ public class PrintVisitor extends AstVisitor<String> {
 
     private String visitStatements(Collection<? extends Tree> statements) {
         return statements.stream()
-                .map(this::visitStatement)
+                .map(this::fmtStatement)
                 .reduce("", this::reduce);
     }
 
-    private String visitStatement(Tree statement) {
+    private String fmtStatement(Tree statement) {
         String semicolonOrEmpty = (
                 statement instanceof Tr.Assign ||
                         statement instanceof Tr.AssignOp ||
@@ -371,14 +371,14 @@ public class PrintVisitor extends AstVisitor<String> {
     public String visitForLoop(ForLoop forLoop) {
         ForLoop.Control ctrl = forLoop.getControl();
         var expr = fmt(ctrl, "(" + visit(ctrl.getInit()) + ";" + visit(ctrl.getCondition()) + ";" + visit(ctrl.getUpdate()) + ")");
-        return fmt(forLoop, "for" + expr + visitStatement(forLoop.getBody()));
+        return fmt(forLoop, "for" + expr + fmtStatement(forLoop.getBody()));
     }
 
     @Override
     public String visitForEachLoop(ForEachLoop forEachLoop) {
         ForEachLoop.Control ctrl = forEachLoop.getControl();
         var expr = fmt(ctrl, "(" + visit(ctrl.getVariable()) + ":" + visit(ctrl.getIterable()) + ")");
-        return fmt(forEachLoop, "for" + expr + visitStatement(forEachLoop.getBody()));
+        return fmt(forEachLoop, "for" + expr + fmtStatement(forEachLoop.getBody()));
     }
 
     @Override
@@ -389,8 +389,8 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitIf(If iff) {
         var elsePart = iff.getElsePart() == null ? "" :
-                fmt(iff.getElsePart(), "else" + visitStatement(iff.getElsePart().getStatement()));
-        return fmt(iff, "if" + visit(iff.getIfCondition()) + visitStatement(iff.getThenPart()) + elsePart);
+                fmt(iff.getElsePart(), "else" + fmtStatement(iff.getElsePart().getStatement()));
+        return fmt(iff, "if" + visit(iff.getIfCondition()) + fmtStatement(iff.getThenPart()) + elsePart);
     }
 
     @Override
@@ -618,7 +618,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitWhileLoop(WhileLoop whileLoop) {
-        return fmt(whileLoop, "while" + visit(whileLoop.getCondition()) + visitStatement(whileLoop.getBody()));
+        return fmt(whileLoop, "while" + visit(whileLoop.getCondition()) + fmtStatement(whileLoop.getBody()));
     }
 
     @Override

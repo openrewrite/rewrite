@@ -23,6 +23,7 @@ import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.search.FindType;
+import lombok.EqualsAndHashCode;
 import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.List;
 import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
+@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends RefactorVisitor {
     static final Comparator<String> packageComparator = (p1, p2) -> {
         var p1s = p1.split("\\.");
@@ -50,8 +52,10 @@ public class AddImport extends RefactorVisitor {
         return p1s.length < p2.length() ? -1 : 0;
     };
 
+    @EqualsAndHashCode.Include
     String clazz;
 
+    @EqualsAndHashCode.Include
     @Nullable
     String staticMethod;
 

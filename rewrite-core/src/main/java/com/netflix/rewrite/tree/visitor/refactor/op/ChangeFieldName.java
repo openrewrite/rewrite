@@ -17,17 +17,21 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
-import lombok.AllArgsConstructor;
+import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.List;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-@AllArgsConstructor
-public class ChangeFieldName extends RefactorVisitor {
+public class ChangeFieldName extends ScopedRefactorVisitor {
     String name;
+
+    public ChangeFieldName(UUID scope, String name) {
+        super(scope);
+        this.name = name;
+    }
 
     @Override
     protected String getRuleName() {
@@ -37,14 +41,14 @@ public class ChangeFieldName extends RefactorVisitor {
     @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
     public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
-        if(multiVariable.getVars().size() > 1) {
+        if (!isInScope(multiVariable) || multiVariable.getVars().size() > 1) {
             // change field name is not supported on multi-variable declarations
             return emptyList();
         }
 
         var v = multiVariable.getVars().stream().findAny().get();
         return v.getSimpleName().equals(name) ?
-                emptyList() :
-                transform(multiVariable, mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
+            emptyList() :
+            transform(multiVariable, mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
     }
 }
