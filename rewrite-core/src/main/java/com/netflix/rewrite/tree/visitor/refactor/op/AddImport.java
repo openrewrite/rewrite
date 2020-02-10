@@ -24,33 +24,22 @@ import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.search.FindType;
 import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
+import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends RefactorVisitor {
-    static final Comparator<String> packageComparator = (p1, p2) -> {
-        var p1s = p1.split("\\.");
-        var p2s = p2.split("\\.");
-
-        for (int i = 0; i < p1s.length; i++) {
-            String s = p1s[i];
-            if (p2s.length < i + 1) {
-                return 1;
-            }
-            if (!s.equals(p2s[i])) {
-                return s.compareTo(p2s[i]);
-            }
-        }
-
-        return p1s.length < p2.length() ? -1 : 0;
-    };
+    // TODO make this configurable
+    OrderImports orderImports = new IntellijOrderImports();
 
     @EqualsAndHashCode.Include
     String clazz;
@@ -126,53 +115,132 @@ public class AddImport extends RefactorVisitor {
             return emptyList();
         }
 
-        var lastPrior = lastPriorImport();
-        Tr.FieldAccess classImportField = (Tr.FieldAccess) TreeBuilder.buildName(clazz, Formatting.format(" "));
+        List<AstTransform> changes = transform(getCursor().getParentCompilationUnit(), cu -> cu.withImports(orderImports.addImport()));
 
-        var importStatementToAdd = staticMethod == null ?
-                new Tr.Import(randomId(), classImportField, false, Formatting.INFER) :
-                new Tr.Import(randomId(), new Tr.FieldAccess(randomId(), classImportField, Tr.Ident.build(randomId(), staticMethod, null, Formatting.EMPTY), null, Formatting.EMPTY), true, Formatting.INFER);
+        if (cu.getClasses().size() > 0 && cu.getImports().isEmpty() ||
+                cu.getClasses().get(0).getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() < 2) {
+            changes.addAll(transform(cu.getClasses().get(0), clazz -> clazz.withFormatting(clazz.getFormatting().withPrefix("\n\n"))));
+        }
 
-        return lastPrior == null ?
-                transform(getCursor().getParentCompilationUnit(), cu -> {
-                    List<Tr.Import> imports = new ArrayList<>(cu.getImports().size() + 1);
-                    imports.add(importStatementToAdd);
-                    imports.addAll(cu.getImports());
-                    return cu.withImports(imports);
-                }) :
-                transform(getCursor().getParentCompilationUnit(), cu -> {
-                    List<Tr.Import> imports = new ArrayList<>(cu.getImports().size() + 1);
-                    for (Tr.Import im : cu.getImports()) {
-                        imports.add(im);
-                        if (im == lastPrior) {
-                            imports.add(importStatementToAdd);
-                        }
-                    }
-                    return cu.withImports(imports);
-                });
+        return changes;
     }
 
-    @Nullable
-    private Tr.Import lastPriorImport() {
-        return cu.getImports().stream()
-                .filter(im -> {
-                    // static imports go after all non-static imports
-                    if (staticMethod != null && !im.isStatic()) {
-                        return true;
-                    }
+    public abstract class OrderImports {
+        public abstract List<Tr.Import> addImport();
 
-                    // non-static imports should always go before static imports
-                    if (staticMethod == null && im.isStatic()) {
-                        return false;
-                    }
+        /**
+         * @return The list of imports that could, together with the import to add, be replaced by a star import.
+         */
+        protected List<Tr.Import> importsThatCouldBeStarReplaced() {
+            return staticMethod == null ?
+                    cu.getImports().stream()
+                            .filter(i -> !i.isStatic() && i.getPackageName().equals(classType.getPackageName()))
+                            .collect(toList()) :
+                    cu.getImports().stream()
+                            .filter(i -> {
+                                String fqn = i.getQualid().getTarget().printTrimmed();
+                                return i.isStatic() && fqn.substring(0, Math.max(0, fqn.lastIndexOf('.'))).equals(clazz);
+                            })
+                            .collect(toList());
+        }
+    }
 
-                    int comp = packageComparator.compare(im.getQualid().getTarget().printTrimmed(),
-                            staticMethod != null ? clazz : classType.getPackageName());
-                    return comp == 0 ?
-                            im.getQualid().getSimpleName().compareTo(staticMethod != null ? staticMethod : classType.getClassName()) < 0 :
-                            comp < 0;
-                })
-                .reduce((import1, import2) -> import2)
-                .orElse(null);
+    @RequiredArgsConstructor
+    public class IntellijOrderImports extends OrderImports {
+        int classCountToUseStarImport;
+        int namesCountToUseStarImport;
+
+        public IntellijOrderImports() {
+            this(5, 3);
+        }
+
+        @Override
+        public List<Tr.Import> addImport() {
+            List<Tr.Import> importsThatCouldBeStarReplaced = importsThatCouldBeStarReplaced();
+            boolean starImporting = importsThatCouldBeStarReplaced.size() > (staticMethod == null ? classCountToUseStarImport : namesCountToUseStarImport);
+
+            List<Tr.Import> importsWithAdded = new ArrayList<>(cu.getImports());
+            if (starImporting) {
+                importsWithAdded.removeAll(importsThatCouldBeStarReplaced);
+            }
+
+            Tr.FieldAccess classImportField = (Tr.FieldAccess) TreeBuilder.buildName(clazz, format(" "));
+            Tr.Import importStatementToAdd;
+            if (staticMethod == null) {
+                importStatementToAdd = new Tr.Import(randomId(),
+                        starImporting ?
+                                (Tr.FieldAccess) TreeBuilder.buildName(classType.getPackageName() + ".*", format(" ")) :
+                                classImportField,
+                        false,
+                        format("\n"));
+
+                boolean added = false;
+                for (int i = 0; i < importsWithAdded.size(); i++) {
+                    Tr.Import anImport = importsWithAdded.get(i);
+                    if (anImport.isStatic() || importStatementToAdd.compareTo(anImport) < 0) {
+                        importsWithAdded.add(i, importStatementToAdd);
+                        added = true;
+                        break;
+                    }
+                }
+
+                if (!added) {
+                    importsWithAdded.add(importStatementToAdd);
+                }
+
+                boolean encounteredJavaImport = false;
+                for (int i = 0; i < importsWithAdded.size(); i++) {
+                    Tr.Import anImport = importsWithAdded.get(i);
+                    if (i == 0) {
+                        encounteredJavaImport = anImport.getPackageName().startsWith("java");
+                        if (cu.getPackageDecl() == null) {
+                            continue;
+                        }
+                    }
+                    if (i == 0 || (!encounteredJavaImport && (encounteredJavaImport = anImport.getPackageName().startsWith("java"))) ||
+                            anImport.isStatic()) {
+                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n\n")));
+                        if (anImport.isStatic()) {
+                            // don't attempt any other formatting, because we will not have modified this list
+                            break;
+                        }
+                    } else {
+                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n")));
+                    }
+                }
+            } else {
+                importStatementToAdd = new Tr.Import(randomId(),
+                        new Tr.FieldAccess(randomId(), classImportField,
+                                Tr.Ident.build(randomId(), starImporting ? "*" : staticMethod, null, Formatting.EMPTY), null, Formatting.EMPTY),
+                        true,
+                        format("\n"));
+
+                boolean added = false;
+                for (int i = 0; i < importsWithAdded.size(); i++) {
+                    Tr.Import anImport = importsWithAdded.get(i);
+                    if (anImport.isStatic() && importStatementToAdd.compareTo(anImport) < 0) {
+                        importsWithAdded.add(i, importStatementToAdd);
+                        added = true;
+                        break;
+                    }
+                }
+
+                if (!added) {
+                    importsWithAdded.add(importStatementToAdd);
+                }
+
+                boolean encounteredStatic = false;
+                for (int i = 0; i < importsWithAdded.size(); i++) {
+                    Tr.Import anImport = importsWithAdded.get(i);
+                    if (!encounteredStatic && (encounteredStatic = anImport.isStatic())) {
+                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n\n")));
+                    } else if (anImport.isStatic()) {
+                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n")));
+                    }
+                }
+            }
+
+            return importsWithAdded;
+        }
     }
 }

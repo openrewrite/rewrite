@@ -18,10 +18,10 @@ package com.netflix.rewrite.tree.visitor.refactor.op
 import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.tree.Tr
 import org.junit.Test
 
 open class AddImportTest : Parser by OpenJdkParser() {
-
     @Test
     fun addMultipleImports() {
         val a = parse("class A {}")
@@ -167,7 +167,9 @@ open class AddImportTest : Parser by OpenJdkParser() {
             package a;
             
             import java.util.List;
+            
             import static java.util.List.*;
+            
             class A {}
         """)
     }
@@ -183,8 +185,9 @@ open class AddImportTest : Parser by OpenJdkParser() {
 
         assertRefactored(fixed, """
             import java.util.*;
-            import static java.util.Collections.emptyList;
             
+            import static java.util.Collections.emptyList;
+
             class A {}
         """)
     }

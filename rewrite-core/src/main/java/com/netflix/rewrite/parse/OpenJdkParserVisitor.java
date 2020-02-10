@@ -55,7 +55,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 
-public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tree.Tree, Formatting.Reified> {
+public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tree.Tree, Formatting> {
     private static final Logger logger = LoggerFactory.getLogger(OpenJdkParserVisitor.class);
 
     private final Path path;
@@ -70,7 +70,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitAnnotation(AnnotationTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitAnnotation(AnnotationTree node, Formatting fmt) {
         skip("@");
         NameTree name = convert(node.getAnnotationType());
 
@@ -113,7 +113,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitArrayAccess(ArrayAccessTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitArrayAccess(ArrayAccessTree node, Formatting fmt) {
         Expression indexed = convert(node.getExpression());
 
         var dimensionPrefix = sourceBefore("[");
@@ -124,7 +124,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitArrayType(ArrayTypeTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitArrayType(ArrayTypeTree node, Formatting fmt) {
         var typeIdent = node.getType();
         var dimCount = 1;
 
@@ -144,19 +144,19 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitAssert(AssertTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitAssert(AssertTree node, Formatting fmt) {
         skip("assert");
         return new Tr.Assert(randomId(), convert(((JCAssert) node).cond), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitAssignment(AssignmentTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitAssignment(AssignmentTree node, Formatting fmt) {
         Expression variable = convert(node.getVariable(), t -> sourceBefore("="));
         return new Tr.Assign(randomId(), variable, convert(node.getExpression()), type(node), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitBinary(BinaryTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitBinary(BinaryTree node, Formatting fmt) {
         Expression left = convert(node.getLeftOperand());
 
         var opPrefix = format(whitespace());
@@ -246,7 +246,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitBlock(BlockTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitBlock(BlockTree node, Formatting fmt) {
         Tr.Empty stat = null;
 
         if ((((JCBlock) node).flags & (long) Flags.STATIC) != 0L) {
@@ -267,7 +267,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitBreak(BreakTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitBreak(BreakTree node, Formatting fmt) {
         skip("break");
 
         Tr.Ident label = null;
@@ -281,7 +281,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitCase(CaseTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitCase(CaseTree node, Formatting fmt) {
         Expression pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
         if (pattern == null) {
             pattern = Tr.Ident.build(randomId(), skip("default"), null, format(sourceBefore(":")));
@@ -294,7 +294,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitCatch(CatchTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitCatch(CatchTree node, Formatting fmt) {
         skip("catch");
 
         var paramPrefix = sourceBefore("(");
@@ -305,7 +305,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitClass(ClassTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitClass(ClassTree node, Formatting fmt) {
         List<Tr.Annotation> annotations = convertAll(node.getModifiers().getAnnotations(), noDelim, noDelim);
         List<Tr.Modifier> modifiers = sortedFlags(node.getModifiers());
 
@@ -381,7 +381,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitCompilationUnit(CompilationUnitTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
         logger.debug(path + " building Rewrite AST from OpenJDK AST");
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
@@ -413,7 +413,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitCompoundAssignment(CompoundAssignmentTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitCompoundAssignment(CompoundAssignmentTree node, Formatting fmt) {
         Expression left = convert(((JCAssignOp) node).lhs);
 
         var opPrefix = format(whitespace());
@@ -477,7 +477,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitConditionalExpression(ConditionalExpressionTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitConditionalExpression(ConditionalExpressionTree node, Formatting fmt) {
         return new Tr.Ternary(randomId(),
                 convert(node.getCondition(), t -> sourceBefore("?")),
                 convert(node.getTrueExpression(), t -> sourceBefore(":")),
@@ -488,7 +488,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitContinue(ContinueTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitContinue(ContinueTree node, Formatting fmt) {
         skip("continue");
         Name label = node.getLabel();
         return new Tr.Continue(randomId(),
@@ -498,7 +498,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitDoWhileLoop(DoWhileLoopTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitDoWhileLoop(DoWhileLoopTree node, Formatting fmt) {
         skip("do");
         Statement stat = convert(node.getStatement(), t -> sourceBefore("while"));
         return new Tr.DoWhileLoop(randomId(),
@@ -509,12 +509,12 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitEmptyStatement(EmptyStatementTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitEmptyStatement(EmptyStatementTree node, Formatting fmt) {
         return new Tr.Empty(randomId(), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitEnhancedForLoop(EnhancedForLoopTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitEnhancedForLoop(EnhancedForLoopTree node, Formatting fmt) {
         skip("for");
         var ctrlPrefix = sourceBefore("(");
         Tr.VariableDecls variable = convert(node.getVariable(), t -> sourceBefore(":"));
@@ -527,7 +527,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         );
     }
 
-    private com.netflix.rewrite.tree.Tree visitEnumVariable(VariableTree node, Formatting.Reified fmt) {
+    private com.netflix.rewrite.tree.Tree visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
         var name = Tr.Ident.build(randomId(), node.getName().toString(), type(node), Formatting.EMPTY);
 
@@ -546,7 +546,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitForLoop(ForLoopTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitForLoop(ForLoopTree node, Formatting fmt) {
         skip("for");
         var ctrlPrefix = sourceBefore("(");
 
@@ -582,13 +582,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitIdentifier(IdentifierTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitIdentifier(IdentifierTree node, Formatting fmt) {
         cursor += node.getName().toString().length();
         return Tr.Ident.build(randomId(), node.getName().toString(), type(node), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitIf(IfTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitIf(IfTree node, Formatting fmt) {
         skip("if");
 
         Tr.Parentheses<Expression> ifPart = convert(node.getCondition());
@@ -604,14 +604,14 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitImport(ImportTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitImport(ImportTree node, Formatting fmt) {
         skip("import");
         skipPattern("\\s+static");
         return new Tr.Import(randomId(), convert(node.getQualifiedIdentifier()), node.isStatic(), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitInstanceOf(InstanceOfTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitInstanceOf(InstanceOfTree node, Formatting fmt) {
         return new Tr.InstanceOf(randomId(),
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
@@ -621,7 +621,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitLabeledStatement(LabeledStatementTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitLabeledStatement(LabeledStatementTree node, Formatting fmt) {
         skip(node.getLabel().toString());
         return new Tr.Label(randomId(),
                 Tr.Ident.build(randomId(), node.getLabel().toString(), null, format("", sourceBefore(":"))),
@@ -631,7 +631,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitLambdaExpression(LambdaExpressionTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitLambdaExpression(LambdaExpressionTree node, Formatting fmt) {
         var parenthesized = source.charAt(cursor) == '(';
         skip("(");
 
@@ -666,7 +666,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitLiteral(LiteralTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitLiteral(LiteralTree node, Formatting fmt) {
         cursor(endPos(node));
         var value = node.getValue();
         var type = primitive(((JCTree.JCLiteral) node).typetag);
@@ -679,7 +679,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitMemberReference(MemberReferenceTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitMemberReference(MemberReferenceTree node, Formatting fmt) {
         JCMemberReference ref = (JCMemberReference) node;
         Expression expr = convert(ref.expr, t -> sourceBefore("::"));
 
@@ -700,7 +700,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitMemberSelect(MemberSelectTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitMemberSelect(MemberSelectTree node, Formatting fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
         Expression target = convert(fieldAccess.selected, t -> sourceBefore("."));
         var name = Tr.Ident.build(randomId(), fieldAccess.name.toString(), null, format(sourceBefore(fieldAccess.name.toString())));
@@ -708,7 +708,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitMethodInvocation(MethodInvocationTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitMethodInvocation(MethodInvocationTree node, Formatting fmt) {
         var jcSelect = ((JCTree.JCMethodInvocation) node).getMethodSelect();
 
         Expression select = null;
@@ -782,7 +782,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitMethod(MethodTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitMethod(MethodTree node, Formatting fmt) {
         logger.trace("Visiting method {}", node.getName());
 
         List<Tr.Annotation> annotations = convertAll(node.getModifiers().getAnnotations(), noDelim, noDelim);
@@ -837,7 +837,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitNewArray(NewArrayTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitNewArray(NewArrayTree node, Formatting fmt) {
         skip("new");
 
         var jcVarType = ((JCNewArray) node).elemtype;
@@ -882,7 +882,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitNewClass(NewClassTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitNewClass(NewClassTree node, Formatting fmt) {
         skip("new");
         TypeTree clazz = convert(node.getIdentifier());
 
@@ -910,7 +910,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitParameterizedType(ParameterizedTypeTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitParameterizedType(ParameterizedTypeTree node, Formatting fmt) {
         NameTree clazz = convert(node.getType());
 
         var typeArgPrefix = sourceBefore("<");
@@ -930,13 +930,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitParenthesized(ParenthesizedTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitParenthesized(ParenthesizedTree node, Formatting fmt) {
         skip("(");
         return new Tr.Parentheses<Expression>(randomId(), convert(node.getExpression(), t -> sourceBefore(")")), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitPrimitiveType(PrimitiveTypeTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitPrimitiveType(PrimitiveTypeTree node, Formatting fmt) {
         cursor(endPos(node));
 
         Type.Primitive primitiveType;
@@ -976,13 +976,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitReturn(ReturnTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitReturn(ReturnTree node, Formatting fmt) {
         skip("return");
         return new Tr.Return(randomId(), convertOrNull(node.getExpression()), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitSwitch(SwitchTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitSwitch(SwitchTree node, Formatting fmt) {
         skip("switch");
         Tr.Parentheses<Expression> selector = convert(node.getExpression());
 
@@ -993,7 +993,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitSynchronized(SynchronizedTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitSynchronized(SynchronizedTree node, Formatting fmt) {
         skip("synchronized");
         return new Tr.Synchronized(randomId(),
                 convert(node.getExpression()),
@@ -1003,13 +1003,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitThrow(ThrowTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitThrow(ThrowTree node, Formatting fmt) {
         skip("throw");
         return new Tr.Throw(randomId(), convert(node.getExpression()), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitTry(TryTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitTry(TryTree node, Formatting fmt) {
         skip("try");
         Tr.Try.Resources resources = null;
         if (!node.getResources().isEmpty()) {
@@ -1032,7 +1032,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitTypeCast(TypeCastTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitTypeCast(TypeCastTree node, Formatting fmt) {
         var clazzPrefix = sourceBefore("(");
         var clazz = new Tr.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
                 format(clazzPrefix));
@@ -1041,7 +1041,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitTypeParameter(TypeParameterTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitTypeParameter(TypeParameterTree node, Formatting fmt) {
         List<Tr.Annotation> annotations = convertAll(node.getAnnotations(), noDelim, noDelim);
 
         var name = TreeBuilder.buildName(node.getName().toString(), format(sourceBefore(node.getName().toString())));
@@ -1058,12 +1058,12 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitUnionType(UnionTypeTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitUnionType(UnionTypeTree node, Formatting fmt) {
         return new Tr.MultiCatch(randomId(), convertAll(node.getTypeAlternatives(), t -> sourceBefore("|"), noDelim), fmt);
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitUnary(UnaryTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitUnary(UnaryTree node, Formatting fmt) {
         JCUnary unary = (JCUnary) node;
         var tag = unary.getTag();
         Tr.Unary.Operator op;
@@ -1116,13 +1116,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitVariable(VariableTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitVariable(VariableTree node, Formatting fmt) {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
     }
 
-    private Tr.VariableDecls visitVariables(List<VariableTree> nodes, Formatting.Reified fmt) {
+    private Tr.VariableDecls visitVariables(List<VariableTree> nodes, Formatting fmt) {
         JCTree.JCVariableDecl node = (JCVariableDecl) nodes.get(0);
         List<Tr.Annotation> annotations = convertAll(node.getModifiers().annotations, noDelim, noDelim);
 
@@ -1194,7 +1194,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitWhileLoop(WhileLoopTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitWhileLoop(WhileLoopTree node, Formatting fmt) {
         skip("while");
         return new Tr.WhileLoop(randomId(),
                 convert(node.getCondition()),
@@ -1204,7 +1204,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     @Override
-    public com.netflix.rewrite.tree.Tree visitWildcard(WildcardTree node, Formatting.Reified fmt) {
+    public com.netflix.rewrite.tree.Tree visitWildcard(WildcardTree node, Formatting fmt) {
         skip("?");
 
         JCWildcard wildcard = (JCWildcard) node;

@@ -18,7 +18,6 @@ package com.netflix.rewrite.refactor;
 import com.netflix.rewrite.internal.lang.NonNullApi;
 import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
-import com.netflix.rewrite.tree.visitor.refactor.FormatVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.*;
@@ -243,8 +242,7 @@ public class Refactor {
         for (RefactorVisitor visitor : ops) {
             acc = transformRecursive(acc, visitor);
         }
-
-        return (Tr.CompilationUnit) new TransformVisitor(new FormatVisitor().visit(acc)).visit(acc);
+        return acc;
     }
 
     private Tr.CompilationUnit transformRecursive(Tr.CompilationUnit acc, RefactorVisitor visitor) {

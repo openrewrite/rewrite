@@ -57,26 +57,25 @@ public class AddField extends ScopedRefactorVisitor {
         List<AstTransform> changes = super.visitClassDecl(classDecl);
 
         if (isInScope(classDecl)) {
-
-            var classType = Type.Class.build(clazz);
-            var newField = new Tr.VariableDecls(randomId(),
-                    emptyList(),
-                    modifiers,
-                    Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
-                    null,
-                    emptyList(),
-                    singletonList(new Tr.VariableDecls.NamedVar(randomId(),
-                            Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
-                            emptyList(),
-                            init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
-                            classType,
-                            Formatting.format(" ")
-                    )),
-                    Formatting.INFER
-            );
-
             changes.addAll(
                     transform(classDecl.getBody(), block -> {
+                        var classType = Type.Class.build(clazz);
+                        var newField = new Tr.VariableDecls(randomId(),
+                                emptyList(),
+                                modifiers,
+                                Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
+                                null,
+                                emptyList(),
+                                singletonList(new Tr.VariableDecls.NamedVar(randomId(),
+                                        Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
+                                        emptyList(),
+                                        init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
+                                        classType,
+                                        Formatting.format(" ")
+                                )),
+                                formatter().format(block)
+                        );
+
                         List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
                         statements.add(newField);
                         statements.addAll(block.getStatements());

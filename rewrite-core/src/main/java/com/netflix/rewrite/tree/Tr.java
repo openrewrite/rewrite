@@ -31,8 +31,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -356,6 +358,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression left;
 
+        @With
         Operator operator;
 
         @With
@@ -592,6 +595,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
         @Getter
         String endOfBlockSuffix;
 
@@ -604,6 +608,11 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitBlock((Block<Tree>) this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        public int getIndent() {
+            return (int) endOfBlockSuffix.chars().dropWhile(c -> c == '\n' || c == '\r').count();
         }
     }
 
@@ -1268,12 +1277,17 @@ public abstract class Tr implements Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @Override
+            public <R> R accept(AstVisitor<R> v) {
+                return v.visitElse(this);
+            }
         }
     }
 
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class Import extends Tr {
+    public static class Import extends Tr implements Comparable<Import> {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1305,6 +1319,39 @@ public abstract class Tr implements Serializable, Tree {
                 );
             }
             return qualid.printTrimmed().equals(clazz);
+        }
+
+        @JsonIgnore
+        public String getPackageName() {
+            Type.Class importType = TypeUtils.asClass(qualid.getType());
+            if(importType != null) {
+                return importType.getPackageName();
+            }
+
+            return stream(qualid.getTarget().printTrimmed().split("\\."))
+                    .takeWhile(pkg -> !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)))
+                    .collect(joining("."));
+        }
+
+        @Override
+        public int compareTo(Import o) {
+            String p1 = this.getPackageName();
+            String p2 = o.getPackageName();
+
+            var p1s = p1.split("\\.");
+            var p2s = p2.split("\\.");
+
+            for (int i = 0; i < p1s.length; i++) {
+                String s = p1s[i];
+                if (p2s.length < i + 1) {
+                    return 1;
+                }
+                if (!s.equals(p2s[i])) {
+                    return s.compareTo(p2s[i]);
+                }
+            }
+
+            return p1s.length < p2s.length ? -1 : 0;
         }
     }
 

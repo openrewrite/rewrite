@@ -21,7 +21,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 abstract class ImportTest(p: Parser): Parser by p {
-    
+
     @Test
     fun matchImport() {
         val a = parse("""
@@ -74,5 +74,18 @@ abstract class ImportTest(p: Parser): Parser by p {
         
         assertEquals("import java.util.List", a.imports[0].printTrimmed())
         assertEquals("import static java.util.Collections.*", a.imports[1].printTrimmed())
+    }
+
+    @Test
+    fun compare() {
+        val a = parse("""
+            import b.B;
+            import c.c.C;
+        """.trimIndent())
+
+        val (b, c) = a.imports
+
+        assertTrue(b < c)
+        assertTrue(c > b)
     }
 }

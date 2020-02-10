@@ -17,9 +17,7 @@ package com.netflix.rewrite.tree;
 
 import com.netflix.rewrite.internal.lang.Nullable;
 import lombok.AllArgsConstructor;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
-import lombok.Getter;
 import lombok.experimental.NonFinal;
 
 import java.util.Iterator;

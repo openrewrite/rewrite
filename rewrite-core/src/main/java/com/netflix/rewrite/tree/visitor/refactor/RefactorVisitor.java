@@ -16,7 +16,6 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.refactor.Refactor;
 import com.netflix.rewrite.tree.Statement;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
@@ -25,20 +24,21 @@ import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.AddImport;
 import com.netflix.rewrite.tree.visitor.refactor.op.DeleteStatement;
 import com.netflix.rewrite.tree.visitor.refactor.op.RemoveImport;
+import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 
-import static java.util.Collections.emptyList;
+import static java.util.Arrays.asList;
 import static java.util.Collections.singletonList;
 
 public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform>> {
     private final ThreadLocal<List<RefactorVisitor>> andThen = new ThreadLocal<>();
+
+    @NonFinal
+    private Formatter formatter;
 
     public RefactorVisitor() {
         andThen.set(new ArrayList<>());
@@ -46,6 +46,7 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
 
     @Override
     public List<AstTransform> visitCompilationUnit(Tr.CompilationUnit cu) {
+        formatter = new Formatter(cu);
         andThen.get().clear();
         return super.visitCompilationUnit(cu);
     }
@@ -57,6 +58,10 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
      */
     public Iterable<RefactorVisitor> andThen() {
         return andThen.get();
+    }
+
+    protected Formatter formatter() {
+        return formatter;
     }
 
     protected List<AstTransform> maybeTransform(boolean shouldTransform,
@@ -98,6 +103,10 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         andThen.get().add(new DeleteStatement(statement.getId()));
     }
 
+    protected void andThen(RefactorVisitor visitor) {
+        andThen.get().add(visitor);
+    }
+
     @Override
     public List<AstTransform> defaultTo(Tree t) {
         return new ArrayList<>();
@@ -111,6 +120,8 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
 
     @SuppressWarnings("unchecked")
     protected <U extends Tree> List<AstTransform> transform(U target, String name, Function<U, U> mutation) {
-        return singletonList(new AstTransform(target.getId(), name, (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
+        List<AstTransform> changes = new ArrayList<>(1);
+        changes.add(new AstTransform(target.getId(), name, (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
+        return changes;
     }
 }

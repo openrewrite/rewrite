@@ -106,13 +106,13 @@ public class DeleteStatement extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visit(Tree tree) {
-        if(tree.getId().equals(scope)) {
+        if(tree != null && tree.getId().equals(scope)) {
             new ReferencedTypesVisitor().visit(tree).forEach(this::maybeRemoveImport);
         }
         return super.visit(tree);
     }
 
     private Tr.Block<Tree> emptyBlock() {
-        return new Tr.Block<>(randomId(), null, emptyList(), Formatting.INFER, "");
+        return new Tr.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, "");
     }
 }

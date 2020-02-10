@@ -17,7 +17,6 @@ package com.netflix.rewrite.tree.visitor;
 
 import com.netflix.rewrite.tree.Cursor;
 import com.netflix.rewrite.tree.Tree;
-import lombok.Getter;
 import lombok.experimental.NonFinal;
 
 public abstract class CursorAstVisitor<R> extends AstVisitor<R> {
@@ -33,15 +32,6 @@ public abstract class CursorAstVisitor<R> extends AstVisitor<R> {
         R t = reduce(tree.accept(this), visitTree(tree));
         cursor.set(cursor.get().getParent());
         return t;
-    }
-
-    public <T extends Tree> T retrieve(T original) {
-        return retrieve(original, cursor.get().getParentOrThrow().getTree());
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T extends Tree> T retrieve(T original, Tree containedWithin) {
-        return (T) new RetrieveTreeVisitor(original.getId()).visit(containedWithin);
     }
 
     public Cursor getCursor() {

@@ -16,7 +16,6 @@
 package com.netflix.rewrite.tree.visitor;
 
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
 
@@ -85,15 +84,7 @@ public class PrintVisitor extends AstVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : prefix(tree.getFormatting()) + code + suffix(tree.getFormatting());
-    }
-
-    private String prefix(Formatting fmt) {
-        return fmt instanceof Formatting.Reified ? ((Formatting.Reified) fmt).getPrefix() : "";
-    }
-
-    private String suffix(Formatting fmt) {
-        return fmt instanceof Formatting.Reified ? ((Formatting.Reified) fmt).getSuffix() : "";
+        return tree == null || code == null ? "" : tree.getFormatting().getPrefix() + code + tree.getFormatting().getSuffix();
     }
 
     private String visitModifiers(Iterable<Tr.Modifier> modifiers) {

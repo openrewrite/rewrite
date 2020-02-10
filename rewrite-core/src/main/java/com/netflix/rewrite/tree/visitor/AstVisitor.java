@@ -133,15 +133,11 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitArrayAccess(Tr.ArrayAccess arrayAccess) {
-        return visitAfter(visit(arrayAccess.getIndexed()), arrayAccess.getDimension().getIndex());
+        return visitAfter(visit(arrayAccess.getDimension().getIndex()), arrayAccess.getIndexed());
     }
 
     public R visitArrayType(Tr.ArrayType arrayType) {
         return visitTypeNameAfter(visit(arrayType.getElementType()), arrayType.getElementType());
-    }
-
-    public R visit(Tr.Assert azzert) {
-        return visit(azzert.getCondition());
     }
 
     public R visitAssert(Tr.Assert azzert) {
@@ -169,11 +165,11 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitCase(Tr.Case caze) {
-        return visitAfter(visit(caze.getPattern()), caze.getStatements());
+        return visitAfter(visit(caze.getStatements()), caze.getPattern());
     }
 
     public R visitCatch(Tr.Catch catzh) {
-        return visitAfter(visit(catzh.getParam()), catzh.getBody());
+        return visitAfter(visit(catzh.getBody()), catzh.getParam());
     }
 
     public R visitClassDecl(Tr.ClassDecl classDecl) {
@@ -185,7 +181,7 @@ public abstract class AstVisitor<R> {
                                                 visitAfter(
                                                         visitAfter(
                                                                 visitAfter(
-                                                                        visit(classDecl.getAnnotations()),
+                                                                        visit(classDecl.getBody()),
                                                                         classDecl.getModifiers()
                                                                 ),
                                                                 classDecl.getName()
@@ -196,7 +192,7 @@ public abstract class AstVisitor<R> {
                                         ),
                                         classDecl.getImplements()
                                 ),
-                                classDecl.getBody()
+                                classDecl.getAnnotations()
                         ),
                         classDecl.getExtends()
                 ),
@@ -222,7 +218,7 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitDoWhileLoop(Tr.DoWhileLoop doWhileLoop) {
-        return visitAfter(visit(doWhileLoop.getCondition()), doWhileLoop.getBody());
+        return visitAfter(visit(doWhileLoop.getBody()), doWhileLoop.getCondition());
     }
 
     public R visitEmpty(Tr.Empty empty) {
@@ -254,22 +250,22 @@ public abstract class AstVisitor<R> {
         return visitAfter(
                 visitAfter(
                         visitAfter(
-                                visit(forLoop.getControl().getInit()),
-                                forLoop.getControl().getCondition()
+                                visit(forLoop.getBody()),
+                                forLoop.getControl().getUpdate()
                         ),
-                        forLoop.getControl().getUpdate()
+                        forLoop.getControl().getCondition()
                 ),
-                forLoop.getBody()
+                forLoop.getControl().getInit()
         );
     }
 
     public R visitForEachLoop(Tr.ForEachLoop forEachLoop) {
         return visitAfter(
                 visitAfter(
-                        visit(forEachLoop.getControl().getVariable()),
+                        visit(forEachLoop.getBody()),
                         forEachLoop.getControl().getIterable()
                 ),
-                forEachLoop.getBody()
+                forEachLoop.getControl().getVariable()
         );
     }
 
@@ -280,12 +276,15 @@ public abstract class AstVisitor<R> {
     public R visitIf(Tr.If iff) {
         return visitAfter(
                 visitAfter(
-                        visit(iff.getIfCondition()),
-                        iff.getThenPart()
-
+                        visit(iff.getThenPart()),
+                        iff.getElsePart()
                 ),
-                iff.getElsePart() == null ? null : iff.getElsePart().getStatement()
+                iff.getIfCondition()
         );
+    }
+
+    public R visitElse(Tr.If.Else elze) {
+        return visit(elze.getStatement());
     }
 
     public R visitImport(Tr.Import impoort) {
@@ -309,7 +308,7 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitMemberReference(Tr.MemberReference memberRef) {
-        return visitAfter(visit(memberRef.getContaining()), memberRef.getReference());
+        return visitAfter(visit(memberRef.getReference()), memberRef.getContaining());
     }
 
     public R visitMethod(Tr.MethodDecl method) {
@@ -323,20 +322,20 @@ public abstract class AstVisitor<R> {
                                                                 visitAfter(
                                                                         visitAfter(
                                                                                 visitAfter(
-                                                                                        visit(method.getAnnotations()),
+                                                                                        visit(method.getBody()),
                                                                                         method.getModifiers()
                                                                                 ),
                                                                                 method.getTypeParameters() == null ? null : method.getTypeParameters().getParams()
                                                                         ),
-                                                                        method.getReturnTypeExpr()
+                                                                        method.getName()
                                                                 ),
-                                                                method.getName()
+                                                                method.getReturnTypeExpr()
                                                         ),
                                                         method.getParams().getParams()
                                                 ),
                                                 method.getThrows() == null ? null : method.getThrows().getExceptions()
                                         ),
-                                        method.getBody()
+                                        method.getAnnotations()
                                 ),
                                 method.getDefaultValue()
                         ),
@@ -354,12 +353,12 @@ public abstract class AstVisitor<R> {
                 visitAfter(
                         visitAfter(
                                 visitAfter(
-                                        visit(method.getSelect()),
+                                        visit(method.getArgs().getArgs()),
                                         method.getName()
                                 ),
-                                method.getArgs().getArgs()
+                                method.getTypeParameters()
                         ),
-                        method.getTypeParameters()
+                        method.getSelect()
                 ),
                 selectTypeVisit
         );
@@ -383,12 +382,12 @@ public abstract class AstVisitor<R> {
                 visitAfter(
                         visitAfter(
                                 visitAfter(
-                                        visit(multiVariable.getAnnotations()),
-                                        multiVariable.getModifiers()
+                                        visit(multiVariable.getVars()),
+                                        multiVariable.getTypeExpr()
                                 ),
-                                multiVariable.getTypeExpr()
+                                multiVariable.getModifiers()
                         ),
-                        multiVariable.getVars()
+                        multiVariable.getAnnotations()
                 ),
                 varTypeVisit
         );
@@ -411,10 +410,10 @@ public abstract class AstVisitor<R> {
         return visitTypeNameAfter(
                 visitAfter(
                         visitAfter(
-                                visit(newClass.getClazz()),
+                                visit(newClass.getBody()),
                                 newClass.getArgs().getArgs()
                         ),
-                        newClass.getBody()
+                        newClass.getClazz()
                 ),
                 newClass.getClazz()
         );
@@ -428,8 +427,8 @@ public abstract class AstVisitor<R> {
         return visitTypeNamesAfter(
                 visitTypeNameAfter(
                         visitAfter(
-                                visit(type.getClazz()),
-                                type.getTypeArguments() == null ? null : type.getTypeArguments().getArgs()
+                                visit(type.getTypeArguments() == null ? null : type.getTypeArguments().getArgs()),
+                                type.getClazz()
                         ),
                         type.getClazz()
                 ),
@@ -453,20 +452,20 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitSwitch(Tr.Switch switzh) {
-        return visitAfter(visit(switzh.getSelector()), switzh.getCases());
+        return visitAfter(visit(switzh.getCases()), switzh.getSelector());
     }
 
     public R visitSynchronized(Tr.Synchronized synch) {
-        return visitAfter(visit(synch.getLock()), synch.getBody());
+        return visitAfter(visit(synch.getBody()), synch.getLock());
     }
 
     public R visitTernary(Tr.Ternary ternary) {
         return visitAfter(
                 visitAfter(
-                        visit(ternary.getCondition()),
+                        visit(ternary.getFalsePart()),
                         ternary.getTruePart()
                 ),
-                ternary.getFalsePart()
+                ternary.getCondition()
         );
     }
 
@@ -478,8 +477,8 @@ public abstract class AstVisitor<R> {
         return visitAfter(
                 visitAfter(
                         visitAfter(
-                                visit(tryable.getResources() == null ? null : tryable.getResources().getDecls()),
-                                tryable.getBody()
+                                visit(tryable.getBody()),
+                                tryable.getResources() == null ? null : tryable.getResources().getDecls()
                         ),
                         tryable.getCatches()
                 ),
@@ -528,15 +527,15 @@ public abstract class AstVisitor<R> {
     public R visitVariable(Tr.VariableDecls.NamedVar variable) {
         return visitAfter(
                 visitAfter(
-                        visit(variable.getName()),
+                        visit(variable.getInitializer()),
                         variable.getDimensionsAfterName()
                 ),
-                variable.getInitializer()
+                variable.getName()
         );
     }
 
     public R visitWhileLoop(Tr.WhileLoop whileLoop) {
-        return visitAfter(visit(whileLoop.getCondition()), whileLoop.getBody());
+        return visitAfter(visit(whileLoop.getBody()), whileLoop.getCondition());
     }
 
     public R visitWildcard(Tr.Wildcard wildcard) {

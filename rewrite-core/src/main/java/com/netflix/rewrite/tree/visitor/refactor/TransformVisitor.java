@@ -189,7 +189,12 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
         return transform(iff,
                 t(If::getIfCondition, If::withIfCondition),
                 t(If::getThenPart, If::withThenPart),
-                t(If::getElsePart, If::withElsePart, If.Else::getStatement, If.Else::withStatement));
+                t(If::getElsePart, If::withElsePart));
+    }
+
+    @Override
+    public Tree visitElse(If.Else elze) {
+        return transform(elze, t(If.Else::getStatement, If.Else::withStatement));
     }
 
     @Override
