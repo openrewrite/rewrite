@@ -1981,6 +1981,7 @@ public abstract class Tr implements Serializable, Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
+            @With
             Expression size;
 
             @With
