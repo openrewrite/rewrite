@@ -37,7 +37,7 @@ public class ChangeLiteral extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "change-literal";
     }
 
@@ -47,11 +47,6 @@ public class ChangeLiteral extends ScopedRefactorVisitor {
     }
 
     private RefactorVisitor nested = new RefactorVisitor() {
-        @Override
-        protected String getRuleName() {
-            return ChangeLiteral.this.getRuleName();
-        }
-
         @Override
         public List<AstTransform> visitLiteral(Tr.Literal literal) {
             if(!isInScope(literal)) {

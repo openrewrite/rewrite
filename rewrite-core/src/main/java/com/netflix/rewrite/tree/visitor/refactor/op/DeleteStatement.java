@@ -38,7 +38,7 @@ public class DeleteStatement extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "delete-statement";
     }
 

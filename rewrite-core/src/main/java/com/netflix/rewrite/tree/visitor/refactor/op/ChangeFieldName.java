@@ -34,7 +34,7 @@ public class ChangeFieldName extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "change-field-name";
     }
 

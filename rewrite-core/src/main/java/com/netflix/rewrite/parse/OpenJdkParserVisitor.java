@@ -1416,7 +1416,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                     var symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
                     return Type.Class.build(sym.className(), fields,
                             classType.typarams_field == null ? emptyList() : classType.typarams_field.stream().map(tParam -> type(tParam, stackWithSym, true)).filter(Objects::nonNull).collect(toList()),
-                            symType.interfaces_field == null ? emptyList() : symType.interfaces_field.stream().map(iParam -> type(iParam, stackWithSym, true)).filter(Objects::nonNull).collect(toList()),
+                            symType.interfaces_field == null ? emptyList() : symType.interfaces_field.stream().map(iParam -> type(iParam, stackWithSym, false)).filter(Objects::nonNull).collect(toList()),
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)));
                 }
             }

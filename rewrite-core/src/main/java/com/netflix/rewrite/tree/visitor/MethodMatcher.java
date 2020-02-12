@@ -64,9 +64,7 @@ public class MethodMatcher {
             return false;
         }
 
-        var targetType = method.getType().getDeclaringType().getFullyQualifiedName();
-
-        if(method.getType().getResolvedSignature() == null) {
+        if (method.getType().getResolvedSignature() == null) {
             // no way to verify the parameter list
             return false;
         }
@@ -76,20 +74,23 @@ public class MethodMatcher {
                 .filter(Objects::nonNull)
                 .collect(joining(","));
 
-        return targetTypePattern.matcher(targetType).matches() &&
+        return matchesTargetType(method.getType().getDeclaringType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(resolvedSignaturePattern).matches();
     }
 
+    boolean matchesTargetType(@Nullable Type.Class type) {
+        return type != null && (targetTypePattern.matcher(type.getFullyQualifiedName()).matches() ||
+                type != Type.Class.OBJECT && matchesTargetType(type.getSupertype() == null ? Type.Class.OBJECT : type.getSupertype()));
+    }
+
     @Nullable
     private String typePattern(Type type) {
-        if(type instanceof Type.Primitive) {
+        if (type instanceof Type.Primitive) {
             return ((Type.Primitive) type).getKeyword();
-        }
-        else if(type instanceof Type.Class) {
+        } else if (type instanceof Type.Class) {
             return ((Type.Class) type).getFullyQualifiedName();
-        }
-        else if(type instanceof Type.Array) {
+        } else if (type instanceof Type.Array) {
             return typePattern(((Type.Array) type).getElemType()) + "[]";
         }
         return null;
@@ -103,7 +104,7 @@ class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
                 .map(c -> AspectjUtils.aspectjNameToPattern(c.getText()))
                 .collect(joining(""));
 
-        if(!className.contains(".")) {
+        if (!className.contains(".")) {
             try {
                 int arrInit = className.lastIndexOf("\\[");
                 Class.forName("java.lang." + (arrInit == -1 ? className : className.substring(0, arrInit)), false, TypeVisitor.class.getClassLoader());
@@ -135,7 +136,7 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
 
     @Override
     public String visitTerminal(TerminalNode node) {
-        if("...".equals(node.getText())) {
+        if ("...".equals(node.getText())) {
             ((Argument.FormalType) arguments.get(arguments.size() - 1)).setVariableArgs(true);
         }
         return super.visitTerminal(node);
@@ -162,21 +163,18 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
             Argument argument = arguments.get(i);
 
             // Note: the AspectJ grammar doesn't allow for multiple ..'s in one formal parameter pattern
-            if(argument == Argument.DOT_DOT) {
-                if(arguments.size() == 1) {
+            if (argument == Argument.DOT_DOT) {
+                if (arguments.size() == 1) {
                     argumentPatterns.add("(" + argument.getRegex() + ")?");
-                }
-                else if(i > 0) {
+                } else if (i > 0) {
                     argumentPatterns.add("(," + argument.getRegex() + ")?");
-                }
-                else {
+                } else {
                     argumentPatterns.add("(" + argument.getRegex() + ",)?");
                 }
             } else { // FormalType
-                if(i > 0 && arguments.get(i - 1) != Argument.DOT_DOT) {
+                if (i > 0 && arguments.get(i - 1) != Argument.DOT_DOT) {
                     argumentPatterns.add("," + argument.getRegex());
-                }
-                else {
+                } else {
                     argumentPatterns.add(argument.getRegex());
                 }
             }

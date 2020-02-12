@@ -47,7 +47,7 @@ public class ChangeType extends RefactorVisitor {
     // represents a type (could represent a variable name, etc.)
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "change-type";
     }
 

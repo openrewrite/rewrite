@@ -16,11 +16,32 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.parse.OpenJdkParser
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
+import com.netflix.rewrite.parse.Parser
+import org.junit.Assert.*
 import org.junit.Test
 
-class TypeTest {
+open class TypeTest: Parser by OpenJdkParser() {
+    @Test
+    fun isAssignableFrom() {
+        val a = parse("""
+            import java.util.List;
+            import java.util.Collection;
+            public class A {
+                public List[] listArr;
+                public Collection[] collArr;
+            }
+        """.trimIndent())
+
+        val (list, collection) = a.imports.map { TypeUtils.asClass(it.qualid.type)!! }
+        val (listArr, collectionArr) = a.classes[0].fields.map { TypeUtils.asClass(it.typeExpr!!.type)!! }
+
+        assertTrue(collection.isAssignableFrom(list))
+        assertFalse(list.isAssignableFrom(collection))
+        assertTrue(Type.Class.OBJECT.isAssignableFrom(collection))
+
+        assertTrue(collectionArr.isAssignableFrom(listArr))
+        assertFalse(listArr.isAssignableFrom(collectionArr))
+    }
 
     @Test
     fun innerClassType() {

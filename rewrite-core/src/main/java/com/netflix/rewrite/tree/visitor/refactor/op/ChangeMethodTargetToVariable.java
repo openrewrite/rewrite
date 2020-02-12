@@ -40,7 +40,7 @@ public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "change-method-target";
     }
 

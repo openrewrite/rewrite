@@ -21,11 +21,6 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
-        return "shift-format-right";
-    }
-
-    @Override
     public List<AstTransform> visitElse(Tr.If.Else elze) {
         return maybeTransform(isInScope(elze) && isOnOwnLine(elze),
                 super.visitElse(elze),

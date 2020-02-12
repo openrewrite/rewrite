@@ -17,10 +17,12 @@ package com.netflix.rewrite.tree.visitor.search;
 
 import com.netflix.rewrite.grammar.AnnotationSignatureParser;
 import com.netflix.rewrite.grammar.AspectJLexer;
-import com.netflix.rewrite.tree.*;
+import com.netflix.rewrite.tree.Tr;
+import com.netflix.rewrite.tree.Tree;
+import com.netflix.rewrite.tree.Type;
+import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
 import lombok.Data;
-import lombok.experimental.FieldDefaults;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 

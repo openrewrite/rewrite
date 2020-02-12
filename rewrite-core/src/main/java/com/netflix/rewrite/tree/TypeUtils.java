@@ -23,6 +23,10 @@ public class TypeUtils {
     private TypeUtils() {
     }
 
+    public static boolean isString(@Nullable Type type) {
+        return type instanceof Type.Class && "java.lang.String".equals(((Type.Class) type).getFullyQualifiedName());
+    }
+
     @Nullable
     public static Type.Class asClass(@Nullable Type type) {
         return type instanceof Type.Class ? (Type.Class) type : null;

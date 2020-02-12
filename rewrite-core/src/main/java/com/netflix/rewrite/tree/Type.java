@@ -20,12 +20,16 @@ import com.koloboke.collect.map.hash.HashObjObjMaps;
 import com.koloboke.collect.set.hash.HashObjSet;
 import com.koloboke.collect.set.hash.HashObjSets;
 import com.netflix.rewrite.internal.lang.Nullable;
-import lombok.*;
-import lombok.experimental.Accessors;
-import lombok.experimental.FieldDefaults;
+import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import lombok.With;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -37,10 +41,9 @@ import static java.util.stream.Collectors.toList;
 public interface Type extends Serializable {
     boolean deepEquals(@Nullable Type type);
 
-    @FieldDefaults(makeFinal = true)
     @Data
     class MultiCatch implements Type {
-        List<Type> throwableTypes;
+        private final List<Type> throwableTypes;
 
         @Override
         public boolean deepEquals(@Nullable Type type) {
@@ -53,10 +56,9 @@ public interface Type extends Serializable {
      * Reduces memory and CPU footprint when deep class insight isn't necessary, such as
      * for the type parameters of a Type.Class
      */
-    @FieldDefaults(makeFinal = true)
     @Data
     class ShallowClass implements Type {
-        final String fullyQualifiedName;
+        private final String fullyQualifiedName;
 
         @Override
         public boolean deepEquals(Type type) {
@@ -65,22 +67,23 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Getter
     class Class implements Type {
-        @Setter
-        private static boolean classVersionDependentComparison = true;
-
         // there shouldn't be too many distinct types represented by the same fully qualified name
         private static final Map<String, HashObjSet<Class>> flyweights = HashObjObjMaps.newMutableMap();
 
-        String fullyQualifiedName;
-        List<Var> members;
-        List<Type> typeParameters;
-        List<Type> interfaces;
+        public static final Class OBJECT = build("java.lang.Object");
+
+        @Setter
+        private static boolean classVersionDependentComparison = true;
+
+        private final String fullyQualifiedName;
+        private final List<Var> members;
+        private final List<Type> typeParameters;
+        private final List<Type> interfaces;
 
         @Nullable
-        Class supertype;
+        private final Class supertype;
 
         private Class(String fullyQualifiedName, List<Var> members, List<Type> typeParameters, List<Type> interfaces, @Nullable Class supertype) {
             this.fullyQualifiedName = fullyQualifiedName;
@@ -117,35 +120,6 @@ public interface Type extends Serializable {
             }
         }
 
-        public static Builder builder(String fullyQualifiedName) {
-            return new Builder(fullyQualifiedName);
-        }
-
-        public static class Builder {
-            String fullyQualifiedName;
-
-            @Accessors(fluent = true)
-            List<Var> members = emptyList();
-
-            @Accessors(fluent = true)
-            List<Type> typeParameters = emptyList();
-
-            @Accessors(fluent = true)
-            List<Type> interfaces = emptyList();
-
-            @Accessors(fluent = true)
-            @Nullable
-            Class supertype = null;
-
-            public Builder(String fullyQualifiedName) {
-                this.fullyQualifiedName = fullyQualifiedName;
-            }
-
-            public Class build() {
-                return new Class(fullyQualifiedName, members, typeParameters, interfaces, supertype);
-            }
-        }
-
         @JsonIgnore
         public String getClassName() {
             return Arrays.stream(fullyQualifiedName.split("\\."))
@@ -158,6 +132,15 @@ public interface Type extends Serializable {
             return Arrays.stream(fullyQualifiedName.split("\\."))
                     .takeWhile(part -> part.length() > 0 && !Character.isUpperCase(part.charAt(0)))
                     .collect(joining("."));
+        }
+
+        @JsonIgnore
+        public boolean isAssignableFrom(@Nullable Type.Class clazz) {
+            return clazz != null && (this == OBJECT ||
+                    this.fullyQualifiedName.equals(clazz.fullyQualifiedName) ||
+                    isAssignableFrom(clazz.getSupertype()) ||
+                    clazz.getInterfaces().stream().anyMatch(i -> i instanceof Class && isAssignableFrom((Class) i))
+            );
         }
 
         @Override
@@ -174,10 +157,9 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Data
     class Cyclic implements Type {
-        String fullyQualifiedName;
+        private final String fullyQualifiedName;
 
         @Override
         public boolean deepEquals(Type type) {
@@ -185,15 +167,14 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Data
     class Var implements Type {
-        String name;
+        private final String name;
 
         @Nullable
-        Type type;
+        private final Type type;
 
-        Set<Flag> flags;
+        private final Set<Flag> flags;
 
         public boolean hasFlags(Flag... test) {
             return Arrays.stream(test).allMatch(flags::contains);
@@ -211,21 +192,20 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Getter
     class Method implements Type {
         private static final Map<Class, Map<String, Set<Method>>> flyweights = HashObjObjMaps.newMutableMap();
 
         @With
-        Class declaringType;
+        private final Class declaringType;
 
-        String name;
-        Signature genericSignature;
-        Signature resolvedSignature;
-        List<String> paramNames;
+        private final String name;
+        private final Signature genericSignature;
+        private final Signature resolvedSignature;
+        private final List<String> paramNames;
 
         @With
-        Set<Flag> flags;
+        private final Set<Flag> flags;
 
         private Method(Class declaringType, String name, Signature genericSignature, Signature resolvedSignature, List<String> paramNames, Set<Flag> flags) {
             this.declaringType = declaringType;
@@ -261,13 +241,12 @@ public interface Type extends Serializable {
             }
         }
 
-        @FieldDefaults(makeFinal = true)
         @Data
         public static class Signature implements Serializable {
             @Nullable
-            Type returnType;
+            private final Type returnType;
 
-            List<Type> paramTypes;
+            private final List<Type> paramTypes;
         }
 
         private static boolean signatureDeepEquals(@Nullable Signature s1, @Nullable Signature s2) {
@@ -295,13 +274,12 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Data
     class GenericTypeVariable implements Type {
-        String fullyQualifiedName;
+        private final String fullyQualifiedName;
 
         @Nullable
-        Class bound;
+        private final Class bound;
 
         @Override
         public boolean deepEquals(Type type) {
@@ -315,10 +293,9 @@ public interface Type extends Serializable {
         }
     }
 
-    @FieldDefaults(makeFinal = true)
     @Data
     class Array implements Type {
-        Type elemType;
+        private final Type elemType;
 
         @Override
         public boolean deepEquals(Type type) {
@@ -364,9 +341,11 @@ public interface Type extends Serializable {
 
         @JsonIgnore
         public String getKeyword() {
-            switch(this) {
-                case Boolean: return "boolean";
-                case Byte: return "byte";
+            switch (this) {
+                case Boolean:
+                    return "boolean";
+                case Byte:
+                    return "byte";
                 case Char:
                     return "char";
                 case Double:

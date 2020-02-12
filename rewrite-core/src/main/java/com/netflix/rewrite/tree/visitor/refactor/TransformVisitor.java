@@ -21,7 +21,6 @@ import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -390,11 +389,10 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
         return transform(wildcard, t(Wildcard::getBoundedType, Wildcard::withBoundedType));
     }
 
-    @FieldDefaults(makeFinal = true)
     @Data
     private static class Transformable<T extends Tree, F> {
-        Function<T, F> getter;
-        BiFunction<T, F, T> with;
+        private final Function<T, F> getter;
+        private final BiFunction<T, F, T> with;
     }
 
     /**

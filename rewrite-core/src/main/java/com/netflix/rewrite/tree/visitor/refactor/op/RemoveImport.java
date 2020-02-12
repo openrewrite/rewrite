@@ -55,7 +55,7 @@ public class RemoveImport extends RefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "remove-import";
     }
 

@@ -41,7 +41,7 @@ public class ReorderMethodArguments extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "reorder-method-arguments";
     }
 

@@ -33,8 +33,6 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
 
         val changeMethodName = { to: String ->
             object : RefactorVisitor() {
-                override fun getRuleName(): String = "rename s"
-
                 override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform> =
                         transform(method) { m: Tr.MethodDecl -> m.withName(m.name.withName(to)) }
             }

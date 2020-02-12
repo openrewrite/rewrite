@@ -13,14 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.netflix.rewrite.tree.visitor.search
+package com.netflix.rewrite.tree.visitor
 
-import com.netflix.rewrite.tree.visitor.MethodMatcher
+import com.netflix.rewrite.tree.Type
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MethodMatcherTest {
-    
+    @Test
+    fun matchesSuperclassType() {
+        assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(Type.Class.build("java.lang.String")))
+        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(Type.Class.build("java.lang.Object")))
+    }
+
     @Test
     fun matchesMethodTargetType() {
         val typeRegex = { signature: String -> MethodMatcher(signature).targetTypePattern.toRegex() }
@@ -72,6 +78,12 @@ class MethodMatcherTest {
         assertTrue(argRegex("A foo(..)").matches(""))
         assertTrue(argRegex("A foo(..)").matches("int"))
         assertTrue(argRegex("A foo(..)").matches("int,int"))
+    }
+
+    @Test
+    fun matchesSuperclassArgumentTypes() {
+        assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(Type.Class.build("java.lang.String")))
+        assertFalse(MethodMatcher("String equals(String)").matchesTargetType(Type.Class.build("java.lang.Object")))
     }
 
     @Test

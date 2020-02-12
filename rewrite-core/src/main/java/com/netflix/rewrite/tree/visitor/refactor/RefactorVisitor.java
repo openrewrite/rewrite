@@ -106,16 +106,15 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         return new ArrayList<>();
     }
 
-    protected abstract String getRuleName();
-
-    protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
-        return transform(target, getRuleName(), mutation);
+    @Nullable
+    public String getRuleName() {
+        return null;
     }
 
     @SuppressWarnings("unchecked")
-    protected <U extends Tree> List<AstTransform> transform(U target, String name, Function<U, U> mutation) {
+    protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
         List<AstTransform> changes = new ArrayList<>(1);
-        changes.add(new AstTransform(target.getId(), name, (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
         return changes;
     }
 }

@@ -38,7 +38,7 @@ public class DeleteMethodArgument extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "delete-method-argument";
     }
 

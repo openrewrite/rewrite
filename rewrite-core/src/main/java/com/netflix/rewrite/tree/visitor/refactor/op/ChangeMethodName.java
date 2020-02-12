@@ -35,7 +35,7 @@ public class ChangeMethodName extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "change-method-name";
     }
 

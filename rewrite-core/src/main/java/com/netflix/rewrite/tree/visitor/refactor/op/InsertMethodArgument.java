@@ -41,7 +41,7 @@ public class InsertMethodArgument extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "insert-method-argument";
     }
 

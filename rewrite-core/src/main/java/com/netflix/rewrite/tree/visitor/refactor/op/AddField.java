@@ -48,7 +48,7 @@ public class AddField extends ScopedRefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "add-field";
     }
 
