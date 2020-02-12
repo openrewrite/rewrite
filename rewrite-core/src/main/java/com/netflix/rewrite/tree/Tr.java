@@ -23,6 +23,7 @@ import com.netflix.rewrite.refactor.Refactor;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
 import com.netflix.rewrite.tree.visitor.search.*;
 import lombok.*;
+import lombok.experimental.FieldDefaults;
 
 import java.io.Serializable;
 import java.util.*;
@@ -43,6 +44,7 @@ public abstract class Tr implements Serializable, Tree {
         return UUID.randomUUID();
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Annotation extends Tr implements Expression {
@@ -70,6 +72,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitAnnotation(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -84,6 +87,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ArrayAccess extends Tr implements Expression {
@@ -107,6 +111,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitArrayAccess(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
@@ -121,6 +126,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ArrayType extends Tr implements TypeTree, Expression {
@@ -145,6 +151,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitArrayType(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
@@ -158,6 +165,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Assert extends Tr implements Statement {
@@ -176,6 +184,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Assign extends Tr implements Statement, Expression {
@@ -205,6 +214,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class AssignOp extends Tr implements Statement, Expression {
@@ -237,6 +247,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Operator extends Tr {
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Addition extends Operator {
@@ -247,6 +258,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Subtraction extends Operator {
@@ -257,6 +269,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Multiplication extends Operator {
@@ -267,6 +280,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Division extends Operator {
@@ -277,6 +291,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Modulo extends Operator {
@@ -287,6 +302,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitAnd extends Operator {
@@ -297,6 +313,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitOr extends Operator {
@@ -307,6 +324,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitXor extends Operator {
@@ -317,6 +335,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LeftShift extends Operator {
@@ -327,6 +346,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class RightShift extends Operator {
@@ -337,6 +357,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class UnsignedRightShift extends Operator {
@@ -349,6 +370,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Binary extends Tr implements Expression {
@@ -385,6 +407,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Operator extends Tr {
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Addition extends Operator {
@@ -395,6 +418,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Subtraction extends Operator {
@@ -405,6 +429,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Multiplication extends Operator {
@@ -415,6 +440,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Division extends Operator {
@@ -425,6 +451,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Modulo extends Operator {
@@ -435,6 +462,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LessThan extends Operator {
@@ -445,6 +473,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class GreaterThan extends Operator {
@@ -455,6 +484,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LessThanOrEqual extends Operator {
@@ -465,6 +495,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class GreaterThanOrEqual extends Operator {
@@ -475,6 +506,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Equal extends Operator {
@@ -485,6 +517,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class NotEqual extends Operator {
@@ -495,6 +528,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitAnd extends Operator {
@@ -505,6 +539,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitOr extends Operator {
@@ -515,6 +550,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class BitXor extends Operator {
@@ -525,6 +561,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class LeftShift extends Operator {
@@ -535,6 +572,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class RightShift extends Operator {
@@ -545,6 +583,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class UnsignedRightShift extends Operator {
@@ -555,6 +594,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Or extends Operator {
@@ -565,6 +605,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class And extends Operator {
@@ -577,6 +618,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Block<T extends Tree> extends Tr implements Statement {
@@ -616,6 +658,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Break extends Tr implements Statement {
@@ -634,6 +677,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Case extends Tr implements Statement {
@@ -656,6 +700,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Catch extends Tr {
@@ -677,6 +722,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class ClassDecl extends Tr implements Statement {
@@ -769,6 +815,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public static abstract class Kind extends Tr {
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Class extends Kind {
@@ -779,6 +826,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Enum extends Kind {
@@ -789,6 +837,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Interface extends Kind {
@@ -799,6 +848,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Annotation extends Kind {
@@ -865,6 +915,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class CompilationUnit extends Tr {
@@ -922,6 +973,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Continue extends Tr implements Statement {
@@ -940,6 +992,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class DoWhileLoop extends Tr implements Statement {
@@ -961,6 +1014,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Empty extends Tr implements Statement, Expression, TypeTree {
@@ -981,6 +1035,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class EnumValue extends Tr implements Statement {
@@ -1002,6 +1057,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitEnumValue(this), v.visitStatement(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -1016,6 +1072,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class EnumValueSet extends Tr implements Statement {
@@ -1036,6 +1093,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class FieldAccess extends Tr implements TypeTree, Expression {
@@ -1095,6 +1153,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ForEachLoop extends Tr implements Statement {
@@ -1115,6 +1174,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitForEachLoop(this), v.visitStatement(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Control extends Tr {
@@ -1132,6 +1192,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ForLoop extends Tr implements Statement {
@@ -1152,6 +1213,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitForLoop(this), v.visitStatement(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Control extends Tr {
@@ -1172,6 +1234,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
     public static class Ident extends Tr implements TypeTree, Expression {
@@ -1226,6 +1289,7 @@ public abstract class Tr implements Serializable, Tree {
             }
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
         public static class IdentFlyweight implements Serializable {
             String simpleName;
@@ -1242,6 +1306,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class If extends Tr implements Statement {
@@ -1266,6 +1331,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitIf(this), v.visitStatement(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Else extends Tr {
@@ -1285,6 +1351,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Import extends Tr implements Comparable<Import> {
@@ -1324,7 +1391,7 @@ public abstract class Tr implements Serializable, Tree {
         @JsonIgnore
         public String getPackageName() {
             Type.Class importType = TypeUtils.asClass(qualid.getType());
-            if(importType != null) {
+            if (importType != null) {
                 return importType.getPackageName();
             }
 
@@ -1355,6 +1422,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class InstanceOf extends Tr implements Expression {
@@ -1371,7 +1439,7 @@ public abstract class Tr implements Serializable, Tree {
         Type type;
 
         @With
-        Formatting formatting;
+        private final Formatting formatting;
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
@@ -1379,6 +1447,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Label extends Tr implements Statement {
@@ -1399,6 +1468,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Lambda extends Tr implements Expression {
@@ -1424,6 +1494,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitLambda(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arrow extends Tr {
@@ -1434,6 +1505,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Parameters extends Tr {
@@ -1455,6 +1527,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Literal extends Tr implements Expression {
@@ -1492,6 +1565,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MemberReference extends Tr implements Expression {
@@ -1516,6 +1590,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
     public static class MethodDecl extends Tr {
@@ -1590,6 +1665,7 @@ public abstract class Tr implements Serializable, Tree {
             return new FindAnnotations(signature).visit(this);
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Parameters extends Tr {
@@ -1603,6 +1679,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Throws extends Tr {
@@ -1616,6 +1693,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Default extends Tr {
@@ -1639,6 +1717,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MethodInvocation extends Tr implements Statement, Expression {
@@ -1688,6 +1767,7 @@ public abstract class Tr implements Serializable, Tree {
             return singletonList(this);
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -1704,6 +1784,7 @@ public abstract class Tr implements Serializable, Tree {
 
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     public static abstract class Modifier extends Tr {
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Default extends Modifier {
@@ -1714,6 +1795,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Public extends Modifier {
@@ -1724,6 +1806,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Protected extends Modifier {
@@ -1734,6 +1817,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Private extends Modifier {
@@ -1744,6 +1828,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Abstract extends Modifier {
@@ -1754,6 +1839,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Static extends Modifier {
@@ -1764,6 +1850,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Final extends Modifier {
@@ -1774,6 +1861,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Native extends Modifier {
@@ -1784,6 +1872,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Strictfp extends Modifier {
@@ -1794,6 +1883,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Synchronized extends Modifier {
@@ -1804,6 +1894,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Transient extends Modifier {
@@ -1814,6 +1905,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Volatile extends Modifier {
@@ -1825,6 +1917,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class MultiCatch extends Tr implements TypeTree {
@@ -1852,6 +1945,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class NewArray extends Tr implements Expression {
@@ -1880,6 +1974,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitNewArray(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
@@ -1892,6 +1987,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Initializer extends Tr {
@@ -1905,6 +2001,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class NewClass extends Tr implements Statement, Expression {
@@ -1937,6 +2034,7 @@ public abstract class Tr implements Serializable, Tree {
             return singletonList(this);
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Arguments extends Tr {
@@ -1951,6 +2049,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Package extends Tr {
@@ -1969,6 +2068,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class ParameterizedType extends Tr implements TypeTree, Expression {
@@ -1995,6 +2095,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitParameterizedType(this), v.visitExpression(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class TypeArguments extends Tr {
@@ -2012,6 +2113,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Parentheses<T extends Tree> extends Tr implements Expression {
@@ -2040,6 +2142,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Primitive extends Tr implements TypeTree, Expression {
@@ -2065,6 +2168,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Return extends Tr implements Statement {
@@ -2084,6 +2188,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Switch extends Tr implements Statement {
@@ -2105,6 +2210,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Synchronized extends Tr implements Statement {
@@ -2126,6 +2232,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Ternary extends Tr implements Expression {
@@ -2153,6 +2260,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Throw extends Tr implements Statement {
@@ -2171,6 +2279,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class Try extends Tr implements Statement {
@@ -2209,6 +2318,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitTry(this), v.visitStatement(this));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Resources extends Tr {
@@ -2222,6 +2332,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Finally extends Tr {
@@ -2235,6 +2346,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeCast extends Tr implements Expression {
@@ -2261,6 +2373,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeParameter extends Tr {
@@ -2285,6 +2398,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.visitTypeParameter(this);
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Bounds extends Tr {
@@ -2299,6 +2413,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class TypeParameters extends Tr {
@@ -2317,6 +2432,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Unary extends Tr implements Statement, Expression {
@@ -2349,6 +2465,7 @@ public abstract class Tr implements Serializable, Tree {
         public abstract static class Operator extends Tr {
             // NOTE: only some operators may have empty formatting
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PreIncrement extends Operator {
@@ -2364,6 +2481,7 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PreDecrement extends Operator {
@@ -2379,6 +2497,7 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PostIncrement extends Operator {
@@ -2389,6 +2508,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class PostDecrement extends Operator {
@@ -2399,6 +2519,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Positive extends Operator {
@@ -2414,6 +2535,7 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Negative extends Operator {
@@ -2429,6 +2551,7 @@ public abstract class Tr implements Serializable, Tree {
                 }
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Complement extends Operator {
@@ -2439,6 +2562,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Not extends Operator {
@@ -2451,6 +2575,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class UnparsedSource extends Tr implements Statement, Expression {
@@ -2473,6 +2598,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class VariableDecls extends Tr implements Statement {
@@ -2511,6 +2637,7 @@ public abstract class Tr implements Serializable, Tree {
             return Optional.ofNullable(typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType()));
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Varargs extends Tr {
@@ -2521,6 +2648,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class Dimension extends Tr {
@@ -2533,6 +2661,7 @@ public abstract class Tr implements Serializable, Tree {
             Formatting formatting;
         }
 
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
         public static class NamedVar extends Tr {
@@ -2570,6 +2699,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class WhileLoop extends Tr implements Statement {
@@ -2591,6 +2721,7 @@ public abstract class Tr implements Serializable, Tree {
         }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     public static class Wildcard extends Tr implements Expression {
@@ -2619,6 +2750,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         public abstract static class Bound extends Tr {
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Extends extends Bound {
@@ -2629,6 +2761,7 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
 
+            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
             public static class Super extends Bound {

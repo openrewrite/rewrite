@@ -32,12 +32,12 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class AddField extends ScopedRefactorVisitor {
-    List<Tr.Modifier> modifiers;
-    String clazz;
-    String name;
+    private final List<Tr.Modifier> modifiers;
+    private final String clazz;
+    private final String name;
 
     @Nullable
-    String init;
+    private final String init;
 
     public AddField(UUID scope, List<Tr.Modifier> modifiers, String clazz, String name, @Nullable String init) {
         super(scope);

@@ -26,7 +26,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class FindMethods extends AstVisitor<List<Tr.MethodInvocation>> {
-    MethodMatcher matcher;
+    private final MethodMatcher matcher;
 
     public FindMethods(String signature) {
         this.matcher = new MethodMatcher(signature);

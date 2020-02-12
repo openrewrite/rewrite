@@ -31,8 +31,8 @@ import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class InsertMethodArgument extends ScopedRefactorVisitor {
-    int pos;
-    String source;
+    private final int pos;
+    private final String source;
 
     public InsertMethodArgument(UUID scope, int pos, String source) {
         super(scope);

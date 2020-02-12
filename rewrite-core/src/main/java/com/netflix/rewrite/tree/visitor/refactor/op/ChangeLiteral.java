@@ -29,7 +29,7 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 
 public class ChangeLiteral extends ScopedRefactorVisitor {
-    Function<Object, Object> transform;
+    private final Function<Object, Object> transform;
 
     public ChangeLiteral(UUID scope, Function<Object, Object> transform) {
         super(scope);

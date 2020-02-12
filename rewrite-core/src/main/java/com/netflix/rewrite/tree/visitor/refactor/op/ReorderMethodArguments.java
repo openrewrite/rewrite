@@ -20,7 +20,6 @@ import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
-import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -28,10 +27,8 @@ import java.util.List;
 import java.util.UUID;
 
 public class ReorderMethodArguments extends ScopedRefactorVisitor {
-    String[] byArgumentNames;
-
-    @NonFinal
-    String[] originalParamNames;
+    private final String[] byArgumentNames;
+    private String[] originalParamNames;
 
     public ReorderMethodArguments(UUID scope, String[] byArgumentNames) {
         super(scope);

@@ -25,10 +25,8 @@ import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.search.FindType;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 
 import static com.netflix.rewrite.tree.Formatting.format;
@@ -42,26 +40,19 @@ public class AddImport extends RefactorVisitor {
     OrderImports orderImports = new IntellijOrderImports();
 
     @EqualsAndHashCode.Include
-    String clazz;
+    private final String clazz;
 
     @EqualsAndHashCode.Include
     @Nullable
-    String staticMethod;
+    private final String staticMethod;
 
-    boolean onlyIfReferenced;
+    private final boolean onlyIfReferenced;
+    private final Type.Class classType;
 
-    @NonFinal
-    boolean coveredByExistingImport;
+    private boolean coveredByExistingImport;
+    private boolean hasReferences;
+    private Tr.CompilationUnit cu;
 
-    @NonFinal
-    boolean hasReferences;
-
-    @NonFinal
-    Tr.CompilationUnit cu;
-
-    @NonFinal
-    final
-    Type.Class classType;
 
     public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
         this.clazz = clazz;
@@ -147,8 +138,8 @@ public class AddImport extends RefactorVisitor {
 
     @RequiredArgsConstructor
     public class IntellijOrderImports extends OrderImports {
-        int classCountToUseStarImport;
-        int namesCountToUseStarImport;
+        private final int classCountToUseStarImport;
+        private final int namesCountToUseStarImport;
 
         public IntellijOrderImports() {
             this(5, 3);

@@ -20,6 +20,7 @@ import com.netflix.rewrite.tree.Tr.*;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import lombok.Data;
+import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,14 +33,11 @@ import java.util.function.Function;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
+@RequiredArgsConstructor
 public class TransformVisitor extends CursorAstVisitor<Tree> {
     private static final Logger logger = LoggerFactory.getLogger(TransformVisitor.class);
 
-    Iterable<AstTransform> transformations;
-
-    public TransformVisitor(Iterable<AstTransform> transformations) {
-        this.transformations = transformations;
-    }
+    private final Iterable<AstTransform> transformations;
 
     @Override
     public Tree defaultTo(Tree t) {

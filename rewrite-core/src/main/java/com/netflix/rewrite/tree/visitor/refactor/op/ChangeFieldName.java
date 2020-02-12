@@ -26,7 +26,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 public class ChangeFieldName extends ScopedRefactorVisitor {
-    String name;
+    private final String name;
 
     public ChangeFieldName(UUID scope, String name) {
         super(scope);

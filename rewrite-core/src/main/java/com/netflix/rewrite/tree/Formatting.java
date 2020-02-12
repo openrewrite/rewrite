@@ -39,8 +39,8 @@ public class Formatting implements Serializable {
         }
     };
 
-    String prefix;
-    String suffix;
+    private final String prefix;
+    private final String suffix;
 
     private Formatting(String prefix, String suffix) {
         this.prefix = prefix;

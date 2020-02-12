@@ -22,7 +22,7 @@ import java.util.UUID;
 
 public class RetrieveTreeVisitor extends AstVisitor<Tree> {
     @Nullable
-    UUID treeId;
+    private final UUID treeId;
 
     public RetrieveTreeVisitor(@Nullable UUID treeId) {
         this.treeId = treeId;

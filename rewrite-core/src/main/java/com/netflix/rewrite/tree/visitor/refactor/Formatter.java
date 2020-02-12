@@ -22,7 +22,6 @@ import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import lombok.experimental.NonFinal;
 
 import java.util.Map;
 import java.util.SortedMap;
@@ -37,17 +36,15 @@ import static java.util.stream.IntStream.range;
 
 @RequiredArgsConstructor
 public class Formatter {
-    Tr.CompilationUnit cu;
-
-    @NonFinal
-    Result wholeSourceIndent;
+    private final Tr.CompilationUnit cu;
+    private Result wholeSourceIndent;
 
     @RequiredArgsConstructor
     @Getter
     public static class Result {
-        int enclosingIndent;
-        int indentToUse;
-        boolean indentedWithSpaces;
+        private final int enclosingIndent;
+        private final int indentToUse;
+        private final boolean indentedWithSpaces;
     }
 
     public Result findIndent(int enclosingIndent, Iterable<? extends Tree> trees) {
@@ -104,15 +101,11 @@ public class Formatter {
      */
     @RequiredArgsConstructor
     private static class FindIndentVisitor extends CursorAstVisitor<Integer> {
-        SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
+        private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
+        private final int enclosingIndent;
 
-        int enclosingIndent;
-
-        @NonFinal
-        int linesWithSpaceIndents = 0;
-
-        @NonFinal
-        int linesWithTabIndents = 0;
+        private int linesWithSpaceIndents = 0;
+        private int linesWithTabIndents = 0;
 
         @Override
         public Integer defaultTo(Tree t) {

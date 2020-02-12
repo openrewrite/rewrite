@@ -31,7 +31,7 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public class FindAnnotations extends AstVisitor<List<Tr.Annotation>> {
-    AnnotationMatcher matcher;
+    private final AnnotationMatcher matcher;
 
     public FindAnnotations(String signature) {
         this.matcher = new AnnotationMatcher(signature);
@@ -48,7 +48,7 @@ public class FindAnnotations extends AstVisitor<List<Tr.Annotation>> {
     }
 
     private static class AnnotationMatcher {
-        AnnotationSignatureParser.AnnotationContext match;
+        private final AnnotationSignatureParser.AnnotationContext match;
 
         public AnnotationMatcher(String signature) {
             this.match = new AnnotationSignatureParser(new CommonTokenStream(new AspectJLexer(CharStreams.fromString(signature))))
@@ -103,11 +103,10 @@ public class FindAnnotations extends AstVisitor<List<Tr.Annotation>> {
                     .orElse(true);
         }
 
-        @FieldDefaults(makeFinal = true)
         @Data
         private static class AnnotationParameter {
-            String id;
-            String value;
+            private final String id;
+            private final String value;
         }
     }
 }

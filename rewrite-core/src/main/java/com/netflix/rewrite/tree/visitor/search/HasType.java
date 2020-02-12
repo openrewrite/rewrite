@@ -20,13 +20,11 @@ import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class HasType extends AstVisitor<Boolean> {
-    String clazz;
-
-    public HasType(String clazz) {
-        this.clazz = clazz;
-    }
+    private final String clazz;
 
     @Override
     public Boolean defaultTo(Tree t) {

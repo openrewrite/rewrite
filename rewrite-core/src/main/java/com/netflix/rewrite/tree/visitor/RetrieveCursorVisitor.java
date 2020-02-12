@@ -23,7 +23,7 @@ import java.util.UUID;
 
 @AllArgsConstructor
 public class RetrieveCursorVisitor extends CursorAstVisitor<Cursor> {
-    UUID treeId;
+    private final UUID treeId;
 
     @Override
     public Cursor defaultTo(Tree t) {

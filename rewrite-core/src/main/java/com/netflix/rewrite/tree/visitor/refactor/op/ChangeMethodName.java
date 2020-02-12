@@ -27,7 +27,7 @@ import java.util.UUID;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class ChangeMethodName extends ScopedRefactorVisitor {
-    String name;
+    private final String name;
 
     public ChangeMethodName(UUID scope, String name) {
         super(scope);

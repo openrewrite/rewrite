@@ -18,13 +18,11 @@ package com.netflix.rewrite.tree.visitor.search;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
 
+@RequiredArgsConstructor
 public class HasImport extends AstVisitor<Boolean> {
-    String clazz;
-
-    public HasImport(String clazz) {
-        this.clazz = clazz;
-    }
+    private final String clazz;
 
     @Override
     public Boolean defaultTo(Tree t) {

@@ -29,7 +29,7 @@ import static com.netflix.rewrite.tree.Tr.randomId;
 import static java.util.Collections.emptyList;
 
 public class ChangeFieldType extends ScopedRefactorVisitor {
-    String targetType;
+    private final String targetType;
 
     public ChangeFieldType(UUID scope, String targetType) {
         super(scope);

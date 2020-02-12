@@ -37,14 +37,9 @@ import static java.util.stream.Collectors.joining;
 
 @Getter
 public class MethodMatcher {
-    @NonFinal
-    Pattern targetTypePattern;
-
-    @NonFinal
-    Pattern methodNamePattern;
-
-    @NonFinal
-    Pattern argumentPattern;
+    private Pattern targetTypePattern;
+    private Pattern methodNamePattern;
+    private Pattern argumentPattern;
 
     public MethodMatcher(String signature) {
         var parser = new RefactorMethodSignatureParser(new CommonTokenStream(new AspectJLexer(
@@ -136,7 +131,7 @@ class TypeVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
  * picks out execution join points for void methods named m whose last parameter is of type int.
  */
 class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<String> {
-    List<Argument> arguments = new ArrayList<>();
+    private final List<Argument> arguments = new ArrayList<>();
 
     @Override
     public String visitTerminal(TerminalNode node) {
@@ -193,7 +188,7 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
     private static abstract class Argument {
         abstract String getRegex();
 
-        static final Argument DOT_DOT = new Argument() {
+        private static final Argument DOT_DOT = new Argument() {
             @Override
             String getRegex() {
                 return "([^,]+,)*([^,]+)";

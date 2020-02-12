@@ -20,8 +20,7 @@ import com.netflix.rewrite.tree.Tree;
 import lombok.experimental.NonFinal;
 
 public abstract class CursorAstVisitor<R> extends AstVisitor<R> {
-    @NonFinal
-    ThreadLocal<Cursor> cursor = new ThreadLocal<>();
+    private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
 
     public R visit(Tree tree) {
         if(tree == null) {

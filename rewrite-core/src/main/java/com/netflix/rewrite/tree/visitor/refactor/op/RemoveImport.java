@@ -20,7 +20,6 @@ import com.netflix.rewrite.tree.visitor.MethodMatcher;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,25 +34,19 @@ import static java.util.stream.Collectors.toList;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport extends RefactorVisitor {
     @EqualsAndHashCode.Include
-    String clazz;
+    private final String clazz;
 
-    MethodMatcher methodMatcher;
+    private final MethodMatcher methodMatcher;
 
-    Type.Class classType;
+    private final Type.Class classType;
 
-    @NonFinal
-    Tr.Import namedImport;
+    private Tr.Import namedImport;
+    private Tr.Import starImport;
+    private Tr.Import staticStarImport;
 
-    @NonFinal
-    Tr.Import starImport;
-
-    Set<String> referencedTypes = new HashSet<>();
-    Set<Tr.Ident> referencedMethods = new HashSet<>();
-
-    List<Tr.Import> staticNamedImports = new ArrayList<>();
-
-    @NonFinal
-    Tr.Import staticStarImport;
+    private final Set<String> referencedTypes = new HashSet<>();
+    private final Set<Tr.Ident> referencedMethods = new HashSet<>();
+    private final List<Tr.Import> staticNamedImports = new ArrayList<>();
 
     public RemoveImport(String clazz) {
         this.clazz = clazz;

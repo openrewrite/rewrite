@@ -18,18 +18,16 @@ package com.netflix.rewrite.tree.visitor.search;
 import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 
+@RequiredArgsConstructor
 public class FindInheritedFields extends AstVisitor<List<Type.Var>> {
-    String fullyQualifiedClassName;
-
-    public FindInheritedFields(String fullyQualifiedClassName) {
-        this.fullyQualifiedClassName = fullyQualifiedClassName;
-    }
+    private final String fullyQualifiedClassName;
 
     @Override
     public List<Type.Var> defaultTo(Tree t) {

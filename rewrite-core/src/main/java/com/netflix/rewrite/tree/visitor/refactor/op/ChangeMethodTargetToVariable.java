@@ -28,10 +28,10 @@ import java.util.UUID;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
-    String varName;
+    private final String varName;
 
     @Nullable
-    Type.Class type;
+    private final Type.Class type;
 
     public ChangeMethodTargetToVariable(UUID scope, String varName, @Nullable Type.Class type) {
         super(scope);

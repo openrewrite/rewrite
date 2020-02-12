@@ -24,20 +24,14 @@ import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.AddImport;
 import com.netflix.rewrite.tree.visitor.refactor.op.DeleteStatement;
 import com.netflix.rewrite.tree.visitor.refactor.op.RemoveImport;
-import lombok.experimental.NonFinal;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
-
-import static java.util.Arrays.asList;
-import static java.util.Collections.singletonList;
 
 public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform>> {
     private final ThreadLocal<List<RefactorVisitor>> andThen = new ThreadLocal<>();
 
-    @NonFinal
     private Formatter formatter;
 
     public RefactorVisitor() {

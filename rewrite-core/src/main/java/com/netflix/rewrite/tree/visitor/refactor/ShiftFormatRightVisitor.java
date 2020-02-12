@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 import static java.util.stream.IntStream.range;
 
 public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
-    String shift;
+    private final String shift;
 
     public ShiftFormatRightVisitor(UUID scope, int shift, boolean isIndentedWithSpaces) {
         super(scope);

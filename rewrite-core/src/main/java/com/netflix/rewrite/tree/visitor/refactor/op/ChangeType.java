@@ -35,8 +35,8 @@ import static java.util.Collections.emptyList;
  * is defined on the super class.
  */
 public class ChangeType extends RefactorVisitor {
-    String from;
-    Type.Class toClassType;
+    private final String from;
+    private final Type.Class toClassType;
 
     public ChangeType(String from, String to) {
         this.from = from;

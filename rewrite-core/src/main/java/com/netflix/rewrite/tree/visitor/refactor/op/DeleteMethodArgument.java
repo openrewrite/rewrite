@@ -30,7 +30,7 @@ import java.util.UUID;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class DeleteMethodArgument extends ScopedRefactorVisitor {
-    int pos;
+    private final int pos;
 
     public DeleteMethodArgument(UUID scope, int pos) {
         super(scope);

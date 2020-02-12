@@ -32,7 +32,7 @@ import java.util.UUID;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
-    String clazz;
+    private final String clazz;
 
     public ChangeMethodTargetToStatic(UUID scope, String clazz) {
         super(scope);

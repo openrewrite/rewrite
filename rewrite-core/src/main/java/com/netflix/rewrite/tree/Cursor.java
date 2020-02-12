@@ -30,9 +30,9 @@ import static java.util.stream.StreamSupport.stream;
 @AllArgsConstructor
 public class Cursor {
     @Nullable
-    Cursor parent;
+    private final Cursor parent;
 
-    Tree tree;
+    private final Tree tree;
 
     public Iterator<Tree> getPath() {
         return new CursorIterator(this);
@@ -50,8 +50,7 @@ public class Cursor {
     }
 
     private static class CursorIterator implements Iterator<Tree> {
-        @NonFinal
-        Cursor cursor;
+        private Cursor cursor;
 
         private CursorIterator(Cursor cursor) {
             this.cursor = cursor;

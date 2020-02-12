@@ -20,17 +20,15 @@ import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 import static java.util.Collections.*;
 
+@RequiredArgsConstructor
 public class FindType extends AstVisitor<List<NameTree>> {
-    String clazz;
-
-    public FindType(String clazz) {
-        this.clazz = clazz;
-    }
+    private final String clazz;
 
     @Override
     public List<NameTree> defaultTo(Tree t) {

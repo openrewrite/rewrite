@@ -17,16 +17,14 @@ package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.tree.Tree;
 import lombok.Data;
-import lombok.experimental.FieldDefaults;
 
 import java.util.UUID;
 import java.util.function.Function;
 
-@FieldDefaults(makeFinal = true)
 @Data
 public class AstTransform {
-    UUID id;
-    String name;
-    Class<Tree> treeType;
-    Function<Tree, Tree> mutation;
+    private final UUID id;
+    private final String name;
+    private final Class<Tree> treeType;
+    private final Function<Tree, Tree> mutation;
 }

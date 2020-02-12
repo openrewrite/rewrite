@@ -19,18 +19,16 @@ import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
+@RequiredArgsConstructor
 public class FindFields extends AstVisitor<List<Tr.VariableDecls>> {
-    String fullyQualifiedName;
-
-    public FindFields(String fullyQualifiedName) {
-        this.fullyQualifiedName = fullyQualifiedName;
-    }
+    private final String fullyQualifiedName;
 
     @Override
     public List<Tr.VariableDecls> defaultTo(Tree t) {
