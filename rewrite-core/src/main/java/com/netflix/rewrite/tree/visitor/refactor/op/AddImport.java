@@ -62,7 +62,7 @@ public class AddImport extends RefactorVisitor {
     }
 
     @Override
-    protected String getRuleName() {
+    public String getRuleName() {
         return "add-import";
     }
 

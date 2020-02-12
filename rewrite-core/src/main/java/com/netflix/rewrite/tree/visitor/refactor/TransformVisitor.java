@@ -214,7 +214,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     @Override
     public Tree visitLambda(Lambda lambda) {
         return transform(lambda,
-                t(l -> l.getParamSet().getParams(), (l, params) -> l.withParamSet(l.getParamSet().withParams(params))),
+                t(Lambda::getParamSet, Lambda::withParamSet, Lambda.Parameters::getParams, Lambda.Parameters::withParams),
                 t(Lambda::getBody, Lambda::withBody));
     }
 
@@ -390,24 +390,24 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     }
 
     @Data
-    private static class Transformable<T extends Tree, F> {
-        private final Function<T, F> getter;
-        private final BiFunction<T, F, T> with;
+    private static class Transformable<T extends Tree, U extends T, F> {
+        private final Function<U, F> getter;
+        private final BiFunction<U, F, T> with;
     }
 
     /**
      * One-level-deep field transformation
      */
-    private static <T extends Tree, F> Transformable<T, F> t(Function<T, F> getter,
-                                                             BiFunction<T, F, T> with) {
+    private static <T extends Tree, U extends T, F> Transformable<T, U, F> t(Function<U, F> getter,
+                                                             BiFunction<U, F, T> with) {
         return new Transformable<>(getter, with);
     }
 
     /**
      * Two-level-deep field transformation
      */
-    private static <T extends Tree, F1, F2> Transformable<T, F2> t(Function<T, F1> getter1,
-                                                                   BiFunction<T, F1, T> with1,
+    private static <T extends Tree, U extends T, F1, F2> Transformable<T, U, F2> t(Function<U, F1> getter1,
+                                                                   BiFunction<U, F1, T> with1,
                                                                    Function<F1, F2> getter2,
                                                                    BiFunction<F1, F2, F1> with2) {
         return t(
@@ -428,8 +428,8 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
     @SafeVarargs
-    private <T extends Tree> T transform(T original, Transformable<T, ?>... checks) {
-        T maybeMutated = original;
+    private <T extends Tree, U extends T> Tree transform(U original, Transformable<T, U, ?>... checks) {
+        Tree maybeMutated = original;
         for (Transformable check : checks) {
             Object field = check.getter.apply(maybeMutated);
             if (field == null) {
@@ -439,7 +439,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
                     visit((Tree) field) :
                     visitList((List) field);
             if (field != maybeMutatedField) {
-                maybeMutated = (T) check.with.apply(maybeMutated, maybeMutatedField);
+                maybeMutated = (Tree) check.with.apply(maybeMutated, maybeMutatedField);
             }
         }
         return transformShallow(maybeMutated);
@@ -449,8 +449,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
      * Apply transformations at just this level of the tree. It is the responsibility of each visitXX method to determine
      * which nested levels we should attempt transformations on as well.
      */
-    @SuppressWarnings("unchecked")
-    private <T extends Tree> T transformShallow(T tree) {
+    private Tree transformShallow(Tree tree) {
         List<AstTransform> filteredTransforms = stream(transformations.spliterator(), false)
                 .filter(t -> t.getId().equals(getCursor().getTree().getId()))
                 .filter(t -> t.getTreeType().isInstance(tree))
@@ -472,7 +471,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
             }
         }
 
-        return (T) mutation;
+        return mutation;
     }
 
     @SuppressWarnings("unchecked")

@@ -114,7 +114,14 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
     @SuppressWarnings("unchecked")
     protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
         List<AstTransform> changes = new ArrayList<>(1);
-        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), t -> mutation.apply((U) t)));
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), t -> mutation.apply(((U) t))));
+        return changes;
+    }
+
+    @SuppressWarnings("unchecked")
+    protected <T extends Tree, U extends T> List<AstTransform> transform(Class<T> widenTo, U target, Function<U, T> mutation) {
+        List<AstTransform> changes = new ArrayList<>(1);
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) widenTo, t -> mutation.apply(((U) t))));
         return changes;
     }
 }
