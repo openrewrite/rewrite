@@ -92,5 +92,3 @@ open class FindMethodTest : Parser by OpenJdkParser() {
         assertEquals(1, parse(a, b).classes[0].findMethodCalls("B.C foo()").size)
     }
 }
-
-class OpenJdkJdkFindMethodTest: FindMethodTest()

@@ -172,5 +172,3 @@ open class FindTypeTest : Parser by OpenJdkParser() {
         assertEquals(2, b.findType("a.A1").size)
     }
 }
-
-class OpenJdkJdkFindTypeTest: FindTypeTest()

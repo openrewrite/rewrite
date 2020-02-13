@@ -64,5 +64,3 @@ open class HasImportTest : Parser by OpenJdkParser() {
         assertTrue(parse(c, a).hasImport("a.A"))
     }
 }
-
-class OpenJdkJdkHasImportTest: HasImportTest()

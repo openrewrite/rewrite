@@ -2606,7 +2606,10 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         List<Annotation> annotations;
+
+        @With
         List<Modifier> modifiers;
 
         @With

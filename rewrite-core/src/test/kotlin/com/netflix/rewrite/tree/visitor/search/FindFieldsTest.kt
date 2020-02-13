@@ -73,5 +73,3 @@ open class FindFieldsTest : Parser by OpenJdkParser() {
         assertEquals(1, a.classes[0].findFields("java.io.File").size)
     }
 }
-
-class OpenJdkJdkFindFieldsTest: FindFieldsTest()

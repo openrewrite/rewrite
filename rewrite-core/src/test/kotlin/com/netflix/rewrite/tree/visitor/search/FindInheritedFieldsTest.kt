@@ -59,5 +59,3 @@ open class FindInheritedFieldsTest : Parser by OpenJdkParser() {
         assertTrue(b.classes[0].findInheritedFields("java.util.Set").isEmpty())
     }
 }
-
-class OpenJdkFindInheritedFieldsTest: FindInheritedFieldsTest()

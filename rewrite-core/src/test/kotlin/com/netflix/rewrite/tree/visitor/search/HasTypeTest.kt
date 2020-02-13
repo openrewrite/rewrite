@@ -99,5 +99,3 @@ open class HasTypeTest : Parser by OpenJdkParser() {
         a.classes[0].hasType("DoesNotMatter") // doesn't throw an exception
     }
 }
-
-class OpenJdkJdkHasTypeTest: HasTypeTest()
