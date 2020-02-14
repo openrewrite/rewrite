@@ -17,10 +17,18 @@ package com.netflix.rewrite.tree;
 
 import com.netflix.rewrite.internal.lang.Nullable;
 
+import java.util.Collections;
 import java.util.List;
+
+import static java.util.Collections.emptyList;
 
 public class TypeUtils {
     private TypeUtils() {
+    }
+
+    public static List<Type.Var> getVisibleSupertypeMembers(@Nullable Type type) {
+        Type.Class classType = TypeUtils.asClass(type);
+        return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
     }
 
     public static boolean isString(@Nullable Type type) {

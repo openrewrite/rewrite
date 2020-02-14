@@ -20,7 +20,6 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 
 import java.util.Iterator;
-import java.util.Optional;
 import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -141,7 +140,12 @@ public class Cursor {
                         t instanceof Tr.Try ||
                         t instanceof Tr.ForLoop ||
                         t instanceof Tr.ForEachLoop).findAny()
-                .map(higherNameScope -> scope.getPathAsStream().anyMatch(higherNameScope::equals))
+                .map(higherNameScope -> scope.getPathAsStream()
+                        .takeWhile(t -> !(t instanceof Tr.ClassDecl) ||
+                                (((Tr.ClassDecl) t).getKind() instanceof Tr.ClassDecl.Kind.Class &&
+                                        !((Tr.ClassDecl) t).hasModifier("static"))
+                        )
+                        .anyMatch(higherNameScope::equals))
                 .orElse(false);
     }
 }

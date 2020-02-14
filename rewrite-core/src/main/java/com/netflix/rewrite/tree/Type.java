@@ -26,10 +26,7 @@ import lombok.Setter;
 import lombok.With;
 
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static java.util.Collections.emptyList;
 import static java.util.Comparator.comparing;
@@ -141,6 +138,16 @@ public interface Type extends Serializable {
                     isAssignableFrom(clazz.getSupertype()) ||
                     clazz.getInterfaces().stream().anyMatch(i -> i instanceof Class && isAssignableFrom((Class) i))
             );
+        }
+
+        @JsonIgnore
+        public List<Type.Var> getVisibleSupertypeMembers() {
+            List<Type.Var> members = new ArrayList<>();
+            if(supertype != null) {
+                members.addAll(supertype.getMembers());
+                members.addAll(supertype.getVisibleSupertypeMembers());
+            }
+            return members;
         }
 
         @Override
