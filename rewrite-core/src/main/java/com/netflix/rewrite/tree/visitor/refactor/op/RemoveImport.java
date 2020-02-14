@@ -112,7 +112,7 @@ public class RemoveImport extends RefactorVisitor {
         } else if (starImport != null && referencedTypes.isEmpty()) {
             deletes.addAll(delete(starImport));
         } else if (starImport != null && referencedTypes.size() == 1) {
-            deletes.addAll(transform(getCursor().getParentCompilationUnit(), cu -> cu
+            deletes.addAll(transform(getCursor().enclosingCompilationUnit(), cu -> cu
                     .withImports(cu.getImports().stream()
                             .map(i -> i == starImport ?
                                     new Tr.Import(randomId(), (Tr.FieldAccess) TreeBuilder.buildName(referencedTypes.iterator().next(), format(" ")), false, i.getFormatting()) :
@@ -137,7 +137,7 @@ public class RemoveImport extends RefactorVisitor {
     }
 
     private List<AstTransform> delete(Tr.Import impoort) {
-        return transform(getCursor().getParentCompilationUnit(), cu -> cu.withImports(cu.getImports().stream()
+        return transform(getCursor().enclosingCompilationUnit(), cu -> cu.withImports(cu.getImports().stream()
                 .filter(i -> i != impoort)
                 .collect(toList())));
     }

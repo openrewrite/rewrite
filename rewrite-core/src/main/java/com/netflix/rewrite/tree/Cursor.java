@@ -18,11 +18,12 @@ package com.netflix.rewrite.tree;
 import com.netflix.rewrite.internal.lang.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
-import lombok.experimental.NonFinal;
 
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.Spliterators;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.stream.StreamSupport.stream;
 
@@ -38,15 +39,8 @@ public class Cursor {
         return new CursorIterator(this);
     }
 
-    public Tr.CompilationUnit getParentCompilationUnit() {
-        Iterator<Tree> path = getPath();
-        while(path.hasNext()) {
-            Tree next = path.next();
-            if(next instanceof Tr.CompilationUnit) {
-                return (Tr.CompilationUnit) next;
-            }
-        }
-        throw new IllegalStateException("Expected to find a Tr.CompilationUnit in " + this);
+    public Stream<Tree> getPathAsStream() {
+        return stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false);
     }
 
     private static class CursorIterator implements Iterator<Tree> {
@@ -67,6 +61,14 @@ public class Cursor {
             cursor = cursor.parent;
             return t;
         }
+    }
+
+    public Tr.CompilationUnit enclosingCompilationUnit() {
+        Tr.CompilationUnit cu = firstEnclosing(Tr.CompilationUnit.class);
+        if (cu == null) {
+            throw new IllegalStateException("Expected to find a Tr.CompilationUnit in " + this);
+        }
+        return cu;
     }
 
     @Nullable
@@ -92,9 +94,9 @@ public class Cursor {
     @Nullable
     private <T extends Tree> T firstEnclosing(Class<T> tClass) {
         CursorIterator iter = new CursorIterator(this);
-        while(iter.hasNext()) {
+        while (iter.hasNext()) {
             Tree t = iter.next();
-            if(tClass.isInstance(t)) {
+            if (tClass.isInstance(t)) {
                 //noinspection unchecked
                 return (T) t;
             }
@@ -106,8 +108,8 @@ public class Cursor {
     public String toString() {
         return "Cursor{" +
                 stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
-                    .map(t -> t.getClass().getSimpleName())
-                    .collect(Collectors.joining("->"))
+                        .map(t -> t.getClass().getSimpleName())
+                        .collect(Collectors.joining("->"))
                 + "}";
     }
 
@@ -117,7 +119,7 @@ public class Cursor {
     }
 
     public Cursor getParentOrThrow() {
-        if(parent == null) {
+        if (parent == null) {
             throw new IllegalStateException("Expected to find a parent for " + this);
         }
         return parent;
@@ -126,5 +128,20 @@ public class Cursor {
     @SuppressWarnings("unchecked")
     public <T extends Tree> T getTree() {
         return (T) tree;
+    }
+
+    /**
+     * @param scope The cursor of the lower scoped tree element to check.
+     * @return Whether this cursor shares the same name scope as {@code scope}.
+     */
+    public boolean isInSameNameScope(Cursor scope) {
+        return getPathAsStream()
+                .filter(t -> t instanceof Tr.Block ||
+                        t instanceof Tr.MethodDecl ||
+                        t instanceof Tr.Try ||
+                        t instanceof Tr.ForLoop ||
+                        t instanceof Tr.ForEachLoop).findAny()
+                .map(higherNameScope -> scope.getPathAsStream().anyMatch(higherNameScope::equals))
+                .orElse(false);
     }
 }

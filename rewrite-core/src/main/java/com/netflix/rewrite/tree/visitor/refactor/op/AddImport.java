@@ -106,7 +106,7 @@ public class AddImport extends RefactorVisitor {
             return emptyList();
         }
 
-        List<AstTransform> changes = transform(getCursor().getParentCompilationUnit(), cu -> cu.withImports(orderImports.addImport()));
+        List<AstTransform> changes = transform(getCursor().enclosingCompilationUnit(), cu -> cu.withImports(orderImports.addImport()));
 
         if (cu.getClasses().size() > 0 && cu.getImports().isEmpty() ||
                 cu.getClasses().get(0).getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() < 2) {
