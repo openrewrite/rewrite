@@ -18,7 +18,9 @@ package com.netflix.rewrite.tree.visitor.refactor
 import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.tree.Cursor
 import com.netflix.rewrite.tree.Tr
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 
 class TransformVisitorTest : Parser by OpenJdkParser() {
@@ -48,5 +50,25 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
                         }
                     }
                 """.trimIndent())
+    }
+
+    @Test
+    fun canAccessCursorFromInsideTransformation() {
+        val a = parse("""
+            public class A {
+                public void test() {
+                }
+            }
+        """)
+
+        val accessCursor = object : RefactorVisitor() {
+            override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform> =
+                    transform(method) { m: Tr.MethodDecl, c: Cursor? ->
+                        assertNotNull(c)
+                        m
+                    }
+        }
+
+        a.refactor().run(accessCursor).fix()
     }
 }

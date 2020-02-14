@@ -16,10 +16,7 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.tree.Statement;
-import com.netflix.rewrite.tree.Tr;
-import com.netflix.rewrite.tree.Tree;
-import com.netflix.rewrite.tree.Type;
+import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.AddImport;
 import com.netflix.rewrite.tree.visitor.refactor.op.DeleteStatement;
@@ -27,6 +24,7 @@ import com.netflix.rewrite.tree.visitor.refactor.op.RemoveImport;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform>> {
@@ -112,16 +110,30 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
     }
 
     @SuppressWarnings("unchecked")
+    protected <U extends Tree> List<AstTransform> transform(U target, BiFunction<U, Cursor, U> mutation) {
+        List<AstTransform> changes = new ArrayList<>(1);
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), (t, c) -> mutation.apply((U) t, c)));
+        return changes;
+    }
+
+    @SuppressWarnings("unchecked")
+    protected <T extends Tree, U extends T> List<AstTransform> transform(Class<T> widenTo, U target, BiFunction<U, Cursor, T> mutation) {
+        List<AstTransform> changes = new ArrayList<>(1);
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) widenTo, (t, c) -> mutation.apply((U) t, c)));
+        return changes;
+    }
+
+    @SuppressWarnings("unchecked")
     protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
         List<AstTransform> changes = new ArrayList<>(1);
-        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), t -> mutation.apply(((U) t))));
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), (t, c) -> mutation.apply(((U) t))));
         return changes;
     }
 
     @SuppressWarnings("unchecked")
     protected <T extends Tree, U extends T> List<AstTransform> transform(Class<T> widenTo, U target, Function<U, T> mutation) {
         List<AstTransform> changes = new ArrayList<>(1);
-        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) widenTo, t -> mutation.apply(((U) t))));
+        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) widenTo, (t, c) -> mutation.apply(((U) t))));
         return changes;
     }
 }

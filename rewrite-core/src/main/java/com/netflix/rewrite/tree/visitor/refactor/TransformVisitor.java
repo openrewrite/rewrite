@@ -463,7 +463,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
                 logger.debug(mutation.printTrimmed() + "\n");
             }
 
-            mutation = trans.getMutation().apply(mutation);
+            mutation = trans.getMutation().apply(mutation, getCursor());
 
             if (logger.isDebugEnabled()) {
                 logger.debug("Transformed: ");

@@ -17,7 +17,6 @@ package com.netflix.rewrite.tree.visitor;
 
 import com.netflix.rewrite.tree.Cursor;
 import com.netflix.rewrite.tree.Tree;
-import lombok.experimental.NonFinal;
 
 public abstract class CursorAstVisitor<R> extends AstVisitor<R> {
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
