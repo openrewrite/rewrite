@@ -70,6 +70,11 @@ public class Cursor {
     }
 
     @Nullable
+    public Tr.Block<?> enclosingBlock() {
+        return firstEnclosing(Tr.Block.class);
+    }
+
+    @Nullable
     public Tr.VariableDecls enclosingVariableDecl() {
         return firstEnclosing(Tr.VariableDecls.class);
     }

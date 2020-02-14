@@ -22,6 +22,7 @@ import lombok.Getter;
 
 import java.io.Serializable;
 import java.util.Map;
+import java.util.PrimitiveIterator;
 
 /**
  * The stylistic surroundings of a tree element
@@ -69,5 +70,17 @@ public class Formatting implements Serializable {
 
     public Formatting withSuffix(String suffix) {
         return format(prefix, suffix);
+    }
+
+    public static int getIndent(String formatting) {
+        int indent = 0;
+        for (char c : formatting.toCharArray()) {
+            if(c == '\n' || c == '\r' || !Character.isWhitespace(c)) {
+                indent = 0;
+                continue;
+            }
+            indent++;
+        }
+        return indent;
     }
 }

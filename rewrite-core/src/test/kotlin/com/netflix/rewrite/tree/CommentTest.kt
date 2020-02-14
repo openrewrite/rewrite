@@ -24,13 +24,13 @@ abstract class CommentTest(p: Parser): Parser by p {
     @Test
     fun comments() {
         val aSrc = """
-            |// About me
-            |public class A {
-            |/* } */
-            |// }
-            |}
-            |// Trailing
-        """.trimMargin()
+            // About me
+            public class A {
+            /* } */
+            // }
+            }
+            // Trailing
+        """.trimIndent()
 
         val a = parse(aSrc)
         assertEquals(aSrc, a.printTrimmed())

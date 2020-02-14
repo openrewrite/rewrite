@@ -654,7 +654,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @JsonIgnore
         public int getIndent() {
-            return (int) endOfBlockSuffix.chars().dropWhile(c -> c == '\n' || c == '\r').count();
+            return Formatting.getIndent(endOfBlockSuffix);
         }
     }
 
@@ -734,6 +734,7 @@ public abstract class Tr implements Serializable, Tree {
         @Getter
         List<Annotation> annotations;
 
+        @With
         @Getter
         List<Modifier> modifiers;
 
@@ -1598,9 +1599,11 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         @Getter
         List<Annotation> annotations;
 
+        @With
         @Getter
         List<Modifier> modifiers;
 
@@ -1663,6 +1666,11 @@ public abstract class Tr implements Serializable, Tree {
 
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
+        }
+
+        @JsonIgnore
+        public boolean isConstructor() {
+            return getReturnTypeExpr() == null;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
