@@ -15,12 +15,29 @@
  */
 package com.netflix.rewrite.tree
 
+import com.netflix.rewrite.asClass
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
 open class TypeTest: Parser by OpenJdkParser() {
+    @Test
+    fun memberVisibility() {
+        val b = """
+            public class B {
+                protected int n;
+            }
+        """.trimIndent()
+
+        val a = parse("""
+            public class A extends B {
+            }
+        """.trimIndent(), b)
+
+        assertTrue(a.classes[0].type.asClass()!!.supertype!!.members[0].flags.contains(Flag.Protected))
+    }
+
     @Test
     fun isAssignableFrom() {
         val a = parse("""

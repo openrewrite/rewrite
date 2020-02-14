@@ -24,7 +24,7 @@ open class CursorTest : Parser by OpenJdkParser() {
     @Test
     fun inSameNameScope() {
         val a = parse("""
-            public class A {
+            public class A extends B {
                 int n;
                 
                 public void foo(int n1) {

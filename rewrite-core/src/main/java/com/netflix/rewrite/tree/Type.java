@@ -144,7 +144,9 @@ public interface Type extends Serializable {
         public List<Type.Var> getVisibleSupertypeMembers() {
             List<Type.Var> members = new ArrayList<>();
             if(supertype != null) {
-                members.addAll(supertype.getMembers());
+                supertype.getMembers().stream()
+                        .filter(member -> !member.hasFlags(Flag.Private))
+                        .forEach(members::add);
                 members.addAll(supertype.getVisibleSupertypeMembers());
             }
             return members;
