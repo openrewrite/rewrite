@@ -133,7 +133,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     @Override
     public Tree visitDoWhileLoop(DoWhileLoop doWhileLoop) {
         return transform(doWhileLoop,
-                t(DoWhileLoop::getCondition, DoWhileLoop::withCondition),
+                t(DoWhileLoop::getWhileCondition, DoWhileLoop::withWhileCondition, DoWhileLoop.While::getCondition, DoWhileLoop.While::withCondition),
                 t(DoWhileLoop::getBody, DoWhileLoop::withBody));
     }
 

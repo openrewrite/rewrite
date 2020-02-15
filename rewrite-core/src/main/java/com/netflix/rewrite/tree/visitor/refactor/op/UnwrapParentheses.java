@@ -25,7 +25,6 @@ import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 
@@ -225,9 +224,9 @@ public class UnwrapParentheses extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitDoWhileLoop(Tr.DoWhileLoop doWhileLoop) {
-        return maybeTransform(scope.equals(doWhileLoop.getCondition().getTree().getId()),
+        return maybeTransform(scope.equals(doWhileLoop.getWhileCondition().getCondition().getTree().getId()),
                 super.visitDoWhileLoop(doWhileLoop),
-                transform(doWhileLoop.getCondition().getTree(), UNWRAP_PARENS));
+                transform(doWhileLoop.getWhileCondition().getCondition().getTree(), UNWRAP_PARENS));
     }
 
     @Override

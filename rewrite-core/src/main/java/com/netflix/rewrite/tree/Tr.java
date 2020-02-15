@@ -982,7 +982,7 @@ public abstract class Tr implements Serializable, Tree {
         Statement body;
 
         @With
-        Parentheses<Expression> condition;
+        While whileCondition;
 
         @With
         Formatting formatting;
@@ -990,6 +990,20 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitDoWhileLoop(this), v.visitStatement(this));
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class While extends Tr {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Parentheses<Expression> condition;
+
+            @With
+            Formatting formatting;
         }
     }
 

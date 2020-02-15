@@ -500,10 +500,11 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     @Override
     public com.netflix.rewrite.tree.Tree visitDoWhileLoop(DoWhileLoopTree node, Formatting fmt) {
         skip("do");
-        Statement stat = convert(node.getStatement(), t -> sourceBefore("while"));
+        Statement stat = convert(node.getStatement());
+        var whilePrefix = sourceBefore("while");
         return new Tr.DoWhileLoop(randomId(),
                 stat,
-                convert(node.getCondition()),
+                new Tr.DoWhileLoop.While(randomId(), convert(node.getCondition()), format(whilePrefix)),
                 fmt
         );
     }

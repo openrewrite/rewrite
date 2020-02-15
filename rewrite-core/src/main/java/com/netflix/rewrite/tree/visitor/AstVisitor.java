@@ -218,7 +218,7 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitDoWhileLoop(Tr.DoWhileLoop doWhileLoop) {
-        return visitAfter(visit(doWhileLoop.getBody()), doWhileLoop.getCondition());
+        return visitAfter(visit(doWhileLoop.getBody()), doWhileLoop.getWhileCondition().getCondition());
     }
 
     public R visitEmpty(Tr.Empty empty) {

@@ -16,6 +16,7 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.StringUtils;
+import com.netflix.rewrite.tree.Cursor;
 import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
@@ -48,7 +49,11 @@ public class Formatter {
         private final boolean indentedWithSpaces;
 
         public String getPrefix() {
-            return range(0, indentToUse + enclosingIndent)
+            return getPrefix(0);
+        }
+
+        public String getPrefix(int offset) {
+            return range(0, indentToUse + (indentToUse * offset) + enclosingIndent)
                     .mapToObj(i -> indentedWithSpaces ? " " : "\t")
                     .collect(joining("", "\n", ""));
         }
@@ -78,6 +83,10 @@ public class Formatter {
     public Formatting format(Tr.Block<?> relativeToEnclosing) {
         Result indentation = findIndent(relativeToEnclosing.getIndent(), relativeToEnclosing.getStatements());
         return Formatting.format(indentation.getPrefix());
+    }
+
+    public Formatting format(Cursor cursor) {
+        return format(cursor.enclosingBlock());
     }
 
     /**

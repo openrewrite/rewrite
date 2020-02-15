@@ -332,7 +332,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitDoWhileLoop(DoWhileLoop doWhileLoop) {
-        return fmt(doWhileLoop, "do" + visit(doWhileLoop.getBody()) + "while" + visit(doWhileLoop.getCondition()));
+        return fmt(doWhileLoop, "do" + fmtStatement(doWhileLoop.getBody()) + fmt(doWhileLoop.getWhileCondition(), "while") + visit(doWhileLoop.getWhileCondition().getCondition()));
     }
 
     @Override

@@ -34,7 +34,7 @@ abstract class DoWhileLoopTest(p: Parser): Parser by p {
 
     @Test
     fun doWhileLoop() {
-        assertTrue(whileLoop.condition.tree is Tr.Literal)
+        assertTrue(whileLoop.whileCondition.condition.tree is Tr.Literal)
         assertTrue(whileLoop.body is Tr.Block<*>)
     }
 
