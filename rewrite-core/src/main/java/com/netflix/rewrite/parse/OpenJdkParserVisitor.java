@@ -301,7 +301,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         Tr.VariableDecls paramDecl = convert(node.getParameter(), t -> sourceBefore(")"));
         var param = new Tr.Parentheses<>(randomId(), paramDecl, format(paramPrefix));
 
-        return new Tr.Catch(randomId(), param, convert(node.getBlock()), fmt);
+        return new Try.Catch(randomId(), param, convert(node.getBlock()), fmt);
     }
 
     @Override
@@ -1019,7 +1019,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         }
 
         Tr.Block<Statement> block = convert(node.getBlock());
-        List<Tr.Catch> catches = convertAll(node.getCatches(), noDelim, noDelim);
+        List<Try.Catch> catches = convertAll(node.getCatches(), noDelim, noDelim);
 
         Tr.Try.Finally finallyy = null;
         if (node.getFinallyBlock() != null) {

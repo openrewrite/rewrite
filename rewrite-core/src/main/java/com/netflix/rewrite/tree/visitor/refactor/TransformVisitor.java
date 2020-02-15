@@ -101,10 +101,10 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     }
 
     @Override
-    public Tree visitCatch(Catch catzh) {
+    public Tree visitCatch(Try.Catch catzh) {
         return transform(catzh,
-                t(Catch::getParam, Catch::withParam),
-                t(Catch::getBody, Catch::withBody));
+                t(Try.Catch::getParam, Try.Catch::withParam),
+                t(Try.Catch::getBody, Try.Catch::withBody));
     }
 
     @Override
@@ -157,6 +157,11 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     @Override
     public Tree visitFieldAccess(FieldAccess fieldAccess) {
         return transform(fieldAccess, t(FieldAccess::getTarget, FieldAccess::withTarget));
+    }
+
+    @Override
+    public Tree visitFinally(Try.Finally finallie) {
+        return transform(finallie, t(Try.Finally::getBody, Try.Finally::withBody));
     }
 
     @Override

@@ -26,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.singletonList;
@@ -45,10 +46,16 @@ public class Formatter {
         private final int enclosingIndent;
         private final int indentToUse;
         private final boolean indentedWithSpaces;
+
+        public String getPrefix() {
+            return range(0, indentToUse + enclosingIndent)
+                    .mapToObj(i -> indentedWithSpaces ? " " : "\t")
+                    .collect(joining("", "\n", ""));
+        }
     }
 
     public Result findIndent(int enclosingIndent, Iterable<? extends Tree> trees) {
-        if(wholeSourceIndent == null) {
+        if (wholeSourceIndent == null) {
             var wholeSourceIndentVisitor = new FindIndentVisitor(0);
             wholeSourceIndentVisitor.visit(cu);
             wholeSourceIndent = new Result(0, wholeSourceIndentVisitor.getMostCommonIndent() > 0 ?
@@ -70,17 +77,12 @@ public class Formatter {
 
     public Formatting format(Tr.Block<?> relativeToEnclosing) {
         Result indentation = findIndent(relativeToEnclosing.getIndent(), relativeToEnclosing.getStatements());
-
-        var indentedPrefix = range(0, indentation.getIndentToUse() + indentation.getEnclosingIndent())
-                .mapToObj(i -> indentation.isIndentedWithSpaces() ? " " : "\t")
-                .collect(joining("", "\n", ""));
-
-        return Formatting.format(indentedPrefix);
+        return Formatting.format(indentation.getPrefix());
     }
 
     /**
      * @param moving The tree that is moving
-     * @param into The block the tree is moving into
+     * @param into   The block the tree is moving into
      * @return A shift right format visitor that can be appended to a refactor visitor pipeline
      */
     public ShiftFormatRightVisitor shiftRight(Tree moving, Tree into, Tree enclosesBoth) {
@@ -112,15 +114,27 @@ public class Formatter {
             return null;
         }
 
+        private static final Pattern SINGLE_LINE_COMMENT = Pattern.compile("//[^\\n]+");
+        private static final Pattern MULTI_LINE_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
+
         @Override
         public Integer visitTree(Tree tree) {
             String prefix = tree.getFormatting().getPrefix();
             if (prefix.chars().takeWhile(c -> c == '\n' || c == '\r').count() > 0) {
-                indentFrequencies.merge((int) prefix.chars()
-                                .dropWhile(c -> c == '\n' || c == '\r')
-                                .takeWhile(Character::isWhitespace)
-                                .count() - enclosingIndent,
-                        1L, Long::sum);
+                int indent = 0;
+                char[] chars = MULTI_LINE_COMMENT.matcher(SINGLE_LINE_COMMENT.matcher(prefix)
+                        .replaceAll("")).replaceAll("").toCharArray();
+                for (char c : chars) {
+                    if (c == '\n' || c == '\r') {
+                        indent = 0;
+                        continue;
+                    }
+                    if (Character.isWhitespace(c)) {
+                        indent++;
+                    }
+                }
+
+                indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
 
                 Map<Boolean, Long> indentTypeCounts = prefix.chars().dropWhile(c -> c == '\n' || c == '\r')
                         .takeWhile(Character::isWhitespace)

@@ -702,28 +702,6 @@ public abstract class Tr implements Serializable, Tree {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    public static class Catch extends Tr {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Parentheses<VariableDecls> param;
-
-        @With
-        Block<Statement> body;
-
-        @With
-        Formatting formatting;
-
-        @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.visitCatch(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
     public static class ClassDecl extends Tr implements Statement {
         @Getter
@@ -2344,14 +2322,42 @@ public abstract class Tr implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
+        public static class Catch extends Tr {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Parentheses<VariableDecls> param;
+
+            @With
+            Block<Statement> body;
+
+            @With
+            Formatting formatting;
+
+            @Override
+            public <R> R accept(AstVisitor<R> v) {
+                return v.visitCatch(this);
+            }
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
         public static class Finally extends Tr {
             @EqualsAndHashCode.Include
             UUID id;
 
-            Block<Statement> block;
+            @With
+            Block<Statement> body;
 
             @With
             Formatting formatting;
+
+            @Override
+            public <R> R accept(AstVisitor<R> v) {
+                return v.visitFinally(this);
+            }
         }
     }
 

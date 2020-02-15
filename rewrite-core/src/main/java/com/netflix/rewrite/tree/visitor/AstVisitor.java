@@ -168,7 +168,7 @@ public abstract class AstVisitor<R> {
         return visitAfter(visit(caze.getStatements()), caze.getPattern());
     }
 
-    public R visitCatch(Tr.Catch catzh) {
+    public R visitCatch(Tr.Try.Catch catzh) {
         return visitAfter(visit(catzh.getBody()), catzh.getParam());
     }
 
@@ -234,6 +234,10 @@ public abstract class AstVisitor<R> {
 
     public R visitEnumValueSet(Tr.EnumValueSet enums) {
         return visit(enums.getEnums());
+    }
+
+    public R visitFinally(Tr.Try.Finally finallie) {
+        return visit(finallie.getBody());
     }
 
     public R visitFieldAccess(Tr.FieldAccess fieldAccess) {
@@ -482,7 +486,7 @@ public abstract class AstVisitor<R> {
                         ),
                         tryable.getCatches()
                 ),
-                tryable.getFinally() == null ? null : tryable.getFinally().getBlock()
+                tryable.getFinally()
         );
     }
 

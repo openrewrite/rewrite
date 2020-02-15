@@ -288,7 +288,7 @@ public class PrintVisitor extends AstVisitor<String> {
     }
 
     @Override
-    public String visitCatch(Tr.Catch catzh) {
+    public String visitCatch(Try.Catch catzh) {
         return fmt(catzh, "catch" + visit(catzh.getParam()) + visit(catzh.getBody()));
     }
 
@@ -356,6 +356,10 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitFieldAccess(FieldAccess fieldAccess) {
         return fmt(fieldAccess, visit(fieldAccess.getTarget()) + "." + visit(fieldAccess.getName()));
+    }
+
+    public String visitFinally(Try.Finally finallie) {
+        return fmt(finallie, "finally" + visit(finallie.getBody()));
     }
 
     @Override
@@ -546,10 +550,8 @@ public class PrintVisitor extends AstVisitor<String> {
     public String visitTry(Try tryable) {
         var resources = tryable.getResources() == null ? "" :
                 fmt(tryable.getResources(), "(" + visit(tryable.getResources().getDecls(), ";") + ")");
-        var finallie = tryable.getFinally() == null ? "" :
-                fmt(tryable.getFinally(), "finally" + visit(tryable.getFinally().getBlock()));
 
-        return fmt(tryable, "try" + resources + visit(tryable.getBody()) + visit(tryable.getCatches()) + finallie);
+        return fmt(tryable, "try" + resources + visit(tryable.getBody()) + visit(tryable.getCatches()) + visit(tryable.getFinally()));
     }
 
     @Override
