@@ -36,7 +36,7 @@ public class TreeBuilder {
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    public static NameTree buildName(String fullyQualifiedName, Formatting fmt) {
+    public static <T extends NameTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
         String[] parts = fullyQualifiedName.split("\\.");
 
         String fullName = "";

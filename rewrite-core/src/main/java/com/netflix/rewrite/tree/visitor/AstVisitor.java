@@ -186,7 +186,7 @@ public abstract class AstVisitor<R> {
                                                                 ),
                                                                 classDecl.getName()
                                                         ),
-                                                        classDecl.getTypeParams() == null ? null : classDecl.getTypeParams().getParams()
+                                                        classDecl.getTypeParams()
                                                 ),
                                                 classDecl.getExtends()
                                         ),
@@ -312,7 +312,13 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitMemberReference(Tr.MemberReference memberRef) {
-        return visitAfter(visit(memberRef.getReference()), memberRef.getContaining());
+        return visitAfter(
+                visitAfter(
+                        visit(memberRef.getTypeParameters()),
+                        memberRef.getReference()
+                ),
+                memberRef.getContaining()
+        );
     }
 
     public R visitMethod(Tr.MethodDecl method) {
@@ -329,7 +335,7 @@ public abstract class AstVisitor<R> {
                                                                                         visit(method.getBody()),
                                                                                         method.getModifiers()
                                                                                 ),
-                                                                                method.getTypeParameters() == null ? null : method.getTypeParameters().getParams()
+                                                                                method.getTypeParameters()
                                                                         ),
                                                                         method.getName()
                                                                 ),
@@ -428,18 +434,12 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitParameterizedType(Tr.ParameterizedType type) {
-        return visitTypeNamesAfter(
-                visitTypeNameAfter(
-                        visitAfter(
-                                visit(type.getTypeArguments() == null ? null : type.getTypeArguments().getArgs()),
-                                type.getClazz()
-                        ),
+        return visitTypeNameAfter(
+                visitAfter(
+                        visit(type.getTypeParameters()),
                         type.getClazz()
                 ),
-                type.getTypeArguments() == null ? null : type.getTypeArguments().getArgs().stream()
-                        .filter(NameTree.class::isInstance)
-                        .map(NameTree.class::cast)
-                        .collect(Collectors.toList())
+                type.getClazz()
         );
     }
 
@@ -512,7 +512,7 @@ public abstract class AstVisitor<R> {
                         ),
                         typeParam.getBounds() == null ? null : typeParam.getBounds().getTypes()
                 ),
-                typeParam.getName()
+                typeParam.getName() instanceof NameTree ? (NameTree) typeParam.getName() : null
         );
     }
 

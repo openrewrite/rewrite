@@ -723,6 +723,7 @@ public abstract class Tr implements Serializable, Tree {
         @Getter
         Ident name;
 
+        @With
         @Getter
         @Nullable
         TypeParameters typeParams;
@@ -1570,6 +1571,10 @@ public abstract class Tr implements Serializable, Tree {
         Expression containing;
 
         @With
+        @Nullable
+        TypeParameters typeParameters;
+
+        @With
         Ident reference;
 
         @Nullable
@@ -2082,7 +2087,7 @@ public abstract class Tr implements Serializable, Tree {
 
         @With
         @Nullable
-        TypeArguments typeArguments;
+        TypeParameters typeParameters;
 
         @With
         Formatting formatting;
@@ -2095,23 +2100,6 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitParameterizedType(this), v.visitExpression(this));
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static class TypeArguments extends Tr {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            /**
-             * Will be either {@link TypeTree} or {@link Wildcard}
-             */
-            @With
-            List<Expression> args;
-
-            @With
-            Formatting formatting;
         }
     }
 
@@ -2413,8 +2401,12 @@ public abstract class Tr implements Serializable, Tree {
         @With
         List<Annotation> annotations;
 
+        /**
+         * Will be either a {@link TypeTree} or {@link Wildcard}. Wildcards aren't possible in
+         * every context where type parameters may be defined (e.g. not possible on new statements).
+         */
         @With
-        NameTree name;
+        Expression name;
 
         @With
         @Nullable
@@ -2663,11 +2655,6 @@ public abstract class Tr implements Serializable, Tree {
 
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
-        }
-
-        @JsonIgnore
-        public Optional<Type.Class> getTypeAsClass() {
-            return Optional.ofNullable(typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType()));
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

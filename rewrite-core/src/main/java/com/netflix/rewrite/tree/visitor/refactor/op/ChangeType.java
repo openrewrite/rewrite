@@ -164,18 +164,6 @@ public class ChangeType extends RefactorVisitor {
     }
 
     @Override
-    public List<AstTransform> visitParameterizedType(Tr.ParameterizedType type) {
-        List<AstTransform> changes = super.visitParameterizedType(type);
-        changes.addAll(transformName(type, type.getClazz(), Tr.ParameterizedType::withClazz));
-        if (type.getTypeArguments() != null) {
-            changes.addAll(transformNames(type, type.getTypeArguments().getArgs(), (t, args) -> t.getTypeArguments() == null ?
-                    t.withTypeArguments(new Tr.ParameterizedType.TypeArguments(randomId(), args, Formatting.EMPTY)) :
-                    t.withTypeArguments(type.getTypeArguments().withArgs(args))));
-        }
-        return changes;
-    }
-
-    @Override
     public List<AstTransform> visitTypeCast(Tr.TypeCast typeCast) {
         List<AstTransform> changes = super.visitTypeCast(typeCast);
         changes.addAll(transformName(typeCast, typeCast.getClazz().getTree(),
@@ -190,6 +178,9 @@ public class ChangeType extends RefactorVisitor {
             changes.addAll(transformNames(typeParam, typeParam.getBounds().getTypes(), (t, types) -> t.getBounds() == null ?
                     t.withBounds(new Tr.TypeParameter.Bounds(randomId(), types, Formatting.EMPTY)) :
                     t.withBounds(typeParam.getBounds().withTypes(types))));
+        }
+        else {
+            changes.addAll(transformName(typeParam, typeParam.getName(), Tr.TypeParameter::withName));
         }
         return changes;
     }

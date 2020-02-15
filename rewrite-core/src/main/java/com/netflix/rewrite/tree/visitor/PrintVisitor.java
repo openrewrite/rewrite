@@ -91,40 +91,29 @@ public class PrintVisitor extends AstVisitor<String> {
         return stream(modifiers.spliterator(), false)
                 .map(mod -> {
                     String keyword = "";
-                    if(mod instanceof Public) {
+                    if (mod instanceof Public) {
                         keyword = "public";
-                    }
-                    else if(mod instanceof Protected) {
+                    } else if (mod instanceof Protected) {
                         keyword = "protected";
-                    }
-                    else if(mod instanceof Private) {
+                    } else if (mod instanceof Private) {
                         keyword = "private";
-                    }
-                    else if(mod instanceof Abstract) {
+                    } else if (mod instanceof Abstract) {
                         keyword = "abstract";
-                    }
-                    else if(mod instanceof Native) {
+                    } else if (mod instanceof Native) {
                         keyword = "native";
-                    }
-                    else if(mod instanceof Static) {
+                    } else if (mod instanceof Static) {
                         keyword = "static";
-                    }
-                    else if(mod instanceof Strictfp) {
+                    } else if (mod instanceof Strictfp) {
                         keyword = "strictfp";
-                    }
-                    else if(mod instanceof Final) {
+                    } else if (mod instanceof Final) {
                         keyword = "final";
-                    }
-                    else if(mod instanceof Transient) {
+                    } else if (mod instanceof Transient) {
                         keyword = "transient";
-                    }
-                    else if(mod instanceof Volatile) {
+                    } else if (mod instanceof Volatile) {
                         keyword = "volatile";
-                    }
-                    else if(mod instanceof Default) {
+                    } else if (mod instanceof Default) {
                         keyword = "default";
-                    }
-                    else if(mod instanceof Modifier.Synchronized) {
+                    } else if (mod instanceof Modifier.Synchronized) {
                         keyword = "synchronized";
                     }
                     return fmt(mod, keyword);
@@ -160,7 +149,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitAssert(Tr.Assert azzert) {
-        return fmt(azzert,"assert" + visit(azzert.getCondition()));
+        return fmt(azzert, "assert" + visit(azzert.getCondition()));
     }
 
     @Override
@@ -171,37 +160,27 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitAssignOp(Tr.AssignOp assignOp) {
         String keyword = "";
-        if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.Addition) {
+        if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.Addition) {
             keyword = "+=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.Subtraction) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.Subtraction) {
             keyword = "-=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.Multiplication) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.Multiplication) {
             keyword = "*=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.Division) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.Division) {
             keyword = "/=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.Modulo) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.Modulo) {
             keyword = "%=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitAnd) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitAnd) {
             keyword = "&=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitOr) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitOr) {
             keyword = "|=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitXor) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.BitXor) {
             keyword = "^=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.LeftShift) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.LeftShift) {
             keyword = "<<=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.RightShift) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.RightShift) {
             keyword = ">>=";
-        }
-        else if(assignOp.getOperator() instanceof Tr.AssignOp.Operator.UnsignedRightShift) {
+        } else if (assignOp.getOperator() instanceof Tr.AssignOp.Operator.UnsignedRightShift) {
             keyword = ">>>=";
         }
 
@@ -211,61 +190,43 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitBinary(Tr.Binary binary) {
         String keyword = "";
-        if(binary.getOperator() instanceof Tr.Binary.Operator.Addition) {
+        if (binary.getOperator() instanceof Tr.Binary.Operator.Addition) {
             keyword = "+";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Subtraction) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Subtraction) {
             keyword = "-";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Multiplication) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Multiplication) {
             keyword = "*";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Division) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Division) {
             keyword = "/";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Modulo) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Modulo) {
             keyword = "%";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.LessThan) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.LessThan) {
             keyword = "<";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.GreaterThan) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.GreaterThan) {
             keyword = ">";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.LessThanOrEqual) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.LessThanOrEqual) {
             keyword = "<=";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.GreaterThanOrEqual) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.GreaterThanOrEqual) {
             keyword = ">=";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Equal) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Equal) {
             keyword = "==";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.NotEqual) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.NotEqual) {
             keyword = "!=";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.BitAnd) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.BitAnd) {
             keyword = "&";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.BitOr) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.BitOr) {
             keyword = "|";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.BitXor) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.BitXor) {
             keyword = "^";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.LeftShift) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.LeftShift) {
             keyword = "<<";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.RightShift) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.RightShift) {
             keyword = ">>";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.UnsignedRightShift) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.UnsignedRightShift) {
             keyword = ">>>";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.Or) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.Or) {
             keyword = "||";
-        }
-        else if(binary.getOperator() instanceof Tr.Binary.Operator.And) {
+        } else if (binary.getOperator() instanceof Tr.Binary.Operator.And) {
             keyword = "&&";
         }
 
@@ -284,7 +245,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitCase(Tr.Case caze) {
-        return fmt(caze,visit(caze.getPattern()) + ":" + visitStatements(caze.getStatements()));
+        return fmt(caze, visit(caze.getPattern()) + ":" + visitStatements(caze.getStatements()));
     }
 
     @Override
@@ -294,27 +255,22 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitClassDecl(Tr.ClassDecl classDecl) {
-        var typeParams = classDecl.getTypeParams() == null ? "" :
-                fmt(classDecl.getTypeParams(), "<" + visit(classDecl.getTypeParams().getParams(), ",") + ">");
         var modifiers = visitModifiers(classDecl.getModifiers());
 
         var kind = "";
-        if(classDecl.getKind() instanceof ClassDecl.Kind.Class) {
+        if (classDecl.getKind() instanceof ClassDecl.Kind.Class) {
             kind = "class";
-        }
-        else if(classDecl.getKind() instanceof ClassDecl.Kind.Enum) {
+        } else if (classDecl.getKind() instanceof ClassDecl.Kind.Enum) {
             kind = "enum";
-        }
-        else if(classDecl.getKind() instanceof ClassDecl.Kind.Interface) {
+        } else if (classDecl.getKind() instanceof ClassDecl.Kind.Interface) {
             kind = "interface";
-        }
-        else if(classDecl.getKind() instanceof ClassDecl.Kind.Annotation) {
+        } else if (classDecl.getKind() instanceof ClassDecl.Kind.Annotation) {
             kind = "@interface";
         }
 
         return fmt(classDecl, visit(classDecl.getAnnotations()) +
                 modifiers + fmt(classDecl.getKind(), kind) + visit(classDecl.getName()) +
-                typeParams + visit(classDecl.getExtends()) + visit(classDecl.getImplements(), ",") +
+                visit(classDecl.getTypeParams()) + visit(classDecl.getExtends()) + visit(classDecl.getImplements(), ",") +
                 visit(classDecl.getBody()));
     }
 
@@ -417,21 +373,20 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitMemberReference(MemberReference memberRef) {
-        return fmt(memberRef, visit(memberRef.getContaining()) + "::" + visit(memberRef.getReference()));
+        return fmt(memberRef, visit(memberRef.getContaining()) + "::" +
+                visit(memberRef.getTypeParameters()) + visit(memberRef.getReference()));
     }
 
     @Override
     public String visitMethod(MethodDecl method) {
         var modifiers = visitModifiers(method.getModifiers());
-        var typeParams = method.getTypeParameters() == null ? "" :
-                fmt(method.getTypeParameters(), "<" + visit(method.getTypeParameters().getParams(), ",", "") + ">");
         var params = fmt(method.getParams(), "(" + visit(method.getParams().getParams(), ",")) + ")";
         var defaultValue = method.getDefaultValue() == null ? "" :
                 fmt(method.getDefaultValue(), "default" + visit(method.getDefaultValue().getValue()));
         var thrown = method.getThrows() == null ? "" :
                 fmt(method.getThrows(), "throws" + visit(method.getThrows().getExceptions(), ","));
 
-        return fmt(method, visit(method.getAnnotations()) + modifiers + typeParams +
+        return fmt(method, visit(method.getAnnotations()) + modifiers + visit(method.getTypeParameters()) +
                 visit(method.getReturnTypeExpr()) + visit(method.getName()) + params +
                 thrown + visit(method.getBody()) + defaultValue);
     }
@@ -469,7 +424,7 @@ public class PrintVisitor extends AstVisitor<String> {
                 .map(d -> fmt(d, "[" + visit(d.getSize()) + "]"))
                 .reduce("", this::reduce);
         var init = newArray.getInitializer() == null ? "" :
-                fmt(newArray.getInitializer(), "{" + visit(newArray.getInitializer().getElements(), ",")+ "}");
+                fmt(newArray.getInitializer(), "{" + visit(newArray.getInitializer().getElements(), ",") + "}");
 
         return fmt(newArray, typeExpr + dimensions + init);
     }
@@ -487,29 +442,52 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitParameterizedType(ParameterizedType type) {
-        var typeParams = type.getTypeArguments() == null ? "" :
-                fmt(type.getTypeArguments(), "<" + visit(type.getTypeArguments().getArgs(), ",") + ">");
-        return fmt(type, visit(type.getClazz()) + typeParams);
+        return fmt(type, visit(type.getClazz()) + visit(type.getTypeParameters()));
     }
 
     @Override
     public String visitPrimitive(Primitive primitive) {
         String keyword;
-        switch(primitive.getType()) {
-            case Boolean: keyword = "boolean"; break;
-            case Byte: keyword = "byte"; break;
-            case Char: keyword = "char"; break;
-            case Double: keyword = "double"; break;
-            case Float: keyword = "float"; break;
-            case Int: keyword = "int"; break;
-            case Long: keyword = "long"; break;
-            case Short: keyword = "short"; break;
-            case Void: keyword = "void"; break;
-            case String: keyword = "String"; break;
-            case Wildcard: keyword = "*"; break;
-            case None: throw new IllegalStateException("Unable to print None primitive");
-            case Null: throw new IllegalStateException("Unable to print Null primitive");
-            default: throw new IllegalStateException("Unable to print non-primitive type");
+        switch (primitive.getType()) {
+            case Boolean:
+                keyword = "boolean";
+                break;
+            case Byte:
+                keyword = "byte";
+                break;
+            case Char:
+                keyword = "char";
+                break;
+            case Double:
+                keyword = "double";
+                break;
+            case Float:
+                keyword = "float";
+                break;
+            case Int:
+                keyword = "int";
+                break;
+            case Long:
+                keyword = "long";
+                break;
+            case Short:
+                keyword = "short";
+                break;
+            case Void:
+                keyword = "void";
+                break;
+            case String:
+                keyword = "String";
+                break;
+            case Wildcard:
+                keyword = "*";
+                break;
+            case None:
+                throw new IllegalStateException("Unable to print None primitive");
+            case Null:
+                throw new IllegalStateException("Unable to print Null primitive");
+            default:
+                throw new IllegalStateException("Unable to print non-primitive type");
         }
 
         return fmt(primitive, keyword);
@@ -560,6 +538,11 @@ public class PrintVisitor extends AstVisitor<String> {
     }
 
     @Override
+    public String visitTypeParameters(TypeParameters typeParams) {
+        return fmt(typeParams, "<" + visit(typeParams.getParams(), ",", "") + ">");
+    }
+
+    @Override
     public String visitTypeParameter(TypeParameter typeParam) {
         var bounds = typeParam.getBounds() == null ? "" :
                 fmt(typeParam.getBounds(), "extends" + visit(typeParam.getBounds().getTypes(), "&"));
@@ -569,28 +552,21 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitUnary(Unary unary) {
         String code = "";
-        if(unary.getOperator() instanceof Tr.Unary.Operator.PreIncrement) {
+        if (unary.getOperator() instanceof Tr.Unary.Operator.PreIncrement) {
             code = "++" + visit(unary.getExpr());
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.PreDecrement) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.PreDecrement) {
             code = "--" + visit(unary.getExpr());
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.PostIncrement) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.PostIncrement) {
             code = visit(unary.getExpr()) + fmt(unary.getOperator(), "++");
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.PostDecrement) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.PostDecrement) {
             code = visit(unary.getExpr()) + fmt(unary.getOperator(), "--");
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.Positive) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.Positive) {
             code = "+" + visit(unary.getExpr());
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.Negative) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.Negative) {
             code = "-" + visit(unary.getExpr());
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.Complement) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.Complement) {
             code = "~" + visit(unary.getExpr());
-        }
-        else if(unary.getOperator() instanceof Tr.Unary.Operator.Not) {
+        } else if (unary.getOperator() instanceof Tr.Unary.Operator.Not) {
             code = "!" + visit(unary.getExpr());
         }
 
@@ -617,10 +593,9 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitWildcard(Wildcard wildcard) {
         var bound = "";
-        if(wildcard.getBound() instanceof Wildcard.Bound.Extends) {
+        if (wildcard.getBound() instanceof Wildcard.Bound.Extends) {
             bound = fmt(wildcard.getBound(), "extends");
-        }
-        else if(wildcard.getBound() instanceof Wildcard.Bound.Super) {
+        } else if (wildcard.getBound() instanceof Wildcard.Bound.Super) {
             bound = fmt(wildcard.getBound(), "super");
         }
         return fmt(wildcard, "?" + bound + visit(wildcard.getBoundedType()));

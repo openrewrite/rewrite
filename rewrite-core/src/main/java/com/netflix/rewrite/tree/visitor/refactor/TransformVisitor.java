@@ -114,6 +114,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
                 t(ClassDecl::getName, ClassDecl::withName),
                 t(ClassDecl::getExtends, ClassDecl::withExtendings),
                 t(ClassDecl::getImplements, ClassDecl::withImplementings),
+                t(ClassDecl::getTypeParams, ClassDecl::withTypeParams),
                 t(ClassDecl::getBody, ClassDecl::withBody));
     }
 
@@ -232,6 +233,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     public Tree visitMemberReference(MemberReference memberRef) {
         return transform(memberRef,
                 t(MemberReference::getContaining, MemberReference::withContaining),
+                t(MemberReference::getTypeParameters, MemberReference::withTypeParameters),
                 t(MemberReference::getReference, MemberReference::withReference));
     }
 
@@ -242,7 +244,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
                 t(MethodDecl::getParams, MethodDecl::withParams, MethodDecl.Parameters::getParams, MethodDecl.Parameters::withParams),
                 t(MethodDecl::getThrows, MethodDecl::withThrowz, MethodDecl.Throws::getExceptions, MethodDecl.Throws::withExceptions),
                 t(MethodDecl::getDefaultValue, MethodDecl::withDefaultValue, MethodDecl.Default::getValue, MethodDecl.Default::withValue),
-                t(MethodDecl::getTypeParameters, MethodDecl::withTypeParameters, MethodDecl.TypeParameters::getParams, MethodDecl.TypeParameters::withParams),
+                t(MethodDecl::getTypeParameters, MethodDecl::withTypeParameters),
                 t(MethodDecl::getBody, MethodDecl::withBody));
     }
 
@@ -251,7 +253,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
         return transform(method,
                 t(MethodInvocation::getSelect, MethodInvocation::withSelect),
                 t(MethodInvocation::getArgs, MethodInvocation::withArgs, MethodInvocation.Arguments::getArgs, MethodInvocation.Arguments::withArgs),
-                t(MethodInvocation::getTypeParameters, MethodInvocation::withTypeParameters, MethodInvocation.TypeParameters::getParams, MethodInvocation.TypeParameters::withParams));
+                t(MethodInvocation::getTypeParameters, MethodInvocation::withTypeParameters));
     }
 
     @Override
@@ -291,7 +293,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     public Tree visitParameterizedType(ParameterizedType type) {
         return transform(type,
                 t(ParameterizedType::getClazz, ParameterizedType::withClazz),
-                t(ParameterizedType::getTypeArguments, ParameterizedType::withTypeArguments, ParameterizedType.TypeArguments::getArgs, ParameterizedType.TypeArguments::withArgs));
+                t(ParameterizedType::getTypeParameters, ParameterizedType::withTypeParameters));
     }
 
     @Override

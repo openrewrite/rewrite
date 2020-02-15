@@ -237,7 +237,7 @@ open class ChangeTypeTest : Parser by OpenJdkParser() {
     }
 
     @Test
-    fun paramaterizedType() {
+    fun parameterizedType() {
         val b = parse("""
             import a.A1;
             public class B {

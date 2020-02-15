@@ -44,6 +44,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
+import static com.netflix.rewrite.tree.Formatting.EMPTY;
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.AssignOp.Operator.*;
 import static com.netflix.rewrite.tree.Type.Primitive.Method;
@@ -353,7 +354,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                 return semicolonPresent.get() ? sourceBefore(";", '}') : "";
             });
 
-            enumSet = new Tr.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), Formatting.EMPTY);
+            enumSet = new Tr.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), EMPTY);
         }
 
         List<? extends Tree> membersMultiVariablesSeparated = node.getMembers().stream()
@@ -396,7 +397,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         Tr.Package packageDecl = null;
         if (cu.getPackageName() != null) {
             skip("package");
-            packageDecl = new Tr.Package(randomId(), convert(cu.getPackageName()), Formatting.EMPTY);
+            packageDecl = new Tr.Package(randomId(), convert(cu.getPackageName()), EMPTY);
             skip(";");
         }
 
@@ -530,7 +531,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
     private com.netflix.rewrite.tree.Tree visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
-        var name = Tr.Ident.build(randomId(), node.getName().toString(), type(node), Formatting.EMPTY);
+        var name = Tr.Ident.build(randomId(), node.getName().toString(), type(node), EMPTY);
 
         Tr.EnumValue.Arguments initializer = null;
         if (source.charAt(endPos(node) - 1) == ')') {
@@ -695,9 +696,10 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                 break;
         }
 
+        var typeParams = convertTypeParameters(node.getTypeArguments());
         var reference = Tr.Ident.build(randomId(), referenceName, null, format(sourceBefore(referenceName)));
 
-        return new Tr.MemberReference(randomId(), expr, reference, type(node), fmt);
+        return new Tr.MemberReference(randomId(), expr, typeParams, reference, type(node), fmt);
     }
 
     @Override
@@ -723,9 +725,9 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         Tr.MethodInvocation.TypeParameters typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
             var genericPrefix = sourceBefore("<");
-            List<NameTree> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
+            List<Expression> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
             typeParams = new TypeParameters(randomId(), genericParams.stream()
-                    .map(gp -> new TypeParameter(randomId(), emptyList(), gp, null, Formatting.EMPTY))
+                    .map(gp -> new TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
                     .collect(toList()),
                     format(genericPrefix));
         }
@@ -912,22 +914,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
     @Override
     public com.netflix.rewrite.tree.Tree visitParameterizedType(ParameterizedTypeTree node, Formatting fmt) {
-        NameTree clazz = convert(node.getType());
-
-        var typeArgPrefix = sourceBefore("<");
-        List<Expression> typeArgs;
-        if (node.getTypeArguments().isEmpty()) {
-            // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
-            typeArgs = singletonList(new Tr.Empty(randomId(), format(sourceBefore(">"))));
-        } else {
-            typeArgs = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
-        }
-
-        return new Tr.ParameterizedType(randomId(),
-                clazz,
-                new Tr.ParameterizedType.TypeArguments(randomId(), typeArgs, format(typeArgPrefix)),
-                fmt
-        );
+        return new Tr.ParameterizedType(randomId(), convert(node.getType()), convertTypeParameters(node.getTypeArguments()), fmt);
     }
 
     @Override
@@ -1101,12 +1088,12 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                 break;
             case COMPL:
                 skip("~");
-                op = new Tr.Unary.Operator.Complement(randomId(), Formatting.EMPTY);
+                op = new Tr.Unary.Operator.Complement(randomId(), EMPTY);
                 expr = convert(unary.arg);
                 break;
             case NOT:
                 skip("!");
-                op = new Tr.Unary.Operator.Not(randomId(), Formatting.EMPTY);
+                op = new Tr.Unary.Operator.Not(randomId(), EMPTY);
                 expr = convert(unary.arg);
                 break;
             default:
@@ -1291,6 +1278,28 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
             converted.add(convert(trees.get(i), i == trees.size() - 1 ? suffix : innerSuffix));
         }
         return converted;
+    }
+
+    private Tr.TypeParameters convertTypeParameters(List<? extends Tree> typeArguments) {
+        if(typeArguments == null) {
+            return null;
+        }
+
+        var typeArgPrefix = sourceBefore("<");
+        List<Expression> typeArgs;
+        if (typeArguments.isEmpty()) {
+            // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
+            typeArgs = singletonList(new Empty(randomId(), format(sourceBefore(">"))));
+        } else {
+            typeArgs = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
+        }
+
+        // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
+        // elsewhere in the tree
+        return new TypeParameters(randomId(), typeArgs.stream()
+                .map(gp -> new TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
+                .collect(toList()),
+                format(typeArgPrefix));
     }
 
     private final Function<Tree, String> statementDelim = (@Nullable Tree t) -> {
