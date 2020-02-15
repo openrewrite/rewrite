@@ -15,10 +15,12 @@
  */
 package com.netflix.rewrite.tree.visitor.refactor.op
 
+import com.netflix.rewrite.asClass
 import com.netflix.rewrite.assertRefactored
 import org.junit.Test
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.tree.Type
 
 open class ChangeFieldNameTest : Parser by OpenJdkParser() {
 
@@ -32,13 +34,44 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .changeFieldName(a.classes[0].findFields("java.util.List"), "list")
+                .changeFieldName(a.classes[0].type.asClass()!!, "collection", "list")
                 .fix()
 
         assertRefactored(fixed, """
             import java.util.List;
             public class A {
                List list = null;
+            }
+        """)
+    }
+
+    @Test
+    fun changeFieldNameReferences() {
+        val b = """
+            public class B {
+               int n;
+            }
+        """.trimIndent()
+
+        val a = parse("""
+            public class A {
+                B b = new B();
+                {
+                    b.n = 1;
+                }
+            }
+        """.trimIndent())
+
+        val fixed = a.refactor()
+                .changeFieldName(Type.Class.build("B"), "n", "n1")
+                .fix()
+
+        assertRefactored(fixed, """
+            public class A {
+                B b = new B();
+                {
+                    b.n1 = 1;
+                }
             }
         """)
     }

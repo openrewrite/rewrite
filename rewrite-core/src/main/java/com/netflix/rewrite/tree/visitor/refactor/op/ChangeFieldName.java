@@ -16,39 +16,46 @@
 package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Tr;
+import com.netflix.rewrite.tree.Type;
+import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
-import java.util.UUID;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
-
-public class ChangeFieldName extends ScopedRefactorVisitor {
-    private final String name;
-
-    public ChangeFieldName(UUID scope, String name) {
-        super(scope);
-        this.name = name;
-    }
+@RequiredArgsConstructor
+public class ChangeFieldName extends RefactorVisitor {
+    private final Type.Class classType;
+    private final String hasName;
+    private final String toName;
 
     @Override
     public String getRuleName() {
         return "change-field-name";
     }
 
-    @SuppressWarnings("OptionalGetWithoutIsPresent")
     @Override
-    public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
-        if (!isInScope(multiVariable) || multiVariable.getVars().size() > 1) {
-            // change field name is not supported on multi-variable declarations
-            return emptyList();
-        }
+    public List<AstTransform> visitVariable(Tr.VariableDecls.NamedVar variable) {
+        boolean isField = getCursor()
+                .getParentOrThrow() // Tr.VariableDecls
+                .getParentOrThrow() // Tr.Block
+                .getParentOrThrow() // maybe Tr.ClassDecl
+                .getTree() instanceof Tr.ClassDecl;
+        Type.Class containingClassType = TypeUtils.asClass(getCursor().enclosingClass().getType());
 
-        var v = multiVariable.getVars().stream().findAny().get();
-        return v.getSimpleName().equals(name) ?
-            emptyList() :
-            transform(multiVariable, mv -> mv.withVars(singletonList(v.withName(v.getName().withName(name)))));
+        return maybeTransform(isField && containingClassType == classType && variable.getSimpleName().equals(hasName),
+                super.visitVariable(variable),
+                transform(variable, v -> v.withName(v.getName().withName(toName)))
+        );
+    }
+
+    @Override
+    public List<AstTransform> visitFieldAccess(Tr.FieldAccess fieldAccess) {
+        Type.Class targetType = TypeUtils.asClass(fieldAccess.getTarget().getType());
+        return maybeTransform(targetType == classType && fieldAccess.getSimpleName().equals(hasName),
+                super.visitFieldAccess(fieldAccess),
+                transform(fieldAccess, fa -> fa.withName(fa.getName().withName(toName)))
+        );
     }
 }

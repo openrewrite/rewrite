@@ -1082,6 +1082,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression target;
 
+        @With
         Ident name;
 
         @Nullable

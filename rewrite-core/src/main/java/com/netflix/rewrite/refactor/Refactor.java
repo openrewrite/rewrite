@@ -109,13 +109,8 @@ public class Refactor {
         return this;
     }
 
-    public Refactor changeFieldName(Iterable<Tr.VariableDecls> targets, String toName) {
-        targets.forEach(t -> changeFieldName(t, toName));
-        return this;
-    }
-
-    public Refactor changeFieldName(Tr.VariableDecls target, String toName) {
-        ops.add(new ChangeFieldName(target.getId(), toName));
+    public Refactor changeFieldName(Type.Class classType, String hasName, String toName) {
+        ops.add(new ChangeFieldName(classType, hasName, toName));
         return this;
     }
 

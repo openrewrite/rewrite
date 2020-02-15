@@ -85,7 +85,6 @@ public class Cursor {
         return firstEnclosing(Tr.MethodDecl.class);
     }
 
-    @Nullable
     public Tr.ClassDecl enclosingClass() {
         return firstEnclosing(Tr.ClassDecl.class);
     }
