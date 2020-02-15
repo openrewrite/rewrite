@@ -19,6 +19,7 @@ import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.AddImport;
+import com.netflix.rewrite.tree.visitor.refactor.op.ChangeFieldName;
 import com.netflix.rewrite.tree.visitor.refactor.op.DeleteStatement;
 import com.netflix.rewrite.tree.visitor.refactor.op.RemoveImport;
 
@@ -93,6 +94,10 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
 
     protected void deleteStatement(Statement statement) {
         andThen.get().add(new DeleteStatement(statement.getId()));
+    }
+
+    protected void changeFieldName(Type.Class classType, String hasName, String toName) {
+        andThen.get().add(new ChangeFieldName(classType, hasName, toName));
     }
 
     protected void andThen(RefactorVisitor visitor) {

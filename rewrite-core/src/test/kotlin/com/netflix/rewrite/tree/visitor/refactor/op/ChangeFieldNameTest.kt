@@ -47,6 +47,47 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
 
     @Test
     fun changeFieldNameReferences() {
+        val b = parse("""
+            public class B {
+               int n;
+               
+               {
+                   n = 1;
+                   n /= 2;
+                   if(n + 1 == 2) {}
+                   n++;
+               }
+               
+               public int foo(int n) {
+                   return n + this.n;
+               }
+            }
+        """.trimIndent())
+
+        val fixed = b.refactor()
+                .changeFieldName(Type.Class.build("B"), "n", "n1")
+                .fix()
+
+        assertRefactored(fixed, """
+            public class B {
+               int n1;
+               
+               {
+                   n1 = 1;
+                   n1 /= 2;
+                   if(n1 + 1 == 2) {}
+                   n1++;
+               }
+               
+               public int foo(int n) {
+                   return n + this.n1;
+               }
+            }
+        """)
+    }
+
+    @Test
+    fun changeFieldNameReferencesInOtherClass() {
         val b = """
             public class B {
                int n;
@@ -60,7 +101,7 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
                     b.n = 1;
                 }
             }
-        """.trimIndent())
+        """.trimIndent(), b)
 
         val fixed = a.refactor()
                 .changeFieldName(Type.Class.build("B"), "n", "n1")
