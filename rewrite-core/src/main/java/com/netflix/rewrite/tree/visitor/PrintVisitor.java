@@ -321,7 +321,7 @@ public class PrintVisitor extends AstVisitor<String> {
     @Override
     public String visitForLoop(ForLoop forLoop) {
         ForLoop.Control ctrl = forLoop.getControl();
-        var expr = fmt(ctrl, "(" + visit(ctrl.getInit()) + ";" + visit(ctrl.getCondition()) + ";" + visit(ctrl.getUpdate()) + ")");
+        var expr = fmt(ctrl, "(" + visit(ctrl.getInit()) + ";" + visit(ctrl.getCondition()) + ";" + visit(ctrl.getUpdate(), ",", "") + ")");
         return fmt(forLoop, "for" + expr + fmtStatement(forLoop.getBody()));
     }
 
