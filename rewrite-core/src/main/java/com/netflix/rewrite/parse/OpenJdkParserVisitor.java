@@ -391,14 +391,13 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
         endPosTable = cu.endPositions;
 
-        // TODO when we want to implement refactoring into doc comments as well, refer to this table by JCTree node
+        // TODO when we want to implement refactoring into javadoc comments as well, refer to this table by JCTree node
 //        DocCommentTable docTable = cu.docComments;
 
         Tr.Package packageDecl = null;
         if (cu.getPackageName() != null) {
             skip("package");
-            packageDecl = new Tr.Package(randomId(), convert(cu.getPackageName()), EMPTY);
-            skip(";");
+            packageDecl = new Tr.Package(randomId(), convert(cu.getPackageName()), format(sourceBefore(";")));
         }
 
         return new Tr.CompilationUnit(randomId(),
@@ -1289,7 +1288,8 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
         List<Expression> typeArgs;
         if (typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
-            typeArgs = singletonList(new Empty(randomId(), format(sourceBefore(">"))));
+            // adding space before > as a suffix to be consistent with space before > for non-empty lists of type args
+            typeArgs = singletonList(new Empty(randomId(), format("", sourceBefore(">"))));
         } else {
             typeArgs = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }

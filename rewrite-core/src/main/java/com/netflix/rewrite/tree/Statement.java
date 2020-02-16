@@ -15,5 +15,11 @@
  */
 package com.netflix.rewrite.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public interface Statement extends Tree {
+    @JsonIgnore
+    default boolean isSemicolonTerminated() {
+        return false;
+    }
 }

@@ -182,6 +182,12 @@ public abstract class Tr implements Serializable, Tree {
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitAssert(this), v.visitStatement(this));
         }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -208,9 +214,16 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitAssign(this), v.visitExpression(this), v.visitStatement(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
     }
 
@@ -240,9 +253,16 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitAssignOp(this), v.visitExpression(this), v.visitStatement(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -397,6 +417,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitBinary(this), v.visitExpression(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             List<Tree> sideEffects = new ArrayList<>(2);
@@ -674,6 +695,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitBreak(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
     }
 
@@ -970,6 +997,12 @@ public abstract class Tr implements Serializable, Tree {
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitContinue(this), v.visitStatement(this));
         }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -991,6 +1024,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitDoWhileLoop(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1026,6 +1065,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitEmpty(this), v.visitExpression(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
     }
 
@@ -1116,6 +1161,7 @@ public abstract class Tr implements Serializable, Tree {
             return name.getSimpleName();
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return target.getSideEffects();
@@ -1658,6 +1704,11 @@ public abstract class Tr implements Serializable, Tree {
             return v.visitMethod(this);
         }
 
+        @JsonIgnore
+        public boolean isAbstract() {
+            return body == null;
+        }
+
         public boolean hasType(String clazz) {
             return new HasType(clazz).visit(this);
         }
@@ -1757,6 +1808,12 @@ public abstract class Tr implements Serializable, Tree {
         }
 
         @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
+        }
+
+        @JsonIgnore
         @Nullable
         public Type getReturnType() {
             return type == null ? null : type.getResolvedSignature() == null ? null :
@@ -1768,6 +1825,7 @@ public abstract class Tr implements Serializable, Tree {
             return name.getSimpleName();
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
@@ -2036,9 +2094,16 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitNewClass(this), v.visitExpression(this), v.visitStatement(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2121,6 +2186,7 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitParentheses(this), v.visitExpression(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
@@ -2175,6 +2241,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitReturn(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
     }
 
@@ -2266,6 +2338,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitThrow(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
     }
 
@@ -2461,6 +2539,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         Operator operator;
 
         @With
@@ -2477,9 +2556,16 @@ public abstract class Tr implements Serializable, Tree {
             return v.reduce(v.visitUnary(this), v.visitExpression(this), v.visitStatement(this));
         }
 
+        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return expr.getSideEffects();
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2637,9 +2723,11 @@ public abstract class Tr implements Serializable, Tree {
         @Nullable
         TypeTree typeExpr;
 
+        @With
         @Nullable
         Varargs varargs;
 
+        @With
         List<Dimension> dimensionsBeforeName;
 
         @With
@@ -2651,6 +2739,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitMultiVariable(this), v.visitStatement(this));
+        }
+
+        @JsonIgnore
+        @Override
+        public boolean isSemicolonTerminated() {
+            return true;
         }
 
         public List<Annotation> findAnnotations(String signature) {
