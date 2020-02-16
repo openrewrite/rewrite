@@ -240,6 +240,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     @Override
     public Tree visitMethod(MethodDecl method) {
         return transform(method,
+                t(MethodDecl::getAnnotations, MethodDecl::withAnnotations),
                 t(MethodDecl::getReturnTypeExpr, MethodDecl::withReturnTypeExpr),
                 t(MethodDecl::getParams, MethodDecl::withParams, MethodDecl.Parameters::getParams, MethodDecl.Parameters::withParams),
                 t(MethodDecl::getThrows, MethodDecl::withThrowz, MethodDecl.Throws::getExceptions, MethodDecl.Throws::withExceptions),
@@ -264,6 +265,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
     @Override
     public Tree visitMultiVariable(VariableDecls multiVariable) {
         return transform(multiVariable,
+                t(VariableDecls::getAnnotations, VariableDecls::withAnnotations),
                 t(VariableDecls::getTypeExpr, VariableDecls::withTypeExpr),
                 t(VariableDecls::getVars, VariableDecls::withVars));
     }

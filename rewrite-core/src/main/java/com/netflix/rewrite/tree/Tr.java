@@ -136,6 +136,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         TypeTree elementType;
 
+        @With
         List<Dimension> dimensions;
 
         @With
@@ -2059,6 +2060,7 @@ public abstract class Tr implements Serializable, Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
+            @With
             List<Expression> elements;
 
             @With
