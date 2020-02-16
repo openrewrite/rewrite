@@ -79,10 +79,6 @@ public class PrintVisitor extends AstVisitor<String> {
         return visit(statement) + semicolonOrEmpty;
     }
 
-    private String visit(@Nullable Tree t, String suffix) {
-        return t == null ? "" : visit(t) + suffix;
-    }
-
     private String fmt(@Nullable Tree tree, @Nullable String code) {
         return tree == null || code == null ? "" : tree.getFormatting().getPrefix() + code + tree.getFormatting().getSuffix();
     }
@@ -276,7 +272,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
     @Override
     public String visitCompilationUnit(CompilationUnit cu) {
-        return fmt(cu, visit(cu.getPackageDecl(), ";") +
+        return fmt(cu, (cu.getPackageDecl() == null ? "" : visit(cu.getPackageDecl()) + ";") +
                 visit(cu.getImports(), ";", ";") +
                 visit(cu.getClasses()));
     }
