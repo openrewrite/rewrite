@@ -115,7 +115,7 @@ public class RemoveImport extends RefactorVisitor {
             deletes.addAll(transform(getCursor().enclosingCompilationUnit(), cu -> cu
                     .withImports(cu.getImports().stream()
                             .map(i -> i == starImport ?
-                                    new Tr.Import(randomId(), (Tr.FieldAccess) TreeBuilder.buildName(referencedTypes.iterator().next(), format(" ")), false, i.getFormatting()) :
+                                    new Tr.Import(randomId(), TreeBuilder.buildName(referencedTypes.iterator().next(), format(" ")), false, i.getFormatting()) :
                                     i
                             )
                             .collect(toList())

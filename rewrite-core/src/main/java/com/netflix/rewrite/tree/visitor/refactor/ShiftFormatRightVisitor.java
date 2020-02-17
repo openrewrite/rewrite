@@ -18,9 +18,11 @@ package com.netflix.rewrite.tree.visitor.refactor;
 import com.netflix.rewrite.tree.Statement;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Tree;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.stream.IntStream.range;
@@ -63,6 +65,24 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
     }
 
     private List<AstTransform> shiftRight(Tree tree) {
-        return transform(tree, s -> s.withPrefix(s.getFormatting().getPrefix() + shift));
+        return transform(tree, new ShiftRightMutation(shift));
+    }
+
+    /**
+     * Exists only for debugging purposes, where it is easier to see what kind of shifts are applying to each tree element
+     */
+    @RequiredArgsConstructor
+    private static class ShiftRightMutation implements Function<Tree, Tree> {
+        private final String shift;
+
+        @Override
+        public Tree apply(Tree tree) {
+            return tree.withPrefix(tree.getFormatting().getPrefix() + shift);
+        }
+
+        @Override
+        public String toString() {
+            return "ShiftRightMutation{shift='" + shift.length() + "',indentChar='" + (shift.contains("\t") ? "tab" : "space") + "'}";
+        }
     }
 }

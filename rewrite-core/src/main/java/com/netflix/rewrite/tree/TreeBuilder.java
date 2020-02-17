@@ -16,15 +16,36 @@
 package com.netflix.rewrite.tree;
 
 import com.netflix.rewrite.internal.lang.NonNullApi;
+import com.netflix.rewrite.internal.lang.Nullable;
+import com.netflix.rewrite.parse.OpenJdkParser;
+import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
+import com.netflix.rewrite.tree.visitor.refactor.Formatter;
+import com.netflix.rewrite.tree.visitor.refactor.ShiftFormatRightVisitor;
+import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.MessageFormatter;
 
+import java.nio.charset.Charset;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.netflix.rewrite.internal.StringUtils.trimIndent;
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
+import static java.util.Arrays.stream;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
+import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 
 @NonNullApi
 public class TreeBuilder {
+    private static final Logger logger = LoggerFactory.getLogger(TreeBuilder.class);
+
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
@@ -69,5 +90,75 @@ public class TreeBuilder {
 
         //noinspection ConstantConditions
         return expr.withFormatting(fmt);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <T extends Tree> List<T> buildSnippet(Tr.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
+        OpenJdkParser parser = new OpenJdkParser(Charset.defaultCharset(), true);
+
+        // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
+        // @formatter:off
+        String source =
+            "class CodeSnippet {\n" +
+                new ListScopeVariables(insertionScope).visit(containing).stream()
+                    .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
+                "  // the contents of this block are the snippet\n" +
+                "  {\n" +
+                MessageFormatter.arrayFormat(trimIndent(snippet), stream(arguments).map(Tree::printTrimmed).toArray()).getMessage() + "\n" +
+                "  }\n" +
+            "}";
+        // @formatter:on
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("Building code snippet using synthetic class:");
+            logger.debug(source);
+        }
+
+        Tr.CompilationUnit cu = parser.parse(source);
+        List<Tree> statements = cu.getClasses().get(0).getBody().getStatements();
+        Tr.Block<T> block = (Tr.Block<T>) statements.get(statements.size() - 1);
+
+        Formatter formatter = new Formatter(cu);
+
+        Tr.CompilationUnit formattedCu = (Tr.CompilationUnit) new TransformVisitor(block.getStatements().stream()
+                .flatMap(stat -> formatter.shiftRight(stat, insertionScope.getTree(), insertionScope.getTree()).visit(cu).stream())
+                .collect(toList())).visit(cu);
+
+        List<Tree> formattedStatements = formattedCu.getClasses().get(0).getBody().getStatements();
+        Tr.Block<T> formattedBlock = (Tr.Block<T>) formattedStatements.get(statements.size() - 1);
+        return formattedBlock.getStatements();
+    }
+
+    @RequiredArgsConstructor
+    private static class ListScopeVariables extends CursorAstVisitor<List<String>> {
+        private final Cursor scope;
+
+        @Override
+        public List<String> defaultTo(@Nullable Tree t) {
+            return emptyList();
+        }
+
+        @Override
+        public List<String> visitVariable(Tr.VariableDecls.NamedVar variable) {
+            if (getCursor().isInSameNameScope(scope)) {
+                Tr.VariableDecls variableDecls = getCursor().getParentOrThrow().getTree();
+
+                Type type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
+                String typeName = "";
+                if (type instanceof Type.Class) {
+                    typeName = ((Type.Class) type).getFullyQualifiedName();
+                } else if (type instanceof Type.ShallowClass) {
+                    typeName = ((Type.ShallowClass) type).getFullyQualifiedName();
+                } else if (type instanceof Type.GenericTypeVariable) {
+                    typeName = ((Type.GenericTypeVariable) type).getFullyQualifiedName();
+                } else if (type instanceof Type.Primitive) {
+                    typeName = ((Type.Primitive) type).getKeyword();
+                }
+
+                return singletonList(typeName + " " + variable.getSimpleName());
+            }
+
+            return super.visitVariable(variable);
+        }
     }
 }

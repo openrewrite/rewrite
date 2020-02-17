@@ -59,6 +59,14 @@ import static java.util.stream.StreamSupport.stream;
 public class OpenJdkParser extends AbstractParser {
     private static final Logger logger = LoggerFactory.getLogger(OpenJdkParser.class);
 
+    /**
+     * When true, enables a parser to use class types from the in-memory type cache rather than performing
+     * a deep equality check. Useful when deep class types have already been built from a separate parsing phase
+     * and we want to parse some code snippet without requiring the classpath to be fully specified, using type
+     * information we've already learned about in a prior phase.
+     */
+    private final boolean relaxedClassTypeMatching;
+
     @Nullable
     private final List<Path> classpath;
 
@@ -71,16 +79,17 @@ public class OpenJdkParser extends AbstractParser {
     private final ResettableLog compilerLog = new ResettableLog(context);
 
     public OpenJdkParser() {
-        this(emptyList());
+        this(Charset.defaultCharset(), false);
     }
 
-    public OpenJdkParser(@Nullable List<Path> classpath) {
-        this(classpath, Charset.defaultCharset());
+    public OpenJdkParser(Charset charset, boolean relaxedClassTypeMatching) {
+        this(emptyList(), charset, relaxedClassTypeMatching);
     }
 
-    public OpenJdkParser(@Nullable List<Path> classpath, Charset charset) {
+    public OpenJdkParser(@Nullable List<Path> classpath, Charset charset, boolean relaxedClassTypeMatching) {
         this.classpath = classpath;
         this.charset = charset;
+        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.pfm = new JavacFileManager(context, true, charset);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
@@ -157,8 +166,8 @@ public class OpenJdkParser extends AbstractParser {
             try {
                 OpenJdkParserVisitor parser = new OpenJdkParserVisitor(
                         relativeTo == null ? path : relativeTo.relativize(path),
-                        Files.readString(path, charset)
-                );
+                        Files.readString(path, charset),
+                        relaxedClassTypeMatching);
                 return (Tr.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
             } catch (IOException e) {
                 throw new UncheckedIOException(e);

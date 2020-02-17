@@ -16,7 +16,10 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.StringUtils;
-import com.netflix.rewrite.tree.*;
+import com.netflix.rewrite.tree.Cursor;
+import com.netflix.rewrite.tree.Formatting;
+import com.netflix.rewrite.tree.Tr;
+import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -27,7 +30,6 @@ import java.util.TreeMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.singletonList;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.joining;
@@ -56,7 +58,7 @@ public class Formatter {
         }
     }
 
-    public Result findIndent(int enclosingIndent, Tree... trees) {
+    private Result wholeSourceIndent() {
         if (wholeSourceIndent == null) {
             var wholeSourceIndentVisitor = new FindIndentVisitor(0);
             wholeSourceIndentVisitor.visit(cu);
@@ -64,7 +66,10 @@ public class Formatter {
                     wholeSourceIndentVisitor.getMostCommonIndent() : 4 /* default to 4 spaces */,
                     wholeSourceIndentVisitor.isIndentedWithSpaces());
         }
+        return wholeSourceIndent;
+    }
 
+    public Result findIndent(int enclosingIndent, Tree... trees) {
         var findIndentVisitor = new FindIndentVisitor(enclosingIndent);
         for (Tree tree : trees) {
             findIndentVisitor.visit(tree);
@@ -72,9 +77,9 @@ public class Formatter {
 
         var indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?
                 findIndentVisitor.getMostCommonIndent() :
-                wholeSourceIndent.getIndentToUse();
+                wholeSourceIndent().getIndentToUse();
         var indentedWithSpaces = findIndentVisitor.getTotalLines() > 0 ? findIndentVisitor.isIndentedWithSpaces() :
-                wholeSourceIndent.isIndentedWithSpaces();
+                wholeSourceIndent().isIndentedWithSpaces();
 
         return new Result(enclosingIndent, indentToUse, indentedWithSpaces);
     }
@@ -96,8 +101,8 @@ public class Formatter {
     public ShiftFormatRightVisitor shiftRight(Tree moving, Tree into, Tree enclosesBoth) {
         // NOTE: This isn't absolutely perfect... suppose the block moving was indented with tabs and the surrounding source was spaces.
         // Should be close enough in the vast majority of cases.
-        int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
-        return new ShiftFormatRightVisitor(moving.getId(), shift, wholeSourceIndent.isIndentedWithSpaces());
+        int shift = enclosingIndent(into) + findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
+        return new ShiftFormatRightVisitor(moving.getId(), shift, wholeSourceIndent().isIndentedWithSpaces());
     }
 
     private int enclosingIndent(Tree enclosesBoth) {

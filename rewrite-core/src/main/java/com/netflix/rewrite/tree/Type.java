@@ -71,9 +71,6 @@ public interface Type extends Serializable {
 
         public static final Class OBJECT = build("java.lang.Object");
 
-        @Setter
-        private static boolean classVersionDependentComparison = true;
-
         private final String fullyQualifiedName;
         private final List<Var> members;
         private final List<Type> typeParameters;
@@ -90,8 +87,17 @@ public interface Type extends Serializable {
             this.supertype = supertype;
         }
 
+        /**
+         * Build a class type only from the class' fully qualified name. Since we are not providing any member, type parameter,
+         * interface, or supertype information, this fully qualified name could potentially match on more than one version of
+         * the class found in the type cache. This method will simply pick one of them, because there is no way of selecting
+         * between the versions of the class based solely on the fully qualified class name.
+         *
+         * @param fullyQualifiedName The fully qualified name of the class to build
+         * @return Any class found in the type cache
+         */
         public static Class build(String fullyQualifiedName) {
-            return build(fullyQualifiedName, emptyList(), emptyList(), emptyList(), null);
+            return build(fullyQualifiedName, emptyList(), emptyList(), emptyList(), null, true);
         }
 
         @JsonCreator
@@ -99,16 +105,19 @@ public interface Type extends Serializable {
                                   @JsonProperty("members") List<Var> members,
                                   @JsonProperty("typeParameters") List<Type> typeParameters,
                                   @JsonProperty("interfaces") List<Type> interfaces,
-                                  @JsonProperty("supertype") @Nullable Class supertype) {
-            // the variants are the various versions of this fully qualified name, where equality is determined by
-            // whether the supertype hierarchy and members through the entire supertype hierarchy are equal
+                                  @JsonProperty("supertype") @Nullable Class supertype,
+                                  boolean relaxedClassTypeMatching) {
+
+            // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
+            // name, where equality is determined by whether the supertype hierarchy and members through the entire
+            // supertype hierarchy are equal
             var test = new Class(fullyQualifiedName,
                     members.stream().sorted(comparing(Var::getName)).collect(toList()),
                     typeParameters, interfaces, supertype);
 
             synchronized (flyweights) {
                 var variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
-                return (classVersionDependentComparison ? variants.stream().filter(v -> v.deepEquals(test)) : variants.stream())
+                return (!relaxedClassTypeMatching ? variants.stream().filter(v -> v.deepEquals(test)) : variants.stream())
                         .findAny()
                         .orElseGet(() -> {
                             variants.add(test);

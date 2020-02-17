@@ -61,13 +61,15 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
     private final Path path;
     private final String source;
+    private final boolean relaxedClassTypeMatching;
 
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public OpenJdkParserVisitor(Path path, String source) {
+    public OpenJdkParserVisitor(Path path, String source, boolean relaxedClassTypeMatching) {
         this.path = path;
         this.source = source;
+        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
     }
 
     @Override
@@ -1227,7 +1229,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
             var prefix = source.substring(cursor, max(((JCTree) t2).getStartPosition(), cursor));
             cursor += prefix.length();
             @SuppressWarnings("unchecked") T t = (T) scan(t2, format(prefix));
-            if(t != null) {
+            if (t != null) {
                 t = t.withSuffix(suffix.apply(t2));
             }
             cursor(max(endPos(t2), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
@@ -1280,7 +1282,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
     }
 
     private Tr.TypeParameters convertTypeParameters(List<? extends Tree> typeArguments) {
-        if(typeArguments == null) {
+        if (typeArguments == null) {
             return null;
         }
 
@@ -1427,7 +1429,8 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
                     return Type.Class.build(sym.className(), fields,
                             classType.typarams_field == null ? emptyList() : classType.typarams_field.stream().map(tParam -> type(tParam, stackWithSym, true)).filter(Objects::nonNull).collect(toList()),
                             symType.interfaces_field == null ? emptyList() : symType.interfaces_field.stream().map(iParam -> type(iParam, stackWithSym, false)).filter(Objects::nonNull).collect(toList()),
-                            TypeUtils.asClass(type(classType.supertype_field, stackWithSym)));
+                            TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
+                            relaxedClassTypeMatching);
                 }
             }
         } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {

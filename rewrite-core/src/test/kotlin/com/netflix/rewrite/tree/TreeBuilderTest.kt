@@ -16,10 +16,82 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
+import com.netflix.rewrite.assertRefactored
+import com.netflix.rewrite.parse.OpenJdkParser
+import com.netflix.rewrite.tree.visitor.RetrieveCursorVisitor
+import com.netflix.rewrite.tree.visitor.refactor.AstTransform
+import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TreeBuilderTest {
+    @Test
+    fun buildSnippet() {
+        val a = OpenJdkParser().parse("""
+            import java.util.List;
+            public class A {
+                int n = 0;
+                
+                void foo(String m, List<String> others) {
+                }
+            }
+        """.trimIndent())
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursorVisitor(method.body!!.id).visit(a)
+        val paramName = (method.params.params[0] as Tr.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, "others.add({});", paramName)
+        assertTrue(snippets[0] is Tr.MethodInvocation)
+    }
+
+    @Test
+    fun injectSnippetIntoMethod() {
+        val a = OpenJdkParser().parse("""
+            import java.util.List;
+            public class A {
+                int n = 0;
+                
+                void foo(String m, List<String> others) {
+                }
+            }
+        """.trimIndent())
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursorVisitor(method.body!!.id).visit(a)
+        val paramName = (method.params.params[0] as Tr.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, """
+            others.add({});
+            if(others.contains({})) {
+                others.remove({});
+            }
+        """.trimIndent(), paramName, paramName, paramName)
+
+        val fixed = a.refactor().run(object: RefactorVisitor() {
+            override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform> {
+                return transform(method) { m ->
+                    m.withBody(m.body!!.withStatements(snippets))
+                }
+            }
+        }).fix()
+
+        assertRefactored(fixed, """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                    if(others.contains(m)) {
+                        others.remove(m);
+                    }
+                }
+            }
+        """)
+    }
+
     @Test
     fun buildFullyQualifiedClassName() {
         val name = TreeBuilder.buildName("java.util.List", Formatting.EMPTY) as Tr.FieldAccess

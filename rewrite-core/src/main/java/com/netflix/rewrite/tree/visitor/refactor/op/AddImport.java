@@ -155,7 +155,7 @@ public class AddImport extends RefactorVisitor {
                 importsWithAdded.removeAll(importsThatCouldBeStarReplaced);
             }
 
-            Tr.FieldAccess classImportField = (Tr.FieldAccess) TreeBuilder.buildName(clazz, format(" "));
+            Tr.FieldAccess classImportField = TreeBuilder.buildName(clazz, format(" "));
             Tr.Import importStatementToAdd;
             if (staticMethod == null) {
                 importStatementToAdd = new Tr.Import(randomId(),
