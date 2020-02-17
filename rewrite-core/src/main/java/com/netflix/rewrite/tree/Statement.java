@@ -16,10 +16,30 @@
 package com.netflix.rewrite.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.netflix.rewrite.internal.lang.Nullable;
 
 public interface Statement extends Tree {
     @JsonIgnore
     default boolean isSemicolonTerminated() {
         return false;
+    }
+
+    @JsonIgnore
+    default boolean hasClassType(@Nullable Type.Class classType) {
+        if(classType == null) {
+            return false;
+        }
+
+        if (!(this instanceof Tr.VariableDecls)) {
+            return false;
+        }
+
+        Tr.VariableDecls variable = (Tr.VariableDecls) this;
+
+        if (variable.getTypeExpr() == null) {
+            return false;
+        }
+
+        return TypeUtils.isOfClassType(variable.getTypeExpr().getType(), classType.getFullyQualifiedName());
     }
 }

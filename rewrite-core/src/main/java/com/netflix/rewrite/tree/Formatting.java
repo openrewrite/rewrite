@@ -18,9 +18,11 @@ package com.netflix.rewrite.tree;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
+import com.netflix.rewrite.internal.lang.Nullable;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.util.List;
 import java.util.Map;
 import java.util.PrimitiveIterator;
 
@@ -31,7 +33,8 @@ import java.util.PrimitiveIterator;
 @Getter
 public class Formatting implements Serializable {
     // suffixes are uncommon, so we'll treat them as a secondary index
-    private static final Map<String, Map<String, Formatting>> flyweights = HashObjObjMaps.newMutableMap();;
+    private static final Map<String, Map<String, Formatting>> flyweights = HashObjObjMaps.newMutableMap();
+    ;
 
     public static Formatting EMPTY = new Formatting("", "") {
         @Override
@@ -54,7 +57,7 @@ public class Formatting implements Serializable {
 
     public static Formatting format(String prefix, String suffix) {
         synchronized (flyweights) {
-            if(prefix.isEmpty() && suffix.isEmpty()) {
+            if (prefix.isEmpty() && suffix.isEmpty()) {
                 return EMPTY;
             }
 
@@ -75,12 +78,48 @@ public class Formatting implements Serializable {
     public static int getIndent(String formatting) {
         int indent = 0;
         for (char c : formatting.toCharArray()) {
-            if(c == '\n' || c == '\r' || !Character.isWhitespace(c)) {
+            if (c == '\n' || c == '\r' || !Character.isWhitespace(c)) {
                 indent = 0;
                 continue;
             }
             indent++;
         }
         return indent;
+    }
+
+    public static String firstPrefix(@Nullable List<? extends Tree> trees) {
+        return trees == null || trees.isEmpty() ? "" : trees.iterator().next().getFormatting().getPrefix();
+    }
+
+    public static String lastSuffix(@Nullable List<? extends Tree> trees) {
+        return trees == null || trees.isEmpty() ? "" : trees.get(trees.size() - 1).getFormatting().getSuffix();
+    }
+
+    public static <T extends Tree> List<T> formatFirstPrefix(@Nullable List<T> trees, String prefix) {
+        if (trees == null) {
+            return null;
+        }
+        if (!trees.isEmpty()) {
+            trees.set(0, trees.get(0).withPrefix(prefix));
+        }
+        return trees;
+    }
+
+    public static <T extends Tree> List<T> formatLastSuffix(@Nullable List<T> trees, String suffix) {
+        if (trees == null) {
+            return null;
+        }
+        if (!trees.isEmpty()) {
+            trees.set(trees.size() - 1, trees.get(trees.size() - 1).withSuffix(suffix));
+        }
+        return trees;
+    }
+
+    public static <T extends Tree> T stripSuffix(@Nullable T t) {
+        return t == null ? null : t.withSuffix("");
+    }
+
+    public static <T extends Tree> T stripPrefix(@Nullable T t) {
+        return t == null ? null : t.withPrefix("");
     }
 }

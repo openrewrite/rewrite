@@ -70,7 +70,6 @@ public class Cursor {
         return cu;
     }
 
-    @Nullable
     public Tr.Block<?> enclosingBlock() {
         return firstEnclosing(Tr.Block.class);
     }

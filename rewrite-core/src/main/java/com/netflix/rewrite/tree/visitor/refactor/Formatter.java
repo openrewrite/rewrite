@@ -16,10 +16,7 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.StringUtils;
-import com.netflix.rewrite.tree.Cursor;
-import com.netflix.rewrite.tree.Formatting;
-import com.netflix.rewrite.tree.Tr;
-import com.netflix.rewrite.tree.Tree;
+import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -59,7 +56,7 @@ public class Formatter {
         }
     }
 
-    public Result findIndent(int enclosingIndent, Iterable<? extends Tree> trees) {
+    public Result findIndent(int enclosingIndent, Tree... trees) {
         if (wholeSourceIndent == null) {
             var wholeSourceIndentVisitor = new FindIndentVisitor(0);
             wholeSourceIndentVisitor.visit(cu);
@@ -69,7 +66,9 @@ public class Formatter {
         }
 
         var findIndentVisitor = new FindIndentVisitor(enclosingIndent);
-        trees.forEach(findIndentVisitor::visit);
+        for (Tree tree : trees) {
+            findIndentVisitor.visit(tree);
+        }
 
         var indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?
                 findIndentVisitor.getMostCommonIndent() :
@@ -81,7 +80,7 @@ public class Formatter {
     }
 
     public Formatting format(Tr.Block<?> relativeToEnclosing) {
-        Result indentation = findIndent(relativeToEnclosing.getIndent(), relativeToEnclosing.getStatements());
+        Result indentation = findIndent(relativeToEnclosing.getIndent(), relativeToEnclosing.getStatements().toArray(Tree[]::new));
         return Formatting.format(indentation.getPrefix());
     }
 
@@ -97,7 +96,7 @@ public class Formatter {
     public ShiftFormatRightVisitor shiftRight(Tree moving, Tree into, Tree enclosesBoth) {
         // NOTE: This isn't absolutely perfect... suppose the block moving was indented with tabs and the surrounding source was spaces.
         // Should be close enough in the vast majority of cases.
-        int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), singletonList(moving)).getEnclosingIndent();
+        int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
         return new ShiftFormatRightVisitor(moving.getId(), shift, wholeSourceIndent.isIndentedWithSpaces());
     }
 

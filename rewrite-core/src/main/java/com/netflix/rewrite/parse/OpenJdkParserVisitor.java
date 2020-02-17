@@ -652,7 +652,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
             var prefix = sourceBefore("{");
             cursor--;
             body = convert(node.getBody());
-            body = body.withFormatting(body.getFormatting().withPrefix(prefix));
+            body = body.withPrefix(prefix);
         } else {
             body = convert(node.getBody());
         }
@@ -1228,7 +1228,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
             cursor += prefix.length();
             @SuppressWarnings("unchecked") T t = (T) scan(t2, format(prefix));
             if(t != null) {
-                t = t.withFormatting(t.getFormatting().withSuffix(suffix.apply(t2)));
+                t = t.withSuffix(suffix.apply(t2));
             }
             cursor(max(endPos(t2), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
             return t;
@@ -1344,7 +1344,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
                         @SuppressWarnings("unchecked")
                         Tr.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
-                        vars = vars.withFormatting(vars.getFormatting().withSuffix(semiDelim.apply(last)));
+                        vars = vars.withSuffix(semiDelim.apply(last));
                         cursor(max(endPos(last), cursor));
                         return (T) vars;
                     }

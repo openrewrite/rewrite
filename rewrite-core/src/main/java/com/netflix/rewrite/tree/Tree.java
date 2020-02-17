@@ -39,6 +39,14 @@ public interface Tree {
      */
     <T extends Tree> T withFormatting(Formatting fmt);
 
+    default <T extends Tree> T withPrefix(String prefix) {
+        return withFormatting(getFormatting().withPrefix(prefix));
+    }
+
+    default <T extends Tree> T withSuffix(String suffix) {
+        return withFormatting(getFormatting().withSuffix(suffix));
+    }
+
     default <R> R accept(AstVisitor<R> v)  {
         return v.defaultTo(null);
     }

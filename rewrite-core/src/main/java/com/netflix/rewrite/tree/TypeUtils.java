@@ -35,6 +35,11 @@ public class TypeUtils {
         return type instanceof Type.Class && "java.lang.String".equals(((Type.Class) type).getFullyQualifiedName());
     }
 
+    public static boolean isOfClassType(@Nullable Type type, String fqn) {
+        Type.Class classType = asClass(type);
+        return classType != null && classType.getFullyQualifiedName().equals(fqn);
+    }
+
     @Nullable
     public static Type.Class asClass(@Nullable Type type) {
         return type instanceof Type.Class ? (Type.Class) type : null;

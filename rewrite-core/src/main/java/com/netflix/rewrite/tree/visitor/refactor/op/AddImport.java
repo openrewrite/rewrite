@@ -110,7 +110,7 @@ public class AddImport extends RefactorVisitor {
 
         if (cu.getClasses().size() > 0 && cu.getImports().isEmpty() ||
                 cu.getClasses().get(0).getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() < 2) {
-            changes.addAll(transform(cu.getClasses().get(0), clazz -> clazz.withFormatting(clazz.getFormatting().withPrefix("\n\n"))));
+            changes.addAll(transform(cu.getClasses().get(0), clazz -> clazz.withPrefix("\n\n")));
         }
 
         return changes;
@@ -190,13 +190,13 @@ public class AddImport extends RefactorVisitor {
                     }
                     if (i == 0 || (!encounteredJavaImport && (encounteredJavaImport = anImport.getPackageName().startsWith("java"))) ||
                             anImport.isStatic()) {
-                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n\n")));
+                        importsWithAdded.set(i, anImport.withPrefix("\n\n"));
                         if (anImport.isStatic()) {
                             // don't attempt any other formatting, because we will not have modified this list
                             break;
                         }
                     } else {
-                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n")));
+                        importsWithAdded.set(i, anImport.withPrefix("\n"));
                     }
                 }
             } else {
@@ -224,9 +224,9 @@ public class AddImport extends RefactorVisitor {
                 for (int i = 0; i < importsWithAdded.size(); i++) {
                     Tr.Import anImport = importsWithAdded.get(i);
                     if (!encounteredStatic && (encounteredStatic = anImport.isStatic())) {
-                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n\n")));
+                        importsWithAdded.set(i, anImport.withPrefix("\n\n"));
                     } else if (anImport.isStatic()) {
-                        importsWithAdded.set(i, anImport.withFormatting(anImport.getFormatting().withPrefix("\n")));
+                        importsWithAdded.set(i, anImport.withPrefix("\n"));
                     }
                 }
             }

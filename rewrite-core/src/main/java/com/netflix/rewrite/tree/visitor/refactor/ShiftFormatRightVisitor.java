@@ -63,6 +63,6 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
     }
 
     private List<AstTransform> shiftRight(Tree tree) {
-        return transform(tree, s -> s.withFormatting(tree.getFormatting().withPrefix(tree.getFormatting().getPrefix() + shift)));
+        return transform(tree, s -> s.withPrefix(s.getFormatting().getPrefix() + shift));
     }
 }
