@@ -101,14 +101,18 @@ public class Formatter {
     public ShiftFormatRightVisitor shiftRight(Tree moving, Tree into, Tree enclosesBoth) {
         // NOTE: This isn't absolutely perfect... suppose the block moving was indented with tabs and the surrounding source was spaces.
         // Should be close enough in the vast majority of cases.
-        int shift = enclosingIndent(into) + findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
+        int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
         return new ShiftFormatRightVisitor(moving.getId(), shift, wholeSourceIndent().isIndentedWithSpaces());
     }
 
-    private int enclosingIndent(Tree enclosesBoth) {
+    public static int enclosingIndent(Tree enclosesBoth) {
         return enclosesBoth instanceof Tr.Block ? ((Tr.Block<?>) enclosesBoth).getIndent() :
                 (int) enclosesBoth.getFormatting().getPrefix().chars().dropWhile(c -> c == '\n' || c == '\r')
                         .takeWhile(Character::isWhitespace).count();
+    }
+
+    public boolean isIndentedWithSpaces() {
+        return wholeSourceIndent().isIndentedWithSpaces();
     }
 
     /**

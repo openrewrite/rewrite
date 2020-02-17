@@ -36,6 +36,7 @@ import java.util.regex.Pattern;
 import static com.netflix.rewrite.internal.StringUtils.trimIndent;
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
+import static com.netflix.rewrite.tree.visitor.refactor.Formatter.enclosingIndent;
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -121,7 +122,11 @@ public class TreeBuilder {
         Formatter formatter = new Formatter(cu);
 
         Tr.CompilationUnit formattedCu = (Tr.CompilationUnit) new TransformVisitor(block.getStatements().stream()
-                .flatMap(stat -> formatter.shiftRight(stat, insertionScope.getTree(), insertionScope.getTree()).visit(cu).stream())
+                .flatMap(stat -> {
+                    ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat.getId(), enclosingIndent(insertionScope.getTree()) +
+                            formatter.findIndent(enclosingIndent(insertionScope.getTree()), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
+                    return shiftRight.visit(cu).stream();
+                })
                 .collect(toList())).visit(cu);
 
         List<Tree> formattedStatements = formattedCu.getClasses().get(0).getBody().getStatements();
