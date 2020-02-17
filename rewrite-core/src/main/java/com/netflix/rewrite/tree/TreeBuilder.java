@@ -52,12 +52,12 @@ public class TreeBuilder {
     private TreeBuilder() {
     }
 
-    public static NameTree buildName(String fullyQualifiedName) {
+    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
         return buildName(fullyQualifiedName, Formatting.EMPTY);
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
-    public static <T extends NameTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
+    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
         String[] parts = fullyQualifiedName.split("\\.");
 
         String fullName = "";
