@@ -22,12 +22,10 @@ import java.lang.annotation.*;
  * that define refactoring operations and release with new versions of their libraries. Build tool
  * plugins then scan for the annotation in the classpath and apply the operations to the codebase.
  *
- * Methods marked with @Rewrite should be public static and return a <pre>List{@literal <}RefactorVisitor></pre>.
+ * Methods marked with @RefactoringProvider should be public static and return a <pre>List{@literal <}RefactorVisitor></pre>.
  */
 @Documented
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface Rewrite {
-    String value();
-    String description();
+public @interface RefactoringProvider {
 }
