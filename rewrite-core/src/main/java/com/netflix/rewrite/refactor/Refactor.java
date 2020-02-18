@@ -54,6 +54,11 @@ public class Refactor {
     // Custom refactoring visitors
     // -------------
 
+    public Refactor run(Iterable<RefactorVisitor> visitors) {
+        visitors.forEach(ops::add);
+        return this;
+    }
+
     public Refactor run(RefactorVisitor visitor) {
         ops.add(visitor);
         return this;
