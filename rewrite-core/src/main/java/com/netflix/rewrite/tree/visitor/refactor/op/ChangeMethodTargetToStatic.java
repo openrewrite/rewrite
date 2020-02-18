@@ -16,19 +16,17 @@
 package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Flag;
-import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
-import lombok.AllArgsConstructor;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
+import static com.netflix.rewrite.tree.Formatting.EMPTY;
 import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
@@ -46,29 +44,28 @@ public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        if(!isInScope(method)) {
-            return super.visitMethodInvocation(method);
-        }
+        return transformIfScoped(method,
+                super::visitMethodInvocation,
+                m -> {
+                    var classType = Type.Class.build(clazz);
+                    Tr.MethodInvocation transformedMethodInvocation = m.withSelect(
+                            Tr.Ident.build(randomId(), classType.getClassName(), classType,
+                                    m.getSelect() == null ? EMPTY : m.getSelect().getFormatting()));
 
-        var classType = Type.Class.build(clazz);
-        return transform(method, m -> {
-            Tr.MethodInvocation transformedMethodInvocation = m
-                    .withSelect(Tr.Ident.build(randomId(), classType.getClassName(), classType, m.getSelect() == null ?
-                            Formatting.EMPTY : m.getSelect().getFormatting()));
+                    Type.Method transformedType = null;
+                    if (m.getType() != null) {
+                        maybeRemoveImport(m.getType().getDeclaringType());
+                        transformedType = m.getType().withDeclaringType(classType);
+                        if (!m.getType().hasFlags(Flag.Static)) {
+                            Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
+                            flags.add(Flag.Static);
+                            transformedType = transformedType.withFlags(flags);
+                        }
+                    }
 
-            Type.Method transformedType = null;
-            if (m.getType() != null) {
-                maybeRemoveImport(m.getType().getDeclaringType());
-                transformedType = m.getType().withDeclaringType(classType);
-                if (!m.getType().hasFlags(Flag.Static)) {
-                    Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
-                    flags.add(Flag.Static);
-                    transformedType = transformedType.withFlags(flags);
+                    return transformedMethodInvocation.withType(transformedType);
                 }
-            }
-
-            return transformedMethodInvocation.withType(transformedType);
-        });
+        );
     }
 
     @Override

@@ -17,14 +17,10 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
-import lombok.AllArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
-
-import static com.netflix.rewrite.tree.Tr.randomId;
 
 public class ChangeMethodName extends ScopedRefactorVisitor {
     private final String name;
@@ -41,10 +37,8 @@ public class ChangeMethodName extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        List<AstTransform> changes = super.visitMethodInvocation(method);
-        if(isInScope(method)) {
-            changes.addAll(transform(method, m -> m.withName(m.getName().withName(name))));
-        }
-        return changes;
+        return transformIfScoped(method,
+                super::visitMethodInvocation,
+                m -> m.withName(m.getName().withName(name)));
     }
 }

@@ -59,54 +59,54 @@ public class DeleteStatement extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitForLoop(Tr.ForLoop forLoop) {
-        List<AstTransform> changes = super.visitForLoop(forLoop);
-        if (forLoop.getBody().getId().equals(scope)) {
-            changes.addAll(transform(forLoop, t -> t.withBody(emptyBlock())));
-        }
-        return changes;
+        return maybeTransform(forLoop,
+                forLoop.getBody().getId().equals(scope),
+                super::visitForLoop,
+                t -> t.withBody(emptyBlock())
+        );
     }
 
     @Override
     public List<AstTransform> visitForEachLoop(Tr.ForEachLoop forEachLoop) {
-        List<AstTransform> changes = super.visitForEachLoop(forEachLoop);
-        if (forEachLoop.getBody().getId().equals(scope)) {
-            changes.addAll(transform(forEachLoop, t -> t.withBody(emptyBlock())));
-        }
-        return changes;
+        return maybeTransform(forEachLoop,
+                forEachLoop.getBody().getId().equals(scope),
+                super::visitForEachLoop,
+                t -> t.withBody(emptyBlock())
+        );
     }
 
     @Override
     public List<AstTransform> visitWhileLoop(Tr.WhileLoop whileLoop) {
-        List<AstTransform> changes = super.visitWhileLoop(whileLoop);
-        if (whileLoop.getBody().getId().equals(scope)) {
-            changes.addAll(transform(whileLoop, t -> t.withBody(emptyBlock())));
-        }
-        return changes;
+        return maybeTransform(whileLoop,
+                whileLoop.getBody().getId().equals(scope),
+                super::visitWhileLoop,
+                t -> t.withBody(emptyBlock())
+        );
     }
 
     @Override
     public List<AstTransform> visitDoWhileLoop(Tr.DoWhileLoop doWhileLoop) {
-        List<AstTransform> changes = super.visitDoWhileLoop(doWhileLoop);
-        if (doWhileLoop.getBody().getId().equals(scope)) {
-            changes.addAll(transform(doWhileLoop, t -> t.withBody(emptyBlock())));
-        }
-        return changes;
+        return maybeTransform(doWhileLoop,
+                doWhileLoop.getBody().getId().equals(scope),
+                super::visitDoWhileLoop,
+                t -> t.withBody(emptyBlock())
+        );
     }
 
     @Override
     public List<AstTransform> visitBlock(Tr.Block<Tree> block) {
-        List<AstTransform> changes = super.visitBlock(block);
-        if (block.getStatements().stream().anyMatch(s -> s.getId().equals(scope))) {
-            changes.addAll(transform(block, t -> t.withStatements(t.getStatements().stream()
-                    .filter(s -> !s.getId().equals(scope))
-                    .collect(toList()))));
-        }
-        return changes;
+        return maybeTransform(block,
+                block.getStatements().stream().anyMatch(s -> s.getId().equals(scope)),
+                super::visitBlock,
+                t -> t.withStatements(t.getStatements().stream()
+                        .filter(s -> !s.getId().equals(scope))
+                        .collect(toList()))
+        );
     }
 
     @Override
     public List<AstTransform> visit(Tree tree) {
-        if(tree != null && tree.getId().equals(scope)) {
+        if (tree != null && tree.getId().equals(scope)) {
             new ReferencedTypesVisitor().visit(tree).forEach(this::maybeRemoveImport);
         }
         return super.visit(tree);

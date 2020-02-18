@@ -47,54 +47,51 @@ public class ReorderMethodArguments extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        List<AstTransform> changes = super.visitMethodInvocation(method);
-
-        if(isInScope(method) && method.getType() != null) {
-            changes.addAll(transform(method, m -> {
-                if(m.getType() == null) {
-                    return m;
-                }
-
-                var paramNames = originalParamNames.length == 0 ? m.getType().getParamNames() :
-                        Arrays.asList(originalParamNames);
-
-                if(paramNames == null) {
-                    throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
-                            "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
-                }
-
-                List<Expression> originalArgs = m.getArgs().getArgs();
-
-                var resolvedParamCount = m.getType().getResolvedSignature() == null ? originalArgs.size() :
-                        m.getType().getResolvedSignature().getParamTypes().size();
-
-                int i = 0;
-                List<Expression> reordered = new ArrayList<>(originalArgs.size());
-                List<Formatting> formattings = new ArrayList<>(originalArgs.size());
-
-                for (String name : byArgumentNames) {
-                    int fromPos = paramNames.indexOf(name);
-                    if(originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
-                        // this is a varargs argument
-                        List<Expression> varargs = originalArgs.subList(fromPos, originalArgs.size());
-                        reordered.addAll(varargs);
-                        originalArgs.subList(i, (i++) + varargs.size()).stream().map(Expression::getFormatting).forEach(formattings::add);
+        return maybeTransform(method,
+                isInScope(method) && method.getType() != null,
+                super::visitMethodInvocation,
+                m -> {
+                    if (m.getType() == null) {
+                        return m;
                     }
-                    else if(fromPos >= 0 && originalArgs.size() > fromPos) {
-                        reordered.add(originalArgs.get(fromPos));
-                        formattings.add(originalArgs.get(i++).getFormatting());
+
+                    var paramNames = originalParamNames.length == 0 ? m.getType().getParamNames() :
+                            Arrays.asList(originalParamNames);
+
+                    if (paramNames == null) {
+                        throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
+                                "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
                     }
+
+                    List<Expression> originalArgs = m.getArgs().getArgs();
+
+                    var resolvedParamCount = m.getType().getResolvedSignature() == null ? originalArgs.size() :
+                            m.getType().getResolvedSignature().getParamTypes().size();
+
+                    int i = 0;
+                    List<Expression> reordered = new ArrayList<>(originalArgs.size());
+                    List<Formatting> formattings = new ArrayList<>(originalArgs.size());
+
+                    for (String name : byArgumentNames) {
+                        int fromPos = paramNames.indexOf(name);
+                        if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
+                            // this is a varargs argument
+                            List<Expression> varargs = originalArgs.subList(fromPos, originalArgs.size());
+                            reordered.addAll(varargs);
+                            originalArgs.subList(i, (i++) + varargs.size()).stream().map(Expression::getFormatting).forEach(formattings::add);
+                        } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
+                            reordered.add(originalArgs.get(fromPos));
+                            formattings.add(originalArgs.get(i++).getFormatting());
+                        }
+                    }
+
+                    i = 0;
+                    for (Expression expression : reordered) {
+                        reordered.set(i, expression.withFormatting(formattings.get(i++)));
+                    }
+
+                    return m.withArgs(m.getArgs().withArgs(reordered));
                 }
-
-                i = 0;
-                for (Expression expression : reordered) {
-                    reordered.set(i, expression.withFormatting(formattings.get(i++)));
-                }
-
-                return m.withArgs(m.getArgs().withArgs(reordered));
-            }));
-        }
-
-        return changes;
+        );
     }
 }

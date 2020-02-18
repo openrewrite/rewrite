@@ -57,13 +57,50 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         return formatter;
     }
 
-    protected List<AstTransform> maybeTransform(boolean shouldTransform,
-                                                List<AstTransform> callSuper,
-                                                List<AstTransform> transform) {
+    protected <T extends Tree, U extends Tree> List<AstTransform> maybeTransform(T tree,
+                                                                                 boolean shouldTransform,
+                                                                                 Function<T, List<AstTransform>> callSuper,
+                                                                                 Function<T, U> transformNestedElement,
+                                                                                 BiFunction<U, Cursor, U> mutation) {
+        List<AstTransform> changes = callSuper.apply(tree);
         if (shouldTransform) {
-            callSuper.addAll(transform);
+            changes.addAll(transform(transformNestedElement.apply(tree), mutation));
         }
-        return callSuper;
+        return changes;
+    }
+
+    protected <T extends Tree, U extends Tree> List<AstTransform> maybeTransform(T tree,
+                                                                                 boolean shouldTransform,
+                                                                                 Function<T, List<AstTransform>> callSuper,
+                                                                                 Function<T, U> transformNestedElement,
+                                                                                 Function<U, U> mutation) {
+        List<AstTransform> changes = callSuper.apply(tree);
+        if (shouldTransform) {
+            changes.addAll(transform(transformNestedElement.apply(tree), mutation));
+        }
+        return changes;
+    }
+
+    protected <T extends Tree> List<AstTransform> maybeTransform(T tree,
+                                                                 boolean shouldTransform,
+                                                                 Function<T, List<AstTransform>> callSuper,
+                                                                 Function<T, T> mutation) {
+        List<AstTransform> changes = callSuper.apply(tree);
+        if (shouldTransform) {
+            changes.addAll(transform(tree, mutation));
+        }
+        return changes;
+    }
+
+    protected <T extends Tree> List<AstTransform> maybeTransform(T tree,
+                                                                 boolean shouldTransform,
+                                                                 Function<T, List<AstTransform>> callSuper,
+                                                                 BiFunction<T, Cursor, T> mutation) {
+        List<AstTransform> changes = callSuper.apply(tree);
+        if (shouldTransform) {
+            changes.addAll(transform(tree, mutation));
+        }
+        return changes;
     }
 
     protected void maybeAddImport(@Nullable Type.Class clazz) {
@@ -132,13 +169,6 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
     protected <U extends Tree> List<AstTransform> transform(U target, Function<U, U> mutation) {
         List<AstTransform> changes = new ArrayList<>(1);
         changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) target.getClass(), (t, c) -> mutation.apply(((U) t))));
-        return changes;
-    }
-
-    @SuppressWarnings("unchecked")
-    protected <T extends Tree, U extends T> List<AstTransform> transform(Class<T> widenTo, U target, Function<U, T> mutation) {
-        List<AstTransform> changes = new ArrayList<>(1);
-        changes.add(new AstTransform(target.getId(), getRuleName(), (Class<Tree>) widenTo, (t, c) -> mutation.apply(((U) t))));
         return changes;
     }
 }

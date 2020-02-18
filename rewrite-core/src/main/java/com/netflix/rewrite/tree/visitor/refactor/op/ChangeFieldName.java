@@ -43,28 +43,31 @@ public class ChangeFieldName extends RefactorVisitor {
                 .getParentOrThrow() // maybe Tr.ClassDecl
                 .getTree() instanceof Tr.ClassDecl;
 
-        return maybeTransform(isField &&
+        return maybeTransform(variable,
+                isField &&
                         matchesClass(getCursor().enclosingClass().getType()) &&
                         variable.getSimpleName().equals(hasName),
-                super.visitVariable(variable),
-                transform(variable, v -> v.withName(v.getName().withName(toName)))
+                super::visitVariable,
+                v -> v.withName(v.getName().withName(toName))
         );
     }
 
     @Override
     public List<AstTransform> visitFieldAccess(Tr.FieldAccess fieldAccess) {
-        return maybeTransform(matchesClass(fieldAccess.getTarget().getType()) &&
+        return maybeTransform(fieldAccess,
+                matchesClass(fieldAccess.getTarget().getType()) &&
                         fieldAccess.getSimpleName().equals(hasName),
-                super.visitFieldAccess(fieldAccess),
-                transform(fieldAccess, fa -> fa.withName(fa.getName().withName(toName)))
+                super::visitFieldAccess,
+                fa -> fa.withName(fa.getName().withName(toName))
         );
     }
 
     @Override
     public List<AstTransform> visitIdentifier(Tr.Ident ident) {
-        return maybeTransform(ident.getSimpleName().equals(hasName) && isFieldReference(ident),
-                super.visitIdentifier(ident),
-                transform(ident, i -> i.withName(toName))
+        return maybeTransform(ident,
+                ident.getSimpleName().equals(hasName) && isFieldReference(ident),
+                super::visitIdentifier,
+                i -> i.withName(toName)
         );
     }
 
@@ -101,11 +104,11 @@ public class ChangeFieldName extends RefactorVisitor {
 
         @Override
         public Cursor reduce(Cursor r1, Cursor r2) {
-            if(r1 == null) {
+            if (r1 == null) {
                 return r2;
             }
 
-            if(r2 == null) {
+            if (r2 == null) {
                 return r1;
             }
 

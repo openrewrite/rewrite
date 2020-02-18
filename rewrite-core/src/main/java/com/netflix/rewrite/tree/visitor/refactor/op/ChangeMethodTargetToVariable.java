@@ -46,30 +46,27 @@ public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        List<AstTransform> changes = super.visitMethodInvocation(method);
+        return maybeTransform(method,
+                method.getId().equals(scope),
+                super::visitMethodInvocation,
+                m -> {
+                    Expression select = m.getSelect();
 
-        if (isInScope(method)) {
-            changes.addAll(transform(method, m -> {
-                        Expression select = m.getSelect();
+                    Type.Method type = null;
+                    if (m.getType() != null) {
+                        // if the original is a static method invocation, the import on it's type may no longer be needed
+                        maybeRemoveImport(m.getType().getDeclaringType());
 
-                        Type.Method type = null;
-                        if (m.getType() != null) {
-                            // if the original is a static method invocation, the import on it's type may no longer be needed
-                            maybeRemoveImport(m.getType().getDeclaringType());
+                        Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
+                        flags.remove(Flag.Static);
+                        type = m.getType().withDeclaringType(this.type).withFlags(flags);
+                    }
 
-                            Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
-                            flags.remove(Flag.Static);
-                            type = m.getType().withDeclaringType(this.type).withFlags(flags);
-                        }
-
-                        return m
-                                .withSelect(Tr.Ident.build(randomId(), varName, select == null ? null : select.getType(),
-                                        select == null ? Formatting.EMPTY : select.getFormatting()))
-                                .withType(type);
-                    })
-            );
-        }
-
-        return changes;
+                    return m
+                            .withSelect(Tr.Ident.build(randomId(), varName, select == null ? null : select.getType(),
+                                    select == null ? Formatting.EMPTY : select.getFormatting()))
+                            .withType(type);
+                }
+        );
     }
 }

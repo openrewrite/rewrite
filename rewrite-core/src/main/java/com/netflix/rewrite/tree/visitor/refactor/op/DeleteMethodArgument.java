@@ -20,14 +20,13 @@ import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
-import lombok.AllArgsConstructor;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
+import static java.util.Collections.singletonList;
 
 public class DeleteMethodArgument extends ScopedRefactorVisitor {
     private final int pos;
@@ -44,20 +43,17 @@ public class DeleteMethodArgument extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        List<AstTransform> changes = super.visitMethodInvocation(method);
-
-        if (isInScope(method) && method.getArgs().getArgs().stream().filter(arg -> !(arg instanceof Tr.Empty)).count() > pos) {
-            changes.addAll(transform(method, m -> {
-                        List<Expression> args = new ArrayList<>(m.getArgs().getArgs());
-                        args.remove(pos);
-                        if (args.isEmpty()) {
-                            args = Collections.singletonList(new Tr.Empty(randomId(), Formatting.EMPTY));
-                        }
-                        return m.withArgs(m.getArgs().withArgs(args));
-                    })
-            );
-        }
-
-        return changes;
+        return maybeTransform(method,
+                method.getId().equals(scope) && method.getArgs().getArgs().stream()
+                        .filter(arg -> !(arg instanceof Tr.Empty)).count() > pos,
+                super::visitMethodInvocation,
+                m -> {
+                    List<Expression> args = new ArrayList<>(m.getArgs().getArgs());
+                    args.remove(pos);
+                    if (args.isEmpty()) {
+                        args = singletonList(new Tr.Empty(randomId(), Formatting.EMPTY));
+                    }
+                    return m.withArgs(m.getArgs().withArgs(args));
+                });
     }
 }

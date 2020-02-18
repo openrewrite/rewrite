@@ -47,33 +47,29 @@ public class InsertMethodArgument extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
-        List<AstTransform> changes = super.visitMethodInvocation(method);
+        return maybeTransform(method,
+                method.getId().equals(scope),
+                super::visitMethodInvocation,
+                m -> {
+                    List<Expression> modifiedArgs = m.getArgs().getArgs().stream()
+                            .filter(a -> !(a instanceof Tr.Empty))
+                            .collect(Collectors.toCollection(ArrayList::new));
+                    modifiedArgs.add(pos,
+                            new Tr.UnparsedSource(randomId(),
+                                    source,
+                                    pos == 0 ?
+                                            modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
+                                            format(" ")
+                            )
+                    );
 
-        if (isInScope(method)) {
-            changes.addAll(
-                    transform(method, m -> {
-                        List<Expression> modifiedArgs = m.getArgs().getArgs().stream()
-                                .filter(a -> !(a instanceof Tr.Empty))
-                                .collect(Collectors.toCollection(ArrayList::new));
-                        modifiedArgs.add(pos,
-                                new Tr.UnparsedSource(randomId(),
-                                        source,
-                                        pos == 0 ?
-                                                modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
-                                                format(" ")
-                                )
-                        );
+                    if (pos == 0 && modifiedArgs.size() > 1) {
+                        // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
+                        modifiedArgs.set(1, modifiedArgs.get(1).withFormatting(format(" ")));
+                    }
 
-                        if (pos == 0 && modifiedArgs.size() > 1) {
-                            // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
-                            modifiedArgs.set(1, modifiedArgs.get(1).withFormatting(format(" ")));
-                        }
-
-                        return m.withArgs(m.getArgs().withArgs(modifiedArgs));
-                    })
-            );
-        }
-
-        return changes;
+                    return m.withArgs(m.getArgs().withArgs(modifiedArgs));
+                }
+        );
     }
 }

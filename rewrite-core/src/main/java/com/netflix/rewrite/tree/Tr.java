@@ -2753,6 +2753,11 @@ public abstract class Tr implements Serializable, Tree {
             return new FindAnnotations(signature).visit(this);
         }
 
+
+        public Type.Class getTypeAsClass() {
+            return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data

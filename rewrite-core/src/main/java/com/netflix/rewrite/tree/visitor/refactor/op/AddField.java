@@ -54,36 +54,32 @@ public class AddField extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitClassDecl(Tr.ClassDecl classDecl) {
-        List<AstTransform> changes = super.visitClassDecl(classDecl);
+        return transformIfScoped(classDecl,
+                super::visitClassDecl,
+                Tr.ClassDecl::getBody,
+                block -> {
+                    var classType = Type.Class.build(clazz);
+                    var newField = new Tr.VariableDecls(randomId(),
+                            emptyList(),
+                            modifiers,
+                            Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
+                            null,
+                            emptyList(),
+                            singletonList(new Tr.VariableDecls.NamedVar(randomId(),
+                                    Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
+                                    emptyList(),
+                                    init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
+                                    classType,
+                                    Formatting.format(" ")
+                            )),
+                            formatter().format(block)
+                    );
 
-        if (isInScope(classDecl)) {
-            changes.addAll(
-                    transform(classDecl.getBody(), block -> {
-                        var classType = Type.Class.build(clazz);
-                        var newField = new Tr.VariableDecls(randomId(),
-                                emptyList(),
-                                modifiers,
-                                Tr.Ident.build(randomId(), classType.getClassName(), classType, Formatting.EMPTY),
-                                null,
-                                emptyList(),
-                                singletonList(new Tr.VariableDecls.NamedVar(randomId(),
-                                        Tr.Ident.build(randomId(), name, null, Formatting.format("", init == null ? "" : " ")),
-                                        emptyList(),
-                                        init == null ? null : new Tr.UnparsedSource(randomId(), init, Formatting.format(" ")),
-                                        classType,
-                                        Formatting.format(" ")
-                                )),
-                                formatter().format(block)
-                        );
-
-                        List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
-                        statements.add(newField);
-                        statements.addAll(block.getStatements());
-                        return block.withStatements(statements);
-                    })
-            );
-        }
-
-        return changes;
+                    List<Tree> statements = new ArrayList<>(block.getStatements().size() + 1);
+                    statements.add(newField);
+                    statements.addAll(block.getStatements());
+                    return block.withStatements(statements);
+                }
+        );
     }
 }

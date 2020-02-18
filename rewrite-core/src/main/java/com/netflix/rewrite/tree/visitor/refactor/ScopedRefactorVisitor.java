@@ -16,11 +16,15 @@
 package com.netflix.rewrite.tree.visitor.refactor;
 
 import com.netflix.rewrite.internal.lang.Nullable;
+import com.netflix.rewrite.tree.Cursor;
 import com.netflix.rewrite.tree.Tree;
 import lombok.RequiredArgsConstructor;
 
+import java.util.List;
 import java.util.Spliterators;
 import java.util.UUID;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import static java.util.stream.StreamSupport.stream;
 
@@ -32,5 +36,24 @@ public abstract class ScopedRefactorVisitor extends RefactorVisitor {
         return (t != null && t.getId().equals(scope)) ||
                 stream(Spliterators.spliteratorUnknownSize(getCursor().getPath(), 0), false)
                     .anyMatch(p -> p.getId().equals(scope));
+    }
+
+    protected <T extends Tree> List<AstTransform> transformIfScoped(T tree,
+                                                                    Function<T, List<AstTransform>> callSuper,
+                                                                    Function<T, T> mutation) {
+        return maybeTransform(tree, tree.getId().equals(scope), callSuper, mutation);
+    }
+
+    protected <T extends Tree, U extends Tree> List<AstTransform> transformIfScoped(T tree,
+                                                                                    Function<T, List<AstTransform>> callSuper,
+                                                                                    Function<T, U> transformNestedElement,
+                                                                                    Function<U, U> mutation) {
+        return maybeTransform(tree, tree.getId().equals(scope), callSuper, transformNestedElement, mutation);
+    }
+
+    protected <T extends Tree> List<AstTransform> transformIfScoped(T tree,
+                                                                    Function<T, List<AstTransform>> callSuper,
+                                                                    BiFunction<T, Cursor, T> mutation) {
+        return maybeTransform(tree, tree.getId().equals(scope), callSuper, mutation);
     }
 }

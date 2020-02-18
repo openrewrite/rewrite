@@ -22,6 +22,7 @@ import com.netflix.rewrite.internal.lang.Nullable;
 import lombok.Getter;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.PrimitiveIterator;
@@ -100,7 +101,9 @@ public class Formatting implements Serializable {
             return null;
         }
         if (!trees.isEmpty()) {
-            trees.set(0, trees.get(0).withPrefix(prefix));
+            List<T> formattedTrees = new ArrayList<>(trees);
+            formattedTrees.set(0, formattedTrees.get(0).withPrefix(prefix));
+            return formattedTrees;
         }
         return trees;
     }
@@ -110,7 +113,9 @@ public class Formatting implements Serializable {
             return null;
         }
         if (!trees.isEmpty()) {
-            trees.set(trees.size() - 1, trees.get(trees.size() - 1).withSuffix(suffix));
+            List<T> formattedTrees = new ArrayList<>(trees);
+            formattedTrees.set(formattedTrees.size() - 1, formattedTrees.get(formattedTrees.size() - 1).withSuffix(suffix));
+            return formattedTrees;
         }
         return trees;
     }

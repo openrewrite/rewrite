@@ -39,24 +39,27 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitElse(Tr.If.Else elze) {
-        return maybeTransform(isInScope(elze) && isOnOwnLine(elze),
-                super.visitElse(elze),
-                shiftRight(elze));
+        return maybeTransform(elze,
+                isInScope(elze) && isOnOwnLine(elze),
+                super::visitElse,
+                new ShiftRightMutation<>(shift));
     }
 
     @Override
     public List<AstTransform> visitStatement(Statement statement) {
-        return maybeTransform(isInScope(statement) && isOnOwnLine(statement),
-                super.visitStatement(statement),
-                shiftRight(statement)
+        return maybeTransform(statement,
+                isInScope(statement) && isOnOwnLine(statement),
+                super::visitStatement,
+                new ShiftRightMutation<>(shift)
         );
     }
 
     @Override
     public List<AstTransform> visitBlock(Tr.Block<Tree> block) {
-        return maybeTransform(isInScope(block),
-                super.visitBlock(block),
-                transform(block, b -> b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift))
+        return maybeTransform(block,
+                isInScope(block),
+                super::visitBlock,
+                b -> b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift)
         );
     }
 
@@ -64,19 +67,15 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
         return tree.getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() > 0;
     }
 
-    private List<AstTransform> shiftRight(Tree tree) {
-        return transform(tree, new ShiftRightMutation(shift));
-    }
-
     /**
      * Exists only for debugging purposes, where it is easier to see what kind of shifts are applying to each tree element
      */
     @RequiredArgsConstructor
-    private static class ShiftRightMutation implements Function<Tree, Tree> {
+    private static class ShiftRightMutation<T extends Tree> implements Function<T, T> {
         private final String shift;
 
         @Override
-        public Tree apply(Tree tree) {
+        public T apply(T tree) {
             return tree.withPrefix(tree.getFormatting().getPrefix() + shift);
         }
 

@@ -18,7 +18,6 @@ package com.netflix.rewrite.tree.visitor.refactor.op;
 import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
-import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
 
@@ -26,7 +25,6 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Tr.randomId;
-import static java.util.Collections.emptyList;
 
 public class ChangeFieldType extends ScopedRefactorVisitor {
     private final String targetType;
@@ -43,17 +41,20 @@ public class ChangeFieldType extends ScopedRefactorVisitor {
 
     @Override
     public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
-        if(!isInScope(multiVariable) || multiVariable.getTypeExpr() == null) {
-            return emptyList();
-        }
+        Type.Class originalType = multiVariable.getTypeAsClass();
 
-        Type.Class type = Type.Class.build(targetType);
-        Type.Class originalType = TypeUtils.asClass(multiVariable.getTypeExpr().getType());
-        maybeRemoveImport(originalType);
-
-        return originalType != null && originalType.getFullyQualifiedName().equals(targetType) ? emptyList() :
-                transform(multiVariable, mv -> mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
-                        mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting())));
+        return maybeTransform(multiVariable,
+                multiVariable.getId().equals(scope) &&
+                        originalType != null &&
+                        !originalType.getFullyQualifiedName().equals(targetType),
+                super::visitMultiVariable,
+                mv -> {
+                    Type.Class type = Type.Class.build(targetType);
+                    maybeRemoveImport(originalType);
+                    return mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
+                            mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting()));
+                }
+        );
     }
 
     @Override
