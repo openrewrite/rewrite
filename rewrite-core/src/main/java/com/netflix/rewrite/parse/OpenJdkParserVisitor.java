@@ -1168,7 +1168,7 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
             var dimensionsAfterName = dimensions.get();
             if(!dimensionsAfterName.isEmpty()) {
-                formatLastSuffix(dimensionsAfterName, vd.init != null ? sourceBefore("=") : "");
+                dimensionsAfterName = formatLastSuffix(dimensionsAfterName, vd.init != null ? sourceBefore("=") : "");
             }
 
             var name = Tr.Ident.build(randomId(), n.getName().toString(), type(node),
