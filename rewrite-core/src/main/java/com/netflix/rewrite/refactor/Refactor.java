@@ -211,12 +211,14 @@ public class Refactor {
 
     public RefactorResult fix(int maxCycles) {
         Tr.CompilationUnit acc = original;
-
         Set<String> rulesThatMadeChanges = new HashSet<>();
 
         for (int i = 0; i < maxCycles; i++) {
             Set<String> rulesThatMadeChangesThisCycle = new HashSet<>();
             for (RefactorVisitor visitor : ops) {
+                // only for use in debugging visitors
+                visitor.setCycle(i);
+
                 if(visitor.isSingleRun() && i > 0) {
                     continue;
                 }

@@ -22,6 +22,8 @@ import com.netflix.rewrite.tree.visitor.refactor.op.AddImport;
 import com.netflix.rewrite.tree.visitor.refactor.op.ChangeFieldName;
 import com.netflix.rewrite.tree.visitor.refactor.op.DeleteStatement;
 import com.netflix.rewrite.tree.visitor.refactor.op.RemoveImport;
+import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,6 +34,12 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
     private final ThreadLocal<List<RefactorVisitor>> andThen = new ThreadLocal<>();
 
     private Formatter formatter;
+
+    /**
+     * For debugging purposes, when a RefactorVisitor isn't properly idempotent across multiple runs.
+     */
+    @Setter
+    private int cycle = 0;
 
     public RefactorVisitor() {
         andThen.set(new ArrayList<>());
