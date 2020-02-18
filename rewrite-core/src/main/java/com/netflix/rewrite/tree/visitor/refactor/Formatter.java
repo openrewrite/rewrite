@@ -84,8 +84,16 @@ public class Formatter {
         return new Result(enclosingIndent, indentToUse, indentedWithSpaces);
     }
 
-    public Formatting format(Tr.Block<?> relativeToEnclosing) {
-        Result indentation = findIndent(relativeToEnclosing.getIndent(), relativeToEnclosing.getStatements().toArray(Tree[]::new));
+    public Formatting format(Tree relativeToEnclosing) {
+        Tree[] siblings = new Tree[0];
+        if(relativeToEnclosing instanceof Tr.Block) {
+            siblings = ((Tr.Block<?>) relativeToEnclosing).getStatements().toArray(Tree[]::new);
+        }
+        else if(relativeToEnclosing instanceof Tr.Case) {
+            siblings = ((Tr.Case) relativeToEnclosing).getStatements().toArray(Tree[]::new);
+        }
+
+        Result indentation = findIndent(enclosingIndent(relativeToEnclosing), siblings);
         return Formatting.format(indentation.getPrefix());
     }
 

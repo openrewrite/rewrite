@@ -44,8 +44,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
-import static com.netflix.rewrite.tree.Formatting.EMPTY;
-import static com.netflix.rewrite.tree.Formatting.format;
+import static com.netflix.rewrite.tree.Formatting.*;
 import static com.netflix.rewrite.tree.Tr.AssignOp.Operator.*;
 import static com.netflix.rewrite.tree.Type.Primitive.Method;
 import static com.netflix.rewrite.tree.TypeUtils.asClass;
@@ -1166,12 +1165,19 @@ public class OpenJdkParserVisitor extends TreePathScanner<com.netflix.rewrite.tr
 
             var namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
+
+            var dimensionsAfterName = dimensions.get();
+            if(!dimensionsAfterName.isEmpty()) {
+                formatLastSuffix(dimensionsAfterName, vd.init != null ? sourceBefore("=") : "");
+            }
+
             var name = Tr.Ident.build(randomId(), n.getName().toString(), type(node),
-                    format("", (vd.init != null) ? sourceBefore("=") : ""));
+                    format("", (dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : ""));
+
             vars.add(
                     new Tr.VariableDecls.NamedVar(randomId(),
                             name,
-                            dimensions.get(),
+                            dimensionsAfterName,
                             convertOrNull(vd.init),
                             type(n),
                             i == nodes.size() - 1 ? format(namedVarPrefix) : format(namedVarPrefix, sourceBefore(","))

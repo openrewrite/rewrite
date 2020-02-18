@@ -2787,6 +2787,7 @@ public abstract class Tr implements Serializable, Tree {
             @With
             Ident name;
 
+            @With
             List<Dimension> dimensionsAfterName;
 
             @With
