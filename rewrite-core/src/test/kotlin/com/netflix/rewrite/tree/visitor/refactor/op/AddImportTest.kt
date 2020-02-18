@@ -18,7 +18,6 @@ package com.netflix.rewrite.tree.visitor.refactor.op
 import com.netflix.rewrite.assertRefactored
 import com.netflix.rewrite.parse.OpenJdkParser
 import com.netflix.rewrite.parse.Parser
-import com.netflix.rewrite.tree.Tr
 import org.junit.Test
 
 open class AddImportTest : Parser by OpenJdkParser() {
@@ -26,7 +25,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
     fun addMultipleImports() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").addImport("java.util.Set").fix()
+        val fixed = a.refactor().addImport("java.util.List").addImport("java.util.Set").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -40,7 +39,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
     fun addNamedImport() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -53,7 +52,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
     fun addNamedImportByClass() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -69,7 +68,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -104,7 +103,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
                 
                 class A {}
             """.trimIndent(), otherImports.plus(b))
-            val fixed = cu.refactor().addImport("$pkg.B").fix()
+            val fixed = cu.refactor().addImport("$pkg.B").fix().fixed
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -123,7 +122,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -142,7 +141,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -161,7 +160,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix()
+        val fixed = a.refactor().addImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -181,7 +180,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.Collections", "emptyList").fix()
+        val fixed = a.refactor().addImport("java.util.Collections", "emptyList").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.*;
@@ -195,7 +194,7 @@ open class AddImportTest : Parser by OpenJdkParser() {
     @Test
     fun dontAddImportWhenClassHasNoPackage() {
         val a = parse("class A {}")
-        val fixed = a.refactor().addImport("C").fix()
+        val fixed = a.refactor().addImport("C").fix().fixed
         assertRefactored(fixed, "class A {}")
     }
 }

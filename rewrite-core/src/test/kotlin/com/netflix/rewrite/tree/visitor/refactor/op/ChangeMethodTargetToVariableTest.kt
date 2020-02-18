@@ -53,10 +53,10 @@ open class ChangeMethodTargetToVariableTest : Parser by OpenJdkParser() {
         val fixed = cu.refactor().apply {
             val f = cu.classes[0].findFields("a.A")[0]
             changeMethodTarget(cu.findMethodCalls("b.B foo()"), f.vars[0])
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
-            import a.*;
+            import a.A;
             public class C {
                A a;
                public void test() {
@@ -98,10 +98,10 @@ open class ChangeMethodTargetToVariableTest : Parser by OpenJdkParser() {
         val fixed = cu.refactor().apply {
             val f = cu.classes[0].findFields("a.A")[0]
             changeMethodTarget(cu.findMethodCalls("b.B foo()"), f.vars[0])
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
-            import a.*;
+            import a.A;
             public class C {
                A a;
                public void test() {

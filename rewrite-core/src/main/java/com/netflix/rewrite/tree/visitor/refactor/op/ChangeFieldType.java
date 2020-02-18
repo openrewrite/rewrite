@@ -36,7 +36,7 @@ public class ChangeFieldType extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-field-type";
+        return "core.ChangeFieldType{to=" + targetType + "}";
     }
 
     @Override

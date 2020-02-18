@@ -38,7 +38,12 @@ public class DeleteMethodArgument extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "delete-method-argument";
+        return "core.DeleteMethodArgument";
+    }
+
+    @Override
+    public boolean isSingleRun() {
+        return true;
     }
 
     @Override

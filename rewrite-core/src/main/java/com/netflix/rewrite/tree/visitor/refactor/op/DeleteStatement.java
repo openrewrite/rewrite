@@ -39,7 +39,7 @@ public class DeleteStatement extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "delete-statement";
+        return "core.DeleteStatement";
     }
 
     @Override

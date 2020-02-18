@@ -41,9 +41,9 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
         }
 
         assertRefactored(a.refactor()
-                .run(changeMethodName("test2"))
-                .run(changeMethodName("test3"))
-                .fix(),
+                .visit(changeMethodName("test2"))
+                .visit(changeMethodName("test3"))
+                .fix().fixed,
                 """
                     public class A {
                         public void test3() {
@@ -69,6 +69,6 @@ class TransformVisitorTest : Parser by OpenJdkParser() {
                     }
         }
 
-        a.refactor().run(accessCursor).fix()
+        a.refactor().visit(accessCursor).fix().fixed
     }
 }

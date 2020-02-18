@@ -34,7 +34,7 @@ public class ChangeMethodNameTestJava {
 
         Tr.CompilationUnit fixed = cu.refactor()
                 .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
-                .fix();
+                .fix().getFixed();
 
         assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
     }
@@ -48,6 +48,7 @@ public class ChangeMethodNameTestJava {
 
         String diff = cu.refactor()
                 .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
+                .fix()
                 .diff();
 
         System.out.println(diff);

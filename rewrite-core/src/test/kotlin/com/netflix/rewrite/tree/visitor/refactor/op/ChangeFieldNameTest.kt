@@ -35,7 +35,7 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
                 .changeFieldName(a.classes[0].type.asClass()!!, "collection", "list")
-                .fix()
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -66,7 +66,7 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
 
         val fixed = b.refactor()
                 .changeFieldName(Type.Class.build("B"), "n", "n1")
-                .fix()
+                .fix().fixed
 
         assertRefactored(fixed, """
             public class B {
@@ -105,7 +105,7 @@ open class ChangeFieldNameTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
                 .changeFieldName(Type.Class.build("B"), "n", "n1")
-                .fix()
+                .fix().fixed
 
         assertRefactored(fixed, """
             public class A {

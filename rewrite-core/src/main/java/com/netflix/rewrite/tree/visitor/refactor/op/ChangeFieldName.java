@@ -21,6 +21,7 @@ import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.helpers.MessageFormatter;
 
 import java.util.List;
 
@@ -32,7 +33,8 @@ public class ChangeFieldName extends RefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-field-name";
+        return MessageFormatter.arrayFormat("core.ChangeFieldName{classType={},whenName={},toName={}}",
+                new String[]{classType.getFullyQualifiedName(), hasName, toName}).toString();
     }
 
     @Override

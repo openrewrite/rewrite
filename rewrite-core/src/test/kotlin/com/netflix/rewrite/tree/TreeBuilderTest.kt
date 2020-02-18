@@ -69,13 +69,13 @@ class TreeBuilderTest {
             }
         """.trimIndent(), paramName, paramName, paramName)
 
-        val fixed = a.refactor().run(object: RefactorVisitor() {
+        val fixed = a.refactor().visit(object: RefactorVisitor() {
             override fun visitMethod(method: Tr.MethodDecl): MutableList<AstTransform> {
                 return transform(method) { m ->
                     m.withBody(m.body!!.withStatements(snippets))
                 }
             }
-        }).fix()
+        }).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;

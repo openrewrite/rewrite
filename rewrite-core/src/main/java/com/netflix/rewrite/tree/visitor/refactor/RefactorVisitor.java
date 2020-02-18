@@ -146,9 +146,15 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         return new ArrayList<>();
     }
 
-    @Nullable
     public String getRuleName() {
-        return null;
+        return "uncategorized";
+    }
+
+    /**
+     * Determines whether this visitor can be run multiple times as a top-level rule.
+     */
+    public boolean isSingleRun() {
+        return false;
     }
 
     @SuppressWarnings("unchecked")

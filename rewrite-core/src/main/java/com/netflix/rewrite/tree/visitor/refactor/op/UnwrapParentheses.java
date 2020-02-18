@@ -38,6 +38,11 @@ public class UnwrapParentheses extends ScopedRefactorVisitor {
     }
 
     @Override
+    public String getRuleName() {
+        return "core.UnwrapParentheses";
+    }
+
+    @Override
     public List<AstTransform> visitArrayAccess(Tr.ArrayAccess arrayAccess) {
         List<AstTransform> changes = maybeTransform(arrayAccess,
                 scope.equals(arrayAccess.getIndexed().getId()),

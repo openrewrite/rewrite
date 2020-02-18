@@ -38,7 +38,7 @@ public class ChangeLiteral extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-literal";
+        return "core.ChangeLiteral";
     }
 
     @Override

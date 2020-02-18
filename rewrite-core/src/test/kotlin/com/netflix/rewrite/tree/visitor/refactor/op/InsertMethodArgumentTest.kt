@@ -53,7 +53,7 @@ open class InsertMethodArgumentTest : Parser by OpenJdkParser() {
             insertArgument(oneParamFoo, 2, "\"2\"") // insert at end
 
             insertArgument(cu.findMethodCalls("B foo()"), 0, "\"0\"")
-        }.fix()
+        }.fix().fixed
 
         // FIXME re-add this compatibility test once reordering is implemented
 //          .findMethodCalls("B bar(String, String)")

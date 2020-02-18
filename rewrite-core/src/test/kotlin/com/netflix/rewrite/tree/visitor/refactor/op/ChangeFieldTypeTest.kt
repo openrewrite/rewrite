@@ -33,7 +33,7 @@ open class ChangeFieldTypeTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
                 .changeFieldType(a.classes[0].findFields("java.util.List"), "java.util.Collection")
-                .fix()
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.Collection;

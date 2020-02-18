@@ -19,11 +19,11 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.nio.file.Paths
 
-class RefactorTest {
+class RefactorResultTest {
 
     @Test
     fun idempotent() {
-        val diff = Refactor.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 "public class A {}",
                 "public class A {}")
 
@@ -32,7 +32,7 @@ class RefactorTest {
 
     @Test
     fun singleLineChange() {
-        val diff = Refactor.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
             """
                 |public void test() {
                 |   logger.infof("some %s", 1);
@@ -63,7 +63,7 @@ class RefactorTest {
 
     @Test
     fun multipleChangesMoreThanThreeLinesApart() {
-        val diff = Refactor.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 """
                 |public void test() {
                 |   logger.infof("some %s", 1);

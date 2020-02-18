@@ -33,7 +33,7 @@ open class DeleteStatementTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
             .deleteStatement(a.classes[0].findFields("java.util.List"))
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             public class A {

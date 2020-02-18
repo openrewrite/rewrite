@@ -19,6 +19,7 @@ import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
+import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +49,8 @@ public class ChangeType extends RefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-type";
+        return MessageFormatter.arrayFormat("core.ChangeType{from={},to={}}",
+                new String[] { from, toClassType.getFullyQualifiedName() }).toString();
     }
 
     @Override

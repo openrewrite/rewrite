@@ -29,7 +29,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -41,7 +41,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -55,7 +55,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -72,7 +72,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -86,7 +86,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.Collection;
@@ -106,7 +106,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix()
+        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
 
         assertRefactored(fixed, """
             import java.util.*;
@@ -124,7 +124,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix()
+        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -138,7 +138,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix()
+        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.*;
@@ -158,7 +158,7 @@ open class RemoveImportTest: Parser by OpenJdkParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix()
+        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.emptyList;

@@ -39,7 +39,7 @@ public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-method-target";
+        return "core.ChangeMethodTarget{to=" + clazz + "}";
     }
 
     @Override

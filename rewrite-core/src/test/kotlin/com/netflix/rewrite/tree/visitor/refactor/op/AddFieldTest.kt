@@ -31,7 +31,7 @@ open class AddFieldTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
             .addField(a.classes[0], "java.util.List", "list", "new ArrayList<>()")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -54,7 +54,7 @@ open class AddFieldTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
             .addField(a.classes[0], "java.util.List", "list")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -78,7 +78,7 @@ open class AddFieldTest : Parser by OpenJdkParser() {
 
         val fixed = a.refactor()
             .addField(a.classes[0], "java.util.List", "list")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;

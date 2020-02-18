@@ -32,7 +32,7 @@ public class ChangeMethodName extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-method-name";
+        return "core.ChangeMethodName{to=" + name + "}";
     }
 
     @Override

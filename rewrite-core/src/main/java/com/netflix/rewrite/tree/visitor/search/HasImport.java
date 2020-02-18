@@ -31,6 +31,6 @@ public class HasImport extends AstVisitor<Boolean> {
 
     @Override
     public Boolean visitImport(Tr.Import impoort) {
-        return impoort.matches(clazz);
+        return impoort.isFromType(clazz);
     }
 }

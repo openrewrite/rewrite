@@ -21,20 +21,8 @@ import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
 import com.netflix.rewrite.tree.visitor.refactor.op.*;
-import org.eclipse.jgit.diff.DiffEntry;
-import org.eclipse.jgit.diff.DiffFormatter;
-import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.FileMode;
 
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 
 import static com.netflix.rewrite.tree.Formatting.format;
@@ -54,12 +42,12 @@ public class Refactor {
     // Custom refactoring visitors
     // -------------
 
-    public Refactor run(Iterable<RefactorVisitor> visitors) {
+    public Refactor visit(Iterable<RefactorVisitor> visitors) {
         visitors.forEach(ops::add);
         return this;
     }
 
-    public Refactor run(RefactorVisitor visitor) {
+    public Refactor visit(RefactorVisitor visitor) {
         ops.add(visitor);
         return this;
     }
@@ -217,32 +205,37 @@ public class Refactor {
         return this;
     }
 
-    // TODO rework this to make it more useful (and don't forget to recurse through pipelined visitors!)
-//    public Map<String, Long> stats() {
-//        Map<String, Long> stats = new HashMap<>();
-//
-//        Tr.CompilationUnit acc = original;
-//        for (RefactorOperation op : ops) {
-//            var target = new RetrieveTreeVisitor(op.getId()).visit(acc);
-//            List<AstTransform> transformations = new ArrayList<>(op.getVisitor().visit(target));
-//            acc = (Tr.CompilationUnit) new TransformVisitor(transformations).visit(acc);
-//            transformations.stream()
-//                    .collect(Collectors.groupingBy(AstTransform::getName, counting()))
-//                    .forEach((name, count) -> stats.merge(name, count, Long::sum));
-//        }
-//
-//        return stats;
-//    }
+    public RefactorResult fix() {
+        return fix(10);
+    }
 
-    /**
-     * @return Transformed version of the AST after changes are applied
-     */
-    public Tr.CompilationUnit fix() {
+    public RefactorResult fix(int maxCycles) {
         Tr.CompilationUnit acc = original;
-        for (RefactorVisitor visitor : ops) {
-            acc = transformRecursive(acc, visitor);
+
+        Set<String> rulesThatMadeChanges = new HashSet<>();
+
+        for (int i = 0; i < maxCycles; i++) {
+            Set<String> rulesThatMadeChangesThisCycle = new HashSet<>();
+            for (RefactorVisitor visitor : ops) {
+                if(visitor.isSingleRun() && i > 0) {
+                    continue;
+                }
+
+                var before = acc;
+                acc = transformRecursive(acc, visitor);
+                if(before != acc) {
+                    // we only report on the top-level visitors, not any andThen() visitors that
+                    // are applied as part of the top-level visitor's pipeline
+                    rulesThatMadeChangesThisCycle.add(visitor.getRuleName());
+                }
+            }
+            if (rulesThatMadeChangesThisCycle.isEmpty()) {
+                break;
+            }
+            rulesThatMadeChanges.addAll(rulesThatMadeChangesThisCycle);
         }
-        return acc;
+
+        return new RefactorResult(original, acc, rulesThatMadeChanges);
     }
 
     private Tr.CompilationUnit transformRecursive(Tr.CompilationUnit acc, RefactorVisitor visitor) {
@@ -252,60 +245,5 @@ public class Refactor {
             acc = transformRecursive(acc, vis);
         }
         return acc;
-    }
-
-    public String diff() {
-        return diff(null);
-    }
-
-    /**
-     * @return Git-style patch diff representing the changes to this compilation unit
-     */
-    public String diff(@Nullable Path relativeTo) {
-        return new InMemoryDiffEntry(Paths.get(original.getSourcePath()), relativeTo,
-                original.print(), fix().print()).getDiff();
-    }
-
-    static class InMemoryDiffEntry extends DiffEntry {
-        InMemoryRepository repo;
-
-        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource) {
-            this.changeType = ChangeType.MODIFY;
-
-            var relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
-            this.oldPath = relativePath.toString();
-            this.newPath = relativePath.toString();
-
-            try {
-                this.repo = new InMemoryRepository.Builder().build();
-
-                var inserter = repo.getObjectDatabase().newInserter();
-                oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes()).abbreviate(40);
-                newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes()).abbreviate(40);
-                inserter.flush();
-
-                oldMode = FileMode.REGULAR_FILE;
-                newMode = FileMode.REGULAR_FILE;
-                repo.close();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }
-
-        String getDiff() {
-            if(oldId.equals(newId)) {
-                return "";
-            }
-
-            var patch = new ByteArrayOutputStream();
-            var formatter = new DiffFormatter(patch);
-            formatter.setRepository(repo);
-            try {
-                formatter.format(this);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return new String(patch.toByteArray());
-        }
     }
 }

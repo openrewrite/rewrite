@@ -56,7 +56,7 @@ public class RemoveImport extends RefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "remove-import";
+        return "core.RemoveImport{classType=" + clazz + "}";
     }
 
     @Override

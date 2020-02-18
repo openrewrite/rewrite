@@ -42,7 +42,12 @@ public class InsertMethodArgument extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "insert-method-argument";
+        return "core.InsertMethodArgument";
+    }
+
+    @Override
+    public boolean isSingleRun() {
+        return true;
     }
 
     @Override

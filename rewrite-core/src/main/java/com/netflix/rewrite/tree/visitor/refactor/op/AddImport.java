@@ -25,6 +25,7 @@ import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.tree.visitor.search.FindType;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -63,7 +64,8 @@ public class AddImport extends RefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "add-import";
+        return MessageFormatter.arrayFormat( "core.AddImport{classType={},staticMethod={}}",
+                new String[] { classType.getFullyQualifiedName(), staticMethod }).toString();
     }
 
     @Override
@@ -78,11 +80,11 @@ public class AddImport extends RefactorVisitor {
         var importedType = impoort.getQualid().getSimpleName();
 
         if (staticMethod != null) {
-            if (impoort.matches(clazz) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {
+            if (impoort.isFromType(clazz) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {
                 coveredByExistingImport = true;
             }
         } else {
-            if (impoort.matches(clazz)) {
+            if (impoort.isFromType(clazz)) {
                 coveredByExistingImport = true;
             } else if (importedType.equals("*") && impoort.getQualid().getTarget().printTrimmed().equals(classType.getPackageName())) {
                 coveredByExistingImport = true;

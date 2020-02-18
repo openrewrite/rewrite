@@ -29,7 +29,7 @@ abstract class ImportTest(p: Parser): Parser by p {
             public class A {}
         """)
 
-        assertTrue(a.imports.first().matches("java.util.List"))
+        assertTrue(a.imports.first().isFromType("java.util.List"))
     }
 
     @Test
@@ -39,7 +39,7 @@ abstract class ImportTest(p: Parser): Parser by p {
             public class A {}
         """)
 
-        assertTrue(a.imports.first().matches("java.util.List"))
+        assertTrue(a.imports.first().isFromType("java.util.List"))
     }
 
     @Test
@@ -60,8 +60,8 @@ abstract class ImportTest(p: Parser): Parser by p {
 
         val cu = parse(c, a)
         val import = cu.imports.first()
-        assertTrue(import.matches("a.A.B"))
-        assertTrue(import.matches("a.A"))
+        assertTrue(import.isFromType("a.A.B"))
+        assertTrue(import.isFromType("a.A"))
     }
     
     @Test

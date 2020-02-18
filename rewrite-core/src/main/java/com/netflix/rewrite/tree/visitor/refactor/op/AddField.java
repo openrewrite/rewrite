@@ -22,6 +22,7 @@ import com.netflix.rewrite.tree.Tree;
 import com.netflix.rewrite.tree.Type;
 import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
 import com.netflix.rewrite.tree.visitor.refactor.ScopedRefactorVisitor;
+import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -49,12 +50,18 @@ public class AddField extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "add-field";
+        return MessageFormatter.arrayFormat("core.AddField{classType={},name={}}",
+                new String[]{clazz, name}).toString();
     }
 
     @Override
     public List<AstTransform> visitClassDecl(Tr.ClassDecl classDecl) {
-        return transformIfScoped(classDecl,
+        return maybeTransform(classDecl,
+                classDecl.getId().equals(scope) && classDecl.getBody().getStatements()
+                        .stream()
+                        .filter(s -> s instanceof Tr.VariableDecls)
+                        .map(Tr.VariableDecls.class::cast)
+                        .noneMatch(mv -> mv.getVars().stream().anyMatch(var -> var.getSimpleName().equals(name))),
                 super::visitClassDecl,
                 Tr.ClassDecl::getBody,
                 block -> {

@@ -42,7 +42,12 @@ public class ReorderMethodArguments extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "reorder-method-arguments";
+        return "core.ReorderMethodArguments";
+    }
+
+    @Override
+    public boolean isSingleRun() {
+        return true;
     }
 
     @Override

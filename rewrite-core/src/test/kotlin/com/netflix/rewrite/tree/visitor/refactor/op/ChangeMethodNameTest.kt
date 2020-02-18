@@ -44,7 +44,7 @@ open class ChangeMethodNameTest : Parser by OpenJdkParser() {
 
         val fixed = cu.refactor()
             .changeMethodName(cu.findMethodCalls("B singleArg(String)"), "bar")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -69,7 +69,7 @@ open class ChangeMethodNameTest : Parser by OpenJdkParser() {
 
         val fixed = cu.refactor()
             .changeMethodName(cu.findMethodCalls("B arrArg(String[])"), "bar")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -94,7 +94,7 @@ open class ChangeMethodNameTest : Parser by OpenJdkParser() {
 
         val fixed = cu.refactor()
             .changeMethodName(cu.findMethodCalls("B varargArg(String...)"), "bar")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -125,7 +125,7 @@ open class ChangeMethodNameTest : Parser by OpenJdkParser() {
         val cu = parse(a, b)
         val fixed = cu.refactor()
                 .changeMethodName(cu.findMethodCalls("B error()"), "foo")
-                .fix()
+                .fix().fixed
 
         assertRefactored(fixed, """
             class A {

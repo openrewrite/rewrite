@@ -52,7 +52,7 @@ open class ReorderMethodArgumentsTest : Parser by OpenJdkParser() {
                 it.args.args.firstOrNull()?.let { arg -> changeLiteral(listOf(arg)) { "anotherstring" } }
                 reorderArguments(it, "n", "m", "s")
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -94,7 +94,7 @@ open class ReorderMethodArgumentsTest : Parser by OpenJdkParser() {
             cu.findMethodCalls("a.A foo(..)").forEach {
                 reorderArguments(it, "n", "s").setOriginalParamNames("s", "n")
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -132,7 +132,7 @@ open class ReorderMethodArgumentsTest : Parser by OpenJdkParser() {
             cu.findMethodCalls("a.A foo(..)").forEach {
                 reorderArguments(it, "s", "o", "n")
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -168,7 +168,7 @@ open class ReorderMethodArgumentsTest : Parser by OpenJdkParser() {
             cu.findMethodCalls("a.A foo(..)").forEach {
                 reorderArguments(it, "o", "s")
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import a.*;

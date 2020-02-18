@@ -55,7 +55,7 @@ open class ChangeMethodTargetToStaticTest : Parser by OpenJdkParser() {
         val fixed = cu.refactor()
             .changeMethodTargetToStatic(targets, "b.B")
             .changeMethodName(targets, "foo")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             import b.B;
@@ -99,7 +99,7 @@ open class ChangeMethodTargetToStaticTest : Parser by OpenJdkParser() {
         val cu = parse(c, a, b)
         val fixed = cu.refactor()
             .changeMethodTargetToStatic(cu.findMethodCalls("a.A foo()"), "b.B")
-            .fix()
+            .fix().fixed
 
         assertRefactored(fixed, """
             import b.B;

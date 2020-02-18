@@ -36,7 +36,7 @@ open class DeleteMethodArgumentTest : Parser by OpenJdkParser() {
     @Test
     fun deleteMiddleArgument() {
         val a = parse("public class A {{ B.foo(0, 1, 2); }}", b)
-        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 1).fix()
+        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 1).fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo(0, 2); }}")
     }
 
@@ -44,21 +44,21 @@ open class DeleteMethodArgumentTest : Parser by OpenJdkParser() {
     fun deleteArgumentsConsecutively() {
         val a = parse("public class A {{ B.foo(0, 1, 2); }}", b)
         val foos = a.findMethodCalls("B foo(..)")
-        val fixed = a.refactor().deleteArgument(foos, 1).deleteArgument(foos, 1).fix()
+        val fixed = a.refactor().deleteArgument(foos, 1).deleteArgument(foos, 1).fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo(0); }}")
     }
 
     @Test
     fun doNotDeleteEmptyContainingFormatting() {
         val a = parse("public class A {{ B.foo( ); }}", b)
-        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 0).fix()
+        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 0).fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo( ); }}")
     }
 
     @Test
     fun insertEmptyWhenLastArgumentIsDeleted() {
         val a = parse("public class A {{ B.foo( ); }}", b)
-        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 0).fix()
+        val fixed = a.refactor().deleteArgument(a.findMethodCalls("B foo(..)"), 0).fix().fixed
         assertTrue(fixed.findMethodCalls("B foo(..)").first().args.args[0] is Tr.Empty)
     }
 }

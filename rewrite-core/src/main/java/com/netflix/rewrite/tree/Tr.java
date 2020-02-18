@@ -1420,14 +1420,15 @@ public abstract class Tr implements Serializable, Tree {
             return statik;
         }
 
-        public boolean matches(String clazz) {
+        @JsonIgnore
+        public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
                 return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
                         .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
                         .collect(Collectors.joining("."))
                 );
             }
-            return qualid.printTrimmed().equals(clazz);
+            return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
         }
 
         @JsonIgnore

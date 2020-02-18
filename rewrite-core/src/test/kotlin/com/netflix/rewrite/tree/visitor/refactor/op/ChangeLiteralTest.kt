@@ -46,7 +46,7 @@ open class ChangeLiteralTest : Parser by OpenJdkParser() {
             cu.findMethodCalls("b.B singleArg(String)").forEach {
                 changeLiteral(it.args.args) { s -> s?.toString()?.replace("%s", "{}") ?: s }
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import b.*;
@@ -76,7 +76,7 @@ open class ChangeLiteralTest : Parser by OpenJdkParser() {
             cu.findMethodCalls("b.B singleArg(..)").forEach {
                 changeLiteral(it.args.args) { s -> s?.toString()?.replace("%s", "{}") ?: s }
             }
-        }.fix()
+        }.fix().fixed
 
         assertRefactored(fixed, """
             import b.*;

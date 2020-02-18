@@ -41,7 +41,7 @@ public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
 
     @Override
     public String getRuleName() {
-        return "change-method-target";
+        return "core.ChangeMethodTarget{to=" + varName + "}";
     }
 
     @Override
