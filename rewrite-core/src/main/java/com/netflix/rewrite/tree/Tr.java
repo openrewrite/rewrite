@@ -238,6 +238,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression variable;
 
+        @With
         Operator operator;
 
         @With
@@ -1555,6 +1556,7 @@ public abstract class Tr implements Serializable, Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
+            @With
             boolean parenthesized;
 
             @With

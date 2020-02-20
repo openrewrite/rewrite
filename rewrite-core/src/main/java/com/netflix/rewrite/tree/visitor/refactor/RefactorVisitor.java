@@ -39,7 +39,7 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
      * For debugging purposes, when a RefactorVisitor isn't properly idempotent across multiple runs.
      */
     @Setter
-    private int cycle = 0;
+    protected int cycle = 0;
 
     public RefactorVisitor() {
         andThen.set(new ArrayList<>());
