@@ -159,6 +159,7 @@ public abstract class Tr implements Serializable, Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
+            @With
             Empty inner;
 
             @With
@@ -650,6 +651,7 @@ public abstract class Tr implements Serializable, Tree {
         UUID id;
 
         @Nullable
+        @With
         Empty statik;
 
         @With
@@ -688,6 +690,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         @Nullable
         Ident label;
 
@@ -989,6 +992,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         @Nullable
         Ident label;
 
@@ -1406,6 +1410,7 @@ public abstract class Tr implements Serializable, Tree {
         @Getter
         FieldAccess qualid;
 
+        @With
         boolean statik;
 
         @Getter
@@ -1498,6 +1503,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         Ident label;
 
         @With
@@ -1522,6 +1528,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Parameters paramSet;
 
+        @With
         Arrow arrow;
 
         @With
@@ -1586,6 +1593,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         String valueSource;
 
+        @With
         Type.Primitive type; // Strings are included
 
         @With
@@ -2695,6 +2703,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         String source;
 
         @With
@@ -2779,6 +2788,7 @@ public abstract class Tr implements Serializable, Tree {
             @EqualsAndHashCode.Include
             UUID id;
 
+            @With
             Empty whitespace;
 
             @With
@@ -2853,6 +2863,7 @@ public abstract class Tr implements Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         @Nullable
         Bound bound;
 
