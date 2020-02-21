@@ -17,10 +17,10 @@ package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
 import com.netflix.rewrite.assertRefactored
-import com.netflix.rewrite.parse.OpenJdkParser
-import com.netflix.rewrite.tree.visitor.RetrieveCursorVisitor
-import com.netflix.rewrite.tree.visitor.refactor.AstTransform
-import com.netflix.rewrite.tree.visitor.refactor.RefactorVisitor
+import com.netflix.rewrite.Parser
+import com.netflix.rewrite.visitor.RetrieveCursorVisitor
+import com.netflix.rewrite.visitor.refactor.AstTransform
+import com.netflix.rewrite.visitor.refactor.RefactorVisitor
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,7 +28,7 @@ import org.junit.Test
 class TreeBuilderTest {
     @Test
     fun buildSnippet() {
-        val a = OpenJdkParser().parse("""
+        val a = Parser().parse("""
             import java.util.List;
             public class A {
                 int n = 0;
@@ -48,7 +48,7 @@ class TreeBuilderTest {
 
     @Test
     fun injectSnippetIntoMethod() {
-        val a = OpenJdkParser().parse("""
+        val a = Parser().parse("""
             import java.util.List;
             public class A {
                 int n = 0;

@@ -16,12 +16,12 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.firstMethodStatement
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-abstract class AssignTest(p: Parser): Parser by p {
+open class AssignTest : Parser() {
     
     @Test
     fun assignmentToField() {

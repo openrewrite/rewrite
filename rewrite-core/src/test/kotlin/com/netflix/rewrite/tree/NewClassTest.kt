@@ -16,11 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-abstract class NewClassTest(p: Parser): Parser by p {
+open class NewClassTest : Parser() {
     val a = """
         package a;
         public class A {

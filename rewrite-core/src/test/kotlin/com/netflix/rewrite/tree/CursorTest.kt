@@ -15,12 +15,11 @@
  */
 package com.netflix.rewrite.tree
 
-import com.netflix.rewrite.parse.OpenJdkParser
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
-open class CursorTest : Parser by OpenJdkParser() {
+open class CursorTest : Parser() {
     @Test
     fun inSameNameScope() {
         val a = parse("""

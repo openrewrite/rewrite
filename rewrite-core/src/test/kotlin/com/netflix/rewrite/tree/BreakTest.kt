@@ -16,11 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.firstMethodStatement
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
-abstract class BreakTest(p: Parser): Parser by p {
+open class BreakTest : Parser() {
 
     @Test
     fun breakFromWhileLoop() {

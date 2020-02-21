@@ -16,11 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.firstMethodStatement
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-abstract class ForEachLoopTest(p: Parser): Parser by p {
+open class ForEachLoopTest : Parser() {
 
     val a: Tr.CompilationUnit by lazy { parse("""
             public class A {

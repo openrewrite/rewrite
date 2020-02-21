@@ -16,13 +16,13 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
-import com.netflix.rewrite.parse.Parser
-import com.netflix.rewrite.tree.visitor.AstVisitor
+import com.netflix.rewrite.Parser
+import com.netflix.rewrite.visitor.AstVisitor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
 
-abstract class MemberReferenceTest(p: Parser): Parser by p {
+open class MemberReferenceTest : Parser() {
 
     @Test
     fun staticFunctionReference() {

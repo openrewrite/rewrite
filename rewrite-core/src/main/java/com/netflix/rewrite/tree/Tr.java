@@ -19,9 +19,9 @@ import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
 import com.netflix.rewrite.internal.lang.NonNull;
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.refactor.Refactor;
-import com.netflix.rewrite.tree.visitor.AstVisitor;
-import com.netflix.rewrite.tree.visitor.search.*;
+import com.netflix.rewrite.Refactor;
+import com.netflix.rewrite.visitor.AstVisitor;
+import com.netflix.rewrite.visitor.search.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 

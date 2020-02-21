@@ -16,12 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
-import com.netflix.rewrite.parse.OpenJdkParser
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
-open class TypeTest: Parser by OpenJdkParser() {
+open class TypeTest : Parser() {
     @Test
     fun memberVisibility() {
         val b = """
@@ -84,7 +83,7 @@ open class TypeTest: Parser by OpenJdkParser() {
 
     @Test
     fun selfReferentialTypeIsShared() {
-        val a = OpenJdkParser().parse("public class A { A a; }")
+        val a = Parser().parse("public class A { A a; }")
         val outerType = a.classes[0].type
         val fieldType = a.classes[0].fields[0].typeExpr?.type
         assertTrue(outerType === fieldType)
@@ -92,28 +91,28 @@ open class TypeTest: Parser by OpenJdkParser() {
 
     @Test
     fun typeFlyweightsAreSharedBetweenParsers() {
-        val a = OpenJdkParser().parse("public class A {}")
-        val a2 = OpenJdkParser().parse("public class A {}")
+        val a = Parser().parse("public class A {}")
+        val a2 = Parser().parse("public class A {}")
 
         assertTrue(a.classes[0].type === a2.classes[0].type)
     }
 
     @Test
     fun sameFullyQualifiedNameWithDifferentMembers() {
-        val a = OpenJdkParser().parse("public class A { String foo; }")
-        val a2 = OpenJdkParser().parse("public class A { String bar; }")
+        val a = Parser().parse("public class A { String foo; }")
+        val a2 = Parser().parse("public class A { String bar; }")
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }
 
     @Test
     fun sameFullyQualifiedNameWithDifferentTypeHierarchy() {
-        val a = OpenJdkParser().parse("""
+        val a = Parser().parse("""
             public class A extends B {}
             class B {}
         """)
 
-        val a2 = OpenJdkParser().parse("""
+        val a2 = Parser().parse("""
             public class A {}
             class B {}
         """)

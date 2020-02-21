@@ -16,11 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.fields
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 
-abstract class PrimitiveTest(p: Parser): Parser by p {
+open class PrimitiveTest : Parser() {
 
     @Test
     fun primitiveField() {

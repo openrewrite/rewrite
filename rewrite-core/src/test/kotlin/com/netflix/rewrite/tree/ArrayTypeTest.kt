@@ -15,11 +15,11 @@
  */
 package com.netflix.rewrite.tree
 
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert
 import org.junit.Test
 
-abstract class ArrayTypeTest(p: Parser): Parser by p {
+open class ArrayTypeTest : Parser() {
 
     @Test
     fun formatArrayReturnType() {

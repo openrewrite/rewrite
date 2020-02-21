@@ -19,11 +19,11 @@ import com.netflix.rewrite.asClass
 import com.netflix.rewrite.asGeneric
 import com.netflix.rewrite.fields
 import com.netflix.rewrite.hasElementType
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.*
 import org.junit.Test
 
-abstract class MethodInvocationTest(p: Parser) : Parser by p {
+open class MethodInvocationTest : Parser() {
 
     val a: Tr.CompilationUnit by lazy {
         parse("""

@@ -17,12 +17,11 @@ package com.netflix.rewrite.tree;
 
 import com.netflix.rewrite.internal.lang.NonNullApi;
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.parse.OpenJdkParser;
-import com.netflix.rewrite.tree.visitor.CursorAstVisitor;
-import com.netflix.rewrite.tree.visitor.refactor.AstTransform;
-import com.netflix.rewrite.tree.visitor.refactor.Formatter;
-import com.netflix.rewrite.tree.visitor.refactor.ShiftFormatRightVisitor;
-import com.netflix.rewrite.tree.visitor.refactor.TransformVisitor;
+import com.netflix.rewrite.Parser;
+import com.netflix.rewrite.visitor.CursorAstVisitor;
+import com.netflix.rewrite.visitor.refactor.Formatter;
+import com.netflix.rewrite.visitor.refactor.ShiftFormatRightVisitor;
+import com.netflix.rewrite.visitor.refactor.TransformVisitor;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +35,7 @@ import java.util.regex.Pattern;
 import static com.netflix.rewrite.internal.StringUtils.trimIndent;
 import static com.netflix.rewrite.tree.Formatting.format;
 import static com.netflix.rewrite.tree.Tr.randomId;
-import static com.netflix.rewrite.tree.visitor.refactor.Formatter.enclosingIndent;
+import static com.netflix.rewrite.visitor.refactor.Formatter.enclosingIndent;
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -95,7 +94,7 @@ public class TreeBuilder {
 
     @SuppressWarnings("unchecked")
     public static <T extends Tree> List<T> buildSnippet(Tr.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
-        OpenJdkParser parser = new OpenJdkParser(Charset.defaultCharset(), true);
+        Parser parser = new Parser(Charset.defaultCharset(), true);
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off

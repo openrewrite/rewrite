@@ -15,11 +15,11 @@
  */
 package com.netflix.rewrite.tree
 
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-abstract class AssertTest(p: Parser): Parser by p {
+open class AssertTest : Parser() {
 
     @Test
     fun assertStatement() {

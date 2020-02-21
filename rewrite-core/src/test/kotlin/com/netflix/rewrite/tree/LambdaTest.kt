@@ -15,12 +15,12 @@
  */
 package com.netflix.rewrite.tree
 
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-abstract class LambdaTest(p: Parser): Parser by p {
+open class LambdaTest : Parser() {
 
     val a: Tr.CompilationUnit by lazy {
         parse("""

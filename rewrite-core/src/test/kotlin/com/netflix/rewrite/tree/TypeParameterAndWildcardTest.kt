@@ -15,11 +15,11 @@
  */
 package com.netflix.rewrite.tree
 
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-abstract class TypeParameterAndWildcardTest(p: Parser): Parser by p {
+open class TypeParameterAndWildcardTest : Parser() {
     private val bc = listOf("public interface B {}", "public interface C {}")
 
     @Test

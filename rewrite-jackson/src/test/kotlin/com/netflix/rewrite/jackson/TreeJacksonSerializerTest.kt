@@ -15,8 +15,7 @@
  */
 package com.netflix.rewrite.jackson
 
-import com.netflix.rewrite.parse.OpenJdkParser
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -24,21 +23,22 @@ import org.junit.Test
 /**
  * Test that flyweights survive a serialization/deserialization cycle
  */
-class TreeJacksonSerializerTest : Parser by OpenJdkParser() {
+open class TreeJacksonSerializerTest : Parser() {
 
     private val serializer = TreeJacksonSerializer()
 
-    private val a = parse("""
+    private val aSource = """
             public class A {
                 A a = foo();
                 A a2 = foo();
 
                 public A foo() { return null; }
             }
-        """)
+        """
 
     @Test
     fun `round trip serialization of AST preserves flyweights`() {
+        val a = parse(aSource)
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
 
@@ -52,6 +52,7 @@ class TreeJacksonSerializerTest : Parser by OpenJdkParser() {
 
     @Test
     fun `round trip serialization of AST list`() {
+        val a = parse(aSource)
         val aBytes = serializer.write(listOf(a))
         assertEquals(a, serializer.readList(aBytes)[0])
     }

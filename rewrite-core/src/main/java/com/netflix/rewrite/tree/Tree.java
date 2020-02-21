@@ -18,9 +18,9 @@ package com.netflix.rewrite.tree;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.netflix.rewrite.internal.StringUtils;
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.tree.visitor.AstVisitor;
-import com.netflix.rewrite.tree.visitor.PrintVisitor;
-import com.netflix.rewrite.tree.visitor.RetrieveCursorVisitor;
+import com.netflix.rewrite.visitor.AstVisitor;
+import com.netflix.rewrite.visitor.PrintVisitor;
+import com.netflix.rewrite.visitor.RetrieveCursorVisitor;
 
 import java.util.UUID;
 

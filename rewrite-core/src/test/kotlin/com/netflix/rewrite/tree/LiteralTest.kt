@@ -16,11 +16,11 @@
 package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.fields
-import com.netflix.rewrite.parse.Parser
+import com.netflix.rewrite.Parser
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-abstract class LiteralTest(p: Parser): Parser by p {
+open class LiteralTest : Parser() {
     
     @Test
     fun literalField() {
