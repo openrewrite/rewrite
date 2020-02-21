@@ -22,6 +22,7 @@ import com.netflix.rewrite.visitor.AstVisitor;
 import com.netflix.rewrite.visitor.PrintVisitor;
 import com.netflix.rewrite.visitor.RetrieveCursorVisitor;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
@@ -62,5 +63,10 @@ public interface Tree {
     @Nullable
     default Cursor cursor(Tree t) {
         return new RetrieveCursorVisitor(t.getId()).visit(this);
+    }
+
+    @SuppressWarnings("unchecked")
+    default <T extends Tree> Optional<T> whenType(Class<T> treeType) {
+        return treeType.isAssignableFrom(this.getClass()) ? Optional.of((T) this) : Optional.empty();
     }
 }
