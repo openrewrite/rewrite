@@ -173,6 +173,7 @@ open class RemoveImportTest: Parser() {
             package foo;
             public class B {
                 public static final String STRING = "string";
+                public static final String STRING2 = "string2";
             }
         """.trimIndent()
 
@@ -184,7 +185,8 @@ open class RemoveImportTest: Parser() {
         """.trimIndent()
 
         val a = parse("""
-            import static foo.B.*;
+            import static foo.B.STRING;
+            import static foo.B.STRING2;
             import static foo.C.*;
             public class A {
                 String a = STRING;
@@ -194,7 +196,7 @@ open class RemoveImportTest: Parser() {
         val fixed = a.refactor().removeImport("foo.B").removeImport("foo.C").fix().fixed
 
         assertRefactored(fixed, """
-            import static foo.B.*;
+            import static foo.B.STRING;
             public class A {
                 String a = STRING;
             }

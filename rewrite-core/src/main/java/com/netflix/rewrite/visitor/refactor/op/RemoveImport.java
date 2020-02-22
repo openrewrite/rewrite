@@ -135,24 +135,26 @@ public class RemoveImport extends RefactorVisitor {
     private void staticImportDeletions(List<AstTransform> deletes) {
         if (staticStarImport != null) {
             var qualidType = TypeUtils.asClass(staticStarImport.getQualid().getTarget().getType());
-            if(referencedMethods.isEmpty() && noFieldReferences(qualidType)) {
+            if (referencedMethods.isEmpty() && noFieldReferences(qualidType, null)) {
                 deletes.addAll(delete(staticStarImport));
             }
         }
         for (Tr.Import staticImport : staticNamedImports) {
-            var method = staticImport.getQualid().getSimpleName();
+            var methodOrField = staticImport.getQualid().getSimpleName();
             var qualidType = TypeUtils.asClass(staticImport.getQualid().getTarget().getType());
-            if (referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(method)) &&
-                    noFieldReferences(qualidType)) {
+            if (referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(methodOrField)) &&
+                    noFieldReferences(qualidType, methodOrField)) {
                 deletes.addAll(delete(staticImport));
             }
         }
     }
 
-    private boolean noFieldReferences(@Nullable Type.Class qualidType) {
-        return (qualidType == null || referencedFields.stream()
-                .noneMatch(f -> qualidType.getMembers().stream().anyMatch(v -> f.equals(v.getName())) ||
-                        qualidType.getVisibleSupertypeMembers().stream().anyMatch(v -> f.equals(v.getName()))));
+    private boolean noFieldReferences(@Nullable Type.Class qualidType, @Nullable String fieldName) {
+        return qualidType == null || (
+                fieldName != null ? !referencedFields.contains(fieldName) :
+                        referencedFields.stream().noneMatch(f -> qualidType.getMembers().stream().anyMatch(v -> f.equals(v.getName())) ||
+                                qualidType.getVisibleSupertypeMembers().stream().anyMatch(v -> f.equals(v.getName())))
+        );
     }
 
     private List<AstTransform> delete(Tr.Import impoort) {
