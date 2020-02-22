@@ -36,7 +36,7 @@ open class FindTypeTest : Parser() {
             public class B extends A1 {}
         """, a1)
 
-        assertEquals(1, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -61,7 +61,7 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(3, b.findType("a.A1").size)
     }
 
     @Test
@@ -73,7 +73,7 @@ open class FindTypeTest : Parser() {
             public class B extends A1 implements I1 {}
         """, a1, i1)
 
-        assertEquals(1, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
         assertEquals(1, b.findType("I1").size)
     }
 
@@ -86,7 +86,7 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(3, b.findType("a.A1").size)
     }
 
     @Test
@@ -105,7 +105,7 @@ open class FindTypeTest : Parser() {
 
         b.findType("a.A1").map { b.cursor(it) }
 
-        assertEquals(4, b.findType("a.A1").size)
+        assertEquals(5, b.findType("a.A1").size)
     }
 
     @Test
@@ -120,7 +120,7 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(1, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -132,7 +132,8 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(1, b.findType("a.A1").size)
+        // f1 and f2 Tr.Idents both have type a.A1
+        assertEquals(4, b.findType("a.A1").size)
     }
 
     @Test
@@ -144,7 +145,7 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(4, b.findType("a.A1").size)
     }
 
     @Test
@@ -156,7 +157,7 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(3, b.findType("a.A1").size)
     }
 
     @Test
@@ -168,6 +169,6 @@ open class FindTypeTest : Parser() {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(4, b.findType("a.A1").size)
     }
 }

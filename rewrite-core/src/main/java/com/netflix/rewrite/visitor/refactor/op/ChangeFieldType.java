@@ -15,16 +15,16 @@
  */
 package com.netflix.rewrite.visitor.refactor.op;
 
-import com.netflix.rewrite.tree.Formatting;
 import com.netflix.rewrite.tree.Tr;
 import com.netflix.rewrite.tree.Type;
+import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.visitor.refactor.AstTransform;
 import com.netflix.rewrite.visitor.refactor.ScopedRefactorVisitor;
 
 import java.util.List;
 import java.util.UUID;
 
-import static com.netflix.rewrite.tree.Tr.randomId;
+import static java.util.stream.Collectors.toList;
 
 public class ChangeFieldType extends ScopedRefactorVisitor {
     private final String targetType;
@@ -51,8 +51,16 @@ public class ChangeFieldType extends ScopedRefactorVisitor {
                 mv -> {
                     Type.Class type = Type.Class.build(targetType);
                     maybeRemoveImport(originalType);
-                    return mv.withTypeExpr(Tr.Ident.build(randomId(), type.getClassName(), type,
-                            mv.getTypeExpr() == null ? Formatting.EMPTY : mv.getTypeExpr().getFormatting()));
+
+                    return mv.withTypeExpr(mv.getTypeExpr() == null ? null : Tr.Ident.build(mv.getTypeExpr().getId(),
+                            type.getClassName(), type, mv.getTypeExpr().getFormatting()))
+                            .withVars(mv.getVars().stream().map(var -> {
+                                Type.Class varType = TypeUtils.asClass(var.getType());
+                                if (varType != null && !varType.equals(type)) {
+                                    return var.withType(type).withName(var.getName().withType(type));
+                                }
+                                return var;
+                            }).collect(toList()));
                 }
         );
     }

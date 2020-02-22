@@ -15,6 +15,7 @@
  */
 package com.netflix.rewrite.visitor.refactor.op;
 
+import com.netflix.rewrite.internal.lang.Nullable;
 import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.visitor.MethodMatcher;
 import com.netflix.rewrite.visitor.refactor.AstTransform;
@@ -46,6 +47,7 @@ public class RemoveImport extends RefactorVisitor {
 
     private final Set<String> referencedTypes = new HashSet<>();
     private final Set<Tr.Ident> referencedMethods = new HashSet<>();
+    private final Set<String> referencedFields = new HashSet<>();
     private final List<Tr.Import> staticNamedImports = new ArrayList<>();
 
     public RemoveImport(String clazz) {
@@ -90,6 +92,12 @@ public class RemoveImport extends RefactorVisitor {
     }
 
     @Override
+    public List<AstTransform> visitIdentifier(Tr.Ident ident) {
+        referencedFields.add(ident.getSimpleName());
+        return super.visitIdentifier(ident);
+    }
+
+    @Override
     public List<AstTransform> visitMethodInvocation(Tr.MethodInvocation method) {
         if (methodMatcher.matches(method) && method.getType() != null &&
                 method.getType().getDeclaringType().getFullyQualifiedName().equals(clazz)) {
@@ -125,15 +133,26 @@ public class RemoveImport extends RefactorVisitor {
     }
 
     private void staticImportDeletions(List<AstTransform> deletes) {
-        if(staticStarImport != null && referencedMethods.isEmpty()) {
-            deletes.addAll(delete(staticStarImport));
+        if (staticStarImport != null) {
+            var qualidType = TypeUtils.asClass(staticStarImport.getQualid().getTarget().getType());
+            if(referencedMethods.isEmpty() && noFieldReferences(qualidType)) {
+                deletes.addAll(delete(staticStarImport));
+            }
         }
         for (Tr.Import staticImport : staticNamedImports) {
             var method = staticImport.getQualid().getSimpleName();
-            if(referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(method))) {
+            var qualidType = TypeUtils.asClass(staticImport.getQualid().getTarget().getType());
+            if (referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(method)) &&
+                    noFieldReferences(qualidType)) {
                 deletes.addAll(delete(staticImport));
             }
         }
+    }
+
+    private boolean noFieldReferences(@Nullable Type.Class qualidType) {
+        return (qualidType == null || referencedFields.stream()
+                .noneMatch(f -> qualidType.getMembers().stream().anyMatch(v -> f.equals(v.getName())) ||
+                        qualidType.getVisibleSupertypeMembers().stream().anyMatch(v -> f.equals(v.getName()))));
     }
 
     private List<AstTransform> delete(Tr.Import impoort) {

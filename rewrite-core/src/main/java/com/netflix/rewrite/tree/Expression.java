@@ -26,6 +26,8 @@ public interface Expression extends Tree {
     @Nullable
     Type getType();
 
+    <T extends Tree> T withType(@Nullable Type type);
+
     /**
      * @return A list of the side effects emitted by the statement, if the statement was decomposed.
      * So for a binary operation, there are up to two potential side effects (the left and right side) and as

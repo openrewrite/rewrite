@@ -17,6 +17,7 @@ package com.netflix.rewrite.tree
 
 import com.netflix.rewrite.asClass
 import com.netflix.rewrite.Parser
+import com.netflix.rewrite.visitor.AstVisitor
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -81,5 +82,22 @@ open class AnnotationTest : Parser() {
         """)
 
         assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[0].printTrimmed())
+    }
+
+    @Test
+    fun annotationArgTypesVisited() {
+        val a = parse("""
+            import java.lang.annotation.Target;
+            import static java.lang.annotation.ElementType.*;
+
+            @Target({ FIELD, PARAMETER })
+            public @interface Annotation {}
+        """)
+
+        assertEquals(true, object: AstVisitor<Boolean>() {
+            override fun defaultTo(t: Tree?): Boolean = false
+
+            override fun visitTypeName(name: NameTree): Boolean = name.type.asClass()?.fullyQualifiedName == "java.lang.annotation.ElementType"
+        }.visit(a))
     }
 }

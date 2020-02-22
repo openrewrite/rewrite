@@ -166,4 +166,38 @@ open class RemoveImportTest: Parser() {
             }
         """)
     }
+
+    @Test
+    fun leaveNamedStaticImportOnFieldIfReferenceStillExists() {
+        val bSource = """
+            package foo;
+            public class B {
+                public static final String STRING = "string";
+            }
+        """.trimIndent()
+
+        val cSource = """
+            package foo;
+            public class C {
+                public static final String ANOTHER = "string";
+            }
+        """.trimIndent()
+
+        val a = parse("""
+            import static foo.B.*;
+            import static foo.C.*;
+            public class A {
+                String a = STRING;
+            }
+        """.trimIndent(), bSource, cSource)
+
+        val fixed = a.refactor().removeImport("foo.B").removeImport("foo.C").fix().fixed
+
+        assertRefactored(fixed, """
+            import static foo.B.*;
+            public class A {
+                String a = STRING;
+            }
+        """)
+    }
 }

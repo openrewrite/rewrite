@@ -61,6 +61,15 @@ public class ChangeType extends RefactorVisitor {
     }
 
     @Override
+    public List<AstTransform> visitTypeName(NameTree name) {
+        Type.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
+        return maybeTransform(name,
+                !(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(from),
+                super::visitTypeName,
+                n -> n.withType(toClassType));
+    }
+
+    @Override
     public List<AstTransform> visitAnnotation(Tr.Annotation annotation) {
         List<AstTransform> changes = super.visitAnnotation(annotation);
         changes.addAll(transformName(annotation, annotation.getAnnotationType(), Tr.Annotation::withAnnotationType));
@@ -109,6 +118,11 @@ public class ChangeType extends RefactorVisitor {
             changes.addAll(transformName(method, method.getSelect(), Tr.MethodInvocation::withSelect));
         }
 
+        Type.Class selectType = TypeUtils.asClass(method.getSelect().getType());
+        if(selectType != null && selectType.getFullyQualifiedName().equals(from)) {
+            changes.addAll(transform(method.getSelect(), s -> s.withType(toClassType)));
+        }
+
         if (method.getTypeParameters() != null) {
             for (Tr.TypeParameter param : method.getTypeParameters().getParams()) {
                 changes.addAll(transformName(param, param.getName(), Tr.TypeParameter::withName));
@@ -135,17 +149,11 @@ public class ChangeType extends RefactorVisitor {
 
         changes.addAll(transformName(multiVariable, multiVariable.getTypeExpr(), Tr.VariableDecls::withTypeExpr));
 
-        List<Tr.VariableDecls.NamedVar> vars = multiVariable.getVars();
-        for (int i = 0; i < vars.size(); i++) {
-            Tr.VariableDecls.NamedVar var = vars.get(i);
-            final int innerI = i;
-            changes.addAll(transformName(multiVariable, var, (m, transformedName) -> {
-                List<Tr.VariableDecls.NamedVar> transformedVars = new ArrayList<>(vars.size());
-                for (int j = 0; j < vars.size(); j++) {
-                    transformedVars.add(innerI == j ? var.withName(transformedName) : var);
-                }
-                return m.withVars(transformedVars);
-            }));
+        for (Tr.VariableDecls.NamedVar var : multiVariable.getVars()) {
+            Type.Class varType = TypeUtils.asClass(var.getType());
+            if (varType != null && varType.getFullyQualifiedName().equals(from)) {
+                changes.addAll(transform(var, v -> v.withType(toClassType).withName(v.getName().withType(toClassType))));
+            }
         }
 
         return changes;

@@ -107,7 +107,7 @@ public abstract class AstVisitor<R> {
     }
 
     public R visitExpression(Expression expr) {
-        return defaultTo(expr);
+        return expr instanceof NameTree ? visitTypeName((NameTree) expr) : defaultTo(expr);
     }
 
     public R visitStatement(Statement statement) {

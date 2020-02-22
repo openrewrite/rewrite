@@ -17,9 +17,9 @@ package com.netflix.rewrite.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
+import com.netflix.rewrite.Refactor;
 import com.netflix.rewrite.internal.lang.NonNull;
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.Refactor;
 import com.netflix.rewrite.visitor.AstVisitor;
 import com.netflix.rewrite.visitor.search.*;
 import lombok.*;
@@ -67,6 +67,12 @@ public abstract class Tr implements Serializable, Tree {
             return annotationType.getType();
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public Annotation withType(@Nullable Type type) {
+            return withAnnotationType(annotationType.withType(type));
+        }
+
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitAnnotation(this), v.visitExpression(this));
@@ -100,6 +106,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Dimension dimension;
 
+        @With
         @Nullable
         Type type;
 
@@ -145,6 +152,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public Type getType() {
             return elementType.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ArrayType withType(Type type) {
+            return withElementType(elementType.withType(type));
         }
 
         @Override
@@ -205,6 +218,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression assignment;
 
+        @With
         @Nullable
         Type type;
 
@@ -245,6 +259,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression assignment;
 
+        @With
         @Nullable
         Type type;
 
@@ -409,6 +424,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression right;
 
+        @With
         @Nullable
         Type type;
 
@@ -890,7 +906,7 @@ public abstract class Tr implements Serializable, Tree {
             return new FindMethods(signature).visit(this);
         }
 
-        public List<NameTree> findType(String clazz) {
+        public Set<NameTree> findType(String clazz) {
             return new FindType(clazz).visit(this);
         }
 
@@ -966,7 +982,7 @@ public abstract class Tr implements Serializable, Tree {
             return new FindMethods(signature).visit(this);
         }
 
-        public List<NameTree> findType(String clazz) {
+        public Set<NameTree> findType(String clazz) {
             return new FindType(clazz).visit(this);
         }
 
@@ -1068,6 +1084,12 @@ public abstract class Tr implements Serializable, Tree {
             return null;
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public Empty withType(Type type) {
+            return this;
+        }
+
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitEmpty(this), v.visitExpression(this), v.visitStatement(this));
@@ -1151,6 +1173,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Ident name;
 
+        @With
         @Nullable
         Type type;
 
@@ -1304,6 +1327,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public Type getType() {
             return ident.getType();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Ident withType(Type type) {
+            return build(id, getSimpleName(), type, formatting);
         }
 
         @JsonIgnore
@@ -1484,6 +1513,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Tree clazz;
 
+        @With
         @Nullable
         Type type;
 
@@ -1534,6 +1564,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Tree body;
 
+        @With
         @Nullable
         Type type;
 
@@ -1593,8 +1624,19 @@ public abstract class Tr implements Serializable, Tree {
         @With
         String valueSource;
 
-        @With
-        Type.Primitive type; // Strings are included
+        /**
+         * Including String literals
+         */
+        Type.Primitive type;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Literal withType(Type type) {
+            if(type instanceof Type.Primitive) {
+                return new Literal(id, value, valueSource, (Type.Primitive) type, formatting);
+            }
+            return this;
+        }
 
         @With
         Formatting formatting;
@@ -1635,6 +1677,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Ident reference;
 
+        @With
         @Nullable
         Type type;
 
@@ -1807,12 +1850,20 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Arguments args;
 
-        @With
         @Nullable
         Type.Method type;
 
         @With
         Formatting formatting;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public MethodInvocation withType(Type type) {
+            if(type instanceof Type.Method) {
+                return new MethodInvocation(id, select, typeParameters, name, args, (Type.Method) type, formatting);
+            }
+            return this;
+        }
 
         @Override
         public <R> R accept(AstVisitor<R> v) {
@@ -2011,6 +2062,13 @@ public abstract class Tr implements Serializable, Tree {
             return v.visitMultiCatch(this);
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public MultiCatch withType(Type type) {
+            // cannot overwrite type directly, perform this operation on each alternative separately
+            return this;
+        }
+
         @JsonIgnore
         @Override
         public Type getType() {
@@ -2039,6 +2097,7 @@ public abstract class Tr implements Serializable, Tree {
         @Nullable
         Initializer initializer;
 
+        @With
         @Nullable
         Type type;
 
@@ -2096,6 +2155,7 @@ public abstract class Tr implements Serializable, Tree {
         @Nullable
         Block<? extends Tree> body;
 
+        @With
         @Nullable
         Type type;
 
@@ -2175,6 +2235,12 @@ public abstract class Tr implements Serializable, Tree {
             return clazz.getType();
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public ParameterizedType withType(Type type) {
+            return withClazz(clazz.withType(type));
+        }
+
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitParameterizedType(this), v.visitExpression(this));
@@ -2207,7 +2273,17 @@ public abstract class Tr implements Serializable, Tree {
 
         @Override
         public Type getType() {
-            return tree instanceof Expression ? ((Expression) tree).getType() : null;
+            return tree instanceof Expression ? ((Expression) tree).getType() :
+                    tree instanceof NameTree ? ((NameTree) tree).getType() :
+                    null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Parentheses<T> withType(Type type) {
+            return tree instanceof Expression ? ((Expression) tree).withType(type) :
+                    tree instanceof NameTree ? ((NameTree) tree).withType(type) :
+                    this;
         }
     }
 
@@ -2220,6 +2296,15 @@ public abstract class Tr implements Serializable, Tree {
         UUID id;
 
         Type.Primitive type;
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Primitive withType(Type type) {
+            if(!(type instanceof Type.Primitive)) {
+                throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitve");
+            }
+            return new Primitive(id, (Type.Primitive) type, formatting);
+        }
 
         @Override
         @NonNull
@@ -2323,6 +2408,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression falsePart;
 
+        @With
         @Nullable
         Type type;
 
@@ -2476,6 +2562,12 @@ public abstract class Tr implements Serializable, Tree {
             return clazz.getType();
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public TypeCast withType(Type type) {
+            return withClazz(clazz.withType(type));
+        }
+
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitTypeCast(this), v.visitExpression(this));
@@ -2558,6 +2650,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         Expression expr;
 
+        @With
         @Nullable
         Type type;
 
@@ -2714,6 +2807,12 @@ public abstract class Tr implements Serializable, Tree {
             return null;
         }
 
+        @SuppressWarnings("unchecked")
+        @Override
+        public UnparsedSource withType(Type type) {
+            return null;
+        }
+
         @Override
         public <R> R accept(AstVisitor<R> v) {
             return v.reduce(v.visitUnparsedSource(this), v.visitExpression(this), v.visitStatement(this));
@@ -2798,7 +2897,7 @@ public abstract class Tr implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class NamedVar extends Tr {
+        public static class NamedVar extends Tr implements NameTree {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2812,6 +2911,7 @@ public abstract class Tr implements Serializable, Tree {
             @Nullable
             Expression initializer;
 
+            @With
             @Nullable
             Type type;
 
@@ -2877,6 +2977,12 @@ public abstract class Tr implements Serializable, Tree {
         @Override
         public Type getType() {
             return null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Wildcard withType(Type type) {
+            return this;
         }
 
         @Override

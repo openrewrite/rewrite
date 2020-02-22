@@ -295,7 +295,7 @@ open class ChangeTypeTest : Parser() {
     }
 
     @Test
-    fun `even though references to original type remain in the ast, the original type's import is removed`() {
+    fun methodSelect() {
         val b = parse("""
             import a.A1;
             public class B {

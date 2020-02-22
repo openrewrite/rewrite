@@ -23,4 +23,6 @@ import com.netflix.rewrite.internal.lang.Nullable;
 public interface NameTree extends Tree {
     @Nullable
     Type getType();
+
+    <T extends Tree> T withType(@Nullable Type type);
 }

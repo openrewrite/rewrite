@@ -52,20 +52,19 @@ public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
                 m -> {
                     Expression select = m.getSelect();
 
-                    Type.Method type = null;
+                    Type.Method methodType = null;
                     if (m.getType() != null) {
                         // if the original is a static method invocation, the import on it's type may no longer be needed
                         maybeRemoveImport(m.getType().getDeclaringType());
 
                         Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
                         flags.remove(Flag.Static);
-                        type = m.getType().withDeclaringType(this.type).withFlags(flags);
+                        methodType = m.getType().withDeclaringType(this.type).withFlags(flags);
                     }
 
                     return m
-                            .withSelect(Tr.Ident.build(randomId(), varName, select == null ? null : select.getType(),
-                                    select == null ? Formatting.EMPTY : select.getFormatting()))
-                            .withType(type);
+                            .withSelect(Tr.Ident.build(randomId(), varName, type, select == null ? Formatting.EMPTY : select.getFormatting()))
+                            .withType(methodType);
                 }
         );
     }

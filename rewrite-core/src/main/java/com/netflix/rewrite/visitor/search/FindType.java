@@ -22,24 +22,37 @@ import com.netflix.rewrite.tree.TypeUtils;
 import com.netflix.rewrite.visitor.AstVisitor;
 import lombok.RequiredArgsConstructor;
 
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.*;
 
 @RequiredArgsConstructor
-public class FindType extends AstVisitor<List<NameTree>> {
+public class FindType extends AstVisitor<Set<NameTree>> {
     private final String clazz;
 
     @Override
-    public List<NameTree> defaultTo(Tree t) {
-        return emptyList();
+    public Set<NameTree> defaultTo(Tree t) {
+        return Collections.newSetFromMap(new IdentityHashMap<>());
     }
 
     @Override
-    public List<NameTree> visitTypeName(NameTree name) {
+    public Set<NameTree> reduce(Set<NameTree> r1, Set<NameTree> r2) {
+        r1.addAll(r2);
+        return r1;
+    }
+
+    @Override
+    public Set<NameTree> visitTypeName(NameTree name) {
         Type.Class asClass = TypeUtils.asClass(name.getType());
-        return asClass == null ? emptyList() :
-                asClass.getFullyQualifiedName().equals(clazz) ? singletonList(name) :
-                        emptyList();
+        if(asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
+            Set<NameTree> names = defaultTo(name);
+            names.add(name);
+            return names;
+        }
+
+        return super.visitTypeName(name);
     }
 }
