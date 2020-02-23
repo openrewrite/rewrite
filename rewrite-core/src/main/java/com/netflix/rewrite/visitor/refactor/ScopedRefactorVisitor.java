@@ -32,6 +32,10 @@ import static java.util.stream.StreamSupport.stream;
 public abstract class ScopedRefactorVisitor extends RefactorVisitor {
     protected final UUID scope;
 
+    protected boolean isScope(@Nullable Tree t) {
+        return t != null && scope.equals(t.getId());
+    }
+
     protected boolean isInScope(@Nullable Tree t) {
         return (t != null && t.getId().equals(scope)) ||
                 stream(Spliterators.spliteratorUnknownSize(getCursor().getPath(), 0), false)

@@ -22,7 +22,6 @@ import com.koloboke.collect.set.hash.HashObjSets;
 import com.netflix.rewrite.internal.lang.Nullable;
 import lombok.Data;
 import lombok.Getter;
-import lombok.Setter;
 import lombok.With;
 
 import java.io.Serializable;
