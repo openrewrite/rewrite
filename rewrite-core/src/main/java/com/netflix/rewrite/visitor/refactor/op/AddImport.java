@@ -16,10 +16,7 @@
 package com.netflix.rewrite.visitor.refactor.op;
 
 import com.netflix.rewrite.internal.lang.Nullable;
-import com.netflix.rewrite.tree.Formatting;
-import com.netflix.rewrite.tree.Tr;
-import com.netflix.rewrite.tree.TreeBuilder;
-import com.netflix.rewrite.tree.Type;
+import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.visitor.refactor.AstTransform;
 import com.netflix.rewrite.visitor.refactor.RefactorVisitor;
 import com.netflix.rewrite.visitor.search.FindType;
@@ -53,7 +50,6 @@ public class AddImport extends RefactorVisitor {
     private boolean coveredByExistingImport;
     private boolean hasReferences;
     private Tr.CompilationUnit cu;
-
 
     public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
         this.clazz = clazz;
