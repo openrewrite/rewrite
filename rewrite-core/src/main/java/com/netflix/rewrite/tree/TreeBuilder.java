@@ -94,7 +94,7 @@ public class TreeBuilder {
 
     @SuppressWarnings("unchecked")
     public static <T extends Tree> List<T> buildSnippet(Tr.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
-        Parser parser = new Parser(Charset.defaultCharset(), true);
+        Parser parser = new Parser(emptyList(), Charset.defaultCharset(), true);
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off

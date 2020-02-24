@@ -32,6 +32,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static com.netflix.rewrite.tree.Formatting.*;
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -760,10 +761,27 @@ public abstract class Tr implements Serializable, Tree {
         @Getter
         List<Annotation> annotations;
 
-        @With
         @Getter
         List<Modifier> modifiers;
 
+        public ClassDecl withModifiers(List<Modifier> modifiers) {
+            return new ClassDecl(id, annotations, modifiers, kind, name, typeParams,
+                    extendings, implementings, body, type, formatting);
+        }
+
+        public ClassDecl withModifiers(String... modifierKeywords) {
+            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
+
+            if (fixedModifiers == modifiers) {
+                return this;
+            } else if (modifiers.isEmpty()) {
+                return withModifiers(fixedModifiers).withKind(kind.withPrefix(" "));
+            }
+
+            return withModifiers(fixedModifiers);
+        }
+
+        @With
         @Getter
         Kind kind;
 
@@ -919,7 +937,7 @@ public abstract class Tr implements Serializable, Tree {
         }
 
         public boolean hasModifier(String modifier) {
-            return hasModifier(getModifiers(), modifier);
+            return Modifier.hasModifier(getModifiers(), modifier);
         }
 
         @JsonIgnore
@@ -1600,7 +1618,7 @@ public abstract class Tr implements Serializable, Tree {
             @With
             List<? extends Tree> params;
 
-            Formatting formatting = Formatting.EMPTY;
+            Formatting formatting = EMPTY;
 
             @SuppressWarnings("unchecked")
             @Override
@@ -1632,7 +1650,7 @@ public abstract class Tr implements Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Literal withType(Type type) {
-            if(type instanceof Type.Primitive) {
+            if (type instanceof Type.Primitive) {
                 return new Literal(id, value, valueSource, (Type.Primitive) type, formatting);
             }
             return this;
@@ -1702,9 +1720,34 @@ public abstract class Tr implements Serializable, Tree {
         @Getter
         List<Annotation> annotations;
 
-        @With
         @Getter
         List<Modifier> modifiers;
+
+        public MethodDecl withModifiers(List<Modifier> modifiers) {
+            return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr, name, params,
+                    throwz, body, defaultValue, formatting);
+        }
+
+        public MethodDecl withModifiers(String... modifierKeywords) {
+            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
+
+            if (fixedModifiers == modifiers) {
+                return this;
+            } else if (modifiers.isEmpty()) {
+                if(typeParameters != null) {
+                    return withModifiers(formatFirstPrefix(fixedModifiers, typeParameters.getFormatting().getPrefix()))
+                            .withTypeParameters(typeParameters.withPrefix(" "));
+                } else if(returnTypeExpr != null) {
+                    return withModifiers(formatFirstPrefix(fixedModifiers, returnTypeExpr.getFormatting().getPrefix()))
+                            .withReturnTypeExpr(returnTypeExpr.withPrefix(" "));
+                } else {
+                    return withModifiers(formatFirstPrefix(fixedModifiers, name.getFormatting().getPrefix()))
+                            .withName(name.withPrefix(" "));
+                }
+            }
+
+            return withModifiers(fixedModifiers);
+        }
 
         @With
         @Getter
@@ -1825,7 +1868,7 @@ public abstract class Tr implements Serializable, Tree {
         }
 
         public boolean hasModifier(String modifier) {
-            return hasModifier(getModifiers(), modifier);
+            return Modifier.hasModifier(getModifiers(), modifier);
         }
     }
 
@@ -1859,7 +1902,7 @@ public abstract class Tr implements Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public MethodInvocation withType(Type type) {
-            if(type instanceof Type.Method) {
+            if (type instanceof Type.Method) {
                 return new MethodInvocation(id, select, typeParameters, name, args, (Type.Method) type, formatting);
             }
             return this;
@@ -1911,6 +1954,121 @@ public abstract class Tr implements Serializable, Tree {
 
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     public static abstract class Modifier extends Tr {
+        static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
+            return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
+                    .toLowerCase().equals(modifier));
+        }
+
+        /**
+         * Adds a new modifier(s) to a modifier list in a canonical way, e.g. add final after static and visibility modifiers,
+         * static before final and after visibility modifiers.
+         *
+         * @param existing         The existing list of modifiers to add to.
+         * @param modifierKeywords The new modifiers to add.
+         * @return A new list containing the new modifier, or the original list instance if the modifier
+         * is already present in the list.
+         */
+        static List<Modifier> withModifiers(List<Modifier> existing, String... modifierKeywords) {
+            boolean visibilityChanged = false;
+            List<Modifier> modifiers = new ArrayList<>(existing);
+
+            for (String modifier : modifierKeywords) {
+                int sizeBeforeAdd = modifiers.size();
+
+                if ("final".equals(modifier) && !hasModifier(existing, "final")) {
+                    boolean finalAdded = false;
+
+                    for (int i = 0; i < sizeBeforeAdd; i++) {
+                        Modifier m = modifiers.get(i);
+                        if (m instanceof Static) {
+                            modifiers.add(i + 1, new Final(randomId(), format(" ")));
+                            finalAdded = true;
+                            break;
+                        }
+
+                        if (i == modifiers.size() - 1) {
+                            modifiers.set(i, m.withSuffix(""));
+                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getFormatting().getSuffix())));
+                            finalAdded = true;
+                        }
+                    }
+
+                    if (!finalAdded) {
+                        modifiers.add(0, new Final(randomId(), EMPTY));
+                    }
+                } else if ("static".equals(modifier) && !hasModifier(existing, "static")) {
+                    boolean staticAdded = false;
+                    int afterAccessModifier = 0;
+
+                    for (int i = 0; i < sizeBeforeAdd; i++) {
+                        Modifier m = modifiers.get(i);
+                        if (m instanceof Private || m instanceof Protected || m instanceof Public) {
+                            afterAccessModifier = i + 1;
+                        } else if (m instanceof Final) {
+                            modifiers.set(i, m.withFormatting(format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(i, new Static(randomId(), format(m.getFormatting().getPrefix())));
+                            staticAdded = true;
+                            break;
+                        }
+
+                        if (i == modifiers.size() - 1) {
+                            modifiers.set(i, m.withSuffix(""));
+                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getFormatting().getSuffix())));
+                            staticAdded = true;
+                        }
+                    }
+
+                    if (!staticAdded) {
+                        modifiers.add(0, new Static(randomId(), EMPTY));
+                    }
+                } else if (("public".equals(modifier) || "protected".equals(modifier) || "private".equals(modifier)) &&
+                        !hasModifier(existing, modifier)) {
+                    boolean accessModifierAdded = false;
+
+                    for (int i = 0; i < sizeBeforeAdd; i++) {
+                        Modifier m = modifiers.get(i);
+                        if (m instanceof Private || m instanceof Protected || m instanceof Public) {
+                            // replace a different access modifier in place
+                            modifiers.set(i, buildModifier(modifier, m.getFormatting()));
+                            accessModifierAdded = true;
+                            visibilityChanged = true;
+                            break;
+                        }
+
+                        if (i == modifiers.size() - 1) {
+                            modifiers.add(0, buildModifier(modifier, format(modifiers.get(0).getFormatting().getPrefix(),
+                                    m.getFormatting().getSuffix())));
+                            modifiers.set(i + 1, m.withFormatting(format(" ", "")));
+                            accessModifierAdded = true;
+                        }
+                    }
+
+                    if (!accessModifierAdded) {
+                        modifiers.add(0, buildModifier(modifier, EMPTY));
+                    }
+                }
+            }
+
+            return visibilityChanged || modifiers.size() > existing.size() ? modifiers : existing;
+        }
+
+        private static Tr.Modifier buildModifier(String modifier, Formatting formatting) {
+            Modifier access;
+            switch (modifier) {
+                case "public":
+                    access = new Public(randomId(), formatting);
+                    break;
+                case "protected":
+                    access = new Protected(randomId(), formatting);
+                    break;
+                case "private":
+                default:
+                    access = new Private(randomId(), formatting);
+                    break;
+            }
+            return access;
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
@@ -2275,7 +2433,7 @@ public abstract class Tr implements Serializable, Tree {
         public Type getType() {
             return tree instanceof Expression ? ((Expression) tree).getType() :
                     tree instanceof NameTree ? ((NameTree) tree).getType() :
-                    null;
+                            null;
         }
 
         @SuppressWarnings("unchecked")
@@ -2283,7 +2441,7 @@ public abstract class Tr implements Serializable, Tree {
         public Parentheses<T> withType(Type type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
-                    this;
+                            this;
         }
     }
 
@@ -2300,7 +2458,7 @@ public abstract class Tr implements Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Primitive withType(Type type) {
-            if(!(type instanceof Type.Primitive)) {
+            if (!(type instanceof Type.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitve");
             }
             return new Primitive(id, (Type.Primitive) type, formatting);
@@ -2686,7 +2844,7 @@ public abstract class Tr implements Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2702,7 +2860,7 @@ public abstract class Tr implements Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2740,7 +2898,7 @@ public abstract class Tr implements Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2756,7 +2914,7 @@ public abstract class Tr implements Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2829,8 +2987,31 @@ public abstract class Tr implements Serializable, Tree {
         @With
         List<Annotation> annotations;
 
-        @With
         List<Modifier> modifiers;
+
+        public VariableDecls withModifiers(List<Modifier> modifiers) {
+            return new VariableDecls(id, annotations, modifiers, typeExpr, varargs,
+                    dimensionsBeforeName, vars, formatting);
+        }
+
+        public VariableDecls withModifiers(String... modifierKeywords) {
+            if (typeExpr == null) {
+                // cannot place modifiers on VariableDecls that occur in places where a type expression
+                // is not also present (e.g. Lambda parameters).
+                return this;
+            }
+
+            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
+
+            if (fixedModifiers == modifiers) {
+                return this;
+            } else if (modifiers.isEmpty()) {
+                return withModifiers(formatFirstPrefix(fixedModifiers, typeExpr.getFormatting().getPrefix()))
+                        .withTypeExpr(typeExpr.withPrefix(" "));
+            }
+
+            return withModifiers(fixedModifiers);
+        }
 
         @With
         @Nullable
@@ -2930,7 +3111,7 @@ public abstract class Tr implements Serializable, Tree {
         }
 
         public boolean hasModifier(String modifier) {
-            return hasModifier(getModifiers(), modifier);
+            return Modifier.hasModifier(getModifiers(), modifier);
         }
     }
 
@@ -3014,10 +3195,5 @@ public abstract class Tr implements Serializable, Tree {
                 Formatting formatting;
             }
         }
-    }
-
-    static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
-        return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
-                .toLowerCase().equals(modifier));
     }
 }

@@ -76,12 +76,33 @@ public class Parser {
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog = new ResettableLog(context);
 
-    public Parser() {
-        this(Charset.defaultCharset(), false);
+    /**
+     * Convenience utility for constructing a parser with binary dependencies on the runtime classpath of the process
+     * constructing the parser.
+     *
+     * @param artifactNames The "artifact name" of the dependency to look for. Artifact name is the artifact portion of
+     *                      group:artifact:version coordinates. For example, for Google's Guava (com.google.guava:guava:VERSION),
+     *                      the artifact name is "guava".
+     * @return A set of paths of jars on the runtime classpath matching the provided artifact names, to the extent such
+     * matching jars can be found.
+     */
+    public static List<Path> dependenciesFromClasspath(String... artifactNames) {
+        List<Pattern> artifactNamePatterns = Arrays.stream(artifactNames)
+                .map(name -> Pattern.compile(name + "-.*?\\.jar$"))
+                .collect(toList());
+
+        return Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
+                .filter(cpEntry -> artifactNamePatterns.stream().anyMatch(namePattern -> namePattern.matcher(cpEntry).find()))
+                .map(cpEntry -> new File(cpEntry).toPath())
+                .collect(toList());
     }
 
-    public Parser(Charset charset, boolean relaxedClassTypeMatching) {
-        this(emptyList(), charset, relaxedClassTypeMatching);
+    public Parser() {
+        this(null, Charset.defaultCharset(), false);
+    }
+
+    public Parser(@Nullable List<Path> classpath) {
+        this(classpath, Charset.defaultCharset(), false);
     }
 
     public Parser(@Nullable List<Path> classpath, Charset charset, boolean relaxedClassTypeMatching) {
@@ -106,7 +127,7 @@ public class Parser {
             @Override
             public void write(char[] cbuf, int off, int len) {
                 var log = new String(Arrays.copyOfRange(cbuf, off, len));
-                if(!log.isBlank()) {
+                if (!log.isBlank()) {
                     logger.warn(log);
                 }
             }
@@ -123,7 +144,7 @@ public class Parser {
 
     public List<Tr.CompilationUnit> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
         if (classpath != null) { // override classpath
-            if(context.get(JavaFileManager.class) != pfm) {
+            if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
             }
 
@@ -146,12 +167,12 @@ public class Parser {
             // For some reason this is necessary in JDK 9+, where the the internal block counter that
             // annotationsBlocked() tests against remains >0 after attribution.
             Annotate annotate = Annotate.instance(context);
-            while(annotate.annotationsBlocked()) {
+            while (annotate.annotationsBlocked()) {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
             compiler.attribute(compiler.todo);
-        } catch(Throwable t) {
+        } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             logger.warn("Failed symbol entering or attribution", t);
