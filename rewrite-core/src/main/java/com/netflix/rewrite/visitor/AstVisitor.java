@@ -186,7 +186,7 @@ public abstract class AstVisitor<R> {
                                                                 ),
                                                                 classDecl.getName()
                                                         ),
-                                                        classDecl.getTypeParams()
+                                                        classDecl.getTypeParameters()
                                                 ),
                                                 classDecl.getExtends()
                                         ),

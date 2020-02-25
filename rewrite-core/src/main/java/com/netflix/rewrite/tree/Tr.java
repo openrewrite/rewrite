@@ -765,7 +765,7 @@ public abstract class Tr implements Serializable, Tree {
         List<Modifier> modifiers;
 
         public ClassDecl withModifiers(List<Modifier> modifiers) {
-            return new ClassDecl(id, annotations, modifiers, kind, name, typeParams,
+            return new ClassDecl(id, annotations, modifiers, kind, name, typeParameters,
                     extendings, implementings, body, type, formatting);
         }
 
@@ -792,7 +792,7 @@ public abstract class Tr implements Serializable, Tree {
         @With
         @Getter
         @Nullable
-        TypeParameters typeParams;
+        TypeParameters typeParameters;
 
         @With
         @Nullable

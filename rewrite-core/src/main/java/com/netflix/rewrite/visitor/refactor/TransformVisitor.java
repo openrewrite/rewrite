@@ -114,7 +114,7 @@ public class TransformVisitor extends CursorAstVisitor<Tree> {
                 t(ClassDecl::getName, ClassDecl::withName),
                 t(ClassDecl::getExtends, ClassDecl::withExtendings),
                 t(ClassDecl::getImplements, ClassDecl::withImplementings),
-                t(ClassDecl::getTypeParams, ClassDecl::withTypeParams),
+                t(ClassDecl::getTypeParameters, ClassDecl::withTypeParameters),
                 t(ClassDecl::getBody, ClassDecl::withBody));
     }
 

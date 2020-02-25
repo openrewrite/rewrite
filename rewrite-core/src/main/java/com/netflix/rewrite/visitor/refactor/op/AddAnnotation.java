@@ -49,9 +49,9 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                         List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedCd.getAnnotations());
 
                         Formatting annotationFormatting = cd.getModifiers().isEmpty() ?
-                                (cd.getTypeParams() == null ?
+                                (cd.getTypeParameters() == null ?
                                         cd.getKind().getFormatting() :
-                                        cd.getTypeParams().getFormatting()) :
+                                        cd.getTypeParameters().getFormatting()) :
                                 format(firstPrefix(cd.getModifiers()));
 
                         fixedAnnotations.add(new Tr.Annotation(randomId(),
@@ -73,8 +73,8 @@ public class AddAnnotation extends ScopedRefactorVisitor {
 
                             if (!fixedCd.getModifiers().isEmpty()) {
                                 fixedCd = fixedCd.withModifiers(formatFirstPrefix(fixedCd.getModifiers(), prefix));
-                            } else if (fixedCd.getTypeParams() != null) {
-                                fixedCd = fixedCd.withTypeParams(fixedCd.getTypeParams().withPrefix(prefix));
+                            } else if (fixedCd.getTypeParameters() != null) {
+                                fixedCd = fixedCd.withTypeParameters(fixedCd.getTypeParameters().withPrefix(prefix));
                             } else {
                                 fixedCd = fixedCd.withKind(fixedCd.getKind().withPrefix(prefix));
                             }
@@ -128,6 +128,45 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                     }
 
                     return fixedMv;
+                });
+    }
+
+    @Override
+    public List<AstTransform> visitMethod(Tr.MethodDecl method) {
+        return maybeTransform(method,
+                isScope(method),
+                super::visitMethod,
+                (md, cursor) -> {
+                    Tr.MethodDecl fixedMethod = md;
+
+                    maybeAddImport(annotationType.getFullyQualifiedName());
+
+                    if (fixedMethod.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
+                        List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedMethod.getAnnotations());
+
+                        fixedAnnotations.add(new Tr.Annotation(randomId(),
+                                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                                null,
+                                EMPTY)
+                        );
+
+                        fixedMethod = fixedMethod.withAnnotations(fixedAnnotations);
+                        if (md.getAnnotations().isEmpty()) {
+                            String prefix = formatter().findIndent(0, md).getPrefix();
+
+                            if (!fixedMethod.getModifiers().isEmpty()) {
+                                fixedMethod = fixedMethod.withModifiers(formatFirstPrefix(fixedMethod.getModifiers(), prefix));
+                            } else if (fixedMethod.getTypeParameters() != null) {
+                                fixedMethod = fixedMethod.withTypeParameters(fixedMethod.getTypeParameters().withPrefix(prefix));
+                            } else if(fixedMethod.getReturnTypeExpr() != null) {
+                                fixedMethod = fixedMethod.withReturnTypeExpr(fixedMethod.getReturnTypeExpr().withPrefix(prefix));
+                            } else {
+                                fixedMethod = fixedMethod.withName(fixedMethod.getName().withPrefix(prefix));
+                            }
+                        }
+                    }
+
+                    return fixedMethod;
                 });
     }
 }

@@ -19,7 +19,7 @@ import com.netflix.rewrite.Parser
 import com.netflix.rewrite.assertRefactored
 import org.junit.Test
 
-class AddAnnotationTest: Parser() {
+class AddAnnotationTest : Parser() {
     @Test
     fun addAnnotationToClass() {
         val a = parse("""
@@ -77,6 +77,58 @@ class AddAnnotationTest: Parser() {
             
                 @Inject
                 NameService nameService;
+            }
+        """)
+    }
+
+    @Test
+    fun addAnnotationToMethod() {
+        val a = parse("""
+            package a;
+            
+            public class UsersController {
+                UsersController() {
+                }
+            
+                public void onInit() {
+                }
+    
+                void onInit2() {
+                }
+                
+                <T> T onInit3() {
+                    return null;
+                }
+            }
+        """.trimIndent())
+
+
+        val fixed = a.classes[0].methods
+                .fold(a.refactor()) { refactor, method -> refactor.visit(AddAnnotation(method.id, "javax.annotation.PostConstruct")) }
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            package a;
+            
+            import javax.annotation.PostConstruct;
+            
+            public class UsersController {
+                @PostConstruct
+                UsersController() {
+                }
+            
+                @PostConstruct
+                public void onInit() {
+                }
+            
+                @PostConstruct
+                void onInit2() {
+                }
+                
+                @PostConstruct
+                <T> T onInit3() {
+                    return null;
+                }
             }
         """)
     }

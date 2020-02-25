@@ -249,7 +249,7 @@ public class PrintVisitor extends AstVisitor<String> {
 
         return fmt(classDecl, visit(classDecl.getAnnotations()) +
                 modifiers + fmt(classDecl.getKind(), kind) + visit(classDecl.getName()) +
-                visit(classDecl.getTypeParams()) + visit(classDecl.getExtends()) + visit(classDecl.getImplements(), ",") +
+                visit(classDecl.getTypeParameters()) + visit(classDecl.getExtends()) + visit(classDecl.getImplements(), ",") +
                 visit(classDecl.getBody()));
     }
 
