@@ -69,5 +69,5 @@ compileJava {
 }
 
 javadoc {
-    exclude '**/OpenJdkParser**'
+    exclude '**/Parser**'
 }
