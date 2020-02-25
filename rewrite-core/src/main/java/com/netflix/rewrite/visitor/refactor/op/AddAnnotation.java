@@ -15,10 +15,7 @@
  */
 package com.netflix.rewrite.visitor.refactor.op;
 
-import com.netflix.rewrite.tree.Formatting;
-import com.netflix.rewrite.tree.Tr;
-import com.netflix.rewrite.tree.Type;
-import com.netflix.rewrite.tree.TypeUtils;
+import com.netflix.rewrite.tree.*;
 import com.netflix.rewrite.visitor.refactor.AstTransform;
 import com.netflix.rewrite.visitor.refactor.ScopedRefactorVisitor;
 
@@ -51,7 +48,7 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                     if (fixedCd.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
                         List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedCd.getAnnotations());
 
-                        Formatting requiredArgsFormatting = cd.getModifiers().isEmpty() ?
+                        Formatting annotationFormatting = cd.getModifiers().isEmpty() ?
                                 (cd.getTypeParams() == null ?
                                         cd.getKind().getFormatting() :
                                         cd.getTypeParams().getFormatting()) :
@@ -60,7 +57,7 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                         fixedAnnotations.add(new Tr.Annotation(randomId(),
                                 Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
                                 null,
-                                requiredArgsFormatting)
+                                annotationFormatting)
                         );
 
                         fixedCd = fixedCd.withAnnotations(fixedAnnotations);
@@ -85,6 +82,52 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                     }
 
                     return fixedCd;
+                });
+    }
+
+    @Override
+    public List<AstTransform> visitMultiVariable(Tr.VariableDecls multiVariable) {
+        return maybeTransform(multiVariable,
+                isScope(multiVariable),
+                super::visitMultiVariable,
+                (mv, cursor) -> {
+                    Tr.VariableDecls fixedMv = mv;
+
+                    maybeAddImport(annotationType.getFullyQualifiedName());
+
+                    if (fixedMv.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
+                        List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedMv.getAnnotations());
+
+                        if(mv.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
+                            List<?> statements = cursor.enclosingBlock().getStatements();
+                            for (int i = 1; i < statements.size(); i++) {
+                                if(statements.get(i) == mv) {
+                                    fixedMv = fixedMv.withPrefix("\n" + fixedMv.getFormatting().getPrefix());
+                                    break;
+                                }
+                            }
+                        }
+
+                        fixedAnnotations.add(new Tr.Annotation(randomId(),
+                                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                                null,
+                                EMPTY)
+                        );
+
+                        fixedMv = fixedMv.withAnnotations(fixedAnnotations);
+                        if (mv.getAnnotations().isEmpty()) {
+                            String prefix = formatter().format(cursor.enclosingBlock()).getPrefix();
+
+                            if (!fixedMv.getModifiers().isEmpty()) {
+                                fixedMv = fixedMv.withModifiers(formatFirstPrefix(fixedMv.getModifiers(), prefix));
+                            } else {
+                                //noinspection ConstantConditions
+                                fixedMv = fixedMv.withTypeExpr(fixedMv.getTypeExpr().withPrefix(prefix));
+                            }
+                        }
+                    }
+
+                    return fixedMv;
                 });
     }
 }

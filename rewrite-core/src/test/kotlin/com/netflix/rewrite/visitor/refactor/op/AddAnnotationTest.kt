@@ -21,7 +21,7 @@ import org.junit.Test
 
 class AddAnnotationTest: Parser() {
     @Test
-    fun addAnnotation() {
+    fun addAnnotationToClass() {
         val a = parse("""
             package a;
             
@@ -46,6 +46,37 @@ class AddAnnotationTest: Parser() {
                 @RequiredArgsConstructor
                 class Inner {
                 }
+            }
+        """)
+    }
+
+    @Test
+    fun addAnnotationToField() {
+        val a = parse("""
+            package a;
+            
+            public class UsersController {
+                private final UserService userService;
+                NameService nameService;
+            }
+        """.trimIndent())
+
+        val fixed = a.refactor()
+                .visit(AddAnnotation(a.classes[0].fields[0].id, "javax.inject.Inject"))
+                .visit(AddAnnotation(a.classes[0].fields[1].id, "javax.inject.Inject"))
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            package a;
+            
+            import javax.inject.Inject;
+            
+            public class UsersController {
+                @Inject
+                private final UserService userService;
+            
+                @Inject
+                NameService nameService;
             }
         """)
     }
