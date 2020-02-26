@@ -91,12 +91,15 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                 (mv, cursor) -> {
                     Tr.VariableDecls fixedMv = mv;
 
+                    Tree parent = cursor.getParentOrThrow().getTree();
+                    boolean isMethodOrLambdaParameter = parent instanceof Tr.MethodDecl || parent instanceof Tr.Lambda;
+
                     maybeAddImport(annotationType.getFullyQualifiedName());
 
                     if (fixedMv.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
                         List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedMv.getAnnotations());
 
-                        if(mv.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
+                        if(!isMethodOrLambdaParameter && mv.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
                             List<?> statements = cursor.enclosingBlock().getStatements();
                             for (int i = 1; i < statements.size(); i++) {
                                 if(statements.get(i) == mv) {
@@ -110,7 +113,8 @@ public class AddAnnotation extends ScopedRefactorVisitor {
 
                         fixedMv = fixedMv.withAnnotations(fixedAnnotations);
                         if (mv.getAnnotations().isEmpty()) {
-                            String prefix = formatter().format(cursor.enclosingBlock()).getPrefix();
+                            String prefix = isMethodOrLambdaParameter ? " " :
+                                    formatter().format(cursor.enclosingBlock()).getPrefix();
 
                             if (!fixedMv.getModifiers().isEmpty()) {
                                 fixedMv = fixedMv.withModifiers(formatFirstPrefix(fixedMv.getModifiers(), prefix));

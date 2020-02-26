@@ -132,4 +132,31 @@ class AddAnnotationTest : Parser() {
             }
         """)
     }
+
+    @Test
+    fun addAnnotationToMethodParameters() {
+        val a = parse("""
+            package a;
+            
+            public class UsersController {
+                public void getUsers(Integer maxUsers) {
+                }
+            }
+        """.trimIndent())
+
+        val fixed = a.refactor()
+                .visit(AddAnnotation(a.classes[0].methods[0].params.params[0].id, "javax.annotation.Nonnull"))
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            package a;
+            
+            import javax.annotation.Nonnull;
+            
+            public class UsersController {
+                public void getUsers(@Nonnull Integer maxUsers) {
+                }
+            }
+        """)
+    }
 }
