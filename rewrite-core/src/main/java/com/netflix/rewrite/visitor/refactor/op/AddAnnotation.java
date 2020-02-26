@@ -24,15 +24,17 @@ import java.util.List;
 import java.util.UUID;
 
 import static com.netflix.rewrite.tree.Formatting.*;
-import static com.netflix.rewrite.tree.Formatting.formatFirstPrefix;
 import static com.netflix.rewrite.tree.Tr.randomId;
+import static java.util.Arrays.asList;
 
 public class AddAnnotation extends ScopedRefactorVisitor {
     private final Type.Class annotationType;
+    private final List<Expression> arguments;
 
-    public AddAnnotation(UUID scope, String annotationTypeName) {
+    public AddAnnotation(UUID scope, String annotationTypeName, Expression... arguments) {
         super(scope);
         this.annotationType = Type.Class.build(annotationTypeName);
+        this.arguments = asList(arguments);
     }
 
     @Override
@@ -54,11 +56,7 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                                         cd.getTypeParameters().getFormatting()) :
                                 format(firstPrefix(cd.getModifiers()));
 
-                        fixedAnnotations.add(new Tr.Annotation(randomId(),
-                                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                                null,
-                                annotationFormatting)
-                        );
+                        fixedAnnotations.add(buildAnnotation(annotationFormatting));
 
                         fixedCd = fixedCd.withAnnotations(fixedAnnotations);
                         if (cd.getAnnotations().isEmpty()) {
@@ -108,11 +106,7 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                             }
                         }
 
-                        fixedAnnotations.add(new Tr.Annotation(randomId(),
-                                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                                null,
-                                EMPTY)
-                        );
+                        fixedAnnotations.add(buildAnnotation(EMPTY));
 
                         fixedMv = fixedMv.withAnnotations(fixedAnnotations);
                         if (mv.getAnnotations().isEmpty()) {
@@ -144,11 +138,7 @@ public class AddAnnotation extends ScopedRefactorVisitor {
                     if (fixedMethod.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
                         List<Tr.Annotation> fixedAnnotations = new ArrayList<>(fixedMethod.getAnnotations());
 
-                        fixedAnnotations.add(new Tr.Annotation(randomId(),
-                                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                                null,
-                                EMPTY)
-                        );
+                        fixedAnnotations.add(buildAnnotation(EMPTY));
 
                         fixedMethod = fixedMethod.withAnnotations(fixedAnnotations);
                         if (md.getAnnotations().isEmpty()) {
@@ -168,5 +158,12 @@ public class AddAnnotation extends ScopedRefactorVisitor {
 
                     return fixedMethod;
                 });
+    }
+
+    private Tr.Annotation buildAnnotation(Formatting formatting) {
+        return new Tr.Annotation(randomId(),
+                Tr.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                arguments.isEmpty() ? null : new Tr.Annotation.Arguments(randomId(), arguments, EMPTY),
+                formatting);
     }
 }
