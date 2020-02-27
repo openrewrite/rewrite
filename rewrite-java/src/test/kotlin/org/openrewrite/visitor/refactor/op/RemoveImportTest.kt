@@ -15,7 +15,7 @@
  */
 package org.openrewrite.visitor.refactor.op
 
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.assertRefactored
 

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.visitor.search
 
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 
 open class HasTypeTest : Parser() {

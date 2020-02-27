@@ -1,9 +1,3 @@
-plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.3.61'
-}
-
-apply plugin: 'nebula.facet'
-
 java {
     registerFeature("bigData") {
         usingSourceSet(sourceSets["main"])
@@ -26,33 +20,26 @@ task generateAntlrSources(type: JavaExec) {
 dependencies {
     api project(':rewrite-core')
 
-    implementation 'org.antlr:antlr4:4.7'
+    implementation 'org.antlr:antlr4:4.8-1'
 
     implementation 'eu.infomas:annotation-detector:latest.release'
     implementation 'org.slf4j:slf4j-api:1.7.+'
-    implementation 'commons-lang:commons-lang:2.6'
+    implementation 'commons-lang:commons-lang:latest.release'
 
-    compileOnly 'org.projectlombok:lombok:1.18.10'
-    annotationProcessor 'org.projectlombok:lombok:1.18.10'
+    compileOnly 'org.projectlombok:lombok:latest.release'
+    annotationProcessor 'org.projectlombok:lombok:latest.release'
 
     implementation 'com.koloboke:koloboke-api-jdk8:latest.release'
     implementation 'com.koloboke:koloboke-impl-jdk8:latest.release'
 
-    implementation 'com.fasterxml.jackson.core:jackson-databind:2.10.2', optional
+    implementation 'com.fasterxml.jackson.core:jackson-databind:latest.release', optional
 
-    bigDataApi 'com.fasterxml.jackson.core:jackson-databind:2.10.2'
-    bigDataApi 'com.fasterxml.jackson.core:jackson-annotations:2.10.2'
-    bigDataApi 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.10.2'
+    bigDataApi 'com.fasterxml.jackson.core:jackson-databind:latest.release'
+    bigDataApi 'com.fasterxml.jackson.core:jackson-annotations:latest.release'
+    bigDataApi 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release'
 
     implementation'org.ow2.asm:asm:latest.release'
     implementation'org.ow2.asm:asm-util:latest.release'
-
-    testImplementation 'org.jetbrains.kotlin:kotlin-reflect'
-    testImplementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
-
-    testImplementation 'junit:junit:4.+'
-    testImplementation 'ch.qos.logback:logback-classic:1.0.13'
-    testImplementation 'org.assertj:assertj-core:latest.release'
 }
 
 tasks.withType(Javadoc) {

@@ -16,8 +16,7 @@
 package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import org.junit.jupiter.api.Test
 
 class StringUtilsTest {
     @Test
@@ -86,7 +85,7 @@ class StringUtilsTest {
             }
         """
 
-        assertEquals(input.trimIndent(), StringUtils.trimIndent(input))
+        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
     @Test
@@ -97,13 +96,13 @@ class StringUtilsTest {
             }
         """
 
-        assertEquals(input.trimIndent(), StringUtils.trimIndent(input))
+        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
     @Test
     fun trimIndentNoIndent() {
         val input = "class{\n   A field;\n}"
 
-        assertEquals(input.trimIndent(), StringUtils.trimIndent(input))
+        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
     }
 }

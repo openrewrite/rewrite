@@ -19,7 +19,7 @@ import org.openrewrite.tree.Statement
 import org.openrewrite.tree.J
 import org.openrewrite.tree.Type
 import org.openrewrite.tree.TypeUtils
-import org.junit.Assert.assertEquals
+import org.junit.jupiter.api.Assertions.assertEquals
 
 /**
  * The first statement of the first method in the first class declaration

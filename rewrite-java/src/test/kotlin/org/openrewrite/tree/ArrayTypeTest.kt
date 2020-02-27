@@ -15,8 +15,8 @@
  */
 package org.openrewrite.tree
 
-import org.junit.Assert
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 
 open class ArrayTypeTest : Parser() {
@@ -31,6 +31,6 @@ open class ArrayTypeTest : Parser() {
         """)
 
         val meth = a.classes[0].methods[0]
-        Assert.assertEquals("public String[][] foo() { return null; }", meth.printTrimmed())
+        assertEquals("public String[][] foo() { return null; }", meth.printTrimmed())
     }
 }

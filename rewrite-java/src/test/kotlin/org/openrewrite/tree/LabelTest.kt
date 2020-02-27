@@ -15,9 +15,9 @@
  */
 package org.openrewrite.tree
 
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.firstMethodStatement
 
@@ -38,7 +38,7 @@ open class LabelTest : Parser() {
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("labeled", labeled.label.simpleName)
         assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals("Should recreate original", orig, a.print())
+        assertEquals(orig, a.print())
     }
 
     @Test
@@ -60,6 +60,6 @@ open class LabelTest : Parser() {
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("outer", labeled.label.simpleName)
         assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals("Should recreate original", orig, a.print())
+        assertEquals(orig, a.print())
     }
 }

@@ -16,7 +16,7 @@
 package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 
 open class ChangeTypeTest : Parser() {

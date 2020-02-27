@@ -16,8 +16,8 @@
 package org.openrewrite.visitor.refactor
 
 import org.openrewrite.assertRefactored
-import org.junit.Assert.assertNotNull
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.tree.Cursor
 import org.openrewrite.tree.J

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.tree
 
-import org.junit.Assert.*
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 
 open class MethodDeclTest : Parser() {

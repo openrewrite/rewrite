@@ -17,7 +17,7 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.asClass
 import org.openrewrite.assertRefactored
-import org.junit.Test
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.tree.Type
 

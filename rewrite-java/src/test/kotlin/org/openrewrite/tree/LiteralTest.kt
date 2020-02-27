@@ -15,13 +15,13 @@
  */
 package org.openrewrite.tree
 
-import org.junit.Assert.assertEquals
-import org.junit.Test
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.fields
 
 open class LiteralTest : Parser() {
-    
+
     @Test
     fun literalField() {
         val a = parse("""
@@ -82,7 +82,7 @@ open class LiteralTest : Parser() {
         """)
 
         a.fields(0..5).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("expected octal notation for ${it.type}", "01", it.printTrimmed().trimEnd('L'))
+            assertEquals("01", it.printTrimmed().trimEnd('L'), "expected octal notation for ${it.type}")
         }
     }
 
@@ -98,7 +98,7 @@ open class LiteralTest : Parser() {
         """)
 
         a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("expected binary notation for ${it.type}", "0b10", it.printTrimmed().trimEnd('L'))
+            assertEquals("0b10", it.printTrimmed().trimEnd('L'), "expected binary notation for ${it.type}")
         }
     }
 
@@ -114,7 +114,7 @@ open class LiteralTest : Parser() {
         """)
 
         a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("expected hex notation for ${it.type}", "0xA0", it.printTrimmed().trimEnd('L'))
+            assertEquals("0xA0", it.printTrimmed().trimEnd('L'), "expected hex notation for ${it.type}")
         }
     }
 
