@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Netflix, Inc.
+ * Copyright 2020 the original authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,4 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-include 'rewrite-core', 'rewrite-java'
+package org.openrewrite.tree;
+
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.internal.lang.Nullable;
+
+/**
+ * A tree representing a simple or fully qualified name
+ */
+public interface NameTree extends Tree {
+    @Nullable
+    Type getType();
+
+    <T extends Tree> T withType(@Nullable Type type);
+}

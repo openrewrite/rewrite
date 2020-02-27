@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Netflix, Inc.
+ * Copyright 2020 the original authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,4 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-include 'rewrite-core', 'rewrite-java'
+package org.openrewrite.visitor;
+
+import org.openrewrite.tree.Cursor;
+import org.openrewrite.tree.Tree;
+import lombok.AllArgsConstructor;
+
+import java.util.UUID;
+
+@AllArgsConstructor
+public class RetrieveCursorVisitor extends CursorAstVisitor<Cursor> {
+    private final UUID treeId;
+
+    @Override
+    public Cursor defaultTo(Tree t) {
+        return null;
+    }
+
+    @Override
+    public Cursor visitTree(Tree tree) {
+        return tree.getId().equals(treeId) ? getCursor() : super.visitTree(tree);
+    }
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Netflix, Inc.
+ * Copyright 2020 the original authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,4 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-include 'rewrite-core', 'rewrite-java'
+package org.openrewrite.tree;
+
+public enum Flag {
+    Public,
+    Private,
+    Protected,
+    Static,
+    Final,
+    Synchronized,
+    Volatile,
+    Transient,
+    Abstract
+}

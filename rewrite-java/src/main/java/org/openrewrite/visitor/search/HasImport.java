@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 Netflix, Inc.
+ * Copyright 2020 the original authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,4 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-include 'rewrite-core', 'rewrite-java'
+package org.openrewrite.visitor.search;
+
+import org.openrewrite.tree.J;
+import org.openrewrite.tree.Tree;
+import org.openrewrite.visitor.AstVisitor;
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
+public class HasImport extends AstVisitor<Boolean> {
+    private final String clazz;
+
+    @Override
+    public Boolean defaultTo(Tree t) {
+        return false;
+    }
+
+    @Override
+    public Boolean visitImport(J.Import impoort) {
+        return impoort.isFromType(clazz);
+    }
+}
