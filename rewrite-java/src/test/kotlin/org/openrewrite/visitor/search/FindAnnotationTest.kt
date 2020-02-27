@@ -15,13 +15,9 @@
  */
 package org.openrewrite.visitor.search
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
-import org.slf4j.LoggerFactory
 
 open class FindAnnotationTest : Parser() {
 
@@ -32,12 +28,6 @@ open class FindAnnotationTest : Parser() {
             String baz();
         }
     """
-
-    @BeforeEach
-    fun before() {
-        val logger = LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger
-        logger.level = Level.DEBUG
-    }
 
     @Test
     fun matchesSimpleFullyQualifiedAnnotation() {

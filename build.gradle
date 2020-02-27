@@ -73,6 +73,7 @@ subprojects {
         header = file('../gradle/licenseHeader.txt')
         exclude '**/*.tokens'
         exclude '**/grammar/*.java'
+        exclude '**/lombok.config'
         mapping('kt', 'SLASHSTAR_STYLE')
         mapping('java', 'SLASHSTAR_STYLE')
         sourceSets = project.sourceSets
