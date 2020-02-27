@@ -15,14 +15,14 @@
  */
 package org.openrewrite.visitor.refactor.op;
 
-import org.openrewrite.Parser;
+import org.openrewrite.JavaParser;
 import org.openrewrite.tree.J;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ChangeMethodNameTestJava {
-    final Parser parser = new Parser();
+    private final JavaParser parser = new JavaParser();
 
     @Test
     public void refactorMethodName() {
@@ -32,13 +32,13 @@ public class ChangeMethodNameTestJava {
         final J.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
         J.CompilationUnit fixed = cu.refactor()
-                .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
+                .visit(new ChangeMethodName(cu.findMethodCalls("B foo(int)").get(0), "bar"))
                 .fix().getFixed();
 
         assertEquals(fixed.print(), "class A {{ B.bar(0); }}");
     }
 
-    @org.junit.jupiter.api.Test
+    @Test
     public void refactorMethodNameDiff() {
         String a = "class A {\n   {\n      B.foo(0);\n   }\n}";
         String b = "class B { static void foo(int n) {} }";
@@ -46,7 +46,7 @@ public class ChangeMethodNameTestJava {
         final J.CompilationUnit cu = parser.parse(a, /* which depends on */ b);
 
         String diff = cu.refactor()
-                .changeMethodName(cu.findMethodCalls("B foo(int)"), "bar")
+                .visit(new ChangeMethodName(cu.findMethodCalls("B foo(int)").get(0), "bar"))
                 .fix()
                 .diff();
 

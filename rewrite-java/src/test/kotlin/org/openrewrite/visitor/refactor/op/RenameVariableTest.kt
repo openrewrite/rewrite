@@ -17,10 +17,10 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.tree.J
 
-open class RenameVariableTest : Parser() {
+open class RenameVariableTest : JavaParser() {
     @Test
     fun renameVariable() {
         val a = parse("""

@@ -17,10 +17,10 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.fields
 
-open class LiteralTest : Parser() {
+open class LiteralTest : JavaParser() {
 
     @Test
     fun literalField() {

@@ -17,12 +17,12 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asClass
 import org.openrewrite.fields
 import org.openrewrite.firstMethodStatement
 
-open class VariableDeclsTest : Parser() {
+open class VariableDeclsTest : JavaParser() {
     
     @Test
     fun fieldDefinition() {

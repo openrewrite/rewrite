@@ -17,9 +17,10 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
+import org.openrewrite.tree.J
 
-open class ChangeLiteralTest : Parser() {
+open class ChangeLiteralTest : JavaParser() {
 
     val b: String = """
         package b;
@@ -41,11 +42,7 @@ open class ChangeLiteralTest : Parser() {
         """.trimIndent()
 
         val cu = parse(a, b)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("b.B singleArg(String)").forEach {
-                changeLiteral(it.args.args) { s -> s?.toString()?.replace("%s", "{}") ?: s }
-            }
-        }.fix().fixed
+        val fixed = cu.findMethodCalls("b.B singleArg(String)").changeLiterals(cu)
 
         assertRefactored(fixed, """
             import b.*;
@@ -71,11 +68,7 @@ open class ChangeLiteralTest : Parser() {
         """.trimIndent()
 
         val cu = parse(a, b)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("b.B singleArg(..)").forEach {
-                changeLiteral(it.args.args) { s -> s?.toString()?.replace("%s", "{}") ?: s }
-            }
-        }.fix().fixed
+        val fixed = cu.findMethodCalls("b.B singleArg(..)").changeLiterals(cu)
 
         assertRefactored(fixed, """
             import b.*;
@@ -87,4 +80,13 @@ open class ChangeLiteralTest : Parser() {
             }
         """)
     }
+
+    private fun List<J.MethodInvocation>.changeLiterals(cu: J.CompilationUnit) = fold(cu.refactor()) { acc, meth ->
+        meth.args.args
+                .fold(acc, { acc2, exp ->
+                    acc2.visit(ChangeLiteral(exp as J.Literal) { s ->
+                        s?.toString()?.replace("%s", "{}") ?: s
+                    })
+                })
+    }.fix().fixed
 }

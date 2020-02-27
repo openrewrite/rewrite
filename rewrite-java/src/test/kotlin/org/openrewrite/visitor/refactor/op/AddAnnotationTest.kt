@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-class AddAnnotationTest : Parser() {
+class AddAnnotationTest : JavaParser() {
     @Test
     fun addAnnotationToClass() {
         val a = parse("""

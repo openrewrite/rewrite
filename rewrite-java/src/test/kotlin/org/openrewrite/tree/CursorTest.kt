@@ -17,9 +17,9 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class CursorTest : Parser() {
+open class CursorTest : JavaParser() {
     @Test
     fun inSameNameScope() {
         val a = parse("""

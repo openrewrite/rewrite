@@ -18,16 +18,14 @@ package org.openrewrite.visitor.refactor.op;
 import org.openrewrite.tree.J;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.List;
-import java.util.UUID;
 
 public class ChangeMethodName extends ScopedRefactorVisitor {
     private final String name;
 
-    public ChangeMethodName(UUID scope, String name) {
-        super(scope);
+    public ChangeMethodName(J.MethodInvocation scope, String name) {
+        super(scope.getId());
         this.name = name;
     }
 

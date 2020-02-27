@@ -20,13 +20,10 @@ import org.openrewrite.tree.J;
 import org.openrewrite.tree.Type;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.tree.Type;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.openrewrite.tree.Formatting.EMPTY;
 import static org.openrewrite.tree.J.randomId;
@@ -34,8 +31,8 @@ import static org.openrewrite.tree.J.randomId;
 public class ChangeMethodTargetToStatic extends ScopedRefactorVisitor {
     private final String clazz;
 
-    public ChangeMethodTargetToStatic(UUID scope, String clazz) {
-        super(scope);
+    public ChangeMethodTargetToStatic(J.MethodInvocation scope, String clazz) {
+        super(scope.getId());
         this.clazz = clazz;
     }
 

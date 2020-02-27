@@ -19,9 +19,9 @@ import org.openrewrite.hasElementType
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class FindFieldsTest : Parser() {
+open class FindFieldsTest : JavaParser() {
 
     @Test
     fun findPrivateNonInheritedField() {

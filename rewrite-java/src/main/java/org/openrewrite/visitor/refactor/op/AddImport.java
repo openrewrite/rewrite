@@ -15,29 +15,24 @@
  */
 package org.openrewrite.visitor.refactor.op;
 
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.tree.*;
-import org.openrewrite.tree.J;
-import org.openrewrite.visitor.refactor.AstTransform;
-import org.openrewrite.visitor.refactor.RefactorVisitor;
-import org.openrewrite.visitor.search.FindType;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.Formatting;
+import org.openrewrite.tree.J;
 import org.openrewrite.tree.TreeBuilder;
 import org.openrewrite.tree.Type;
 import org.openrewrite.visitor.refactor.AstTransform;
+import org.openrewrite.visitor.refactor.RefactorVisitor;
 import org.openrewrite.visitor.search.FindType;
 import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.openrewrite.tree.Formatting.format;
-import static org.openrewrite.tree.J.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.tree.J.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends RefactorVisitor {

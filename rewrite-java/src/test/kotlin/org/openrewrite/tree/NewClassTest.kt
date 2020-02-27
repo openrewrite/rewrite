@@ -17,10 +17,10 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asClass
 
-open class NewClassTest : Parser() {
+open class NewClassTest : JavaParser() {
     val a = """
         package a;
         public class A {

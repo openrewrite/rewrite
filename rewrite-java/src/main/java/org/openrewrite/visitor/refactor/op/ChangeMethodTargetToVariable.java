@@ -17,16 +17,12 @@ package org.openrewrite.visitor.refactor.op;
 
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.tree.*;
-import org.openrewrite.tree.*;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import static org.openrewrite.tree.J.randomId;
 
@@ -36,8 +32,12 @@ public class ChangeMethodTargetToVariable extends ScopedRefactorVisitor {
     @Nullable
     private final Type.Class type;
 
-    public ChangeMethodTargetToVariable(UUID scope, String varName, @Nullable Type.Class type) {
-        super(scope);
+    public ChangeMethodTargetToVariable(J.MethodInvocation scope, J.VariableDecls.NamedVar namedVar) {
+        this(scope, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
+    }
+
+    public ChangeMethodTargetToVariable(J.MethodInvocation scope, String varName, @Nullable Type.Class type) {
+        super(scope.getId());
         this.varName = varName;
         this.type = type;
     }

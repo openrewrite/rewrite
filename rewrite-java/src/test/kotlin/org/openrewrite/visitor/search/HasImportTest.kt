@@ -18,9 +18,9 @@ package org.openrewrite.visitor.search
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class HasImportTest : Parser() {
+open class HasImportTest : JavaParser() {
     
     @Test
     fun hasImport() {

@@ -35,8 +35,8 @@ public class InsertMethodArgument extends ScopedRefactorVisitor {
     private final int pos;
     private final String source;
 
-    public InsertMethodArgument(UUID scope, int pos, String source) {
-        super(scope);
+    public InsertMethodArgument(J.MethodInvocation scope, int pos, String source) {
+        super(scope.getId());
         this.pos = pos;
         this.source = source;
     }

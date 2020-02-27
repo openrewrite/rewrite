@@ -18,9 +18,9 @@ package org.openrewrite.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class LambdaTest : Parser() {
+open class LambdaTest : JavaParser() {
 
     val a: J.CompilationUnit by lazy {
         parse("""

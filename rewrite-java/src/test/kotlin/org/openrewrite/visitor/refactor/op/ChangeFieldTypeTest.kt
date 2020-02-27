@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class ChangeFieldTypeTest : Parser() {
+open class ChangeFieldTypeTest : JavaParser() {
 
     @Test
     fun changeFieldType() {
@@ -31,7 +31,7 @@ open class ChangeFieldTypeTest : Parser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .changeFieldType(a.classes[0].findFields("java.util.List"), "java.util.Collection")
+                .visit(ChangeFieldType(a.classes[0].findFields("java.util.List")[0], "java.util.Collection"))
                 .fix().fixed
 
         assertRefactored(fixed, """

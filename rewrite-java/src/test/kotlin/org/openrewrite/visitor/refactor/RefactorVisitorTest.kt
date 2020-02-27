@@ -16,10 +16,10 @@
 package org.openrewrite.visitor.refactor
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.tree.Statement
 
-open class RefactorVisitorTest : Parser() {
+open class RefactorVisitorTest : JavaParser() {
     @Test
     fun traversalIsDepthFirst() {
         val a = parse("""

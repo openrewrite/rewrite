@@ -17,18 +17,13 @@ package org.openrewrite.tree;
 
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.Parser;
+import org.openrewrite.JavaParser;
 import org.openrewrite.visitor.CursorAstVisitor;
 import org.openrewrite.visitor.refactor.Formatter;
 import org.openrewrite.visitor.refactor.ShiftFormatRightVisitor;
 import org.openrewrite.visitor.refactor.TransformVisitor;
 import lombok.RequiredArgsConstructor;
-import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.visitor.CursorAstVisitor;
-import org.openrewrite.visitor.refactor.TransformVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.MessageFormatter;
@@ -38,7 +33,6 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.internal.StringUtils.trimIndent;
 import static org.openrewrite.tree.Formatting.format;
 import static org.openrewrite.tree.J.randomId;
 import static org.openrewrite.visitor.refactor.Formatter.enclosingIndent;
@@ -100,7 +94,7 @@ public class TreeBuilder {
 
     @SuppressWarnings("unchecked")
     public static <T extends Tree> List<T> buildSnippet(J.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
-        Parser parser = new Parser(emptyList(), Charset.defaultCharset(), true);
+        JavaParser parser = new JavaParser(emptyList(), Charset.defaultCharset(), true);
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off

@@ -18,10 +18,10 @@ package org.openrewrite.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.firstMethodStatement
 
-open class ForLoopTest : Parser() {
+open class ForLoopTest : JavaParser() {
     
     @Test
     fun forLoop() {

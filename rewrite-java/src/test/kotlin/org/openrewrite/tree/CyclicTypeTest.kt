@@ -17,11 +17,11 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asArray
 import org.openrewrite.asClass
 
-open class CyclicTypeTest : Parser() {
+open class CyclicTypeTest : JavaParser() {
 
     @Test
     fun genericNesting() {

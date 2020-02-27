@@ -15,16 +15,14 @@
  */
 package org.openrewrite.visitor.refactor.op;
 
+import org.apache.commons.lang.StringEscapeUtils;
 import org.openrewrite.tree.Expression;
 import org.openrewrite.tree.J;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.RefactorVisitor;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.apache.commons.lang.StringEscapeUtils;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
@@ -32,8 +30,8 @@ import static java.util.Collections.emptyList;
 public class ChangeLiteral extends ScopedRefactorVisitor {
     private final Function<Object, Object> transform;
 
-    public ChangeLiteral(UUID scope, Function<Object, Object> transform) {
-        super(scope);
+    public ChangeLiteral(J.Literal scope, Function<Object, Object> transform) {
+        super(scope.getId());
         this.transform = transform;
     }
 

@@ -17,10 +17,10 @@ package org.openrewrite.visitor.search
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.tree.J
 
-class FindReferencesToVariableTest : Parser() {
+class FindReferencesToVariableTest : JavaParser() {
     @Test
     fun findReferences() {
         val a = parse("""

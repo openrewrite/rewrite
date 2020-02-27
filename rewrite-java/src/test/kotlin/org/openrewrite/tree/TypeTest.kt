@@ -17,10 +17,10 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asClass
 
-open class TypeTest : Parser() {
+open class TypeTest : JavaParser() {
     @Test
     fun memberVisibility() {
         val b = """
@@ -83,7 +83,7 @@ open class TypeTest : Parser() {
 
     @Test
     fun selfReferentialTypeIsShared() {
-        val a = Parser().parse("public class A { A a; }")
+        val a = JavaParser().parse("public class A { A a; }")
         val outerType = a.classes[0].type
         val fieldType = a.classes[0].fields[0].typeExpr?.type
         assertTrue(outerType === fieldType)
@@ -91,28 +91,28 @@ open class TypeTest : Parser() {
 
     @Test
     fun typeFlyweightsAreSharedBetweenParsers() {
-        val a = Parser().parse("public class A {}")
-        val a2 = Parser().parse("public class A {}")
+        val a = JavaParser().parse("public class A {}")
+        val a2 = JavaParser().parse("public class A {}")
 
         assertTrue(a.classes[0].type === a2.classes[0].type)
     }
 
     @Test
     fun sameFullyQualifiedNameWithDifferentMembers() {
-        val a = Parser().parse("public class A { String foo; }")
-        val a2 = Parser().parse("public class A { String bar; }")
+        val a = JavaParser().parse("public class A { String foo; }")
+        val a2 = JavaParser().parse("public class A { String bar; }")
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }
 
     @Test
     fun sameFullyQualifiedNameWithDifferentTypeHierarchy() {
-        val a = Parser().parse("""
+        val a = JavaParser().parse("""
             public class A extends B {}
             class B {}
         """)
 
-        val a2 = Parser().parse("""
+        val a2 = JavaParser().parse("""
             public class A {}
             class B {}
         """)

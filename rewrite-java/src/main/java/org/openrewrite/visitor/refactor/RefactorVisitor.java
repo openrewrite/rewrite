@@ -15,20 +15,14 @@
  */
 package org.openrewrite.visitor.refactor;
 
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.tree.*;
-import org.openrewrite.visitor.CursorAstVisitor;
-import org.openrewrite.visitor.refactor.op.AddImport;
-import org.openrewrite.visitor.refactor.op.ChangeFieldName;
-import org.openrewrite.visitor.refactor.op.DeleteStatement;
-import org.openrewrite.visitor.refactor.op.RemoveImport;
 import lombok.Setter;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.tree.*;
+import org.openrewrite.tree.Cursor;
+import org.openrewrite.tree.J;
+import org.openrewrite.tree.Tree;
+import org.openrewrite.tree.Type;
 import org.openrewrite.visitor.CursorAstVisitor;
 import org.openrewrite.visitor.refactor.op.AddImport;
-import org.openrewrite.visitor.refactor.op.ChangeFieldName;
-import org.openrewrite.visitor.refactor.op.DeleteStatement;
 import org.openrewrite.visitor.refactor.op.RemoveImport;
 
 import java.util.ArrayList;
@@ -141,14 +135,6 @@ public abstract class RefactorVisitor extends CursorAstVisitor<List<AstTransform
         if (!andThen.get().contains(op)) {
             andThen.get().add(op);
         }
-    }
-
-    protected void deleteStatement(Statement statement) {
-        andThen.get().add(new DeleteStatement(statement.getId()));
-    }
-
-    protected void changeFieldName(Type.Class classType, String hasName, String toName) {
-        andThen.get().add(new ChangeFieldName(classType, hasName, toName));
     }
 
     protected void andThen(RefactorVisitor visitor) {

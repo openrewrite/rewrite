@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class ChangeMethodTargetToVariableTest : Parser() {
+open class ChangeMethodTargetToVariableTest : JavaParser() {
 
     @Test
     fun refactorExplicitStaticToVariable() {
@@ -49,9 +49,10 @@ open class ChangeMethodTargetToVariableTest : Parser() {
         """.trimIndent()
 
         val cu = parse(c, a, b)
-        val fixed = cu.refactor().apply {
-            val f = cu.classes[0].findFields("a.A")[0]
-            changeMethodTarget(cu.findMethodCalls("b.B foo()"), f.vars[0])
+        val f = cu.classes[0].findFields("a.A")[0]
+
+        val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
+            ChangeMethodTargetToVariable(it, f.vars[0])
         }.fix().fixed
 
         assertRefactored(fixed, """
@@ -94,9 +95,9 @@ open class ChangeMethodTargetToVariableTest : Parser() {
 
         val cu = parse(c, a, b)
 
-        val fixed = cu.refactor().apply {
-            val f = cu.classes[0].findFields("a.A")[0]
-            changeMethodTarget(cu.findMethodCalls("b.B foo()"), f.vars[0])
+        val f = cu.classes[0].findFields("a.A")[0]
+        val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
+            ChangeMethodTargetToVariable(it, f.vars[0])
         }.fix().fixed
 
         assertRefactored(fixed, """

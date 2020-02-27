@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class ChangeMethodNameTest : Parser() {
+open class ChangeMethodNameTest : JavaParser() {
 
     private val b: String = """
                 class B {
@@ -42,8 +42,8 @@ open class ChangeMethodNameTest : Parser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-            .changeMethodName(cu.findMethodCalls("B singleArg(String)"), "bar")
-            .fix().fixed
+                .fold(cu.findMethodCalls("B singleArg(String)")) { ChangeMethodName(it, "bar") }
+                .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -67,8 +67,8 @@ open class ChangeMethodNameTest : Parser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-            .changeMethodName(cu.findMethodCalls("B arrArg(String[])"), "bar")
-            .fix().fixed
+                .fold(cu.findMethodCalls("B arrArg(String[])")) { ChangeMethodName(it, "bar") }
+                .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -92,8 +92,8 @@ open class ChangeMethodNameTest : Parser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-            .changeMethodName(cu.findMethodCalls("B varargArg(String...)"), "bar")
-            .fix().fixed
+                .fold(cu.findMethodCalls("B varargArg(String...)")) { ChangeMethodName(it, "bar") }
+                .fix().fixed
 
         assertRefactored(fixed, """
             class A {
@@ -123,7 +123,7 @@ open class ChangeMethodNameTest : Parser() {
 
         val cu = parse(a, b)
         val fixed = cu.refactor()
-                .changeMethodName(cu.findMethodCalls("B error()"), "foo")
+                .fold(cu.findMethodCalls("B error()")) { ChangeMethodName(it, "foo") }
                 .fix().fixed
 
         assertRefactored(fixed, """

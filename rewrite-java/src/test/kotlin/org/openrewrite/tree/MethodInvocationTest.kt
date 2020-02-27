@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 
-open class MethodInvocationTest : Parser() {
+open class MethodInvocationTest : JavaParser() {
 
     val a: J.CompilationUnit by lazy {
         parse("""

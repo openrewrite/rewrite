@@ -18,9 +18,9 @@ package org.openrewrite.visitor
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-class RetrieveTreeVisitorTest : Parser() {
+class RetrieveTreeVisitorTest : JavaParser() {
 
     @Test
     fun retrieveTreeById() {

@@ -17,9 +17,9 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class TypeParameterAndWildcardTest : Parser() {
+open class TypeParameterAndWildcardTest : JavaParser() {
     private val bc = listOf("public interface B {}", "public interface C {}")
 
     @Test

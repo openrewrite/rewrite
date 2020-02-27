@@ -17,9 +17,9 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class AssertTest : Parser() {
+open class AssertTest : JavaParser() {
 
     @Test
     fun assertStatement() {

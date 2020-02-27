@@ -17,9 +17,10 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
+import org.openrewrite.tree.J
 
-open class ReorderMethodArgumentsTest : Parser() {
+open class ReorderMethodArgumentsTest : JavaParser() {
 
     @Test
     fun refactorReorderArguments() {
@@ -46,12 +47,15 @@ open class ReorderMethodArgumentsTest : Parser() {
         """.trimIndent()
 
         val cu = parse(b, a)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("a.A foo(..)").forEach {
-                it.args.args.firstOrNull()?.let { arg -> changeLiteral(listOf(arg)) { "anotherstring" } }
-                reorderArguments(it, "n", "m", "s")
-            }
-        }.fix().fixed
+        val foos = cu.findMethodCalls("a.A foo(..)")
+        val fixed = cu.refactor()
+                .fold(foos) {
+                    it.args.args.firstOrNull()?.let { arg ->
+                        ChangeLiteral(arg as J.Literal) { "anotherstring" }
+                    }
+                }
+                .fold(foos) { ReorderMethodArguments(it, "n", "m", "s") }
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -89,11 +93,12 @@ open class ReorderMethodArgumentsTest : Parser() {
         """
 
         val cu = parse(b, a)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("a.A foo(..)").forEach {
-                reorderArguments(it, "n", "s").setOriginalParamNames("s", "n")
-            }
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .fold(cu.findMethodCalls("a.A foo(..)")) {
+                    ReorderMethodArguments(it, "n", "s")
+                            .withOriginalParamNames("s", "n")
+                }
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -127,10 +132,9 @@ open class ReorderMethodArgumentsTest : Parser() {
         """
 
         val cu = parse(b, a)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("a.A foo(..)").forEach {
-                reorderArguments(it, "s", "o", "n")
-            }
+
+        val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
+             ReorderMethodArguments(it, "s", "o", "n")
         }.fix().fixed
 
         assertRefactored(fixed, """
@@ -163,10 +167,8 @@ open class ReorderMethodArgumentsTest : Parser() {
         """
 
         val cu = parse(b, a)
-        val fixed = cu.refactor().apply {
-            cu.findMethodCalls("a.A foo(..)").forEach {
-                reorderArguments(it, "o", "s")
-            }
+        val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
+             ReorderMethodArguments(it, "o", "s")
         }.fix().fixed
 
         assertRefactored(fixed, """

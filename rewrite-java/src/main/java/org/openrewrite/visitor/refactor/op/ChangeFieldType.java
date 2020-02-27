@@ -20,18 +20,16 @@ import org.openrewrite.tree.Type;
 import org.openrewrite.tree.TypeUtils;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.List;
-import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
 
 public class ChangeFieldType extends ScopedRefactorVisitor {
     private final String targetType;
 
-    public ChangeFieldType(UUID scope, String targetType) {
-        super(scope);
+    public ChangeFieldType(J.VariableDecls scope, String targetType) {
+        super(scope.getId());
         this.targetType = targetType;
     }
 

@@ -17,10 +17,10 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.firstMethodStatement
 
-open class IfTest : Parser() {
+open class IfTest : JavaParser() {
     val a: J.CompilationUnit by lazy {
         parse("""
             public class A {

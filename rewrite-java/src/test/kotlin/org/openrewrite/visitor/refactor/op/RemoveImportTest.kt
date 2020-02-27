@@ -16,11 +16,11 @@
 package org.openrewrite.visitor.refactor.op
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.assertRefactored
 
-open class RemoveImportTest: Parser() {
-    
+open class RemoveImportTest : JavaParser() {
+
     @Test
     fun removeNamedImport() {
         val a = parse("""
@@ -28,7 +28,7 @@ open class RemoveImportTest: Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -40,7 +40,7 @@ open class RemoveImportTest: Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -54,7 +54,7 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -71,7 +71,7 @@ open class RemoveImportTest: Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -85,7 +85,7 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.Collection;
@@ -105,7 +105,7 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.*;
@@ -123,7 +123,7 @@ open class RemoveImportTest: Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -137,7 +137,7 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.*;
@@ -157,7 +157,7 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().removeImport("java.util.Collections").fix().fixed
+        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.emptyList;
@@ -193,7 +193,10 @@ open class RemoveImportTest: Parser() {
             }
         """.trimIndent(), bSource, cSource)
 
-        val fixed = a.refactor().removeImport("foo.B").removeImport("foo.C").fix().fixed
+        val fixed = a.refactor()
+                .visit(RemoveImport("foo.B"))
+                .visit(RemoveImport("foo.C"))
+                .fix().fixed
 
         assertRefactored(fixed, """
             import static foo.B.STRING;

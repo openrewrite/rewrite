@@ -17,9 +17,9 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class ClassDeclTest : Parser() {
+open class ClassDeclTest : JavaParser() {
     
     @Test
     fun multipleClassDeclarationsInOneCompilationUnit() {

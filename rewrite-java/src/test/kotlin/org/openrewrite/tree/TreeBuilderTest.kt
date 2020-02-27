@@ -18,7 +18,7 @@ package org.openrewrite.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asClass
 import org.openrewrite.assertRefactored
 import org.openrewrite.tree.Formatting.EMPTY
@@ -29,7 +29,7 @@ import org.openrewrite.visitor.refactor.RefactorVisitor
 class TreeBuilderTest {
     @Test
     fun buildSnippet() {
-        val a = Parser().parse("""
+        val a = JavaParser().parse("""
             import java.util.List;
             public class A {
                 int n = 0;
@@ -49,7 +49,7 @@ class TreeBuilderTest {
 
     @Test
     fun injectSnippetIntoMethod() {
-        val a = Parser().parse("""
+        val a = JavaParser().parse("""
             import java.util.List;
             public class A {
                 int n = 0;

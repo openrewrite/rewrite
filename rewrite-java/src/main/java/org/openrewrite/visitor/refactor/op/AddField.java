@@ -22,17 +22,14 @@ import org.openrewrite.tree.Tree;
 import org.openrewrite.tree.Type;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.visitor.refactor.AstTransform;
 import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
-import static org.openrewrite.tree.J.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
+import static org.openrewrite.tree.J.randomId;
 
 public class AddField extends ScopedRefactorVisitor {
     private final List<J.Modifier> modifiers;
@@ -42,8 +39,8 @@ public class AddField extends ScopedRefactorVisitor {
     @Nullable
     private final String init;
 
-    public AddField(UUID scope, List<J.Modifier> modifiers, String clazz, String name, @Nullable String init) {
-        super(scope);
+    public AddField(J.ClassDecl scope, List<J.Modifier> modifiers, String clazz, String name, @Nullable String init) {
+        super(scope.getId());
         this.modifiers = modifiers;
         this.clazz = clazz;
         this.name = name;

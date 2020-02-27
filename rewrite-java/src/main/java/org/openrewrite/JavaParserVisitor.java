@@ -50,8 +50,8 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 
-public class ParserVisitor extends TreePathScanner<org.openrewrite.tree.Tree, Formatting> {
-    private static final Logger logger = LoggerFactory.getLogger(ParserVisitor.class);
+class JavaParserVisitor extends TreePathScanner<org.openrewrite.tree.Tree, Formatting> {
+    private static final Logger logger = LoggerFactory.getLogger(JavaParserVisitor.class);
 
     private final Path path;
     private final String source;
@@ -60,7 +60,7 @@ public class ParserVisitor extends TreePathScanner<org.openrewrite.tree.Tree, Fo
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching) {
+    public JavaParserVisitor(Path path, String source, boolean relaxedClassTypeMatching) {
         this.path = path;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;

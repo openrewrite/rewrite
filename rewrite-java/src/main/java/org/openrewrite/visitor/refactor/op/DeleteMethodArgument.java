@@ -20,21 +20,18 @@ import org.openrewrite.tree.Formatting;
 import org.openrewrite.tree.J;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.tree.Formatting;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
-import static org.openrewrite.tree.J.randomId;
 import static java.util.Collections.singletonList;
+import static org.openrewrite.tree.J.randomId;
 
 public class DeleteMethodArgument extends ScopedRefactorVisitor {
     private final int pos;
 
-    public DeleteMethodArgument(UUID scope, int pos) {
-        super(scope);
+    public DeleteMethodArgument(J.MethodInvocation scope, int pos) {
+        super(scope.getId());
         this.pos = pos;
     }
 

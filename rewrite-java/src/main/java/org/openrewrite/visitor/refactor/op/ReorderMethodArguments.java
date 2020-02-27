@@ -32,14 +32,15 @@ public class ReorderMethodArguments extends ScopedRefactorVisitor {
     private final String[] byArgumentNames;
     private String[] originalParamNames;
 
-    public ReorderMethodArguments(UUID scope, String[] byArgumentNames) {
-        super(scope);
+    public ReorderMethodArguments(J.MethodInvocation scope, String... byArgumentNames) {
+        super(scope.getId());
         this.byArgumentNames = byArgumentNames;
         this.originalParamNames = new String[0];
     }
 
-    public void setOriginalParamNames(String... originalParamNames) {
+    public ReorderMethodArguments withOriginalParamNames(String... originalParamNames) {
         this.originalParamNames = originalParamNames;
+        return this;
     }
 
     @Override

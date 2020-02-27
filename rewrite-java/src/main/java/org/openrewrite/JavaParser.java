@@ -53,8 +53,8 @@ import static java.util.stream.StreamSupport.stream;
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
  */
 @NonNullApi
-public class Parser {
-    private static final Logger logger = LoggerFactory.getLogger(Parser.class);
+public class JavaParser {
+    private static final Logger logger = LoggerFactory.getLogger(JavaParser.class);
 
     /**
      * When true, enables a parser to use class types from the in-memory type cache rather than performing
@@ -96,15 +96,15 @@ public class Parser {
                 .collect(toList());
     }
 
-    public Parser() {
+    public JavaParser() {
         this(null, Charset.defaultCharset(), false);
     }
 
-    public Parser(@Nullable List<Path> classpath) {
+    public JavaParser(@Nullable List<Path> classpath) {
         this(classpath, Charset.defaultCharset(), false);
     }
 
-    public Parser(@Nullable List<Path> classpath, Charset charset, boolean relaxedClassTypeMatching) {
+    public JavaParser(@Nullable List<Path> classpath, Charset charset, boolean relaxedClassTypeMatching) {
         this.classpath = classpath;
         this.charset = charset;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
@@ -181,7 +181,7 @@ public class Parser {
             var path = cuByPath.getKey();
             logger.trace("Building AST for {}", path.toAbsolutePath().getFileName());
             try {
-                ParserVisitor parser = new ParserVisitor(
+                JavaParserVisitor parser = new JavaParserVisitor(
                         relativeTo == null ? path : relativeTo.relativize(path),
                         Files.readString(path, charset),
                         relaxedClassTypeMatching);

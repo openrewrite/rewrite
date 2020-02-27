@@ -17,9 +17,9 @@ package org.openrewrite.visitor.search
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class FindAnnotationTest : Parser() {
+open class FindAnnotationTest : JavaParser() {
 
     val foo = """
         package com.netflix.foo;

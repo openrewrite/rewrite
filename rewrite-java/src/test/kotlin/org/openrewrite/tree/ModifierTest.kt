@@ -17,7 +17,7 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
 class ModifierTest {
     @Test
@@ -119,13 +119,13 @@ class ModifierTest {
     }
 
     private fun modifiersOnClass(modifiers: String): J.ClassDecl =
-            Parser().parse("public class A {${modifiers}class B {}}").classes[0].body.statements[0] as J.ClassDecl
+            JavaParser().parse("public class A {${modifiers}class B {}}").classes[0].body.statements[0] as J.ClassDecl
 
     private fun modifiersOnField(modifiers: String): J.VariableDecls =
-            Parser().parse("public class A {${modifiers}int n;").classes[0].body.statements[0] as J.VariableDecls
+            JavaParser().parse("public class A {${modifiers}int n;").classes[0].body.statements[0] as J.VariableDecls
 
     private fun modifiersOnMethod(modifiers: String): J.MethodDecl =
-            Parser().parse("public class A {${modifiers}void foo() {}").classes[0].body.statements[0] as J.MethodDecl
+            JavaParser().parse("public class A {${modifiers}void foo() {}").classes[0].body.statements[0] as J.MethodDecl
 
     private fun J.ClassDecl.printMods() = print().substringBefore("class")
     private fun J.VariableDecls.printMods() = print().substringBefore("int")

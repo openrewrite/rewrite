@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class DeleteStatementTest : Parser() {
+open class DeleteStatementTest : JavaParser() {
 
     @Test
     fun deleteField() {
@@ -31,8 +31,8 @@ open class DeleteStatementTest : Parser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-            .deleteStatement(a.classes[0].findFields("java.util.List"))
-            .fix().fixed
+                .fold(a.classes[0].findFields("java.util.List")) { DeleteStatement(it) }
+                .fix().fixed
 
         assertRefactored(fixed, """
             public class A {

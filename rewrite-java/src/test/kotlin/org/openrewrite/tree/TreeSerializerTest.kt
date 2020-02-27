@@ -18,12 +18,12 @@ package org.openrewrite.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
 /**
  * Test that flyweights survive a serialization/deserialization cycle
  */
-open class TreeSerializerTest : Parser() {
+open class TreeSerializerTest : JavaParser() {
 
     private val serializer = TreeSerializer()
 

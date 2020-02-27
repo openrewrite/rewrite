@@ -19,9 +19,9 @@ import org.openrewrite.asClass
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class FindMethodTest : Parser() {
+open class FindMethodTest : JavaParser() {
 
     @Test
     fun findStaticMethodCalls() {

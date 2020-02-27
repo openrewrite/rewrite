@@ -17,14 +17,17 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class AddImportTest : Parser() {
+open class AddImportTest : JavaParser() {
     @Test
     fun addMultipleImports() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").addImport("java.util.Set").fix().fixed
+        val fixed = a.refactor()
+                .visit(AddImport("java.util.List", null, false))
+                .visit(AddImport("java.util.Set", null, false))
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -38,7 +41,7 @@ open class AddImportTest : Parser() {
     fun addNamedImport() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -51,7 +54,7 @@ open class AddImportTest : Parser() {
     fun addNamedImportByClass() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -67,7 +70,7 @@ open class AddImportTest : Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -102,7 +105,7 @@ open class AddImportTest : Parser() {
                 
                 class A {}
             """.trimIndent(), otherImports.plus(b))
-            val fixed = cu.refactor().addImport("$pkg.B").fix().fixed
+            val fixed = cu.refactor().visit(AddImport("$pkg.B", null, false)).fix().fixed
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -121,7 +124,7 @@ open class AddImportTest : Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -140,7 +143,7 @@ open class AddImportTest : Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -159,7 +162,7 @@ open class AddImportTest : Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.List").fix().fixed
+        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -179,7 +182,9 @@ open class AddImportTest : Parser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().addImport("java.util.Collections", "emptyList").fix().fixed
+        val fixed = a.refactor()
+                .visit(AddImport("java.util.Collections", "emptyList", false))
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.*;
@@ -193,7 +198,7 @@ open class AddImportTest : Parser() {
     @Test
     fun dontAddImportWhenClassHasNoPackage() {
         val a = parse("class A {}")
-        val fixed = a.refactor().addImport("C").fix().fixed
+        val fixed = a.refactor().visit(AddImport("C", null, false)).fix().fixed
         assertRefactored(fixed, "class A {}")
     }
 }

@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-class GenerateConstructorUsingFieldsTest: Parser() {
+class GenerateConstructorUsingFieldsTest : JavaParser() {
     @Test
     fun generateConstructorUsingFields() {
         val a = parse("""
@@ -29,7 +29,8 @@ class GenerateConstructorUsingFieldsTest: Parser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(GenerateConstructorUsingFields(a.classes[0].id, a.classes[0].fields))
+        val fixed = a.refactor()
+                .visit(GenerateConstructorUsingFields(a.classes[0].id, a.classes[0].fields))
                 .fix().fixed
 
         assertRefactored(fixed, """

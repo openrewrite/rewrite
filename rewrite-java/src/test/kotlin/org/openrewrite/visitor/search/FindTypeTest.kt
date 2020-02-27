@@ -17,9 +17,9 @@ package org.openrewrite.visitor.search
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class FindTypeTest : Parser() {
+open class FindTypeTest : JavaParser() {
 
     private val a1 = """
         package a;

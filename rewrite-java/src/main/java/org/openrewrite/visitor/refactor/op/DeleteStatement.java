@@ -17,26 +17,24 @@ package org.openrewrite.visitor.refactor.op;
 
 import org.openrewrite.tree.Formatting;
 import org.openrewrite.tree.J;
+import org.openrewrite.tree.Statement;
 import org.openrewrite.tree.Tree;
 import org.openrewrite.visitor.ReferencedTypesVisitor;
 import org.openrewrite.visitor.refactor.AstTransform;
 import org.openrewrite.visitor.refactor.ScopedRefactorVisitor;
-import org.openrewrite.visitor.ReferencedTypesVisitor;
-import org.openrewrite.visitor.refactor.AstTransform;
 
 import java.util.List;
-import java.util.UUID;
 
-import static org.openrewrite.tree.J.randomId;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.tree.J.randomId;
 
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
  */
 public class DeleteStatement extends ScopedRefactorVisitor {
-    public DeleteStatement(UUID scope) {
-        super(scope);
+    public DeleteStatement(Statement scope) {
+        super(scope.getId());
     }
 
     @Override

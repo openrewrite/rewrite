@@ -17,9 +17,9 @@ package org.openrewrite.visitor.refactor.op
 
 import org.openrewrite.assertRefactored
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 
-open class InsertMethodArgumentTest : Parser() {
+open class InsertMethodArgumentTest : JavaParser() {
 
     val b = """
             class B {
@@ -46,13 +46,13 @@ open class InsertMethodArgumentTest : Parser() {
         """.trimIndent()
 
         val cu = parse(a, b)
-        val fixed = cu.refactor().apply {
-            val oneParamFoo = cu.findMethodCalls("B foo(String)")
-            insertArgument(oneParamFoo, 0, "\"0\"") // insert at beginning
-            insertArgument(oneParamFoo, 2, "\"2\"") // insert at end
+        val oneParamFoos = cu.findMethodCalls("B foo(String)")
 
-            insertArgument(cu.findMethodCalls("B foo()"), 0, "\"0\"")
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .fold(oneParamFoos) { InsertMethodArgument(it, 0, "\"0\"") }
+                .fold(oneParamFoos) { InsertMethodArgument(it, 2, "\"2\"") }
+                .fold(cu.findMethodCalls("B foo()")) { InsertMethodArgument(it, 0, "\"0\"") }
+                .fix().fixed
 
         // FIXME re-add this compatibility test once reordering is implemented
 //          .findMethodCalls("B bar(String, String)")

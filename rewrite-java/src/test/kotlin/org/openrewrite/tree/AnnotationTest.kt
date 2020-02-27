@@ -17,11 +17,11 @@ package org.openrewrite.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.asClass
 import org.openrewrite.visitor.AstVisitor
 
-open class AnnotationTest : Parser() {
+open class AnnotationTest : JavaParser() {
     
     @Test
     fun annotation() {

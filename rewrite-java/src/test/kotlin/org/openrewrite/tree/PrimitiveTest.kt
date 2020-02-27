@@ -17,10 +17,10 @@ package org.openrewrite.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Parser
+import org.openrewrite.JavaParser
 import org.openrewrite.fields
 
-open class PrimitiveTest : Parser() {
+open class PrimitiveTest : JavaParser() {
 
     @Test
     fun primitiveField() {
