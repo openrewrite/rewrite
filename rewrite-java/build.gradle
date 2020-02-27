@@ -9,8 +9,8 @@ task generateAntlrSources(type: JavaExec) {
     main = 'org.antlr.v4.Tool'
 
     args = [
-            '-o', 'src/main/java/org/openrewrite/internal/grammar',
-            '-package', 'org.openrewrite.internal.grammar',
+            '-o', 'src/main/java/org/openrewrite/java/internal/grammar',
+            '-package', 'org.openrewrite.java.internal.grammar',
             '-visitor'
     ] + project.fileTree(dir: 'src/main/antlr', include: '**/*.g4').collect { it.path }
 
@@ -25,9 +25,6 @@ dependencies {
     implementation 'eu.infomas:annotation-detector:latest.release'
     implementation 'org.slf4j:slf4j-api:1.7.+'
     implementation 'commons-lang:commons-lang:latest.release'
-
-    compileOnly 'org.projectlombok:lombok:latest.release'
-    annotationProcessor 'org.projectlombok:lombok:latest.release'
 
     implementation 'com.koloboke:koloboke-api-jdk8:latest.release'
     implementation 'com.koloboke:koloboke-impl-jdk8:latest.release'
