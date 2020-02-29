@@ -17,7 +17,7 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.tree.Formatting.format
+import org.openrewrite.Formatting.format
 
 class FormattingTest {
 

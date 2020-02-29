@@ -85,11 +85,11 @@ open class CyclicTypeTest : JavaParser() {
         """)
         
         val fieldType = a.classes[0].fields[0].vars[0].type.asArray()
-        assertTrue(fieldType is Type.Array)
+        assertTrue(fieldType is JavaType.Array)
 
         val elemType = fieldType!!.elemType.asClass()
-        assertTrue(elemType is Type.Class)
+        assertTrue(elemType is JavaType.Class)
 
-        assertTrue(elemType!!.members[0].type?.asArray()?.elemType is Type.Cyclic)
+        assertTrue(elemType!!.members[0].type?.asArray()?.elemType is JavaType.Cyclic)
     }
 }

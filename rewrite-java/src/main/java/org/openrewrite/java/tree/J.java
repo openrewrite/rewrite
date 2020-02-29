@@ -17,13 +17,14 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
-import org.openrewrite.java.Refactor;
-import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.visitor.AstVisitor;
-import org.openrewrite.java.visitor.search.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.*;
+import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.internal.JavaPrintVisitor;
+import org.openrewrite.java.visitor.search.*;
 
 import java.io.Serializable;
 import java.util.*;
@@ -37,17 +38,29 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-public abstract class J implements Serializable, Tree {
-    public static UUID randomId() {
-        return UUID.randomUUID();
+public interface J extends Serializable, Tree {
+    @Override
+    default <R> R accept(SourceVisitor<R> v) {
+        return v instanceof JavaSourceVisitor ?
+                acceptJava((JavaSourceVisitor<R>) v) : v.defaultTo(null);
+    }
+
+    default <R> R acceptJava(JavaSourceVisitor<R> v) {
+        return v.defaultTo(null);
+    }
+
+    @Override
+    default String print() {
+        return new JavaPrintVisitor().visit(this);
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Annotation extends J implements Expression {
+    class Annotation implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -63,25 +76,25 @@ public abstract class J implements Serializable, Tree {
 
         @JsonIgnore
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return annotationType.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Annotation withType(@Nullable Type type) {
+        public Annotation withType(@Nullable JavaType type) {
             return withAnnotationType(annotationType.withType(type));
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAnnotation(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitAnnotation(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments extends J {
+        public static class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -96,7 +109,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class ArrayAccess extends J implements Expression {
+    class ArrayAccess implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -108,20 +121,20 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitArrayAccess(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitArrayAccess(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension extends J {
+        public static class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -136,7 +149,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class ArrayType extends J implements TypeTree, Expression {
+    class ArrayType implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -150,25 +163,25 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return elementType.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public ArrayType withType(Type type) {
+        public ArrayType withType(JavaType type) {
             return withElementType(elementType.withType(type));
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitArrayType(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitArrayType(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension extends J {
+        public static class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -183,7 +196,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Assert extends J implements Statement {
+    class Assert implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -194,8 +207,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAssert(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitAssert(this);
         }
 
         @JsonIgnore
@@ -208,7 +221,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Assign extends J implements Statement, Expression {
+    class Assign implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -220,14 +233,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAssign(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitAssign(this);
         }
 
         @JsonIgnore
@@ -246,7 +259,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class AssignOp extends J implements Statement, Expression {
+    class AssignOp implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -261,14 +274,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitAssignOp(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitAssignOp(this);
         }
 
         @JsonIgnore
@@ -284,7 +297,7 @@ public abstract class J implements Serializable, Tree {
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Operator extends J {
+        public static abstract class Operator implements J {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
@@ -411,7 +424,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Binary extends J implements Expression {
+    class Binary implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -426,14 +439,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitBinary(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitBinary(this);
         }
 
         @JsonIgnore
@@ -446,7 +459,7 @@ public abstract class J implements Serializable, Tree {
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Operator extends J {
+        public static abstract class Operator implements J {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
@@ -661,7 +674,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class Block<T extends Tree> extends J implements Statement {
+    class Block<T extends Tree> implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -689,8 +702,8 @@ public abstract class J implements Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitBlock((Block<Tree>) this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitBlock((Block<Tree>) this);
         }
 
         @JsonIgnore
@@ -702,7 +715,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Break extends J implements Statement {
+    class Break implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -714,8 +727,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitBreak(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitBreak(this);
         }
 
         @JsonIgnore
@@ -728,7 +741,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Case extends J implements Statement {
+    class Case implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -743,15 +756,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitCase(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitCase(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class ClassDecl extends J implements Statement {
+    class ClassDecl implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -793,9 +806,13 @@ public abstract class J implements Serializable, Tree {
         @Nullable
         TypeParameters typeParameters;
 
-        @With
         @Nullable
         TypeTree extendings;
+
+        public ClassDecl withExtends(TypeTree extendings) {
+            return new ClassDecl(id, annotations, modifiers, kind, name,
+                    typeParameters, extendings, implementings, body, type, formatting);
+        }
 
         @JsonProperty("extendings")
         @Nullable
@@ -803,8 +820,12 @@ public abstract class J implements Serializable, Tree {
             return extendings;
         }
 
-        @With
         List<TypeTree> implementings;
+
+        public ClassDecl withImplements(List<TypeTree> implementings) {
+            return new ClassDecl(id, annotations, modifiers, kind, name,
+                    typeParameters, extendings, implementings, body, type, formatting);
+        }
 
         @JsonProperty("implementings")
         public List<TypeTree> getImplements() {
@@ -817,15 +838,15 @@ public abstract class J implements Serializable, Tree {
 
         @Getter
         @Nullable
-        Type type;
+        JavaType type;
 
         @Getter
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitClassDecl(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitClassDecl(this);
         }
 
         @JsonIgnore
@@ -859,7 +880,7 @@ public abstract class J implements Serializable, Tree {
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Kind extends J {
+        public static abstract class Kind implements J {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
@@ -915,7 +936,7 @@ public abstract class J implements Serializable, Tree {
         /**
          * Find fields defined up the type hierarchy, but do not include fields defined directly on this class
          */
-        public List<Type.Var> findInheritedFields(String clazz) {
+        public List<JavaType.Var> findInheritedFields(String clazz) {
             return new FindInheritedFields(clazz).visit(this);
         }
 
@@ -963,7 +984,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class CompilationUnit extends J {
+    class CompilationUnit implements J, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -983,7 +1004,7 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitCompilationUnit(this);
         }
 
@@ -1003,8 +1024,8 @@ public abstract class J implements Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
-        public Refactor refactor() {
-            return new Refactor(this);
+        public Refactor<CompilationUnit, J> refactor() {
+            return new Refactor<>(this);
         }
 
         /**
@@ -1021,7 +1042,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Continue extends J implements Statement {
+    class Continue implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1033,8 +1054,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitContinue(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitContinue(this);
         }
 
         @JsonIgnore
@@ -1047,7 +1068,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class DoWhileLoop extends J implements Statement {
+    class DoWhileLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1061,8 +1082,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitDoWhileLoop(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitDoWhileLoop(this);
         }
 
         @JsonIgnore
@@ -1074,7 +1095,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class While extends J {
+        public static class While implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1089,7 +1110,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Empty extends J implements Statement, Expression, TypeTree {
+    class Empty implements J, Statement, Expression, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1097,19 +1118,19 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return null;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Empty withType(Type type) {
+        public Empty withType(JavaType type) {
             return this;
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitEmpty(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitEmpty(this);
         }
 
         @JsonIgnore
@@ -1122,7 +1143,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class EnumValue extends J implements Statement {
+    class EnumValue implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1137,14 +1158,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitEnumValue(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitEnumValue(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments extends J {
+        public static class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1159,7 +1180,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class EnumValueSet extends J implements Statement {
+    class EnumValueSet implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1172,15 +1193,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitEnumValueSet(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitEnumValueSet(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class FieldAccess extends J implements TypeTree, Expression {
+    class FieldAccess implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1192,14 +1213,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitFieldAccess(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitFieldAccess(this);
         }
 
         @JsonIgnore
@@ -1228,10 +1249,10 @@ public abstract class J implements Serializable, Tree {
         public NameTree asClassReference() {
             if (target instanceof NameTree) {
                 String fqn = null;
-                if (type instanceof Type.Class) {
-                    fqn = ((Type.Class) type).getFullyQualifiedName();
-                } else if (type instanceof Type.ShallowClass) {
-                    fqn = ((Type.ShallowClass) type).getFullyQualifiedName();
+                if (type instanceof JavaType.Class) {
+                    fqn = ((JavaType.Class) type).getFullyQualifiedName();
+                } else if (type instanceof JavaType.ShallowClass) {
+                    fqn = ((JavaType.ShallowClass) type).getFullyQualifiedName();
                 }
 
                 return "java.lang.Class".equals(fqn) ? (NameTree) target : null;
@@ -1243,7 +1264,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class ForEachLoop extends J implements Statement {
+    class ForEachLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1257,14 +1278,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitForEachLoop(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitForEachLoop(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Control extends J {
+        public static class Control implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1282,7 +1303,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class ForLoop extends J implements Statement {
+    class ForLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1296,14 +1317,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitForLoop(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitForLoop(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Control extends J {
+        public static class Control implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1324,8 +1345,8 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
-    public static class Ident extends J implements TypeTree, Expression {
-        private static final Map<String, Map<Type, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
+    class Ident implements J, TypeTree, Expression {
+        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -1342,13 +1363,13 @@ public abstract class J implements Serializable, Tree {
         }
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return ident.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Ident withType(Type type) {
+        public Ident withType(JavaType type) {
             return build(id, getSimpleName(), type, formatting);
         }
 
@@ -1358,8 +1379,8 @@ public abstract class J implements Serializable, Tree {
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitIdentifier(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitIdentifier(this);
         }
 
         public Ident withName(String name) {
@@ -1369,7 +1390,7 @@ public abstract class J implements Serializable, Tree {
         @JsonCreator
         public static Ident build(@JsonProperty("id") UUID id,
                                   @JsonProperty("simpleName") String simpleName,
-                                  @JsonProperty("type") @Nullable Type type,
+                                  @JsonProperty("type") @Nullable JavaType type,
                                   @JsonProperty("formatting") Formatting formatting) {
             synchronized (flyweights) {
                 return new Ident(
@@ -1388,7 +1409,7 @@ public abstract class J implements Serializable, Tree {
             String simpleName;
 
             @Nullable
-            Type type;
+            JavaType type;
         }
 
         /**
@@ -1402,7 +1423,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class If extends J implements Statement {
+    class If implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1420,14 +1441,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitIf(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitIf(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Else extends J {
+        public static class Else implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1438,7 +1459,7 @@ public abstract class J implements Serializable, Tree {
             Formatting formatting;
 
             @Override
-            public <R> R accept(AstVisitor<R> v) {
+            public <R> R acceptJava(JavaSourceVisitor<R> v) {
                 return v.visitElse(this);
             }
         }
@@ -1447,7 +1468,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class Import extends J implements Comparable<Import> {
+    class Import implements J, Comparable<Import> {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1464,7 +1485,7 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitImport(this);
         }
 
@@ -1485,7 +1506,7 @@ public abstract class J implements Serializable, Tree {
 
         @JsonIgnore
         public String getPackageName() {
-            Type.Class importType = TypeUtils.asClass(qualid.getType());
+            JavaType.Class importType = TypeUtils.asClass(qualid.getType());
             if (importType != null) {
                 return importType.getPackageName();
             }
@@ -1520,7 +1541,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class InstanceOf extends J implements Expression {
+    class InstanceOf implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1532,21 +1553,21 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         private final Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitInstanceOf(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitInstanceOf(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Label extends J implements Statement {
+    class Label implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1560,15 +1581,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitLabel(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitLabel(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Lambda extends J implements Expression {
+    class Lambda implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1583,20 +1604,20 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitLambda(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitLambda(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arrow extends J {
+        public static class Arrow implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1607,7 +1628,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Parameters extends J {
+        public static class Parameters implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1630,7 +1651,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Literal extends J implements Expression {
+    class Literal implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1644,13 +1665,13 @@ public abstract class J implements Serializable, Tree {
         /**
          * Including String literals
          */
-        Type.Primitive type;
+        JavaType.Primitive type;
 
         @SuppressWarnings("unchecked")
         @Override
-        public Literal withType(Type type) {
-            if (type instanceof Type.Primitive) {
-                return new Literal(id, value, valueSource, (Type.Primitive) type, formatting);
+        public Literal withType(JavaType type) {
+            if (type instanceof JavaType.Primitive) {
+                return new Literal(id, value, valueSource, (JavaType.Primitive) type, formatting);
             }
             return this;
         }
@@ -1659,8 +1680,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitLiteral(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitLiteral(this);
         }
 
         public <T> String transformValue(Function<T, Object> transform) {
@@ -1680,7 +1701,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class MemberReference extends J implements Expression {
+    class MemberReference implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1696,13 +1717,13 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMemberReference(this);
         }
     }
@@ -1710,7 +1731,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    public static class MethodDecl extends J {
+    class MethodDecl implements J {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1733,10 +1754,10 @@ public abstract class J implements Serializable, Tree {
             if (fixedModifiers == modifiers) {
                 return this;
             } else if (modifiers.isEmpty()) {
-                if(typeParameters != null) {
+                if (typeParameters != null) {
                     return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeParameters.getFormatting().getPrefix()))
                             .withTypeParameters(typeParameters.withPrefix(" "));
-                } else if(returnTypeExpr != null) {
+                } else if (returnTypeExpr != null) {
                     return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, returnTypeExpr.getFormatting().getPrefix()))
                             .withReturnTypeExpr(returnTypeExpr.withPrefix(" "));
                 } else {
@@ -1769,9 +1790,13 @@ public abstract class J implements Serializable, Tree {
         @Getter
         Parameters params;
 
-        @With
         @Nullable
         Throws throwz;
+
+        public MethodDecl withThrows(Throws throwz) {
+            return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr,
+                    name, params, throwz, body, defaultValue, formatting);
+        }
 
         @JsonProperty("throwz")
         @Nullable
@@ -1797,7 +1822,7 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMethod(this);
         }
 
@@ -1822,7 +1847,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Parameters extends J {
+        public static class Parameters implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1836,7 +1861,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Throws extends J {
+        public static class Throws implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1850,7 +1875,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Default extends J {
+        public static class Default implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1874,7 +1899,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class MethodInvocation extends J implements Statement, Expression {
+    class MethodInvocation implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1893,23 +1918,23 @@ public abstract class J implements Serializable, Tree {
         Arguments args;
 
         @Nullable
-        Type.Method type;
+        JavaType.Method type;
 
         @With
         Formatting formatting;
 
         @SuppressWarnings("unchecked")
         @Override
-        public MethodInvocation withType(Type type) {
-            if (type instanceof Type.Method) {
-                return new MethodInvocation(id, select, typeParameters, name, args, (Type.Method) type, formatting);
+        public MethodInvocation withType(JavaType type) {
+            if (type instanceof JavaType.Method) {
+                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, formatting);
             }
             return this;
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitMethodInvocation(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitMethodInvocation(this);
         }
 
         @JsonIgnore
@@ -1920,7 +1945,7 @@ public abstract class J implements Serializable, Tree {
 
         @JsonIgnore
         @Nullable
-        public Type getReturnType() {
+        public JavaType getReturnType() {
             return type == null ? null : type.getResolvedSignature() == null ? null :
                     type.getResolvedSignature().getReturnType();
         }
@@ -1939,7 +1964,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments extends J {
+        public static class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1952,7 +1977,7 @@ public abstract class J implements Serializable, Tree {
     }
 
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    public static abstract class Modifier extends J {
+    abstract class Modifier implements J {
         static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
             return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
                     .toLowerCase().equals(modifier));
@@ -2204,7 +2229,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class MultiCatch extends J implements TypeTree {
+    class MultiCatch implements J, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2215,21 +2240,21 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMultiCatch(this);
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public MultiCatch withType(Type type) {
+        public MultiCatch withType(JavaType type) {
             // cannot overwrite type directly, perform this operation on each alternative separately
             return this;
         }
 
         @JsonIgnore
         @Override
-        public Type getType() {
-            return new Type.MultiCatch(alternatives.stream()
+        public JavaType getType() {
+            return new JavaType.MultiCatch(alternatives.stream()
                     .filter(Objects::nonNull)
                     .map(NameTree::getType)
                     .collect(toList()));
@@ -2239,7 +2264,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class NewArray extends J implements Expression {
+    class NewArray implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2256,20 +2281,20 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitNewArray(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitNewArray(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension extends J {
+        public static class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2283,7 +2308,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Initializer extends J {
+        public static class Initializer implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2298,7 +2323,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class NewClass extends J implements Statement, Expression {
+    class NewClass implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2314,14 +2339,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitNewClass(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitNewClass(this);
         }
 
         @JsonIgnore
@@ -2339,7 +2364,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments extends J {
+        public static class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2354,7 +2379,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Package extends J {
+    class Package implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2365,7 +2390,7 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitPackage(this);
         }
     }
@@ -2373,7 +2398,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class ParameterizedType extends J implements TypeTree, Expression {
+    class ParameterizedType implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2388,26 +2413,26 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return clazz.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public ParameterizedType withType(Type type) {
+        public ParameterizedType withType(JavaType type) {
             return withClazz(clazz.withType(type));
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitParameterizedType(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitParameterizedType(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Parentheses<T extends Tree> extends J implements Expression {
+    class Parentheses<T extends Tree> implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2418,8 +2443,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitParentheses(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitParentheses(this);
         }
 
         @JsonIgnore
@@ -2429,7 +2454,7 @@ public abstract class J implements Serializable, Tree {
         }
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return tree instanceof Expression ? ((Expression) tree).getType() :
                     tree instanceof NameTree ? ((NameTree) tree).getType() :
                             null;
@@ -2437,7 +2462,7 @@ public abstract class J implements Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Parentheses<T> withType(Type type) {
+        public Parentheses<T> withType(JavaType type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
@@ -2447,25 +2472,25 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class Primitive extends J implements TypeTree, Expression {
+    class Primitive implements J, TypeTree, Expression {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
-        Type.Primitive type;
+        JavaType.Primitive type;
 
         @SuppressWarnings("unchecked")
         @Override
-        public Primitive withType(Type type) {
-            if (!(type instanceof Type.Primitive)) {
+        public Primitive withType(JavaType type) {
+            if (!(type instanceof JavaType.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitve");
             }
-            return new Primitive(id, (Type.Primitive) type, formatting);
+            return new Primitive(id, (JavaType.Primitive) type, formatting);
         }
 
         @Override
         @NonNull
-        public Type.Primitive getType() {
+        public JavaType.Primitive getType() {
             return type;
         }
 
@@ -2474,15 +2499,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitPrimitive(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitPrimitive(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Return extends J implements Statement {
+    class Return implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2494,8 +2519,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitReturn(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitReturn(this);
         }
 
         @JsonIgnore
@@ -2508,7 +2533,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Switch extends J implements Statement {
+    class Switch implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2522,15 +2547,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitSwitch(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitSwitch(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Synchronized extends J implements Statement {
+    class Synchronized implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2544,15 +2569,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitSynchronized(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitSynchronized(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Ternary extends J implements Expression {
+    class Ternary implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2567,21 +2592,21 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitTernary(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitTernary(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Throw extends J implements Statement {
+    class Throw implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2592,8 +2617,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitThrow(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitThrow(this);
         }
 
         @JsonIgnore
@@ -2606,7 +2631,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    public static class Try extends J implements Statement {
+    class Try implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2624,9 +2649,12 @@ public abstract class J implements Serializable, Tree {
         @Getter
         List<Catch> catches;
 
-        @With
         @Nullable
         Finally finallie;
+
+        public Try withFinally(Finally finallie) {
+            return new Try(id, resources, body, catches, finallie, formatting);
+        }
 
         @Nullable
         public Finally getFinally() {
@@ -2638,14 +2666,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitTry(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitTry(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Resources extends J {
+        public static class Resources implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2659,7 +2687,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Catch extends J {
+        public static class Catch implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2673,7 +2701,7 @@ public abstract class J implements Serializable, Tree {
             Formatting formatting;
 
             @Override
-            public <R> R accept(AstVisitor<R> v) {
+            public <R> R acceptJava(JavaSourceVisitor<R> v) {
                 return v.visitCatch(this);
             }
         }
@@ -2681,7 +2709,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Finally extends J {
+        public static class Finally implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2692,7 +2720,7 @@ public abstract class J implements Serializable, Tree {
             Formatting formatting;
 
             @Override
-            public <R> R accept(AstVisitor<R> v) {
+            public <R> R acceptJava(JavaSourceVisitor<R> v) {
                 return v.visitFinally(this);
             }
         }
@@ -2701,7 +2729,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class TypeCast extends J implements Expression {
+    class TypeCast implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2715,26 +2743,26 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return clazz.getType();
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public TypeCast withType(Type type) {
+        public TypeCast withType(JavaType type) {
             return withClazz(clazz.withType(type));
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitTypeCast(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitTypeCast(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class TypeParameter extends J {
+    class TypeParameter implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2756,14 +2784,14 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitTypeParameter(this);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Bounds extends J {
+        public static class Bounds implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2778,7 +2806,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class TypeParameters extends J {
+    class TypeParameters implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2789,7 +2817,7 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitTypeParameters(this);
         }
     }
@@ -2797,7 +2825,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Unary extends J implements Statement, Expression {
+    class Unary implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2809,14 +2837,14 @@ public abstract class J implements Serializable, Tree {
 
         @With
         @Nullable
-        Type type;
+        JavaType type;
 
         @With
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitUnary(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitUnary(this);
         }
 
         @JsonIgnore
@@ -2833,7 +2861,7 @@ public abstract class J implements Serializable, Tree {
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public abstract static class Operator extends J {
+        public abstract static class Operator implements J {
             // NOTE: only some operators may have empty formatting
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2949,7 +2977,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class UnparsedSource extends J implements Statement, Expression {
+    class UnparsedSource implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2960,26 +2988,26 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return null;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public UnparsedSource withType(Type type) {
+        public UnparsedSource withType(JavaType type) {
             return null;
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitUnparsedSource(this), v.visitExpression(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitUnparsedSource(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class VariableDecls extends J implements Statement {
+    class VariableDecls implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3030,8 +3058,8 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitMultiVariable(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitMultiVariable(this);
         }
 
         @JsonIgnore
@@ -3045,14 +3073,14 @@ public abstract class J implements Serializable, Tree {
         }
 
         @JsonIgnore
-        public Type.Class getTypeAsClass() {
+        public JavaType.Class getTypeAsClass() {
             return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Varargs extends J {
+        public static class Varargs implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3063,7 +3091,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension extends J {
+        public static class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3077,7 +3105,7 @@ public abstract class J implements Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class NamedVar extends J implements NameTree {
+        public static class NamedVar implements J, NameTree {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3093,7 +3121,7 @@ public abstract class J implements Serializable, Tree {
 
             @With
             @Nullable
-            Type type;
+            JavaType type;
 
             @With
             Formatting formatting;
@@ -3104,8 +3132,17 @@ public abstract class J implements Serializable, Tree {
             }
 
             @Override
-            public <R> R accept(AstVisitor<R> v) {
+            public <R> R acceptJava(JavaSourceVisitor<R> v) {
                 return v.visitVariable(this);
+            }
+
+            @JsonIgnore
+            public boolean isField(Cursor cursor) {
+                return cursor
+                        .getParentOrThrow() // J.VariableDecls
+                        .getParentOrThrow() // J.Block
+                        .getParentOrThrow() // maybe J.ClassDecl
+                        .getTree() instanceof J.ClassDecl;
             }
         }
 
@@ -3117,7 +3154,7 @@ public abstract class J implements Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class WhileLoop extends J implements Statement {
+    class WhileLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3131,15 +3168,15 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitWhileLoop(this), v.visitStatement(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitWhileLoop(this);
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    public static class Wildcard extends J implements Expression {
+    class Wildcard implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3155,23 +3192,23 @@ public abstract class J implements Serializable, Tree {
         Formatting formatting;
 
         @Override
-        public Type getType() {
+        public JavaType getType() {
             return null;
         }
 
         @SuppressWarnings("unchecked")
         @Override
-        public Wildcard withType(Type type) {
+        public Wildcard withType(JavaType type) {
             return this;
         }
 
         @Override
-        public <R> R accept(AstVisitor<R> v) {
-            return v.reduce(v.visitWildcard(this), v.visitExpression(this));
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitWildcard(this);
         }
 
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public abstract static class Bound extends J {
+        public abstract static class Bound implements J {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data

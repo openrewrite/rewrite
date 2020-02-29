@@ -30,6 +30,7 @@ dependencies {
     implementation 'com.koloboke:koloboke-impl-jdk8:latest.release'
 
     implementation 'com.fasterxml.jackson.core:jackson-databind:latest.release', optional
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:latest.release', optional
 
     bigDataApi 'com.fasterxml.jackson.core:jackson-databind:latest.release'
     bigDataApi 'com.fasterxml.jackson.core:jackson-annotations:latest.release'

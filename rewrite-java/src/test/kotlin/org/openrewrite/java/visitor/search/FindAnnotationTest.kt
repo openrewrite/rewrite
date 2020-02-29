@@ -15,9 +15,14 @@
  */
 package org.openrewrite.java.visitor.search
 
-import org.junit.jupiter.api.Assertions.*
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaSourceVisitor
+import org.openrewrite.java.tree.J
 
 open class FindAnnotationTest : JavaParser() {
 
@@ -41,8 +46,6 @@ open class FindAnnotationTest : JavaParser() {
 
     @Test
     fun matchesAnnotationOnMethod() {
-        // FIXME look at com.sun.tools.javac.comp.Annotate.TypeAnnotate
-
         val a = parse("""
             public class A {
                 @Deprecated
@@ -50,9 +53,17 @@ open class FindAnnotationTest : JavaParser() {
             }
         """)
 
-        val annotation = a.classes[0].methods[0].findAnnotations("@java.lang.Deprecated").firstOrNull()
-        assertNotNull(annotation)
-        assertEquals("foo", a.cursor(annotation)?.enclosingMethod()?.simpleName)
+        val deprecated = a.classes[0].methods[0].findAnnotations("@java.lang.Deprecated").firstOrNull()
+        assertNotNull(deprecated)
+
+        assertThat(object : JavaSourceVisitor<String?>() {
+            override fun defaultTo(t: Tree?): String? = null
+            override fun isCursored(): Boolean = true
+
+            override fun visitAnnotation(annotation: J.Annotation?): String? {
+                return if (annotation === deprecated) enclosingMethod()?.simpleName else super.visitAnnotation(annotation)
+            }
+        }.visit(a)).isEqualTo("foo")
     }
 
     @Test

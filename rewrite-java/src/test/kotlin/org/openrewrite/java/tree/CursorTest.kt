@@ -15,9 +15,13 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRetrieveCursorVisitor
+import org.openrewrite.java.JavaSourceVisitor
 
 open class CursorTest : JavaParser() {
     @Test
@@ -51,23 +55,31 @@ open class CursorTest : JavaParser() {
             }
         """.trimIndent())
 
-        fun Tree.cursor() = a.cursor(this)
+        fun Tree.cursor() = JavaRetrieveCursorVisitor(id).visit(a)
 
         val fieldScope = a.classes[0].fields[0].cursor()!!
         val methodParamScope = a.classes[0].methods[0].params.params[0].cursor()!!
         val forInitScope = a.classes[0].methods[0].body!!.statements.filterIsInstance<J.ForLoop>()[0].control.init.cursor()!!
 
-        assertTrue(fieldScope.isInSameNameScope(methodParamScope))
-        assertFalse(methodParamScope.isInSameNameScope(fieldScope))
+        assertThat(object : JavaSourceVisitor<Int>() {
+            override fun defaultTo(t: Tree?): Int = 0
+            override fun isCursored(): Boolean = true
 
-        assertTrue(fieldScope.isInSameNameScope(forInitScope))
+            override fun visitCompilationUnit(cu: J.CompilationUnit?): Int {
+                assertTrue(isInSameNameScope(fieldScope, methodParamScope))
+                assertFalse(isInSameNameScope(methodParamScope, fieldScope))
+                assertTrue(isInSameNameScope(fieldScope, forInitScope))
 
-        val innerClasses = a.classes[0].body.statements.filterIsInstance<J.ClassDecl>()
-        assertEquals(4, innerClasses.size)
+                val innerClasses = a.classes[0].body.statements.filterIsInstance<J.ClassDecl>()
+                assertEquals(4, innerClasses.size)
 
-        innerClasses.forEachIndexed { n, innerClass ->
-            val innerStaticClassMethodParam = innerClass.methods[0].params.params[0].cursor()!!
-            assertEquals(n >= 3, fieldScope.isInSameNameScope(innerStaticClassMethodParam))
-        }
+                innerClasses.forEachIndexed { n, innerClass ->
+                    val innerStaticClassMethodParam = innerClass.methods[0].params.params[0].cursor()!!
+                    assertEquals(n >= 3, isInSameNameScope(fieldScope, innerStaticClassMethodParam))
+                }
+
+                return 1
+            }
+        }.visit(a)).isEqualTo(1)
     }
 }

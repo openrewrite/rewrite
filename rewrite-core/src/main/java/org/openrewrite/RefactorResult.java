@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
@@ -29,29 +30,35 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 
-public interface RefactorResult {
+public class RefactorResult<S extends SourceFile> {
+    private final S original;
+
+    @Getter
+    private final S fixed;
+
+    @Getter
+    private final Set<String> getRulesThatMadeChanges;
+
+    public RefactorResult(S original, S fixed, Set<String> getRulesThatMadeChanges) {
+        this.original = original;
+        this.fixed = fixed;
+        this.getRulesThatMadeChanges = getRulesThatMadeChanges;
+    }
+
     /**
      * @return Git-style patch diff representing the changes to this compilation unit
      */
-    default String diff() {
+    public String diff() {
         return diff(null);
     }
 
     /**
      * @return Git-style patch diff representing the changes to this compilation unit
      */
-    default String diff(@Nullable Path relativeTo) {
-        return new InMemoryDiffEntry(Paths.get(getSourcePath()), relativeTo,
-                getOriginalSource(), getFixedSource()).getDiff();
+    public String diff(@Nullable Path relativeTo) {
+        return new InMemoryDiffEntry(Paths.get(original.print()), relativeTo,
+                original.getSourcePath(), fixed.print()).getDiff();
     }
-
-    String getSourcePath();
-
-    String getOriginalSource();
-
-    String getFixedSource();
-
-    Set<String> getRulesThatMadeChanges();
 
     static class InMemoryDiffEntry extends DiffEntry {
         InMemoryRepository repo;

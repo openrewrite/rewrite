@@ -15,10 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.internal.lang.NonNullApi;
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.Formatting;
-import org.openrewrite.java.tree.J;
 import com.sun.tools.javac.comp.Annotate;
 import com.sun.tools.javac.comp.Check;
 import com.sun.tools.javac.comp.Enter;
@@ -29,6 +25,10 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
+import org.openrewrite.Formatting;
+import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.J;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

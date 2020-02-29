@@ -32,6 +32,6 @@ open class PrimitiveTest : JavaParser() {
         """)
 
         assertThat(a.fields(0..1).map { it.typeExpr?.type })
-                .containsExactlyInAnyOrder(Type.Primitive.Int, Type.Primitive.Char)
+                .containsExactlyInAnyOrder(JavaType.Primitive.Int, JavaType.Primitive.Char)
     }
 }

@@ -15,19 +15,16 @@
  */
 package org.openrewrite.java.visitor.refactor;
 
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import lombok.RequiredArgsConstructor;
+import org.openrewrite.java.tree.Statement;
 
-import java.util.List;
 import java.util.UUID;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static java.util.stream.IntStream.range;
 
-public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
+public class ShiftFormatRightVisitor extends ScopedJavaRefactorVisitor {
     private final String shift;
 
     public ShiftFormatRightVisitor(UUID scope, int shift, boolean isIndentedWithSpaces) {
@@ -38,50 +35,33 @@ public class ShiftFormatRightVisitor extends ScopedRefactorVisitor {
     }
 
     @Override
-    public List<AstTransform> visitElse(J.If.Else elze) {
-        return maybeTransform(elze,
-                isInScope(elze) && isOnOwnLine(elze),
-                super::visitElse,
-                new ShiftRightMutation<>(shift));
+    public J visitElse(J.If.Else elze) {
+        J.If.Else e = refactor(elze, super::visitElse);
+        if (isScopeInCursorPath() && isOnOwnLine(elze)) {
+            e = e.withPrefix(e.getFormatting().getPrefix() + shift);
+        }
+        return e;
     }
 
     @Override
-    public List<AstTransform> visitStatement(Statement statement) {
-        return maybeTransform(statement,
-                isInScope(statement) && isOnOwnLine(statement),
-                super::visitStatement,
-                new ShiftRightMutation<>(shift)
-        );
+    public J visitStatement(Statement statement) {
+        Statement s = refactor(statement, super::visitStatement);
+        if (isScopeInCursorPath() && isOnOwnLine(statement)) {
+            s = s.withPrefix(s.getFormatting().getPrefix() + shift);
+        }
+        return s;
     }
 
     @Override
-    public List<AstTransform> visitBlock(J.Block<Tree> block) {
-        return maybeTransform(block,
-                isInScope(block),
-                super::visitBlock,
-                b -> b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift)
-        );
+    public J visitBlock(J.Block<Tree> block) {
+        J.Block<Tree> b = refactor(block, super::visitBlock);
+        if (isScopeInCursorPath()) {
+            b = b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift);
+        }
+        return b;
     }
 
     private boolean isOnOwnLine(Tree tree) {
         return tree.getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() > 0;
-    }
-
-    /**
-     * Exists only for debugging purposes, where it is easier to see what kind of shifts are applying to each tree element
-     */
-    @RequiredArgsConstructor
-    private static class ShiftRightMutation<T extends Tree> implements Function<T, T> {
-        private final String shift;
-
-        @Override
-        public T apply(T tree) {
-            return tree.withPrefix(tree.getFormatting().getPrefix() + shift);
-        }
-
-        @Override
-        public String toString() {
-            return "ShiftRightMutation{shift='" + shift.length() + "',indentChar='" + (shift.contains("\t") ? "tab" : "space") + "'}";
-        }
     }
 }

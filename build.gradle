@@ -56,6 +56,12 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions {
+            jvmTarget = '1.8'
+        }
+    }
+
     configurations.all {
         resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
     }

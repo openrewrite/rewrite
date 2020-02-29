@@ -15,17 +15,17 @@
  */
 package org.openrewrite.java.visitor.search;
 
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.internal.MethodMatcher;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.visitor.AstVisitor;
-import org.openrewrite.java.visitor.MethodMatcher;
 
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-public class FindMethods extends AstVisitor<List<J.MethodInvocation>> {
+public class FindMethods extends JavaSourceVisitor<List<J.MethodInvocation>> {
     private final MethodMatcher matcher;
 
     public FindMethods(String signature) {

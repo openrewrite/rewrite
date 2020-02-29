@@ -32,8 +32,8 @@ open class NewArrayTest : JavaParser() {
         
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertNull(newArr.initializer)
-        assertTrue(newArr.type is Type.Array)
-        assertTrue(newArr.type.asArray()?.elemType is Type.Primitive)
+        assertTrue(newArr.type is JavaType.Array)
+        assertTrue(newArr.type.asArray()?.elemType is JavaType.Primitive)
         assertEquals(1, newArr.dimensions.size)
         assertTrue(newArr.dimensions[0].size is J.Literal)
     }
@@ -48,8 +48,8 @@ open class NewArrayTest : JavaParser() {
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertTrue(newArr.dimensions[0].size is J.Empty)
-        assertTrue(newArr.type is Type.Array)
-        assertTrue(newArr.type.asArray()?.elemType is Type.Primitive)
+        assertTrue(newArr.type is JavaType.Array)
+        assertTrue(newArr.type.asArray()?.elemType is JavaType.Primitive)
         assertEquals(3, newArr.initializer?.elements?.size)
     }
 

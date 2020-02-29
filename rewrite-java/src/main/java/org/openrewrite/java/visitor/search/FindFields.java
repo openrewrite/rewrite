@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.visitor.search;
 
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.visitor.AstVisitor;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 
@@ -27,7 +27,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 @RequiredArgsConstructor
-public class FindFields extends AstVisitor<List<J.VariableDecls>> {
+public class FindFields extends JavaSourceVisitor<List<J.VariableDecls>> {
     private final String fullyQualifiedName;
 
     @Override

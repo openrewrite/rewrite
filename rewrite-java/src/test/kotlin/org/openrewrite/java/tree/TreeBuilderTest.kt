@@ -18,13 +18,12 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaRetrieveCursorVisitor
 import org.openrewrite.java.asClass
 import org.openrewrite.java.assertRefactored
-import org.openrewrite.java.tree.Formatting.EMPTY
-import org.openrewrite.java.visitor.RetrieveCursorVisitor
-import org.openrewrite.java.visitor.refactor.AstTransform
-import org.openrewrite.java.visitor.refactor.RefactorVisitor
+import org.openrewrite.java.visitor.refactor.JavaRefactorVisitor
 
 class TreeBuilderTest {
     @Test
@@ -40,7 +39,7 @@ class TreeBuilderTest {
         """.trimIndent())
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = RetrieveCursorVisitor(method.body!!.id).visit(a)
+        val methodBodyCursor = JavaRetrieveCursorVisitor(method.body!!.id).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
         val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, "others.add({});", paramName)
@@ -60,7 +59,7 @@ class TreeBuilderTest {
         """.trimIndent())
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = RetrieveCursorVisitor(method.body!!.id).visit(a)
+        val methodBodyCursor = JavaRetrieveCursorVisitor(method.body!!.id).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
         val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, """
@@ -70,12 +69,8 @@ class TreeBuilderTest {
             }
         """.trimIndent(), paramName, paramName, paramName)
 
-        val fixed = a.refactor().visit(object: RefactorVisitor() {
-            override fun visitMethod(method: J.MethodDecl): MutableList<AstTransform> {
-                return transform(method) { m ->
-                    m.withBody(m.body!!.withStatements(snippets))
-                }
-            }
+        val fixed = a.refactor().visit(object : JavaRefactorVisitor() {
+            override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
         }).fix().fixed
 
         assertRefactored(fixed, """

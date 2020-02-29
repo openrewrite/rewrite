@@ -17,9 +17,10 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
-import org.openrewrite.java.visitor.AstVisitor
 import java.util.concurrent.CountDownLatch
 
 open class MemberReferenceTest : JavaParser() {
@@ -42,7 +43,7 @@ open class MemberReferenceTest : JavaParser() {
 
         val memberRefLatch = CountDownLatch(1)
 
-        object: AstVisitor<Unit?>() {
+        object: JavaSourceVisitor<Unit?>() {
             override fun defaultTo(t: Tree?): Nothing? = null
 
             override fun visitMemberReference(memberRef: J.MemberReference): Unit? {

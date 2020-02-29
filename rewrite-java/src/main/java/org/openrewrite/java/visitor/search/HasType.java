@@ -15,15 +15,15 @@
  */
 package org.openrewrite.java.visitor.search;
 
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.tree.Type;
-import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.visitor.AstVisitor;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 @RequiredArgsConstructor
-public class HasType extends AstVisitor<Boolean> {
+public class HasType extends JavaSourceVisitor<Boolean> {
     private final String clazz;
 
     @Override
@@ -33,7 +33,7 @@ public class HasType extends AstVisitor<Boolean> {
 
     @Override
     public Boolean visitIdentifier(J.Ident ident) {
-        Type.Class asClass = TypeUtils.asClass(ident.getType());
+        JavaType.Class asClass = TypeUtils.asClass(ident.getType());
         return asClass != null && asClass.getFullyQualifiedName().equals(clazz);
     }
 

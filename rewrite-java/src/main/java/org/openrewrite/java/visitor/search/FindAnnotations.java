@@ -15,16 +15,16 @@
  */
 package org.openrewrite.java.visitor.search;
 
-import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
-import org.openrewrite.java.internal.grammar.AspectJLexer;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.tree.Type;
-import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.visitor.AstVisitor;
 import lombok.Data;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
+import org.openrewrite.java.internal.grammar.AspectJLexer;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.List;
 
@@ -32,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public class FindAnnotations extends AstVisitor<List<J.Annotation>> {
+public class FindAnnotations extends JavaSourceVisitor<List<J.Annotation>> {
     private final AnnotationMatcher matcher;
 
     public FindAnnotations(String signature) {
@@ -64,7 +64,7 @@ public class FindAnnotations extends AstVisitor<List<J.Annotation>> {
         }
 
         private boolean matchesAnnotationName(J.Annotation annotation) {
-            Type.Class typeAsClass = TypeUtils.asClass(annotation.getType());
+            JavaType.Class typeAsClass = TypeUtils.asClass(annotation.getType());
             return match.annotationName().getText().equals(typeAsClass == null ? null : typeAsClass.getFullyQualifiedName());
         }
 

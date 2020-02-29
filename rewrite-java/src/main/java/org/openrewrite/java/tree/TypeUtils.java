@@ -25,66 +25,66 @@ public class TypeUtils {
     private TypeUtils() {
     }
 
-    public static List<Type.Var> getVisibleSupertypeMembers(@Nullable Type type) {
-        Type.Class classType = TypeUtils.asClass(type);
+    public static List<JavaType.Var> getVisibleSupertypeMembers(@Nullable JavaType type) {
+        JavaType.Class classType = TypeUtils.asClass(type);
         return classType == null ? emptyList() : classType.getVisibleSupertypeMembers();
     }
 
-    public static boolean isString(@Nullable Type type) {
-        return type instanceof Type.Class && "java.lang.String".equals(((Type.Class) type).getFullyQualifiedName());
+    public static boolean isString(@Nullable JavaType type) {
+        return type instanceof JavaType.Class && "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName());
     }
 
-    public static boolean isOfClassType(@Nullable Type type, String fqn) {
-        Type.Class classType = asClass(type);
+    public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
+        JavaType.Class classType = asClass(type);
         return classType != null && classType.getFullyQualifiedName().equals(fqn);
     }
 
     @Nullable
-    public static Type.Class asClass(@Nullable Type type) {
-        return type instanceof Type.Class ? (Type.Class) type : null;
+    public static JavaType.Class asClass(@Nullable JavaType type) {
+        return type instanceof JavaType.Class ? (JavaType.Class) type : null;
     }
 
     @Nullable
-    public static Type.Array asArray(@Nullable Type type) {
-        return type instanceof Type.Array ? (Type.Array) type : null;
+    public static JavaType.Array asArray(@Nullable JavaType type) {
+        return type instanceof JavaType.Array ? (JavaType.Array) type : null;
     }
 
     @Nullable
-    public static Type.GenericTypeVariable asGeneric(@Nullable Type type) {
-        return type instanceof Type.GenericTypeVariable ? (Type.GenericTypeVariable) type : null;
+    public static JavaType.GenericTypeVariable asGeneric(@Nullable JavaType type) {
+        return type instanceof JavaType.GenericTypeVariable ? (JavaType.GenericTypeVariable) type : null;
     }
 
     @Nullable
-    public static Type.Method asMethod(@Nullable Type type) {
-        return type instanceof Type.Method ? (Type.Method) type : null;
+    public static JavaType.Method asMethod(@Nullable JavaType type) {
+        return type instanceof JavaType.Method ? (JavaType.Method) type : null;
     }
 
     @Nullable
-    public static Type.Primitive asPrimitive(@Nullable Type type) {
-        return type instanceof Type.Primitive ? (Type.Primitive) type : null;
+    public static JavaType.Primitive asPrimitive(@Nullable JavaType type) {
+        return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }
 
-    public static boolean hasElementType(@Nullable Type type, String fullyQualifiedName) {
-        if (type instanceof Type.Array) {
-            return hasElementType(((Type.Array) type).getElemType(), fullyQualifiedName);
+    public static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
+        if (type instanceof JavaType.Array) {
+            return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);
         }
-        if (type instanceof Type.Class) {
-            return ((Type.Class) type).getFullyQualifiedName().equals(fullyQualifiedName);
+        if (type instanceof JavaType.Class) {
+            return ((JavaType.Class) type).getFullyQualifiedName().equals(fullyQualifiedName);
         }
-        if (type instanceof Type.GenericTypeVariable) {
-            return ((Type.GenericTypeVariable) type).getFullyQualifiedName().equals(fullyQualifiedName);
+        if (type instanceof JavaType.GenericTypeVariable) {
+            return ((JavaType.GenericTypeVariable) type).getFullyQualifiedName().equals(fullyQualifiedName);
         }
         return false;
     }
 
-    static boolean deepEquals(List<? extends Type> ts1, List<? extends Type> ts2) {
+    static boolean deepEquals(List<? extends JavaType> ts1, List<? extends JavaType> ts2) {
         if (ts1.size() != ts2.size()) {
             return false;
         }
 
         for (int i = 0; i < ts1.size(); i++) {
-            Type t1 = ts1.get(i);
-            Type t2 = ts2.get(i);
+            JavaType t1 = ts1.get(i);
+            JavaType t2 = ts2.get(i);
             if (t1 == null) {
                 if (t2 != null) {
                     return false;
@@ -97,7 +97,7 @@ public class TypeUtils {
         return true;
     }
 
-    static boolean deepEquals(@Nullable Type t, @Nullable Type t2) {
+    static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
         return t == null ? t2 == null : t.deepEquals(t2);
     }
 }

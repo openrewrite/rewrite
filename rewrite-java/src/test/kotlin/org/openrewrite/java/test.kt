@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java
 
-import org.openrewrite.java.tree.Statement
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.Type
-import org.openrewrite.java.tree.TypeUtils
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import org.openrewrite.java.tree.Statement
+import org.openrewrite.java.tree.TypeUtils
 
 /**
  * The first statement of the first method in the first class declaration
@@ -34,10 +34,10 @@ fun assertRefactored(cu: J.CompilationUnit, refactored: String) {
     assertEquals(refactored.trimIndent(), cu.printTrimmed())
 }
 
-fun Type?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
+fun JavaType?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
 
-fun Type?.asClass(): Type.Class? = TypeUtils.asClass(this)
+fun JavaType?.asClass(): JavaType.Class? = TypeUtils.asClass(this)
 
-fun Type?.asArray(): Type.Array? = TypeUtils.asArray(this)
+fun JavaType?.asArray(): JavaType.Array? = TypeUtils.asArray(this)
 
-fun Type?.asGeneric(): Type.GenericTypeVariable? = TypeUtils.asGeneric(this)
+fun JavaType?.asGeneric(): JavaType.GenericTypeVariable? = TypeUtils.asGeneric(this)

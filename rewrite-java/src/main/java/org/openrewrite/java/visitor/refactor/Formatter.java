@@ -15,14 +15,14 @@
  */
 package org.openrewrite.java.visitor.refactor;
 
-import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.tree.Cursor;
-import org.openrewrite.java.tree.Formatting;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.visitor.CursorAstVisitor;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Cursor;
+import org.openrewrite.Formatting;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
 
 import java.util.Map;
 import java.util.SortedMap;
@@ -98,7 +98,7 @@ public class Formatter {
     }
 
     public Formatting format(Cursor cursor) {
-        return format(cursor.enclosingBlock());
+        return format(cursor.firstEnclosing(J.Block.class));
     }
 
     /**
@@ -127,7 +127,7 @@ public class Formatter {
      * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
      */
     @RequiredArgsConstructor
-    private static class FindIndentVisitor extends CursorAstVisitor<Integer> {
+    private static class FindIndentVisitor extends JavaSourceVisitor<Integer> {
         private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
         private final int enclosingIndent;
 
@@ -181,7 +181,8 @@ public class Formatter {
         }
 
         @Override
-        public Integer visitEnd() {
+        public Integer visitCompilationUnit(J.CompilationUnit cu) {
+            super.visitCompilationUnit(cu);
             return getMostCommonIndent();
         }
 

@@ -15,15 +15,17 @@
  */
 package org.openrewrite.java.tree;
 
+import lombok.RequiredArgsConstructor;
+import org.openrewrite.Cursor;
+import org.openrewrite.Formatting;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.visitor.CursorAstVisitor;
+import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.visitor.refactor.Formatter;
 import org.openrewrite.java.visitor.refactor.ShiftFormatRightVisitor;
-import org.openrewrite.java.visitor.refactor.TransformVisitor;
-import lombok.RequiredArgsConstructor;
-import org.openrewrite.internal.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.MessageFormatter;
@@ -33,14 +35,14 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.java.tree.Formatting.format;
-import static org.openrewrite.java.tree.J.randomId;
-import static org.openrewrite.java.visitor.refactor.Formatter.enclosingIndent;
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Formatting.format;
+import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.java.visitor.refactor.Formatter.enclosingIndent;
 
 @NonNullApi
 public class TreeBuilder {
@@ -81,7 +83,7 @@ public class TreeBuilder {
                         expr,
                         J.Ident.build(randomId(), part.trim(), null, identFmt),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
-                                Type.Class.build(fullName) :
+                                JavaType.Class.build(fullName) :
                                 null,
                         partFmt
                 );
@@ -120,22 +122,23 @@ public class TreeBuilder {
 
         Formatter formatter = new Formatter(cu);
 
-        J.CompilationUnit formattedCu = (J.CompilationUnit) new TransformVisitor(block.getStatements().stream()
-                .flatMap(stat -> {
+        return block.getStatements().stream()
+                .map(stat -> {
                     ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat.getId(), enclosingIndent(insertionScope.getTree()) +
                             formatter.findIndent(enclosingIndent(insertionScope.getTree()), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
-                    return shiftRight.visit(cu).stream();
+                    return (T) shiftRight.visit(stat);
                 })
-                .collect(toList())).visit(cu);
-
-        List<Tree> formattedStatements = formattedCu.getClasses().get(0).getBody().getStatements();
-        J.Block<T> formattedBlock = (J.Block<T>) formattedStatements.get(statements.size() - 1);
-        return formattedBlock.getStatements();
+                .collect(toList());
     }
 
     @RequiredArgsConstructor
-    private static class ListScopeVariables extends CursorAstVisitor<List<String>> {
+    private static class ListScopeVariables extends JavaSourceVisitor<List<String>> {
         private final Cursor scope;
+
+        @Override
+        public boolean isCursored() {
+            return true;
+        }
 
         @Override
         public List<String> defaultTo(@Nullable Tree t) {
@@ -144,19 +147,19 @@ public class TreeBuilder {
 
         @Override
         public List<String> visitVariable(J.VariableDecls.NamedVar variable) {
-            if (getCursor().isInSameNameScope(scope)) {
+            if (isInSameNameScope(scope)) {
                 J.VariableDecls variableDecls = getCursor().getParentOrThrow().getTree();
 
-                Type type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
+                JavaType type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
                 String typeName = "";
-                if (type instanceof Type.Class) {
-                    typeName = ((Type.Class) type).getFullyQualifiedName();
-                } else if (type instanceof Type.ShallowClass) {
-                    typeName = ((Type.ShallowClass) type).getFullyQualifiedName();
-                } else if (type instanceof Type.GenericTypeVariable) {
-                    typeName = ((Type.GenericTypeVariable) type).getFullyQualifiedName();
-                } else if (type instanceof Type.Primitive) {
-                    typeName = ((Type.Primitive) type).getKeyword();
+                if (type instanceof JavaType.Class) {
+                    typeName = ((JavaType.Class) type).getFullyQualifiedName();
+                } else if (type instanceof JavaType.ShallowClass) {
+                    typeName = ((JavaType.ShallowClass) type).getFullyQualifiedName();
+                } else if (type instanceof JavaType.GenericTypeVariable) {
+                    typeName = ((JavaType.GenericTypeVariable) type).getFullyQualifiedName();
+                } else if (type instanceof JavaType.Primitive) {
+                    typeName = ((JavaType.Primitive) type).getKeyword();
                 }
 
                 return singletonList(typeName + " " + variable.getSimpleName());

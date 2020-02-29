@@ -15,13 +15,13 @@
  */
 package org.openrewrite.java.visitor.search;
 
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.visitor.AstVisitor;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
 
 @RequiredArgsConstructor
-public class HasImport extends AstVisitor<Boolean> {
+public class HasImport extends JavaSourceVisitor<Boolean> {
     private final String clazz;
 
     @Override

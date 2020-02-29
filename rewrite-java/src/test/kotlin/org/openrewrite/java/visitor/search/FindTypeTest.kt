@@ -103,8 +103,6 @@ open class FindTypeTest : JavaParser() {
             }
         """, a1)
 
-        b.findType("a.A1").map { b.cursor(it) }
-
         assertEquals(5, b.findType("a.A1").size)
     }
 

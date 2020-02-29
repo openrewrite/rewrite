@@ -32,7 +32,7 @@ open class LiteralTest : JavaParser() {
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals(0, literal.value)
-        assertEquals(Type.Primitive.Int, literal.type)
+        assertEquals(JavaType.Primitive.Int, literal.type)
         assertEquals("0", literal.printTrimmed())
     }
 
@@ -46,7 +46,7 @@ open class LiteralTest : JavaParser() {
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals('a', literal.value)
-        assertEquals(Type.Primitive.Char, literal.type)
+        assertEquals(JavaType.Primitive.Char, literal.type)
         assertEquals("'a'", literal.printTrimmed())
     }
 

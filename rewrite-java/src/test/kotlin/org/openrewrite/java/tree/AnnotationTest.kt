@@ -17,9 +17,10 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
-import org.openrewrite.java.visitor.AstVisitor
 
 open class AnnotationTest : JavaParser() {
     
@@ -94,7 +95,7 @@ open class AnnotationTest : JavaParser() {
             public @interface Annotation {}
         """)
 
-        assertEquals(true, object: AstVisitor<Boolean>() {
+        assertEquals(true, object: JavaSourceVisitor<Boolean>() {
             override fun defaultTo(t: Tree?): Boolean = false
 
             override fun visitTypeName(name: NameTree): Boolean = name.type.asClass()?.fullyQualifiedName == "java.lang.annotation.ElementType"

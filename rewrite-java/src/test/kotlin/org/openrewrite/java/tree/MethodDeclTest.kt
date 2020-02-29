@@ -47,7 +47,7 @@ open class MethodDeclTest : JavaParser() {
         assertEquals("foo", meth.simpleName)
         assertEquals(3, meth.params.params.size)
         assertEquals(1, meth.body!!.statements.size)
-        assertEquals("R", ((meth.returnTypeExpr as J.Ident).type as Type.GenericTypeVariable).fullyQualifiedName)
+        assertEquals("R", ((meth.returnTypeExpr as J.Ident).type as JavaType.GenericTypeVariable).fullyQualifiedName)
 
         assertTrue(meth.hasModifier("public"))
     }

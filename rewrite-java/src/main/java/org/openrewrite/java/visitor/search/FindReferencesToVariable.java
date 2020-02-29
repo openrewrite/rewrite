@@ -15,16 +15,16 @@
  */
 package org.openrewrite.java.visitor.search;
 
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.visitor.AstVisitor;
 
 import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-public class FindReferencesToVariable extends AstVisitor<List<Tree>> {
+public class FindReferencesToVariable extends JavaSourceVisitor<List<Tree>> {
     private final J.Ident variable;
 
     public FindReferencesToVariable(J.Ident variable) {
@@ -55,7 +55,7 @@ public class FindReferencesToVariable extends AstVisitor<List<Tree>> {
         return new HasReferenceToVariableInSubtree().visit(t);
     }
 
-    private class HasReferenceToVariableInSubtree extends AstVisitor<Boolean> {
+    private class HasReferenceToVariableInSubtree extends JavaSourceVisitor<Boolean> {
         @Override
         public Boolean defaultTo(Tree t) {
             return false;

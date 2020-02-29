@@ -15,19 +15,19 @@
  */
 package org.openrewrite.java.visitor.search;
 
-import org.openrewrite.java.tree.NameTree;
-import org.openrewrite.java.tree.Tree;
-import org.openrewrite.java.tree.Type;
-import org.openrewrite.java.tree.TypeUtils;
-import org.openrewrite.java.visitor.AstVisitor;
 import lombok.RequiredArgsConstructor;
+import org.openrewrite.Tree;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
 @RequiredArgsConstructor
-public class FindType extends AstVisitor<Set<NameTree>> {
+public class FindType extends JavaSourceVisitor<Set<NameTree>> {
     private final String clazz;
 
     @Override
@@ -43,7 +43,7 @@ public class FindType extends AstVisitor<Set<NameTree>> {
 
     @Override
     public Set<NameTree> visitTypeName(NameTree name) {
-        Type.Class asClass = TypeUtils.asClass(name.getType());
+        JavaType.Class asClass = TypeUtils.asClass(name.getType());
         if(asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
             Set<NameTree> names = defaultTo(name);
             names.add(name);
