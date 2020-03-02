@@ -114,8 +114,6 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         c = c.withAnnotations(refactor(c.getAnnotations()));
         c = c.withModifiers(refactor(c.getModifiers()));
         c = c.withTypeParameters(refactor(c.getTypeParameters()));
-        c = c.withTypeParameters(c.getTypeParameters() == null ? null :
-                c.getTypeParameters().withParams(refactor(c.getTypeParameters().getParams())));
         c = c.withKind(refactor(c.getKind()));
         c = c.withName(refactor(c.getName()));
         c = c.withExtends(refactor(c.getExtends()));
@@ -248,8 +246,6 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         J.MemberReference m = memberRef;
         m = m.withContaining(refactor(m.getContaining()));
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
-        m = m.withTypeParameters(m.getTypeParameters() == null ? null :
-                m.getTypeParameters().withParams(refactor(m.getTypeParameters().getParams())));
         return m.withReference(refactor(m.getReference()));
     }
 
@@ -258,8 +254,6 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         J.MethodDecl m = method;
         m = m.withAnnotations(refactor(m.getAnnotations()));
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
-        m = m.withTypeParameters(m.getTypeParameters() == null ? null :
-                m.getTypeParameters().withParams(refactor(m.getTypeParameters().getParams())));
         m = m.withReturnTypeExpr(refactor(m.getReturnTypeExpr()));
         m = m.withParams(refactor(m.getParams()));
         m = m.withParams(m.getParams().withParams(refactor(m.getParams().getParams())));
@@ -273,8 +267,6 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         m = refactor(m, this::visitExpression);
         m = m.withSelect(refactor(m.getSelect()));
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
-        m = m.withTypeParameters(m.getTypeParameters() == null ? null :
-                m.getTypeParameters().withParams(refactor(m.getTypeParameters().getParams())));
         m = m.withName(refactor(m.getName()));
         m = m.withArgs(refactor(m.getArgs()));
         return m = m.withArgs(m.getArgs().withArgs(refactor(m.getArgs().getArgs())));
@@ -320,9 +312,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     public J visitParameterizedType(J.ParameterizedType type) {
         J.ParameterizedType p = refactor(type, this::visitExpression);
         p = p.withClazz(refactor(p.getClazz()));
-        p = p.withTypeParameters(refactor(p.getTypeParameters()));
-        return p.withTypeParameters(p.getTypeParameters() == null ? null :
-                p.getTypeParameters().withParams(refactor(p.getTypeParameters().getParams())));
+        return p.withTypeParameters(refactor(p.getTypeParameters()));
     }
 
     @Override
