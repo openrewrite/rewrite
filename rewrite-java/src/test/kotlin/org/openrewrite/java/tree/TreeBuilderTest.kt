@@ -23,7 +23,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaRetrieveCursorVisitor
 import org.openrewrite.java.asClass
 import org.openrewrite.java.assertRefactored
-import org.openrewrite.java.visitor.refactor.JavaRefactorVisitor
+import org.openrewrite.java.refactor.JavaRefactorVisitor
 
 class TreeBuilderTest {
     @Test

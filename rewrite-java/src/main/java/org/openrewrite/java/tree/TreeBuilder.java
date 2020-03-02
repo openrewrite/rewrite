@@ -24,8 +24,8 @@ import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.visitor.refactor.Formatter;
-import org.openrewrite.java.visitor.refactor.ShiftFormatRightVisitor;
+import org.openrewrite.java.refactor.Formatter;
+import org.openrewrite.java.refactor.ShiftFormatRightVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.MessageFormatter;
@@ -42,7 +42,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.visitor.refactor.Formatter.enclosingIndent;
+import static org.openrewrite.java.refactor.Formatter.enclosingIndent;
 
 @NonNullApi
 public class TreeBuilder {

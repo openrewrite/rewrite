@@ -24,7 +24,7 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.internal.JavaPrintVisitor;
-import org.openrewrite.java.visitor.search.*;
+import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
 import java.util.*;
