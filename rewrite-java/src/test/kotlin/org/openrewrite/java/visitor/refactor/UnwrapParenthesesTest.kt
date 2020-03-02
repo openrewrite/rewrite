@@ -55,7 +55,7 @@ class UnwrapParenthesesTest : JavaParser() {
             }
         """.trimIndent())
 
-        val cond = ((a.classes[0].body.statements[0] as J.Block<*>).statements[0] as J.If).ifCondition as J.Parentheses<*>
+        val cond = ((a.classes[0].body.statements[0] as J.Block<*>).statements[0] as J.If).ifCondition.tree as J.Parentheses<*>
         val fixed = a.refactor().visit(UnwrapParentheses(cond)).fix().fixed
 
         assertRefactored(fixed, """

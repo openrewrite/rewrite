@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -28,6 +29,8 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 public abstract class SourceVisitor<R> {
+    private static final boolean IS_DEBUGGING = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
+
     private final ThreadLocal<List<SourceVisitor<R>>> andThen = new ThreadLocal<>();
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
 
@@ -60,7 +63,7 @@ public abstract class SourceVisitor<R> {
     }
 
     public boolean isCursored() {
-        return false;
+        return IS_DEBUGGING;
     }
 
     public Cursor getCursor() {
@@ -127,12 +130,12 @@ public abstract class SourceVisitor<R> {
         return t;
     }
 
-    public final R visit(@Nullable Iterable<? extends Tree> trees) {
+    public R visit(@Nullable List<? extends Tree> trees) {
         R r = defaultTo(null);
         if (trees != null) {
             for (Tree tree : trees) {
                 if (tree != null) {
-                    r = reduce(r, visit(tree));
+                    r = reduce(visit(tree), r);
                 }
             }
         }
@@ -147,7 +150,7 @@ public abstract class SourceVisitor<R> {
         return tree == null ? r : reduce(r, visit(tree));
     }
 
-    public final R visitAfter(R r, @Nullable Iterable<? extends Tree> trees) {
+    public final R visitAfter(R r, @Nullable List<? extends Tree> trees) {
         return reduce(r, visit(trees));
     }
 }
