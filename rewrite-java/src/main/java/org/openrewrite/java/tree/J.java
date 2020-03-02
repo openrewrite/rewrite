@@ -777,6 +777,9 @@ public interface J extends Serializable, Tree {
         List<Modifier> modifiers;
 
         public ClassDecl withModifiers(List<Modifier> modifiers) {
+            if (modifiers == this.modifiers) {
+                return this;
+            }
             return new ClassDecl(id, annotations, modifiers, kind, name, typeParameters,
                     extendings, implementings, body, type, formatting);
         }
@@ -810,6 +813,9 @@ public interface J extends Serializable, Tree {
         TypeTree extendings;
 
         public ClassDecl withExtends(TypeTree extendings) {
+            if(extendings == this.extendings) {
+                return this;
+            }
             return new ClassDecl(id, annotations, modifiers, kind, name,
                     typeParameters, extendings, implementings, body, type, formatting);
         }
@@ -823,6 +829,9 @@ public interface J extends Serializable, Tree {
         List<TypeTree> implementings;
 
         public ClassDecl withImplements(List<TypeTree> implementings) {
+            if(implementings == this.implementings) {
+                return this;
+            }
             return new ClassDecl(id, annotations, modifiers, kind, name,
                     typeParameters, extendings, implementings, body, type, formatting);
         }
@@ -1744,6 +1753,9 @@ public interface J extends Serializable, Tree {
         List<Modifier> modifiers;
 
         public MethodDecl withModifiers(List<Modifier> modifiers) {
+            if (modifiers == this.modifiers) {
+                return this;
+            }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr, name, params,
                     throwz, body, defaultValue, formatting);
         }
@@ -1794,6 +1806,9 @@ public interface J extends Serializable, Tree {
         Throws throwz;
 
         public MethodDecl withThrows(Throws throwz) {
+            if(throwz == this.throwz) {
+                return this;
+            }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr,
                     name, params, throwz, body, defaultValue, formatting);
         }
@@ -2653,6 +2668,9 @@ public interface J extends Serializable, Tree {
         Finally finallie;
 
         public Try withFinally(Finally finallie) {
+            if(finallie == this.finallie) {
+                return this;
+            }
             return new Try(id, resources, body, catches, finallie, formatting);
         }
 
@@ -3017,6 +3035,9 @@ public interface J extends Serializable, Tree {
         List<Modifier> modifiers;
 
         public VariableDecls withModifiers(List<Modifier> modifiers) {
+            if (modifiers == this.modifiers) {
+                return this;
+            }
             return new VariableDecls(id, annotations, modifiers, typeExpr, varargs,
                     dimensionsBeforeName, vars, formatting);
         }
