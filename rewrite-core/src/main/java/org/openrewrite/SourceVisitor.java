@@ -135,7 +135,7 @@ public abstract class SourceVisitor<R> {
         if (trees != null) {
             for (Tree tree : trees) {
                 if (tree != null) {
-                    r = reduce(visit(tree), r);
+                    r = reduce(r, visit(tree));
                 }
             }
         }
