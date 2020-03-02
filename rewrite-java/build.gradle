@@ -1,9 +1,3 @@
-java {
-    registerFeature("bigData") {
-        usingSourceSet(sourceSets["main"])
-    }
-}
-
 // run manually with -x compileKotlin when you need to regenerate
 task generateAntlrSources(type: JavaExec) {
     main = 'org.antlr.v4.Tool'
@@ -29,12 +23,9 @@ dependencies {
     implementation 'com.koloboke:koloboke-api-jdk8:latest.release'
     implementation 'com.koloboke:koloboke-impl-jdk8:latest.release'
 
-    implementation 'com.fasterxml.jackson.core:jackson-databind:latest.release', optional
-    implementation 'com.fasterxml.jackson.core:jackson-annotations:latest.release', optional
-
-    bigDataApi 'com.fasterxml.jackson.core:jackson-databind:latest.release'
-    bigDataApi 'com.fasterxml.jackson.core:jackson-annotations:latest.release'
-    bigDataApi 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release'
+    implementation 'com.fasterxml.jackson.core:jackson-databind:latest.release'
+    implementation 'com.fasterxml.jackson.core:jackson-annotations:latest.release'
+    implementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release'
 
     implementation'org.ow2.asm:asm:latest.release'
     implementation'org.ow2.asm:asm-util:latest.release'
