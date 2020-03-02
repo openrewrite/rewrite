@@ -51,7 +51,7 @@ import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
 
-class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting> {
+class JavaParserVisitor extends TreePathScanner<J, Formatting> {
     private static final Logger logger = LoggerFactory.getLogger(JavaParserVisitor.class);
 
     private final Path path;
@@ -68,7 +68,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitAnnotation(AnnotationTree node, Formatting fmt) {
+    public J visitAnnotation(AnnotationTree node, Formatting fmt) {
         skip("@");
         NameTree name = convert(node.getAnnotationType());
 
@@ -111,7 +111,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitArrayAccess(ArrayAccessTree node, Formatting fmt) {
+    public J visitArrayAccess(ArrayAccessTree node, Formatting fmt) {
         Expression indexed = convert(node.getExpression());
 
         var dimensionPrefix = sourceBefore("[");
@@ -122,7 +122,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitArrayType(ArrayTypeTree node, Formatting fmt) {
+    public J visitArrayType(ArrayTypeTree node, Formatting fmt) {
         var typeIdent = node.getType();
         var dimCount = 1;
 
@@ -142,19 +142,19 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitAssert(AssertTree node, Formatting fmt) {
+    public J visitAssert(AssertTree node, Formatting fmt) {
         skip("assert");
         return new J.Assert(randomId(), convert(((JCAssert) node).cond), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitAssignment(AssignmentTree node, Formatting fmt) {
+    public J visitAssignment(AssignmentTree node, Formatting fmt) {
         Expression variable = convert(node.getVariable(), t -> sourceBefore("="));
         return new J.Assign(randomId(), variable, convert(node.getExpression()), type(node), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitBinary(BinaryTree node, Formatting fmt) {
+    public J visitBinary(BinaryTree node, Formatting fmt) {
         Expression left = convert(node.getLeftOperand());
 
         var opPrefix = Formatting.format(whitespace());
@@ -244,7 +244,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitBlock(BlockTree node, Formatting fmt) {
+    public J visitBlock(BlockTree node, Formatting fmt) {
         J.Empty stat = null;
 
         if ((((JCBlock) node).flags & (long) Flags.STATIC) != 0L) {
@@ -265,7 +265,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitBreak(BreakTree node, Formatting fmt) {
+    public J visitBreak(BreakTree node, Formatting fmt) {
         skip("break");
 
         J.Ident label = null;
@@ -279,7 +279,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitCase(CaseTree node, Formatting fmt) {
+    public J visitCase(CaseTree node, Formatting fmt) {
         Expression pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
         if (pattern == null) {
             pattern = J.Ident.build(randomId(), skip("default"), null, Formatting.format(sourceBefore(":")));
@@ -292,7 +292,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitCatch(CatchTree node, Formatting fmt) {
+    public J visitCatch(CatchTree node, Formatting fmt) {
         skip("catch");
 
         var paramPrefix = sourceBefore("(");
@@ -303,7 +303,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitClass(ClassTree node, Formatting fmt) {
+    public J visitClass(ClassTree node, Formatting fmt) {
         List<J.Annotation> annotations = convertAll(node.getModifiers().getAnnotations(), noDelim, noDelim);
         List<J.Modifier> modifiers = sortedFlags(node.getModifiers());
 
@@ -369,7 +369,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
                 .collect(toList());
 
         var members = Stream.concat(
-                Stream.ofNullable((org.openrewrite.Tree) enumSet),
+                Stream.ofNullable((J) enumSet),
                 convertPossibleMultiVariable(membersMultiVariablesSeparated).stream()
         ).collect(toList());
 
@@ -379,7 +379,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
+    public J visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
         logger.debug(path + " building Rewrite AST from OpenJDK AST");
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
@@ -410,7 +410,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitCompoundAssignment(CompoundAssignmentTree node, Formatting fmt) {
+    public J visitCompoundAssignment(CompoundAssignmentTree node, Formatting fmt) {
         Expression left = convert(((JCAssignOp) node).lhs);
 
         var opPrefix = Formatting.format(whitespace());
@@ -474,7 +474,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitConditionalExpression(ConditionalExpressionTree node, Formatting fmt) {
+    public J visitConditionalExpression(ConditionalExpressionTree node, Formatting fmt) {
         return new J.Ternary(randomId(),
                 convert(node.getCondition(), t -> sourceBefore("?")),
                 convert(node.getTrueExpression(), t -> sourceBefore(":")),
@@ -485,7 +485,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitContinue(ContinueTree node, Formatting fmt) {
+    public J visitContinue(ContinueTree node, Formatting fmt) {
         skip("continue");
         Name label = node.getLabel();
         return new J.Continue(randomId(),
@@ -495,7 +495,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitDoWhileLoop(DoWhileLoopTree node, Formatting fmt) {
+    public J visitDoWhileLoop(DoWhileLoopTree node, Formatting fmt) {
         skip("do");
         Statement stat = convert(node.getStatement());
         var whilePrefix = sourceBefore("while");
@@ -507,12 +507,12 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitEmptyStatement(EmptyStatementTree node, Formatting fmt) {
+    public J visitEmptyStatement(EmptyStatementTree node, Formatting fmt) {
         return new J.Empty(randomId(), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitEnhancedForLoop(EnhancedForLoopTree node, Formatting fmt) {
+    public J visitEnhancedForLoop(EnhancedForLoopTree node, Formatting fmt) {
         skip("for");
         var ctrlPrefix = sourceBefore("(");
         J.VariableDecls variable = convert(node.getVariable(), t -> sourceBefore(":"));
@@ -525,7 +525,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
         );
     }
 
-    private org.openrewrite.Tree visitEnumVariable(VariableTree node, Formatting fmt) {
+    private J visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
         var name = J.Ident.build(randomId(), node.getName().toString(), type(node), Formatting.EMPTY);
 
@@ -544,7 +544,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitForLoop(ForLoopTree node, Formatting fmt) {
+    public J visitForLoop(ForLoopTree node, Formatting fmt) {
         skip("for");
         var ctrlPrefix = sourceBefore("(");
 
@@ -580,13 +580,13 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitIdentifier(IdentifierTree node, Formatting fmt) {
+    public J visitIdentifier(IdentifierTree node, Formatting fmt) {
         cursor += node.getName().toString().length();
         return J.Ident.build(randomId(), node.getName().toString(), type(node), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitIf(IfTree node, Formatting fmt) {
+    public J visitIf(IfTree node, Formatting fmt) {
         skip("if");
 
         J.Parentheses<Expression> ifPart = convert(node.getCondition());
@@ -602,14 +602,14 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitImport(ImportTree node, Formatting fmt) {
+    public J visitImport(ImportTree node, Formatting fmt) {
         skip("import");
         skipPattern("\\s+static");
         return new J.Import(randomId(), convert(node.getQualifiedIdentifier()), node.isStatic(), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitInstanceOf(InstanceOfTree node, Formatting fmt) {
+    public J visitInstanceOf(InstanceOfTree node, Formatting fmt) {
         return new J.InstanceOf(randomId(),
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
@@ -619,7 +619,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitLabeledStatement(LabeledStatementTree node, Formatting fmt) {
+    public J visitLabeledStatement(LabeledStatementTree node, Formatting fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(),
                 J.Ident.build(randomId(), node.getLabel().toString(), null, Formatting.format("", sourceBefore(":"))),
@@ -629,7 +629,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitLambdaExpression(LambdaExpressionTree node, Formatting fmt) {
+    public J visitLambdaExpression(LambdaExpressionTree node, Formatting fmt) {
         var parenthesized = source.charAt(cursor) == '(';
         skip("(");
 
@@ -644,7 +644,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
         var params = new J.Lambda.Parameters(randomId(), parenthesized, paramList);
         var arrow = new J.Lambda.Arrow(randomId(), Formatting.format(sourceBefore("->")));
 
-        org.openrewrite.Tree body;
+        J body;
         if (node.getBody() instanceof JCTree.JCBlock) {
             var prefix = sourceBefore("{");
             cursor--;
@@ -664,7 +664,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitLiteral(LiteralTree node, Formatting fmt) {
+    public J visitLiteral(LiteralTree node, Formatting fmt) {
         cursor(endPos(node));
         var value = node.getValue();
         var type = primitive(((JCTree.JCLiteral) node).typetag);
@@ -677,7 +677,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitMemberReference(MemberReferenceTree node, Formatting fmt) {
+    public J visitMemberReference(MemberReferenceTree node, Formatting fmt) {
         JCMemberReference ref = (JCMemberReference) node;
         Expression expr = convert(ref.expr, t -> sourceBefore("::"));
 
@@ -699,7 +699,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitMemberSelect(MemberSelectTree node, Formatting fmt) {
+    public J visitMemberSelect(MemberSelectTree node, Formatting fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
         Expression target = convert(fieldAccess.selected, t -> sourceBefore("."));
         var name = J.Ident.build(randomId(), fieldAccess.name.toString(), null, Formatting.format(sourceBefore(fieldAccess.name.toString())));
@@ -707,7 +707,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitMethodInvocation(MethodInvocationTree node, Formatting fmt) {
+    public J visitMethodInvocation(MethodInvocationTree node, Formatting fmt) {
         var jcSelect = ((JCTree.JCMethodInvocation) node).getMethodSelect();
 
         Expression select = null;
@@ -781,7 +781,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitMethod(MethodTree node, Formatting fmt) {
+    public J visitMethod(MethodTree node, Formatting fmt) {
         logger.trace("Visiting method {}", node.getName());
 
         List<J.Annotation> annotations = convertAll(node.getModifiers().getAnnotations(), noDelim, noDelim);
@@ -836,7 +836,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitNewArray(NewArrayTree node, Formatting fmt) {
+    public J visitNewArray(NewArrayTree node, Formatting fmt) {
         skip("new");
 
         var jcVarType = ((JCNewArray) node).elemtype;
@@ -881,7 +881,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitNewClass(NewClassTree node, Formatting fmt) {
+    public J visitNewClass(NewClassTree node, Formatting fmt) {
         skip("new");
         TypeTree clazz = convert(node.getIdentifier());
 
@@ -909,18 +909,18 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitParameterizedType(ParameterizedTypeTree node, Formatting fmt) {
+    public J visitParameterizedType(ParameterizedTypeTree node, Formatting fmt) {
         return new J.ParameterizedType(randomId(), convert(node.getType()), convertTypeParameters(node.getTypeArguments()), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitParenthesized(ParenthesizedTree node, Formatting fmt) {
+    public J visitParenthesized(ParenthesizedTree node, Formatting fmt) {
         skip("(");
         return new J.Parentheses<Expression>(randomId(), convert(node.getExpression(), t -> sourceBefore(")")), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitPrimitiveType(PrimitiveTypeTree node, Formatting fmt) {
+    public J visitPrimitiveType(PrimitiveTypeTree node, Formatting fmt) {
         cursor(endPos(node));
 
         JavaType.Primitive primitiveType;
@@ -960,13 +960,13 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitReturn(ReturnTree node, Formatting fmt) {
+    public J visitReturn(ReturnTree node, Formatting fmt) {
         skip("return");
         return new J.Return(randomId(), convertOrNull(node.getExpression()), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitSwitch(SwitchTree node, Formatting fmt) {
+    public J visitSwitch(SwitchTree node, Formatting fmt) {
         skip("switch");
         J.Parentheses<Expression> selector = convert(node.getExpression());
 
@@ -977,7 +977,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitSynchronized(SynchronizedTree node, Formatting fmt) {
+    public J visitSynchronized(SynchronizedTree node, Formatting fmt) {
         skip("synchronized");
         return new J.Synchronized(randomId(),
                 convert(node.getExpression()),
@@ -987,13 +987,13 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitThrow(ThrowTree node, Formatting fmt) {
+    public J visitThrow(ThrowTree node, Formatting fmt) {
         skip("throw");
         return new J.Throw(randomId(), convert(node.getExpression()), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitTry(TryTree node, Formatting fmt) {
+    public J visitTry(TryTree node, Formatting fmt) {
         skip("try");
         J.Try.Resources resources = null;
         if (!node.getResources().isEmpty()) {
@@ -1016,7 +1016,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitTypeCast(TypeCastTree node, Formatting fmt) {
+    public J visitTypeCast(TypeCastTree node, Formatting fmt) {
         var clazzPrefix = sourceBefore("(");
         var clazz = new J.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
                 Formatting.format(clazzPrefix));
@@ -1025,7 +1025,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitTypeParameter(TypeParameterTree node, Formatting fmt) {
+    public J visitTypeParameter(TypeParameterTree node, Formatting fmt) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations(), noDelim, noDelim);
 
         var name = TreeBuilder.buildName(node.getName().toString(), Formatting.format(sourceBefore(node.getName().toString())));
@@ -1042,12 +1042,12 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitUnionType(UnionTypeTree node, Formatting fmt) {
+    public J visitUnionType(UnionTypeTree node, Formatting fmt) {
         return new J.MultiCatch(randomId(), convertAll(node.getTypeAlternatives(), t -> sourceBefore("|"), noDelim), fmt);
     }
 
     @Override
-    public org.openrewrite.Tree visitUnary(UnaryTree node, Formatting fmt) {
+    public J visitUnary(UnaryTree node, Formatting fmt) {
         JCUnary unary = (JCUnary) node;
         var tag = unary.getTag();
         J.Unary.Operator op;
@@ -1100,7 +1100,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitVariable(VariableTree node, Formatting fmt) {
+    public J visitVariable(VariableTree node, Formatting fmt) {
         return hasFlag(node.getModifiers(), Flags.ENUM) ?
                 visitEnumVariable(node, fmt) :
                 visitVariables(singletonList(node), fmt); // method arguments cannot be multi-declarations
@@ -1185,7 +1185,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitWhileLoop(WhileLoopTree node, Formatting fmt) {
+    public J visitWhileLoop(WhileLoopTree node, Formatting fmt) {
         skip("while");
         return new J.WhileLoop(randomId(),
                 convert(node.getCondition()),
@@ -1195,7 +1195,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     }
 
     @Override
-    public org.openrewrite.Tree visitWildcard(WildcardTree node, Formatting fmt) {
+    public J visitWildcard(WildcardTree node, Formatting fmt) {
         skip("?");
 
         JCWildcard wildcard = (JCWildcard) node;
@@ -1222,11 +1222,11 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
      * --------------
      */
 
-    private <T extends org.openrewrite.Tree> T convert(com.sun.source.tree.Tree t) {
+    private <T extends J> T convert(com.sun.source.tree.Tree t) {
         return convert(t, t2 -> "");
     }
 
-    private <T extends org.openrewrite.Tree> T convert(com.sun.source.tree.Tree t2, Function<com.sun.source.tree.Tree, String> suffix) {
+    private <T extends J> T convert(com.sun.source.tree.Tree t2, Function<com.sun.source.tree.Tree, String> suffix) {
         try {
             var prefix = source.substring(cursor, max(((JCTree) t2).getStartPosition(), cursor));
             cursor += prefix.length();
@@ -1266,16 +1266,16 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
         logger.error("--- END PATH ---");
     }
 
-    private <T extends org.openrewrite.Tree> T convertOrNull(@Nullable com.sun.source.tree.Tree t) {
+    private <T extends J> T convertOrNull(@Nullable com.sun.source.tree.Tree t) {
         return convertOrNull(t, t2 -> "");
     }
 
     @Nullable
-    private <T extends org.openrewrite.Tree> T convertOrNull(@Nullable com.sun.source.tree.Tree t, Function<com.sun.source.tree.Tree, String> suffix) {
+    private <T extends J> T convertOrNull(@Nullable com.sun.source.tree.Tree t, Function<com.sun.source.tree.Tree, String> suffix) {
         return t == null ? null : convert(t, suffix);
     }
 
-    private <T extends org.openrewrite.Tree> List<T> convertAll(List<? extends Tree> trees, Function<Tree, String> innerSuffix, Function<Tree, String> suffix) {
+    private <T extends J> List<T> convertAll(List<? extends Tree> trees, Function<Tree, String> innerSuffix, Function<Tree, String> suffix) {
         List<T> converted = new ArrayList<>(trees.size());
         for (int i = 0; i < trees.size(); i++) {
             converted.add(convert(trees.get(i), i == trees.size() - 1 ? suffix : innerSuffix));
@@ -1328,7 +1328,7 @@ class JavaParserVisitor extends TreePathScanner<org.openrewrite.Tree, Formatting
     };
 
     @SuppressWarnings("unchecked")
-    private <T extends org.openrewrite.Tree> List<T> convertPossibleMultiVariable(@Nullable List<? extends Tree> trees) {
+    private <T extends J> List<T> convertPossibleMultiVariable(@Nullable List<? extends Tree> trees) {
         if (trees == null)
             return emptyList();
 

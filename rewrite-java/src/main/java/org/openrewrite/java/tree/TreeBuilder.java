@@ -95,7 +95,7 @@ public class TreeBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T extends Tree> List<T> buildSnippet(J.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
+    public static <T extends J> List<T> buildSnippet(J.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
         JavaParser parser = new JavaParser(emptyList(), Charset.defaultCharset(), true);
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
@@ -117,7 +117,7 @@ public class TreeBuilder {
         }
 
         J.CompilationUnit cu = parser.parse(source);
-        List<Tree> statements = cu.getClasses().get(0).getBody().getStatements();
+        List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
         Formatter formatter = new Formatter(cu);

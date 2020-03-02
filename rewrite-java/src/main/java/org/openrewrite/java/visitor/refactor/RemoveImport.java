@@ -18,7 +18,7 @@ package org.openrewrite.java.visitor.refactor;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.internal.MethodMatcher;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.*;
 
 import java.util.Collections;

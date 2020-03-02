@@ -53,8 +53,8 @@ public class ShiftFormatRightVisitor extends ScopedJavaRefactorVisitor {
     }
 
     @Override
-    public J visitBlock(J.Block<Tree> block) {
-        J.Block<Tree> b = refactor(block, super::visitBlock);
+    public J visitBlock(J.Block<J> block) {
+        J.Block<J> b = refactor(block, super::visitBlock);
         if (isScopeInCursorPath()) {
             b = b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift);
         }

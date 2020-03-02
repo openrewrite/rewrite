@@ -214,7 +214,7 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
     }
 
     @Override
-    public String visitBlock(Block<Tree> block) {
+    public String visitBlock(Block<J> block) {
         return fmt(block, fmt(block.getStatic(), "static") + "{" + visitStatements(block.getStatements()) + block.getEndOfBlockSuffix() + "}");
     }
 
@@ -474,7 +474,7 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
     }
 
     @Override
-    public <T extends Tree> String visitParentheses(Parentheses<T> parens) {
+    public <T extends J> String visitParentheses(Parentheses<T> parens) {
         return fmt(parens, "(" + visit(parens.getTree()) + ")");
     }
 

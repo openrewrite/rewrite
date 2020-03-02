@@ -17,7 +17,7 @@ package org.openrewrite.java.visitor.search;
 
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.internal.MethodMatcher;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;

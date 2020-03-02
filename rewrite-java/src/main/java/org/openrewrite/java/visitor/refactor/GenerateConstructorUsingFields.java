@@ -47,7 +47,7 @@ public class GenerateConstructorUsingFields extends ScopedJavaRefactorVisitor {
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         if (isScope() && !hasRequiredArgsConstructor(classDecl)) {
-            List<Tree> statements = classDecl.getBody().getStatements();
+            List<J> statements = classDecl.getBody().getStatements();
 
             int lastField = 0;
             for (int i = 0; i < statements.size(); i++) {

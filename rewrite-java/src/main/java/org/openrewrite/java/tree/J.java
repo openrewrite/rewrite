@@ -674,7 +674,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class Block<T extends Tree> implements J, Statement {
+    class Block<T extends J> implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -703,7 +703,7 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitBlock((Block<Tree>) this);
+            return v.visitBlock((Block<J>) this);
         }
 
         @JsonIgnore
@@ -834,7 +834,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        Block<Tree> body;
+        Block<J> body;
 
         @Getter
         @Nullable
@@ -2432,7 +2432,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Parentheses<T extends Tree> implements J, Expression {
+    class Parentheses<T extends J> implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 

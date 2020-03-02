@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.visitor.refactor;
 
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -81,7 +80,7 @@ public class AddField extends ScopedJavaRefactorVisitor {
                     formatter.format(body)
             );
 
-            List<Tree> statements = new ArrayList<>(body.getStatements().size() + 1);
+            List<J> statements = new ArrayList<>(body.getStatements().size() + 1);
             statements.add(newField);
             statements.addAll(body.getStatements());
 

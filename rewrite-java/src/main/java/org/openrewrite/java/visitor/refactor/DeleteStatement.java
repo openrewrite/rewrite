@@ -76,8 +76,8 @@ public class DeleteStatement extends ScopedJavaRefactorVisitor {
     }
 
     @Override
-    public J visitBlock(J.Block<Tree> block) {
-        J.Block<Tree> b = refactor(block, super::visitBlock);
+    public J visitBlock(J.Block<J> block) {
+        J.Block<J> b = refactor(block, super::visitBlock);
 
         if (block.getStatements().stream().anyMatch(this::isScope)) {
             b = b.withStatements(b.getStatements().stream()
@@ -96,7 +96,7 @@ public class DeleteStatement extends ScopedJavaRefactorVisitor {
         return super.visitTree(tree);
     }
 
-    private J.Block<Tree> emptyBlock() {
+    private J.Block<J> emptyBlock() {
         return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, "");
     }
 }

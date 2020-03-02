@@ -88,8 +88,8 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     @Override
-    public J visitBlock(J.Block<Tree> block) {
-        J.Block<Tree> b = refactor(block, this::visitStatement);
+    public J visitBlock(J.Block<J> block) {
+        J.Block<J> b = refactor(block, this::visitStatement);
         b = refactor(b, super::visitBlock);
         return b.withStatements(refactor(b.getStatements()));
     }
@@ -356,7 +356,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     @Override
-    public <T extends Tree> J visitParentheses(J.Parentheses<T> parens) {
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens) {
         J.Parentheses<T> p = refactor(parens, this::visitExpression);
         p = refactor(p, super::visitParentheses);
         return p.withTree(refactor(p.getTree()));

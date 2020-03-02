@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceVisitor;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -181,7 +180,7 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
         );
     }
 
-    public R visitBlock(J.Block<Tree> block) {
+    public R visitBlock(J.Block<J> block) {
         return reduce(
                 defaultTo(block),
                 reduce(
@@ -630,7 +629,7 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
         );
     }
 
-    public <T extends Tree> R visitParentheses(J.Parentheses<T> parens) {
+    public <T extends J> R visitParentheses(J.Parentheses<T> parens) {
         return reduce(
                 defaultTo(parens),
                 reduce(
