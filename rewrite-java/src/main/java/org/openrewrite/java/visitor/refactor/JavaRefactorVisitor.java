@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.visitor.refactor;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.RefactorVisitorSupport;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -500,6 +501,12 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         RemoveImport op = new RemoveImport(fullyQualifiedName);
         if (!andThen().contains(op)) {
             andThen(op);
+        }
+    }
+
+    protected void maybeUnwrapParentheses(Cursor parensCursor) {
+        if(UnwrapParentheses.isUnwrappable(parensCursor)) {
+            andThen(new UnwrapParentheses(parensCursor.getTree()));
         }
     }
 }
