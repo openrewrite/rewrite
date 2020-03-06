@@ -23,6 +23,25 @@ open class TypeParameterAndWildcardTest : JavaParser() {
     private val bc = listOf("public interface B {}", "public interface C {}")
 
     @Test
+    fun annotatedTypeParametersOnReturnTypeExpression() {
+        val aSource = """
+            import java.util.List;
+            public class A {
+                public List<
+                    @NotNull(groups = Prioritized.P1.class)
+                    @javax.validation.Valid
+                    B> foo() {
+                    return null;
+                }
+            }
+        """.trimIndent()
+
+        val a = parse(aSource, "public class B {}")
+
+        assertEquals(aSource, a.print())
+    }
+
+    @Test
     fun extendsAndSuper() {
         val a = parse("""
             import java.util.List;

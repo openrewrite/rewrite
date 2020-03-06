@@ -77,8 +77,12 @@ public abstract class SourceVisitor<R> {
     public void nextCycle() {
         synchronized (this) {
             cycle++;
+            if(andThen.get() != null) {
+                andThen.get().clear();
+            } else {
+                andThen.set(new ArrayList<>());
+            }
         }
-        andThen.get().clear();
     }
 
     @Nullable
