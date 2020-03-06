@@ -64,6 +64,8 @@ public class JavaParser {
      */
     private final boolean relaxedClassTypeMatching;
 
+    private boolean logCompilationWarningsAndErrors = true;
+
     @Nullable
     private final List<Path> classpath;
 
@@ -126,7 +128,7 @@ public class JavaParser {
             @Override
             public void write(char[] cbuf, int off, int len) {
                 var log = new String(Arrays.copyOfRange(cbuf, off, len));
-                if (!log.isBlank()) {
+                if (logCompilationWarningsAndErrors && !log.isBlank()) {
                     logger.warn(log);
                 }
             }
@@ -253,6 +255,11 @@ public class JavaParser {
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).newRound();
+    }
+
+    public JavaParser setLogCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
+        this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
+        return this;
     }
 
     /**

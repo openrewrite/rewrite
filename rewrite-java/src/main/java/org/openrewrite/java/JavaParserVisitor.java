@@ -380,7 +380,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
-        logger.debug(path + " building Rewrite AST from OpenJDK AST");
+        logger.debug("Building AST for: " + path);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         var prefix = source.substring(0, cu.getStartPosition());
