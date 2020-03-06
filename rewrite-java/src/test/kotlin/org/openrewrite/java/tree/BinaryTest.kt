@@ -62,4 +62,22 @@ open class BinaryTest : JavaParser() {
 
         assertEquals("\"a\" + \"b\"", parse(a).classes[0].fields[0].vars[0].initializer?.printTrimmed())
     }
+
+    @Test
+    fun endOfLineBreaks() {
+        val aSource = """
+            import java.util.Objects;
+            public class A {
+                {
+                    boolean b = Objects.equals(1, 2) //
+                        && Objects.equals(3, 4) //
+                        && Objects.equals(4, 5);
+                }
+            }
+        """.trimIndent()
+
+        val a = parse(aSource)
+
+        assertEquals(aSource, a.print())
+    }
 }

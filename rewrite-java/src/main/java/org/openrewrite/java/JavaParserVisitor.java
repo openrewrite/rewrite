@@ -1251,20 +1251,22 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
         var paths = stream(getCurrentPath().spliterator(), false).collect(toList());
         for (int i = paths.size(); i-- > 0; ) {
             JCTree tree = (JCTree) paths.get(i);
-            var lineNumber = source.substring(0, tree.getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
-
             if (tree instanceof JCCompilationUnit) {
                 logger.error("JCCompilationUnit(sourceFile = " + ((JCCompilationUnit) tree).sourcefile.getName() + ")");
             } else if (tree instanceof JCClassDecl) {
-                logger.error("JCClassDecl(name = " + ((JCClassDecl) tree).name + ")");
+                logger.error("JCClassDecl(name = " + ((JCClassDecl) tree).name + ", line = " + lineNumber(tree) + ")");
             } else if (tree instanceof JCVariableDecl) {
-                logger.error("JCVariableDecl(name = " + ((JCVariableDecl) tree).name + ", line = " + lineNumber + ")");
+                logger.error("JCVariableDecl(name = " + ((JCVariableDecl) tree).name + ", line = " + lineNumber(tree) + ")");
             } else {
-                logger.error(tree.getClass().getSimpleName() + "(line = " + lineNumber + ")");
+                logger.error(tree.getClass().getSimpleName() + "(line = " + lineNumber(tree) + ")");
             }
         }
 
         logger.error("--- END PATH ---");
+    }
+
+    private long lineNumber(Tree tree) {
+        return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
     }
 
     private <T extends J> T convertOrNull(@Nullable com.sun.source.tree.Tree t) {
@@ -1570,22 +1572,22 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
 
         int delimIndex = cursor;
         for (; delimIndex < source.length(); delimIndex++) {
-            if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
+            if (inSingleLineComment && (source.charAt(delimIndex) == '\n' || source.charAt(delimIndex) == '\r')) {
                 inSingleLineComment = false;
             } else {
                 if (source.length() > delimIndex + 1) {
                     switch (source.substring(delimIndex, delimIndex + 2)) {
                         case "//":
                             inSingleLineComment = true;
-                            delimIndex += 2;
+                            delimIndex++;
                             continue;
                         case "/*":
                             inMultiLineComment = true;
-                            delimIndex += 2;
+                            delimIndex++;
                             continue;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex += 2;
+                            delimIndex++;
                             continue;
                     }
                 }
