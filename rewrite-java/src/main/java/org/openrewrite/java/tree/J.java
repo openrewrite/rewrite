@@ -62,6 +62,38 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    class AnnotatedType implements J, Expression, TypeTree {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        List<J.Annotation> annotations;
+
+        @With
+        TypeTree typeExpr;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public JavaType getType() {
+            return typeExpr.getType();
+        }
+
+        @Override
+        public AnnotatedType withType(@Nullable JavaType type) {
+            return withTypeExpr(typeExpr.withType(type));
+        }
+
+        @Override
+        public <R> R acceptJava(JavaSourceVisitor<R> v) {
+            return v.visitAnnotatedType(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
     class Annotation implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;

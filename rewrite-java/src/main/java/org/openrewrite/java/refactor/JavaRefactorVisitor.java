@@ -32,6 +32,13 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     @Override
+    public J visitAnnotatedType(J.AnnotatedType annotatedType) {
+        J.AnnotatedType a = refactor(annotatedType, super::visitExpression);
+        a = a.withAnnotations(refactor(a.getAnnotations()));
+        return a.withTypeExpr(refactor(a.getTypeExpr()));
+    }
+
+    @Override
     public J visitAnnotation(J.Annotation annotation) {
         J.Annotation a = refactor(annotation, this::visitExpression);
         a = a.withArgs(refactor(a.getArgs() == null ? null :

@@ -1028,9 +1028,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitAnnotatedType(AnnotatedTypeTree node, Formatting formatting) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations(), noDelim, noDelim);
-        Expression name = convert(node.getUnderlyingType());
-
-        return new J.TypeParameter(randomId(), annotations, name, null, formatting);
+        return new J.AnnotatedType(randomId(), annotations, convert(node.getUnderlyingType()), formatting);
     }
 
     @Override
@@ -1300,7 +1298,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         var typeArgPrefix = sourceBefore("<");
-        List<J> typeArgs;
+        List<Expression> typeArgs;
         if (typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
             // adding space before > as a suffix to be consistent with space before > for non-empty lists of type args
@@ -1312,9 +1310,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
         // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
         // elsewhere in the tree
         return new J.TypeParameters(randomId(), typeArgs.stream()
-                .map(gp -> gp instanceof J.TypeParameter ?
-                        (J.TypeParameter) gp :
-                        new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
+                .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
                 .collect(toList()),
                 format(typeArgPrefix));
     }

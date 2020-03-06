@@ -36,11 +36,6 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     @Nullable
-    public J.VariableDecls enclosingVariableDecl() {
-        return getCursor().firstEnclosing(J.VariableDecls.class);
-    }
-
-    @Nullable
     public J.MethodDecl enclosingMethod() {
         return getCursor().firstEnclosing(J.MethodDecl.class);
     }
@@ -98,6 +93,22 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
 
     public R visitTypeName(NameTree name) {
         return defaultTo(name);
+    }
+
+    public R visitAnnotatedType(J.AnnotatedType annotatedType) {
+        return reduce(
+                defaultTo(annotatedType),
+                reduce(
+                        visitExpression(annotatedType),
+                        visitTypeNameAfter(
+                                visitAfter(
+                                        visit(annotatedType.getTypeExpr()),
+                                        annotatedType.getAnnotations()
+                                ),
+                                annotatedType.getTypeExpr()
+                        )
+                )
+        );
     }
 
     public R visitAnnotation(J.Annotation annotation) {

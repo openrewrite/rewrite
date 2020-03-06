@@ -107,6 +107,11 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
     }
 
     @Override
+    public String visitAnnotatedType(AnnotatedType annotatedType) {
+        return fmt(annotatedType, visit(annotatedType.getAnnotations(), "") + visit(annotatedType.getTypeExpr()));
+    }
+
+    @Override
     public String visitAnnotation(Annotation annotation) {
         var args = annotation.getArgs() == null ? "" :
                 fmt(annotation.getArgs(), "(" + visit(annotation.getArgs().getArgs(), ",") + ")");
