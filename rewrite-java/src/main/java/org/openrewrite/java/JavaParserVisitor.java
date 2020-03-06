@@ -1725,6 +1725,10 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
                             return new J.Modifier.Strictfp(randomId(), modFormat);
                         case SYNCHRONIZED:
                             return new J.Modifier.Synchronized(randomId(), modFormat);
+                        case TRANSIENT:
+                            return new J.Modifier.Transient(randomId(), modFormat);
+                        case VOLATILE:
+                            return new J.Modifier.Volatile(randomId(), modFormat);
                         default:
                             throw new IllegalArgumentException("Unexpected modifier " + mod);
                     }
