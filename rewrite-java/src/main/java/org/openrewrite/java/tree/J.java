@@ -1187,7 +1187,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Arguments initializer;
+        NewClass initializer;
 
         @With
         Formatting formatting;
@@ -1195,20 +1195,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitEnumValue(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static class Arguments implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Expression> args;
-
-            @With
-            Formatting formatting;
         }
     }
 
@@ -2369,9 +2355,11 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Nullable
         @With
         TypeTree clazz;
 
+        @Nullable
         @With
         Arguments args;
 

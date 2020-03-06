@@ -48,6 +48,7 @@ import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
+import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
@@ -351,7 +352,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
                 return semicolonPresent.get() ? sourceBefore(";", '}') : "";
             });
 
-            enumSet = new J.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), Formatting.EMPTY);
+            enumSet = new J.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), EMPTY);
         }
 
         List<? extends Tree> membersMultiVariablesSeparated = node.getMembers().stream()
@@ -528,17 +529,11 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
 
     private J visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
-        var name = J.Ident.build(randomId(), node.getName().toString(), type(node), Formatting.EMPTY);
+        var name = J.Ident.build(randomId(), node.getName().toString(), type(node), EMPTY);
 
-        J.EnumValue.Arguments initializer = null;
-        if (source.charAt(endPos(node) - 1) == ')') {
-            var initPrefix = sourceBefore("(");
-            List<JCExpression> unconvertedArgs = ((JCNewClass) node.getInitializer()).args;
-            List<Expression> args = convertAll(unconvertedArgs, commaDelim, t -> sourceBefore(")"));
-            if (unconvertedArgs.isEmpty()) {
-                args = singletonList(new J.Empty(randomId(), format(sourceBefore(")"))));
-            }
-            initializer = new J.EnumValue.Arguments(randomId(), args, format(initPrefix));
+        J.NewClass initializer = null;
+        if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
+            initializer = convert(node.getInitializer());
         }
 
         return new J.EnumValue(randomId(), name, initializer, fmt);
@@ -724,7 +719,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
             var genericPrefix = sourceBefore("<");
             List<Expression> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
             typeParams = new J.TypeParameters(randomId(), genericParams.stream()
-                    .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(Formatting.EMPTY), null, gp.getFormatting()))
+                    .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
                     .collect(toList()),
                     format(genericPrefix));
         }
@@ -884,14 +879,19 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitNewClass(NewClassTree node, Formatting fmt) {
         skip("new");
-        TypeTree clazz = convert(node.getIdentifier());
 
-        var argPrefix = sourceBefore("(");
-        var args = new J.NewClass.Arguments(randomId(),
-                node.getArguments().isEmpty() ?
-                        singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
-                        convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")),
-                format(argPrefix));
+        // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
+        TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
+
+        J.NewClass.Arguments args = null;
+        if(positionOfNext("(", '{') > -1) {
+            var argPrefix = sourceBefore("(");
+            args = new J.NewClass.Arguments(randomId(),
+                    node.getArguments().isEmpty() ?
+                            singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
+                            convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")),
+                    format(argPrefix));
+        }
 
         J.Block<?> body = null;
         if (node.getClassBody() != null) {
@@ -1085,12 +1085,12 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
                 break;
             case COMPL:
                 skip("~");
-                op = new J.Unary.Operator.Complement(randomId(), Formatting.EMPTY);
+                op = new J.Unary.Operator.Complement(randomId(), EMPTY);
                 expr = convert(unary.arg);
                 break;
             case NOT:
                 skip("!");
-                op = new J.Unary.Operator.Not(randomId(), Formatting.EMPTY);
+                op = new J.Unary.Operator.Not(randomId(), EMPTY);
                 expr = convert(unary.arg);
                 break;
             default:
@@ -1302,7 +1302,7 @@ class JavaParserVisitor extends TreePathScanner<J, Formatting> {
         // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
         // elsewhere in the tree
         return new J.TypeParameters(randomId(), typeArgs.stream()
-                .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(Formatting.EMPTY), null, gp.getFormatting()))
+                .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
                 .collect(toList()),
                 format(typeArgPrefix));
     }

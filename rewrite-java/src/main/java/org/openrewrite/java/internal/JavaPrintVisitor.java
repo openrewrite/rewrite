@@ -278,9 +278,17 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
 
     @Override
     public String visitEnumValue(EnumValue enoom) {
-        var initializer = enoom.getInitializer() == null ? "" :
-                fmt(enoom.getInitializer(), "(" + visit(enoom.getInitializer().getArgs(), ",") + ")");
-        return fmt(enoom, visit(enoom.getName()) + initializer);
+        var init = "";
+
+        NewClass initializer = enoom.getInitializer();
+        if(initializer != null) {
+            if(initializer.getArgs() != null) {
+                init = fmt(initializer.getArgs(), "(" + visit(initializer.getArgs().getArgs(), ",") + ")");
+            }
+            init = fmt(initializer, init + visit(initializer.getBody()));
+        }
+
+        return fmt(enoom, visit(enoom.getName()) + init);
     }
 
     @Override
