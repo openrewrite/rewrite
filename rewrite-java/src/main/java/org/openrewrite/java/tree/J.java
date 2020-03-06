@@ -27,6 +27,7 @@ import org.openrewrite.java.internal.JavaPrintVisitor;
 import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -34,10 +35,11 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Formatting.EMPTY;
+import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -1000,6 +1002,9 @@ public interface J extends Serializable, Tree {
         String sourcePath;
 
         @With
+        Map<String, String> metadata;
+
+        @With
         @Nullable
         Package packageDecl;
 
@@ -1045,6 +1050,27 @@ public interface J extends Serializable, Tree {
         @JsonProperty("@c")
         public String getJacksonPolymorphicTypeTag() {
             return jacksonPolymorphicTypeTag;
+        }
+
+        public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
+            String sourcePath = sourceSet.resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator"))).toString();
+            return new J.CompilationUnit(randomId(),
+                    sourcePath,
+                    emptyMap(),
+                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), EMPTY),
+                    emptyList(),
+                    singletonList(new J.ClassDecl(randomId(),
+                            emptyList(),
+                            emptyList(),
+                            new ClassDecl.Kind.Class(randomId(), EMPTY),
+                            TreeBuilder.buildName(className).withPrefix(" "),
+                            null,
+                            null,
+                            emptyList(),
+                            new Try.Block<>(randomId(), null, emptyList(), format(" "), "\n"),
+                            JavaType.Class.build(packageName + "." + className),
+                            format("\n\n")).withModifiers("public")),
+                    EMPTY);
         }
     }
 
@@ -1543,7 +1569,8 @@ public interface J extends Serializable, Tree {
                 }
             }
 
-            return p1s.length < p2s.length ? -1 : 0;
+            return p1s.length < p2s.length ? -1 :
+                    this.getQualid().getSimpleName().compareTo(o.getQualid().getSimpleName());
         }
     }
 
@@ -1647,7 +1674,7 @@ public interface J extends Serializable, Tree {
             @With
             List<? extends Tree> params;
 
-            Formatting formatting = Formatting.EMPTY;
+            Formatting formatting = EMPTY;
 
             @SuppressWarnings("unchecked")
             @Override
@@ -2020,20 +2047,20 @@ public interface J extends Serializable, Tree {
                     for (int i = 0; i < sizeBeforeAdd; i++) {
                         Modifier m = modifiers.get(i);
                         if (m instanceof Static) {
-                            modifiers.add(i + 1, new Final(randomId(), Formatting.format(" ")));
+                            modifiers.add(i + 1, new Final(randomId(), format(" ")));
                             finalAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(i + 1, new Final(randomId(), Formatting.format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getFormatting().getSuffix())));
                             finalAdded = true;
                         }
                     }
 
                     if (!finalAdded) {
-                        modifiers.add(0, new Final(randomId(), Formatting.EMPTY));
+                        modifiers.add(0, new Final(randomId(), EMPTY));
                     }
                 } else if ("static".equals(modifier) && !hasModifier(existing, "static")) {
                     boolean staticAdded = false;
@@ -2044,21 +2071,21 @@ public interface J extends Serializable, Tree {
                         if (m instanceof Private || m instanceof Protected || m instanceof Public) {
                             afterAccessModifier = i + 1;
                         } else if (m instanceof Final) {
-                            modifiers.set(i, m.withFormatting(Formatting.format(" ", m.getFormatting().getSuffix())));
-                            modifiers.add(i, new Static(randomId(), Formatting.format(m.getFormatting().getPrefix())));
+                            modifiers.set(i, m.withFormatting(format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(i, new Static(randomId(), format(m.getFormatting().getPrefix())));
                             staticAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(afterAccessModifier, new Static(randomId(), Formatting.format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getFormatting().getSuffix())));
                             staticAdded = true;
                         }
                     }
 
                     if (!staticAdded) {
-                        modifiers.add(0, new Static(randomId(), Formatting.EMPTY));
+                        modifiers.add(0, new Static(randomId(), EMPTY));
                     }
                 } else if (("public".equals(modifier) || "protected".equals(modifier) || "private".equals(modifier)) &&
                         !hasModifier(existing, modifier)) {
@@ -2075,15 +2102,15 @@ public interface J extends Serializable, Tree {
                         }
 
                         if (i == modifiers.size() - 1) {
-                            modifiers.add(0, buildModifier(modifier, Formatting.format(modifiers.get(0).getFormatting().getPrefix(),
+                            modifiers.add(0, buildModifier(modifier, format(modifiers.get(0).getFormatting().getPrefix(),
                                     m.getFormatting().getSuffix())));
-                            modifiers.set(i + 1, m.withFormatting(Formatting.format(" ", "")));
+                            modifiers.set(i + 1, m.withFormatting(format(" ", "")));
                             accessModifierAdded = true;
                         }
                     }
 
                     if (!accessModifierAdded) {
-                        modifiers.add(0, buildModifier(modifier, Formatting.EMPTY));
+                        modifiers.add(0, buildModifier(modifier, EMPTY));
                     }
                 }
             }
@@ -2889,7 +2916,7 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2905,7 +2932,7 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2943,7 +2970,7 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -2959,7 +2986,7 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = Formatting.EMPTY;
+                Formatting formatting = EMPTY;
 
                 @SuppressWarnings("unchecked")
                 @Override

@@ -27,6 +27,7 @@ import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,9 +80,11 @@ public class MethodMatcher {
                 argumentPattern.matcher(resolvedSignaturePattern).matches();
     }
 
-    boolean matchesTargetType(@Nullable JavaType.Class type) {
+    boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
+        JavaType.Class asClass = TypeUtils.asClass(type);
         return type != null && (targetTypePattern.matcher(type.getFullyQualifiedName()).matches() ||
-                type != JavaType.Class.OBJECT && matchesTargetType(type.getSupertype() == null ? JavaType.Class.OBJECT : type.getSupertype()));
+                type != JavaType.Class.OBJECT &&
+                        (asClass == null || matchesTargetType(asClass.getSupertype() == null ? JavaType.Class.OBJECT : asClass.getSupertype())));
     }
 
     @Nullable

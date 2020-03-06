@@ -157,7 +157,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix(1).fixed
+        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;

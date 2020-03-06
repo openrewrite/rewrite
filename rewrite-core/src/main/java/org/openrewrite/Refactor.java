@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.NonNullApi;
 import java.util.*;
 import java.util.function.Function;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.StreamSupport.stream;
 
 @NonNullApi
@@ -56,11 +57,11 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 .reduce(this, Refactor::visit, (r1, r2) -> r2);
     }
 
-    public RefactorResult<S> fix() {
+    public Change<S> fix() {
         return fix(10);
     }
 
-    public RefactorResult<S> fix(int maxCycles) {
+    public Change<S> fix(int maxCycles) {
         S acc = original;
         Set<String> rulesThatMadeChanges = new HashSet<>();
 
@@ -90,7 +91,7 @@ public class Refactor<S extends SourceFile, T extends Tree> {
             rulesThatMadeChanges.addAll(rulesThatMadeChangesThisCycle);
         }
 
-        return new RefactorResult<>(original, acc, rulesThatMadeChanges);
+        return new Change<>(original, acc, rulesThatMadeChanges);
     }
 
     @SuppressWarnings("unchecked")

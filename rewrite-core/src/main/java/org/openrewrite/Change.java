@@ -30,7 +30,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Set;
 
-public class RefactorResult<S extends SourceFile> {
+public class Change<S extends SourceFile> {
+    @Nullable
     private final S original;
 
     @Getter
@@ -39,7 +40,7 @@ public class RefactorResult<S extends SourceFile> {
     @Getter
     private final Set<String> getRulesThatMadeChanges;
 
-    public RefactorResult(S original, S fixed, Set<String> getRulesThatMadeChanges) {
+    public Change(S original, S fixed, Set<String> getRulesThatMadeChanges) {
         this.original = original;
         this.fixed = fixed;
         this.getRulesThatMadeChanges = getRulesThatMadeChanges;
@@ -56,8 +57,8 @@ public class RefactorResult<S extends SourceFile> {
      * @return Git-style patch diff representing the changes to this compilation unit
      */
     public String diff(@Nullable Path relativeTo) {
-        return new InMemoryDiffEntry(Paths.get(original.print()), relativeTo,
-                original.getSourcePath(), fixed.print()).getDiff();
+        return new InMemoryDiffEntry(Paths.get(fixed.getSourcePath()), relativeTo,
+                original == null ? "" : original.print(), fixed.print()).getDiff();
     }
 
     static class InMemoryDiffEntry extends DiffEntry {

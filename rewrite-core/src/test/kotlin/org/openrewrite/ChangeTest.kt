@@ -19,11 +19,10 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 
-class RefactorResultTest {
-
+class ChangeTest {
     @Test
     fun idempotent() {
-        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 "public class A {}",
                 "public class A {}")
 
@@ -32,7 +31,7 @@ class RefactorResultTest {
 
     @Test
     fun singleLineChange() {
-        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 """
                 |public void test() {
                 |   logger.infof("some %s", 1);
@@ -63,7 +62,7 @@ class RefactorResultTest {
 
     @Test
     fun multipleChangesMoreThanThreeLinesApart() {
-        val diff = RefactorResult.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 """
                 |public void test() {
                 |   logger.infof("some %s", 1);

@@ -95,18 +95,22 @@ public class TreeBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T extends J> List<T> buildSnippet(J.CompilationUnit containing, Cursor insertionScope, String snippet, Tree... arguments) {
+    public static <T extends J> List<T> buildSnippet(J.CompilationUnit containing,
+                                                     Cursor insertionScope,
+                                                     String snippet,
+                                                     JavaType.Class... imports) {
         JavaParser parser = new JavaParser(emptyList(), Charset.defaultCharset(), true);
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
         String source =
+            stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
             "class CodeSnippet {\n" +
                 new ListScopeVariables(insertionScope).visit(containing).stream()
                     .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
                 "  // the contents of this block are the snippet\n" +
                 "  {\n" +
-                MessageFormatter.arrayFormat(StringUtils.trimIndent(snippet), stream(arguments).map(Tree::printTrimmed).toArray()).getMessage() + "\n" +
+                        StringUtils.trimIndent(snippet) + "\n" +
                 "  }\n" +
             "}";
         // @formatter:on

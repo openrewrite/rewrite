@@ -88,4 +88,17 @@ open class ImportTest : JavaParser() {
         assertTrue(b < c)
         assertTrue(c > b)
     }
+
+    @Test
+    fun compareSamePackageDifferentNameLengths() {
+        val a = parse("""
+            import org.springframework.context.annotation.Bean;
+            import org.springframework.context.annotation.Configuration;
+        """.trimIndent())
+
+        val (b, c) = a.imports
+
+        assertTrue(b < c)
+        assertTrue(c > b)
+    }
 }

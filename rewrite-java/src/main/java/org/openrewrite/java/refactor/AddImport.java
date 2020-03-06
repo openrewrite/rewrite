@@ -43,7 +43,9 @@ public class AddImport extends JavaRefactorVisitor {
     @Nullable
     private final String staticMethod;
 
+    @EqualsAndHashCode.Include
     private final boolean onlyIfReferenced;
+
     private final JavaType.Class classType;
 
     private boolean coveredByExistingImport;

@@ -269,7 +269,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
         m = m.withName(refactor(m.getName()));
         m = m.withArgs(refactor(m.getArgs()));
-        return m = m.withArgs(m.getArgs().withArgs(refactor(m.getArgs().getArgs())));
+        return m.withArgs(m.getArgs().withArgs(refactor(m.getArgs().getArgs())));
     }
 
     @Override
@@ -425,33 +425,40 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         return w.withBoundedType(refactor(w.getBoundedType()));
     }
 
-    protected void maybeAddImport(@Nullable JavaType.Class clazz) {
+    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
         if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
     }
 
-    protected void maybeAddImport(String fullyQualifiedName) {
+    public void addImport(String fullyQualifiedName) {
+        AddImport op = new AddImport(fullyQualifiedName, null, false);
+        if (!andThen().contains(op)) {
+            andThen(op);
+        }
+    }
+
+    public void maybeAddImport(String fullyQualifiedName) {
         AddImport op = new AddImport(fullyQualifiedName, null, true);
         if (!andThen().contains(op)) {
             andThen(op);
         }
     }
 
-    protected void maybeRemoveImport(@Nullable JavaType.Class clazz) {
+    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
         if (clazz != null) {
             maybeRemoveImport(clazz.getFullyQualifiedName());
         }
     }
 
-    protected void maybeRemoveImport(String fullyQualifiedName) {
+    public void maybeRemoveImport(String fullyQualifiedName) {
         RemoveImport op = new RemoveImport(fullyQualifiedName);
         if (!andThen().contains(op)) {
             andThen(op);
         }
     }
 
-    protected void maybeUnwrapParentheses(Cursor parensCursor) {
+    public void maybeUnwrapParentheses(Cursor parensCursor) {
         if(UnwrapParentheses.isUnwrappable(parensCursor)) {
             andThen(new UnwrapParentheses(parensCursor.getTree()));
         }

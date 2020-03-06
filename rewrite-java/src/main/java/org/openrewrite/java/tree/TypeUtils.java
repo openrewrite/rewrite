@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Arrays;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -37,6 +38,35 @@ public class TypeUtils {
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
         JavaType.Class classType = asClass(type);
         return classType != null && classType.getFullyQualifiedName().equals(fqn);
+    }
+
+    public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
+        if(from == JavaType.Class.OBJECT) {
+            return to == JavaType.Class.OBJECT;
+        }
+
+        JavaType.Class classTo = asClass(to);
+        JavaType.Class classFrom = asClass(from);
+
+        if (classTo == null || classFrom == null) {
+            return false;
+        }
+
+        if (classTo.getFullyQualifiedName().equals(classFrom.getFullyQualifiedName()) ||
+                isAssignableTo(to, classFrom.getSupertype()) ||
+                classFrom.getInterfaces().stream().anyMatch(i -> isAssignableTo(to, i))) {
+            return true;
+        }
+
+        try {
+            Class<?> classFromReflect = Class.forName(classFrom.getFullyQualifiedName(), false, TypeUtils.class.getClassLoader());
+            if(classFromReflect.getSuperclass() != null && isAssignableTo(to, JavaType.Class.build(classFromReflect.getSuperclass().getName()))) {
+                return true;
+            }
+            return Arrays.stream(classFromReflect.getInterfaces()).anyMatch(i -> isAssignableTo(to, JavaType.Class.build(i.getName())));
+        } catch (ClassNotFoundException ignored) {
+            return false;
+        }
     }
 
     @Nullable
