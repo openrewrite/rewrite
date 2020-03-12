@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.internal;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
@@ -52,7 +52,7 @@ import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-class JavaParserVisitor extends TreePathScanner<J, Formatting> {
+public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
     private static final Logger logger = LoggerFactory.getLogger(JavaParserVisitor.class);
 
     private final Path path;

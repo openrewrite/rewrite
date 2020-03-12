@@ -1,0 +1,377 @@
+package org.openrewrite.xml.tree;
+
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.With;
+import lombok.experimental.FieldDefaults;
+import org.openrewrite.Formatting;
+import org.openrewrite.SourceVisitor;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.XmlSourceVisitor;
+import org.openrewrite.xml.internal.XmlPrintVisitor;
+
+import java.io.Serializable;
+import java.util.List;
+import java.util.UUID;
+
+import static org.openrewrite.Formatting.EMPTY;
+import static org.openrewrite.Tree.randomId;
+
+/**
+ * The XML <a href="https://www.w3.org/TR/xml11/#syntax">spec</a>.
+ */
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
+public interface Xml extends Serializable, Tree {
+    @Override
+    default String print() {
+        return new XmlPrintVisitor().visit(this);
+    }
+
+    @Override
+    default <R> R accept(SourceVisitor<R> v) {
+        return v instanceof XmlSourceVisitor ?
+                acceptXml((XmlSourceVisitor<R>) v) : v.defaultTo(null);
+    }
+
+    default <R> R acceptXml(XmlSourceVisitor<R> v) {
+        return v.defaultTo(null);
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Document implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Prolog prolog;
+
+        @With
+        Tag root;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitDocument(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Prolog implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        ProcessingInstruction xmlDecl;
+
+        @With
+        List<Misc> misc;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitProlog(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class ProcessingInstruction implements Xml, Misc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String name;
+
+        @With
+        List<Attribute> attributes;
+
+        /**
+         * Space before '>'
+         */
+        @With
+        String beforeTagDelimiterPrefix;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitProcessingInstruction(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Tag implements Xml, Content {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        /**
+         * XML does not allow space between the '<' and tag name.
+         */
+        String name;
+
+        public Tag withName(String name) {
+            return new Tag(id, name, attributes, content,
+                    closing == null ? null : closing.withName(name),
+                    beforeTagDelimiterPrefix,
+                    formatting);
+        }
+
+        @With
+        List<Attribute> attributes;
+
+        List<Content> content;
+
+        public Tag withContent(List<Content> content) {
+            Tag tag = new Tag(id, name, attributes, content, closing,
+                    beforeTagDelimiterPrefix,
+                    formatting);
+            return !content.isEmpty() && closing == null ?
+                    tag.withClosing(new Closing(randomId(), name, "", EMPTY)) :
+                    tag;
+        }
+
+        @With
+        @Nullable
+        Closing closing;
+
+        /**
+         * Space before '>' or '/>'
+         */
+        @With
+        String beforeTagDelimiterPrefix;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitTag(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class Closing implements Xml {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            String name;
+
+            /**
+             * Space before '>'
+             */
+            @With
+            String beforeTagDelimiterPrefix;
+
+            @With
+            Formatting formatting;
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Attribute implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Ident key;
+
+        @With
+        Value value;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitAttribute(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class Value implements Xml {
+            public enum Quote {
+                Double, Single
+            }
+
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Quote quote;
+
+            @With
+            String value;
+
+            @With
+            Formatting formatting;
+        }
+
+        public String getKeyAsString() {
+            return key.getName();
+        }
+
+        public String getValueAsString() {
+            return value.getValue();
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class CharData implements Xml, Content {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        boolean cdata;
+
+        @With
+        String text;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitCharData(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Comment implements Xml, Content, Misc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String text;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitComment(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class DocTypeDecl implements Xml, Misc {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Ident name;
+
+        @With
+        Ident externalId;
+
+        @With
+        List<Ident> internalSubset;
+
+        @With
+        @Nullable
+        ExternalSubsets externalSubsets;
+
+        /**
+         * Space before '>'
+         */
+        @With
+        String beforeTagDelimiterPrefix;
+
+        @With
+        Formatting formatting;
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class ExternalSubsets implements Xml {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            List<Element> elements;
+
+            @With
+            Formatting formatting;
+        }
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitDocTypeDecl(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Element implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        List<Ident> subset;
+
+        /**
+         * Space before '>'
+         */
+        @With
+        String beforeTagDelimiterPrefix;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitElement(this);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Ident implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String name;
+
+        @With
+        Formatting formatting;
+
+        @Override
+        public <R> R acceptXml(XmlSourceVisitor<R> v) {
+            return v.visitIdent(this);
+        }
+
+        @Override
+        public String toString() {
+            return "Ident{" + name + "}";
+        }
+    }
+}

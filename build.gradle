@@ -49,6 +49,7 @@ subprojects {
 
     test {
         useJUnitPlatform()
+        jvmArgs = ["-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames"]
     }
 
     java {

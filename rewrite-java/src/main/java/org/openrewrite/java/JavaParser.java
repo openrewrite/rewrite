@@ -28,6 +28,7 @@ import com.sun.tools.javac.util.Options;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.internal.JavaParserVisitor;
 import org.openrewrite.java.tree.J;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
