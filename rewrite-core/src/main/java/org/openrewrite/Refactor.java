@@ -20,7 +20,6 @@ import org.openrewrite.internal.lang.NonNullApi;
 import java.util.*;
 import java.util.function.Function;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.StreamSupport.stream;
 
 @NonNullApi

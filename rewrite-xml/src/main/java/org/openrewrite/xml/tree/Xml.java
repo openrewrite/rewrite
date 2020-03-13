@@ -8,6 +8,7 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Formatting;
+import org.openrewrite.SourceFile;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -16,6 +17,7 @@ import org.openrewrite.xml.internal.XmlPrintVisitor;
 
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.openrewrite.Formatting.EMPTY;
@@ -44,9 +46,14 @@ public interface Xml extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Document implements Xml {
+    class Document implements Xml, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
+
+        String sourcePath;
+
+        @With
+        Map<String, String> metadata;
 
         @With
         Prolog prolog;
@@ -60,6 +67,11 @@ public interface Xml extends Serializable, Tree {
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitDocument(this);
+        }
+
+        @Override
+        public String getFileType() {
+            return "XML";
         }
     }
 

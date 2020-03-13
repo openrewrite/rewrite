@@ -18,26 +18,27 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BiFunction;
 
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
+    private final Path path;
     private final String source;
 
     private int cursor = 0;
 
-    public XmlParserVisitor(Path path) {
-        try {
-            this.source = Files.readString(path, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    public XmlParserVisitor(Path path, String source) {
+        this.path = path;
+        this.source = source;
     }
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         return convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
+                path.toString(),
+                emptyMap(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 format)

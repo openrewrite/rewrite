@@ -1049,6 +1049,12 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @JsonIgnore
+        @Override
+        public String getFileType() {
+            return "Java";
+        }
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitCompilationUnit(this);

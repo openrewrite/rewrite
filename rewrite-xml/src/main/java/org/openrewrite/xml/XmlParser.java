@@ -2,6 +2,7 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.XmlParserVisitor;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
@@ -10,6 +11,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -30,7 +32,7 @@ public class XmlParser {
                     throw new UncheckedIOException(e);
                 }
 
-                return parse(file);
+                return parse(file, null);
             } finally {
                 // delete temp recursively
                 //noinspection ResultOfMethodCallIgnored
@@ -44,16 +46,17 @@ public class XmlParser {
         }
     }
 
-    public List<Xml.Document> parse(List<Path> sourceFiles) {
-        return sourceFiles.stream().map(this::parse).collect(toList());
+    public List<Xml.Document> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
+        return sourceFiles.stream().map(source -> parse(source, relativeTo)).collect(toList());
     }
 
-    public Xml.Document parse(Path sourceFile) {
+    public Xml.Document parse(Path sourceFile, @Nullable Path relativeTo) {
         try {
             var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                     CharStreams.fromPath(sourceFile))));
 
-            return new XmlParserVisitor(sourceFile).visitDocument(parser.document());
+            return new XmlParserVisitor(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile),
+                    Files.readString(sourceFile, StandardCharsets.UTF_8)).visitDocument(parser.document());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

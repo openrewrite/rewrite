@@ -31,6 +31,7 @@ import java.nio.file.Paths;
 import java.util.Set;
 
 public class Change<S extends SourceFile> {
+    @Getter
     @Nullable
     private final S original;
 

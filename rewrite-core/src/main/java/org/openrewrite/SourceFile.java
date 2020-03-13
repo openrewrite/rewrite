@@ -25,4 +25,6 @@ public interface SourceFile extends Tree {
      * a source file or not.
      */
     Map<String, String> getMetadata();
+
+    String getFileType();
 }
