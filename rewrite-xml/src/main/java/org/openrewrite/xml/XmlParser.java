@@ -77,6 +77,13 @@ public class XmlParser {
         }
     }
 
+    public Xml.Document parseFromString(Path sourceFileLocation, String xmlSource) {
+        var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                CharStreams.fromString(xmlSource))));
+
+        return new XmlParserVisitor(sourceFileLocation, xmlSource).visitDocument(parser.document());
+    }
+
     public Xml.Tag parseTag(String snippet) {
         var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                 CharStreams.fromString(snippet))));

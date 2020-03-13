@@ -19,16 +19,13 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Formatting;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.BiFunction;
@@ -50,14 +47,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
-        return convert(ctx, (c, format) -> new Xml.Document(
+        Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
                 path.toString(),
                 emptyMap(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 format)
-        ).withSuffix(source.substring(cursor));
+        );
+        return d == null ? null : d.withSuffix(source.substring(cursor));
     }
 
     @Override
@@ -225,7 +223,12 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return Formatting.format(prefix);
     }
 
+    @Nullable
     private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Formatting, T> conversion) {
+        if(ctx == null) {
+            return null;
+        }
+
         Formatting format = format(ctx);
         T t = conversion.apply(ctx, format);
         cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);

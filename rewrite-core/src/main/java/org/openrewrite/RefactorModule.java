@@ -33,7 +33,8 @@ public interface RefactorModule<S extends SourceFile, T extends Tree> {
         return emptyList();
     }
 
-    static <S extends SourceFile, T extends Tree> List<Refactor<S, T>> plan(
+    @SafeVarargs
+    static <S extends SourceFile, T extends Tree> List<Refactor<?, ?>> plan(
             Collection<S> sources,
             RefactorModule<S, T>... modules) {
 

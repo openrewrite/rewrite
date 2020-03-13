@@ -25,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.internal.JavaPrintVisitor;
 import org.openrewrite.java.search.*;
+import org.openrewrite.Metadata;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -1034,7 +1035,7 @@ public interface J extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<String, String> metadata;
+        Map<Metadata, String> metadata;
 
         @With
         @Nullable

@@ -24,6 +24,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.Metadata;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.XmlPrintVisitor;
 
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -65,7 +65,7 @@ public interface Xml extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<String, String> metadata;
+        Map<Metadata, String> metadata;
 
         @With
         Prolog prolog;

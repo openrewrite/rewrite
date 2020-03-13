@@ -22,6 +22,12 @@ import java.util.function.Function;
 
 import static java.util.stream.StreamSupport.stream;
 
+/**
+ * A refactoring operation on a single source file.
+ *
+ * @param <S>
+ * @param <T>
+ */
 @NonNullApi
 public class Refactor<S extends SourceFile, T extends Tree> {
     private final S original;
