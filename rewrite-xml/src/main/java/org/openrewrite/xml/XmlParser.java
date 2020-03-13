@@ -61,4 +61,10 @@ public class XmlParser {
             throw new UncheckedIOException(e);
         }
     }
+
+    public Xml.Tag parseTag(String snippet) {
+        var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                CharStreams.fromString(snippet))));
+        return (Xml.Tag) new XmlParserVisitor(null, snippet).visitContent(parser.content());
+    }
 }

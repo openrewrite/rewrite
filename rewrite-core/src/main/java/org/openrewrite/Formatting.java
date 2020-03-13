@@ -15,10 +15,7 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
 import lombok.Getter;
 import org.openrewrite.internal.lang.Nullable;
@@ -75,6 +72,11 @@ public class Formatting implements Serializable {
 
     public Formatting withSuffix(String suffix) {
         return format(prefix, suffix);
+    }
+
+    @JsonIgnore
+    public int getIndent() {
+        return getIndent(prefix);
     }
 
     public static int getIndent(String formatting) {

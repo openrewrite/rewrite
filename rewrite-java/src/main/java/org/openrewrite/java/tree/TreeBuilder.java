@@ -24,11 +24,10 @@ import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.refactor.Formatter;
+import org.openrewrite.java.refactor.JavaFormatter;
 import org.openrewrite.java.refactor.ShiftFormatRightVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.helpers.MessageFormatter;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -42,7 +41,7 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.refactor.Formatter.enclosingIndent;
+import static org.openrewrite.java.refactor.JavaFormatter.enclosingIndent;
 
 @NonNullApi
 public class TreeBuilder {
@@ -124,7 +123,7 @@ public class TreeBuilder {
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
-        Formatter formatter = new Formatter(cu);
+        JavaFormatter formatter = new JavaFormatter(cu);
 
         return block.getStatements().stream()
                 .map(stat -> {

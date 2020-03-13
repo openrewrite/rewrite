@@ -24,7 +24,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
 public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implements RefactorVisitorSupport {
-    protected Formatter formatter;
+    protected JavaFormatter formatter;
 
     @Override
     public J defaultTo(Tree t) {
@@ -130,7 +130,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
-        formatter = new Formatter(cu);
+        formatter = new JavaFormatter(cu);
         J.CompilationUnit c = cu;
         c = c.withPackageDecl(refactor(c.getPackageDecl()));
         c = c.withImports(refactor(c.getImports()));

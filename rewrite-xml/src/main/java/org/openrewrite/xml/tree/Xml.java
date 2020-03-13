@@ -7,10 +7,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.Formatting;
-import org.openrewrite.SourceFile;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.XmlPrintVisitor;
@@ -63,6 +60,10 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        public Refactor<Document, Xml> refactor() {
+            return new Refactor<>(this);
+        }
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -153,8 +154,9 @@ public interface Xml extends Serializable, Tree {
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,
                     formatting);
-            return !content.isEmpty() && closing == null ?
-                    tag.withClosing(new Closing(randomId(), name, "", EMPTY)) :
+            return content != null && !content.isEmpty() && closing == null ?
+                    tag.withClosing(new Closing(randomId(), name, "",
+                            formatting.withPrefix(formatting.getPrefix().substring(formatting.getPrefix().lastIndexOf('\n'))))) :
                     tag;
         }
 
