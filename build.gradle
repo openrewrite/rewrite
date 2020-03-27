@@ -73,7 +73,8 @@ subprojects {
 
     publishing {
         publications {
-            withType(MavenPublication) {
+            mavenJava(MavenPublication) {
+                from components.java
                 pom.withXml {
                     asNode().dependencies.dependency.scope.each {
                         it.value = 'compile'
