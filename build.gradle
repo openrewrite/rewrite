@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 buildscript {
     repositories {
         jcenter()
@@ -13,11 +15,13 @@ buildscript {
     }
 }
 
-allprojects {
-    apply plugin: 'nebula.netflixoss'
+plugins {
+    id "nebula.release" version "13.2.1"
+}
 
-    group = 'com.netflix.devinsight.rewrite'
-    description 'Pluggable and distributed refactoring tool for Java source code'
+allprojects {
+    group = 'org.gradle.rewrite'
+    description 'Pluggable and distributed refactoring tool'
 }
 
 subprojects {
@@ -57,7 +61,7 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
-    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    tasks.withType(KotlinCompile).configureEach {
         kotlinOptions {
             jvmTarget = '1.8'
         }
@@ -77,7 +81,20 @@ subprojects {
                 }
             }
         }
+
+        repositories {
+            maven {
+                name = "GradleBuildInternalSnapshots"
+                url = URI.create("https://repo.gradle.org/gradle/libs-snapshots-local")
+                credentials {
+                    username = project.findProperty("artifactoryUsername")
+                    password = project.findProperty("artifactoryPassword")
+                }
+            }
+        }
     }
+
+
 
     license {
         header = file('../gradle/licenseHeader.txt')
