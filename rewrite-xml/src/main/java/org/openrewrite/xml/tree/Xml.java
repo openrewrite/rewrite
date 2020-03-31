@@ -127,7 +127,7 @@ public interface Xml extends Serializable, Tree {
         List<Attribute> attributes;
 
         /**
-         * Space before '>'
+         * Space before '&gt;'
          */
         @With
         String beforeTagDelimiterPrefix;
@@ -149,7 +149,7 @@ public interface Xml extends Serializable, Tree {
         UUID id;
 
         /**
-         * XML does not allow space between the '<' and tag name.
+         * XML does not allow space between the '&lt;' and tag name.
          */
         String name;
 
@@ -180,7 +180,7 @@ public interface Xml extends Serializable, Tree {
         Closing closing;
 
         /**
-         * Space before '>' or '/>'
+         * Space before '&gt;' or '/&gt;'
          */
         @With
         String beforeTagDelimiterPrefix;
@@ -204,7 +204,7 @@ public interface Xml extends Serializable, Tree {
             String name;
 
             /**
-             * Space before '>'
+             * Space before '&gt;'
              */
             @With
             String beforeTagDelimiterPrefix;
@@ -327,7 +327,7 @@ public interface Xml extends Serializable, Tree {
         ExternalSubsets externalSubsets;
 
         /**
-         * Space before '>'
+         * Space before '&gt;'.
          */
         @With
         String beforeTagDelimiterPrefix;
@@ -366,7 +366,7 @@ public interface Xml extends Serializable, Tree {
         List<Ident> subset;
 
         /**
-         * Space before '>'
+         * Space before '&gt;'
          */
         @With
         String beforeTagDelimiterPrefix;
