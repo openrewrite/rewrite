@@ -31,12 +31,18 @@ public interface Tree {
 
     /**
      * An id that can be used to identify a particular AST element, even after transformations have taken place on it
+     *
+     * @return A unique identifier
      */
     UUID getId();
 
     /**
      * An overload that allows us to create a copy of any Tree element, optionally
      * changing formatting
+     *
+     * @param <T> The type of this tree.
+     * @param fmt The formatting to apply to this tree.
+     * @return A copy of this tree, with formatting changed.
      */
     <T extends Tree> T withFormatting(Formatting fmt);
 
@@ -48,7 +54,7 @@ public interface Tree {
         return withFormatting(getFormatting().withSuffix(suffix));
     }
 
-    default <R> R accept(SourceVisitor<R> v)  {
+    default <R> R accept(SourceVisitor<R> v) {
         return v.defaultTo(null);
     }
 

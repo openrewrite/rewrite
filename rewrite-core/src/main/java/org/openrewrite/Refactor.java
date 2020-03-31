@@ -25,8 +25,8 @@ import static java.util.stream.StreamSupport.stream;
 /**
  * A refactoring operation on a single source file.
  *
- * @param <S>
- * @param <T>
+ * @param <S> The root AST element for a particular language
+ * @param <T> The common interface to all AST elements for a particular language.
  */
 @NonNullApi
 public class Refactor<S extends SourceFile, T extends Tree> {
@@ -56,7 +56,7 @@ public class Refactor<S extends SourceFile, T extends Tree> {
      * @param refactorForEach Build a refactoring operation built for each tree item in the collection.
      *                        The function should return null when there is some condition under which an
      *                        item in the list should not be transformed.
-     * @param <T2>             The type of tree element to operate on.
+     * @param <T2>            The type of tree element to operate on.
      * @return This instance, with a visitor for each tree element added.
      */
     @SuppressWarnings("unchecked")

@@ -57,6 +57,8 @@ public abstract class SourceVisitor<R> {
      * Determines whether this visitor can be run multiple times as a top-level rule.
      * In the case of a visitor which mutates the underlying tree, indicates that running once or
      * N times will yield the same mutation.
+     *
+     * @return If true, this visitor can be run multiple times.
      */
     public boolean isIdempotent() {
         return true;
@@ -77,7 +79,7 @@ public abstract class SourceVisitor<R> {
     public void nextCycle() {
         synchronized (this) {
             cycle++;
-            if(andThen.get() != null) {
+            if (andThen.get() != null) {
                 andThen.get().clear();
             } else {
                 andThen.set(new ArrayList<>());
@@ -95,6 +97,10 @@ public abstract class SourceVisitor<R> {
     /**
      * Some sensible defaults for reduce (boolean OR, list concatenation, or else just the value of r1).
      * Override if your particular visitor needs to reduce values in a different way.
+     *
+     * @param r1 The left side to reduce.
+     * @param r2 The right side to reduce.
+     * @return The reduced value.
      */
     @SuppressWarnings({"unchecked", "RedundantCast"})
     public R reduce(R r1, R r2) {

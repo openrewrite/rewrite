@@ -23,6 +23,8 @@ public interface SourceFile extends Tree {
     /**
      * {@link SourceVisitor} may respond to metadata to determine whether to act on
      * a source file or not.
+     *
+     * @return A metadata map containing any additional context about this source file.
      */
     Map<Metadata, String> getMetadata();
 

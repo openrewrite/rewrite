@@ -55,6 +55,7 @@ public class Change<S extends SourceFile> {
     }
 
     /**
+     * @param relativeTo Optional relative path that is used to relativize file paths of reported differences.
      * @return Git-style patch diff representing the changes to this compilation unit
      */
     public String diff(@Nullable Path relativeTo) {
