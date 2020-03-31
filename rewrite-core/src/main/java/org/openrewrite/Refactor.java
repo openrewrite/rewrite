@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.Getter;
 import org.openrewrite.internal.lang.NonNullApi;
 
 import java.util.*;
@@ -30,6 +31,7 @@ import static java.util.stream.StreamSupport.stream;
  */
 @NonNullApi
 public class Refactor<S extends SourceFile, T extends Tree> {
+    @Getter
     private final S original;
 
     private final List<SourceVisitor<T>> ops = new ArrayList<>();
