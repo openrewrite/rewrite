@@ -44,6 +44,11 @@ public class Refactor<S extends SourceFile, T extends Tree> {
         return this;
     }
 
+    public final Refactor<S, T> visit(Iterable<SourceVisitor<T>> visitors) {
+        visitors.forEach(ops::add);
+        return this;
+    }
+
     /**
      * Shortcut for building refactoring operations for a collection of like-typed {@link Tree} elements.
      *
