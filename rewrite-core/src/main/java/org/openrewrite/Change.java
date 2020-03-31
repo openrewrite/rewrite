@@ -39,12 +39,12 @@ public class Change<S extends SourceFile> {
     private final S fixed;
 
     @Getter
-    private final Set<String> getRulesThatMadeChanges;
+    private final Set<String> rulesThatMadeChanges;
 
-    public Change(S original, S fixed, Set<String> getRulesThatMadeChanges) {
+    public Change(S original, S fixed, Set<String> rulesThatMadeChanges) {
         this.original = original;
         this.fixed = fixed;
-        this.getRulesThatMadeChanges = getRulesThatMadeChanges;
+        this.rulesThatMadeChanges = rulesThatMadeChanges;
     }
 
     /**
