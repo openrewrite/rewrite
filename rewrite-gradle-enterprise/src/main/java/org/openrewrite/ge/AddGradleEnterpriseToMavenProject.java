@@ -1,7 +1,6 @@
 package org.openrewrite.ge;
 
 import org.openrewrite.RefactorModule;
-import org.openrewrite.SourceVisitor;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -9,18 +8,12 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptyList;
 
 public class AddGradleEnterpriseToMavenProject implements RefactorModule<Xml.Document, Xml> {
     private final Configuration configuration;
 
     public AddGradleEnterpriseToMavenProject(Configuration configuration) {
         this.configuration = configuration;
-    }
-
-    @Override
-    public List<SourceVisitor<Xml>> getVisitors() {
-        return emptyList();
     }
 
     @Override
@@ -49,5 +42,4 @@ public class AddGradleEnterpriseToMavenProject implements RefactorModule<Xml.Doc
 
         return asList(extensionsXml, gradleEnterpriseXml);
     }
-
 }

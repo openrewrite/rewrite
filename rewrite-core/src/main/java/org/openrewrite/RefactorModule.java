@@ -22,7 +22,9 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 public interface RefactorModule<S extends SourceFile, T extends Tree> {
-    List<SourceVisitor<T>> getVisitors();
+    default Refactor<S, T> apply(Refactor<S, T> refactor) {
+        return refactor;
+    }
 
     /**
      * @return A list of outputs that will certainly be affected by this module, in addition to source file inputs
@@ -48,10 +50,8 @@ public interface RefactorModule<S extends SourceFile, T extends Tree> {
             allSources.addAll(module.getDeclaredOutputs());
         }
 
-        return allSources.stream().map(s -> {
-            Refactor<S, T> refactor = new Refactor<>(s);
-            stream(modules).forEach(mod -> mod.getVisitors().forEach(refactor::visit));
-            return refactor;
-        }).collect(toList());
+        return allSources.stream()
+                .map(s -> stream(modules).reduce(new Refactor<S, T>(s), (refactor, mod) -> mod.apply(refactor), (r1, r2) -> r1))
+                .collect(toList());
     }
 }
