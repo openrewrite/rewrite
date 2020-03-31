@@ -34,7 +34,8 @@ public class Refactor<S extends SourceFile, T extends Tree> {
     @Getter
     private final S original;
 
-    private final List<SourceVisitor<T>> ops = new ArrayList<>();
+    @Getter
+    private final List<SourceVisitor<T>> visitors = new ArrayList<>();
 
     public Refactor(S original) {
         this.original = original;
@@ -42,12 +43,12 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
     @SafeVarargs
     public final Refactor<S, T> visit(SourceVisitor<T>... visitors) {
-        Collections.addAll(ops, visitors);
+        Collections.addAll(this.visitors, visitors);
         return this;
     }
 
     public final Refactor<S, T> visit(Iterable<SourceVisitor<T>> visitors) {
-        visitors.forEach(ops::add);
+        visitors.forEach(this.visitors::add);
         return this;
     }
 
@@ -79,7 +80,7 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
         for (int i = 0; i < maxCycles; i++) {
             Set<String> rulesThatMadeChangesThisCycle = new HashSet<>();
-            for (SourceVisitor<T> visitor : ops) {
+            for (SourceVisitor<T> visitor : visitors) {
                 visitor.nextCycle();
 
                 if (!visitor.isIdempotent() && i > 0) {
