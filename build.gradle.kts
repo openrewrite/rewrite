@@ -7,7 +7,7 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.3.71" apply false
 }
 
-project.gradle.taskGraph.whenReady(object: Action<TaskExecutionGraph> {
+project.gradle.taskGraph.whenReady(object : Action<TaskExecutionGraph> {
     override fun execute(graph: TaskExecutionGraph) {
         if (graph.hasTask(":snapshot") || graph.hasTask(":immutableSnapshot")) {
             throw GradleException("You cannot use the snapshot or immutableSnapshot task from the release plugin. Please use the devSnapshot task.")
@@ -78,7 +78,7 @@ subprojects {
                 from(components["java"])
                 pom.withXml {
                     val scopes = asElement().getElementsByTagName("scope")
-                    (0..scopes.length).forEach {i ->
+                    for (i in 0 until scopes.length) {
                         scopes.item(i).nodeValue = "compile"
                     }
                 }
@@ -88,7 +88,7 @@ subprojects {
         repositories {
             maven {
                 name = "GradleEnterprise"
-                url = if(shouldUseReleaseRepo()) {
+                url = if (shouldUseReleaseRepo()) {
                     URI.create("https://repo.gradle.org/gradle/enterprise-libs-releases-local")
                 } else {
                     URI.create("https://repo.gradle.org/gradle/enterprise-libs-snapshots-local")
