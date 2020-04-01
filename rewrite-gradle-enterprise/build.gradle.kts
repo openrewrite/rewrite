@@ -1,6 +1,6 @@
 dependencies {
-    api project(":rewrite-xml")
-    implementation project(":rewrite-core")
+    api(project(":rewrite-xml"))
+    implementation(project(":rewrite-core"))
 
     implementation("commons-cli:commons-cli:1.4")
 
