@@ -3,6 +3,7 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.git.GitMetadata
 import org.openrewrite.java.JavaParser
 
 /**
@@ -23,7 +24,10 @@ open class TreeSerializerTest : JavaParser() {
 
     @Test
     fun `round trip serialization of AST preserves flyweights`() {
-        val a = parse(aSource)
+        val a = parse(aSource).withMetadata(mapOf(GitMetadata.HEAD_COMMIT_ID to "123"))
+
+        println(serializer.writePretty(a))
+
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
 

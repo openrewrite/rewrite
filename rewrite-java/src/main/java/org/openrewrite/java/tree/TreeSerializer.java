@@ -1,17 +1,25 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.fasterxml.jackson.databind.ser.std.StdSerializer;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
+import org.openrewrite.Metadata;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public class TreeSerializer {
     private final TypeReference<List<J.CompilationUnit>> cuListType = new TypeReference<>() {
@@ -19,15 +27,24 @@ public class TreeSerializer {
 
     private final ObjectMapper mapper;
 
+    private SimpleModule metadataModule;
+
     public TreeSerializer() {
+        this.metadataModule = new SimpleModule();
+        metadataModule.addKeySerializer(Metadata.class, new MetadataKeySerializer());
+        metadataModule.addKeyDeserializer(Metadata.class, new MetadataKeyDeserializer());
+
         var f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
-        this.mapper = new ObjectMapper(f).setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        this.mapper = new ObjectMapper(f)
+                .registerModule(metadataModule)
+                .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }
 
     public String writePretty(J.CompilationUnit cu) {
         try {
             return new ObjectMapper()
+                    .registerModule(metadataModule)
                     .setSerializationInclusion(JsonInclude.Include.NON_NULL)
                     .writerWithDefaultPrettyPrinter()
                     .writeValueAsString(cu);
@@ -97,6 +114,42 @@ public class TreeSerializer {
             return mapper.readValue(bytes, J.CompilationUnit.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
+        }
+    }
+
+    private static class MetadataKeyDeserializer extends KeyDeserializer {
+        private final Map<String, Function<String, Metadata>> metadataValueByName = new ConcurrentHashMap<>();
+
+        @Override
+        public Metadata deserializeKey(String key, DeserializationContext ctxt) {
+            String[] classAndValue = key.split("#");
+            return metadataValueByName.computeIfAbsent(classAndValue[0], this::loadMetadataClass).apply(classAndValue[1]);
+        }
+
+        private Function<String, Metadata> loadMetadataClass(String clazz) {
+            try {
+                Class<?> metadataClass = Class.forName(clazz);
+                return value -> {
+                    try {
+                        return (Metadata) metadataClass.getDeclaredMethod("valueOf", String.class).invoke(null, value);
+                    } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+                        throw new RuntimeException(e);
+                    }
+                };
+            } catch (ClassNotFoundException e) {
+                throw new IllegalArgumentException(e);
+            }
+        }
+    }
+
+    private static class MetadataKeySerializer extends StdSerializer<Metadata> {
+        public MetadataKeySerializer() {
+            super(Metadata.class);
+        }
+
+        @Override
+        public void serialize(Metadata value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            gen.writeFieldName(value.getClass().getName() + "#" + value.toString());
         }
     }
 }
