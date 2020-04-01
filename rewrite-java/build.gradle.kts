@@ -16,15 +16,14 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.8-1")
 
-    implementation("eu.infomas:annotation-detector:latest.release")
     implementation("org.slf4j:slf4j-api:1.7.+")
     implementation("commons-lang:commons-lang:latest.release")
 
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
 
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
-    implementation("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
     implementation("org.ow2.asm:asm:latest.release")
@@ -39,7 +38,7 @@ tasks.withType<Javadoc> {
 }
 
 tasks.named<JavaCompile>("compileJava") {
-    options.setFork(true)
+    options.isFork = true
     options.forkOptions.executable = "javac"
     options.compilerArgs.addAll(listOf(
             "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",

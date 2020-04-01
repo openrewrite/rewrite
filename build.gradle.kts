@@ -3,6 +3,7 @@ import java.net.URI
 
 plugins {
     id("nebula.release") version "13.2.1"
+    id("nebula.maven-publish") version "17.2.1" apply false
     id("nebula.maven-resolved-dependencies") version "17.2.1" apply false
     id("org.jetbrains.kotlin.jvm") version "1.3.71" apply false
 }
@@ -26,12 +27,21 @@ allprojects {
 
 subprojects {
     apply(plugin = "java-library")
-    apply(plugin = "maven-publish")
+    apply(plugin = "nebula.maven-publish")
     apply(plugin = "nebula.maven-resolved-dependencies")
     apply(plugin = "org.jetbrains.kotlin.jvm")
 
     repositories {
-        mavenCentral()
+        mavenCentral {
+            content {
+                excludeVersionByRegex("com\\.fasterxml\\.jackson\\..*", ".*", ".*rc.*")
+            }
+        }
+        mavenCentral {
+            content {
+                includeVersionByRegex("com\\.fasterxml\\.jackson\\..*", ".*", "(\\d+\\.)*\\d+")
+            }
+        }
     }
 
     dependencies {
@@ -73,18 +83,6 @@ subprojects {
     }
 
     configure<PublishingExtension> {
-        publications {
-            create<MavenPublication>("jar") {
-                from(components["java"])
-                pom.withXml {
-                    val scopes = asElement().getElementsByTagName("scope")
-                    for (i in 0 until scopes.length) {
-                        scopes.item(i).nodeValue = "compile"
-                    }
-                }
-            }
-        }
-
         repositories {
             maven {
                 name = "GradleEnterprise"
@@ -101,5 +99,5 @@ subprojects {
         }
     }
 
-    project.rootProject.tasks.getByName("postRelease").dependsOn(project.tasks.getByName("publishAllPublicationsToGradleEnterpriseRepository"))
+    project.rootProject.tasks.getByName("postRelease").dependsOn(project.tasks.getByName("publishNebulaPublicationToGradleEnterpriseRepository"))
 }

@@ -16,7 +16,7 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.8-1")
 
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
-    implementation("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 }
