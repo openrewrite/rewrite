@@ -18,6 +18,8 @@ package org.openrewrite;
 import lombok.Getter;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
+import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryBuilder;
+import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
@@ -74,7 +76,9 @@ public class Change<S extends SourceFile> {
             this.newPath = relativePath.toString();
 
             try {
-                this.repo = new InMemoryRepository.Builder().build();
+                this.repo = new InMemoryRepository.Builder()
+                        .setRepositoryDescription(new DfsRepositoryDescription())
+                        .build();
 
                 var inserter = repo.getObjectDatabase().newInserter();
                 oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes()).abbreviate(40);

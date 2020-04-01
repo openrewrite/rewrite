@@ -1,5 +1,5 @@
 dependencies {
-    implementation 'org.eclipse.jgit:org.eclipse.jgit:4.4.1.201607150455-r'
+    implementation 'org.eclipse.jgit:org.eclipse.jgit:latest.release'
     implementation 'com.fasterxml.jackson.core:jackson-databind:latest.release', optional
 
     implementation 'com.koloboke:koloboke-api-jdk8:latest.release'

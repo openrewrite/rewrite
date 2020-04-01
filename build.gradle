@@ -97,8 +97,6 @@ subprojects {
         }
     }
 
-
-
     license {
         header = file('../gradle/licenseHeader.txt')
         exclude '**/*.tokens'
