@@ -87,8 +87,8 @@ subprojects {
 
         repositories {
             maven {
-                name = "GradleBuildInternalSnapshots"
-                url = URI.create("https://repo.gradle.org/gradle/libs-snapshots-local")
+                name = "GradleReleases"
+                url = URI.create("https://repo.gradle.org/gradle/libs-releases-local")
                 credentials {
                     username = project.findProperty("artifactoryUsername")
                     password = project.findProperty("artifactoryPassword")
