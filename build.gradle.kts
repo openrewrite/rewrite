@@ -7,13 +7,13 @@ plugins {
     id("org.jetbrains.kotlin.jvm") version "1.3.71" apply false
 }
 
-//project.gradle.taskGraph.whenReady(object : Action<TaskExecutionGraph> {
-//    override fun execute(graph: TaskExecutionGraph) {
-//        if (graph.hasTask(":snapshot") || graph.hasTask(":immutableSnapshot")) {
-//            throw GradleException("You cannot use the snapshot or immutableSnapshot task from the release plugin. Please use the devSnapshot task.")
-//        }
-//    }
-//})
+project.gradle.taskGraph.whenReady(object : Action<TaskExecutionGraph> {
+    override fun execute(graph: TaskExecutionGraph) {
+        if (graph.hasTask(":snapshot") || graph.hasTask(":immutableSnapshot")) {
+            throw GradleException("You cannot use the snapshot or immutableSnapshot task from the release plugin. Please use the devSnapshot task.")
+        }
+    }
+})
 
 fun shouldUseReleaseRepo(): Boolean {
     return project.gradle.startParameter.taskNames.contains("final") || project.gradle.startParameter.taskNames.contains(":final")
