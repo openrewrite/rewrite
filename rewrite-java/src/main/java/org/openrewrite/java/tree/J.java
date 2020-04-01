@@ -1092,7 +1092,11 @@ public interface J extends Serializable, Tree {
         }
 
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
-            String sourcePath = sourceSet.resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator"))).toString();
+            String sourcePath = sourceSet
+                    .resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator")))
+                    .resolve(className + ".java")
+                    .toString();
+
             return new J.CompilationUnit(randomId(),
                     sourcePath,
                     emptyMap(),
