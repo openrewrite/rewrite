@@ -14,7 +14,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 public class Change<S extends SourceFile> {
     @Getter
@@ -46,14 +49,16 @@ public class Change<S extends SourceFile> {
      */
     public String diff(@Nullable Path relativeTo) {
         return new InMemoryDiffEntry(Paths.get(fixed.getSourcePath()), relativeTo,
-                original == null ? "" : original.print(), fixed.print()).getDiff();
+                original == null ? "" : original.print(), fixed.print(), rulesThatMadeChanges).getDiff();
     }
 
     static class InMemoryDiffEntry extends DiffEntry {
         InMemoryRepository repo;
+        Set<String> rulesThatMadeChanges;
 
-        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource) {
+        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<String> rulesThatMadeChanges) {
             this.changeType = ChangeType.MODIFY;
+            this.rulesThatMadeChanges = rulesThatMadeChanges;
 
             var relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
             this.oldPath = relativePath.toString();
@@ -90,7 +95,22 @@ public class Change<S extends SourceFile> {
             } catch (IOException e) {
                 throw new UncheckedIOException(e);
             }
-            return new String(patch.toByteArray());
+
+            String diff = new String(patch.toByteArray());
+
+            AtomicBoolean addedComment = new AtomicBoolean(false);
+            // NOTE: String.lines() would remove empty lines which we don't want
+            return Arrays.stream(diff.split("\n"))
+                    .map(l -> {
+                        if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
+                            addedComment.set(true);
+                            return l + rulesThatMadeChanges.stream()
+                                    .sorted()
+                                    .collect(Collectors.joining(", ", " ", ""));
+                        }
+                        return l;
+                    })
+                    .collect(Collectors.joining("\n")) + "\n";
         }
     }
 }

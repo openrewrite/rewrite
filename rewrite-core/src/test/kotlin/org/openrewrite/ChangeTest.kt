@@ -9,7 +9,8 @@ class ChangeTest {
     fun idempotent() {
         val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
                 "public class A {}",
-                "public class A {}")
+                "public class A {}",
+                emptySet())
 
         assertThat(diff.diff).isEmpty()
     }
@@ -28,7 +29,8 @@ class ChangeTest {
                 |   logger.info("some {}", 1);
                 |}
                 |
-            """.trimMargin()
+            """.trimMargin(),
+                setOf("logger.Fix")
         ).diff
 
         assertThat("""
@@ -36,7 +38,7 @@ class ChangeTest {
             |index 3490cbf..5d64ae4 100644
             |--- a/com/netflix/MyJavaClass.java
             |+++ b/com/netflix/MyJavaClass.java
-            |@@ -1,3 +1,3 @@
+            |@@ -1,3 +1,3 @@ logger.Fix
             | public void test() {
             |-   logger.infof("some %s", 1);
             |+   logger.info("some {}", 1);
@@ -77,7 +79,8 @@ class ChangeTest {
                 |   logger.info("some %s", 2);
                 |}
                 |
-            """.trimMargin()
+            """.trimMargin(),
+                setOf("logger.Fix1", "logger.Fix2")
         ).diff
 
         assertThat("""
@@ -85,7 +88,7 @@ class ChangeTest {
                 |index c17f051..bb2dfba 100644
                 |--- a/com/netflix/MyJavaClass.java
                 |+++ b/com/netflix/MyJavaClass.java
-                |@@ -1,5 +1,5 @@
+                |@@ -1,5 +1,5 @@ logger.Fix1, logger.Fix2
                 | public void test() {
                 |-   logger.infof("some %s", 1);
                 |+   logger.info("some {}", 1);
