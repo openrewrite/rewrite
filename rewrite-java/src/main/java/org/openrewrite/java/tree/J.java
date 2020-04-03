@@ -699,8 +699,11 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @Nullable
-        @With
         Empty statik;
+
+        public Block<T> withStatic(Empty statik) {
+            return new Block<>(id, statik, statements, formatting, endOfBlockSuffix);
+        }
 
         @With
         @Getter
