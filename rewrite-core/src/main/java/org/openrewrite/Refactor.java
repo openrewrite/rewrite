@@ -1,5 +1,6 @@
 package org.openrewrite;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
@@ -20,6 +21,8 @@ import static java.util.stream.StreamSupport.stream;
 public class Refactor<S extends SourceFile, T extends Tree> {
     @Getter
     private final S original;
+
+    private MeterRegistry meterRegistry = Metrics.globalRegistry;
 
     @Getter
     private final List<SourceVisitor<T>> visitors = new ArrayList<>();
@@ -97,7 +100,7 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 .description("The time it takes to execute a refactoring plan consisting of potentially more than one visitor over more than one cycle")
                 .tag("file.type", original.getFileType())
                 .tag("outcome", rulesThatMadeChanges.isEmpty() ? "Unchanged" : "Changed")
-                .register(Metrics.globalRegistry));
+                .register(meterRegistry));
 
         return new Change<>(original, acc, rulesThatMadeChanges);
     }
@@ -115,8 +118,13 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
                 .tag("visitor", visitor.getName() == null ? "Unnamed visitor" : visitor.getName())
                 .tag("file.type", original.getFileType())
-                .register(Metrics.globalRegistry));
+                .register(meterRegistry));
 
         return acc;
+    }
+
+    public Refactor<S, T> setMeterRegistry(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        return this;
     }
 }

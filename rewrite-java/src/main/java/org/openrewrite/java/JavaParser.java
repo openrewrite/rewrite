@@ -7,6 +7,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
@@ -40,6 +41,8 @@ import static java.util.stream.StreamSupport.stream;
 @NonNullApi
 public class JavaParser {
     private static final Logger logger = LoggerFactory.getLogger(JavaParser.class);
+
+    private MeterRegistry meterRegistry = Metrics.globalRegistry;
 
     /**
      * When true, enables a parser to use class types from the in-memory type cache rather than performing
@@ -149,7 +152,7 @@ public class JavaParser {
                                 .description("The time spent by the JDK in parsing and tokenizing the source file")
                                 .tag("file.type", "Java")
                                 .tag("step", "JDK parsing")
-                                .register(Metrics.globalRegistry)
+                                .register(meterRegistry)
                                 .record(() -> compiler.parse(filename)),
                         (e2, e1) -> e1, LinkedHashMap::new));
 
@@ -176,7 +179,7 @@ public class JavaParser {
                         .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
                         .tag("file.type", "Java")
                         .tag("step", "Map to Rewrite AST")
-                        .register(Metrics.globalRegistry)
+                        .register(meterRegistry)
                         .record(() -> {
                             var path = cuByPath.getKey();
                             logger.trace("Building AST for {}", path.toAbsolutePath().getFileName());
@@ -261,6 +264,11 @@ public class JavaParser {
         return this;
     }
 
+    public JavaParser setMeterRegistry(MeterRegistry registry) {
+        this.meterRegistry = registry;
+        return this;
+    }
+
     /**
      * Initialize modules
      */
@@ -294,7 +302,7 @@ public class JavaParser {
                 .collect(Collectors.toList());
     }
 
-    private static class TimedTodo extends Todo {
+    private class TimedTodo extends Todo {
         private final Todo todo;
         private Timer.Sample sample;
 
@@ -310,7 +318,7 @@ public class JavaParser {
                         .description("The time spent by the JDK in type attributing the source file")
                         .tag("file.type", "Java")
                         .tag("step", "Type attribution")
-                        .register(Metrics.globalRegistry));
+                        .register(meterRegistry));
             }
             return todo.isEmpty();
         }
