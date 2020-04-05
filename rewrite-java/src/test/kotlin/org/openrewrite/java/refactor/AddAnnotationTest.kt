@@ -87,7 +87,6 @@ class AddAnnotationTest : JavaParser() {
             }
         """.trimIndent())
 
-
         val fixed = a.classes[0].methods
                 .fold(a.refactor()) { refactor, method -> refactor.visit(AddAnnotation(method.id, "javax.annotation.PostConstruct")) }
                 .fix().fixed

@@ -22,6 +22,8 @@ dependencies {
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
 
+    implementation("io.micrometer:micrometer-core:latest.release")
+
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")

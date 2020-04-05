@@ -1,5 +1,7 @@
 package org.openrewrite;
 
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.openrewrite.internal.lang.NonNullApi;
 
@@ -60,6 +62,8 @@ public class Refactor<S extends SourceFile, T extends Tree> {
     }
 
     public Change<S> fix(int maxCycles) {
+        Timer.Sample sample = Timer.start();
+
         S acc = original;
         Set<String> rulesThatMadeChanges = new HashSet<>();
 
@@ -89,16 +93,30 @@ public class Refactor<S extends SourceFile, T extends Tree> {
             rulesThatMadeChanges.addAll(rulesThatMadeChangesThisCycle);
         }
 
+        sample.stop(Timer.builder("rewrite.refactor.plan")
+                .description("The time it takes to execute a refactoring plan consisting of potentially more than one visitor over more than one cycle")
+                .tag("file.type", original.getFileType())
+                .tag("outcome", rulesThatMadeChanges.isEmpty() ? "Unchanged" : "Changed")
+                .register(Metrics.globalRegistry));
+
         return new Change<>(original, acc, rulesThatMadeChanges);
     }
 
     @SuppressWarnings("unchecked")
     private S transformPipeline(S acc, SourceVisitor<T> visitor) {
         // by transforming the AST for each op, we allow for the possibility of overlapping changes
+        Timer.Sample sample = Timer.start();
         acc = (S) visitor.visit(acc);
         for (SourceVisitor<T> vis : visitor.andThen()) {
             acc = transformPipeline(acc, vis);
         }
+
+        sample.stop(Timer.builder("rewrite.refactor.visit")
+                .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
+                .tag("visitor", visitor.getName() == null ? "Unnamed visitor" : visitor.getName())
+                .tag("file.type", original.getFileType())
+                .register(Metrics.globalRegistry));
+
         return acc;
     }
 }

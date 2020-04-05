@@ -1,15 +1,14 @@
 package org.openrewrite.java;
 
-import com.sun.tools.javac.comp.Annotate;
-import com.sun.tools.javac.comp.Check;
-import com.sun.tools.javac.comp.Enter;
-import com.sun.tools.javac.comp.Modules;
+import com.sun.tools.javac.comp.*;
 import com.sun.tools.javac.file.JavacFileManager;
 import com.sun.tools.javac.main.JavaCompiler;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
+import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -144,7 +143,14 @@ public class JavaParser {
 
         var fileObjects = pfm.getJavaFileObjects(filterSourceFiles(sourceFiles).toArray(Path[]::new));
         var cus = stream(fileObjects.spliterator(), false)
-                .collect(Collectors.toMap(p -> Paths.get(p.toUri()), compiler::parse,
+                .collect(Collectors.toMap(
+                        p -> Paths.get(p.toUri()),
+                        filename -> Timer.builder("rewrite.parse")
+                                .description("The time spent by the JDK in parsing and tokenizing the source file")
+                                .tag("file.type", "Java")
+                                .tag("step", "JDK parsing")
+                                .register(Metrics.globalRegistry)
+                                .record(() -> compiler.parse(filename)),
                         (e2, e1) -> e1, LinkedHashMap::new));
 
         try {
@@ -158,26 +164,33 @@ public class JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-            compiler.attribute(compiler.todo);
+            compiler.attribute(new TimedTodo(compiler.todo));
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             logger.warn("Failed symbol entering or attribution", t);
         }
 
-        return cus.entrySet().stream().map(cuByPath -> {
-            var path = cuByPath.getKey();
-            logger.trace("Building AST for {}", path.toAbsolutePath().getFileName());
-            try {
-                JavaParserVisitor parser = new JavaParserVisitor(
-                        relativeTo == null ? path : relativeTo.relativize(path),
-                        Files.readString(path, charset),
-                        relaxedClassTypeMatching);
-                return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }).collect(toList());
+        return cus.entrySet().stream().map(cuByPath ->
+                Timer.builder("rewrite.parse")
+                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                        .tag("file.type", "Java")
+                        .tag("step", "Map to Rewrite AST")
+                        .register(Metrics.globalRegistry)
+                        .record(() -> {
+                            var path = cuByPath.getKey();
+                            logger.trace("Building AST for {}", path.toAbsolutePath().getFileName());
+                            try {
+                                JavaParserVisitor parser = new JavaParserVisitor(
+                                        relativeTo == null ? path : relativeTo.relativize(path),
+                                        Files.readString(path, charset),
+                                        relaxedClassTypeMatching);
+                                return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
+                            } catch (IOException e) {
+                                throw new UncheckedIOException(e);
+                            }
+                        })
+        ).collect(toList());
     }
 
     public J.CompilationUnit parse(String source, String whichDependsOn) {
@@ -279,5 +292,33 @@ public class JavaParser {
     private List<Path> filterSourceFiles(List<Path> sourceFiles) {
         return sourceFiles.stream().filter(source -> source.getFileName().toString().endsWith(".java"))
                 .collect(Collectors.toList());
+    }
+
+    private static class TimedTodo extends Todo {
+        private final Todo todo;
+        private Timer.Sample sample;
+
+        private TimedTodo(Todo todo) {
+            super(new Context());
+            this.todo = todo;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            if (sample != null) {
+                sample.stop(Timer.builder("rewrite.parse")
+                        .description("The time spent by the JDK in type attributing the source file")
+                        .tag("file.type", "Java")
+                        .tag("step", "Type attribution")
+                        .register(Metrics.globalRegistry));
+            }
+            return todo.isEmpty();
+        }
+
+        @Override
+        public Env<AttrContext> remove() {
+            this.sample = Timer.start();
+            return todo.remove();
+        }
     }
 }
