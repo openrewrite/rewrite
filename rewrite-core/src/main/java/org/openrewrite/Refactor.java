@@ -1,5 +1,6 @@
 package org.openrewrite;
 
+import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -101,6 +102,15 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 .tag("file.type", original.getFileType())
                 .tag("outcome", rulesThatMadeChanges.isEmpty() ? "Unchanged" : "Changed")
                 .register(meterRegistry));
+
+        for (String ruleThatMadeChange : rulesThatMadeChanges) {
+            Counter.builder("rewrite.refactor.plan.changes")
+                    .description("The number of changes requested by a visitor.")
+                    .tag("visitor", ruleThatMadeChange)
+                    .tag("file.type", original.getFileType())
+                    .register(meterRegistry)
+                    .increment();
+        }
 
         return new Change<>(original, acc, rulesThatMadeChanges);
     }
