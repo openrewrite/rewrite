@@ -1,4 +1,4 @@
-// Generated from /Users/jschneider/Projects/github/Netflix-Skunkworks/Rewrite/rewrite-core/src/main/antlr/RefactorMethodSignatureParser.g4 by ANTLR 4.7
+// Generated from /Users/jon/Projects/github/Netflix-Skunkworks/rewrite/rewrite-java/src/main/antlr/RefactorMethodSignatureParser.g4 by ANTLR 4.8
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.*;
@@ -15,7 +15,7 @@ import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class RefactorMethodSignatureParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.7", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.8", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -76,71 +76,80 @@ public class RefactorMethodSignatureParser extends Parser {
 		RULE_nonWildcardTypeArguments = 105, RULE_typeArgumentsOrDiamond = 106, 
 		RULE_nonWildcardTypeArgumentsOrDiamond = 107, RULE_superSuffix = 108, 
 		RULE_explicitGenericInvocationSuffix = 109, RULE_arguments = 110;
-	public static final String[] ruleNames = {
-		"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot", 
-		"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
-		"formalTypePattern", "classNameOrInterface", "simpleNamePattern", "compilationUnit", 
-		"packageDeclaration", "importDeclaration", "typeDeclaration", "modifier", 
-		"classOrInterfaceModifier", "variableModifier", "classDeclaration", "typeParameters", 
-		"typeParameter", "typeBound", "enumDeclaration", "enumConstants", "enumConstant", 
-		"enumBodyDeclarations", "interfaceDeclaration", "typeList", "classBody", 
-		"interfaceBody", "classBodyDeclaration", "memberDeclaration", "methodDeclaration", 
-		"genericMethodDeclaration", "constructorDeclaration", "genericConstructorDeclaration", 
-		"fieldDeclaration", "interfaceBodyDeclaration", "interfaceMemberDeclaration", 
-		"constDeclaration", "constantDeclarator", "interfaceMethodDeclaration", 
-		"genericInterfaceMethodDeclaration", "variableDeclarators", "variableDeclarator", 
-		"variableDeclaratorId", "variableInitializer", "arrayInitializer", "enumConstantName", 
-		"type", "classOrInterfaceType", "primitiveType", "typeArguments", "typeArgument", 
-		"qualifiedNameList", "formalParameters", "formalParameterList", "formalParameter", 
-		"lastFormalParameter", "methodBody", "constructorBody", "qualifiedName", 
-		"literal", "annotation", "annotationName", "elementValuePairs", "elementValuePair", 
-		"elementValue", "elementValueArrayInitializer", "annotationTypeDeclaration", 
-		"annotationTypeBody", "annotationTypeElementDeclaration", "annotationTypeElementRest", 
-		"annotationMethodOrConstantRest", "annotationMethodRest", "annotationConstantRest", 
-		"defaultValue", "block", "blockStatement", "localVariableDeclarationStatement", 
-		"localVariableDeclaration", "statement", "catchClause", "catchType", "finallyBlock", 
-		"resourceSpecification", "resources", "resource", "switchBlockStatementGroup", 
-		"switchLabel", "forControl", "forInit", "enhancedForControl", "forUpdate", 
-		"parExpression", "expressionList", "statementExpression", "constantExpression", 
-		"expression", "primary", "creator", "createdName", "innerCreator", "arrayCreatorRest", 
-		"classCreatorRest", "explicitGenericInvocation", "nonWildcardTypeArguments", 
-		"typeArgumentsOrDiamond", "nonWildcardTypeArgumentsOrDiamond", "superSuffix", 
-		"explicitGenericInvocationSuffix", "arguments"
-	};
+	private static String[] makeRuleNames() {
+		return new String[] {
+			"methodPattern", "formalParametersPattern", "formalsPattern", "dotDot", 
+			"formalsPatternAfterDotDot", "optionalParensTypePattern", "targetTypePattern", 
+			"formalTypePattern", "classNameOrInterface", "simpleNamePattern", "compilationUnit", 
+			"packageDeclaration", "importDeclaration", "typeDeclaration", "modifier", 
+			"classOrInterfaceModifier", "variableModifier", "classDeclaration", "typeParameters", 
+			"typeParameter", "typeBound", "enumDeclaration", "enumConstants", "enumConstant", 
+			"enumBodyDeclarations", "interfaceDeclaration", "typeList", "classBody", 
+			"interfaceBody", "classBodyDeclaration", "memberDeclaration", "methodDeclaration", 
+			"genericMethodDeclaration", "constructorDeclaration", "genericConstructorDeclaration", 
+			"fieldDeclaration", "interfaceBodyDeclaration", "interfaceMemberDeclaration", 
+			"constDeclaration", "constantDeclarator", "interfaceMethodDeclaration", 
+			"genericInterfaceMethodDeclaration", "variableDeclarators", "variableDeclarator", 
+			"variableDeclaratorId", "variableInitializer", "arrayInitializer", "enumConstantName", 
+			"type", "classOrInterfaceType", "primitiveType", "typeArguments", "typeArgument", 
+			"qualifiedNameList", "formalParameters", "formalParameterList", "formalParameter", 
+			"lastFormalParameter", "methodBody", "constructorBody", "qualifiedName", 
+			"literal", "annotation", "annotationName", "elementValuePairs", "elementValuePair", 
+			"elementValue", "elementValueArrayInitializer", "annotationTypeDeclaration", 
+			"annotationTypeBody", "annotationTypeElementDeclaration", "annotationTypeElementRest", 
+			"annotationMethodOrConstantRest", "annotationMethodRest", "annotationConstantRest", 
+			"defaultValue", "block", "blockStatement", "localVariableDeclarationStatement", 
+			"localVariableDeclaration", "statement", "catchClause", "catchType", 
+			"finallyBlock", "resourceSpecification", "resources", "resource", "switchBlockStatementGroup", 
+			"switchLabel", "forControl", "forInit", "enhancedForControl", "forUpdate", 
+			"parExpression", "expressionList", "statementExpression", "constantExpression", 
+			"expression", "primary", "creator", "createdName", "innerCreator", "arrayCreatorRest", 
+			"classCreatorRest", "explicitGenericInvocation", "nonWildcardTypeArguments", 
+			"typeArgumentsOrDiamond", "nonWildcardTypeArgumentsOrDiamond", "superSuffix", 
+			"explicitGenericInvocationSuffix", "arguments"
+		};
+	}
+	public static final String[] ruleNames = makeRuleNames();
 
-	private static final String[] _LITERAL_NAMES = {
-		null, "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
-		"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
-		"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
-		"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
-		"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
-		"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
-		"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
-		"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
-		"'while'", null, null, null, null, null, "'null'", "'('", "')'", "'{'", 
-		"'}'", "'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", 
-		"'~'", "'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", "'++'", 
-		"'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", "'+='", 
-		"'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", "'>>='", 
-		"'>>>='", null, "'@'", "'...'"
-	};
-	private static final String[] _SYMBOLIC_NAMES = {
-		null, "DOTDOT", "SPACE", "ABSTRACT", "ASSERT", "BOOLEAN", "BREAK", "BYTE", 
-		"CASE", "CATCH", "CHAR", "CLASS", "CONST", "CONTINUE", "DEFAULT", "DO", 
-		"DOUBLE", "ELSE", "ENUM", "EXTENDS", "FINAL", "FINALLY", "FLOAT", "FOR", 
-		"IF", "GOTO", "IMPLEMENTS", "IMPORT", "INSTANCEOF", "INT", "INTERFACE", 
-		"LONG", "NATIVE", "NEW", "PACKAGE", "PRIVATE", "PROTECTED", "PUBLIC", 
-		"RETURN", "SHORT", "STATIC", "STRICTFP", "SUPER", "SWITCH", "SYNCHRONIZED", 
-		"THIS", "THROW", "THROWS", "TRANSIENT", "TRY", "VOID", "VOLATILE", "WHILE", 
-		"IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
-		"StringLiteral", "NullLiteral", "LPAREN", "RPAREN", "LBRACE", "RBRACE", 
-		"LBRACK", "RBRACK", "SEMI", "COMMA", "DOT", "ASSIGN", "GT", "LT", "BANG", 
-		"TILDE", "QUESTION", "COLON", "EQUAL", "LE", "GE", "NOTEQUAL", "AND", 
-		"OR", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "BITAND", "BITOR", "CARET", 
-		"MOD", "ADD_ASSIGN", "SUB_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "AND_ASSIGN", 
-		"OR_ASSIGN", "XOR_ASSIGN", "MOD_ASSIGN", "LSHIFT_ASSIGN", "RSHIFT_ASSIGN", 
-		"URSHIFT_ASSIGN", "Identifier", "AT", "ELLIPSIS", "WS", "COMMENT", "LINE_COMMENT"
-	};
+	private static String[] makeLiteralNames() {
+		return new String[] {
+			null, "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
+			"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
+			"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
+			"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
+			"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
+			"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
+			"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
+			"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
+			"'while'", null, null, null, null, null, "'null'", "'('", "')'", "'{'", 
+			"'}'", "'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", 
+			"'~'", "'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", 
+			"'++'", "'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", 
+			"'+='", "'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", 
+			"'>>='", "'>>>='", null, "'@'", "'...'"
+		};
+	}
+	private static final String[] _LITERAL_NAMES = makeLiteralNames();
+	private static String[] makeSymbolicNames() {
+		return new String[] {
+			null, "DOTDOT", "SPACE", "ABSTRACT", "ASSERT", "BOOLEAN", "BREAK", "BYTE", 
+			"CASE", "CATCH", "CHAR", "CLASS", "CONST", "CONTINUE", "DEFAULT", "DO", 
+			"DOUBLE", "ELSE", "ENUM", "EXTENDS", "FINAL", "FINALLY", "FLOAT", "FOR", 
+			"IF", "GOTO", "IMPLEMENTS", "IMPORT", "INSTANCEOF", "INT", "INTERFACE", 
+			"LONG", "NATIVE", "NEW", "PACKAGE", "PRIVATE", "PROTECTED", "PUBLIC", 
+			"RETURN", "SHORT", "STATIC", "STRICTFP", "SUPER", "SWITCH", "SYNCHRONIZED", 
+			"THIS", "THROW", "THROWS", "TRANSIENT", "TRY", "VOID", "VOLATILE", "WHILE", 
+			"IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
+			"StringLiteral", "NullLiteral", "LPAREN", "RPAREN", "LBRACE", "RBRACE", 
+			"LBRACK", "RBRACK", "SEMI", "COMMA", "DOT", "ASSIGN", "GT", "LT", "BANG", 
+			"TILDE", "QUESTION", "COLON", "EQUAL", "LE", "GE", "NOTEQUAL", "AND", 
+			"OR", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "BITAND", "BITOR", "CARET", 
+			"MOD", "ADD_ASSIGN", "SUB_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "AND_ASSIGN", 
+			"OR_ASSIGN", "XOR_ASSIGN", "MOD_ASSIGN", "LSHIFT_ASSIGN", "RSHIFT_ASSIGN", 
+			"URSHIFT_ASSIGN", "Identifier", "AT", "ELLIPSIS", "WS", "COMMENT", "LINE_COMMENT"
+		};
+	}
+	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
 	public static final Vocabulary VOCABULARY = new VocabularyImpl(_LITERAL_NAMES, _SYMBOLIC_NAMES);
 
 	/**
@@ -190,6 +199,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		super(input);
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
+
 	public static class MethodPatternContext extends ParserRuleContext {
 		public TargetTypePatternContext targetTypePattern() {
 			return getRuleContext(TargetTypePatternContext.class,0);
@@ -248,6 +258,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalParametersPatternContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public FormalsPatternContext formalsPattern() {
 			return getRuleContext(FormalsPatternContext.class,0);
 		}
@@ -308,6 +320,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public DotDotContext dotDot() {
 			return getRuleContext(DotDotContext.class,0);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public List<FormalsPatternAfterDotDotContext> formalsPatternAfterDotDot() {
 			return getRuleContexts(FormalsPatternAfterDotDotContext.class);
 		}
@@ -330,6 +346,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public FormalTypePatternContext formalTypePattern() {
 			return getRuleContext(FormalTypePatternContext.class,0);
 		}
+		public TerminalNode ELLIPSIS() { return getToken(RefactorMethodSignatureParser.ELLIPSIS, 0); }
 		public FormalsPatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -459,6 +476,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class DotDotContext extends ParserRuleContext {
+		public TerminalNode DOTDOT() { return getToken(RefactorMethodSignatureParser.DOTDOT, 0); }
 		public DotDotContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -503,6 +521,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public OptionalParensTypePatternContext optionalParensTypePattern() {
 			return getRuleContext(OptionalParensTypePatternContext.class,0);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public List<FormalsPatternAfterDotDotContext> formalsPatternAfterDotDot() {
 			return getRuleContexts(FormalsPatternAfterDotDotContext.class);
 		}
@@ -516,6 +538,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public FormalTypePatternContext formalTypePattern() {
 			return getRuleContext(FormalTypePatternContext.class,0);
 		}
+		public TerminalNode ELLIPSIS() { return getToken(RefactorMethodSignatureParser.ELLIPSIS, 0); }
 		public FormalsPatternAfterDotDotContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -606,9 +629,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class OptionalParensTypePatternContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public FormalTypePatternContext formalTypePattern() {
 			return getRuleContext(FormalTypePatternContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public OptionalParensTypePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -684,12 +709,15 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ClassNameOrInterfaceContext classNameOrInterface() {
 			return getRuleContext(ClassNameOrInterfaceContext.class,0);
 		}
+		public TerminalNode BANG() { return getToken(RefactorMethodSignatureParser.BANG, 0); }
 		public List<TargetTypePatternContext> targetTypePattern() {
 			return getRuleContexts(TargetTypePatternContext.class);
 		}
 		public TargetTypePatternContext targetTypePattern(int i) {
 			return getRuleContext(TargetTypePatternContext.class,i);
 		}
+		public TerminalNode AND() { return getToken(RefactorMethodSignatureParser.AND, 0); }
+		public TerminalNode OR() { return getToken(RefactorMethodSignatureParser.OR, 0); }
 		public TargetTypePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -810,12 +838,15 @@ public class RefactorMethodSignatureParser extends Parser {
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
+		public TerminalNode BANG() { return getToken(RefactorMethodSignatureParser.BANG, 0); }
 		public List<FormalTypePatternContext> formalTypePattern() {
 			return getRuleContexts(FormalTypePatternContext.class);
 		}
 		public FormalTypePatternContext formalTypePattern(int i) {
 			return getRuleContext(FormalTypePatternContext.class,i);
 		}
+		public TerminalNode AND() { return getToken(RefactorMethodSignatureParser.AND, 0); }
+		public TerminalNode OR() { return getToken(RefactorMethodSignatureParser.OR, 0); }
 		public FormalTypePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -943,9 +974,29 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassNameOrInterfaceContext extends ParserRuleContext {
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
 		public List<TerminalNode> Identifier() { return getTokens(RefactorMethodSignatureParser.Identifier); }
 		public TerminalNode Identifier(int i) {
 			return getToken(RefactorMethodSignatureParser.Identifier, i);
+		}
+		public List<TerminalNode> MUL() { return getTokens(RefactorMethodSignatureParser.MUL); }
+		public TerminalNode MUL(int i) {
+			return getToken(RefactorMethodSignatureParser.MUL, i);
+		}
+		public List<TerminalNode> DOT() { return getTokens(RefactorMethodSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(RefactorMethodSignatureParser.DOT, i);
+		}
+		public List<TerminalNode> DOTDOT() { return getTokens(RefactorMethodSignatureParser.DOTDOT); }
+		public TerminalNode DOTDOT(int i) {
+			return getToken(RefactorMethodSignatureParser.DOTDOT, i);
 		}
 		public ClassNameOrInterfaceContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1037,6 +1088,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public List<TerminalNode> Identifier() { return getTokens(RefactorMethodSignatureParser.Identifier); }
 		public TerminalNode Identifier(int i) {
 			return getToken(RefactorMethodSignatureParser.Identifier, i);
+		}
+		public List<TerminalNode> MUL() { return getTokens(RefactorMethodSignatureParser.MUL); }
+		public TerminalNode MUL(int i) {
+			return getToken(RefactorMethodSignatureParser.MUL, i);
 		}
 		public SimpleNamePatternContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1248,9 +1303,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class PackageDeclarationContext extends ParserRuleContext {
+		public TerminalNode PACKAGE() { return getToken(RefactorMethodSignatureParser.PACKAGE, 0); }
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public List<AnnotationContext> annotation() {
 			return getRuleContexts(AnnotationContext.class);
 		}
@@ -1317,9 +1374,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ImportDeclarationContext extends ParserRuleContext {
+		public TerminalNode IMPORT() { return getToken(RefactorMethodSignatureParser.IMPORT, 0); }
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
+		public TerminalNode STATIC() { return getToken(RefactorMethodSignatureParser.STATIC, 0); }
+		public TerminalNode DOT() { return getToken(RefactorMethodSignatureParser.DOT, 0); }
+		public TerminalNode MUL() { return getToken(RefactorMethodSignatureParser.MUL, 0); }
 		public ImportDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1406,6 +1468,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
 			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public TypeDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1544,6 +1607,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ClassOrInterfaceModifierContext classOrInterfaceModifier() {
 			return getRuleContext(ClassOrInterfaceModifierContext.class,0);
 		}
+		public TerminalNode NATIVE() { return getToken(RefactorMethodSignatureParser.NATIVE, 0); }
+		public TerminalNode SYNCHRONIZED() { return getToken(RefactorMethodSignatureParser.SYNCHRONIZED, 0); }
+		public TerminalNode TRANSIENT() { return getToken(RefactorMethodSignatureParser.TRANSIENT, 0); }
+		public TerminalNode VOLATILE() { return getToken(RefactorMethodSignatureParser.VOLATILE, 0); }
 		public ModifierContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1622,6 +1689,13 @@ public class RefactorMethodSignatureParser extends Parser {
 		public AnnotationContext annotation() {
 			return getRuleContext(AnnotationContext.class,0);
 		}
+		public TerminalNode PUBLIC() { return getToken(RefactorMethodSignatureParser.PUBLIC, 0); }
+		public TerminalNode PROTECTED() { return getToken(RefactorMethodSignatureParser.PROTECTED, 0); }
+		public TerminalNode PRIVATE() { return getToken(RefactorMethodSignatureParser.PRIVATE, 0); }
+		public TerminalNode STATIC() { return getToken(RefactorMethodSignatureParser.STATIC, 0); }
+		public TerminalNode ABSTRACT() { return getToken(RefactorMethodSignatureParser.ABSTRACT, 0); }
+		public TerminalNode FINAL() { return getToken(RefactorMethodSignatureParser.FINAL, 0); }
+		public TerminalNode STRICTFP() { return getToken(RefactorMethodSignatureParser.STRICTFP, 0); }
 		public ClassOrInterfaceModifierContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1693,6 +1767,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class VariableModifierContext extends ParserRuleContext {
+		public TerminalNode FINAL() { return getToken(RefactorMethodSignatureParser.FINAL, 0); }
 		public AnnotationContext annotation() {
 			return getRuleContext(AnnotationContext.class,0);
 		}
@@ -1752,6 +1827,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassDeclarationContext extends ParserRuleContext {
+		public TerminalNode CLASS() { return getToken(RefactorMethodSignatureParser.CLASS, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public ClassBodyContext classBody() {
 			return getRuleContext(ClassBodyContext.class,0);
@@ -1759,9 +1835,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
 		}
+		public TerminalNode EXTENDS() { return getToken(RefactorMethodSignatureParser.EXTENDS, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode IMPLEMENTS() { return getToken(RefactorMethodSignatureParser.IMPLEMENTS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
@@ -1845,11 +1923,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeParametersContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(RefactorMethodSignatureParser.LT, 0); }
 		public List<TypeParameterContext> typeParameter() {
 			return getRuleContexts(TypeParameterContext.class);
 		}
 		public TypeParameterContext typeParameter(int i) {
 			return getRuleContext(TypeParameterContext.class,i);
+		}
+		public TerminalNode GT() { return getToken(RefactorMethodSignatureParser.GT, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public TypeParametersContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1914,6 +1998,7 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class TypeParameterContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode EXTENDS() { return getToken(RefactorMethodSignatureParser.EXTENDS, 0); }
 		public TypeBoundContext typeBound() {
 			return getRuleContext(TypeBoundContext.class,0);
 		}
@@ -1977,6 +2062,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type(int i) {
 			return getRuleContext(TypeContext.class,i);
 		}
+		public List<TerminalNode> BITAND() { return getTokens(RefactorMethodSignatureParser.BITAND); }
+		public TerminalNode BITAND(int i) {
+			return getToken(RefactorMethodSignatureParser.BITAND, i);
+		}
 		public TypeBoundContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2037,12 +2126,16 @@ public class RefactorMethodSignatureParser extends Parser {
 	public static class EnumDeclarationContext extends ParserRuleContext {
 		public TerminalNode ENUM() { return getToken(RefactorMethodSignatureParser.ENUM, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
+		public TerminalNode IMPLEMENTS() { return getToken(RefactorMethodSignatureParser.IMPLEMENTS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
 		public EnumConstantsContext enumConstants() {
 			return getRuleContext(EnumConstantsContext.class,0);
 		}
+		public TerminalNode COMMA() { return getToken(RefactorMethodSignatureParser.COMMA, 0); }
 		public EnumBodyDeclarationsContext enumBodyDeclarations() {
 			return getRuleContext(EnumBodyDeclarationsContext.class,0);
 		}
@@ -2141,6 +2234,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		}
 		public EnumConstantContext enumConstant(int i) {
 			return getRuleContext(EnumConstantContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public EnumConstantsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2291,6 +2388,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class EnumBodyDeclarationsContext extends ParserRuleContext {
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public List<ClassBodyDeclarationContext> classBodyDeclaration() {
 			return getRuleContexts(ClassBodyDeclarationContext.class);
 		}
@@ -2353,6 +2451,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class InterfaceDeclarationContext extends ParserRuleContext {
+		public TerminalNode INTERFACE() { return getToken(RefactorMethodSignatureParser.INTERFACE, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public InterfaceBodyContext interfaceBody() {
 			return getRuleContext(InterfaceBodyContext.class,0);
@@ -2360,6 +2459,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
 		}
+		public TerminalNode EXTENDS() { return getToken(RefactorMethodSignatureParser.EXTENDS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
@@ -2437,6 +2537,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type(int i) {
 			return getRuleContext(TypeContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public TypeListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2495,6 +2599,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<ClassBodyDeclarationContext> classBodyDeclaration() {
 			return getRuleContexts(ClassBodyDeclarationContext.class);
 		}
@@ -2559,6 +2665,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class InterfaceBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<InterfaceBodyDeclarationContext> interfaceBodyDeclaration() {
 			return getRuleContexts(InterfaceBodyDeclarationContext.class);
 		}
@@ -2623,9 +2731,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ClassBodyDeclarationContext extends ParserRuleContext {
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
+		public TerminalNode STATIC() { return getToken(RefactorMethodSignatureParser.STATIC, 0); }
 		public MemberDeclarationContext memberDeclaration() {
 			return getRuleContext(MemberDeclarationContext.class,0);
 		}
@@ -2861,9 +2971,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode VOID() { return getToken(RefactorMethodSignatureParser.VOID, 0); }
 		public MethodBodyContext methodBody() {
 			return getRuleContext(MethodBodyContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
+		public TerminalNode THROWS() { return getToken(RefactorMethodSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -3039,6 +3160,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ConstructorBodyContext constructorBody() {
 			return getRuleContext(ConstructorBodyContext.class,0);
 		}
+		public TerminalNode THROWS() { return getToken(RefactorMethodSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -3155,6 +3277,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public VariableDeclaratorsContext variableDeclarators() {
 			return getRuleContext(VariableDeclaratorsContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public FieldDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3209,6 +3332,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public InterfaceBodyDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3426,6 +3550,11 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ConstantDeclaratorContext constantDeclarator(int i) {
 			return getRuleContext(ConstantDeclaratorContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public ConstDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3489,8 +3618,17 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class ConstantDeclaratorContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode ASSIGN() { return getToken(RefactorMethodSignatureParser.ASSIGN, 0); }
 		public VariableInitializerContext variableInitializer() {
 			return getRuleContext(VariableInitializerContext.class,0);
+		}
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
 		}
 		public ConstantDeclaratorContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3558,9 +3696,20 @@ public class RefactorMethodSignatureParser extends Parser {
 		public FormalParametersContext formalParameters() {
 			return getRuleContext(FormalParametersContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode VOID() { return getToken(RefactorMethodSignatureParser.VOID, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
+		public TerminalNode THROWS() { return getToken(RefactorMethodSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -3719,6 +3868,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public VariableDeclaratorContext variableDeclarator(int i) {
 			return getRuleContext(VariableDeclaratorContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public VariableDeclaratorsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3780,6 +3933,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode ASSIGN() { return getToken(RefactorMethodSignatureParser.ASSIGN, 0); }
 		public VariableInitializerContext variableInitializer() {
 			return getRuleContext(VariableInitializerContext.class,0);
 		}
@@ -3838,6 +3992,14 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class VariableDeclaratorIdContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
 		public VariableDeclaratorIdContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3984,11 +4146,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ArrayInitializerContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<VariableInitializerContext> variableInitializer() {
 			return getRuleContexts(VariableInitializerContext.class);
 		}
 		public VariableInitializerContext variableInitializer(int i) {
 			return getRuleContext(VariableInitializerContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public ArrayInitializerContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4118,6 +4286,14 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ClassOrInterfaceTypeContext classOrInterfaceType() {
 			return getRuleContext(ClassOrInterfaceTypeContext.class,0);
 		}
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
@@ -4231,6 +4407,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeArgumentsContext typeArguments(int i) {
 			return getRuleContext(TypeArgumentsContext.class,i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(RefactorMethodSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(RefactorMethodSignatureParser.DOT, i);
+		}
 		public ClassOrInterfaceTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4311,6 +4491,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class PrimitiveTypeContext extends ParserRuleContext {
+		public TerminalNode BOOLEAN() { return getToken(RefactorMethodSignatureParser.BOOLEAN, 0); }
+		public TerminalNode CHAR() { return getToken(RefactorMethodSignatureParser.CHAR, 0); }
+		public TerminalNode BYTE() { return getToken(RefactorMethodSignatureParser.BYTE, 0); }
+		public TerminalNode SHORT() { return getToken(RefactorMethodSignatureParser.SHORT, 0); }
+		public TerminalNode INT() { return getToken(RefactorMethodSignatureParser.INT, 0); }
+		public TerminalNode LONG() { return getToken(RefactorMethodSignatureParser.LONG, 0); }
+		public TerminalNode FLOAT() { return getToken(RefactorMethodSignatureParser.FLOAT, 0); }
+		public TerminalNode DOUBLE() { return getToken(RefactorMethodSignatureParser.DOUBLE, 0); }
 		public PrimitiveTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4361,11 +4549,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeArgumentsContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(RefactorMethodSignatureParser.LT, 0); }
 		public List<TypeArgumentContext> typeArgument() {
 			return getRuleContexts(TypeArgumentContext.class);
 		}
 		public TypeArgumentContext typeArgument(int i) {
 			return getRuleContext(TypeArgumentContext.class,i);
+		}
+		public TerminalNode GT() { return getToken(RefactorMethodSignatureParser.GT, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public TypeArgumentsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4432,6 +4626,9 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode QUESTION() { return getToken(RefactorMethodSignatureParser.QUESTION, 0); }
+		public TerminalNode EXTENDS() { return getToken(RefactorMethodSignatureParser.EXTENDS, 0); }
+		public TerminalNode SUPER() { return getToken(RefactorMethodSignatureParser.SUPER, 0); }
 		public TypeArgumentContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4523,6 +4720,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public QualifiedNameContext qualifiedName(int i) {
 			return getRuleContext(QualifiedNameContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public QualifiedNameListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4581,6 +4782,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FormalParametersContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public FormalParameterListContext formalParameterList() {
 			return getRuleContext(FormalParameterListContext.class,0);
 		}
@@ -4643,6 +4846,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		}
 		public FormalParameterContext formalParameter(int i) {
 			return getRuleContext(FormalParameterContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public LastFormalParameterContext lastFormalParameter() {
 			return getRuleContext(LastFormalParameterContext.class,0);
@@ -4806,6 +5013,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode ELLIPSIS() { return getToken(RefactorMethodSignatureParser.ELLIPSIS, 0); }
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
@@ -4967,6 +5175,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TerminalNode Identifier(int i) {
 			return getToken(RefactorMethodSignatureParser.Identifier, i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(RefactorMethodSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(RefactorMethodSignatureParser.DOT, i);
+		}
 		public QualifiedNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5032,6 +5244,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TerminalNode CharacterLiteral() { return getToken(RefactorMethodSignatureParser.CharacterLiteral, 0); }
 		public TerminalNode StringLiteral() { return getToken(RefactorMethodSignatureParser.StringLiteral, 0); }
 		public TerminalNode BooleanLiteral() { return getToken(RefactorMethodSignatureParser.BooleanLiteral, 0); }
+		public TerminalNode NullLiteral() { return getToken(RefactorMethodSignatureParser.NullLiteral, 0); }
 		public LiteralContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5082,9 +5295,12 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationContext extends ParserRuleContext {
+		public TerminalNode AT() { return getToken(RefactorMethodSignatureParser.AT, 0); }
 		public AnnotationNameContext annotationName() {
 			return getRuleContext(AnnotationNameContext.class,0);
 		}
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public ElementValuePairsContext elementValuePairs() {
 			return getRuleContext(ElementValuePairsContext.class,0);
 		}
@@ -5213,6 +5429,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ElementValuePairContext elementValuePair(int i) {
 			return getRuleContext(ElementValuePairContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
+		}
 		public ElementValuePairsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5272,6 +5492,7 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class ElementValuePairContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode ASSIGN() { return getToken(RefactorMethodSignatureParser.ASSIGN, 0); }
 		public ElementValueContext elementValue() {
 			return getRuleContext(ElementValueContext.class,0);
 		}
@@ -5418,11 +5639,17 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ElementValueArrayInitializerContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<ElementValueContext> elementValue() {
 			return getRuleContexts(ElementValueContext.class);
 		}
 		public ElementValueContext elementValue(int i) {
 			return getRuleContext(ElementValueContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public ElementValueArrayInitializerContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -5507,6 +5734,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeDeclarationContext extends ParserRuleContext {
+		public TerminalNode AT() { return getToken(RefactorMethodSignatureParser.AT, 0); }
+		public TerminalNode INTERFACE() { return getToken(RefactorMethodSignatureParser.INTERFACE, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public AnnotationTypeBodyContext annotationTypeBody() {
 			return getRuleContext(AnnotationTypeBodyContext.class,0);
@@ -5558,6 +5787,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<AnnotationTypeElementDeclarationContext> annotationTypeElementDeclaration() {
 			return getRuleContexts(AnnotationTypeElementDeclarationContext.class);
 		}
@@ -5631,6 +5862,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public AnnotationTypeElementDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5733,6 +5965,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public AnnotationMethodOrConstantRestContext annotationMethodOrConstantRest() {
 			return getRuleContext(AnnotationMethodOrConstantRestContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public ClassDeclarationContext classDeclaration() {
 			return getRuleContext(ClassDeclarationContext.class,0);
 		}
@@ -5935,6 +6168,8 @@ public class RefactorMethodSignatureParser extends Parser {
 
 	public static class AnnotationMethodRestContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public DefaultValueContext defaultValue() {
 			return getRuleContext(DefaultValueContext.class,0);
 		}
@@ -6038,6 +6273,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class DefaultValueContext extends ParserRuleContext {
+		public TerminalNode DEFAULT() { return getToken(RefactorMethodSignatureParser.DEFAULT, 0); }
 		public ElementValueContext elementValue() {
 			return getRuleContext(ElementValueContext.class,0);
 		}
@@ -6084,6 +6320,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class BlockContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<BlockStatementContext> blockStatement() {
 			return getRuleContexts(BlockStatementContext.class);
 		}
@@ -6221,6 +6459,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public LocalVariableDeclarationContext localVariableDeclaration() {
 			return getRuleContext(LocalVariableDeclarationContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public LocalVariableDeclarationStatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6344,6 +6583,9 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
+		public TerminalNode COLON() { return getToken(RefactorMethodSignatureParser.COLON, 0); }
+		public TerminalNode IF() { return getToken(RefactorMethodSignatureParser.IF, 0); }
 		public ParExpressionContext parExpression() {
 			return getRuleContext(ParExpressionContext.class,0);
 		}
@@ -6353,9 +6595,16 @@ public class RefactorMethodSignatureParser extends Parser {
 		public StatementContext statement(int i) {
 			return getRuleContext(StatementContext.class,i);
 		}
+		public TerminalNode ELSE() { return getToken(RefactorMethodSignatureParser.ELSE, 0); }
+		public TerminalNode FOR() { return getToken(RefactorMethodSignatureParser.FOR, 0); }
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public ForControlContext forControl() {
 			return getRuleContext(ForControlContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
+		public TerminalNode WHILE() { return getToken(RefactorMethodSignatureParser.WHILE, 0); }
+		public TerminalNode DO() { return getToken(RefactorMethodSignatureParser.DO, 0); }
+		public TerminalNode TRY() { return getToken(RefactorMethodSignatureParser.TRY, 0); }
 		public FinallyBlockContext finallyBlock() {
 			return getRuleContext(FinallyBlockContext.class,0);
 		}
@@ -6368,6 +6617,9 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ResourceSpecificationContext resourceSpecification() {
 			return getRuleContext(ResourceSpecificationContext.class,0);
 		}
+		public TerminalNode SWITCH() { return getToken(RefactorMethodSignatureParser.SWITCH, 0); }
+		public TerminalNode LBRACE() { return getToken(RefactorMethodSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(RefactorMethodSignatureParser.RBRACE, 0); }
 		public List<SwitchBlockStatementGroupContext> switchBlockStatementGroup() {
 			return getRuleContexts(SwitchBlockStatementGroupContext.class);
 		}
@@ -6380,7 +6632,12 @@ public class RefactorMethodSignatureParser extends Parser {
 		public SwitchLabelContext switchLabel(int i) {
 			return getRuleContext(SwitchLabelContext.class,i);
 		}
+		public TerminalNode SYNCHRONIZED() { return getToken(RefactorMethodSignatureParser.SYNCHRONIZED, 0); }
+		public TerminalNode RETURN() { return getToken(RefactorMethodSignatureParser.RETURN, 0); }
+		public TerminalNode THROW() { return getToken(RefactorMethodSignatureParser.THROW, 0); }
+		public TerminalNode BREAK() { return getToken(RefactorMethodSignatureParser.BREAK, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode CONTINUE() { return getToken(RefactorMethodSignatureParser.CONTINUE, 0); }
 		public StatementExpressionContext statementExpression() {
 			return getRuleContext(StatementExpressionContext.class,0);
 		}
@@ -6753,10 +7010,13 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class CatchClauseContext extends ParserRuleContext {
+		public TerminalNode CATCH() { return getToken(RefactorMethodSignatureParser.CATCH, 0); }
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public CatchTypeContext catchType() {
 			return getRuleContext(CatchTypeContext.class,0);
 		}
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -6838,6 +7098,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public QualifiedNameContext qualifiedName(int i) {
 			return getRuleContext(QualifiedNameContext.class,i);
 		}
+		public List<TerminalNode> BITOR() { return getTokens(RefactorMethodSignatureParser.BITOR); }
+		public TerminalNode BITOR(int i) {
+			return getToken(RefactorMethodSignatureParser.BITOR, i);
+		}
 		public CatchTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6896,6 +7160,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class FinallyBlockContext extends ParserRuleContext {
+		public TerminalNode FINALLY() { return getToken(RefactorMethodSignatureParser.FINALLY, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -6942,9 +7207,12 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ResourceSpecificationContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public ResourcesContext resources() {
 			return getRuleContext(ResourcesContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
+		public TerminalNode SEMI() { return getToken(RefactorMethodSignatureParser.SEMI, 0); }
 		public ResourceSpecificationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -7006,6 +7274,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		}
 		public ResourceContext resource(int i) {
 			return getRuleContext(ResourceContext.class,i);
+		}
+		public List<TerminalNode> SEMI() { return getTokens(RefactorMethodSignatureParser.SEMI); }
+		public TerminalNode SEMI(int i) {
+			return getToken(RefactorMethodSignatureParser.SEMI, i);
 		}
 		public ResourcesContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7073,6 +7345,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode ASSIGN() { return getToken(RefactorMethodSignatureParser.ASSIGN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
@@ -7224,12 +7497,15 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class SwitchLabelContext extends ParserRuleContext {
+		public TerminalNode CASE() { return getToken(RefactorMethodSignatureParser.CASE, 0); }
 		public ConstantExpressionContext constantExpression() {
 			return getRuleContext(ConstantExpressionContext.class,0);
 		}
+		public TerminalNode COLON() { return getToken(RefactorMethodSignatureParser.COLON, 0); }
 		public EnumConstantNameContext enumConstantName() {
 			return getRuleContext(EnumConstantNameContext.class,0);
 		}
+		public TerminalNode DEFAULT() { return getToken(RefactorMethodSignatureParser.DEFAULT, 0); }
 		public SwitchLabelContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -7303,6 +7579,10 @@ public class RefactorMethodSignatureParser extends Parser {
 	public static class ForControlContext extends ParserRuleContext {
 		public EnhancedForControlContext enhancedForControl() {
 			return getRuleContext(EnhancedForControlContext.class,0);
+		}
+		public List<TerminalNode> SEMI() { return getTokens(RefactorMethodSignatureParser.SEMI); }
+		public TerminalNode SEMI(int i) {
+			return getToken(RefactorMethodSignatureParser.SEMI, i);
 		}
 		public ForInitContext forInit() {
 			return getRuleContext(ForInitContext.class,0);
@@ -7466,6 +7746,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode COLON() { return getToken(RefactorMethodSignatureParser.COLON, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
@@ -7581,9 +7862,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ParExpressionContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public ParExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -7634,6 +7917,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(RefactorMethodSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(RefactorMethodSignatureParser.COMMA, i);
 		}
 		public ExpressionListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -7784,34 +8071,83 @@ public class RefactorMethodSignatureParser extends Parser {
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
 		}
+		public TerminalNode NEW() { return getToken(RefactorMethodSignatureParser.NEW, 0); }
 		public CreatorContext creator() {
 			return getRuleContext(CreatorContext.class,0);
 		}
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
 		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
+		public TerminalNode ADD() { return getToken(RefactorMethodSignatureParser.ADD, 0); }
+		public TerminalNode SUB() { return getToken(RefactorMethodSignatureParser.SUB, 0); }
+		public TerminalNode INC() { return getToken(RefactorMethodSignatureParser.INC, 0); }
+		public TerminalNode DEC() { return getToken(RefactorMethodSignatureParser.DEC, 0); }
+		public TerminalNode TILDE() { return getToken(RefactorMethodSignatureParser.TILDE, 0); }
+		public TerminalNode BANG() { return getToken(RefactorMethodSignatureParser.BANG, 0); }
+		public TerminalNode MUL() { return getToken(RefactorMethodSignatureParser.MUL, 0); }
+		public TerminalNode DIV() { return getToken(RefactorMethodSignatureParser.DIV, 0); }
+		public TerminalNode MOD() { return getToken(RefactorMethodSignatureParser.MOD, 0); }
+		public List<TerminalNode> LT() { return getTokens(RefactorMethodSignatureParser.LT); }
+		public TerminalNode LT(int i) {
+			return getToken(RefactorMethodSignatureParser.LT, i);
+		}
+		public List<TerminalNode> GT() { return getTokens(RefactorMethodSignatureParser.GT); }
+		public TerminalNode GT(int i) {
+			return getToken(RefactorMethodSignatureParser.GT, i);
+		}
+		public TerminalNode LE() { return getToken(RefactorMethodSignatureParser.LE, 0); }
+		public TerminalNode GE() { return getToken(RefactorMethodSignatureParser.GE, 0); }
+		public TerminalNode EQUAL() { return getToken(RefactorMethodSignatureParser.EQUAL, 0); }
+		public TerminalNode NOTEQUAL() { return getToken(RefactorMethodSignatureParser.NOTEQUAL, 0); }
+		public TerminalNode BITAND() { return getToken(RefactorMethodSignatureParser.BITAND, 0); }
+		public TerminalNode CARET() { return getToken(RefactorMethodSignatureParser.CARET, 0); }
+		public TerminalNode BITOR() { return getToken(RefactorMethodSignatureParser.BITOR, 0); }
+		public TerminalNode AND() { return getToken(RefactorMethodSignatureParser.AND, 0); }
+		public TerminalNode OR() { return getToken(RefactorMethodSignatureParser.OR, 0); }
+		public TerminalNode QUESTION() { return getToken(RefactorMethodSignatureParser.QUESTION, 0); }
+		public TerminalNode COLON() { return getToken(RefactorMethodSignatureParser.COLON, 0); }
+		public TerminalNode ASSIGN() { return getToken(RefactorMethodSignatureParser.ASSIGN, 0); }
+		public TerminalNode ADD_ASSIGN() { return getToken(RefactorMethodSignatureParser.ADD_ASSIGN, 0); }
+		public TerminalNode SUB_ASSIGN() { return getToken(RefactorMethodSignatureParser.SUB_ASSIGN, 0); }
+		public TerminalNode MUL_ASSIGN() { return getToken(RefactorMethodSignatureParser.MUL_ASSIGN, 0); }
+		public TerminalNode DIV_ASSIGN() { return getToken(RefactorMethodSignatureParser.DIV_ASSIGN, 0); }
+		public TerminalNode AND_ASSIGN() { return getToken(RefactorMethodSignatureParser.AND_ASSIGN, 0); }
+		public TerminalNode OR_ASSIGN() { return getToken(RefactorMethodSignatureParser.OR_ASSIGN, 0); }
+		public TerminalNode XOR_ASSIGN() { return getToken(RefactorMethodSignatureParser.XOR_ASSIGN, 0); }
+		public TerminalNode RSHIFT_ASSIGN() { return getToken(RefactorMethodSignatureParser.RSHIFT_ASSIGN, 0); }
+		public TerminalNode URSHIFT_ASSIGN() { return getToken(RefactorMethodSignatureParser.URSHIFT_ASSIGN, 0); }
+		public TerminalNode LSHIFT_ASSIGN() { return getToken(RefactorMethodSignatureParser.LSHIFT_ASSIGN, 0); }
+		public TerminalNode MOD_ASSIGN() { return getToken(RefactorMethodSignatureParser.MOD_ASSIGN, 0); }
+		public TerminalNode DOT() { return getToken(RefactorMethodSignatureParser.DOT, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
+		public TerminalNode THIS() { return getToken(RefactorMethodSignatureParser.THIS, 0); }
 		public InnerCreatorContext innerCreator() {
 			return getRuleContext(InnerCreatorContext.class,0);
 		}
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
+		public TerminalNode SUPER() { return getToken(RefactorMethodSignatureParser.SUPER, 0); }
 		public SuperSuffixContext superSuffix() {
 			return getRuleContext(SuperSuffixContext.class,0);
 		}
 		public ExplicitGenericInvocationContext explicitGenericInvocation() {
 			return getRuleContext(ExplicitGenericInvocationContext.class,0);
 		}
+		public TerminalNode LBRACK() { return getToken(RefactorMethodSignatureParser.LBRACK, 0); }
+		public TerminalNode RBRACK() { return getToken(RefactorMethodSignatureParser.RBRACK, 0); }
 		public ExpressionListContext expressionList() {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
+		public TerminalNode INSTANCEOF() { return getToken(RefactorMethodSignatureParser.INSTANCEOF, 0); }
 		public ExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -8298,9 +8634,13 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class PrimaryContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
+		public TerminalNode THIS() { return getToken(RefactorMethodSignatureParser.THIS, 0); }
+		public TerminalNode SUPER() { return getToken(RefactorMethodSignatureParser.SUPER, 0); }
 		public LiteralContext literal() {
 			return getRuleContext(LiteralContext.class,0);
 		}
@@ -8308,6 +8648,9 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode DOT() { return getToken(RefactorMethodSignatureParser.DOT, 0); }
+		public TerminalNode CLASS() { return getToken(RefactorMethodSignatureParser.CLASS, 0); }
+		public TerminalNode VOID() { return getToken(RefactorMethodSignatureParser.VOID, 0); }
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
@@ -8554,6 +8897,10 @@ public class RefactorMethodSignatureParser extends Parser {
 		public TypeArgumentsOrDiamondContext typeArgumentsOrDiamond(int i) {
 			return getRuleContext(TypeArgumentsOrDiamondContext.class,i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(RefactorMethodSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(RefactorMethodSignatureParser.DOT, i);
+		}
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
@@ -8718,6 +9065,14 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ArrayCreatorRestContext extends ParserRuleContext {
+		public List<TerminalNode> LBRACK() { return getTokens(RefactorMethodSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(RefactorMethodSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(RefactorMethodSignatureParser.RBRACK, i);
+		}
 		public ArrayInitializerContext arrayInitializer() {
 			return getRuleContext(ArrayInitializerContext.class,0);
 		}
@@ -8978,9 +9333,11 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class NonWildcardTypeArgumentsContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(RefactorMethodSignatureParser.LT, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
+		public TerminalNode GT() { return getToken(RefactorMethodSignatureParser.GT, 0); }
 		public NonWildcardTypeArgumentsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -9026,6 +9383,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class TypeArgumentsOrDiamondContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(RefactorMethodSignatureParser.LT, 0); }
+		public TerminalNode GT() { return getToken(RefactorMethodSignatureParser.GT, 0); }
 		public TypeArgumentsContext typeArguments() {
 			return getRuleContext(TypeArgumentsContext.class,0);
 		}
@@ -9085,6 +9444,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class NonWildcardTypeArgumentsOrDiamondContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(RefactorMethodSignatureParser.LT, 0); }
+		public TerminalNode GT() { return getToken(RefactorMethodSignatureParser.GT, 0); }
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
@@ -9147,6 +9508,7 @@ public class RefactorMethodSignatureParser extends Parser {
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
 		}
+		public TerminalNode DOT() { return getToken(RefactorMethodSignatureParser.DOT, 0); }
 		public TerminalNode Identifier() { return getToken(RefactorMethodSignatureParser.Identifier, 0); }
 		public SuperSuffixContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -9216,6 +9578,7 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ExplicitGenericInvocationSuffixContext extends ParserRuleContext {
+		public TerminalNode SUPER() { return getToken(RefactorMethodSignatureParser.SUPER, 0); }
 		public SuperSuffixContext superSuffix() {
 			return getRuleContext(SuperSuffixContext.class,0);
 		}
@@ -9283,6 +9646,8 @@ public class RefactorMethodSignatureParser extends Parser {
 	}
 
 	public static class ArgumentsContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(RefactorMethodSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(RefactorMethodSignatureParser.RPAREN, 0); }
 		public ExpressionListContext expressionList() {
 			return getRuleContext(ExpressionListContext.class,0);
 		}

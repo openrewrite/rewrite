@@ -1,4 +1,4 @@
-// Generated from /Users/jschneider/Projects/github/Netflix-Skunkworks/Rewrite/rewrite-core/src/main/antlr/RefactorMethodSignatureParser.g4 by ANTLR 4.7
+// Generated from /Users/jon/Projects/github/Netflix-Skunkworks/rewrite/rewrite-java/src/main/antlr/RefactorMethodSignatureParser.g4 by ANTLR 4.8
 package org.openrewrite.java.internal.grammar;
 import org.antlr.v4.runtime.tree.AbstractParseTreeVisitor;
 

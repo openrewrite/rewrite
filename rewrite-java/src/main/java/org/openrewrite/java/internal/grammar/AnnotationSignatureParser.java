@@ -1,4 +1,4 @@
-// Generated from /Users/jschneider/Projects/github/Netflix-Skunkworks/Rewrite/rewrite-core/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.7
+// Generated from /Users/jon/Projects/github/Netflix-Skunkworks/rewrite/rewrite-java/src/main/antlr/AnnotationSignatureParser.g4 by ANTLR 4.8
 package org.openrewrite.java.internal.grammar;
 
 import org.antlr.v4.runtime.*;
@@ -15,7 +15,7 @@ import java.util.List;
 
 @SuppressWarnings({"all", "warnings", "unchecked", "unused", "cast"})
 public class AnnotationSignatureParser extends Parser {
-	static { RuntimeMetaData.checkVersion("4.7", RuntimeMetaData.VERSION); }
+	static { RuntimeMetaData.checkVersion("4.8", RuntimeMetaData.VERSION); }
 
 	protected static final DFA[] _decisionToDFA;
 	protected static final PredictionContextCache _sharedContextCache =
@@ -73,68 +73,78 @@ public class AnnotationSignatureParser extends Parser {
 		RULE_nonWildcardTypeArguments = 95, RULE_typeArgumentsOrDiamond = 96, 
 		RULE_nonWildcardTypeArgumentsOrDiamond = 97, RULE_superSuffix = 98, RULE_explicitGenericInvocationSuffix = 99, 
 		RULE_arguments = 100;
-	public static final String[] ruleNames = {
-		"annotation", "compilationUnit", "packageDeclaration", "importDeclaration", 
-		"typeDeclaration", "modifier", "classOrInterfaceModifier", "variableModifier", 
-		"classDeclaration", "typeParameters", "typeParameter", "typeBound", "enumDeclaration", 
-		"enumConstants", "enumConstant", "enumBodyDeclarations", "interfaceDeclaration", 
-		"typeList", "classBody", "interfaceBody", "classBodyDeclaration", "memberDeclaration", 
-		"methodDeclaration", "genericMethodDeclaration", "constructorDeclaration", 
-		"genericConstructorDeclaration", "fieldDeclaration", "interfaceBodyDeclaration", 
-		"interfaceMemberDeclaration", "constDeclaration", "constantDeclarator", 
-		"interfaceMethodDeclaration", "genericInterfaceMethodDeclaration", "variableDeclarators", 
-		"variableDeclarator", "variableDeclaratorId", "variableInitializer", "arrayInitializer", 
-		"enumConstantName", "type", "classOrInterfaceType", "primitiveType", "typeArguments", 
-		"typeArgument", "qualifiedNameList", "formalParameters", "formalParameterList", 
-		"formalParameter", "lastFormalParameter", "methodBody", "constructorBody", 
-		"qualifiedName", "literal", "annotationName", "elementValuePairs", "elementValuePair", 
-		"elementValue", "elementValueArrayInitializer", "annotationTypeDeclaration", 
-		"annotationTypeBody", "annotationTypeElementDeclaration", "annotationTypeElementRest", 
-		"annotationMethodOrConstantRest", "annotationMethodRest", "annotationConstantRest", 
-		"defaultValue", "block", "blockStatement", "localVariableDeclarationStatement", 
-		"localVariableDeclaration", "statement", "catchClause", "catchType", "finallyBlock", 
-		"resourceSpecification", "resources", "resource", "switchBlockStatementGroup", 
-		"switchLabel", "forControl", "forInit", "enhancedForControl", "forUpdate", 
-		"parExpression", "expressionList", "statementExpression", "constantExpression", 
-		"expression", "primary", "creator", "createdName", "innerCreator", "arrayCreatorRest", 
-		"classCreatorRest", "explicitGenericInvocation", "nonWildcardTypeArguments", 
-		"typeArgumentsOrDiamond", "nonWildcardTypeArgumentsOrDiamond", "superSuffix", 
-		"explicitGenericInvocationSuffix", "arguments"
-	};
+	private static String[] makeRuleNames() {
+		return new String[] {
+			"annotation", "compilationUnit", "packageDeclaration", "importDeclaration", 
+			"typeDeclaration", "modifier", "classOrInterfaceModifier", "variableModifier", 
+			"classDeclaration", "typeParameters", "typeParameter", "typeBound", "enumDeclaration", 
+			"enumConstants", "enumConstant", "enumBodyDeclarations", "interfaceDeclaration", 
+			"typeList", "classBody", "interfaceBody", "classBodyDeclaration", "memberDeclaration", 
+			"methodDeclaration", "genericMethodDeclaration", "constructorDeclaration", 
+			"genericConstructorDeclaration", "fieldDeclaration", "interfaceBodyDeclaration", 
+			"interfaceMemberDeclaration", "constDeclaration", "constantDeclarator", 
+			"interfaceMethodDeclaration", "genericInterfaceMethodDeclaration", "variableDeclarators", 
+			"variableDeclarator", "variableDeclaratorId", "variableInitializer", 
+			"arrayInitializer", "enumConstantName", "type", "classOrInterfaceType", 
+			"primitiveType", "typeArguments", "typeArgument", "qualifiedNameList", 
+			"formalParameters", "formalParameterList", "formalParameter", "lastFormalParameter", 
+			"methodBody", "constructorBody", "qualifiedName", "literal", "annotationName", 
+			"elementValuePairs", "elementValuePair", "elementValue", "elementValueArrayInitializer", 
+			"annotationTypeDeclaration", "annotationTypeBody", "annotationTypeElementDeclaration", 
+			"annotationTypeElementRest", "annotationMethodOrConstantRest", "annotationMethodRest", 
+			"annotationConstantRest", "defaultValue", "block", "blockStatement", 
+			"localVariableDeclarationStatement", "localVariableDeclaration", "statement", 
+			"catchClause", "catchType", "finallyBlock", "resourceSpecification", 
+			"resources", "resource", "switchBlockStatementGroup", "switchLabel", 
+			"forControl", "forInit", "enhancedForControl", "forUpdate", "parExpression", 
+			"expressionList", "statementExpression", "constantExpression", "expression", 
+			"primary", "creator", "createdName", "innerCreator", "arrayCreatorRest", 
+			"classCreatorRest", "explicitGenericInvocation", "nonWildcardTypeArguments", 
+			"typeArgumentsOrDiamond", "nonWildcardTypeArgumentsOrDiamond", "superSuffix", 
+			"explicitGenericInvocationSuffix", "arguments"
+		};
+	}
+	public static final String[] ruleNames = makeRuleNames();
 
-	private static final String[] _LITERAL_NAMES = {
-		null, "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
-		"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
-		"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
-		"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
-		"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
-		"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
-		"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
-		"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
-		"'while'", null, null, null, null, null, "'null'", "'('", "')'", "'{'", 
-		"'}'", "'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", 
-		"'~'", "'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", "'++'", 
-		"'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", "'+='", 
-		"'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", "'>>='", 
-		"'>>>='", null, "'@'", "'...'"
-	};
-	private static final String[] _SYMBOLIC_NAMES = {
-		null, "DOTDOT", "SPACE", "ABSTRACT", "ASSERT", "BOOLEAN", "BREAK", "BYTE", 
-		"CASE", "CATCH", "CHAR", "CLASS", "CONST", "CONTINUE", "DEFAULT", "DO", 
-		"DOUBLE", "ELSE", "ENUM", "EXTENDS", "FINAL", "FINALLY", "FLOAT", "FOR", 
-		"IF", "GOTO", "IMPLEMENTS", "IMPORT", "INSTANCEOF", "INT", "INTERFACE", 
-		"LONG", "NATIVE", "NEW", "PACKAGE", "PRIVATE", "PROTECTED", "PUBLIC", 
-		"RETURN", "SHORT", "STATIC", "STRICTFP", "SUPER", "SWITCH", "SYNCHRONIZED", 
-		"THIS", "THROW", "THROWS", "TRANSIENT", "TRY", "VOID", "VOLATILE", "WHILE", 
-		"IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
-		"StringLiteral", "NullLiteral", "LPAREN", "RPAREN", "LBRACE", "RBRACE", 
-		"LBRACK", "RBRACK", "SEMI", "COMMA", "DOT", "ASSIGN", "GT", "LT", "BANG", 
-		"TILDE", "QUESTION", "COLON", "EQUAL", "LE", "GE", "NOTEQUAL", "AND", 
-		"OR", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "BITAND", "BITOR", "CARET", 
-		"MOD", "ADD_ASSIGN", "SUB_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "AND_ASSIGN", 
-		"OR_ASSIGN", "XOR_ASSIGN", "MOD_ASSIGN", "LSHIFT_ASSIGN", "RSHIFT_ASSIGN", 
-		"URSHIFT_ASSIGN", "Identifier", "AT", "ELLIPSIS", "WS", "COMMENT", "LINE_COMMENT"
-	};
+	private static String[] makeLiteralNames() {
+		return new String[] {
+			null, "'..'", "' '", "'abstract'", "'assert'", "'boolean'", "'break'", 
+			"'byte'", "'case'", "'catch'", "'char'", "'class'", "'const'", "'continue'", 
+			"'default'", "'do'", "'double'", "'else'", "'enum'", "'extends'", "'final'", 
+			"'finally'", "'float'", "'for'", "'if'", "'goto'", "'implements'", "'import'", 
+			"'instanceof'", "'int'", "'interface'", "'long'", "'native'", "'new'", 
+			"'package'", "'private'", "'protected'", "'public'", "'return'", "'short'", 
+			"'static'", "'strictfp'", "'super'", "'switch'", "'synchronized'", "'this'", 
+			"'throw'", "'throws'", "'transient'", "'try'", "'void'", "'volatile'", 
+			"'while'", null, null, null, null, null, "'null'", "'('", "')'", "'{'", 
+			"'}'", "'['", "']'", "';'", "','", "'.'", "'='", "'>'", "'<'", "'!'", 
+			"'~'", "'?'", "':'", "'=='", "'<='", "'>='", "'!='", "'&&'", "'||'", 
+			"'++'", "'--'", "'+'", "'-'", "'*'", "'/'", "'&'", "'|'", "'^'", "'%'", 
+			"'+='", "'-='", "'*='", "'/='", "'&='", "'|='", "'^='", "'%='", "'<<='", 
+			"'>>='", "'>>>='", null, "'@'", "'...'"
+		};
+	}
+	private static final String[] _LITERAL_NAMES = makeLiteralNames();
+	private static String[] makeSymbolicNames() {
+		return new String[] {
+			null, "DOTDOT", "SPACE", "ABSTRACT", "ASSERT", "BOOLEAN", "BREAK", "BYTE", 
+			"CASE", "CATCH", "CHAR", "CLASS", "CONST", "CONTINUE", "DEFAULT", "DO", 
+			"DOUBLE", "ELSE", "ENUM", "EXTENDS", "FINAL", "FINALLY", "FLOAT", "FOR", 
+			"IF", "GOTO", "IMPLEMENTS", "IMPORT", "INSTANCEOF", "INT", "INTERFACE", 
+			"LONG", "NATIVE", "NEW", "PACKAGE", "PRIVATE", "PROTECTED", "PUBLIC", 
+			"RETURN", "SHORT", "STATIC", "STRICTFP", "SUPER", "SWITCH", "SYNCHRONIZED", 
+			"THIS", "THROW", "THROWS", "TRANSIENT", "TRY", "VOID", "VOLATILE", "WHILE", 
+			"IntegerLiteral", "FloatingPointLiteral", "BooleanLiteral", "CharacterLiteral", 
+			"StringLiteral", "NullLiteral", "LPAREN", "RPAREN", "LBRACE", "RBRACE", 
+			"LBRACK", "RBRACK", "SEMI", "COMMA", "DOT", "ASSIGN", "GT", "LT", "BANG", 
+			"TILDE", "QUESTION", "COLON", "EQUAL", "LE", "GE", "NOTEQUAL", "AND", 
+			"OR", "INC", "DEC", "ADD", "SUB", "MUL", "DIV", "BITAND", "BITOR", "CARET", 
+			"MOD", "ADD_ASSIGN", "SUB_ASSIGN", "MUL_ASSIGN", "DIV_ASSIGN", "AND_ASSIGN", 
+			"OR_ASSIGN", "XOR_ASSIGN", "MOD_ASSIGN", "LSHIFT_ASSIGN", "RSHIFT_ASSIGN", 
+			"URSHIFT_ASSIGN", "Identifier", "AT", "ELLIPSIS", "WS", "COMMENT", "LINE_COMMENT"
+		};
+	}
+	private static final String[] _SYMBOLIC_NAMES = makeSymbolicNames();
 	public static final Vocabulary VOCABULARY = new VocabularyImpl(_LITERAL_NAMES, _SYMBOLIC_NAMES);
 
 	/**
@@ -184,10 +194,14 @@ public class AnnotationSignatureParser extends Parser {
 		super(input);
 		_interp = new ParserATNSimulator(this,_ATN,_decisionToDFA,_sharedContextCache);
 	}
+
 	public static class AnnotationContext extends ParserRuleContext {
+		public TerminalNode AT() { return getToken(AnnotationSignatureParser.AT, 0); }
 		public AnnotationNameContext annotationName() {
 			return getRuleContext(AnnotationNameContext.class,0);
 		}
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public ElementValuePairsContext elementValuePairs() {
 			return getRuleContext(ElementValuePairsContext.class,0);
 		}
@@ -362,9 +376,11 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class PackageDeclarationContext extends ParserRuleContext {
+		public TerminalNode PACKAGE() { return getToken(AnnotationSignatureParser.PACKAGE, 0); }
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public List<AnnotationContext> annotation() {
 			return getRuleContexts(AnnotationContext.class);
 		}
@@ -431,9 +447,14 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ImportDeclarationContext extends ParserRuleContext {
+		public TerminalNode IMPORT() { return getToken(AnnotationSignatureParser.IMPORT, 0); }
 		public QualifiedNameContext qualifiedName() {
 			return getRuleContext(QualifiedNameContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
+		public TerminalNode STATIC() { return getToken(AnnotationSignatureParser.STATIC, 0); }
+		public TerminalNode DOT() { return getToken(AnnotationSignatureParser.DOT, 0); }
+		public TerminalNode MUL() { return getToken(AnnotationSignatureParser.MUL, 0); }
 		public ImportDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -520,6 +541,7 @@ public class AnnotationSignatureParser extends Parser {
 		public AnnotationTypeDeclarationContext annotationTypeDeclaration() {
 			return getRuleContext(AnnotationTypeDeclarationContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public TypeDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -658,6 +680,10 @@ public class AnnotationSignatureParser extends Parser {
 		public ClassOrInterfaceModifierContext classOrInterfaceModifier() {
 			return getRuleContext(ClassOrInterfaceModifierContext.class,0);
 		}
+		public TerminalNode NATIVE() { return getToken(AnnotationSignatureParser.NATIVE, 0); }
+		public TerminalNode SYNCHRONIZED() { return getToken(AnnotationSignatureParser.SYNCHRONIZED, 0); }
+		public TerminalNode TRANSIENT() { return getToken(AnnotationSignatureParser.TRANSIENT, 0); }
+		public TerminalNode VOLATILE() { return getToken(AnnotationSignatureParser.VOLATILE, 0); }
 		public ModifierContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -736,6 +762,13 @@ public class AnnotationSignatureParser extends Parser {
 		public AnnotationContext annotation() {
 			return getRuleContext(AnnotationContext.class,0);
 		}
+		public TerminalNode PUBLIC() { return getToken(AnnotationSignatureParser.PUBLIC, 0); }
+		public TerminalNode PROTECTED() { return getToken(AnnotationSignatureParser.PROTECTED, 0); }
+		public TerminalNode PRIVATE() { return getToken(AnnotationSignatureParser.PRIVATE, 0); }
+		public TerminalNode STATIC() { return getToken(AnnotationSignatureParser.STATIC, 0); }
+		public TerminalNode ABSTRACT() { return getToken(AnnotationSignatureParser.ABSTRACT, 0); }
+		public TerminalNode FINAL() { return getToken(AnnotationSignatureParser.FINAL, 0); }
+		public TerminalNode STRICTFP() { return getToken(AnnotationSignatureParser.STRICTFP, 0); }
 		public ClassOrInterfaceModifierContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -807,6 +840,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class VariableModifierContext extends ParserRuleContext {
+		public TerminalNode FINAL() { return getToken(AnnotationSignatureParser.FINAL, 0); }
 		public AnnotationContext annotation() {
 			return getRuleContext(AnnotationContext.class,0);
 		}
@@ -866,6 +900,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ClassDeclarationContext extends ParserRuleContext {
+		public TerminalNode CLASS() { return getToken(AnnotationSignatureParser.CLASS, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
 		public ClassBodyContext classBody() {
 			return getRuleContext(ClassBodyContext.class,0);
@@ -873,9 +908,11 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
 		}
+		public TerminalNode EXTENDS() { return getToken(AnnotationSignatureParser.EXTENDS, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode IMPLEMENTS() { return getToken(AnnotationSignatureParser.IMPLEMENTS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
@@ -959,11 +996,17 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class TypeParametersContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(AnnotationSignatureParser.LT, 0); }
 		public List<TypeParameterContext> typeParameter() {
 			return getRuleContexts(TypeParameterContext.class);
 		}
 		public TypeParameterContext typeParameter(int i) {
 			return getRuleContext(TypeParameterContext.class,i);
+		}
+		public TerminalNode GT() { return getToken(AnnotationSignatureParser.GT, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public TypeParametersContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1028,6 +1071,7 @@ public class AnnotationSignatureParser extends Parser {
 
 	public static class TypeParameterContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode EXTENDS() { return getToken(AnnotationSignatureParser.EXTENDS, 0); }
 		public TypeBoundContext typeBound() {
 			return getRuleContext(TypeBoundContext.class,0);
 		}
@@ -1091,6 +1135,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type(int i) {
 			return getRuleContext(TypeContext.class,i);
 		}
+		public List<TerminalNode> BITAND() { return getTokens(AnnotationSignatureParser.BITAND); }
+		public TerminalNode BITAND(int i) {
+			return getToken(AnnotationSignatureParser.BITAND, i);
+		}
 		public TypeBoundContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1151,12 +1199,16 @@ public class AnnotationSignatureParser extends Parser {
 	public static class EnumDeclarationContext extends ParserRuleContext {
 		public TerminalNode ENUM() { return getToken(AnnotationSignatureParser.ENUM, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
+		public TerminalNode IMPLEMENTS() { return getToken(AnnotationSignatureParser.IMPLEMENTS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
 		public EnumConstantsContext enumConstants() {
 			return getRuleContext(EnumConstantsContext.class,0);
 		}
+		public TerminalNode COMMA() { return getToken(AnnotationSignatureParser.COMMA, 0); }
 		public EnumBodyDeclarationsContext enumBodyDeclarations() {
 			return getRuleContext(EnumBodyDeclarationsContext.class,0);
 		}
@@ -1255,6 +1307,10 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		public EnumConstantContext enumConstant(int i) {
 			return getRuleContext(EnumConstantContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public EnumConstantsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -1405,6 +1461,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class EnumBodyDeclarationsContext extends ParserRuleContext {
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public List<ClassBodyDeclarationContext> classBodyDeclaration() {
 			return getRuleContexts(ClassBodyDeclarationContext.class);
 		}
@@ -1467,6 +1524,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class InterfaceDeclarationContext extends ParserRuleContext {
+		public TerminalNode INTERFACE() { return getToken(AnnotationSignatureParser.INTERFACE, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
 		public InterfaceBodyContext interfaceBody() {
 			return getRuleContext(InterfaceBodyContext.class,0);
@@ -1474,6 +1532,7 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeParametersContext typeParameters() {
 			return getRuleContext(TypeParametersContext.class,0);
 		}
+		public TerminalNode EXTENDS() { return getToken(AnnotationSignatureParser.EXTENDS, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
@@ -1551,6 +1610,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type(int i) {
 			return getRuleContext(TypeContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
+		}
 		public TypeListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -1609,6 +1672,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ClassBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<ClassBodyDeclarationContext> classBodyDeclaration() {
 			return getRuleContexts(ClassBodyDeclarationContext.class);
 		}
@@ -1673,6 +1738,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class InterfaceBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<InterfaceBodyDeclarationContext> interfaceBodyDeclaration() {
 			return getRuleContexts(InterfaceBodyDeclarationContext.class);
 		}
@@ -1737,9 +1804,11 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ClassBodyDeclarationContext extends ParserRuleContext {
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
+		public TerminalNode STATIC() { return getToken(AnnotationSignatureParser.STATIC, 0); }
 		public MemberDeclarationContext memberDeclaration() {
 			return getRuleContext(MemberDeclarationContext.class,0);
 		}
@@ -1975,9 +2044,20 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode VOID() { return getToken(AnnotationSignatureParser.VOID, 0); }
 		public MethodBodyContext methodBody() {
 			return getRuleContext(MethodBodyContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
+		}
+		public TerminalNode THROWS() { return getToken(AnnotationSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -2153,6 +2233,7 @@ public class AnnotationSignatureParser extends Parser {
 		public ConstructorBodyContext constructorBody() {
 			return getRuleContext(ConstructorBodyContext.class,0);
 		}
+		public TerminalNode THROWS() { return getToken(AnnotationSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -2269,6 +2350,7 @@ public class AnnotationSignatureParser extends Parser {
 		public VariableDeclaratorsContext variableDeclarators() {
 			return getRuleContext(VariableDeclaratorsContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public FieldDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2323,6 +2405,7 @@ public class AnnotationSignatureParser extends Parser {
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public InterfaceBodyDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2540,6 +2623,11 @@ public class AnnotationSignatureParser extends Parser {
 		public ConstantDeclaratorContext constantDeclarator(int i) {
 			return getRuleContext(ConstantDeclaratorContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
+		}
 		public ConstDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2603,8 +2691,17 @@ public class AnnotationSignatureParser extends Parser {
 
 	public static class ConstantDeclaratorContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
 		public VariableInitializerContext variableInitializer() {
 			return getRuleContext(VariableInitializerContext.class,0);
+		}
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
 		}
 		public ConstantDeclaratorContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -2672,9 +2769,20 @@ public class AnnotationSignatureParser extends Parser {
 		public FormalParametersContext formalParameters() {
 			return getRuleContext(FormalParametersContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode VOID() { return getToken(AnnotationSignatureParser.VOID, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
+		}
+		public TerminalNode THROWS() { return getToken(AnnotationSignatureParser.THROWS, 0); }
 		public QualifiedNameListContext qualifiedNameList() {
 			return getRuleContext(QualifiedNameListContext.class,0);
 		}
@@ -2833,6 +2941,10 @@ public class AnnotationSignatureParser extends Parser {
 		public VariableDeclaratorContext variableDeclarator(int i) {
 			return getRuleContext(VariableDeclaratorContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
+		}
 		public VariableDeclaratorsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -2894,6 +3006,7 @@ public class AnnotationSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
 		public VariableInitializerContext variableInitializer() {
 			return getRuleContext(VariableInitializerContext.class,0);
 		}
@@ -2952,6 +3065,14 @@ public class AnnotationSignatureParser extends Parser {
 
 	public static class VariableDeclaratorIdContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
+		}
 		public VariableDeclaratorIdContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3098,11 +3219,17 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ArrayInitializerContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<VariableInitializerContext> variableInitializer() {
 			return getRuleContexts(VariableInitializerContext.class);
 		}
 		public VariableInitializerContext variableInitializer(int i) {
 			return getRuleContext(VariableInitializerContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public ArrayInitializerContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3232,6 +3359,14 @@ public class AnnotationSignatureParser extends Parser {
 		public ClassOrInterfaceTypeContext classOrInterfaceType() {
 			return getRuleContext(ClassOrInterfaceTypeContext.class,0);
 		}
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
+		}
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
@@ -3345,6 +3480,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeArgumentsContext typeArguments(int i) {
 			return getRuleContext(TypeArgumentsContext.class,i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(AnnotationSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(AnnotationSignatureParser.DOT, i);
+		}
 		public ClassOrInterfaceTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3425,6 +3564,14 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class PrimitiveTypeContext extends ParserRuleContext {
+		public TerminalNode BOOLEAN() { return getToken(AnnotationSignatureParser.BOOLEAN, 0); }
+		public TerminalNode CHAR() { return getToken(AnnotationSignatureParser.CHAR, 0); }
+		public TerminalNode BYTE() { return getToken(AnnotationSignatureParser.BYTE, 0); }
+		public TerminalNode SHORT() { return getToken(AnnotationSignatureParser.SHORT, 0); }
+		public TerminalNode INT() { return getToken(AnnotationSignatureParser.INT, 0); }
+		public TerminalNode LONG() { return getToken(AnnotationSignatureParser.LONG, 0); }
+		public TerminalNode FLOAT() { return getToken(AnnotationSignatureParser.FLOAT, 0); }
+		public TerminalNode DOUBLE() { return getToken(AnnotationSignatureParser.DOUBLE, 0); }
 		public PrimitiveTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3475,11 +3622,17 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class TypeArgumentsContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(AnnotationSignatureParser.LT, 0); }
 		public List<TypeArgumentContext> typeArgument() {
 			return getRuleContexts(TypeArgumentContext.class);
 		}
 		public TypeArgumentContext typeArgument(int i) {
 			return getRuleContext(TypeArgumentContext.class,i);
+		}
+		public TerminalNode GT() { return getToken(AnnotationSignatureParser.GT, 0); }
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public TypeArgumentsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -3546,6 +3699,9 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode QUESTION() { return getToken(AnnotationSignatureParser.QUESTION, 0); }
+		public TerminalNode EXTENDS() { return getToken(AnnotationSignatureParser.EXTENDS, 0); }
+		public TerminalNode SUPER() { return getToken(AnnotationSignatureParser.SUPER, 0); }
 		public TypeArgumentContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3637,6 +3793,10 @@ public class AnnotationSignatureParser extends Parser {
 		public QualifiedNameContext qualifiedName(int i) {
 			return getRuleContext(QualifiedNameContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
+		}
 		public QualifiedNameListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -3695,6 +3855,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class FormalParametersContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public FormalParameterListContext formalParameterList() {
 			return getRuleContext(FormalParameterListContext.class,0);
 		}
@@ -3757,6 +3919,10 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		public FormalParameterContext formalParameter(int i) {
 			return getRuleContext(FormalParameterContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public LastFormalParameterContext lastFormalParameter() {
 			return getRuleContext(LastFormalParameterContext.class,0);
@@ -3920,6 +4086,7 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode ELLIPSIS() { return getToken(AnnotationSignatureParser.ELLIPSIS, 0); }
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
@@ -4081,6 +4248,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode Identifier(int i) {
 			return getToken(AnnotationSignatureParser.Identifier, i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(AnnotationSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(AnnotationSignatureParser.DOT, i);
+		}
 		public QualifiedNameContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4146,6 +4317,7 @@ public class AnnotationSignatureParser extends Parser {
 		public TerminalNode CharacterLiteral() { return getToken(AnnotationSignatureParser.CharacterLiteral, 0); }
 		public TerminalNode StringLiteral() { return getToken(AnnotationSignatureParser.StringLiteral, 0); }
 		public TerminalNode BooleanLiteral() { return getToken(AnnotationSignatureParser.BooleanLiteral, 0); }
+		public TerminalNode NullLiteral() { return getToken(AnnotationSignatureParser.NullLiteral, 0); }
 		public LiteralContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4246,6 +4418,10 @@ public class AnnotationSignatureParser extends Parser {
 		public ElementValuePairContext elementValuePair(int i) {
 			return getRuleContext(ElementValuePairContext.class,i);
 		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
+		}
 		public ElementValuePairsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4305,6 +4481,7 @@ public class AnnotationSignatureParser extends Parser {
 
 	public static class ElementValuePairContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
 		public ElementValueContext elementValue() {
 			return getRuleContext(ElementValueContext.class,0);
 		}
@@ -4451,11 +4628,17 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ElementValueArrayInitializerContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<ElementValueContext> elementValue() {
 			return getRuleContexts(ElementValueContext.class);
 		}
 		public ElementValueContext elementValue(int i) {
 			return getRuleContext(ElementValueContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public ElementValueArrayInitializerContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -4540,6 +4723,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeDeclarationContext extends ParserRuleContext {
+		public TerminalNode AT() { return getToken(AnnotationSignatureParser.AT, 0); }
+		public TerminalNode INTERFACE() { return getToken(AnnotationSignatureParser.INTERFACE, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
 		public AnnotationTypeBodyContext annotationTypeBody() {
 			return getRuleContext(AnnotationTypeBodyContext.class,0);
@@ -4591,6 +4776,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class AnnotationTypeBodyContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<AnnotationTypeElementDeclarationContext> annotationTypeElementDeclaration() {
 			return getRuleContexts(AnnotationTypeElementDeclarationContext.class);
 		}
@@ -4664,6 +4851,7 @@ public class AnnotationSignatureParser extends Parser {
 		public ModifierContext modifier(int i) {
 			return getRuleContext(ModifierContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public AnnotationTypeElementDeclarationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -4766,6 +4954,7 @@ public class AnnotationSignatureParser extends Parser {
 		public AnnotationMethodOrConstantRestContext annotationMethodOrConstantRest() {
 			return getRuleContext(AnnotationMethodOrConstantRestContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public ClassDeclarationContext classDeclaration() {
 			return getRuleContext(ClassDeclarationContext.class,0);
 		}
@@ -4968,6 +5157,8 @@ public class AnnotationSignatureParser extends Parser {
 
 	public static class AnnotationMethodRestContext extends ParserRuleContext {
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public DefaultValueContext defaultValue() {
 			return getRuleContext(DefaultValueContext.class,0);
 		}
@@ -5071,6 +5262,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class DefaultValueContext extends ParserRuleContext {
+		public TerminalNode DEFAULT() { return getToken(AnnotationSignatureParser.DEFAULT, 0); }
 		public ElementValueContext elementValue() {
 			return getRuleContext(ElementValueContext.class,0);
 		}
@@ -5117,6 +5309,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class BlockContext extends ParserRuleContext {
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<BlockStatementContext> blockStatement() {
 			return getRuleContexts(BlockStatementContext.class);
 		}
@@ -5254,6 +5448,7 @@ public class AnnotationSignatureParser extends Parser {
 		public LocalVariableDeclarationContext localVariableDeclaration() {
 			return getRuleContext(LocalVariableDeclarationContext.class,0);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public LocalVariableDeclarationStatementContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5377,6 +5572,9 @@ public class AnnotationSignatureParser extends Parser {
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
+		public TerminalNode COLON() { return getToken(AnnotationSignatureParser.COLON, 0); }
+		public TerminalNode IF() { return getToken(AnnotationSignatureParser.IF, 0); }
 		public ParExpressionContext parExpression() {
 			return getRuleContext(ParExpressionContext.class,0);
 		}
@@ -5386,9 +5584,16 @@ public class AnnotationSignatureParser extends Parser {
 		public StatementContext statement(int i) {
 			return getRuleContext(StatementContext.class,i);
 		}
+		public TerminalNode ELSE() { return getToken(AnnotationSignatureParser.ELSE, 0); }
+		public TerminalNode FOR() { return getToken(AnnotationSignatureParser.FOR, 0); }
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public ForControlContext forControl() {
 			return getRuleContext(ForControlContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
+		public TerminalNode WHILE() { return getToken(AnnotationSignatureParser.WHILE, 0); }
+		public TerminalNode DO() { return getToken(AnnotationSignatureParser.DO, 0); }
+		public TerminalNode TRY() { return getToken(AnnotationSignatureParser.TRY, 0); }
 		public FinallyBlockContext finallyBlock() {
 			return getRuleContext(FinallyBlockContext.class,0);
 		}
@@ -5401,6 +5606,9 @@ public class AnnotationSignatureParser extends Parser {
 		public ResourceSpecificationContext resourceSpecification() {
 			return getRuleContext(ResourceSpecificationContext.class,0);
 		}
+		public TerminalNode SWITCH() { return getToken(AnnotationSignatureParser.SWITCH, 0); }
+		public TerminalNode LBRACE() { return getToken(AnnotationSignatureParser.LBRACE, 0); }
+		public TerminalNode RBRACE() { return getToken(AnnotationSignatureParser.RBRACE, 0); }
 		public List<SwitchBlockStatementGroupContext> switchBlockStatementGroup() {
 			return getRuleContexts(SwitchBlockStatementGroupContext.class);
 		}
@@ -5413,7 +5621,12 @@ public class AnnotationSignatureParser extends Parser {
 		public SwitchLabelContext switchLabel(int i) {
 			return getRuleContext(SwitchLabelContext.class,i);
 		}
+		public TerminalNode SYNCHRONIZED() { return getToken(AnnotationSignatureParser.SYNCHRONIZED, 0); }
+		public TerminalNode RETURN() { return getToken(AnnotationSignatureParser.RETURN, 0); }
+		public TerminalNode THROW() { return getToken(AnnotationSignatureParser.THROW, 0); }
+		public TerminalNode BREAK() { return getToken(AnnotationSignatureParser.BREAK, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode CONTINUE() { return getToken(AnnotationSignatureParser.CONTINUE, 0); }
 		public StatementExpressionContext statementExpression() {
 			return getRuleContext(StatementExpressionContext.class,0);
 		}
@@ -5786,10 +5999,13 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class CatchClauseContext extends ParserRuleContext {
+		public TerminalNode CATCH() { return getToken(AnnotationSignatureParser.CATCH, 0); }
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public CatchTypeContext catchType() {
 			return getRuleContext(CatchTypeContext.class,0);
 		}
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -5871,6 +6087,10 @@ public class AnnotationSignatureParser extends Parser {
 		public QualifiedNameContext qualifiedName(int i) {
 			return getRuleContext(QualifiedNameContext.class,i);
 		}
+		public List<TerminalNode> BITOR() { return getTokens(AnnotationSignatureParser.BITOR); }
+		public TerminalNode BITOR(int i) {
+			return getToken(AnnotationSignatureParser.BITOR, i);
+		}
 		public CatchTypeContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -5929,6 +6149,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class FinallyBlockContext extends ParserRuleContext {
+		public TerminalNode FINALLY() { return getToken(AnnotationSignatureParser.FINALLY, 0); }
 		public BlockContext block() {
 			return getRuleContext(BlockContext.class,0);
 		}
@@ -5975,9 +6196,12 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ResourceSpecificationContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public ResourcesContext resources() {
 			return getRuleContext(ResourcesContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
+		public TerminalNode SEMI() { return getToken(AnnotationSignatureParser.SEMI, 0); }
 		public ResourceSpecificationContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6039,6 +6263,10 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		public ResourceContext resource(int i) {
 			return getRuleContext(ResourceContext.class,i);
+		}
+		public List<TerminalNode> SEMI() { return getTokens(AnnotationSignatureParser.SEMI); }
+		public TerminalNode SEMI(int i) {
+			return getToken(AnnotationSignatureParser.SEMI, i);
 		}
 		public ResourcesContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6106,6 +6334,7 @@ public class AnnotationSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
@@ -6257,12 +6486,15 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class SwitchLabelContext extends ParserRuleContext {
+		public TerminalNode CASE() { return getToken(AnnotationSignatureParser.CASE, 0); }
 		public ConstantExpressionContext constantExpression() {
 			return getRuleContext(ConstantExpressionContext.class,0);
 		}
+		public TerminalNode COLON() { return getToken(AnnotationSignatureParser.COLON, 0); }
 		public EnumConstantNameContext enumConstantName() {
 			return getRuleContext(EnumConstantNameContext.class,0);
 		}
+		public TerminalNode DEFAULT() { return getToken(AnnotationSignatureParser.DEFAULT, 0); }
 		public SwitchLabelContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6336,6 +6568,10 @@ public class AnnotationSignatureParser extends Parser {
 	public static class ForControlContext extends ParserRuleContext {
 		public EnhancedForControlContext enhancedForControl() {
 			return getRuleContext(EnhancedForControlContext.class,0);
+		}
+		public List<TerminalNode> SEMI() { return getTokens(AnnotationSignatureParser.SEMI); }
+		public TerminalNode SEMI(int i) {
+			return getToken(AnnotationSignatureParser.SEMI, i);
 		}
 		public ForInitContext forInit() {
 			return getRuleContext(ForInitContext.class,0);
@@ -6499,6 +6735,7 @@ public class AnnotationSignatureParser extends Parser {
 		public VariableDeclaratorIdContext variableDeclaratorId() {
 			return getRuleContext(VariableDeclaratorIdContext.class,0);
 		}
+		public TerminalNode COLON() { return getToken(AnnotationSignatureParser.COLON, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
@@ -6614,9 +6851,11 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ParExpressionContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public ParExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -6667,6 +6906,10 @@ public class AnnotationSignatureParser extends Parser {
 		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
+		}
+		public List<TerminalNode> COMMA() { return getTokens(AnnotationSignatureParser.COMMA); }
+		public TerminalNode COMMA(int i) {
+			return getToken(AnnotationSignatureParser.COMMA, i);
 		}
 		public ExpressionListContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -6817,34 +7060,83 @@ public class AnnotationSignatureParser extends Parser {
 		public PrimaryContext primary() {
 			return getRuleContext(PrimaryContext.class,0);
 		}
+		public TerminalNode NEW() { return getToken(AnnotationSignatureParser.NEW, 0); }
 		public CreatorContext creator() {
 			return getRuleContext(CreatorContext.class,0);
 		}
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public List<ExpressionContext> expression() {
 			return getRuleContexts(ExpressionContext.class);
 		}
 		public ExpressionContext expression(int i) {
 			return getRuleContext(ExpressionContext.class,i);
 		}
+		public TerminalNode ADD() { return getToken(AnnotationSignatureParser.ADD, 0); }
+		public TerminalNode SUB() { return getToken(AnnotationSignatureParser.SUB, 0); }
+		public TerminalNode INC() { return getToken(AnnotationSignatureParser.INC, 0); }
+		public TerminalNode DEC() { return getToken(AnnotationSignatureParser.DEC, 0); }
+		public TerminalNode TILDE() { return getToken(AnnotationSignatureParser.TILDE, 0); }
+		public TerminalNode BANG() { return getToken(AnnotationSignatureParser.BANG, 0); }
+		public TerminalNode MUL() { return getToken(AnnotationSignatureParser.MUL, 0); }
+		public TerminalNode DIV() { return getToken(AnnotationSignatureParser.DIV, 0); }
+		public TerminalNode MOD() { return getToken(AnnotationSignatureParser.MOD, 0); }
+		public List<TerminalNode> LT() { return getTokens(AnnotationSignatureParser.LT); }
+		public TerminalNode LT(int i) {
+			return getToken(AnnotationSignatureParser.LT, i);
+		}
+		public List<TerminalNode> GT() { return getTokens(AnnotationSignatureParser.GT); }
+		public TerminalNode GT(int i) {
+			return getToken(AnnotationSignatureParser.GT, i);
+		}
+		public TerminalNode LE() { return getToken(AnnotationSignatureParser.LE, 0); }
+		public TerminalNode GE() { return getToken(AnnotationSignatureParser.GE, 0); }
+		public TerminalNode EQUAL() { return getToken(AnnotationSignatureParser.EQUAL, 0); }
+		public TerminalNode NOTEQUAL() { return getToken(AnnotationSignatureParser.NOTEQUAL, 0); }
+		public TerminalNode BITAND() { return getToken(AnnotationSignatureParser.BITAND, 0); }
+		public TerminalNode CARET() { return getToken(AnnotationSignatureParser.CARET, 0); }
+		public TerminalNode BITOR() { return getToken(AnnotationSignatureParser.BITOR, 0); }
+		public TerminalNode AND() { return getToken(AnnotationSignatureParser.AND, 0); }
+		public TerminalNode OR() { return getToken(AnnotationSignatureParser.OR, 0); }
+		public TerminalNode QUESTION() { return getToken(AnnotationSignatureParser.QUESTION, 0); }
+		public TerminalNode COLON() { return getToken(AnnotationSignatureParser.COLON, 0); }
+		public TerminalNode ASSIGN() { return getToken(AnnotationSignatureParser.ASSIGN, 0); }
+		public TerminalNode ADD_ASSIGN() { return getToken(AnnotationSignatureParser.ADD_ASSIGN, 0); }
+		public TerminalNode SUB_ASSIGN() { return getToken(AnnotationSignatureParser.SUB_ASSIGN, 0); }
+		public TerminalNode MUL_ASSIGN() { return getToken(AnnotationSignatureParser.MUL_ASSIGN, 0); }
+		public TerminalNode DIV_ASSIGN() { return getToken(AnnotationSignatureParser.DIV_ASSIGN, 0); }
+		public TerminalNode AND_ASSIGN() { return getToken(AnnotationSignatureParser.AND_ASSIGN, 0); }
+		public TerminalNode OR_ASSIGN() { return getToken(AnnotationSignatureParser.OR_ASSIGN, 0); }
+		public TerminalNode XOR_ASSIGN() { return getToken(AnnotationSignatureParser.XOR_ASSIGN, 0); }
+		public TerminalNode RSHIFT_ASSIGN() { return getToken(AnnotationSignatureParser.RSHIFT_ASSIGN, 0); }
+		public TerminalNode URSHIFT_ASSIGN() { return getToken(AnnotationSignatureParser.URSHIFT_ASSIGN, 0); }
+		public TerminalNode LSHIFT_ASSIGN() { return getToken(AnnotationSignatureParser.LSHIFT_ASSIGN, 0); }
+		public TerminalNode MOD_ASSIGN() { return getToken(AnnotationSignatureParser.MOD_ASSIGN, 0); }
+		public TerminalNode DOT() { return getToken(AnnotationSignatureParser.DOT, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
+		public TerminalNode THIS() { return getToken(AnnotationSignatureParser.THIS, 0); }
 		public InnerCreatorContext innerCreator() {
 			return getRuleContext(InnerCreatorContext.class,0);
 		}
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
+		public TerminalNode SUPER() { return getToken(AnnotationSignatureParser.SUPER, 0); }
 		public SuperSuffixContext superSuffix() {
 			return getRuleContext(SuperSuffixContext.class,0);
 		}
 		public ExplicitGenericInvocationContext explicitGenericInvocation() {
 			return getRuleContext(ExplicitGenericInvocationContext.class,0);
 		}
+		public TerminalNode LBRACK() { return getToken(AnnotationSignatureParser.LBRACK, 0); }
+		public TerminalNode RBRACK() { return getToken(AnnotationSignatureParser.RBRACK, 0); }
 		public ExpressionListContext expressionList() {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
+		public TerminalNode INSTANCEOF() { return getToken(AnnotationSignatureParser.INSTANCEOF, 0); }
 		public ExpressionContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -7331,9 +7623,13 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class PrimaryContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
 		public ExpressionContext expression() {
 			return getRuleContext(ExpressionContext.class,0);
 		}
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
+		public TerminalNode THIS() { return getToken(AnnotationSignatureParser.THIS, 0); }
+		public TerminalNode SUPER() { return getToken(AnnotationSignatureParser.SUPER, 0); }
 		public LiteralContext literal() {
 			return getRuleContext(LiteralContext.class,0);
 		}
@@ -7341,6 +7637,9 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeContext type() {
 			return getRuleContext(TypeContext.class,0);
 		}
+		public TerminalNode DOT() { return getToken(AnnotationSignatureParser.DOT, 0); }
+		public TerminalNode CLASS() { return getToken(AnnotationSignatureParser.CLASS, 0); }
+		public TerminalNode VOID() { return getToken(AnnotationSignatureParser.VOID, 0); }
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
@@ -7587,6 +7886,10 @@ public class AnnotationSignatureParser extends Parser {
 		public TypeArgumentsOrDiamondContext typeArgumentsOrDiamond(int i) {
 			return getRuleContext(TypeArgumentsOrDiamondContext.class,i);
 		}
+		public List<TerminalNode> DOT() { return getTokens(AnnotationSignatureParser.DOT); }
+		public TerminalNode DOT(int i) {
+			return getToken(AnnotationSignatureParser.DOT, i);
+		}
 		public PrimitiveTypeContext primitiveType() {
 			return getRuleContext(PrimitiveTypeContext.class,0);
 		}
@@ -7751,6 +8054,14 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ArrayCreatorRestContext extends ParserRuleContext {
+		public List<TerminalNode> LBRACK() { return getTokens(AnnotationSignatureParser.LBRACK); }
+		public TerminalNode LBRACK(int i) {
+			return getToken(AnnotationSignatureParser.LBRACK, i);
+		}
+		public List<TerminalNode> RBRACK() { return getTokens(AnnotationSignatureParser.RBRACK); }
+		public TerminalNode RBRACK(int i) {
+			return getToken(AnnotationSignatureParser.RBRACK, i);
+		}
 		public ArrayInitializerContext arrayInitializer() {
 			return getRuleContext(ArrayInitializerContext.class,0);
 		}
@@ -8011,9 +8322,11 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class NonWildcardTypeArgumentsContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(AnnotationSignatureParser.LT, 0); }
 		public TypeListContext typeList() {
 			return getRuleContext(TypeListContext.class,0);
 		}
+		public TerminalNode GT() { return getToken(AnnotationSignatureParser.GT, 0); }
 		public NonWildcardTypeArgumentsContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
 		}
@@ -8059,6 +8372,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class TypeArgumentsOrDiamondContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(AnnotationSignatureParser.LT, 0); }
+		public TerminalNode GT() { return getToken(AnnotationSignatureParser.GT, 0); }
 		public TypeArgumentsContext typeArguments() {
 			return getRuleContext(TypeArgumentsContext.class,0);
 		}
@@ -8118,6 +8433,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class NonWildcardTypeArgumentsOrDiamondContext extends ParserRuleContext {
+		public TerminalNode LT() { return getToken(AnnotationSignatureParser.LT, 0); }
+		public TerminalNode GT() { return getToken(AnnotationSignatureParser.GT, 0); }
 		public NonWildcardTypeArgumentsContext nonWildcardTypeArguments() {
 			return getRuleContext(NonWildcardTypeArgumentsContext.class,0);
 		}
@@ -8180,6 +8497,7 @@ public class AnnotationSignatureParser extends Parser {
 		public ArgumentsContext arguments() {
 			return getRuleContext(ArgumentsContext.class,0);
 		}
+		public TerminalNode DOT() { return getToken(AnnotationSignatureParser.DOT, 0); }
 		public TerminalNode Identifier() { return getToken(AnnotationSignatureParser.Identifier, 0); }
 		public SuperSuffixContext(ParserRuleContext parent, int invokingState) {
 			super(parent, invokingState);
@@ -8249,6 +8567,7 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ExplicitGenericInvocationSuffixContext extends ParserRuleContext {
+		public TerminalNode SUPER() { return getToken(AnnotationSignatureParser.SUPER, 0); }
 		public SuperSuffixContext superSuffix() {
 			return getRuleContext(SuperSuffixContext.class,0);
 		}
@@ -8316,6 +8635,8 @@ public class AnnotationSignatureParser extends Parser {
 	}
 
 	public static class ArgumentsContext extends ParserRuleContext {
+		public TerminalNode LPAREN() { return getToken(AnnotationSignatureParser.LPAREN, 0); }
+		public TerminalNode RPAREN() { return getToken(AnnotationSignatureParser.RPAREN, 0); }
 		public ExpressionListContext expressionList() {
 			return getRuleContext(ExpressionListContext.class,0);
 		}
