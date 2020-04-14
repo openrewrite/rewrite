@@ -4,4 +4,5 @@ plugins {
 
 apply(from = "gradle/build-cache-configuration.settings.gradle.kts")
 
-include("rewrite-core", "rewrite-java", "rewrite-xml", "rewrite-gradle-enterprise")
+include("rewrite-core", "rewrite-java", "rewrite-xml")
+//, "rewrite-gradle-enterprise")
