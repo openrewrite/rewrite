@@ -25,8 +25,6 @@ plugins {
 }
 
 allprojects {
-    apply(plugin = "io.spring.license")
-
     group = "org.openrewrite"
     description = "Eliminate tech-debt. Automatically."
 }
