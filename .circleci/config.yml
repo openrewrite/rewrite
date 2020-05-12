@@ -25,7 +25,7 @@ commands:
           key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
       - run:
           name: downloadDependencies
-          command: ./gradlew downloadDependencies --console=plain
+          command: ./gradlew downloadDependencies
       - save_cache:
           key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
           paths:
@@ -49,12 +49,6 @@ jobs:
     executor: circle-jdk-executor
     steps:
       - gradlew-build
-
-  docker-tests:
-    executor: machine-executor
-    steps:
-      - gradlew-build:
-          command: dockerTest
 
   deploy:
     executor: circle-jdk-executor
@@ -85,11 +79,9 @@ workflows:
   build_prs_deploy_snapshots:
     jobs:
       - build
-      - docker-tests
       - deploy:
           requires:
             - build
-            - docker-tests
           filters:
             branches:
               only:
@@ -103,16 +95,9 @@ workflows:
               ignore: /.*/
             tags:
               only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
-      - docker-tests:
-          filters:
-            branches:
-              ignore: /.*/
-            tags:
-              only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
       - deploy:
           requires:
             - build
-            - docker-tests
           filters:
             tags:
               only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
