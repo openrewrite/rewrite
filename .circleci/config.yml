@@ -22,12 +22,12 @@ commands:
     steps:
       - checkout
       - restore_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle" }}
+          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
       - run:
           name: downloadDependencies
           command: ./gradlew downloadDependencies --console=plain
       - save_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle" }}
+          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
           paths:
             - ~/.gradle
       - run:
@@ -61,7 +61,7 @@ jobs:
     steps:
       - checkout
       - restore_cache:
-          key: gradle-dependencies-{{ checksum "build.gradle" }}
+          key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
       - deploy:
           name: Deployment
           command: sh ./gradle/deploy.sh
