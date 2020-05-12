@@ -1,6 +1,8 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import nl.javadude.gradle.plugins.license.LicenseExtension
+import java.util.Calendar
 import nebula.plugin.contacts.Contact
 import nebula.plugin.contacts.ContactsExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 buildscript {
     repositories {
@@ -25,6 +27,7 @@ plugins {
 }
 
 allprojects {
+    apply(plugin = "license")
     group = "org.openrewrite"
     description = "Eliminate tech-debt. Automatically."
 }
@@ -61,6 +64,14 @@ subprojects {
         j.moniker("Jonathan Schneider")
 
         people["jkschneider@gmail.com"] = j
+    }
+
+    configure<LicenseExtension> {
+        ext.set("year", Calendar.getInstance().get(Calendar.YEAR))
+//        skipExistingHeaders = true
+        header = project.rootProject.file("gradle/licenseHeader.txt")
+        mapping(mapOf("kt" to "SLASHSTAR_STYLE", "java" to "SLASHSTAR_STYLE"))
+        strictCheck = true
     }
 
     tasks.named<Test>("test") {
