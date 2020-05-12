@@ -1,4 +1,4 @@
-# Rewrite - Distributed Java Source Refactoring
+# Rewrite - Eliminate Tech-Debt. Automatically.
 
 The Rewrite project is a refactoring tool for Java and other source code. It contains a custom Abstract Syntax Tree (AST)  that encodes the structure and formatting of your source code. The AST is printable to
 reconstitute the source code, including its original formatting.

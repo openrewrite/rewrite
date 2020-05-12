@@ -1,47 +1,44 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.net.URI
+import nebula.plugin.contacts.Contact
+import nebula.plugin.contacts.ContactsExtension
+
+buildscript {
+    repositories {
+        jcenter()
+        gradlePluginPortal()
+    }
+
+    dependencies {
+        classpath("io.spring.gradle:spring-release-plugin:0.20.1")
+
+        constraints {
+            classpath("org.jfrog.buildinfo:build-info-extractor-gradle:4.13.0") {
+                because("Need recent version for Gradle 6+ compatibility")
+            }
+        }
+    }
+}
 
 plugins {
-    id("nebula.release") version "13.2.1"
-    id("nebula.maven-publish") version "17.2.1" apply false
-    id("nebula.maven-resolved-dependencies") version "17.2.1" apply false
+    id("io.spring.release") version "0.20.1"
     id("org.jetbrains.kotlin.jvm") version "1.3.71" apply false
 }
 
-project.gradle.taskGraph.whenReady(object : Action<TaskExecutionGraph> {
-    override fun execute(graph: TaskExecutionGraph) {
-        if (graph.hasTask(":snapshot") || graph.hasTask(":immutableSnapshot")) {
-            throw GradleException("You cannot use the snapshot or immutableSnapshot task from the release plugin. Please use the devSnapshot task.")
-        }
-    }
-})
-
-fun shouldUseReleaseRepo(): Boolean {
-    return project.gradle.startParameter.taskNames.contains("final") || project.gradle.startParameter.taskNames.contains(":final")
-}
-
 allprojects {
-    group = "org.gradle.rewrite"
-    description = "Pluggable and distributed refactoring tool"
+    apply(plugin = "io.spring.license")
+
+    group = "org.openrewrite"
+    description = "Eliminate tech-debt. Automatically."
 }
 
 subprojects {
     apply(plugin = "java-library")
-    apply(plugin = "nebula.maven-publish")
-    apply(plugin = "nebula.maven-resolved-dependencies")
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "nebula.maven-resolved-dependencies")
+    apply(plugin = "io.spring.publishing")
 
     repositories {
-        mavenCentral {
-            content {
-                excludeVersionByRegex("com\\.fasterxml\\.jackson\\..*", ".*", ".*rc.*")
-            }
-        }
-        mavenCentral {
-            content {
-                includeVersionByRegex("com\\.fasterxml\\.jackson\\..*", ".*", "(\\d+\\.)*\\d+")
-            }
-        }
+        mavenCentral()
     }
 
     dependencies {
@@ -58,6 +55,14 @@ subprojects {
         "testImplementation"("org.assertj:assertj-core:latest.release")
 
         "testRuntimeOnly"("ch.qos.logback:logback-classic:1.0.13")
+    }
+
+    configure<ContactsExtension> {
+        val j = Contact("jkschneider@gmail.com")
+        j.role("maintainer")
+        j.moniker("Jonathan Schneider")
+
+        people["jkschneider@gmail.com"] = j
     }
 
     tasks.named<Test>("test") {
@@ -78,26 +83,7 @@ subprojects {
     configure<JavaPluginExtension> {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-        withJavadocJar()
-        withSourcesJar()
     }
-
-    configure<PublishingExtension> {
-        repositories {
-            maven {
-                name = "GradleEnterprise"
-                url = if (shouldUseReleaseRepo()) {
-                    URI.create("https://repo.gradle.org/gradle/enterprise-libs-releases-local")
-                } else {
-                    URI.create("https://repo.gradle.org/gradle/enterprise-libs-snapshots-local")
-                }
-                credentials {
-                    username = project.findProperty("artifactoryUsername") as String?
-                    password = project.findProperty("artifactoryPassword") as String?
-                }
-            }
-        }
-    }
-
-    project.rootProject.tasks.getByName("postRelease").dependsOn(project.tasks.getByName("publishNebulaPublicationToGradleEnterpriseRepository"))
 }
+
+defaultTasks("build")
