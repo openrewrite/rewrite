@@ -93,6 +93,14 @@ subprojects {
         targetCompatibility = JavaVersion.VERSION_11
     }
 
+    configure<PublishingExtension> {
+        publications {
+            named("nebula", MavenPublication::class.java) {
+                suppressPomMetadataWarningsFor("runtimeElements")
+            }
+        }
+    }
+
     tasks.withType<GenerateMavenPom> {
         doFirst {
             val runtimeClasspath = configurations.getByName("runtimeClasspath")
