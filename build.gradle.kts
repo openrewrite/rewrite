@@ -5,6 +5,7 @@ import nebula.plugin.info.InfoBrokerPlugin
 import nebula.plugin.contacts.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jfrog.gradle.plugin.artifactory.dsl.*
+import org.w3c.dom.Element
 
 buildscript {
     repositories {
@@ -100,6 +101,21 @@ subprojects {
         publications {
             named("nebula", MavenPublication::class.java) {
                 suppressPomMetadataWarningsFor("runtimeElements")
+
+                pom.withXml {
+                    (asElement().getElementsByTagName("dependencies").item(0) as Element).let { dependencies ->
+                        dependencies.getElementsByTagName("dependency").let { dependencyList ->
+                            (0 until dependencyList.length).forEach { i ->
+                                (dependencyList.item(i) as Element).let { dependency ->
+                                    if ((dependency.getElementsByTagName("scope")
+                                                    .item(0) as Element).textContent == "provided") {
+                                        dependencies.removeChild(dependency)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -124,6 +140,13 @@ subprojects {
     }
 
     tasks.withType<GenerateMavenPom> {
+        doLast {
+            // because pom.withXml adds blank lines
+            destination.writeText(
+                destination.readLines().filter { it.isNotBlank() }.joinToString("\n")
+            )
+        }
+
         doFirst {
             val runtimeClasspath = configurations.getByName("runtimeClasspath")
 
