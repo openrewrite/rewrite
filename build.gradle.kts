@@ -4,6 +4,7 @@ import java.util.*
 import nebula.plugin.info.InfoBrokerPlugin
 import nebula.plugin.contacts.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jfrog.gradle.plugin.artifactory.dsl.*
 
 buildscript {
     repositories {
@@ -106,6 +107,20 @@ subprojects {
     configure<SpringBintrayExtension> {
         org = "openrewrite"
         repo = "maven"
+    }
+
+    project.withConvention(ArtifactoryPluginConvention::class) {
+        setContextUrl("https://oss.jfrog.org/artifactory")
+        publisherConfig.let {
+            val repository: PublisherConfig.Repository = it.javaClass
+                    .getDeclaredField("repository")
+                    .apply { isAccessible = true }
+                    .get(it) as PublisherConfig.Repository
+
+            repository.setRepoKey("oss-snapshot-local")
+            repository.setUsername(project.findProperty("bintrayUser"))
+            repository.setPassword(project.findProperty("bintrayKey"))
+        }
     }
 
     tasks.withType<GenerateMavenPom> {

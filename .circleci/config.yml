@@ -69,8 +69,7 @@ jobs:
           command: openssl aes-256-cbc -d -in gradle.properties.enc -out gradle.properties -k "$KEY" -md sha256
       - deploy:
           name: Maven Central sync
-          # arbitrarily choose one project to run the `mavenCentralSync` task since all use the same Bintray package
-          command: ./gradlew :rewrite-core:mavenCentralSync -Prelease.useLastTag=true -x bintrayPublish -x bintrayUpload -x bintrayCreateVersion -x bintrayCreatePackage
+          command: ./gradlew mavenCentralSync -Prelease.useLastTag=true -x bintrayPublish -x bintrayUpload -x bintrayCreateVersion -x bintrayCreatePackage
           # Maven Central Sync might take more than 10 minutes
           no_output_timeout: 30m
 
