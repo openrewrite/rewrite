@@ -84,7 +84,7 @@ workflows:
           filters:
             branches:
               only:
-#                - master
+                - master
                 - /\d+\.\d+\.x/
   build_deploy_releases:
     jobs:
