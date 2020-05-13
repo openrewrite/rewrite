@@ -1,5 +1,9 @@
 # Rewrite - Eliminate Tech-Debt. Automatically.
 
+[![Build Status](https://circleci.com/gh/openrewrite/rewrite-checkstyle.svg?style=shield)](https://circleci.com/gh/openrewrite/rewrite)
+[![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+[![Maven Central](https://img.shields.io/maven-central/v/org.openrewrite/rewrite-java.svg)](https://mvnrepository.com/artifact/org.openrewrite/rewrite-java)
+
 The Rewrite project is a refactoring tool for Java and other source code. It contains a custom Abstract Syntax Tree (AST)  that encodes the structure and formatting of your source code. The AST is printable to
 reconstitute the source code, including its original formatting.
 
