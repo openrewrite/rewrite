@@ -1,3 +1,4 @@
+import io.spring.gradle.bintray.SpringBintrayExtension
 import nl.javadude.gradle.plugins.license.LicenseExtension
 import java.util.*
 import nebula.plugin.info.InfoBrokerPlugin
@@ -99,6 +100,11 @@ subprojects {
                 suppressPomMetadataWarningsFor("runtimeElements")
             }
         }
+    }
+
+    configure<SpringBintrayExtension> {
+        org = "openrewrite"
+        repo = "maven"
     }
 
     tasks.withType<GenerateMavenPom> {
