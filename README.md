@@ -1,4 +1,5 @@
-# Rewrite - Eliminate Tech-Debt. Automatically.
+![Logo](https://github.com/openrewrite/rewrite/raw/master/doc/logo-oss.png)
+### Eliminate Tech-Debt. Automatically.
 
 [![Build Status](https://circleci.com/gh/openrewrite/rewrite.svg?style=shield)](https://circleci.com/gh/openrewrite/rewrite)
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
