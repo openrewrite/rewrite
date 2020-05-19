@@ -173,3 +173,50 @@ for(J.CompilationUnit cu : cus) {
     @Nullable J.CompilationUnit original = change.getOriginal();
 }
 ```
+
+`rewrite-java` packs with a series of refactoring building blocks which can be used to perform low-level refactoring operations. For example, to change all fields from `java.util.List` to `java.util.Collection`, we could use the `ChangeFieldType` operation:
+
+```kotlin
+@Test
+fun changeFieldType() {
+    val a = parse("""
+        import java.util.List;
+        public class A {
+           List collection;
+        }
+    """.trimIndent())
+
+    val fixed = a.refactor()
+            .visit(ChangeFieldType(
+                    a.classes[0].findFields("java.util.List")[0], 
+                    "java.util.Collection"))
+            .fix().fixed
+
+    assertRefactored(fixed, """
+        import java.util.Collection;
+        
+        public class A {
+           Collection collection;
+        }
+    """)
+}
+```
+
+The basic building blocks are included in the [refactor](https://github.com/openrewrite/rewrite/tree/master/rewrite-java/src/main/java/org/openrewrite/java/refactor) package, including:
+
+* Add annotation to a class, method, or variable.
+* Add a field to a class.
+* Add/remove an import, which can be configured to expand/collapse star imports.
+* Change field name (including its references, even across other source files that _use_ this field not just where the field is defined).
+* Change a field type.
+* Change a literal expression.
+* Change a method name, including anywhere that method is referenced.
+* Change a method target to a static from instance method.
+* Change a method target to an instance method from a static.
+* Change a type reference, anywhere it is found in the tree.
+* Insert/delete method arguments.
+* Delete any statement.
+* Generate constructors using fields.
+* Rename a variable.
+* Reorder method arguments.
+* Unwrap parentheses.
