@@ -142,6 +142,38 @@ You can also move down a level to individual classes (`cu.getClasses()`) inside 
 
 More search methods are available further down the AST.
 
+You can build custom search visitors by extending `JavaSourceVisitor` and implementing any `visitXXX` methods that you need to perform your search. These don't have to be complex. `FindMethods` only extends `visitMethodInvocation` to check whether a given invocation matches the signature we are looking for:
+
+```java
+public class FindMethods extends JavaSourceVisitor<List<J.MethodInvocation>> {
+    private final MethodMatcher matcher;
+
+    public FindMethods(String signature) {
+        this.matcher = new MethodMatcher(signature);
+    }
+
+    @Override
+    public List<J.MethodInvocation> defaultTo(Tree t) {
+        return emptyList();
+    }
+
+    @Override
+    public List<J.MethodInvocation> visitMethodInvocation(J.MethodInvocation method) {
+        return matcher.matches(method) ? singletonList(method) : super.visitMethodInvocation(method);
+    }
+}
+```
+
+Invoke a custom visitor by instantiating the visitor and calling `visit` on the root AST node. `JavaSourceVisitor` can return any type. You define a default return with `defaultTo` and can provide a custom reduction operation by overriding `reduce` on the visitor.
+
+```java
+J.CompilationUnit cu = ...;
+
+// this visitor can return any type you wish, ultimately
+// being a reduction of visiting every AST element
+new MyCustomVisitor().visit(cu);
+```
+
 ## Refactoring Java source
 
 Refactoring code starts at the root of the AST which for Java is `J.CompilationUnit`. Call `refactor()` to begin a refactoring operation. We'll detail the kinds of refactoring operations that you can do in a moment, but at the end of this process, you can call `fix()` which generates a `Change` instance that allows you to generate git diffs and print out the original and transformed source.
@@ -220,3 +252,38 @@ The basic building blocks are included in the [refactor](https://github.com/open
 * Rename a variable.
 * Reorder method arguments.
 * Unwrap parentheses.
+
+Each one of these operations is defined as a `JavaRefactorVisitor` or `ScopedJavaRefactorVisitor`, which are extensions of `JavaSourceVisitor` designed for mutating the AST, ultimately leading to a `Change` object at the end of the refactoring operation.
+
+Visitors can be chained together by calling `andThen(anotherVisitor)`. This is useful for building up pipelines of refactoring operations built up of lower-level components. For example, when `ChangeFieldType` finds a matching field that it is going to transform, it chains together an `AddImport` visitor to add the new import if necessary, and a `RemoveImport` to remove the old import if there are no longer any references to it.
+
+## Refactoring modules
+
+We can encapsulate a set of refactoring operations into a module for easy reuse. [RewriteCheckstyle](https://github.com/openrewrite/rewrite-checkstyle/blob/master/src/main/java/org/openrewrite/checkstyle/RewriteCheckstyle.java) is an example of such a module, encapsulating the logic necessary to read a checkstyle configuration file, configure the refactoring operations necessary to auto-remediate checkstyle issues.
+
+Once built, we can `apply` the module to any `J.CompilationUnit`:
+
+```java
+J.CompilationUnit cu = ...;
+RewriteCheckstyle rewriteCheckstyle = ...;
+
+Refactor<J.CompilationUnit, J> refactor = rewriteCheckstyle.apply(cu.refactor());
+refactor.fix().diff(); // generate a git diff of fixed code
+```
+
+## How refactoring modules support one another
+
+One detail we omitted earlier when discussing calling `fix()` on a `Refactor` instance is that the refactoring visitors will be applied iteratively until no further mutations to the AST are made. You can also call `fix(int maxCycles)` to limit how many iterations will be attempted.
+
+The nice thing about this is you can have rules that play off of one another without having any explicit depending between them. For example:
+
+```java
+J.CompilationUnit cu = ...;
+
+RewriteCheckstyle checkstyle = ...;
+SpringPropertiesMigration springProperties = ...;
+
+Change<J.CompilationUnit, J> change = springProperties.apply(rewriteCheckstyle.apply(cu.refactor())).fix();
+```
+
+The `SpringPropertiesMigration` may generate some code which has whitespace formatting that is different from what your project expects, as defined in its Checkstyle configuration file. In this case, Checkstyle remediation runs first, followed by Spring properties migration which may generate some code which would have failed checkstyle. Since the Spring properties migration mutates the source code, however, the whole cycle is run again, allowing checkstyle remediation to tidy up the code that the Spring properties migration module just generated! Notice how there isn't any explicit dependency between these two modules, and not having to be concerned about formatting simplifies the task of encapsulating what it means to migrate Spring properties.
