@@ -9,9 +9,9 @@
 The Rewrite project is a mass refactoring ecosystem for Java and other source code, designed to eliminate technical debt across an engineering organization. Rewrite is designed to be plugged into various workflows, including:
 
 * Discover and fix code as a **build tool task** (e.g. Gradle and Maven).
-* Subsecond organization-wide code search for a pattern of arbitrary complexity.
-* Mass pull-request issuance to fix a security vulnerability, eliminate the use of a deprecated API, migrate from one technology to another (e.g. JUnit asserts to AssertJ), etc.
-* Mass organization-wide Git commits to do the same.
+* Subsecond organization-wide **code search** for a pattern of arbitrary complexity.
+* **Mass pull-request** issuance to fix a security vulnerability, eliminate the use of a deprecated API, migrate from one technology to another (e.g. JUnit asserts to AssertJ), etc.
+* Mass organization-wide **Git commits** to do the same.
 
 It builds on a custom Abstract Syntax Tree (AST) that encodes the structure and formatting of your source code. The AST is printable to reconstitute the source code, including its original formatting.
 
@@ -79,3 +79,65 @@ List<J.CompilationUnit> cus = parser.parse(pathsToSourceFiles);
 ```
 
 `J.CompilationUnit` is the top-level AST element for Java source files, which contains information about the package, imports, and any class/enum/interface definitions contained in the source file. `J.CompilationUnit` is the basic building block upon which we'll build refactoring and search operations for Java source code.
+
+`JavaParser` contains `parse` method overloads for constructing an AST from a string, which is useful for quickly constructing unit tests for different search and refactoring operations.
+
+For JVM languages like Kotlin that support multiline strings, this can be especially convenient:
+
+```kotlin
+val cu: J.CompilationUnit = JavaParser().parse("""
+    import java.util.Collections;
+    public class A {
+        Object o = Collections.emptyList();
+    }
+""")
+```
+
+Notice how this returns a single `J.CompilationUnit`, which can be immediately acted upon. Ultimately, [JEP-355](https://openjdk.java.net/jeps/355) will bring multiline strings to Java as well, so beautiful unit tests for Rewrite operations will be possible to write in plain Java code.
+
+The `dependenciesFromClasspath` method is especially useful for building unit tests, as you can place a module for which you are affecting some transformation on the test runtime classpath and bind it to the parser. In this way, any references to classes, methods, etc. in that dependency are type-attributed in ASTs produced for unit tests.
+
+```kotlin
+val cu: J.CompilationUnit = JavaParser(JavaParser.dependenciesFromClasspath("guava"))
+    .parse("""
+        import com.google.common.io.Files;
+        public class A {
+            File temp = Files.createTempDir();
+        }
+    """)
+```
+
+## Structured code search for Java
+
+Extending on the example from above, we can search for uses of Guava's `Files#createTempDir()`. The argument for `findMethodCalls` takes the [AspectJ syntax](https://www.eclipse.org/aspectj/doc/next/adk15notebook/ataspectj-pcadvice.html) for pointcut matching on methods.
+
+```kotlin
+val cu: J.CompilationUnit = JavaParser(JavaParser.dependenciesFromClasspath("guava"))
+    .parse("""
+        import com.google.common.io.Files;
+        public class A {
+            File temp = Files.createTempDir();
+        }
+    """)
+
+val calls: List<J.MethodInvocation> = cu.findMethodCalls(
+    "java.io.File com.google.common.io.Files.createTempDir()");
+```
+
+Many other search methods exist on `J.CompilationUnit`:
+
+* `boolean hasImport(String clazz)` to look for imports.
+* `boolean hasType(String clazz)` to check whether a source file has a reference to a type.
+* `Set<NameTree> findType(String clazz)` to return all the AST elements that are type-attributed with a particular type.
+
+You can also move down a level to individual classes (`cu.getClasses()`) inside a source file and perform additional operations: 
+
+* `List<VariableDecls> findFields(String clazz)` to find fields declared in this class that refer to a specific type.
+* `List<JavaType.Var> findInheritedFields(String clazz)` to find fields that are inherited from a base class. Note that since they are inherited, there is no AST element to match on, but you'll be able to determine if a class has a field of a particular type coming from a base class and then look for uses of this field.
+* `Set<NameTree> findType(String clazz)` to return all AST elements inside this class referring to a type.
+* `List<Annotation> findAnnotations(String signature)` to find all annotations matching a signature as defined in the AspectJ pointcut definition for annotation matching.
+* `boolean hasType(String clazz)` to check whether a class refers to a type.
+* `hasModifier(String modifier)` to check for modifiers on the class definition (e.g. public, private, static).
+* `isClass()/isEnum()/isInterface()/isAnnotation()`.
+
+More search methods are available further down the AST.
