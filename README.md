@@ -4,6 +4,17 @@
 [![Apache 2.0](https://img.shields.io/github/license/openrewrite/rewrite.svg)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Maven Central](https://img.shields.io/maven-central/v/org.openrewrite/rewrite-java.svg)](https://mvnrepository.com/artifact/org.openrewrite/rewrite-java)
 
+## Table of contents
+
+* [What is this?](#what-is-this-)
+* [What is unique about the Rewrite AST?](#what-is-unique-about-the-rewrite-ast-)
+* [Rewrite components](#rewrite-components)
+* [Creating a Rewrite AST from Java source code](#creating-a-rewrite-ast-from-java-source-code)
+* [Structured code search for Java](#structured-code-search-for-java)
+* [Refactoring Java source](#refactoring-java-source)
+* [Refactoring modules](#refactoring-modules)
+* [How refactoring modules support one another](#how-refactoring-modules-support-one-another)
+
 ## What is this?
 
 The Rewrite project is a mass refactoring ecosystem for Java and other source code, designed to eliminate technical debt across an engineering organization. Rewrite is designed to be plugged into various workflows, including:
