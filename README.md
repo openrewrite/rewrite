@@ -141,3 +141,35 @@ You can also move down a level to individual classes (`cu.getClasses()`) inside 
 * `isClass()/isEnum()/isInterface()/isAnnotation()`.
 
 More search methods are available further down the AST.
+
+## Refactoring Java source
+
+Refactoring code starts at the root of the AST which for Java is `J.CompilationUnit`. Call `refactor()` to begin a refactoring operation. We'll detail the kinds of refactoring operations that you can do in a moment, but at the end of this process, you can call `fix()` which generates a `Change` instance that allows you to generate git diffs and print out the original and transformed source.
+
+```java
+JavaParser parser = ...;
+List<J.CompilationUnit> cus = parser.parse(sourceFiles);
+
+for(J.CompilationUnit cu : cus) {
+    Refactor<J.CompilationUnit, J> refactor = cu.refactor();
+    
+    // ... do some refactoring
+
+    Change<J.CompilationUnit> change = refactor.fix();
+    
+    change.diff(); // a String representing a git-style patch
+    change.diff(relativeToPath); // relativize the patch's file reference to some other path
+
+    // print out the transformed source, which could be used 
+    // to overwrite the original source file
+    J.CompilationUnit fixed = change.getFixed();
+    fixed.print();
+
+    // useful for unit tests to get trim the output of common whitespace
+    fixed.printTrimmed();
+
+    // this is null when we synthesize a new compilation unit 
+    // where one didn't exist before
+    @Nullable J.CompilationUnit original = change.getOriginal();
+}
+```
