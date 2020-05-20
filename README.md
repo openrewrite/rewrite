@@ -8,7 +8,7 @@
 ## Table of contents
 
 * [What is this?](#what-is-this-)
-* [What is unique about the Rewrite AST?](#what-is-unique-about-the-rewrite-ast-)
+* [What is unique about the Rewrite AST?](#what-is-unique-about-the-rewrite-ast)
 * [Rewrite components](#rewrite-components)
 * [Creating a Rewrite AST from Java source code](#creating-a-rewrite-ast-from-java-source-code)
 * [Structured code search for Java](#structured-code-search-for-java)
