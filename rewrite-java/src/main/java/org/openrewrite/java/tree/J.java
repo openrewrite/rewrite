@@ -138,6 +138,11 @@ public interface J extends Serializable, Tree {
             @With
             Formatting formatting;
         }
+
+        @Override
+        public <T extends Tree> Optional<T> whenType(Class<T> treeType) {
+            return Optional.empty();
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -847,9 +852,9 @@ public interface J extends Serializable, Tree {
         TypeParameters typeParameters;
 
         @Nullable
-        TypeTree extendings;
+        Extends extendings;
 
-        public ClassDecl withExtends(TypeTree extendings) {
+        public ClassDecl withExtends(@Nullable Extends extendings) {
             if(extendings == this.extendings) {
                 return this;
             }
@@ -859,13 +864,14 @@ public interface J extends Serializable, Tree {
 
         @JsonProperty("extendings")
         @Nullable
-        public TypeTree getExtends() {
+        public Extends getExtends() {
             return extendings;
         }
 
-        List<TypeTree> implementings;
+        @Nullable
+        Implements implementings;
 
-        public ClassDecl withImplements(List<TypeTree> implementings) {
+        public ClassDecl withImplements(@Nullable Implements implementings) {
             if(implementings == this.implementings) {
                 return this;
             }
@@ -874,7 +880,8 @@ public interface J extends Serializable, Tree {
         }
 
         @JsonProperty("implementings")
-        public List<TypeTree> getImplements() {
+        @Nullable
+        public Implements getImplements() {
             return implementings;
         }
 
@@ -970,6 +977,35 @@ public interface J extends Serializable, Tree {
                 @With
                 Formatting formatting;
             }
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class Extends implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            @Nullable
+            TypeTree from;
+
+            @With
+            Formatting formatting;
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class Implements implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            List<TypeTree> from;
+
+            @With
+            Formatting formatting;
         }
 
         /**
@@ -1111,7 +1147,7 @@ public interface J extends Serializable, Tree {
                             TreeBuilder.buildName(className).withPrefix(" "),
                             null,
                             null,
-                            emptyList(),
+                            null,
                             new Try.Block<>(randomId(), null, emptyList(), format(" "), "\n"),
                             JavaType.Class.build(packageName + "." + className),
                             format("\n\n")).withModifiers("public")),

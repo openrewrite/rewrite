@@ -26,7 +26,7 @@ buildscript {
 
 plugins {
     id("io.spring.release") version "0.20.1"
-    id("org.jetbrains.kotlin.jvm") version "1.3.71" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.3.72" apply false
 }
 
 allprojects {

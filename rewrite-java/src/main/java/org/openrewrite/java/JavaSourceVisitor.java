@@ -254,9 +254,9 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
                                                 ),
                                                 classDecl.getAnnotations()
                                         ),
-                                        classDecl.getExtends()
+                                        classDecl.getExtends() == null ? null : classDecl.getExtends().getFrom()
                                 ),
-                                classDecl.getImplements()
+                                classDecl.getImplements() == null ? null : classDecl.getImplements().getFrom()
                         )
                 )
         );

@@ -124,7 +124,13 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
         c = c.withKind(refactor(c.getKind()));
         c = c.withName(refactor(c.getName()));
         c = c.withExtends(refactor(c.getExtends()));
+        if (c.getExtends() != null) {
+            c = c.withExtends(c.getExtends().withFrom(refactor(c.getExtends().getFrom())));
+        }
         c = c.withImplements(refactor(c.getImplements()));
+        if (c.getImplements() != null) {
+            c = c.withImplements(c.getImplements().withFrom(refactor(c.getImplements().getFrom())));
+        }
         return c.withBody(refactor(c.getBody()));
     }
 
@@ -466,7 +472,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     public void maybeUnwrapParentheses(Cursor parensCursor) {
-        if(UnwrapParentheses.isUnwrappable(parensCursor)) {
+        if (UnwrapParentheses.isUnwrappable(parensCursor)) {
             andThen(new UnwrapParentheses(parensCursor.getTree()));
         }
     }

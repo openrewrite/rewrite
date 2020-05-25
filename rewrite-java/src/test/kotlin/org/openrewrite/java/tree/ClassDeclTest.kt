@@ -66,7 +66,7 @@ open class ClassDeclTest : JavaParser() {
         val b = "public interface B {}"
         val a = "public class A implements B {}"
         
-        assertEquals(1, parse(a, b).classes[0].implements.size)
+        assertEquals(1, parse(a, b).classes[0].implements?.from?.size)
     }
 
     @Test

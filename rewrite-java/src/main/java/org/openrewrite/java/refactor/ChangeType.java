@@ -82,8 +82,16 @@ public class ChangeType extends JavaRefactorVisitor {
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-        c = c.withExtends(transformName(classDecl.getExtends()));
-        return c.withImplements(transformNames(c.getImplements()));
+
+        if(c.getExtends() != null) {
+            c = c.withExtends(c.getExtends().withFrom(transformName(c.getExtends().getFrom())));
+        }
+
+        if(c.getImplements() != null) {
+            c = c.withImplements(c.getImplements().withFrom(transformNames(c.getImplements().getFrom())));
+        }
+
+        return c;
     }
 
     @Override

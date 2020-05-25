@@ -330,8 +330,25 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
                     format(genericPrefix));
         }
 
-        TypeTree extendsType = convertOrNull(node.getExtendsClause());
-        List<TypeTree> implementsType = convertAll(node.getImplementsClause(), commaDelim, noDelim);
+        J.ClassDecl.Extends extendings = null;
+        if(node.getExtendsClause() != null) {
+            var extendsPrefix = sourceBefore("extends");
+            extendings = new J.ClassDecl.Extends(
+                    randomId(),
+                    convertOrNull(node.getExtendsClause()),
+                    format(extendsPrefix)
+            );
+        }
+
+        J.ClassDecl.Implements implementings = null;
+        if(node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
+            var implementsPrefix = sourceBefore("implements");
+            implementings = new J.ClassDecl.Implements(
+                    randomId(),
+                    convertAll(node.getImplementsClause(), commaDelim, noDelim),
+                    format(implementsPrefix)
+            );
+        }
 
         var bodyPrefix = sourceBefore("{");
 
@@ -376,7 +393,7 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
 
         var body = new J.Block<>(randomId(), null, members, format(bodyPrefix), sourceBefore("}"));
 
-        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendsType, implementsType, body, type(node), fmt);
+        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, type(node), fmt);
     }
 
     @Override

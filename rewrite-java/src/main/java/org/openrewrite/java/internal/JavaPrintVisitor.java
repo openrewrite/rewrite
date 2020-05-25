@@ -254,8 +254,13 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
         }
 
         return fmt(classDecl, visit(classDecl.getAnnotations()) +
-                modifiers + fmt(classDecl.getKind(), kind) + visit(classDecl.getName()) +
-                visit(classDecl.getTypeParameters()) + visit(classDecl.getExtends()) + visit(classDecl.getImplements(), ",") +
+                modifiers + fmt(classDecl.getKind(), kind) +
+                visit(classDecl.getName()) +
+                visit(classDecl.getTypeParameters()) +
+                (classDecl.getExtends() == null ? "" :
+                        fmt(classDecl.getExtends(), "extends" + visit(classDecl.getExtends().getFrom()))) +
+                (classDecl.getImplements() == null ? "" :
+                        fmt(classDecl.getImplements(), "implements" + visit(classDecl.getImplements().getFrom(), ","))) +
                 visit(classDecl.getBody()));
     }
 
@@ -286,8 +291,8 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
         var init = "";
 
         NewClass initializer = enoom.getInitializer();
-        if(initializer != null) {
-            if(initializer.getArgs() != null) {
+        if (initializer != null) {
+            if (initializer.getArgs() != null) {
                 init = fmt(initializer.getArgs(), "(" + visit(initializer.getArgs().getArgs(), ",") + ")");
             }
             init = fmt(initializer, init + visit(initializer.getBody()));
