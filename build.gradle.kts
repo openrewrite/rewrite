@@ -27,6 +27,7 @@ buildscript {
 plugins {
     id("io.spring.release") version "0.20.1"
     id("org.jetbrains.kotlin.jvm") version "1.3.72" apply false
+    id("org.gradle.test-retry") version "1.1.5" apply false
 }
 
 allprojects {
@@ -40,6 +41,7 @@ subprojects {
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "nebula.maven-resolved-dependencies")
     apply(plugin = "io.spring.publishing")
+    apply(plugin = "org.gradle.test-retry")
 
     repositories {
         mavenCentral()
