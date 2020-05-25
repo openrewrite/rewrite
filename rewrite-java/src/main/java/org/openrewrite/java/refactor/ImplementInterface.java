@@ -16,6 +16,7 @@
 package org.openrewrite.java.refactor;
 
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
 
 import java.util.ArrayList;
@@ -27,10 +28,12 @@ import static org.openrewrite.Tree.randomId;
 
 public class ImplementInterface extends ScopedJavaRefactorVisitor {
     private final String interfaze;
+    private final JavaType.Class interfaceType;
 
     public ImplementInterface(J.ClassDecl scope, String interfaze) {
         super(scope.getId());
         this.interfaze = interfaze;
+        this.interfaceType = JavaType.Class.build(interfaze);
     }
 
     @Override
@@ -41,7 +44,8 @@ public class ImplementInterface extends ScopedJavaRefactorVisitor {
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-        if (classDecl.getId().equals(getScope())) {
+        if (classDecl.getId().equals(getScope()) && (classDecl.getImplements() == null ||
+                classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaze);
 
             J.Ident lifeCycle = J.Ident.buildClassName(interfaze).withFormatting(format(" "));
