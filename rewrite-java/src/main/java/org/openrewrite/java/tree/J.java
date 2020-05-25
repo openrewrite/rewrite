@@ -987,7 +987,6 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
-            @Nullable
             TypeTree from;
 
             @With
@@ -2537,6 +2536,42 @@ public interface J extends Serializable, Tree {
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitParameterizedType(this);
+        }
+
+        public static ParameterizedType build(String typeName, String... genericTypeNames) {
+            JavaType.Class typeNameType = JavaType.Class.build(typeName);
+            
+            return new J.ParameterizedType(
+                    randomId(),
+                    J.Ident.build(
+                            randomId(),
+                            typeNameType.getClassName(),
+                            typeNameType,
+                            EMPTY),
+                    new J.TypeParameters(
+                            randomId(),
+                            Formatting.formatFirstPrefix(
+                            stream(genericTypeNames)
+                                .map(generic -> {
+                                    JavaType.Class genericType = JavaType.Class.build(generic);
+                                    return new J.TypeParameter(
+                                            randomId(),
+                                            emptyList(),
+                                            J.Ident.build(
+                                                    randomId(),
+                                                    genericType.getClassName(),
+                                                    genericType,
+                                                    EMPTY
+                                            ),
+                                            null,
+                                            format(" ")
+                                    );
+                                })
+                                .collect(Collectors.toList()), ""
+                            ),
+                            EMPTY),
+                    EMPTY
+            );
         }
     }
 
