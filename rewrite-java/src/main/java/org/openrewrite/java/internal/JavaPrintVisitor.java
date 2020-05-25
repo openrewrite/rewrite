@@ -260,7 +260,9 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
                 (classDecl.getExtends() == null ? "" :
                         fmt(classDecl.getExtends(), "extends" + visit(classDecl.getExtends().getFrom()))) +
                 (classDecl.getImplements() == null ? "" :
-                        fmt(classDecl.getImplements(), "implements" + visit(classDecl.getImplements().getFrom(), ","))) +
+                        fmt(classDecl.getImplements(),
+                                (classDecl.getKind() instanceof ClassDecl.Kind.Interface ? "extends" : "implements") +
+                                        visit(classDecl.getImplements().getFrom(), ","))) +
                 visit(classDecl.getBody()));
     }
 

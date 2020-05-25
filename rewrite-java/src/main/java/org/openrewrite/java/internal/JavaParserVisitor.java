@@ -342,7 +342,9 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.ClassDecl.Implements implementings = null;
         if(node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
-            var implementsPrefix = sourceBefore("implements");
+            var implementsPrefix = sourceBefore(kind instanceof J.ClassDecl.Kind.Interface ?
+                    "extends" : "implements");
+
             implementings = new J.ClassDecl.Implements(
                     randomId(),
                     convertAll(node.getImplementsClause(), commaDelim, noDelim),
