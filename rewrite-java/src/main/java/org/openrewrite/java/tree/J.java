@@ -1504,6 +1504,16 @@ public interface J extends Serializable, Tree {
             }
         }
 
+        public static Ident buildClassName(String fullyQualifiedName) {
+            JavaType.Class classType = JavaType.Class.build(fullyQualifiedName);
+            return J.Ident.build(
+                    randomId(),
+                    classType.getClassName(),
+                    classType,
+                    EMPTY
+            );
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
         public static class IdentFlyweight implements Serializable {
@@ -1797,6 +1807,15 @@ public interface J extends Serializable, Tree {
                 return prefix + transform.apply((T) value) + suffix;
             }
             throw new IllegalStateException("Encountered a literal `" + this + "` that could not be transformed");
+        }
+
+        public static Literal buildString(String value) {
+            return new J.Literal(
+                    randomId(),
+                    value,
+                    "\"" + value + "\"",
+                    JavaType.Primitive.String, EMPTY
+            );
         }
     }
 
