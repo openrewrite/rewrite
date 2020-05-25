@@ -34,6 +34,11 @@ public class ImplementInterface extends ScopedJavaRefactorVisitor {
     }
 
     @Override
+    public String getName() {
+        return "core.ImplementInterface{from=" + interfaze + "}";
+    }
+
+    @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
         if (classDecl.getId().equals(getScope())) {
