@@ -169,10 +169,26 @@ public interface Xml extends Serializable, Tree {
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,
                     formatting);
-            return content != null && !content.isEmpty() && closing == null ?
-                    tag.withClosing(new Closing(randomId(), name, "",
-                            formatting.withPrefix(formatting.getPrefix().substring(formatting.getPrefix().lastIndexOf('\n'))))) :
-                    tag;
+
+            if(closing == null) {
+                if (content != null && !content.isEmpty()) {
+                    Formatting indentedClosingTagFormatting = formatting.withPrefix(
+                            formatting.getPrefix().substring(Math.max(0,
+                                    formatting.getPrefix().lastIndexOf('\n'))));
+
+                    if(content.get(0) instanceof CharData) {
+                        return tag.withClosing(new Closing(randomId(), name, "",
+                                content.get(0).getFormatting().getPrefix().contains("\n") ?
+                                        indentedClosingTagFormatting : Formatting.EMPTY));
+                    }
+                    else {
+                        return tag.withClosing(new Closing(randomId(), name, "",
+                                indentedClosingTagFormatting));
+                    }
+                }
+            }
+
+            return tag;
         }
 
         @With

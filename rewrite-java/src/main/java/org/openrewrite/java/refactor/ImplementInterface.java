@@ -44,7 +44,7 @@ public class ImplementInterface extends ScopedJavaRefactorVisitor {
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-        if (classDecl.getId().equals(getScope()) && (classDecl.getImplements() == null ||
+        if (isScope() && (classDecl.getImplements() == null ||
                 classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaze);
 

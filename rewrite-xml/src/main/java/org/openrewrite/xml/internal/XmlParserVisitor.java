@@ -28,6 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 
 import static java.util.Collections.emptyMap;
@@ -82,18 +83,60 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml visitContent(XMLParser.ContentContext ctx) {
         if (ctx.CDATA() != null) {
-            return convert(ctx.CDATA(), (cdata, format) -> new Xml.CharData(randomId(),
-                    true,
-                    cdata.getText().substring("<![CDATA[".length(), cdata.getText().length() - "]]>".length()),
-                    format));
+            Xml.CharData charData = convert(ctx.CDATA(), (cdata, format) -> {
+                Map.Entry<Formatting, String> formatAndText = charDataFormat(cdata.getText());
+                return new Xml.CharData(randomId(),
+                        true,
+                        formatAndText.getValue().substring("<![CDATA[".length(), cdata.getText().length() - "]]>".length()),
+                        formatAndText.getKey());
+            });
+            cursor++; // otherwise an off-by-one on cursor positioning for close tags?
+            return charData;
         } else if (ctx.chardata() != null) {
-            return convert(ctx.chardata(), (chardata, format) -> new Xml.CharData(randomId(),
-                    false,
-                    chardata.getText(),
-                    format));
+            Xml.CharData charData = convert(ctx.chardata(), (chardata, format) -> {
+                Map.Entry<Formatting, String> formatAndText = charDataFormat(chardata.getText());
+                return new Xml.CharData(randomId(),
+                        false,
+                        formatAndText.getValue(),
+                        formatAndText.getKey());
+            });
+            cursor++; // otherwise an off-by-one on cursor positioning for close tags?
+            return charData;
         } else {
             return super.visitContent(ctx);
         }
+    }
+
+    private Map.Entry<Formatting, String> charDataFormat(String text) {
+        boolean prefixDone = false;
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder value = new StringBuilder();
+        StringBuilder suffix = new StringBuilder();
+
+        for (int i = 0; i < text.length(); i++) {
+            if (!prefixDone) {
+                if(Character.isWhitespace(text.charAt(i))) {
+                    prefix.append(text.charAt(i));
+                }
+                else {
+                    prefixDone = true;
+                    value.append(text.charAt(i));
+                }
+            }
+            else {
+                if(Character.isWhitespace(text.charAt(i))) {
+                    suffix.append(text.charAt(i));
+                }
+                else {
+                    suffix.setLength(0);
+                }
+                value.append(text.charAt(i));
+            }
+        }
+
+        String valueStr = value.toString();
+        return Map.of(Formatting.format(prefix.toString(), suffix.toString()),
+                valueStr.substring(0, valueStr.length() - suffix.length())).entrySet().iterator().next();
     }
 
     @Override
@@ -218,6 +261,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     private Formatting format(Token token) {
         int start = token.getStartIndex();
+        if(start < cursor) {
+            return Formatting.EMPTY;
+        }
         String prefix = source.substring(cursor, start);
         cursor = start;
         return Formatting.format(prefix);
@@ -225,7 +271,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Nullable
     private <C extends ParserRuleContext, T> T convert(C ctx, BiFunction<C, Formatting, T> conversion) {
-        if(ctx == null) {
+        if (ctx == null) {
             return null;
         }
 
