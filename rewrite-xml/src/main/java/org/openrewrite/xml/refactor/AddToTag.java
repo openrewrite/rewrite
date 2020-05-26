@@ -25,6 +25,11 @@ import java.util.List;
 public class AddToTag extends ScopedXmlRefactorVisitor {
     private final Xml.Tag tagToAdd;
 
+    @Override
+    public String getName() {
+        return "core.addToTag";
+    }
+
     public AddToTag(Xml.Tag scope, String tagSource) {
         super(scope.getId());
         this.tagToAdd = new XmlParser().parseTag(tagSource);

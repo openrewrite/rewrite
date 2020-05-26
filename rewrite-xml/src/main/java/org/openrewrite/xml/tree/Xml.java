@@ -196,6 +196,14 @@ public interface Xml extends Serializable, Tree {
             return getChild(name).flatMap(Tag::getValue).orElse(null);
         }
 
+        public Optional<Tag> getSibling(String name, Cursor cursor) {
+            Xml.Tag parent = cursor.getParentOrThrow().getTree();
+            if(parent == null) {
+                return Optional.empty();
+            }
+            return parent.getChild(name);
+        }
+
         public Tag withContent(List<Content> content) {
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,

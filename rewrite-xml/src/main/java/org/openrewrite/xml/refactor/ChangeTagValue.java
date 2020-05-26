@@ -30,6 +30,11 @@ public class ChangeTagValue extends ScopedXmlRefactorVisitor {
     }
 
     @Override
+    public String getName() {
+        return "core.ChangeTagValue{value=" + value + "}";
+    }
+
+    @Override
     public Xml visitTag(Xml.Tag tag) {
         Xml.Tag t = refactor(tag, super::visitTag);
 
