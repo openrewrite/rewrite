@@ -264,8 +264,37 @@ The basic building blocks are included in the [refactor](https://github.com/open
 * Rename a variable.
 * Reorder method arguments.
 * Unwrap parentheses.
+* Implement an interface.
 
 Each one of these operations is defined as a `JavaRefactorVisitor` or `ScopedJavaRefactorVisitor`, which are extensions of `JavaSourceVisitor` designed for mutating the AST, ultimately leading to a `Change` object at the end of the refactoring operation.
+
+Visitors can be cursored or not. Cursored visitors maintain a stack of AST elements that have been traversed in the tree thus far. In exchange for the extra memory footprint, such visitors can operate based on the location of AST elements in the tree. Many refactoring operations don't require this state. Below is an example of a refactoring operation that makes each top-level class final. Since class declarations can be nested (e.g. inner classes), we use the cursor to determine if the class is top-level or not. Refactoring operations should also be given a fully-qualified name with a package representing the group of operations and a name signifying what it does.
+
+```java
+public class MakeClassesFinal extends JavaRefactorVisitor {
+    @Override
+    public String getName() {
+        return "mycompany.MakeClassesFinal";
+    }
+
+    @Override
+    public boolean isCursored() {
+        return true;
+    }
+
+    @Override
+    public J visitClassDecl(J.ClassDecl classDecl) {
+        J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+
+        // only make top-level classes final
+        if(getCursor().firstEnclosing(J.ClassDecl.class) == null) {
+            c = c.withModifiers("final");
+        }
+
+        return c;
+    }
+}
+```
 
 Visitors can be chained together by calling `andThen(anotherVisitor)`. This is useful for building up pipelines of refactoring operations built up of lower-level components. For example, when `ChangeFieldType` finds a matching field that it is going to transform, it chains together an `AddImport` visitor to add the new import if necessary, and a `RemoveImport` to remove the old import if there are no longer any references to it.
 
