@@ -130,8 +130,7 @@ open class FindTypeTest : JavaParser() {
             }
         """, a1)
 
-        // f1 and f2 J.Idents both have type a.A1
-        assertEquals(4, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -143,7 +142,7 @@ open class FindTypeTest : JavaParser() {
             }
         """, a1)
 
-        assertEquals(4, b.findType("a.A1").size)
+        assertEquals(3, b.findType("a.A1").size)
     }
 
     @Test
@@ -167,6 +166,6 @@ open class FindTypeTest : JavaParser() {
             }
         """, a1)
 
-        assertEquals(4, b.findType("a.A1").size)
+        assertEquals(3, b.findType("a.A1").size)
     }
 }

@@ -84,7 +84,20 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     public R visitExpression(Expression expr) {
-        return expr instanceof NameTree ? reduce(defaultTo(expr), visitTypeName((NameTree) expr)) : defaultTo(expr);
+        if(expr.getType() instanceof JavaType.FullyQualified) {
+            JavaType.FullyQualified exprType = (JavaType.FullyQualified) expr.getType();
+            if (expr instanceof J.FieldAccess) {
+                if(((J.FieldAccess) expr).getSimpleName().equals(exprType.getClassName())) {
+                    return reduce(defaultTo(expr), visitTypeName((NameTree) expr));
+                }
+            }
+            else if(expr instanceof J.Ident) {
+                if(((J.Ident) expr).getSimpleName().equals(exprType.getClassName())) {
+                    return reduce(defaultTo(expr), visitTypeName((NameTree) expr));
+                }
+            }
+        }
+        return defaultTo(expr);
     }
 
     public R visitStatement(Statement statement) {

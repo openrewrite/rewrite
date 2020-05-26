@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
@@ -26,6 +27,9 @@ import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
+/**
+ * Find places where a type is mentioned explicitly, excluding imports.
+ */
 @RequiredArgsConstructor
 public class FindType extends JavaSourceVisitor<Set<NameTree>> {
     private final String clazz;
@@ -44,7 +48,7 @@ public class FindType extends JavaSourceVisitor<Set<NameTree>> {
     @Override
     public Set<NameTree> visitTypeName(NameTree name) {
         JavaType.Class asClass = TypeUtils.asClass(name.getType());
-        if(asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
+        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
             Set<NameTree> names = defaultTo(name);
             names.add(name);
             return names;

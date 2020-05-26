@@ -193,4 +193,43 @@ open class RemoveImportTest : JavaParser() {
             }
         """)
     }
+
+    @Test
+    fun removeImportForChangedMethodArgument() {
+        val b = """
+            package b;
+            public interface B {
+                void doSomething();
+            }
+        """.trimIndent()
+
+        val c = """
+            package c;
+            public interface C {
+                void doSomething();
+            }
+        """.trimIndent()
+
+        val a = parse("""
+            import b.B;
+            
+            class A {
+                void foo(B arg) {
+                    arg.doSomething();
+                }
+            }
+        """.trimIndent(), b, c)
+
+        val fixed = a.refactor().visit(ChangeType("b.B", "c.C")).fix().fixed
+
+        assertRefactored(fixed, """
+            import c.C;
+            
+            class A {
+                void foo(C arg) {
+                    arg.doSomething();
+                }
+            }
+        """)
+    }
 }

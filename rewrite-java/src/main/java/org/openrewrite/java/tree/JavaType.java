@@ -70,6 +70,29 @@ public interface JavaType extends Serializable {
             return TreeBuilder.buildName(getFullyQualifiedName())
                     .withType(JavaType.Class.build(getFullyQualifiedName()));
         }
+
+        @JsonIgnore
+        public String getClassName() {
+            return Arrays.stream(getFullyQualifiedName().split("\\."))
+                    .dropWhile(part -> Character.isLowerCase(part.charAt(0)))
+                    .collect(joining("."));
+        }
+
+        @JsonIgnore
+        public String getPackageName() {
+            return Arrays.stream(getFullyQualifiedName().split("\\."))
+                    .takeWhile(part -> part.length() > 0 && !Character.isUpperCase(part.charAt(0)))
+                    .collect(joining("."));
+        }
+
+        @JsonIgnore
+        public boolean isAssignableFrom(@Nullable JavaType.Class clazz) {
+            return clazz != null && (this == Class.OBJECT ||
+                    getFullyQualifiedName().equals(clazz.fullyQualifiedName) ||
+                    isAssignableFrom(clazz.getSupertype()) ||
+                    clazz.getInterfaces().stream().anyMatch(i -> i instanceof Class && isAssignableFrom((Class) i))
+            );
+        }
     }
 
     /**
@@ -206,29 +229,6 @@ public interface JavaType extends Serializable {
                 }
                 return reflectedConstructors;
             }
-        }
-
-        @JsonIgnore
-        public String getClassName() {
-            return Arrays.stream(fullyQualifiedName.split("\\."))
-                    .dropWhile(part -> Character.isLowerCase(part.charAt(0)))
-                    .collect(joining("."));
-        }
-
-        @JsonIgnore
-        public String getPackageName() {
-            return Arrays.stream(fullyQualifiedName.split("\\."))
-                    .takeWhile(part -> part.length() > 0 && !Character.isUpperCase(part.charAt(0)))
-                    .collect(joining("."));
-        }
-
-        @JsonIgnore
-        public boolean isAssignableFrom(@Nullable JavaType.Class clazz) {
-            return clazz != null && (this == OBJECT ||
-                    this.fullyQualifiedName.equals(clazz.fullyQualifiedName) ||
-                    isAssignableFrom(clazz.getSupertype()) ||
-                    clazz.getInterfaces().stream().anyMatch(i -> i instanceof Class && isAssignableFrom((Class) i))
-            );
         }
 
         @JsonIgnore
