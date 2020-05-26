@@ -24,13 +24,13 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.Metadata;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.XmlPrintVisitor;
 
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.openrewrite.Tree.randomId;
@@ -165,23 +165,53 @@ public interface Xml extends Serializable, Tree {
 
         List<Content> content;
 
+        public Optional<Tag> getChild(String name) {
+            return content.stream()
+                    .filter(t -> t instanceof Xml.Tag)
+                    .map(Tag.class::cast)
+                    .filter(t -> t.getName().equals(name))
+                    .findAny();
+        }
+
+        /**
+         * @return If this tag's content is only character data, consider it the value.
+         */
+        public Optional<String> getValue() {
+            if (content.size() != 1) {
+                return Optional.empty();
+            }
+            if (content.get(0) instanceof Xml.CharData) {
+                return Optional.of(((CharData) content.get(0)).getText());
+            }
+            return Optional.empty();
+        }
+
+        /**
+         * A shortcut for {@link #getChildValue(String)} and {@link #getValue()}.
+         * @param name The name of the child element to look for.
+         * @return The character data of the first child element matching the provided name, if any.
+         */
+        @Nullable
+        public String getChildValue(String name) {
+            return getChild(name).flatMap(Tag::getValue).orElse(null);
+        }
+
         public Tag withContent(List<Content> content) {
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,
                     formatting);
 
-            if(closing == null) {
+            if (closing == null) {
                 if (content != null && !content.isEmpty()) {
                     Formatting indentedClosingTagFormatting = formatting.withPrefix(
                             formatting.getPrefix().substring(Math.max(0,
                                     formatting.getPrefix().lastIndexOf('\n'))));
 
-                    if(content.get(0) instanceof CharData) {
+                    if (content.get(0) instanceof CharData) {
                         return tag.withClosing(new Closing(randomId(), name, "",
                                 content.get(0).getFormatting().getPrefix().contains("\n") ?
                                         indentedClosingTagFormatting : Formatting.EMPTY));
-                    }
-                    else {
+                    } else {
                         return tag.withClosing(new Closing(randomId(), name, "",
                                 indentedClosingTagFormatting));
                     }

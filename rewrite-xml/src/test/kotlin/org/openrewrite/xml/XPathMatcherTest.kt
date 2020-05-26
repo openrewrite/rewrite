@@ -34,24 +34,28 @@ class XPathMatcherTest : XmlParser() {
     @Test
     fun matchAbsolute() {
         assertTrue(visitor("/dependencies/dependency").visit(x))
+        assertTrue(visitor("/dependencies/*").visit(x))
         assertFalse(visitor("/dependency/dne").visit(x))
     }
 
     @Test
     fun matchAbsoluteAttribute() {
         assertTrue(visitor("/dependencies/dependency/artifactId/@scope").visit(x))
+        assertTrue(visitor("/dependencies/dependency/artifactId/@*").visit(x))
     }
 
     @Test
     fun matchRelative() {
         assertTrue(visitor("dependency").visit(x))
         assertTrue(visitor("//dependency").visit(x))
+        assertTrue(visitor("dependency/*").visit(x))
         assertFalse(visitor("dne").visit(x))
     }
 
     @Test
     fun matchRelativeAttribute() {
         assertTrue(visitor("artifactId/@scope").visit(x))
+        assertTrue(visitor("artifactId/@*").visit(x))
         assertTrue(visitor("//artifactId/@scope").visit(x))
     }
 

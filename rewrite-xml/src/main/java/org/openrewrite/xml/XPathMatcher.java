@@ -54,9 +54,9 @@ public class XPathMatcher {
             for (int i = 0; i < parts.size(); i++) {
                 var part = parts.remove(0);
                 if (part.startsWith("@")) {
-                    if (!(cursor.getTree() instanceof Xml.Attribute) ||
-                            !((Xml.Attribute) cursor.getTree()).getKeyAsString()
-                                    .equals(part.substring(1))) {
+                    if (!(cursor.getTree() instanceof Xml.Attribute &&
+                            (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1))) ||
+                            part.substring(1).equals("*"))) {
                         return false;
                     }
 
@@ -64,7 +64,7 @@ public class XPathMatcher {
                     continue;
                 }
 
-                if (path.size() < i + 1 || !path.get(i).getName().equals(part)) {
+                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !part.equals("*"))) {
                     return false;
                 }
             }
@@ -78,11 +78,11 @@ public class XPathMatcher {
                 var part = parts[i];
                 if (part.startsWith("@")) {
                     return cursor.getTree() instanceof Xml.Attribute &&
-                            ((Xml.Attribute) cursor.getTree()).getKeyAsString()
-                                    .equals(part.substring(1));
+                            (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1)) ||
+                                    part.substring(1).equals("*"));
                 }
 
-                if (path.size() < i + 1 || !path.get(i).getName().equals(part)) {
+                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !part.equals("*"))) {
                     return false;
                 }
             }
