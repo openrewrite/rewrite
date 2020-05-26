@@ -44,7 +44,10 @@ public abstract class XmlSourceVisitor<R> extends SourceVisitor<R> {
     public R visitTag(Xml.Tag tag) {
         return reduce(
                 defaultTo(tag),
-                visit(tag.getAttributes())
+                reduce(
+                        visit(tag.getAttributes()),
+                        visit(tag.getContent())
+                )
         );
     }
 
