@@ -37,17 +37,9 @@ public class ChangeType extends JavaRefactorVisitor {
     private final JavaType.Class toClassType;
 
     public ChangeType(String from, String to) {
+        super("java.ChangeType", "from", from, "to", to);
         this.from = from;
         this.toClassType = JavaType.Class.build(to);
-    }
-
-    // NOTE: a type change is possible anywhere a J.FieldAccess or J.Ident is possible, but not every FieldAccess or Ident
-    // represents a type (could represent a variable name, etc.)
-
-    @Override
-    public String getName() {
-        return MessageFormatter.arrayFormat("core.ChangeType{from={},to={}}",
-                new String[]{from, toClassType.getFullyQualifiedName()}).toString();
     }
 
     @Override

@@ -27,19 +27,16 @@ import java.util.stream.Collectors;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class InsertMethodArgument extends ScopedJavaRefactorVisitor {
+public class InsertMethodArgument extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final int pos;
     private final String source;
 
     public InsertMethodArgument(J.MethodInvocation scope, int pos, String source) {
-        super(scope.getId());
+        super("java.InsertMethodArgument");
+        this.scope = scope;
         this.pos = pos;
         this.source = source;
-    }
-
-    @Override
-    public String getName() {
-        return "core.InsertMethodArgument";
     }
 
     @Override
@@ -49,7 +46,7 @@ public class InsertMethodArgument extends ScopedJavaRefactorVisitor {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (isScope()) {
+        if (scope.isScope(method)) {
             List<Expression> modifiedArgs = method.getArgs().getArgs().stream()
                     .filter(a -> !(a instanceof J.Empty))
                     .collect(Collectors.toCollection(ArrayList::new));

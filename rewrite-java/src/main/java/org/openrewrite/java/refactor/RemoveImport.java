@@ -48,19 +48,11 @@ public class RemoveImport extends JavaRefactorVisitor {
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public RemoveImport(String clazz) {
+        super("java.RemoveImport", "class.type", clazz);
         this.clazz = clazz;
         this.methodMatcher = new MethodMatcher(clazz + " *(..)");
         this.classType = JavaType.Class.build(clazz);
-    }
-
-    @Override
-    public String getName() {
-        return "core.RemoveImport{classType=" + clazz + "}";
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
+        setCursoringOn();
     }
 
     @Override

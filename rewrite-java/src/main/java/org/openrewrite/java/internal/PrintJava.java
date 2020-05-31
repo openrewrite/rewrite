@@ -26,7 +26,11 @@ import java.util.Collection;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.java.tree.J.Modifier.*;
 
-public class JavaPrintVisitor extends JavaSourceVisitor<String> {
+public class PrintJava extends JavaSourceVisitor<String> {
+    public PrintJava() {
+        super("java.Print");
+    }
+
     @Override
     public String defaultTo(Tree t) {
         return "";
@@ -36,7 +40,7 @@ public class JavaPrintVisitor extends JavaSourceVisitor<String> {
     public String reduce(String r1, String r2) {
         return r1 + r2;
     }
-
+    
     private String visit(Collection<? extends Tree> nodes, String suffixBetween) {
         return visit(nodes, suffixBetween, "");
     }

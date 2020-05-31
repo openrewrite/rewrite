@@ -23,7 +23,6 @@ import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.List;
 import java.util.Set;
-import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
@@ -31,22 +30,20 @@ import static java.util.stream.Collectors.*;
 import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
-public class GenerateConstructorUsingFields extends ScopedJavaRefactorVisitor {
+public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
+    private final J.ClassDecl scope;
     private final List<J.VariableDecls> fields;
 
     public GenerateConstructorUsingFields(J.ClassDecl scope, List<J.VariableDecls> fields) {
-        super(scope.getId());
+        super("java.GenerateConstructorUsingFields");
+        this.scope = scope;
         this.fields = fields;
-    }
-
-    @Override
-    public String getName() {
-        return "core.GenerateConstructorUsingFields";
+        setCursoringOn();
     }
 
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
-        if (isScope() && !hasRequiredArgsConstructor(classDecl)) {
+        if (scope.isScope(classDecl) && !hasRequiredArgsConstructor(classDecl)) {
             List<J> statements = classDecl.getBody().getStatements();
 
             int lastField = 0;
@@ -85,7 +82,7 @@ public class GenerateConstructorUsingFields extends ScopedJavaRefactorVisitor {
                     constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()));
 
             // add assignment statements to constructor
-            andThen(new AddAssignmentsToConstructor(constructor.getId()));
+            andThen(new AddAssignmentsToConstructor(constructor));
 
             statements.add(lastField + 1, constructor);
 
@@ -108,15 +105,19 @@ public class GenerateConstructorUsingFields extends ScopedJavaRefactorVisitor {
                 .orElse(false));
     }
 
-    private class AddAssignmentsToConstructor extends ScopedJavaRefactorVisitor {
-        private AddAssignmentsToConstructor(UUID scope) {
-            super(scope);
+    private class AddAssignmentsToConstructor extends JavaRefactorVisitor {
+        private final J.MethodDecl scope;
+
+        private AddAssignmentsToConstructor(J.MethodDecl scope) {
+            super("java.AddAssignmentsToConstructor");
+            this.scope = scope;
+            setCursoringOn();
         }
 
         @SuppressWarnings("ConstantConditions")
         @Override
         public J visitMethod(J.MethodDecl method) {
-            if (isScope()) {
+            if (scope.isScope(method)) {
                 return method.withBody(method.getBody().withStatements(
                         TreeBuilder.buildSnippet(enclosingCompilationUnit(),
                                 getCursor(),

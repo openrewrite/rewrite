@@ -25,7 +25,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlSourceVisitor;
-import org.openrewrite.xml.internal.XmlPrintVisitor;
+import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
 import java.util.List;
@@ -42,7 +42,7 @@ import static org.openrewrite.Tree.randomId;
 public interface Xml extends Serializable, Tree {
     @Override
     default String print() {
-        return new XmlPrintVisitor().visit(this);
+        return new PrintXml().visit(this);
     }
 
     @Override

@@ -23,24 +23,22 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-public class ReorderMethodArguments extends ScopedJavaRefactorVisitor {
+public class ReorderMethodArguments extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final String[] byArgumentNames;
     private String[] originalParamNames;
 
     public ReorderMethodArguments(J.MethodInvocation scope, String... byArgumentNames) {
-        super(scope.getId());
+        super("java.ReorderMethodArguments");
+        this.scope = scope;
         this.byArgumentNames = byArgumentNames;
         this.originalParamNames = new String[0];
+        setCursoringOn();
     }
 
     public ReorderMethodArguments withOriginalParamNames(String... originalParamNames) {
         this.originalParamNames = originalParamNames;
         return this;
-    }
-
-    @Override
-    public String getName() {
-        return "core.ReorderMethodArguments";
     }
 
     @Override
@@ -50,7 +48,7 @@ public class ReorderMethodArguments extends ScopedJavaRefactorVisitor {
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (isScope() && method.getType() != null) {
+        if (scope.isScope(method) && method.getType() != null) {
             var paramNames = originalParamNames.length == 0 ? method.getType().getParamNames() :
                     Arrays.asList(originalParamNames);
 

@@ -21,7 +21,8 @@ import org.openrewrite.java.tree.J;
 
 import java.util.function.Function;
 
-public class ChangeLiteral extends ScopedJavaRefactorVisitor {
+public class ChangeLiteral extends JavaRefactorVisitor {
+    private final Expression scope;
     private final Function<Object, Object> transform;
 
     /**
@@ -30,18 +31,15 @@ public class ChangeLiteral extends ScopedJavaRefactorVisitor {
      * @param transform The transformation to apply to each literal found in the expression scope.
      */
     public ChangeLiteral(Expression scope, Function<Object, Object> transform) {
-        super(scope.getId());
+        super("java.ChangeLiteral");
+        this.scope = scope;
         this.transform = transform;
-    }
-
-    @Override
-    public String getName() {
-        return "core.ChangeLiteral";
+        setCursoringOn();
     }
 
     @Override
     public J visitLiteral(J.Literal literal) {
-        if (isScopeInCursorPath()) {
+        if (getCursor().isScopeInPath(scope)) {
             var transformed = transform.apply(literal.getValue());
 
             if (transformed == literal.getValue() || literal.getType() == null) {

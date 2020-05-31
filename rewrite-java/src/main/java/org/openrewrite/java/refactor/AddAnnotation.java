@@ -24,32 +24,29 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 import static java.util.Arrays.asList;
 import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
-public class AddAnnotation extends ScopedJavaRefactorVisitor {
+public class AddAnnotation extends JavaRefactorVisitor {
+    private final Tree scope;
     private final JavaType.Class annotationType;
     private final List<Expression> arguments;
 
-    public AddAnnotation(UUID scope, String annotationTypeName, Expression... arguments) {
-        super(scope);
+    public AddAnnotation(Tree scope, String annotationTypeName, Expression... arguments) {
+        super("java.AddAnnotation", "annotation.type", annotationTypeName);
+        this.scope = scope;
         this.annotationType = JavaType.Class.build(annotationTypeName);
         this.arguments = asList(arguments);
-    }
-
-    @Override
-    public String getName() {
-        return "core.AddAnnotation{type=" + annotationType.getFullyQualifiedName() + "}";
+        setCursoringOn();
     }
 
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
 
-        if (isScope()) {
+        if (scope.isScope(classDecl)) {
             maybeAddImport(annotationType.getFullyQualifiedName());
 
             if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
@@ -92,7 +89,7 @@ public class AddAnnotation extends ScopedJavaRefactorVisitor {
     public J visitMultiVariable(J.VariableDecls multiVariable) {
         J.VariableDecls v = refactor(multiVariable, super::visitMultiVariable);
 
-        if (isScope()) {
+        if (scope.isScope(multiVariable)) {
             Tree parent = getCursor().getParentOrThrow().getTree();
             boolean isMethodOrLambdaParameter = parent instanceof J.MethodDecl || parent instanceof J.Lambda;
 
@@ -134,7 +131,7 @@ public class AddAnnotation extends ScopedJavaRefactorVisitor {
     public J visitMethod(J.MethodDecl method) {
         J.MethodDecl m = refactor(method, super::visitMethod);
 
-        if (isScope()) {
+        if (scope.isScope(method)) {
             maybeAddImport(annotationType.getFullyQualifiedName());
 
             if (m.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
@@ -158,7 +155,7 @@ public class AddAnnotation extends ScopedJavaRefactorVisitor {
                 }
             }
         }
-        
+
         return m;
     }
 

@@ -21,8 +21,12 @@ import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implements RefactorVisitorSupport {
+public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implements RefactorVisitorSupport {
     protected Formatter formatter;
+
+    public XmlRefactorVisitor(String name, String... tagKeyValues) {
+        super(name, tagKeyValues);
+    }
 
     @Override
     public Xml defaultTo(Tree t) {
@@ -93,5 +97,17 @@ public class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implements Refacto
     @Override
     public Xml visitIdent(Xml.Ident ident) {
         return refactor(ident, super::visitIdent);
+    }
+
+    public Xml.Tag enclosingTag() {
+        return getCursor().firstEnclosing(Xml.Tag.class);
+    }
+
+    public Xml.Tag enclosingRootTag() {
+        return getCursor().getPathAsStream()
+                .filter(t -> t instanceof Xml.Tag)
+                .map(Xml.Tag.class::cast)
+                .reduce((t1, t2) -> t2)
+                .orElseThrow(() -> new IllegalStateException("No root tag. This operation should be called from a cursor scope that is inside of the root tag."));
     }
 }

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
@@ -127,20 +126,20 @@ public class TreeBuilder {
 
         return block.getStatements().stream()
                 .map(stat -> {
-                    ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat.getId(), enclosingIndent(insertionScope.getTree()) +
+                    ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat, enclosingIndent(insertionScope.getTree()) +
                             formatter.findIndent(enclosingIndent(insertionScope.getTree()), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
                     return (T) shiftRight.visit(stat);
                 })
                 .collect(toList());
     }
 
-    @RequiredArgsConstructor
     private static class ListScopeVariables extends JavaSourceVisitor<List<String>> {
         private final Cursor scope;
 
-        @Override
-        public boolean isCursored() {
-            return true;
+        private ListScopeVariables(Cursor scope) {
+            super("java.ListScopeVariables");
+            this.scope = scope;
+            setCursoringOn();
         }
 
         @Override

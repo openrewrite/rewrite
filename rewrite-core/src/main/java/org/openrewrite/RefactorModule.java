@@ -26,6 +26,8 @@ public interface RefactorModule<S extends SourceFile, T extends Tree> {
         return refactor;
     }
 
+    String getName();
+
     /**
      * @return A list of outputs that will certainly be affected by this module, in addition to source file inputs
      * provided to {@link RefactorModule#plan}. These outputs may represent files that need to change but aren't an input

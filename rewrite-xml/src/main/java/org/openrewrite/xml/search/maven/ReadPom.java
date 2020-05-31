@@ -20,12 +20,17 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class FindMaven extends XmlSourceVisitor<MavenPom> {
+public class ReadPom extends XmlSourceVisitor<MavenPom> {
     private final XPathMatcher dependencyMatcher = new XPathMatcher(
             "/project/dependencies/dependency");
 
     private final XPathMatcher propertyMatcher = new XPathMatcher(
             "/project/properties/*");
+
+    public ReadPom() {
+        super("maven.ReadPom");
+        setCursoringOn();
+    }
 
     @Override
     public MavenPom defaultTo(Tree t) {
@@ -35,11 +40,6 @@ public class FindMaven extends XmlSourceVisitor<MavenPom> {
     @Override
     public MavenPom reduce(MavenPom r1, MavenPom r2) {
         return r1.merge(r2);
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
     }
 
     @Override
@@ -53,7 +53,7 @@ public class FindMaven extends XmlSourceVisitor<MavenPom> {
             ));
         }
 
-        if(propertyMatcher.matches(getCursor())) {
+        if (propertyMatcher.matches(getCursor())) {
             return tag.getValue()
                     .map(value -> new MavenPom().withProperty(tag.getName(), value))
                     .orElseGet(MavenPom::new);

@@ -29,15 +29,27 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 public abstract class SourceVisitor<R> {
+    private final String name;
+    private final String[] tagKeyValues;
+
     private static final boolean IS_DEBUGGING = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
+
+    private boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<List<SourceVisitor<R>>> andThen = new ThreadLocal<>();
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
 
     protected volatile int cycle = 0;
 
-    public SourceVisitor() {
+    public SourceVisitor(String name, String... tagKeyValues) {
+        this.name = name;
+        this.tagKeyValues = tagKeyValues;
+
         andThen.set(new ArrayList<>());
+    }
+
+    protected void setCursoringOn() {
+        this.cursored = true;
     }
 
     /**
@@ -64,14 +76,10 @@ public abstract class SourceVisitor<R> {
         return true;
     }
 
-    public boolean isCursored() {
-        return IS_DEBUGGING;
-    }
-
     public Cursor getCursor() {
         if (cursor.get() == null) {
             throw new IllegalStateException("Cursoring is not enabled for this visitor. " +
-                    "Override isCursored() and return true to enable.");
+                    "Call setCursoredOn() in the visitor's constructor to enable.");
         }
         return cursor.get();
     }
@@ -85,11 +93,6 @@ public abstract class SourceVisitor<R> {
                 andThen.set(new ArrayList<>());
             }
         }
-    }
-
-    @Nullable
-    public String getName() {
-        return null;
     }
 
     public abstract R defaultTo(@Nullable Tree t);
@@ -127,13 +130,13 @@ public abstract class SourceVisitor<R> {
             return defaultTo(null);
         }
 
-        if (isCursored()) {
+        if (cursored) {
             cursor.set(new Cursor(cursor.get(), tree));
         }
 
         R t = reduce(tree.accept(this), visitTree(tree));
 
-        if (isCursored()) {
+        if (cursored) {
             cursor.set(cursor.get().getParent());
         }
 
@@ -162,5 +165,13 @@ public abstract class SourceVisitor<R> {
 
     public final R visitAfter(R r, @Nullable List<? extends Tree> trees) {
         return reduce(r, visit(trees));
+    }
+
+    String getName() {
+        return name;
+    }
+
+    String[] getTagKeyValues() {
+        return tagKeyValues;
     }
 }

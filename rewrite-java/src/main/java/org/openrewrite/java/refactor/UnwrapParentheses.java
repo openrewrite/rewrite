@@ -18,24 +18,18 @@ package org.openrewrite.java.refactor;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.J;
 
-public class UnwrapParentheses extends ScopedJavaRefactorVisitor {
+public class UnwrapParentheses extends JavaRefactorVisitor {
+    private final J.Parentheses<?> scope;
+
     public UnwrapParentheses(J.Parentheses<?> scope) {
-        super(scope.getId());
-    }
-
-    @Override
-    public String getName() {
-        return "core.UnwrapParentheses";
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
+        super("java.UnwrapParentheses");
+        this.scope = scope;
+        setCursoringOn();
     }
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens) {
-        return isScope(parens) && isUnwrappable(getCursor()) ?
+        return scope.isScope(parens) && isUnwrappable(getCursor()) ?
                 parens.getTree().withFormatting(parens.getFormatting()) :
                 super.visitParentheses(parens);
     }

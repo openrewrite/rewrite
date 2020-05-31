@@ -16,23 +16,26 @@
 package org.openrewrite.java.refactor;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.java.JavaRetrieveCursorVisitor;
+import org.openrewrite.java.RetrieveCursor;
 import org.openrewrite.java.tree.J;
 
-public class RenameVariable extends ScopedJavaRefactorVisitor {
+public class RenameVariable extends JavaRefactorVisitor {
+    private final J.VariableDecls.NamedVar scope;
     private final String toName;
 
     private Cursor scopeCursor;
     private String scopeVariableName;
 
     public RenameVariable(J.VariableDecls.NamedVar scope, String toName) {
-        super(scope.getId());
+        super("java.RenameVariable", "to", toName);
+        this.scope = scope;
         this.toName = toName;
+        setCursoringOn();
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
-        scopeCursor = new JavaRetrieveCursorVisitor(getScope()).visit(cu);
+        scopeCursor = new RetrieveCursor(scope).visit(cu);
         scopeVariableName = ((J.VariableDecls.NamedVar) scopeCursor.getTree()).getSimpleName();
 
         return super.visitCompilationUnit(cu);

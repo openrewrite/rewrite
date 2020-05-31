@@ -26,25 +26,22 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class ImplementInterface extends ScopedJavaRefactorVisitor {
+public class ImplementInterface extends JavaRefactorVisitor {
+    private final J.ClassDecl scope;
     private final String interfaze;
     private final JavaType.Class interfaceType;
 
     public ImplementInterface(J.ClassDecl scope, String interfaze) {
-        super(scope.getId());
+        super("java.ImplementInterface", "from", interfaze);
+        this.scope = scope;
         this.interfaze = interfaze;
         this.interfaceType = JavaType.Class.build(interfaze);
     }
 
     @Override
-    public String getName() {
-        return "core.ImplementInterface{from=" + interfaze + "}";
-    }
-
-    @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-        if (isScope() && (classDecl.getImplements() == null ||
+        if (scope.isScope(classDecl) && (classDecl.getImplements() == null ||
                 classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaze);
 

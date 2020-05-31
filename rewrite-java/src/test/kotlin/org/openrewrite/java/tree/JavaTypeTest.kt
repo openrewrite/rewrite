@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
@@ -37,6 +38,7 @@ open class JavaTypeTest : JavaParser() {
         assertTrue(a.classes[0].type.asClass()!!.supertype!!.members[0].flags.contains(Flag.Protected))
     }
 
+    @Disabled("flaky on collection.isAssignableFrom(list)")
     @Test
     fun isAssignableFrom() {
         val a = parse("""

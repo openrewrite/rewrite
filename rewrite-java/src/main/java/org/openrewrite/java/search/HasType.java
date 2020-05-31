@@ -15,16 +15,19 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-@RequiredArgsConstructor
 public class HasType extends JavaSourceVisitor<Boolean> {
     private final String clazz;
+
+    public HasType(String clazz) {
+        super("java.HasType", "type", clazz);
+        this.clazz = clazz;
+    }
 
     @Override
     public Boolean defaultTo(Tree t) {

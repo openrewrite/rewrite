@@ -5,6 +5,8 @@ dependencies {
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
 
+    implementation("io.github.classgraph:classgraph:latest.release")
+
     implementation("io.micrometer:micrometer-core:latest.release")
 
     api("org.kohsuke:github-api:latest.release")

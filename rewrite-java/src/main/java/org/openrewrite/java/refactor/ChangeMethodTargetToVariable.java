@@ -24,7 +24,8 @@ import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
 
-public class ChangeMethodTargetToVariable extends ScopedJavaRefactorVisitor {
+public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final String varName;
 
     @Nullable
@@ -35,19 +36,15 @@ public class ChangeMethodTargetToVariable extends ScopedJavaRefactorVisitor {
     }
 
     public ChangeMethodTargetToVariable(J.MethodInvocation scope, String varName, @Nullable JavaType.Class type) {
-        super(scope.getId());
+        super("java.ChangeMethodTargetToVariable", "to", varName);
+        this.scope = scope;
         this.varName = varName;
         this.type = type;
     }
 
     @Override
-    public String getName() {
-        return "core.ChangeMethodTargetToVariable{to=" + varName + "}";
-    }
-
-    @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (isScope()) {
+        if (scope.isScope(method)) {
             Expression select = method.getSelect();
 
             JavaType.Method methodType = null;

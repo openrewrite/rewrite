@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.refactor;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -23,23 +22,19 @@ import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
-import org.slf4j.helpers.MessageFormatter;
 
-@RequiredArgsConstructor
 public class ChangeFieldName extends JavaRefactorVisitor {
     private final JavaType.Class classType;
     private final String hasName;
     private final String toName;
 
-    @Override
-    public boolean isCursored() {
-        return true;
-    }
-
-    @Override
-    public String getName() {
-        return MessageFormatter.arrayFormat("core.ChangeFieldName{classType={},whenName={},toName={}}",
-                new String[]{classType.getFullyQualifiedName(), hasName, toName}).toString();
+    public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
+        super("java.ChangeFieldName", "class.type", classType.getFullyQualifiedName(),
+                "has.name", hasName, "to.name", toName);
+        this.classType = classType;
+        this.hasName = hasName;
+        this.toName = toName;
+        setCursoringOn();
     }
 
     @Override
@@ -85,19 +80,20 @@ public class ChangeFieldName extends JavaRefactorVisitor {
                 .getTree() instanceof J.ClassDecl;
     }
 
-    @RequiredArgsConstructor
     private static class FindVariableDefinition extends JavaSourceVisitor<Cursor> {
         private final J.Ident ident;
         private final Cursor referenceScope;
 
-        @Override
-        public Cursor defaultTo(Tree t) {
-            return null;
+        public FindVariableDefinition(J.Ident ident, Cursor referenceScope) {
+            super("java.FindVariableDefinition");
+            this.ident = ident;
+            this.referenceScope = referenceScope;
+            setCursoringOn();
         }
 
         @Override
-        public boolean isCursored() {
-            return true;
+        public Cursor defaultTo(Tree t) {
+            return null;
         }
 
         @Override

@@ -28,6 +28,8 @@ public class FindReferencesToVariable extends JavaSourceVisitor<List<Tree>> {
     private final J.Ident variable;
 
     public FindReferencesToVariable(J.Ident variable) {
+        super("java.FindReferencesToVariable", "Uses of a variable in assignments and expressions",
+                "variable", variable.getSimpleName());
         this.variable = variable;
     }
 
@@ -56,6 +58,11 @@ public class FindReferencesToVariable extends JavaSourceVisitor<List<Tree>> {
     }
 
     private class HasReferenceToVariableInSubtree extends JavaSourceVisitor<Boolean> {
+        public HasReferenceToVariableInSubtree() {
+            super("java.HasReferenceToVariableInSubtree",
+                    "Whether a matching identifier is found in a particular subtree");
+        }
+
         @Override
         public Boolean defaultTo(Tree t) {
             return false;

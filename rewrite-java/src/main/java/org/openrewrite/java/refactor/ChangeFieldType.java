@@ -21,24 +21,21 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import static java.util.stream.Collectors.toList;
 
-public class ChangeFieldType extends ScopedJavaRefactorVisitor {
+public class ChangeFieldType extends JavaRefactorVisitor {
+    private final J.VariableDecls scope;
     private final String targetType;
 
     public ChangeFieldType(J.VariableDecls scope, String targetType) {
-        super(scope.getId());
+        super("java.ChangeFieldType", "to", targetType);
+        this.scope = scope;
         this.targetType = targetType;
-    }
-
-    @Override
-    public String getName() {
-        return "core.ChangeFieldType{to=" + targetType + "}";
     }
 
     @Override
     public J visitMultiVariable(J.VariableDecls multiVariable) {
         JavaType.Class originalType = multiVariable.getTypeAsClass();
         J.VariableDecls mv = refactor(multiVariable, super::visitMultiVariable);
-        if (isScope() && originalType != null && !originalType.getFullyQualifiedName().equals(targetType)) {
+        if (scope.isScope(multiVariable) && originalType != null && !originalType.getFullyQualifiedName().equals(targetType)) {
             JavaType.Class type = JavaType.Class.build(targetType);
 
             maybeAddImport(targetType);

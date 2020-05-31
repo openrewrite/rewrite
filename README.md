@@ -266,20 +266,15 @@ The basic building blocks are included in the [refactor](https://github.com/open
 * Unwrap parentheses.
 * Implement an interface.
 
-Each one of these operations is defined as a `JavaRefactorVisitor` or `ScopedJavaRefactorVisitor`, which are extensions of `JavaSourceVisitor` designed for mutating the AST, ultimately leading to a `Change` object at the end of the refactoring operation.
+Each one of these operations is defined as a `JavaRefactorVisitor`, which is an extension of `JavaSourceVisitor` designed for mutating the AST, ultimately leading to a `Change` object at the end of the refactoring operation.
 
 Visitors can be cursored or not. Cursored visitors maintain a stack of AST elements that have been traversed in the tree thus far. In exchange for the extra memory footprint, such visitors can operate based on the location of AST elements in the tree. Many refactoring operations don't require this state. Below is an example of a refactoring operation that makes each top-level class final. Since class declarations can be nested (e.g. inner classes), we use the cursor to determine if the class is top-level or not. Refactoring operations should also be given a fully-qualified name with a package representing the group of operations and a name signifying what it does.
 
 ```java
 public class MakeClassesFinal extends JavaRefactorVisitor {
-    @Override
-    public String getName() {
-        return "mycompany.MakeClassesFinal";
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
+    public MakeClassesFinal {
+        super("my.MakeClassesFinal");
+        setCursoringOn();
     }
 
     @Override

@@ -23,6 +23,10 @@ import org.openrewrite.java.tree.*;
 import static java.util.stream.Collectors.toList;
 
 public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
+    public JavaSourceVisitor(String name, String... tagKeyValues) {
+        super(name, tagKeyValues);
+    }
+
     public J.CompilationUnit enclosingCompilationUnit() {
         J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
         if (cu == null) {

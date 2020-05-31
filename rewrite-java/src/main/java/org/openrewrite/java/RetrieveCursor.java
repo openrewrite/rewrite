@@ -15,24 +15,16 @@
  */
 package org.openrewrite.java;
 
-import lombok.Getter;
 import org.openrewrite.Cursor;
-import org.openrewrite.ScopedVisitorSupport;
 import org.openrewrite.Tree;
 
-import java.util.UUID;
+public class RetrieveCursor extends JavaSourceVisitor<Cursor> {
+    private final Tree scope;
 
-public class JavaRetrieveCursorVisitor extends JavaSourceVisitor<Cursor> implements ScopedVisitorSupport {
-    @Getter
-    private final UUID scope;
-
-    public JavaRetrieveCursorVisitor(UUID scope) {
+    public RetrieveCursor(Tree scope) {
+        super("java.RetrieveCursor");
         this.scope = scope;
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
+        setCursoringOn();
     }
 
     @Override
@@ -42,8 +34,9 @@ public class JavaRetrieveCursorVisitor extends JavaSourceVisitor<Cursor> impleme
 
     @Override
     public Cursor visitTree(Tree tree) {
-        if (tree.getId().equals(getScope()))
+        if (scope.isScope(tree)) {
             return getCursor();
+        }
         return super.visitTree(tree);
     }
 }

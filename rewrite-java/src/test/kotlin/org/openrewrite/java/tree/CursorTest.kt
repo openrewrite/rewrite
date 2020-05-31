@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRetrieveCursorVisitor
+import org.openrewrite.java.RetrieveCursor
 import org.openrewrite.java.JavaSourceVisitor
 
 open class CursorTest : JavaParser() {
@@ -55,15 +55,18 @@ open class CursorTest : JavaParser() {
             }
         """.trimIndent())
 
-        fun Tree.cursor() = JavaRetrieveCursorVisitor(id).visit(a)
+        fun Tree.cursor() = RetrieveCursor(this).visit(a)
 
         val fieldScope = a.classes[0].fields[0].cursor()!!
         val methodParamScope = a.classes[0].methods[0].params.params[0].cursor()!!
         val forInitScope = a.classes[0].methods[0].body!!.statements.filterIsInstance<J.ForLoop>()[0].control.init.cursor()!!
 
-        assertThat(object : JavaSourceVisitor<Int>() {
+        assertThat(object : JavaSourceVisitor<Int>("test.SameNameScope") {
+            init {
+                setCursoringOn()
+            }
+
             override fun defaultTo(t: Tree?): Int = 0
-            override fun isCursored(): Boolean = true
 
             override fun visitCompilationUnit(cu: J.CompilationUnit?): Int {
                 assertTrue(isInSameNameScope(fieldScope, methodParamScope))

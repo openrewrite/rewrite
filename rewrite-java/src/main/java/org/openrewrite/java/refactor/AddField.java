@@ -18,7 +18,6 @@ package org.openrewrite.java.refactor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +28,8 @@ import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class AddField extends ScopedJavaRefactorVisitor {
+public class AddField extends JavaRefactorVisitor {
+    private final J.ClassDecl scope;
     private final List<J.Modifier> modifiers;
     private final String clazz;
     private final String name;
@@ -38,7 +38,8 @@ public class AddField extends ScopedJavaRefactorVisitor {
     private final String init;
 
     public AddField(J.ClassDecl scope, List<J.Modifier> modifiers, String clazz, String name, @Nullable String init) {
-        super(scope.getId());
+        super("java.AddField", "field.class", clazz, "field.name", name);
+        this.scope = scope;
         this.modifiers = modifiers;
         this.clazz = clazz;
         this.name = name;
@@ -46,16 +47,10 @@ public class AddField extends ScopedJavaRefactorVisitor {
     }
 
     @Override
-    public String getName() {
-        return MessageFormatter.arrayFormat("core.AddField{classType={},name={}}",
-                new String[]{clazz, name}).toString();
-    }
-
-    @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
 
-        if (isScope() && classDecl.getBody().getStatements().stream()
+        if (scope.isScope(classDecl) && classDecl.getBody().getStatements().stream()
                 .filter(s -> s instanceof J.VariableDecls)
                 .map(J.VariableDecls.class::cast)
                 .noneMatch(mv -> mv.getVars().stream().anyMatch(var -> var.getSimpleName().equals(name)))) {

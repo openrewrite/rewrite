@@ -52,7 +52,7 @@ public class JavaFormatter extends Formatter {
         // NOTE: This isn't absolutely perfect... suppose the block moving was indented with tabs and the surrounding source was spaces.
         // Should be close enough in the vast majority of cases.
         int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
-        return new ShiftFormatRightVisitor(moving.getId(), shift, wholeSourceIndent().isIndentedWithSpaces());
+        return new ShiftFormatRightVisitor(moving, shift, wholeSourceIndent().isIndentedWithSpaces());
     }
 
     public static int enclosingIndent(Tree enclosesBoth) {

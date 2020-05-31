@@ -19,11 +19,10 @@ import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
-import org.openrewrite.java.search.FindType;
-import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,16 +50,12 @@ public class AddImport extends JavaRefactorVisitor {
     private boolean coveredByExistingImport;
 
     public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
+        super("java.AddImport",
+                "class", clazz, "static.method", staticMethod == null ? "none" : staticMethod);
         this.clazz = clazz;
         this.staticMethod = staticMethod;
         this.onlyIfReferenced = onlyIfReferenced;
         this.classType = JavaType.Class.build(clazz);
-    }
-
-    @Override
-    public String getName() {
-        return MessageFormatter.arrayFormat( "core.AddImport{classType={},staticMethod={}}",
-                new String[] { classType.getFullyQualifiedName(), staticMethod }).toString();
     }
 
     @Override

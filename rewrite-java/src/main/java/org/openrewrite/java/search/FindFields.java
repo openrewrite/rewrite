@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
@@ -26,9 +25,13 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-@RequiredArgsConstructor
 public class FindFields extends JavaSourceVisitor<List<J.VariableDecls>> {
     private final String fullyQualifiedName;
+
+    public FindFields(String fullyQualifiedName) {
+        super("java.FindFields", "type", fullyQualifiedName);
+        this.fullyQualifiedName = fullyQualifiedName;
+    }
 
     @Override
     public List<J.VariableDecls> defaultTo(Tree t) {

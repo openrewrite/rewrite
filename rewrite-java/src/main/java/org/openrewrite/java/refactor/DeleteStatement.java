@@ -28,23 +28,21 @@ import static org.openrewrite.Tree.randomId;
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
  */
-public class DeleteStatement extends ScopedJavaRefactorVisitor {
-    public DeleteStatement(Statement scope) {
-        super(scope.getId());
-    }
+public class DeleteStatement extends JavaRefactorVisitor {
+    private final Statement statement;
 
-    @Override
-    public String getName() {
-        return "core.DeleteStatement";
+    public DeleteStatement(Statement statement) {
+        super("java.DeleteStatement");
+        this.statement = statement;
     }
 
     @Override
     public J visitIf(J.If iff) {
         J.If i = refactor(iff, super::visitIf);
 
-        if (isScope(i.getThenPart())) {
+        if (statement.isScope(i.getThenPart())) {
             i = i.withThenPart(emptyBlock());
-        } else if (i.getElsePart() != null && isScope(i.getElsePart())) {
+        } else if (i.getElsePart() != null && statement.isScope(i.getElsePart())) {
             i = i.withElsePart(i.getElsePart().withStatement(emptyBlock()));
         }
 
@@ -53,25 +51,25 @@ public class DeleteStatement extends ScopedJavaRefactorVisitor {
 
     @Override
     public J visitForLoop(J.ForLoop forLoop) {
-        return isScope(forLoop.getBody()) ? forLoop.withBody(emptyBlock()) :
+        return statement.isScope(forLoop.getBody()) ? forLoop.withBody(emptyBlock()) :
                 super.visitForLoop(forLoop);
     }
 
     @Override
     public J visitForEachLoop(J.ForEachLoop forEachLoop) {
-        return isScope(forEachLoop.getBody()) ? forEachLoop.withBody(emptyBlock()) :
+        return statement.isScope(forEachLoop.getBody()) ? forEachLoop.withBody(emptyBlock()) :
                 super.visitForEachLoop(forEachLoop);
     }
 
     @Override
     public J visitWhileLoop(J.WhileLoop whileLoop) {
-        return isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
+        return statement.isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
                 super.visitWhileLoop(whileLoop);
     }
 
     @Override
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop) {
-        return isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
+        return statement.isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
                 super.visitDoWhileLoop(doWhileLoop);
     }
 
@@ -79,9 +77,9 @@ public class DeleteStatement extends ScopedJavaRefactorVisitor {
     public J visitBlock(J.Block<J> block) {
         J.Block<J> b = refactor(block, super::visitBlock);
 
-        if (block.getStatements().stream().anyMatch(this::isScope)) {
+        if (block.getStatements().stream().anyMatch(statement::isScope)) {
             b = b.withStatements(b.getStatements().stream()
-                    .filter(s -> !s.getId().equals(getScope()))
+                    .filter(s -> !statement.isScope(s))
                     .collect(toList()));
         }
 
@@ -90,7 +88,7 @@ public class DeleteStatement extends ScopedJavaRefactorVisitor {
 
     @Override
     public J visitTree(Tree tree) {
-        if (isScope(tree)) {
+        if (statement.isScope(tree)) {
             new FindReferencedTypes().visit(tree).forEach(this::maybeRemoveImport);
         }
         return super.visitTree(tree);

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.search;
 
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
@@ -29,9 +28,13 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-@RequiredArgsConstructor
 public class FindInheritedFields extends JavaSourceVisitor<List<JavaType.Var>> {
     private final String fullyQualifiedClassName;
+
+    public FindInheritedFields(String fullyQualifiedClassName) {
+        super("java.FindInheritedFields", "type", fullyQualifiedClassName);
+        this.fullyQualifiedClassName = fullyQualifiedClassName;
+    }
 
     @Override
     public List<JavaType.Var> defaultTo(Tree t) {

@@ -95,7 +95,7 @@ open class AnnotationTest : JavaParser() {
             public @interface Annotation {}
         """)
 
-        assertEquals(true, object: JavaSourceVisitor<Boolean>() {
+        assertEquals(true, object: JavaSourceVisitor<Boolean>("test.VisitTypeName") {
             override fun defaultTo(t: Tree?): Boolean = false
 
             override fun visitTypeName(name: NameTree): Boolean = name.type.asClass()?.fullyQualifiedName == "java.lang.annotation.ElementType"

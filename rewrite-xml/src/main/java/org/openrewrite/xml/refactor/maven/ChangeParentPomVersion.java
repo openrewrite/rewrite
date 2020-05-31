@@ -28,21 +28,12 @@ public class ChangeParentPomVersion extends XmlRefactorVisitor {
     private final String version;
 
     public ChangeParentPomVersion(String whenGroupId, String whenArtifactId, String version) {
+        super("maven.ChangeParentPomVersion", "when.group", whenGroupId, "when.artifact", whenArtifactId,
+                "version", version);
         this.whenGroupId = whenGroupId;
         this.whenArtifactId = whenArtifactId;
         this.version = version;
-    }
-
-    @Override
-    public String getName() {
-        return "maven.ChangeParentPomVersion{whenGroupId=" + whenGroupId +
-                ", whenArtifactId=" + whenArtifactId +
-                ", toVersion=" + version + "}";
-    }
-
-    @Override
-    public boolean isCursored() {
-        return true;
+        setCursoringOn();
     }
 
     @Override

@@ -100,4 +100,8 @@ public class Cursor {
     public <T extends Tree> T getTree() {
         return (T) tree;
     }
+
+    public boolean isScopeInPath(Tree scope) {
+        return (tree != null && tree.getId().equals(scope.getId())) || getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
+    }
 }

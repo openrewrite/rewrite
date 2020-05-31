@@ -20,7 +20,11 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class XmlPrintVisitor extends XmlSourceVisitor<String> {
+public class PrintXml extends XmlSourceVisitor<String> {
+    public PrintXml() {
+        super("xml.Print");
+    }
+
     @Override
     public String defaultTo(Tree t) {
         return "";

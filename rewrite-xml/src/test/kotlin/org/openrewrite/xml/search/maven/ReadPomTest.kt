@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.XmlParser
 
-class FindMavenTest : XmlParser() {
+class ReadPomTest : XmlParser() {
     @Test
     fun properties() {
         val x = parse("""
@@ -34,7 +34,7 @@ class FindMavenTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = FindMaven().visit(x)
+        val pom = ReadPom().visit(x)
 
         assertThat(pom.properties).containsExactlyInAnyOrderEntriesOf(
                 mapOf(
@@ -59,7 +59,7 @@ class FindMavenTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = FindMaven().visit(x)
+        val pom = ReadPom().visit(x)
 
         assertThat(pom.dependencies).containsExactly(
                 Dependency("org.openrewrite.plan", "rewrite-checkstyle", "1.0.0", null))

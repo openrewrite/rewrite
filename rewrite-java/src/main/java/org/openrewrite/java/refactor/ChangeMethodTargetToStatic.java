@@ -25,22 +25,19 @@ import java.util.Set;
 import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Tree.randomId;
 
-public class ChangeMethodTargetToStatic extends ScopedJavaRefactorVisitor {
+public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final String clazz;
 
     public ChangeMethodTargetToStatic(J.MethodInvocation scope, String clazz) {
-        super(scope.getId());
+        super("java.ChangeMethodTargetToStatic", "to", clazz);
+        this.scope = scope;
         this.clazz = clazz;
     }
 
     @Override
-    public String getName() {
-        return "core.ChangeMethodTargetToStatic{to=" + clazz + "}";
-    }
-
-    @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (isScope()) {
+        if (scope.isScope(method)) {
             var classType = JavaType.Class.build(clazz);
             J.MethodInvocation m = method.withSelect(
                     J.Ident.build(randomId(), classType.getClassName(), classType,

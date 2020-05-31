@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaRetrieveCursorVisitor
+import org.openrewrite.java.RetrieveCursor
 import org.openrewrite.java.asClass
 import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.refactor.JavaRefactorVisitor
@@ -39,7 +39,7 @@ class TreeBuilderTest {
         """.trimIndent())
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = JavaRetrieveCursorVisitor(method.body!!.id).visit(a)
+        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
         val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, "others.add(${paramName.printTrimmed()});")
@@ -59,7 +59,7 @@ class TreeBuilderTest {
         """.trimIndent())
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = JavaRetrieveCursorVisitor(method.body!!.id).visit(a)
+        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
 
         val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, """
@@ -69,7 +69,7 @@ class TreeBuilderTest {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(object : JavaRefactorVisitor() {
+        val fixed = a.refactor().visit(object : JavaRefactorVisitor("test.VisitMethod") {
             override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
         }).fix().fixed
 

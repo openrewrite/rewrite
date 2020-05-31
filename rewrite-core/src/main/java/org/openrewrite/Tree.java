@@ -17,6 +17,7 @@ package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -67,5 +68,9 @@ public interface Tree {
     @SuppressWarnings("unchecked")
     default <T extends Tree> Optional<T> whenType(Class<T> treeType) {
         return treeType.isAssignableFrom(this.getClass()) ? Optional.of((T) this) : Optional.empty();
+    }
+
+    default boolean isScope(@Nullable Tree tree) {
+        return tree != null && tree.getId().equals(getId());
     }
 }

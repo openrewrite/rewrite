@@ -21,24 +21,21 @@ import org.openrewrite.xml.tree.Xml;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class ChangeTagValue extends ScopedXmlRefactorVisitor {
+public class ChangeTagValue extends XmlRefactorVisitor {
+    private final Xml.Tag scope;
     private final String value;
 
     public ChangeTagValue(Xml.Tag scope, String value) {
-        super(scope.getId());
+        super("xml.ChangeTagValue", "value", value);
+        this.scope = scope;
         this.value = value;
-    }
-
-    @Override
-    public String getName() {
-        return "core.ChangeTagValue{value=" + value + "}";
     }
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
         Xml.Tag t = refactor(tag, super::visitTag);
 
-        if (isScope()) {
+        if (scope.isScope(tag)) {
             Formatting formatting = Formatting.EMPTY;
             if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                 Xml.CharData existingValue = (Xml.CharData) t.getContent().get(0);

@@ -17,22 +17,20 @@ package org.openrewrite.java.refactor;
 
 import org.openrewrite.java.tree.J;
 
-public class ChangeMethodName extends ScopedJavaRefactorVisitor {
+public class ChangeMethodName extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final String name;
 
     public ChangeMethodName(J.MethodInvocation scope, String name) {
-        super(scope.getId());
+        super("java.ChangeMethodName", "name", name);
+        this.scope = scope;
         this.name = name;
     }
 
     @Override
-    public String getName() {
-        return "core.ChangeMethodName{to=" + name + "}";
-    }
-
-    @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        return isScope() ? method.withName(method.getName().withName(name)) :
+        return scope.isScope(method) ?
+                method.withName(method.getName().withName(name)) :
                 super.visitMethodInvocation(method);
     }
 }

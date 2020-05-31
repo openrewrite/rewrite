@@ -20,6 +20,10 @@ import org.openrewrite.xml.tree.Xml;
 
 public abstract class XmlSourceVisitor<R> extends SourceVisitor<R> {
 
+    public XmlSourceVisitor(String name, String... tagKeyValues) {
+        super(name, tagKeyValues);
+    }
+
     public Xml.Tag enclosingTag() {
         return getCursor().firstEnclosing(Xml.Tag.class);
     }

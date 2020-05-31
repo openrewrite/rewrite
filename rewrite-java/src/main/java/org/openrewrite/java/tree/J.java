@@ -23,7 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.internal.JavaPrintVisitor;
+import org.openrewrite.java.internal.PrintJava;
 import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
@@ -56,7 +56,7 @@ public interface J extends Serializable, Tree {
 
     @Override
     default String print() {
-        return new JavaPrintVisitor().visit(this);
+        return new PrintJava().visit(this);
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

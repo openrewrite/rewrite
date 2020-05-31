@@ -141,7 +141,8 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
         sample.stop(Timer.builder("rewrite.refactor.visit")
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
-                .tag("visitor", visitor.getName() == null ? "Unnamed visitor" : visitor.getName())
+                .tag("visitor", visitor.getName())
+                .tags(visitor.getTagKeyValues())
                 .tag("file.type", original.getFileType())
                 .register(meterRegistry));
 

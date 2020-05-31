@@ -62,10 +62,13 @@ class XPathMatcherTest : XmlParser() {
     private fun visitor(xPath: String): XmlSourceVisitor<Boolean> {
         val matcher = XPathMatcher(xPath)
 
-        return object : XmlSourceVisitor<Boolean>() {
+        return object : XmlSourceVisitor<Boolean>("test.UsesXPath") {
+            init {
+                setCursoringOn()
+            }
+
             override fun defaultTo(t: Tree?) = false
             override fun reduce(r1: Boolean, r2: Boolean) = r1 || r2
-            override fun isCursored(): Boolean = true
 
             override fun visitTag(tag: Xml.Tag?) =
                     super.visitTag(tag) || matcher.matches(cursor)

@@ -25,17 +25,14 @@ import java.util.List;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class DeleteMethodArgument extends ScopedJavaRefactorVisitor {
+public class DeleteMethodArgument extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
     private final int pos;
 
     public DeleteMethodArgument(J.MethodInvocation scope, int pos) {
-        super(scope.getId());
+        super("java.DeleteMethodArgument");
+        this.scope = scope;
         this.pos = pos;
-    }
-
-    @Override
-    public String getName() {
-        return "core.DeleteMethodArgument";
     }
 
     @Override
@@ -46,7 +43,7 @@ public class DeleteMethodArgument extends ScopedJavaRefactorVisitor {
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
         List<Expression> originalArgs = method.getArgs().getArgs();
-        if (isScope() && originalArgs.stream()
+        if (scope.isScope(method) && originalArgs.stream()
                 .filter(a -> !(a instanceof J.Empty))
                 .count() >= pos + 1) {
             List<Expression> args = new ArrayList<>(method.getArgs().getArgs());

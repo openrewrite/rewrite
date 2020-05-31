@@ -21,7 +21,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
@@ -29,20 +28,23 @@ import static java.util.stream.IntStream.range;
 import static org.openrewrite.Formatting.formatLastSuffix;
 import static org.openrewrite.Formatting.lastSuffix;
 
-public class ShiftFormatRightVisitor extends ScopedJavaRefactorVisitor {
+public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
+    private final Tree scope;
     private final String shift;
 
-    public ShiftFormatRightVisitor(UUID scope, int shift, boolean isIndentedWithSpaces) {
-        super(scope);
+    public ShiftFormatRightVisitor(Tree scope, int shift, boolean isIndentedWithSpaces) {
+        super("java.ShiftFormatRight");
+        this.scope = scope;
         this.shift = range(0, shift)
                 .mapToObj(n -> isIndentedWithSpaces ? " " : "\t")
                 .collect(Collectors.joining(""));
+        setCursoringOn();
     }
 
     @Override
     public J visitElse(J.If.Else elze) {
         J.If.Else e = refactor(elze, super::visitElse);
-        if (isScopeInCursorPath() && isOnOwnLine(elze)) {
+        if (getCursor().isScopeInPath(scope) && isOnOwnLine(elze)) {
             e = e.withPrefix(e.getFormatting().getPrefix() + shift);
         }
         return e;
@@ -51,7 +53,7 @@ public class ShiftFormatRightVisitor extends ScopedJavaRefactorVisitor {
     @Override
     public J visitStatement(Statement statement) {
         Statement s = refactor(statement, super::visitStatement);
-        if (isScopeInCursorPath() && isOnOwnLine(statement)) {
+        if (getCursor().isScopeInPath(scope) && isOnOwnLine(statement)) {
             s = s.withPrefix(s.getFormatting().getPrefix() + shift);
         }
         return s;
@@ -60,7 +62,7 @@ public class ShiftFormatRightVisitor extends ScopedJavaRefactorVisitor {
     @Override
     public J visitBlock(J.Block<J> block) {
         J.Block<J> b = refactor(block, super::visitBlock);
-        if (isScopeInCursorPath()) {
+        if (getCursor().isScopeInPath(scope)) {
             b = b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift);
         }
         return b;

@@ -29,6 +29,7 @@ public class FindMethods extends JavaSourceVisitor<List<J.MethodInvocation>> {
     private final MethodMatcher matcher;
 
     public FindMethods(String signature) {
+        super("java.FindMethods");
         this.matcher = new MethodMatcher(signature);
     }
 
