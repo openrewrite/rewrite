@@ -25,16 +25,6 @@ public interface RefactorVisitorSupport {
     @SuppressWarnings("unchecked")
     default <T extends Tree> T refactor(T t, Function<T, Tree> callSuper) {
         return (T) callSuper.apply(t);
-
-//        if(refactored != t) {
-//            Logger logger = LoggerFactory.getLogger(Transformer.class);
-//            if (logger.isDebugEnabled()) {
-//                logger.debug("Refactoring " + t.getClass().getSimpleName() + ". Before:");
-//                logger.debug(t.printTrimmed() + "\n");
-//                logger.debug("After: ");
-//                logger.debug(refactored.print() + "\n");
-//            }
-//        }
     }
 
     @SuppressWarnings("unchecked")

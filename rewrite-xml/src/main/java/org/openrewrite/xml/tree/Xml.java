@@ -188,6 +188,7 @@ public interface Xml extends Serializable, Tree {
 
         /**
          * A shortcut for {@link #getChildValue(String)} and {@link #getValue()}.
+         *
          * @param name The name of the child element to look for.
          * @return The character data of the first child element matching the provided name, if any.
          */
@@ -198,13 +199,17 @@ public interface Xml extends Serializable, Tree {
 
         public Optional<Tag> getSibling(String name, Cursor cursor) {
             Xml.Tag parent = cursor.getParentOrThrow().getTree();
-            if(parent == null) {
+            if (parent == null) {
                 return Optional.empty();
             }
             return parent.getChild(name);
         }
 
         public Tag withContent(List<Content> content) {
+            if(this.content == content) {
+                return this;
+            }
+
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,
                     formatting);

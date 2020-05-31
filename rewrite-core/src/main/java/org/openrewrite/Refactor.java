@@ -28,7 +28,7 @@ import java.util.function.Function;
 import static java.util.stream.StreamSupport.stream;
 
 /**
- * A refactoring operation on a single source file.
+ * A refactoring operation on a single source file involving one or more top-level refactoring visitors.
  *
  * @param <S> The root AST element for a particular language
  * @param <T> The common interface to all AST elements for a particular language.

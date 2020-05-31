@@ -30,6 +30,12 @@ public class AddToTag extends XmlRefactorVisitor {
         super("xml.AddToTag");
         this.scope = scope;
         this.tagToAdd = new XmlParser().parseTag(tagSource);
+        setCursoringOn();
+    }
+
+    @Override
+    public boolean isIdempotent() {
+        return false;
     }
 
     @Override

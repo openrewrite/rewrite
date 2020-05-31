@@ -29,6 +29,7 @@ public class ChangeTagValue extends XmlRefactorVisitor {
         super("xml.ChangeTagValue", "value", value);
         this.scope = scope;
         this.value = value;
+        setCursoringOn();
     }
 
     @Override
@@ -37,10 +38,10 @@ public class ChangeTagValue extends XmlRefactorVisitor {
 
         if (scope.isScope(tag)) {
             Formatting formatting = Formatting.EMPTY;
-            if(t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
+            if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
                 Xml.CharData existingValue = (Xml.CharData) t.getContent().get(0);
 
-                if(existingValue.getText().equals(value)) {
+                if (existingValue.getText().equals(value)) {
                     return t;
                 }
 
