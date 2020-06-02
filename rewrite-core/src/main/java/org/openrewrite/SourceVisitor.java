@@ -79,7 +79,7 @@ public abstract class SourceVisitor<R> {
     public Cursor getCursor() {
         if (cursor.get() == null) {
             throw new IllegalStateException("Cursoring is not enabled for this visitor. " +
-                    "Call setCursoredOn() in the visitor's constructor to enable.");
+                    "Call setCursoringOn() in the visitor's constructor to enable.");
         }
         return cursor.get();
     }
@@ -167,11 +167,11 @@ public abstract class SourceVisitor<R> {
         return reduce(r, visit(trees));
     }
 
-    String getName() {
+    protected String getName() {
         return name;
     }
 
-    String[] getTagKeyValues() {
+    protected String[] getTagKeyValues() {
         return tagKeyValues;
     }
 }
