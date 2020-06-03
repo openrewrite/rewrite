@@ -15,13 +15,19 @@
  */
 package org.openrewrite;
 
+import io.github.classgraph.*;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
+import org.eclipse.microprofile.config.Config;
+import org.openrewrite.config.AutoConfigure;
 import org.openrewrite.internal.lang.NonNullApi;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.*;
 import java.util.*;
 import java.util.function.Function;
 
@@ -35,6 +41,8 @@ import static java.util.stream.StreamSupport.stream;
  */
 @NonNullApi
 public class Refactor<S extends SourceFile, T extends Tree> {
+    private final Logger logger = LoggerFactory.getLogger(Refactor.class);
+
     @Getter
     private final S original;
 
@@ -55,6 +63,55 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
     public final Refactor<S, T> visit(Iterable<SourceVisitor<T>> visitors) {
         visitors.forEach(this.visitors::add);
+        return this;
+    }
+
+    public final Refactor<S, T> scan(Config config, String... whitelistPackages) {
+        try (ScanResult scanResult = new ClassGraph()
+                .whitelistPackages(whitelistPackages)
+                .enableMethodInfo()
+                .enableAnnotationInfo()
+                .ignoreClassVisibility()
+                .ignoreMethodVisibility()
+                .scan()) {
+            for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(AutoConfigure.class.getName())) {
+                for (MethodInfo methodInfo : classInfo.getMethodInfo()) {
+                    AnnotationInfo annotationInfo = methodInfo.getAnnotationInfo(AutoConfigure.class.getName());
+                    if (annotationInfo != null) {
+                        MethodParameterInfo[] parameterInfo = methodInfo.getParameterInfo();
+                        if (parameterInfo.length != 1 || !parameterInfo[0].getTypeDescriptor()
+                                .toString().equals("org.eclipse.microprofile.config.Config")) {
+                            logger.debug("Unable to configure refactoring visitor {}#{} because it did not have a single " +
+                                            "parameter of type org.eclipse.microprofile.config.Config",
+                                    classInfo.getSimpleName(), methodInfo.getName());
+                            continue;
+                        }
+
+                        Method method = methodInfo.loadClassAndGetMethod();
+
+                        Type genericSuperclass = method.getReturnType().getGenericSuperclass();
+                        if(genericSuperclass instanceof ParameterizedType) {
+                            Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
+                            if (sourceFileType[0].equals(original.getClass())) {
+                                if ((methodInfo.getModifiers() & Modifier.PUBLIC) == 0 ||
+                                        (classInfo.getModifiers() & Modifier.PUBLIC) == 0) {
+                                    method.setAccessible(true);
+                                }
+
+                                try {
+                                    //noinspection unchecked
+                                    visit((SourceVisitor<T>) method.invoke(null, config));
+                                } catch (IllegalAccessException | InvocationTargetException e) {
+                                    logger.warn("Failed to configure refactoring visitor {}#{}",
+                                            classInfo.getSimpleName(), methodInfo.getName(), e);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return this;
     }
 
