@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite;
 
 import java.util.stream.Collectors;
 
@@ -22,9 +22,9 @@ import java.util.stream.Collectors;
  * at runtime when one or more properties are invalid.
  */
 public class ValidationException extends IllegalStateException {
-    private final Validated<?> validation;
+    private final Validated validation;
 
-    public ValidationException(Validated<?> validation) {
+    public ValidationException(Validated validation) {
         super(validation.failures().stream()
                 .map(invalid -> invalid.getProperty() + " was '" +
                         (invalid.getValue() == null ? "null" : invalid.getValue()) +
@@ -37,7 +37,7 @@ public class ValidationException extends IllegalStateException {
         this.validation = validation;
     }
 
-    public Validated<?> getValidation() {
+    public Validated getValidation() {
         return validation;
     }
 }

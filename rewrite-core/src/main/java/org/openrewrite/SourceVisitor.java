@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
-import org.openrewrite.config.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.management.ManagementFactory;
@@ -77,7 +76,7 @@ public abstract class SourceVisitor<R> {
         return true;
     }
 
-    public Validated<SourceVisitor<R>> validate() {
+    public Validated validate() {
         return Validated.none();
     }
 

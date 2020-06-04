@@ -19,8 +19,7 @@ import org.openrewrite.RefactorVisitorSupport;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.config.AutoConfigure;
-import org.openrewrite.config.InvalidReason;
-import org.openrewrite.config.Validated;
+import org.openrewrite.Validated;
 
 @AutoConfigure
 public class ChangeText extends SourceVisitor<PlainText> implements RefactorVisitorSupport {
@@ -30,10 +29,8 @@ public class ChangeText extends SourceVisitor<PlainText> implements RefactorVisi
     }
 
     @Override
-    public Validated<SourceVisitor<PlainText>> validate() {
-        return toText != null ?
-                Validated.valid("toText", this) :
-                Validated.invalid("toText", null, "Cannot be null", InvalidReason.MISSING);
+    public Validated validate() {
+        return Validated.required("toText", toText);
     }
 
     public void setToText(String toText) {
