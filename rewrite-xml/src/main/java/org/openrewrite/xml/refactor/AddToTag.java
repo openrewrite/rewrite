@@ -27,7 +27,6 @@ public class AddToTag extends XmlRefactorVisitor {
     private final Xml.Tag tagToAdd;
 
     public AddToTag(Xml.Tag scope, String tagSource) {
-        super("xml.AddToTag");
         this.scope = scope;
         this.tagToAdd = new XmlParser().parseTag(tagSource);
         setCursoringOn();

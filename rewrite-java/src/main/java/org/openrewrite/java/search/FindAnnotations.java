@@ -36,7 +36,6 @@ public class FindAnnotations extends JavaSourceVisitor<List<J.Annotation>> {
     private final AnnotationMatcher matcher;
 
     public FindAnnotations(String signature) {
-        super("java.FindAnnotations");
         this.matcher = new AnnotationMatcher(signature);
     }
 

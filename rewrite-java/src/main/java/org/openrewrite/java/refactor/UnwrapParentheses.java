@@ -22,7 +22,6 @@ public class UnwrapParentheses extends JavaRefactorVisitor {
     private final J.Parentheses<?> scope;
 
     public UnwrapParentheses(J.Parentheses<?> scope) {
-        super("java.UnwrapParentheses");
         this.scope = scope;
         setCursoringOn();
     }

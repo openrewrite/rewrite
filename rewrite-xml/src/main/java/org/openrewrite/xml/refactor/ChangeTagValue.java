@@ -15,6 +15,8 @@
  */
 package org.openrewrite.xml.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.xml.tree.Xml;
 
@@ -26,10 +28,14 @@ public class ChangeTagValue extends XmlRefactorVisitor {
     private final String value;
 
     public ChangeTagValue(Xml.Tag scope, String value) {
-        super("xml.ChangeTagValue", "value", value);
         this.scope = scope;
         this.value = value;
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("value", value);
     }
 
     @Override

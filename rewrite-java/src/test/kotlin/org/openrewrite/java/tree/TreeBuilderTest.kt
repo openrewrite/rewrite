@@ -69,7 +69,7 @@ class TreeBuilderTest {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(object : JavaRefactorVisitor("test.VisitMethod") {
+        val fixed = a.refactor().visit(object : JavaRefactorVisitor() {
             override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
         }).fix().fixed
 

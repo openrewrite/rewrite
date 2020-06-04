@@ -24,10 +24,6 @@ import org.openrewrite.xml.tree.Xml;
 public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implements RefactorVisitorSupport {
     protected Formatter formatter;
 
-    public XmlRefactorVisitor(String name, String... tagKeyValues) {
-        super(name, tagKeyValues);
-    }
-
     @Override
     public Xml defaultTo(Tree t) {
         return (Xml) t;

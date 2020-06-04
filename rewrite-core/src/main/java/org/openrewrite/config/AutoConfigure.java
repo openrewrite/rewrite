@@ -23,17 +23,14 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotate on any static method on a {@link SourceVisitor} that takes a single argument of type
- * {@link org.eclipse.microprofile.config.Config} and returns an instance of the visitor to
- * enable auto-configuration of the visitor or null if the configuration doesn't suffice to
- * construct the visitor.
+ * Annotate on any {@link SourceVisitor} that contains setters configuring it for use.
  *
  * Different mechanisms may scan for {@link AutoConfigure} enabled visitor builder methods to
  * automatically wire visitors found on the classpath. For example, we could scan for all
  * Java refactoring visitors and apply all auto-configurable visitors to the Java source files
  * in a project.
  */
-@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD, ElementType.CONSTRUCTOR})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface AutoConfigure {
 }

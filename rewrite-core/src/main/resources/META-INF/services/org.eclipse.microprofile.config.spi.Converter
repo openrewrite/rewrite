@@ -1,3 +1,0 @@
-org.openrewrite.config.FileConverter
-org.openrewrite.config.ListConverter
-org.openrewrite.config.PatternConverter

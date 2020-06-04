@@ -26,10 +26,6 @@ import org.openrewrite.java.tree.JavaType;
 public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implements RefactorVisitorSupport {
     protected JavaFormatter formatter;
 
-    public JavaRefactorVisitor(String name, String... tagKeyValues) {
-        super(name, tagKeyValues);
-    }
-
     @Override
     public J defaultTo(Tree t) {
         return (J) t;

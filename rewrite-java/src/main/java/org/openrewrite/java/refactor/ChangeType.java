@@ -15,10 +15,11 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
-import org.slf4j.helpers.MessageFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,9 +38,13 @@ public class ChangeType extends JavaRefactorVisitor {
     private final JavaType.Class toClassType;
 
     public ChangeType(String from, String to) {
-        super("java.ChangeType", "from", from, "to", to);
         this.from = from;
         this.toClassType = JavaType.Class.build(to);
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("from", from, "to", toClassType.getFullyQualifiedName());
     }
 
     @Override

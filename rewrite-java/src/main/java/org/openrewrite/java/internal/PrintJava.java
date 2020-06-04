@@ -27,10 +27,6 @@ import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.java.tree.J.Modifier.*;
 
 public class PrintJava extends JavaSourceVisitor<String> {
-    public PrintJava() {
-        super("java.Print");
-    }
-
     @Override
     public String defaultTo(Tree t) {
         return "";

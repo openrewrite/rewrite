@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
@@ -28,9 +30,12 @@ public class FindReferencesToVariable extends JavaSourceVisitor<List<Tree>> {
     private final J.Ident variable;
 
     public FindReferencesToVariable(J.Ident variable) {
-        super("java.FindReferencesToVariable", "Uses of a variable in assignments and expressions",
-                "variable", variable.getSimpleName());
         this.variable = variable;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("variable", variable.getSimpleName());
     }
 
     @Override
@@ -58,11 +63,6 @@ public class FindReferencesToVariable extends JavaSourceVisitor<List<Tree>> {
     }
 
     private class HasReferenceToVariableInSubtree extends JavaSourceVisitor<Boolean> {
-        public HasReferenceToVariableInSubtree() {
-            super("java.HasReferenceToVariableInSubtree",
-                    "Whether a matching identifier is found in a particular subtree");
-        }
-
         @Override
         public Boolean defaultTo(Tree t) {
             return false;

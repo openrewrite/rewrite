@@ -30,7 +30,6 @@ public class DeleteMethodArgument extends JavaRefactorVisitor {
     private final int pos;
 
     public DeleteMethodArgument(J.MethodInvocation scope, int pos) {
-        super("java.DeleteMethodArgument");
         this.scope = scope;
         this.pos = pos;
     }

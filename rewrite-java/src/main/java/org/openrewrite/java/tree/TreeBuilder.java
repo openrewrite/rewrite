@@ -137,7 +137,6 @@ public class TreeBuilder {
         private final Cursor scope;
 
         private ListScopeVariables(Cursor scope) {
-            super("java.ListScopeVariables");
             this.scope = scope;
             setCursoringOn();
         }

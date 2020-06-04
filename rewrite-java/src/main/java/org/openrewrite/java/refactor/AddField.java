@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -38,12 +40,16 @@ public class AddField extends JavaRefactorVisitor {
     private final String init;
 
     public AddField(J.ClassDecl scope, List<J.Modifier> modifiers, String clazz, String name, @Nullable String init) {
-        super("java.AddField", "field.class", clazz, "field.name", name);
         this.scope = scope;
         this.modifiers = modifiers;
         this.clazz = clazz;
         this.name = name;
         this.init = init;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("field.class", clazz, "field.name", name);
     }
 
     @Override

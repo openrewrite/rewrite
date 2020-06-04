@@ -61,7 +61,7 @@ open class CursorTest : JavaParser() {
         val methodParamScope = a.classes[0].methods[0].params.params[0].cursor()!!
         val forInitScope = a.classes[0].methods[0].body!!.statements.filterIsInstance<J.ForLoop>()[0].control.init.cursor()!!
 
-        assertThat(object : JavaSourceVisitor<Int>("test.SameNameScope") {
+        assertThat(object : JavaSourceVisitor<Int>() {
             init {
                 setCursoringOn()
             }

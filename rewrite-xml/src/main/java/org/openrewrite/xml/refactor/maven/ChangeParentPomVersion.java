@@ -15,6 +15,8 @@
  */
 package org.openrewrite.xml.refactor.maven;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.refactor.ChangeTagValue;
 import org.openrewrite.xml.refactor.XmlRefactorVisitor;
@@ -28,12 +30,16 @@ public class ChangeParentPomVersion extends XmlRefactorVisitor {
     private final String version;
 
     public ChangeParentPomVersion(String whenGroupId, String whenArtifactId, String version) {
-        super("maven.ChangeParentPomVersion", "when.group", whenGroupId, "when.artifact", whenArtifactId,
-                "version", version);
         this.whenGroupId = whenGroupId;
         this.whenArtifactId = whenArtifactId;
         this.version = version;
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("when.group", whenGroupId, "when.artifact", whenArtifactId,
+                "version", version);
     }
 
     @Override

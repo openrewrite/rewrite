@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
@@ -32,10 +34,14 @@ public class ImplementInterface extends JavaRefactorVisitor {
     private final JavaType.Class interfaceType;
 
     public ImplementInterface(J.ClassDecl scope, String interfaze) {
-        super("java.ImplementInterface", "from", interfaze);
         this.scope = scope;
         this.interfaze = interfaze;
         this.interfaceType = JavaType.Class.build(interfaze);
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("from", interfaze);
     }
 
     @Override

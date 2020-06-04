@@ -13,29 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.config;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-
-public class RetrieveCursor extends JavaSourceVisitor<Cursor> {
-    private final Tree scope;
-
-    public RetrieveCursor(Tree scope) {
-        this.scope = scope;
-        setCursoringOn();
-    }
-
-    @Override
-    public Cursor defaultTo(Tree t) {
-        return null;
-    }
-
-    @Override
-    public Cursor visitTree(Tree tree) {
-        if (scope.isScope(tree)) {
-            return getCursor();
-        }
-        return super.visitTree(tree);
-    }
+/**
+ * Invalid reason.
+ */
+public enum InvalidReason {
+    MALFORMED,
+    MISSING
 }

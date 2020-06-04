@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -36,10 +38,14 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
     }
 
     public ChangeMethodTargetToVariable(J.MethodInvocation scope, String varName, @Nullable JavaType.Class type) {
-        super("java.ChangeMethodTargetToVariable", "to", varName);
         this.scope = scope;
         this.varName = varName;
         this.type = type;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("to", varName);
     }
 
     @Override

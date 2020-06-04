@@ -39,7 +39,6 @@ public class FindIndent extends SourceVisitor<Void> {
     private int linesWithTabIndents = 0;
 
     public FindIndent(int enclosingIndent) {
-        super("core.FindIndent");
         this.enclosingIndent = enclosingIndent;
     }
 

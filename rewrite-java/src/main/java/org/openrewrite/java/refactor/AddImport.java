@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Formatting;
@@ -50,12 +52,15 @@ public class AddImport extends JavaRefactorVisitor {
     private boolean coveredByExistingImport;
 
     public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
-        super("java.AddImport",
-                "class", clazz, "static.method", staticMethod == null ? "none" : staticMethod);
         this.clazz = clazz;
         this.staticMethod = staticMethod;
         this.onlyIfReferenced = onlyIfReferenced;
         this.classType = JavaType.Class.build(clazz);
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("class", clazz, "static.method", staticMethod == null ? "none" : staticMethod);
     }
 
     @Override

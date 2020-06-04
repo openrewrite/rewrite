@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
@@ -48,11 +50,15 @@ public class RemoveImport extends JavaRefactorVisitor {
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
     public RemoveImport(String clazz) {
-        super("java.RemoveImport", "class.type", clazz);
         this.clazz = clazz;
         this.methodMatcher = new MethodMatcher(clazz + " *(..)");
         this.classType = JavaType.Class.build(clazz);
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("class.type", clazz);
     }
 
     @Override

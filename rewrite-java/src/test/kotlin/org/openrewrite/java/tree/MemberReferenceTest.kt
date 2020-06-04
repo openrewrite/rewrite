@@ -43,7 +43,7 @@ open class MemberReferenceTest : JavaParser() {
 
         val memberRefLatch = CountDownLatch(1)
 
-        object: JavaSourceVisitor<Unit?>("test.VisitMemberRef") {
+        object: JavaSourceVisitor<Unit?>() {
             override fun defaultTo(t: Tree?): Nothing? = null
 
             override fun visitMemberReference(memberRef: J.MemberReference): Unit? {

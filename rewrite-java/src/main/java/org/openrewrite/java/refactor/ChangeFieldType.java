@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -26,9 +28,13 @@ public class ChangeFieldType extends JavaRefactorVisitor {
     private final String targetType;
 
     public ChangeFieldType(J.VariableDecls scope, String targetType) {
-        super("java.ChangeFieldType", "to", targetType);
         this.scope = scope;
         this.targetType = targetType;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("to", targetType);
     }
 
     @Override

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.java.tree.J;
 
 public class ChangeMethodName extends JavaRefactorVisitor {
@@ -22,9 +24,13 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     private final String name;
 
     public ChangeMethodName(J.MethodInvocation scope, String name) {
-        super("java.ChangeMethodName", "name", name);
         this.scope = scope;
         this.name = name;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("name", name);
     }
 
     @Override

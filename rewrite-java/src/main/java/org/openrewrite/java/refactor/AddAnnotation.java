@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.Expression;
@@ -35,11 +37,15 @@ public class AddAnnotation extends JavaRefactorVisitor {
     private final List<Expression> arguments;
 
     public AddAnnotation(Tree scope, String annotationTypeName, Expression... arguments) {
-        super("java.AddAnnotation", "annotation.type", annotationTypeName);
         this.scope = scope;
         this.annotationType = JavaType.Class.build(annotationTypeName);
         this.arguments = asList(arguments);
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("annotation.type", annotationType.getFullyQualifiedName());
     }
 
     @Override

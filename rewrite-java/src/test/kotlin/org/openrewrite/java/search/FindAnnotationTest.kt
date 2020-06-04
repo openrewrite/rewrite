@@ -56,7 +56,7 @@ open class FindAnnotationTest : JavaParser() {
         val deprecated = a.classes[0].methods[0].findAnnotations("@java.lang.Deprecated").firstOrNull()
         assertNotNull(deprecated)
 
-        assertThat(object : JavaSourceVisitor<String?>("test.VisitAnnotations") {
+        assertThat(object : JavaSourceVisitor<String?>() {
             init {
                 setCursoringOn()
             }

@@ -20,6 +20,12 @@ import org.junit.jupiter.api.Test
 import java.nio.file.Paths
 
 class ChangeTest {
+    private val filePath = Paths.get("com/netflix/MyJavaClass.java")
+
+    private fun ab(which: String) = ("$which/" + filePath.toString().replace("\\", "\\\\")).apply {
+        return if(contains("\\")) "\"$this\"" else this
+    }
+
     @Test
     fun idempotent() {
         val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
@@ -32,7 +38,7 @@ class ChangeTest {
 
     @Test
     fun singleLineChange() {
-        val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = Change.InMemoryDiffEntry(filePath, null,
                 """
                 |public void test() {
                 |   logger.infof("some %s", 1);
@@ -48,11 +54,12 @@ class ChangeTest {
                 setOf("logger.Fix")
         ).diff
 
+        val filePathEscaped = filePath.toString().replace("\\", "\\\\")
         assertThat("""
-            |diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+            |diff --git ${ab("a")} ${ab("b")}
             |index 3490cbf..5d64ae4 100644
-            |--- a/com/netflix/MyJavaClass.java
-            |+++ b/com/netflix/MyJavaClass.java
+            |--- ${ab("a")}
+            |+++ ${ab("b")}
             |@@ -1,3 +1,3 @@ logger.Fix
             | public void test() {
             |-   logger.infof("some %s", 1);
@@ -64,7 +71,7 @@ class ChangeTest {
 
     @Test
     fun multipleChangesMoreThanThreeLinesApart() {
-        val diff = Change.InMemoryDiffEntry(Paths.get("com/netflix/MyJavaClass.java"), null,
+        val diff = Change.InMemoryDiffEntry(filePath, null,
                 """
                 |public void test() {
                 |   logger.infof("some %s", 1);
@@ -99,10 +106,10 @@ class ChangeTest {
         ).diff
 
         assertThat("""
-                |diff --git a/com/netflix/MyJavaClass.java b/com/netflix/MyJavaClass.java
+                |diff --git ${ab("a")} ${ab("b")}
                 |index c17f051..bb2dfba 100644
-                |--- a/com/netflix/MyJavaClass.java
-                |+++ b/com/netflix/MyJavaClass.java
+                |--- ${ab("a")}
+                |+++ ${ab("b")}
                 |@@ -1,5 +1,5 @@ logger.Fix1, logger.Fix2
                 | public void test() {
                 |-   logger.infof("some %s", 1);

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.RetrieveCursor;
 import org.openrewrite.java.tree.J;
@@ -27,10 +29,14 @@ public class RenameVariable extends JavaRefactorVisitor {
     private String scopeVariableName;
 
     public RenameVariable(J.VariableDecls.NamedVar scope, String toName) {
-        super("java.RenameVariable", "to", toName);
         this.scope = scope;
         this.toName = toName;
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("to", toName);
     }
 
     @Override

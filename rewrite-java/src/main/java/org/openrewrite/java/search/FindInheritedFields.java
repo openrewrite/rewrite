@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
@@ -32,8 +34,12 @@ public class FindInheritedFields extends JavaSourceVisitor<List<JavaType.Var>> {
     private final String fullyQualifiedClassName;
 
     public FindInheritedFields(String fullyQualifiedClassName) {
-        super("java.FindInheritedFields", "type", fullyQualifiedClassName);
         this.fullyQualifiedClassName = fullyQualifiedClassName;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("type", fullyQualifiedClassName);
     }
 
     @Override

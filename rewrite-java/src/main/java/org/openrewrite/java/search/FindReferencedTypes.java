@@ -27,10 +27,6 @@ import java.util.Set;
 import static java.util.Collections.emptySet;
 
 public class FindReferencedTypes extends JavaSourceVisitor<Set<JavaType.Class>> {
-    public FindReferencedTypes() {
-        super("java.FindReferencedTypes");
-    }
-
     @Override
     public Set<JavaType.Class> defaultTo(Tree t) {
         return emptySet();

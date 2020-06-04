@@ -7,13 +7,9 @@ dependencies {
 
     implementation("io.github.classgraph:classgraph:latest.release")
 
-    implementation("io.micrometer:micrometer-core:latest.release")
-
     implementation("org.yaml:snakeyaml:latest.release")
 
-    api("org.eclipse.microprofile.config:microprofile-config-api:latest.release")
+    api("io.micrometer:micrometer-core:latest.release")
     api("org.kohsuke:github-api:latest.release")
     api("com.google.code.findbugs:jsr305:latest.release")
-
-    testRuntimeOnly("org.microbean:microbean-microprofile-config:latest.release")
 }

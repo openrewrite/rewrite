@@ -31,7 +31,6 @@ public class ChangeLiteral extends JavaRefactorVisitor {
      * @param transform The transformation to apply to each literal found in the expression scope.
      */
     public ChangeLiteral(Expression scope, Function<Object, Object> transform) {
-        super("java.ChangeLiteral");
         this.scope = scope;
         this.transform = transform;
         setCursoringOn();

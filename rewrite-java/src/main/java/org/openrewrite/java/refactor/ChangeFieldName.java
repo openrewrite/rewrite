@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
@@ -29,12 +31,16 @@ public class ChangeFieldName extends JavaRefactorVisitor {
     private final String toName;
 
     public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
-        super("java.ChangeFieldName", "class.type", classType.getFullyQualifiedName(),
-                "has.name", hasName, "to.name", toName);
         this.classType = classType;
         this.hasName = hasName;
         this.toName = toName;
         setCursoringOn();
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("class.type", classType.getFullyQualifiedName(),
+                "has.name", hasName, "to.name", toName);
     }
 
     @Override
@@ -85,7 +91,6 @@ public class ChangeFieldName extends JavaRefactorVisitor {
         private final Cursor referenceScope;
 
         public FindVariableDefinition(J.Ident ident, Cursor referenceScope) {
-            super("java.FindVariableDefinition");
             this.ident = ident;
             this.referenceScope = referenceScope;
             setCursoringOn();

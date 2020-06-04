@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.JavaType;
@@ -32,8 +34,12 @@ public class FindType extends JavaSourceVisitor<Set<NameTree>> {
     private final String clazz;
 
     public FindType(String clazz) {
-        super("java.FindType", "type", clazz);
         this.clazz = clazz;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("type", clazz);
     }
 
     @Override

@@ -15,6 +15,9 @@
  */
 package org.openrewrite;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
+import org.openrewrite.config.Validated;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.management.ManagementFactory;
@@ -29,9 +32,6 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 
 public abstract class SourceVisitor<R> {
-    private final String name;
-    private final String[] tagKeyValues;
-
     private static final boolean IS_DEBUGGING = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
     private boolean cursored = IS_DEBUGGING;
@@ -41,11 +41,12 @@ public abstract class SourceVisitor<R> {
 
     protected volatile int cycle = 0;
 
-    public SourceVisitor(String name, String... tagKeyValues) {
-        this.name = name;
-        this.tagKeyValues = tagKeyValues;
-
+    public SourceVisitor() {
         andThen.set(new ArrayList<>());
+    }
+
+    public Iterable<Tag> getTags() {
+        return Tags.empty();
     }
 
     protected void setCursoringOn() {
@@ -74,6 +75,10 @@ public abstract class SourceVisitor<R> {
      */
     public boolean isIdempotent() {
         return true;
+    }
+
+    public Validated<SourceVisitor<R>> validate() {
+        return Validated.none();
     }
 
     public Cursor getCursor() {
@@ -165,13 +170,5 @@ public abstract class SourceVisitor<R> {
 
     public final R visitAfter(R r, @Nullable List<? extends Tree> trees) {
         return reduce(r, visit(trees));
-    }
-
-    protected String getName() {
-        return name;
-    }
-
-    protected String[] getTagKeyValues() {
-        return tagKeyValues;
     }
 }

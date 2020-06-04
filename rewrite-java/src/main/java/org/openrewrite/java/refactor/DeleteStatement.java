@@ -32,7 +32,6 @@ public class DeleteStatement extends JavaRefactorVisitor {
     private final Statement statement;
 
     public DeleteStatement(Statement statement) {
-        super("java.DeleteStatement");
         this.statement = statement;
     }
 

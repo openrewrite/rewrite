@@ -15,13 +15,8 @@
  */
 package org.openrewrite.config;
 
-import org.junit.jupiter.api.Test;
+import java.util.Collection;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
-class ListConverterTest {
-    @Test
-    void convertList() {
-        assertThat(new ListConverter().convert("[lambda, class_def]")).containsExactly("lambda", "class_def");
-    }
+public interface ProfileSource {
+    Collection<Profile> load();
 }

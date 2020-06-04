@@ -21,10 +21,6 @@ import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class PrintXml extends XmlSourceVisitor<String> {
-    public PrintXml() {
-        super("xml.Print");
-    }
-
     @Override
     public String defaultTo(Tree t) {
         return "";

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.refactor;
 
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -30,9 +32,13 @@ public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
     private final String clazz;
 
     public ChangeMethodTargetToStatic(J.MethodInvocation scope, String clazz) {
-        super("java.ChangeMethodTargetToStatic", "to", clazz);
         this.scope = scope;
         this.clazz = clazz;
+    }
+
+    @Override
+    public Iterable<Tag> getTags() {
+        return Tags.of("to", clazz);
     }
 
     @Override

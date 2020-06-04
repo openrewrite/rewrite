@@ -35,7 +35,6 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
     private final List<J.VariableDecls> fields;
 
     public GenerateConstructorUsingFields(J.ClassDecl scope, List<J.VariableDecls> fields) {
-        super("java.GenerateConstructorUsingFields");
         this.scope = scope;
         this.fields = fields;
         setCursoringOn();
@@ -109,7 +108,6 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
         private final J.MethodDecl scope;
 
         private AddAssignmentsToConstructor(J.MethodDecl scope) {
-            super("java.AddAssignmentsToConstructor");
             this.scope = scope;
             setCursoringOn();
         }

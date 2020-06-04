@@ -33,7 +33,6 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     private final String shift;
 
     public ShiftFormatRightVisitor(Tree scope, int shift, boolean isIndentedWithSpaces) {
-        super("java.ShiftFormatRight");
         this.scope = scope;
         this.shift = range(0, shift)
                 .mapToObj(n -> isIndentedWithSpaces ? " " : "\t")

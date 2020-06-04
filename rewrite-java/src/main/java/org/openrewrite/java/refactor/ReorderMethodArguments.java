@@ -29,7 +29,6 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
     private String[] originalParamNames;
 
     public ReorderMethodArguments(J.MethodInvocation scope, String... byArgumentNames) {
-        super("java.ReorderMethodArguments");
         this.scope = scope;
         this.byArgumentNames = byArgumentNames;
         this.originalParamNames = new String[0];

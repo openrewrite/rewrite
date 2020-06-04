@@ -33,7 +33,6 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
     private final String source;
 
     public InsertMethodArgument(J.MethodInvocation scope, int pos, String source) {
-        super("java.InsertMethodArgument");
         this.scope = scope;
         this.pos = pos;
         this.source = source;

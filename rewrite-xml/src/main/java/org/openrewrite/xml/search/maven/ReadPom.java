@@ -28,7 +28,6 @@ public class ReadPom extends XmlSourceVisitor<MavenPom> {
             "/project/properties/*");
 
     public ReadPom() {
-        super("maven.ReadPom");
         setCursoringOn();
     }
 

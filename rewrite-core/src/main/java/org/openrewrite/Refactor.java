@@ -15,19 +15,24 @@
  */
 package org.openrewrite;
 
-import io.github.classgraph.*;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
-import org.eclipse.microprofile.config.Config;
 import org.openrewrite.config.AutoConfigure;
+import org.openrewrite.config.Environment;
+import org.openrewrite.config.Profile;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.*;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.Function;
 
@@ -51,8 +56,14 @@ public class Refactor<S extends SourceFile, T extends Tree> {
     @Getter
     private final List<SourceVisitor<T>> visitors = new ArrayList<>();
 
+    @Getter
+    private final Set<String> profiles = new HashSet<>();
+
+    private Environment environment = new Environment();
+
     public Refactor(S original) {
         this.original = original;
+        this.profiles.add("default");
     }
 
     @SafeVarargs
@@ -66,44 +77,47 @@ public class Refactor<S extends SourceFile, T extends Tree> {
         return this;
     }
 
-    public final Refactor<S, T> scan(Config config, String... whitelistPackages) {
+    public final Refactor<S, T> environment(Environment environment) {
+        this.environment = environment;
+        return this;
+    }
+
+    public final Refactor<S, T> profiles(String... profiles) {
+        this.profiles.addAll(Arrays.asList(profiles));
+        return this;
+    }
+
+    public final Refactor<S, T> scan(String... whitelistPackages) {
         try (ScanResult scanResult = new ClassGraph()
                 .whitelistPackages(whitelistPackages)
+                .enableMemoryMapping()
                 .enableMethodInfo()
                 .enableAnnotationInfo()
                 .ignoreClassVisibility()
                 .ignoreMethodVisibility()
                 .scan()) {
-            for (ClassInfo classInfo : scanResult.getClassesWithMethodAnnotation(AutoConfigure.class.getName())) {
-                for (MethodInfo methodInfo : classInfo.getMethodInfo()) {
-                    AnnotationInfo annotationInfo = methodInfo.getAnnotationInfo(AutoConfigure.class.getName());
-                    if (annotationInfo != null) {
-                        MethodParameterInfo[] parameterInfo = methodInfo.getParameterInfo();
-                        if (parameterInfo.length != 1 || !parameterInfo[0].getTypeDescriptor()
-                                .toString().equals("org.eclipse.microprofile.config.Config")) {
-                            logger.debug("Unable to configure refactoring visitor {}#{} because it did not have a single " +
-                                            "parameter of type org.eclipse.microprofile.config.Config",
-                                    classInfo.getSimpleName(), methodInfo.getName());
-                            continue;
-                        }
-
-                        Method method = methodInfo.loadClassAndGetMethod();
-
-                        Type genericSuperclass = method.getReturnType().getGenericSuperclass();
-                        if(genericSuperclass instanceof ParameterizedType) {
-                            Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
-                            if (sourceFileType[0].equals(original.getClass())) {
-                                if ((methodInfo.getModifiers() & Modifier.PUBLIC) == 0 ||
-                                        (classInfo.getModifiers() & Modifier.PUBLIC) == 0) {
-                                    method.setAccessible(true);
-                                }
-
+            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(AutoConfigure.class.getName())) {
+                Class<?> visitorClass = classInfo.loadClass();
+                Type genericSuperclass = visitorClass.getGenericSuperclass();
+                if (genericSuperclass instanceof ParameterizedType) {
+                    Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
+                    if (sourceFileType[0].equals(original.getClass())) {
+                        for (String profileName : profiles) {
+                            Profile profile = environment.getProfile(profileName);
+                            if (profile != null) {
                                 try {
-                                    //noinspection unchecked
-                                    visit((SourceVisitor<T>) method.invoke(null, config));
-                                } catch (IllegalAccessException | InvocationTargetException e) {
-                                    logger.warn("Failed to configure refactoring visitor {}#{}",
-                                            classInfo.getSimpleName(), methodInfo.getName(), e);
+                                    Constructor<?> constructor = visitorClass.getConstructor();
+                                    constructor.setAccessible(true);
+
+                                    @SuppressWarnings("unchecked") SourceVisitor<T> visitor = profile.configure(
+                                            (SourceVisitor<T>) constructor.newInstance());
+
+                                    if(profile.accept(visitor)) {
+                                        visit(visitor);
+                                        // TODO do something with invalid visitor messaging
+                                    }
+                                } catch (Exception e) {
+                                    logger.warn("Unable to configure {}", visitorClass.getName(), e);
                                 }
                             }
                         }
@@ -156,11 +170,9 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 acc = transformPipeline(acc, visitor);
 
                 if (before != acc) {
-                    // we only report on the top-level visitors, not any andThen() visitors that
+                    // TODO we should only report on the top-level visitors, not any andThen() visitors that
                     // are applied as part of the top-level visitor's pipeline
-                    if (visitor.getName() != null) {
-                        rulesThatMadeChangesThisCycle.add(visitor.getName());
-                    }
+                    rulesThatMadeChangesThisCycle.add(visitor.getClass().getName());
                 }
             }
             if (rulesThatMadeChangesThisCycle.isEmpty()) {
@@ -198,8 +210,8 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
         sample.stop(Timer.builder("rewrite.refactor.visit")
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
-                .tag("visitor", visitor.getName())
-                .tags(visitor.getTagKeyValues())
+                .tag("visitor", visitor.getClass().getName())
+                .tags(visitor.getTags())
                 .tag("file.type", original.getFileType())
                 .register(meterRegistry));
 
