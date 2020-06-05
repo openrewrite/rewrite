@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.ChangeFieldType
 import org.openrewrite.java.JavaParser
@@ -36,6 +37,7 @@ open class ChangeFieldTypeTest {
             }
         """.trimIndent()
 
+    @Disabled("flaky")
     @Test
     fun changeFieldTypeDeclarative() {
         val cu = JavaParser().parse(a)
