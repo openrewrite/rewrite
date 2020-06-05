@@ -16,9 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.AddAnnotation
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
 class AddAnnotationTest : JavaParser() {
     @Test
@@ -33,8 +30,8 @@ class AddAnnotationTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddAnnotation(a.classes[0], "lombok.RequiredArgsConstructor"))
-                .visit(AddAnnotation(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor"))
+                .visit(AddAnnotation.Scoped(a.classes[0], "lombok.RequiredArgsConstructor"))
+                .visit(AddAnnotation.Scoped(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -63,8 +60,8 @@ class AddAnnotationTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddAnnotation(a.classes[0].fields[0], "javax.inject.Inject"))
-                .visit(AddAnnotation(a.classes[0].fields[1], "javax.inject.Inject"))
+                .visit(AddAnnotation.Scoped(a.classes[0].fields[0], "javax.inject.Inject"))
+                .visit(AddAnnotation.Scoped(a.classes[0].fields[1], "javax.inject.Inject"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -104,7 +101,7 @@ class AddAnnotationTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.classes[0].methods
-                .fold(a.refactor()) { refactor, method -> refactor.visit(AddAnnotation(method, "javax.annotation.PostConstruct")) }
+                .fold(a.refactor()) { refactor, method -> refactor.visit(AddAnnotation.Scoped(method, "javax.annotation.PostConstruct")) }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -145,7 +142,7 @@ class AddAnnotationTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddAnnotation(a.classes[0].methods[0].params.params[0], "javax.annotation.Nonnull"))
+                .visit(AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0], "javax.annotation.Nonnull"))
                 .fix().fixed
 
         assertRefactored(fixed, """

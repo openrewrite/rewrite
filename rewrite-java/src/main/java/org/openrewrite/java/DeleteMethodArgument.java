@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -24,37 +25,70 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.Validated.required;
 
 public class DeleteMethodArgument extends JavaRefactorVisitor {
-    private final J.MethodInvocation scope;
-    private final int pos;
-
-    public DeleteMethodArgument(J.MethodInvocation scope, int pos) {
-        this.scope = scope;
-        this.pos = pos;
-    }
+    private MethodMatcher methodMatcher;
+    private Integer index;
 
     @Override
     public boolean isIdempotent() {
         return false;
     }
 
+    public void setMethod(String method) {
+        this.methodMatcher = new MethodMatcher(method);
+    }
+
+    public void setIndex(Integer index) {
+        this.index = index;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("method", methodMatcher)
+                .and(required("index", index));
+    }
+
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        List<Expression> originalArgs = method.getArgs().getArgs();
-        if (scope.isScope(method) && originalArgs.stream()
-                .filter(a -> !(a instanceof J.Empty))
-                .count() >= pos + 1) {
-            List<Expression> args = new ArrayList<>(method.getArgs().getArgs());
+        if(methodMatcher.matches(method)) {
+            andThen(new Scoped(method, index));
+        }
+        return super.visitMethodInvocation(method);
+    }
 
-            args.remove(pos);
-            if (args.isEmpty()) {
-                args = singletonList(new J.Empty(randomId(), Formatting.EMPTY));
-            }
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.MethodInvocation scope;
+        private final int index;
 
-            return method.withArgs(method.getArgs().withArgs(args));
+        public Scoped(J.MethodInvocation scope, int index) {
+            this.scope = scope;
+            this.index = index;
         }
 
-        return super.visitMethodInvocation(method);
+        @Override
+        public boolean isIdempotent() {
+            return false;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method) {
+            List<Expression> originalArgs = method.getArgs().getArgs();
+            if (scope.isScope(method) && originalArgs.stream()
+                    .filter(a -> !(a instanceof J.Empty))
+                    .count() >= index + 1) {
+                List<Expression> args = new ArrayList<>(method.getArgs().getArgs());
+
+                args.remove(index);
+                if (args.isEmpty()) {
+                    args = singletonList(new J.Empty(randomId(), Formatting.EMPTY));
+                }
+
+                return method.withArgs(method.getArgs().withArgs(args));
+            }
+
+            return super.visitMethodInvocation(method);
+        }
     }
 }

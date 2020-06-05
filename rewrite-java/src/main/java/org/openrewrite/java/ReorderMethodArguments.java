@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
@@ -23,69 +24,103 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import static org.openrewrite.Validated.required;
+
 public class ReorderMethodArguments extends JavaRefactorVisitor {
-    private final J.MethodInvocation scope;
-    private final String[] byArgumentNames;
-    private String[] originalParamNames;
-
-    public ReorderMethodArguments(J.MethodInvocation scope, String... byArgumentNames) {
-        this.scope = scope;
-        this.byArgumentNames = byArgumentNames;
-        this.originalParamNames = new String[0];
-        setCursoringOn();
-    }
-
-    public ReorderMethodArguments withOriginalParamNames(String... originalParamNames) {
-        this.originalParamNames = originalParamNames;
-        return this;
-    }
+    private MethodMatcher methodMatcher;
+    private String[] order;
+    private String[] originalOrder = new String[0];
 
     @Override
     public boolean isIdempotent() {
         return false;
     }
 
+    public void setMethod(String method) {
+        this.methodMatcher = new MethodMatcher(method);
+    }
+
+    public void setOrder(String... order) {
+        this.order = order;
+    }
+
+    public void setOriginalOrder(String... originalOrder) {
+        this.originalOrder = originalOrder;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("method", methodMatcher)
+                .and(required("order", order));
+    }
+
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (scope.isScope(method) && method.getType() != null) {
-            var paramNames = originalParamNames.length == 0 ? method.getType().getParamNames() :
-                    Arrays.asList(originalParamNames);
+        if(methodMatcher.matches(method)) {
+            andThen(new Scoped(method, order, originalOrder));
+        }
+        return super.visitMethodInvocation(method);
+    }
 
-            if (paramNames == null) {
-                throw new IllegalStateException("There is no source attachment for method " + method.getType().getDeclaringType().getFullyQualifiedName() +
-                        "." + method.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
-            }
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.MethodInvocation scope;
+        private final String[] order;
+        private final String[] originalOrder;
 
-            List<Expression> originalArgs = method.getArgs().getArgs();
-
-            var resolvedParamCount = method.getType().getResolvedSignature() == null ? originalArgs.size() :
-                    method.getType().getResolvedSignature().getParamTypes().size();
-
-            int i = 0;
-            List<Expression> reordered = new ArrayList<>(originalArgs.size());
-            List<Formatting> formattings = new ArrayList<>(originalArgs.size());
-
-            for (String name : byArgumentNames) {
-                int fromPos = paramNames.indexOf(name);
-                if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
-                    // this is a varargs argument
-                    List<Expression> varargs = originalArgs.subList(fromPos, originalArgs.size());
-                    reordered.addAll(varargs);
-                    originalArgs.subList(i, (i++) + varargs.size()).stream().map(Expression::getFormatting).forEach(formattings::add);
-                } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
-                    reordered.add(originalArgs.get(fromPos));
-                    formattings.add(originalArgs.get(i++).getFormatting());
-                }
-            }
-
-            i = 0;
-            for (Expression expression : reordered) {
-                reordered.set(i, expression.withFormatting(formattings.get(i++)));
-            }
-
-            return method.withArgs(method.getArgs().withArgs(reordered));
+        public Scoped(J.MethodInvocation scope, String[] order, String[] originalOrder) {
+            this.scope = scope;
+            this.order = order;
+            this.originalOrder = originalOrder;
+            setCursoringOn();
         }
 
-        return super.visitMethodInvocation(method);
+        @Override
+        public boolean isIdempotent() {
+            return false;
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method) {
+            if (scope.isScope(method) && method.getType() != null) {
+                var paramNames = originalOrder.length == 0 ? method.getType().getParamNames() :
+                        Arrays.asList(originalOrder);
+
+                if (paramNames == null) {
+                    throw new IllegalStateException("There is no source attachment for method " + method.getType().getDeclaringType().getFullyQualifiedName() +
+                            "." + method.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
+                }
+
+                List<Expression> originalArgs = method.getArgs().getArgs();
+
+                var resolvedParamCount = method.getType().getResolvedSignature() == null ? originalArgs.size() :
+                        method.getType().getResolvedSignature().getParamTypes().size();
+
+                int i = 0;
+                List<Expression> reordered = new ArrayList<>(originalArgs.size());
+                List<Formatting> formattings = new ArrayList<>(originalArgs.size());
+
+                for (String name : order) {
+                    int fromPos = paramNames.indexOf(name);
+                    if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
+                        // this is a varargs argument
+                        List<Expression> varargs = originalArgs.subList(fromPos, originalArgs.size());
+                        reordered.addAll(varargs);
+                        originalArgs.subList(i, (i++) + varargs.size()).stream().map(Expression::getFormatting).forEach(formattings::add);
+                    } else if (fromPos >= 0 && originalArgs.size() > fromPos) {
+                        reordered.add(originalArgs.get(fromPos));
+                        formattings.add(originalArgs.get(i++).getFormatting());
+                    }
+                }
+
+                i = 0;
+                for (Expression expression : reordered) {
+                    reordered.set(i, expression.withFormatting(formattings.get(i++)));
+                }
+
+                return method.withArgs(method.getArgs().withArgs(reordered));
+            }
+
+            return super.visitMethodInvocation(method);
+        }
     }
 }

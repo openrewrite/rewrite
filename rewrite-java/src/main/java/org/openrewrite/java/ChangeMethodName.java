@@ -17,26 +17,56 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 
-public class ChangeMethodName extends JavaRefactorVisitor {
-    private final J.MethodInvocation scope;
-    private final String name;
+import static org.openrewrite.Validated.required;
 
-    public ChangeMethodName(J.MethodInvocation scope, String name) {
-        this.scope = scope;
+public class ChangeMethodName extends JavaRefactorVisitor {
+    private MethodMatcher methodMatcher;
+    private String name;
+
+    public void setMethod(String method) {
+        this.methodMatcher = new MethodMatcher(method);
+    }
+
+    public void setName(String name) {
         this.name = name;
     }
 
     @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("name", name);
+    public Validated validate() {
+        return required("method", methodMatcher)
+                .and(required("name", name));
     }
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        return scope.isScope(method) ?
-                method.withName(method.getName().withName(name)) :
-                super.visitMethodInvocation(method);
+        if (methodMatcher.matches(method)) {
+            andThen(new Scoped(method, name));
+        }
+        return super.visitMethodInvocation(method);
+    }
+
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.MethodInvocation scope;
+        private final String name;
+
+        public Scoped(J.MethodInvocation scope, String name) {
+            this.scope = scope;
+            this.name = name;
+        }
+
+        @Override
+        public Iterable<Tag> getTags() {
+            return Tags.of("name", name);
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method) {
+            return scope.isScope(method) && !method.getSimpleName().equals(name) ?
+                    method.withName(method.getName().withName(name)) :
+                    super.visitMethodInvocation(method);
+        }
     }
 }

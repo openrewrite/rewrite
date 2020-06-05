@@ -16,9 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeMethodName
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
 open class ChangeMethodNameTest : JavaParser() {
 
@@ -29,6 +26,31 @@ open class ChangeMethodNameTest : JavaParser() {
                    public void varargArg(String... s) {}
                 }
             """.trimIndent()
+
+    @Test
+    fun refactorMethodNameForMethodWithSingleArgDeclarative() {
+        val a = """
+            class A {
+               public void test() {
+                   new B().singleArg("boo");
+               }
+            }
+        """.trimIndent()
+
+        val cu = parse(a, b)
+
+        val fixed = cu.refactor()
+                .visit(ChangeMethodName().apply { setMethod("B singleArg(String)"); setName("bar") })
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            class A {
+               public void test() {
+                   new B().bar("boo");
+               }
+            }
+        """)
+    }
 
     @Test
     fun refactorMethodNameForMethodWithSingleArg() {
@@ -43,7 +65,7 @@ open class ChangeMethodNameTest : JavaParser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B singleArg(String)")) { ChangeMethodName(it, "bar") }
+                .fold(cu.findMethodCalls("B singleArg(String)")) { ChangeMethodName.Scoped(it, "bar") }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -68,7 +90,7 @@ open class ChangeMethodNameTest : JavaParser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B arrArg(String[])")) { ChangeMethodName(it, "bar") }
+                .fold(cu.findMethodCalls("B arrArg(String[])")) { ChangeMethodName.Scoped(it, "bar") }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -93,7 +115,7 @@ open class ChangeMethodNameTest : JavaParser() {
         val cu = parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B varargArg(String...)")) { ChangeMethodName(it, "bar") }
+                .fold(cu.findMethodCalls("B varargArg(String...)")) { ChangeMethodName.Scoped(it, "bar") }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -124,7 +146,7 @@ open class ChangeMethodNameTest : JavaParser() {
 
         val cu = parse(a, b)
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B error()")) { ChangeMethodName(it, "foo") }
+                .fold(cu.findMethodCalls("B error()")) { ChangeMethodName.Scoped(it, "foo") }
                 .fix().fixed
 
         assertRefactored(fixed, """

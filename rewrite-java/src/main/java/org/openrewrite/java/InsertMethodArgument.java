@@ -18,10 +18,8 @@ package org.openrewrite.java;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
-import org.openrewrite.config.AutoConfigure;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,18 +29,17 @@ import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-@AutoConfigure
 public class InsertMethodArgument extends JavaRefactorVisitor {
     private MethodMatcher methodMatcher;
-    private Integer pos;
+    private Integer index;
     private String source;
 
     public void setMethod(String method) {
         this.methodMatcher = new MethodMatcher(method);
     }
 
-    public void setPos(int pos) {
-        this.pos = pos;
+    public void setIndex(Integer index) {
+        this.index = index;
     }
 
     public void setSource(String source) {
@@ -52,7 +49,7 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
     @Override
     public Validated validate() {
         return required("method", methodMatcher)
-                .and(required("pos", pos))
+                .and(required("pos", index))
                 .and(required("source", source));
     }
 
@@ -64,19 +61,19 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
-            andThen(new Scoped(method, pos, source));
+            andThen(new Scoped(method, index, source));
         }
         return super.visitMethodInvocation(method);
     }
 
     public static class Scoped extends JavaRefactorVisitor {
         private final J.MethodInvocation scope;
-        private final int pos;
+        private final int index;
         private final String source;
 
-        public Scoped(J.MethodInvocation scope, int pos, String source) {
+        public Scoped(J.MethodInvocation scope, int index, String source) {
             this.scope = scope;
-            this.pos = pos;
+            this.index = index;
             this.source = source;
         }
 
@@ -91,16 +88,16 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
                 List<Expression> modifiedArgs = method.getArgs().getArgs().stream()
                         .filter(a -> !(a instanceof J.Empty))
                         .collect(Collectors.toCollection(ArrayList::new));
-                modifiedArgs.add(pos,
+                modifiedArgs.add(index,
                         new J.UnparsedSource(randomId(),
                                 source,
-                                pos == 0 ?
+                                index == 0 ?
                                         modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
                                         format(" ")
                         )
                 );
 
-                if (pos == 0 && modifiedArgs.size() > 1) {
+                if (index == 0 && modifiedArgs.size() > 1) {
                     // this argument previously did not occur after a comma, and now does, so let's introduce a bit of space
                     modifiedArgs.set(1, modifiedArgs.get(1).withFormatting(format(" ")));
                 }

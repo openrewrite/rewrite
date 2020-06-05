@@ -47,7 +47,7 @@ open class InsertMethodArgumentTest : JavaParser() {
 
         val fixed = cu.refactor().visit(InsertMethodArgument().apply {
             setMethod("B foo(String)")
-            setPos(0)
+            setIndex(0)
             setSource("\"0\"")
         }).fix().fixed
 

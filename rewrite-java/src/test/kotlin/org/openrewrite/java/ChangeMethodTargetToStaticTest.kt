@@ -17,10 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeMethodName
-import org.openrewrite.java.ChangeMethodTargetToStatic
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
 
@@ -54,8 +50,8 @@ open class ChangeMethodTargetToStaticTest : JavaParser() {
         val cu = parse(c, a, b)
         val targets = cu.findMethodCalls("a.A nonStatic()")
         val fixed = cu.refactor()
-                .fold(targets) { ChangeMethodTargetToStatic(it, "b.B") }
-                .fold(targets) { ChangeMethodName(it, "foo") }
+                .fold(targets) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
+                .fold(targets) { ChangeMethodName.Scoped(it, "foo") }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -99,7 +95,7 @@ open class ChangeMethodTargetToStaticTest : JavaParser() {
 
         val cu = parse(c, a, b)
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("a.A foo()")) { ChangeMethodTargetToStatic(it, "b.B") }
+                .fold(cu.findMethodCalls("a.A foo()")) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
                 .fix().fixed
 
         assertRefactored(fixed, """

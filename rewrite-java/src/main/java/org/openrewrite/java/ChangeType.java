@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.Validated.required;
 
 /**
  * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
@@ -34,23 +36,36 @@ import static org.openrewrite.Tree.randomId;
  * is defined on the super class.
  */
 public class ChangeType extends JavaRefactorVisitor {
-    private final String from;
-    private final JavaType.Class toClassType;
+    private String type;
+    private JavaType.Class targetType;
 
-    public ChangeType(String from, String to) {
-        this.from = from;
-        this.toClassType = JavaType.Class.build(to);
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public void setTargetType(String targetType) {
+        this.targetType = JavaType.Class.build(targetType);
+    }
+
+    public void setTargetType(JavaType.Class targetType) {
+        this.targetType = targetType;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("type", type)
+                .and(required("target.type", targetType.getFullyQualifiedName()));
     }
 
     @Override
     public Iterable<Tag> getTags() {
-        return Tags.of("from", from, "to", toClassType.getFullyQualifiedName());
+        return Tags.of("type", type, "target.type", targetType.getFullyQualifiedName());
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
-        maybeAddImport(toClassType);
-        maybeRemoveImport(from);
+        maybeAddImport(targetType);
+        maybeRemoveImport(type);
         return super.visitCompilationUnit(cu);
     }
 
@@ -58,8 +73,8 @@ public class ChangeType extends JavaRefactorVisitor {
     public J visitTypeName(NameTree name) {
         JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
         NameTree n = refactor(name, super::visitTypeName);
-        if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(from)) {
-            n = n.withType(toClassType);
+        if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(type)) {
+            n = n.withType(targetType);
         }
         return n;
     }
@@ -115,8 +130,8 @@ public class ChangeType extends JavaRefactorVisitor {
 
         if (m.getSelect() != null) {
             JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getType());
-            if (selectType != null && selectType.getFullyQualifiedName().equals(from)) {
-                m = m.withSelect(m.getSelect().withType(toClassType));
+            if (selectType != null && selectType.getFullyQualifiedName().equals(type)) {
+                m = m.withSelect(m.getSelect().withType(targetType));
             }
         }
 
@@ -144,8 +159,8 @@ public class ChangeType extends JavaRefactorVisitor {
         J.VariableDecls.NamedVar v = refactor(variable, super::visitVariable);
 
         JavaType.Class varType = TypeUtils.asClass(variable.getType());
-        if (varType != null && varType.getFullyQualifiedName().equals(from)) {
-            v = v.withType(toClassType).withName(v.getName().withType(toClassType));
+        if (varType != null && varType.getFullyQualifiedName().equals(type)) {
+            v = v.withType(targetType).withName(v.getName().withType(targetType));
         }
 
         return v;
@@ -187,8 +202,8 @@ public class ChangeType extends JavaRefactorVisitor {
     private <T extends Tree> T transformName(@Nullable T nameField) {
         if (nameField instanceof NameTree) {
             JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
-            if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(from)) {
-                return (T) J.Ident.build(randomId(), toClassType.getClassName(), toClassType, nameField.getFormatting());
+            if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(type)) {
+                return (T) J.Ident.build(randomId(), targetType.getClassName(), targetType, nameField.getFormatting());
             }
         }
         return nameField;
@@ -205,9 +220,9 @@ public class ChangeType extends JavaRefactorVisitor {
         for (T tree : trees) {
             if (tree instanceof NameTree) {
                 JavaType.Class nodeTypeAsClass = TypeUtils.asClass(((NameTree) tree).getType());
-                if (nodeTypeAsClass != null && nodeTypeAsClass.getFullyQualifiedName().equals(from)) {
+                if (nodeTypeAsClass != null && nodeTypeAsClass.getFullyQualifiedName().equals(type)) {
                     atLeastOneChanged = true;
-                    transformed.add((T) J.Ident.build(randomId(), toClassType.getClassName(), toClassType, tree.getFormatting()));
+                    transformed.add((T) J.Ident.build(randomId(), targetType.getClassName(), targetType, tree.getFormatting()));
                     continue;
                 }
             }

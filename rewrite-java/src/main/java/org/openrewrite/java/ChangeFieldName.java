@@ -24,101 +24,106 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-public class ChangeFieldName extends JavaRefactorVisitor {
-    private final JavaType.Class classType;
-    private final String hasName;
-    private final String toName;
-
-    public ChangeFieldName(JavaType.Class classType, String hasName, String toName) {
-        this.classType = classType;
-        this.hasName = hasName;
-        this.toName = toName;
-        setCursoringOn();
+public final class ChangeFieldName {
+    private ChangeFieldName() {
     }
 
-    @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("class.type", classType.getFullyQualifiedName(),
-                "has.name", hasName, "to.name", toName);
-    }
+    public static class Scoped extends JavaRefactorVisitor {
+        private final JavaType.Class classType;
+        private final String hasName;
+        private final String toName;
 
-    @Override
-    public J visitVariable(J.VariableDecls.NamedVar variable) {
-        J.VariableDecls.NamedVar v = refactor(variable, super::visitVariable);
-        if (variable.isField(getCursor()) && matchesClass(enclosingClass().getType()) &&
-                variable.getSimpleName().equals(hasName)) {
-            v = v.withName(v.getName().withName(toName));
-        }
-        return v;
-    }
-
-    @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess) {
-        J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
-        if(matchesClass(fieldAccess.getTarget().getType()) &&
-                fieldAccess.getSimpleName().equals(hasName)) {
-            f = f.withName(f.getName().withName(toName));
-        }
-        return f;
-    }
-
-    @Override
-    public J visitIdentifier(J.Ident ident) {
-        J.Ident i = refactor(ident, super::visitIdentifier);
-        if(ident.getSimpleName().equals(hasName) && isFieldReference(ident)) {
-            i = i.withName(toName);
-        }
-        return i;
-    }
-
-    private boolean matchesClass(@Nullable JavaType test) {
-        JavaType.Class testClassType = TypeUtils.asClass(test);
-        return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
-    }
-
-    private boolean isFieldReference(J.Ident ident) {
-        Cursor nearest = new FindVariableDefinition(ident, getCursor()).visit(enclosingCompilationUnit());
-        return nearest != null && nearest
-                .getParentOrThrow() // maybe J.VariableDecls
-                .getParentOrThrow() // maybe J.Block
-                .getParentOrThrow() // maybe J.ClassDecl
-                .getTree() instanceof J.ClassDecl;
-    }
-
-    private static class FindVariableDefinition extends JavaSourceVisitor<Cursor> {
-        private final J.Ident ident;
-        private final Cursor referenceScope;
-
-        public FindVariableDefinition(J.Ident ident, Cursor referenceScope) {
-            this.ident = ident;
-            this.referenceScope = referenceScope;
+        public Scoped(JavaType.Class classType, String hasName, String toName) {
+            this.classType = classType;
+            this.hasName = hasName;
+            this.toName = toName;
             setCursoringOn();
         }
 
         @Override
-        public Cursor defaultTo(Tree t) {
-            return null;
+        public Iterable<Tag> getTags() {
+            return Tags.of("class.type", classType.getFullyQualifiedName(),
+                    "has.name", hasName, "to.name", toName);
         }
 
         @Override
-        public Cursor visitVariable(J.VariableDecls.NamedVar variable) {
-            return variable.getSimpleName().equalsIgnoreCase(ident.getSimpleName()) && isInSameNameScope(referenceScope) ?
-                    getCursor() :
-                    super.visitVariable(variable);
+        public J visitVariable(J.VariableDecls.NamedVar variable) {
+            J.VariableDecls.NamedVar v = refactor(variable, super::visitVariable);
+            if (variable.isField(getCursor()) && matchesClass(enclosingClass().getType()) &&
+                    variable.getSimpleName().equals(hasName)) {
+                v = v.withName(v.getName().withName(toName));
+            }
+            return v;
         }
 
         @Override
-        public Cursor reduce(Cursor r1, Cursor r2) {
-            if (r1 == null) {
-                return r2;
+        public J visitFieldAccess(J.FieldAccess fieldAccess) {
+            J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
+            if (matchesClass(fieldAccess.getTarget().getType()) &&
+                    fieldAccess.getSimpleName().equals(hasName)) {
+                f = f.withName(f.getName().withName(toName));
+            }
+            return f;
+        }
+
+        @Override
+        public J visitIdentifier(J.Ident ident) {
+            J.Ident i = refactor(ident, super::visitIdentifier);
+            if (ident.getSimpleName().equals(hasName) && isFieldReference(ident)) {
+                i = i.withName(toName);
+            }
+            return i;
+        }
+
+        private boolean matchesClass(@Nullable JavaType test) {
+            JavaType.Class testClassType = TypeUtils.asClass(test);
+            return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
+        }
+
+        private boolean isFieldReference(J.Ident ident) {
+            Cursor nearest = new FindVariableDefinition(ident, getCursor()).visit(enclosingCompilationUnit());
+            return nearest != null && nearest
+                    .getParentOrThrow() // maybe J.VariableDecls
+                    .getParentOrThrow() // maybe J.Block
+                    .getParentOrThrow() // maybe J.ClassDecl
+                    .getTree() instanceof J.ClassDecl;
+        }
+
+        private static class FindVariableDefinition extends JavaSourceVisitor<Cursor> {
+            private final J.Ident ident;
+            private final Cursor referenceScope;
+
+            public FindVariableDefinition(J.Ident ident, Cursor referenceScope) {
+                this.ident = ident;
+                this.referenceScope = referenceScope;
+                setCursoringOn();
             }
 
-            if (r2 == null) {
-                return r1;
+            @Override
+            public Cursor defaultTo(Tree t) {
+                return null;
             }
 
-            // the definition will be the "closest" cursor, i.e. the one with the longest path in the same name scope
-            return r1.getPathAsStream().count() > r2.getPathAsStream().count() ? r1 : r2;
+            @Override
+            public Cursor visitVariable(J.VariableDecls.NamedVar variable) {
+                return variable.getSimpleName().equalsIgnoreCase(ident.getSimpleName()) && isInSameNameScope(referenceScope) ?
+                        getCursor() :
+                        super.visitVariable(variable);
+            }
+
+            @Override
+            public Cursor reduce(Cursor r1, Cursor r2) {
+                if (r1 == null) {
+                    return r2;
+                }
+
+                if (r2 == null) {
+                    return r1;
+                }
+
+                // the definition will be the "closest" cursor, i.e. the one with the longest path in the same name scope
+                return r1.getPathAsStream().count() > r2.getPathAsStream().count() ? r1 : r2;
+            }
         }
     }
 }

@@ -444,14 +444,17 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     public void addImport(String fullyQualifiedName) {
-        AddImport op = new AddImport(fullyQualifiedName, null, false);
+        AddImport op = new AddImport();
+        op.setType(fullyQualifiedName);
+        op.setOnlyIfReferenced(false);
         if (!andThen().contains(op)) {
             andThen(op);
         }
     }
 
     public void maybeAddImport(String fullyQualifiedName) {
-        AddImport op = new AddImport(fullyQualifiedName, null, true);
+        AddImport op = new AddImport();
+        op.setType(fullyQualifiedName);
         if (!andThen().contains(op)) {
             andThen(op);
         }
@@ -464,7 +467,8 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     }
 
     public void maybeRemoveImport(String fullyQualifiedName) {
-        RemoveImport op = new RemoveImport(fullyQualifiedName);
+        RemoveImport op = new RemoveImport();
+        op.setType(fullyQualifiedName);
         if (!andThen().contains(op)) {
             andThen(op);
         }

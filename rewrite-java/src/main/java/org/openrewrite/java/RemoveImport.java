@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -33,11 +34,11 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class RemoveImport extends JavaRefactorVisitor {
     @EqualsAndHashCode.Include
-    private final String clazz;
+    private String type;
 
-    private final MethodMatcher methodMatcher;
+    private JavaType.Class classType;
 
-    private final JavaType.Class classType;
+    private MethodMatcher methodMatcher;
 
     private J.Import namedImport;
     private J.Import starImport;
@@ -48,20 +49,36 @@ public class RemoveImport extends JavaRefactorVisitor {
     private final Set<String> referencedFields = new HashSet<>();
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    public RemoveImport(String clazz) {
-        this.clazz = clazz;
-        this.methodMatcher = new MethodMatcher(clazz + " *(..)");
-        this.classType = JavaType.Class.build(clazz);
+    public RemoveImport() {
         setCursoringOn();
     }
 
     @Override
     public Iterable<Tag> getTags() {
-        return Tags.of("class.type", clazz);
+        return Tags.of("type", type);
+    }
+
+    @Override
+    public Validated validate() {
+        return Validated.required("type", type);
+    }
+
+    public void setType(String type) {
+        this.type = type;
+        this.methodMatcher = new MethodMatcher(type + " *(..)");
+        this.classType = JavaType.Class.build(type);
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
+        namedImport = null;
+        starImport = null;
+        staticStarImport = null;
+        referencedTypes.clear();
+        referencedMethods.clear();
+        referencedFields.clear();
+        staticNamedImports.clear();
+
         J.CompilationUnit c = refactor(cu, super::visitCompilationUnit);
         return staticImportDeletions(classImportDeletions(c));
     }
@@ -69,7 +86,7 @@ public class RemoveImport extends JavaRefactorVisitor {
     @Override
     public J visitImport(J.Import impoort) {
         if (impoort.isStatic()) {
-            if (impoort.getQualid().getTarget().printTrimmed().equals(clazz)) {
+            if (impoort.getQualid().getTarget().printTrimmed().equals(type)) {
                 if ("*".equals(impoort.getQualid().getSimpleName())) {
                     staticStarImport = impoort;
                 } else {
@@ -77,9 +94,9 @@ public class RemoveImport extends JavaRefactorVisitor {
                 }
             }
         } else {
-            if (impoort.getQualid().printTrimmed().equals(clazz)) {
+            if (impoort.getQualid().printTrimmed().equals(type)) {
                 namedImport = impoort;
-            } else if ("*".equals(impoort.getQualid().getSimpleName()) && clazz.startsWith(impoort.getQualid().getTarget().printTrimmed())) {
+            } else if ("*".equals(impoort.getQualid().getSimpleName()) && type.startsWith(impoort.getQualid().getTarget().printTrimmed())) {
                 starImport = impoort;
             }
         }
@@ -108,14 +125,14 @@ public class RemoveImport extends JavaRefactorVisitor {
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
         if (methodMatcher.matches(method) && method.getType() != null &&
-                method.getType().getDeclaringType().getFullyQualifiedName().equals(clazz)) {
+                method.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
             referencedMethods.add(method.getName());
         }
         return super.visitMethodInvocation(method);
     }
 
     private J.CompilationUnit classImportDeletions(J.CompilationUnit cu) {
-        if (namedImport != null && referencedTypes.stream().noneMatch(t -> t.equals(clazz))) {
+        if (namedImport != null && referencedTypes.stream().noneMatch(t -> t.equals(type))) {
             return delete(cu, namedImport);
         } else if (starImport != null && referencedTypes.isEmpty()) {
             return delete(cu, starImport);

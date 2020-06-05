@@ -16,9 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeMethodTargetToVariable
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
 open class ChangeMethodTargetToVariableTest : JavaParser() {
 
@@ -53,7 +50,7 @@ open class ChangeMethodTargetToVariableTest : JavaParser() {
         val f = cu.classes[0].findFields("a.A")[0]
 
         val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
-            ChangeMethodTargetToVariable(it, f.vars[0])
+            ChangeMethodTargetToVariable.Scoped(it, f.vars[0])
         }.fix().fixed
 
         assertRefactored(fixed, """
@@ -98,7 +95,7 @@ open class ChangeMethodTargetToVariableTest : JavaParser() {
 
         val f = cu.classes[0].findFields("a.A")[0]
         val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
-            ChangeMethodTargetToVariable(it, f.vars[0])
+            ChangeMethodTargetToVariable.Scoped(it, f.vars[0])
         }.fix().fixed
 
         assertRefactored(fixed, """

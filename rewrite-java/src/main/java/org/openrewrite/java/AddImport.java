@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.tree.J;
@@ -31,6 +32,7 @@ import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.Validated.required;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaRefactorVisitor {
@@ -38,35 +40,46 @@ public class AddImport extends JavaRefactorVisitor {
     OrderImports orderImports = new IntellijOrderImports();
 
     @EqualsAndHashCode.Include
-    private final String clazz;
+    private String type;
 
     @EqualsAndHashCode.Include
     @Nullable
-    private final String staticMethod;
+    private String staticMethod;
 
     @EqualsAndHashCode.Include
-    private final boolean onlyIfReferenced;
+    private boolean onlyIfReferenced = true;
 
-    private final JavaType.Class classType;
+    private JavaType.Class classType;
 
     private boolean coveredByExistingImport;
 
-    public AddImport(String clazz, @Nullable String staticMethod, boolean onlyIfReferenced) {
-        this.clazz = clazz;
+    public void setType(String type) {
+        this.type = type;
+        this.classType = JavaType.Class.build(type);
+    }
+
+    public void setStaticMethod(@Nullable String staticMethod) {
         this.staticMethod = staticMethod;
+    }
+
+    public void setOnlyIfReferenced(boolean onlyIfReferenced) {
         this.onlyIfReferenced = onlyIfReferenced;
-        this.classType = JavaType.Class.build(clazz);
     }
 
     @Override
     public Iterable<Tag> getTags() {
-        return Tags.of("class", clazz, "static.method", staticMethod == null ? "none" : staticMethod);
+        return Tags.of("class", type, "static.method", staticMethod == null ? "none" : staticMethod);
+    }
+
+    @Override
+    public Validated validate() {
+        return required("type", type);
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
         coveredByExistingImport = false;
-        boolean hasReferences = !new FindType(clazz).visit(cu).isEmpty();
+        boolean hasReferences = !new FindType(type).visit(cu).isEmpty();
 
         if (onlyIfReferenced && !hasReferences) {
             return cu;
@@ -99,11 +112,11 @@ public class AddImport extends JavaRefactorVisitor {
         var importedType = impoort.getQualid().getSimpleName();
 
         if (staticMethod != null) {
-            if (impoort.isFromType(clazz) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {
+            if (impoort.isFromType(type) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {
                 coveredByExistingImport = true;
             }
         } else {
-            if (impoort.isFromType(clazz)) {
+            if (impoort.isFromType(type)) {
                 coveredByExistingImport = true;
             } else if (importedType.equals("*") && impoort.getQualid().getTarget().printTrimmed().equals(classType.getPackageName())) {
                 coveredByExistingImport = true;
@@ -127,7 +140,7 @@ public class AddImport extends JavaRefactorVisitor {
                     cu.getImports().stream()
                             .filter(i -> {
                                 String fqn = i.getQualid().getTarget().printTrimmed();
-                                return i.isStatic() && fqn.substring(0, Math.max(0, fqn.lastIndexOf('.'))).equals(clazz);
+                                return i.isStatic() && fqn.substring(0, Math.max(0, fqn.lastIndexOf('.'))).equals(type);
                             })
                             .collect(toList());
         }
@@ -152,7 +165,7 @@ public class AddImport extends JavaRefactorVisitor {
                 importsWithAdded.removeAll(importsThatCouldBeStarReplaced);
             }
 
-            J.FieldAccess classImportField = TreeBuilder.buildName(clazz, Formatting.format(" "));
+            J.FieldAccess classImportField = TreeBuilder.buildName(type, Formatting.format(" "));
             J.Import importStatementToAdd;
             if (staticMethod == null) {
                 importStatementToAdd = new J.Import(randomId(),

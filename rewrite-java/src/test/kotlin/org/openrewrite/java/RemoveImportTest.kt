@@ -16,10 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeType
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.RemoveImport
-import org.openrewrite.java.assertRefactored
 
 open class RemoveImportTest : JavaParser() {
 
@@ -30,7 +26,7 @@ open class RemoveImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -44,7 +40,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -61,7 +57,7 @@ open class RemoveImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -75,7 +71,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.Collection;
@@ -95,7 +91,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.List")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.*;
@@ -113,7 +109,7 @@ open class RemoveImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
 
         assertRefactored(fixed, "class A {}")
     }
@@ -127,7 +123,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.*;
@@ -147,7 +143,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(RemoveImport("java.util.Collections")).fix().fixed
+        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
 
         assertRefactored(fixed, """
             import static java.util.Collections.emptyList;
@@ -184,8 +180,8 @@ open class RemoveImportTest : JavaParser() {
         """.trimIndent(), bSource, cSource)
 
         val fixed = a.refactor()
-                .visit(RemoveImport("foo.B"))
-                .visit(RemoveImport("foo.C"))
+                .visit(RemoveImport().apply { setType("foo.B") })
+                .visit(RemoveImport().apply { setType("foo.C") })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -222,7 +218,8 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent(), b, c)
 
-        val fixed = a.refactor().visit(ChangeType("b.B", "c.C")).fix().fixed
+        val fixed = a.refactor().visit(ChangeType().apply { setType("b.B"); setTargetType("c.C") })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import c.C;

@@ -23,8 +23,8 @@ open class AddImportTest : JavaParser() {
         val a = parse("class A {}")
 
         val fixed = a.refactor()
-                .visit(AddImport("java.util.List", null, false))
-                .visit(AddImport("java.util.Set", null, false))
+                .visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .visit(AddImport().apply { setType("java.util.Set"); setOnlyIfReferenced(false) })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -39,7 +39,8 @@ open class AddImportTest : JavaParser() {
     fun addNamedImport() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -52,7 +53,8 @@ open class AddImportTest : JavaParser() {
     fun addNamedImportByClass() {
         val a = parse("class A {}")
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -68,7 +70,8 @@ open class AddImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -103,7 +106,8 @@ open class AddImportTest : JavaParser() {
                 
                 class A {}
             """.trimIndent(), otherImports.plus(b))
-            val fixed = cu.refactor().visit(AddImport("$pkg.B", null, false)).fix().fixed
+            val fixed = cu.refactor().visit(AddImport().apply { setType("$pkg.B"); setOnlyIfReferenced(false) })
+                    .fix().fixed
 
             val expectedImports = otherPackages.mapIndexed { i, otherPkg -> "$otherPkg.C$i" }.toMutableList()
             expectedImports.add(order, "$pkg.B")
@@ -122,7 +126,8 @@ open class AddImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -141,7 +146,8 @@ open class AddImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -160,7 +166,8 @@ open class AddImportTest : JavaParser() {
             class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(AddImport("java.util.List", null, false)).fix().fixed
+        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
+                .fix().fixed
 
         assertRefactored(fixed, """
             package a;
@@ -181,7 +188,11 @@ open class AddImportTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddImport("java.util.Collections", "emptyList", false))
+                .visit(AddImport().apply {
+                    setType("java.util.Collections")
+                    setStaticMethod("emptyList")
+                    setOnlyIfReferenced(false)
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -196,7 +207,12 @@ open class AddImportTest : JavaParser() {
     @Test
     fun dontAddImportWhenClassHasNoPackage() {
         val a = parse("class A {}")
-        val fixed = a.refactor().visit(AddImport("C", null, false)).fix().fixed
+
+        val fixed = a.refactor().visit(AddImport().apply {
+            setType("C")
+            setOnlyIfReferenced(false)
+        }).fix().fixed
+
         assertRefactored(fixed, "class A {}")
     }
 }

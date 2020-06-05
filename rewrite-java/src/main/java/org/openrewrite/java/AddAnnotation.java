@@ -31,144 +31,149 @@ import static java.util.Arrays.asList;
 import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
-public class AddAnnotation extends JavaRefactorVisitor {
-    private final Tree scope;
-    private final JavaType.Class annotationType;
-    private final List<Expression> arguments;
-
-    public AddAnnotation(Tree scope, String annotationTypeName, Expression... arguments) {
-        this.scope = scope;
-        this.annotationType = JavaType.Class.build(annotationTypeName);
-        this.arguments = asList(arguments);
-        setCursoringOn();
+public final class AddAnnotation {
+    private AddAnnotation() {
     }
 
-    @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("annotation.type", annotationType.getFullyQualifiedName());
-    }
+    public static class Scoped extends JavaRefactorVisitor {
+        private final Tree scope;
+        private final JavaType.Class annotationType;
+        private final List<Expression> arguments;
 
-    @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
-        J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-
-        if (scope.isScope(classDecl)) {
-            maybeAddImport(annotationType.getFullyQualifiedName());
-
-            if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                List<J.Annotation> fixedAnnotations = new ArrayList<>(c.getAnnotations());
-
-                Formatting annotationFormatting = classDecl.getModifiers().isEmpty() ?
-                        (classDecl.getTypeParameters() == null ?
-                                classDecl.getKind().getFormatting() :
-                                classDecl.getTypeParameters().getFormatting()) :
-                        format(firstPrefix(classDecl.getModifiers()));
-
-                fixedAnnotations.add(buildAnnotation(annotationFormatting));
-
-                c = c.withAnnotations(fixedAnnotations);
-                if (classDecl.getAnnotations().isEmpty()) {
-                    String prefix = formatter.findIndent(0, c).getPrefix();
-
-                    // special case, where a top-level class is often un-indented completely
-                    String cdPrefix = c.getFormatting().getPrefix();
-                    if (getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit &&
-                            cdPrefix.substring(cdPrefix.lastIndexOf('\n')).chars().noneMatch(p -> p == ' ' || p == '\t')) {
-                        prefix = "\n";
-                    }
-
-                    if (!c.getModifiers().isEmpty()) {
-                        c = c.withModifiers(formatFirstPrefix(c.getModifiers(), prefix));
-                    } else if (c.getTypeParameters() != null) {
-                        c = c.withTypeParameters(c.getTypeParameters().withPrefix(prefix));
-                    } else {
-                        c = c.withKind(c.getKind().withPrefix(prefix));
-                    }
-                }
-            }
+        public Scoped(Tree scope, String annotationTypeName, Expression... arguments) {
+            this.scope = scope;
+            this.annotationType = JavaType.Class.build(annotationTypeName);
+            this.arguments = asList(arguments);
+            setCursoringOn();
         }
 
-        return c;
-    }
+        @Override
+        public Iterable<Tag> getTags() {
+            return Tags.of("annotation.type", annotationType.getFullyQualifiedName());
+        }
 
-    @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable) {
-        J.VariableDecls v = refactor(multiVariable, super::visitMultiVariable);
+        @Override
+        public J visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
 
-        if (scope.isScope(multiVariable)) {
-            Tree parent = getCursor().getParentOrThrow().getTree();
-            boolean isMethodOrLambdaParameter = parent instanceof J.MethodDecl || parent instanceof J.Lambda;
+            if (scope.isScope(classDecl)) {
+                maybeAddImport(annotationType.getFullyQualifiedName());
 
-            maybeAddImport(annotationType.getFullyQualifiedName());
+                if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
+                    List<J.Annotation> fixedAnnotations = new ArrayList<>(c.getAnnotations());
 
-            if (v.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                List<J.Annotation> fixedAnnotations = new ArrayList<>(v.getAnnotations());
+                    Formatting annotationFormatting = classDecl.getModifiers().isEmpty() ?
+                            (classDecl.getTypeParameters() == null ?
+                                    classDecl.getKind().getFormatting() :
+                                    classDecl.getTypeParameters().getFormatting()) :
+                            format(firstPrefix(classDecl.getModifiers()));
 
-                if (!isMethodOrLambdaParameter && multiVariable.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
-                    List<?> statements = enclosingBlock().getStatements();
-                    for (int i = 1; i < statements.size(); i++) {
-                        if (statements.get(i) == multiVariable) {
-                            v = v.withPrefix("\n" + v.getFormatting().getPrefix());
-                            break;
+                    fixedAnnotations.add(buildAnnotation(annotationFormatting));
+
+                    c = c.withAnnotations(fixedAnnotations);
+                    if (classDecl.getAnnotations().isEmpty()) {
+                        String prefix = formatter.findIndent(0, c).getPrefix();
+
+                        // special case, where a top-level class is often un-indented completely
+                        String cdPrefix = c.getFormatting().getPrefix();
+                        if (getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit &&
+                                cdPrefix.substring(cdPrefix.lastIndexOf('\n')).chars().noneMatch(p -> p == ' ' || p == '\t')) {
+                            prefix = "\n";
+                        }
+
+                        if (!c.getModifiers().isEmpty()) {
+                            c = c.withModifiers(formatFirstPrefix(c.getModifiers(), prefix));
+                        } else if (c.getTypeParameters() != null) {
+                            c = c.withTypeParameters(c.getTypeParameters().withPrefix(prefix));
+                        } else {
+                            c = c.withKind(c.getKind().withPrefix(prefix));
                         }
                     }
                 }
+            }
 
-                fixedAnnotations.add(buildAnnotation(EMPTY));
+            return c;
+        }
 
-                v = v.withAnnotations(fixedAnnotations);
-                if (multiVariable.getAnnotations().isEmpty()) {
-                    String prefix = isMethodOrLambdaParameter ? " " : formatter.format(enclosingBlock()).getPrefix();
+        @Override
+        public J visitMultiVariable(J.VariableDecls multiVariable) {
+            J.VariableDecls v = refactor(multiVariable, super::visitMultiVariable);
 
-                    if (!v.getModifiers().isEmpty()) {
-                        v = v.withModifiers(formatFirstPrefix(v.getModifiers(), prefix));
-                    } else {
-                        //noinspection ConstantConditions
-                        v = v.withTypeExpr(v.getTypeExpr().withPrefix(prefix));
+            if (scope.isScope(multiVariable)) {
+                Tree parent = getCursor().getParentOrThrow().getTree();
+                boolean isMethodOrLambdaParameter = parent instanceof J.MethodDecl || parent instanceof J.Lambda;
+
+                maybeAddImport(annotationType.getFullyQualifiedName());
+
+                if (v.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
+                    List<J.Annotation> fixedAnnotations = new ArrayList<>(v.getAnnotations());
+
+                    if (!isMethodOrLambdaParameter && multiVariable.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
+                        List<?> statements = enclosingBlock().getStatements();
+                        for (int i = 1; i < statements.size(); i++) {
+                            if (statements.get(i) == multiVariable) {
+                                v = v.withPrefix("\n" + v.getFormatting().getPrefix());
+                                break;
+                            }
+                        }
+                    }
+
+                    fixedAnnotations.add(buildAnnotation(EMPTY));
+
+                    v = v.withAnnotations(fixedAnnotations);
+                    if (multiVariable.getAnnotations().isEmpty()) {
+                        String prefix = isMethodOrLambdaParameter ? " " : formatter.format(enclosingBlock()).getPrefix();
+
+                        if (!v.getModifiers().isEmpty()) {
+                            v = v.withModifiers(formatFirstPrefix(v.getModifiers(), prefix));
+                        } else {
+                            //noinspection ConstantConditions
+                            v = v.withTypeExpr(v.getTypeExpr().withPrefix(prefix));
+                        }
                     }
                 }
             }
+
+            return v;
         }
 
-        return v;
-    }
+        @Override
+        public J visitMethod(J.MethodDecl method) {
+            J.MethodDecl m = refactor(method, super::visitMethod);
 
-    @Override
-    public J visitMethod(J.MethodDecl method) {
-        J.MethodDecl m = refactor(method, super::visitMethod);
+            if (scope.isScope(method)) {
+                maybeAddImport(annotationType.getFullyQualifiedName());
 
-        if (scope.isScope(method)) {
-            maybeAddImport(annotationType.getFullyQualifiedName());
+                if (m.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
+                    List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
 
-            if (m.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
+                    fixedAnnotations.add(buildAnnotation(EMPTY));
 
-                fixedAnnotations.add(buildAnnotation(EMPTY));
+                    m = m.withAnnotations(fixedAnnotations);
+                    if (method.getAnnotations().isEmpty()) {
+                        String prefix = formatter.findIndent(0, method).getPrefix();
 
-                m = m.withAnnotations(fixedAnnotations);
-                if (method.getAnnotations().isEmpty()) {
-                    String prefix = formatter.findIndent(0, method).getPrefix();
-
-                    if (!m.getModifiers().isEmpty()) {
-                        m = m.withModifiers(formatFirstPrefix(m.getModifiers(), prefix));
-                    } else if (m.getTypeParameters() != null) {
-                        m = m.withTypeParameters(m.getTypeParameters().withPrefix(prefix));
-                    } else if (m.getReturnTypeExpr() != null) {
-                        m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(prefix));
-                    } else {
-                        m = m.withName(m.getName().withPrefix(prefix));
+                        if (!m.getModifiers().isEmpty()) {
+                            m = m.withModifiers(formatFirstPrefix(m.getModifiers(), prefix));
+                        } else if (m.getTypeParameters() != null) {
+                            m = m.withTypeParameters(m.getTypeParameters().withPrefix(prefix));
+                        } else if (m.getReturnTypeExpr() != null) {
+                            m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(prefix));
+                        } else {
+                            m = m.withName(m.getName().withPrefix(prefix));
+                        }
                     }
                 }
             }
+
+            return m;
         }
 
-        return m;
-    }
-
-    private J.Annotation buildAnnotation(Formatting formatting) {
-        return new J.Annotation(randomId(),
-                J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
-                formatting);
+        private J.Annotation buildAnnotation(Formatting formatting) {
+            return new J.Annotation(randomId(),
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
+                    formatting);
+        }
     }
 }

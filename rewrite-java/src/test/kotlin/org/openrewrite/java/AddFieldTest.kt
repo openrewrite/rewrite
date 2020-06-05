@@ -18,9 +18,6 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.Tree.randomId
-import org.openrewrite.java.AddField
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.J
 import java.util.Collections.singletonList
 
@@ -35,7 +32,7 @@ open class AddFieldTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddField(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()"))
+                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -58,7 +55,7 @@ open class AddFieldTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddField(a.classes[0], private, "java.util.List", "list", null))
+                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", null))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -82,7 +79,7 @@ open class AddFieldTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(AddField(a.classes[0], private, "java.util.List", "list", null))
+                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", null))
                 .fix().fixed
 
         assertRefactored(fixed, """

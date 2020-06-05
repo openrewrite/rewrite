@@ -16,11 +16,9 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeType
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
 open class ChangeTypeTest : JavaParser() {
+    private val changeType = ChangeType().apply { setType("a.A1"); setTargetType("a.A2") }
 
     private val a1 = """
         package a;
@@ -41,7 +39,7 @@ open class ChangeTypeTest : JavaParser() {
     @Test
     fun dontAddImportWhenNoChangesWereMade() {
         val b = parse("public class B {}")
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
         assertRefactored(fixed, "public class B {}")
     }
 
@@ -53,7 +51,7 @@ open class ChangeTypeTest : JavaParser() {
             public class B extends A1 {}
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -65,7 +63,7 @@ open class ChangeTypeTest : JavaParser() {
     @Test
     fun fullyQualifiedName() {
         val b = parse("public class B extends a.A1 {}", a1, a2)
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -76,13 +74,13 @@ open class ChangeTypeTest : JavaParser() {
 
     @Test
     fun annotation() {
-        val a1 = "public @interface A1 {}"
-        val a2 = "public @interface A2 {}"
-        val b = parse("@A1 public class B {}", a1, a2)
-        val fixed = b.refactor()
-                .visit(ChangeType("A1", "A2"))
-                .fix().fixed
-        assertRefactored(fixed, "@A2 public class B {}")
+        val a1 = "package a;\npublic @interface A1 {}"
+        val a2 = "package a;\npublic @interface A2 {}"
+        val b = parse("@a.A1 public class B {}", a1, a2)
+
+        val fixed = b.refactor().visit(changeType).fix().fixed
+
+        assertRefactored(fixed, "import a.A2;\n\n@A2 public class B {}")
     }
 
     @Test
@@ -94,7 +92,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -115,8 +113,10 @@ open class ChangeTypeTest : JavaParser() {
             public class B extends A1 implements I1 {}
         """.trimIndent(), a1, a2, i1, i2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2"))
-                .visit(ChangeType("I1", "I2")).fix().fixed
+        val fixed = b.refactor()
+                .visit(changeType)
+                .visit(ChangeType().apply { setType("I1"); setTargetType("I2") })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -134,7 +134,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -158,7 +158,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -185,7 +185,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -208,7 +208,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -228,7 +228,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -248,7 +248,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -268,7 +268,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
             import a.A2;
@@ -288,7 +288,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = a.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = a.refactor().visit(changeType).fix().fixed
         assertRefactored(fixed, """
             import a.A2;
             
@@ -308,7 +308,7 @@ open class ChangeTypeTest : JavaParser() {
             }
         """.trimIndent(), a1, a2)
 
-        val fixed = b.refactor().visit(ChangeType("a.A1", "a.A2")).fix().fixed
+        val fixed = b.refactor().visit(changeType).fix().fixed
 
         val inv = fixed.classes[0].methods[0].body!!.statements[0]
         println(inv)

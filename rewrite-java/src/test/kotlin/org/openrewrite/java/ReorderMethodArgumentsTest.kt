@@ -16,10 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeLiteral
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.ReorderMethodArguments
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.J
 
 open class ReorderMethodArgumentsTest : JavaParser() {
@@ -56,7 +52,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
                         ChangeLiteral(arg as J.Literal) { "anotherstring" }
                     }
                 }
-                .fold(foos) { ReorderMethodArguments(it, "n", "m", "s") }
+                .fold(foos) { ReorderMethodArguments.Scoped(it, arrayOf("n", "m", "s"), arrayOf()) }
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -97,8 +93,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
         val cu = parse(b, a)
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("a.A foo(..)")) {
-                    ReorderMethodArguments(it, "n", "s")
-                            .withOriginalParamNames("s", "n")
+                    ReorderMethodArguments.Scoped(it, arrayOf("n", "s"), arrayOf("s", "n"))
                 }
                 .fix().fixed
 
@@ -136,7 +131,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
         val cu = parse(b, a)
 
         val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
-            ReorderMethodArguments(it, "s", "o", "n")
+            ReorderMethodArguments.Scoped(it, arrayOf("s", "o", "n"), arrayOf())
         }.fix().fixed
 
         assertRefactored(fixed, """
@@ -170,7 +165,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
 
         val cu = parse(b, a)
         val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
-            ReorderMethodArguments(it, "o", "s")
+            ReorderMethodArguments.Scoped(it, arrayOf("o", "s"), arrayOf())
         }.fix().fixed
 
         assertRefactored(fixed, """

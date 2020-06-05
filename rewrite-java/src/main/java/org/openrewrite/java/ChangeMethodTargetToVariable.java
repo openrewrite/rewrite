@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -25,49 +26,83 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.Validated.required;
 
 public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
-    private final J.MethodInvocation scope;
-    private final String varName;
+    private MethodMatcher methodMatcher;
+    private String variable;
+    private JavaType.Class variableType;
 
-    @Nullable
-    private final JavaType.Class type;
-
-    public ChangeMethodTargetToVariable(J.MethodInvocation scope, J.VariableDecls.NamedVar namedVar) {
-        this(scope, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
+    public void setMethod(String method) {
+        this.methodMatcher = new MethodMatcher(method);
     }
 
-    public ChangeMethodTargetToVariable(J.MethodInvocation scope, String varName, @Nullable JavaType.Class type) {
-        this.scope = scope;
-        this.varName = varName;
-        this.type = type;
+    public void setVariable(String variable) {
+        this.variable = variable;
+    }
+
+    public void setVariableType(String variableType) {
+        this.variableType = JavaType.Class.build(variableType);
     }
 
     @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("to", varName);
+    public Validated validate() {
+        return required("method", methodMatcher)
+                .and(required("variable", variable))
+                .and(required("variable.type", variableType.getFullyQualifiedName()));
     }
 
     @Override
     public J visitMethodInvocation(J.MethodInvocation method) {
-        if (scope.isScope(method)) {
-            Expression select = method.getSelect();
+        if(methodMatcher.matches(method)) {
+            andThen(new Scoped(method, variable, variableType));
+        }
+        return super.visitMethodInvocation(method);
+    }
 
-            JavaType.Method methodType = null;
-            if (method.getType() != null) {
-                // if the original is a static method invocation, the import on it's type may no longer be needed
-                maybeRemoveImport(method.getType().getDeclaringType());
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.MethodInvocation scope;
+        private final String variable;
 
-                Set<Flag> flags = new LinkedHashSet<>(method.getType().getFlags());
-                flags.remove(Flag.Static);
-                methodType = method.getType().withDeclaringType(this.type).withFlags(flags);
-            }
+        @Nullable
+        private final JavaType.Class type;
 
-            return method
-                    .withSelect(J.Ident.build(randomId(), varName, type, select == null ? Formatting.EMPTY : select.getFormatting()))
-                    .withType(methodType);
+        public Scoped(J.MethodInvocation scope, J.VariableDecls.NamedVar namedVar) {
+            this(scope, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
         }
 
-        return super.visitMethodInvocation(method);
+        public Scoped(J.MethodInvocation scope, String variable, @Nullable JavaType.Class type) {
+            this.scope = scope;
+            this.variable = variable;
+            this.type = type;
+        }
+
+        @Override
+        public Iterable<Tag> getTags() {
+            return Tags.of("to", variable);
+        }
+
+        @Override
+        public J visitMethodInvocation(J.MethodInvocation method) {
+            if (scope.isScope(method)) {
+                Expression select = method.getSelect();
+
+                JavaType.Method methodType = null;
+                if (method.getType() != null) {
+                    // if the original is a static method invocation, the import on it's type may no longer be needed
+                    maybeRemoveImport(method.getType().getDeclaringType());
+
+                    Set<Flag> flags = new LinkedHashSet<>(method.getType().getFlags());
+                    flags.remove(Flag.Static);
+                    methodType = method.getType().withDeclaringType(this.type).withFlags(flags);
+                }
+
+                return method
+                        .withSelect(J.Ident.build(randomId(), variable, type, select == null ? Formatting.EMPTY : select.getFormatting()))
+                        .withType(methodType);
+            }
+
+            return super.visitMethodInvocation(method);
+        }
     }
 }

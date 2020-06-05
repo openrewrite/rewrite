@@ -16,10 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeFieldName
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.JavaType
 
 open class ChangeFieldNameTest : JavaParser() {
@@ -34,7 +30,7 @@ open class ChangeFieldNameTest : JavaParser() {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(ChangeFieldName(a.classes[0].type.asClass(), "collection", "list"))
+                .visit(ChangeFieldName.Scoped(a.classes[0].type.asClass(), "collection", "list"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -65,7 +61,7 @@ open class ChangeFieldNameTest : JavaParser() {
         """.trimIndent())
 
         val fixed = b.refactor()
-                .visit(ChangeFieldName(JavaType.Class.build("B"), "n", "n1"))
+                .visit(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -104,7 +100,7 @@ open class ChangeFieldNameTest : JavaParser() {
         """.trimIndent(), b)
 
         val fixed = a.refactor()
-                .visit(ChangeFieldName(JavaType.Class.build("B"), "n", "n1"))
+                .visit(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
                 .fix().fixed
 
         assertRefactored(fixed, """
