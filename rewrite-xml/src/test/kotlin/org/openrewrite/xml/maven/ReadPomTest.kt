@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.search.maven
+package org.openrewrite.xml.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -34,7 +34,7 @@ class ReadPomTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = org.openrewrite.xml.maven.ReadPom().visit(x)
+        val pom = ReadPom().visit(x)
 
         assertThat(pom.properties).containsExactlyInAnyOrderEntriesOf(
                 mapOf(
@@ -59,9 +59,9 @@ class ReadPomTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = org.openrewrite.xml.maven.ReadPom().visit(x)
+        val pom = ReadPom().visit(x)
 
         assertThat(pom.dependencies).containsExactly(
-                org.openrewrite.xml.maven.Dependency("org.openrewrite.plan", "rewrite-checkstyle", "1.0.0", null))
+                Dependency("org.openrewrite.plan", "rewrite-checkstyle", "1.0.0", null))
     }
 }
