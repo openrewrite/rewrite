@@ -13,14 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.refactor.maven
+package org.openrewrite.xml.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.XmlParser
 import org.openrewrite.xml.assertRefactored
 
-class ChangeParentPomVersionTest : XmlParser() {
+class SetParentPomVersionTest : XmlParser() {
+    val setBoot23 = SetParentPomVersion().apply {
+        setWhenGroupId("org.springframework.boot")
+        setWhenArtifactId("spring-boot-starter-parent")
+        setVersion("2.3.0.RELEASE")
+    }
+
     @Test
     fun changeParentPomVersionWhenMatchingGroupAndArtifact() {
         val x = parse("""
@@ -33,8 +39,7 @@ class ChangeParentPomVersionTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val fixed = x.refactor().visit(ChangeParentPomVersion("org.springframework.boot",
-                "spring-boot-starter-parent", "2.3.0.RELEASE")).fix().fixed
+        val fixed = x.refactor().visit(setBoot23).fix().fixed
 
         assertRefactored(fixed, """
             <project>
@@ -60,7 +65,7 @@ class ChangeParentPomVersionTest : XmlParser() {
         """.trimIndent())
 
         assertThat(x.refactor()
-                .visit(ChangeParentPomVersion("org.springframework.boot", "spring-boot-starter-parent", "2.3.0.RELEASE"))
+                .visit(setBoot23)
                 .fix()
                 .rulesThatMadeChanges).isEmpty()
     }

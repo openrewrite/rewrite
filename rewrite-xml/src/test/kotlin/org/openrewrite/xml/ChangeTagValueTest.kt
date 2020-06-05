@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.refactor
+package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.xml.XmlParser
-import org.openrewrite.xml.assertRefactored
 import org.openrewrite.xml.tree.Xml
 
 class ChangeTagValueTest : XmlParser() {
@@ -30,7 +28,7 @@ class ChangeTagValueTest : XmlParser() {
             </dependency>
         """.trimIndent())
 
-        val fixed = x.refactor().visit(ChangeTagValue(x.root.content[0] as Xml.Tag, "2.0"))
+        val fixed = x.refactor().visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "2.0"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -52,7 +50,7 @@ class ChangeTagValueTest : XmlParser() {
             </dependency>
         """.trimIndent())
 
-        val fixed = x.refactor().visit(ChangeTagValue(x.root.content[0] as Xml.Tag, "3.0"))
+        val fixed = x.refactor().visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "3.0"))
                 .fix().fixed
 
         assertRefactored(fixed, """

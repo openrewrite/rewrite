@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.search.maven;
+package org.openrewrite.xml.maven;
 
 import lombok.Data;
 import org.openrewrite.internal.lang.Nullable;

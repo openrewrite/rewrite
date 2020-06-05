@@ -13,27 +13,46 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.xml.refactor.maven;
+package org.openrewrite.xml.maven;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Validated;
+import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.refactor.ChangeTagValue;
-import org.openrewrite.xml.refactor.XmlRefactorVisitor;
+import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class ChangeParentPomVersion extends XmlRefactorVisitor {
+import static org.openrewrite.Validated.required;
+
+public class SetParentPomVersion extends XmlRefactorVisitor {
     private final XPathMatcher parentVersion = new XPathMatcher("/project/parent/version");
 
-    private final String whenGroupId;
-    private final String whenArtifactId;
-    private final String version;
+    private String whenGroupId;
+    private String whenArtifactId;
+    private String version;
 
-    public ChangeParentPomVersion(String whenGroupId, String whenArtifactId, String version) {
-        this.whenGroupId = whenGroupId;
-        this.whenArtifactId = whenArtifactId;
-        this.version = version;
+    public SetParentPomVersion() {
         setCursoringOn();
+    }
+
+    public void setWhenGroupId(String whenGroupId) {
+        this.whenGroupId = whenGroupId;
+    }
+
+    public void setWhenArtifactId(String whenArtifactId) {
+        this.whenArtifactId = whenArtifactId;
+    }
+
+    public void setVersion(String version) {
+        this.version = version;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("whenGroupId", whenGroupId)
+                .and(required("whenArtifactId", whenArtifactId))
+                .and(required("version", version));
     }
 
     @Override
@@ -54,7 +73,7 @@ public class ChangeParentPomVersion extends XmlRefactorVisitor {
                         .map(artifactId -> artifactId.equals(whenArtifactId))
                         .orElse(false) &&
                 tag.getValue().map(v -> !v.equals(version)).orElse(true)) {
-            andThen(new ChangeTagValue(tag, version));
+            andThen(new ChangeTagValue.Scoped(tag, version));
         }
 
         return super.visitTag(tag);

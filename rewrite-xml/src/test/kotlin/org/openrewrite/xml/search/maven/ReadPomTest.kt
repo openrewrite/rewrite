@@ -34,7 +34,7 @@ class ReadPomTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = ReadPom().visit(x)
+        val pom = org.openrewrite.xml.maven.ReadPom().visit(x)
 
         assertThat(pom.properties).containsExactlyInAnyOrderEntriesOf(
                 mapOf(
@@ -59,9 +59,9 @@ class ReadPomTest : XmlParser() {
             </project>
         """.trimIndent())
 
-        val pom = ReadPom().visit(x)
+        val pom = org.openrewrite.xml.maven.ReadPom().visit(x)
 
         assertThat(pom.dependencies).containsExactly(
-                Dependency("org.openrewrite.plan", "rewrite-checkstyle", "1.0.0", null))
+                org.openrewrite.xml.maven.Dependency("org.openrewrite.plan", "rewrite-checkstyle", "1.0.0", null))
     }
 }
