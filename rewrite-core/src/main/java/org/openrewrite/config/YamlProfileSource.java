@@ -15,6 +15,7 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Profile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.TypeDescription;

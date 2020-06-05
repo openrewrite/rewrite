@@ -15,24 +15,13 @@
  */
 package org.openrewrite;
 
-import io.github.classgraph.ClassGraph;
-import io.github.classgraph.ClassInfo;
-import io.github.classgraph.ScanResult;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
-import org.openrewrite.config.AutoConfigure;
-import org.openrewrite.config.Environment;
-import org.openrewrite.config.Profile;
 import org.openrewrite.internal.lang.NonNullApi;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.util.*;
 import java.util.function.Function;
 
@@ -46,8 +35,6 @@ import static java.util.stream.StreamSupport.stream;
  */
 @NonNullApi
 public class Refactor<S extends SourceFile, T extends Tree> {
-    private final Logger logger = LoggerFactory.getLogger(Refactor.class);
-
     @Getter
     private final S original;
 
@@ -56,14 +43,8 @@ public class Refactor<S extends SourceFile, T extends Tree> {
     @Getter
     private final List<SourceVisitor<T>> visitors = new ArrayList<>();
 
-    @Getter
-    private final Set<String> profiles = new HashSet<>();
-
-    private Environment environment = new Environment();
-
     public Refactor(S original) {
         this.original = original;
-        this.profiles.add("default");
     }
 
     @SafeVarargs
@@ -77,52 +58,13 @@ public class Refactor<S extends SourceFile, T extends Tree> {
         return this;
     }
 
-    public final Refactor<S, T> environment(Environment environment) {
-        this.environment = environment;
-        return this;
-    }
+    public final Refactor<S, T> activateProfiles(Environment environment, String... profiles) {
+        for (String profileName : profiles) {
+            Profile profile = environment.getProfile(profileName);
 
-    public final Refactor<S, T> profiles(String... profiles) {
-        this.profiles.addAll(Arrays.asList(profiles));
-        return this;
-    }
-
-    public final Refactor<S, T> scan(String... whitelistPackages) {
-        try (ScanResult scanResult = new ClassGraph()
-                .whitelistPackages(whitelistPackages)
-                .enableMemoryMapping()
-                .enableMethodInfo()
-                .enableAnnotationInfo()
-                .ignoreClassVisibility()
-                .ignoreMethodVisibility()
-                .scan()) {
-            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(AutoConfigure.class.getName())) {
-                Class<?> visitorClass = classInfo.loadClass();
-                Type genericSuperclass = visitorClass.getGenericSuperclass();
-                if (genericSuperclass instanceof ParameterizedType) {
-                    Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
-                    if (sourceFileType[0].equals(original.getClass())) {
-                        for (String profileName : profiles) {
-                            Profile profile = environment.getProfile(profileName);
-                            if (profile != null) {
-                                try {
-                                    Constructor<?> constructor = visitorClass.getConstructor();
-                                    constructor.setAccessible(true);
-
-                                    @SuppressWarnings("unchecked") SourceVisitor<T> visitor = profile.configure(
-                                            (SourceVisitor<T>) constructor.newInstance());
-
-                                    if(profile.accept(visitor)) {
-                                        visit(visitor);
-                                        // TODO do something with invalid visitor messaging
-                                    }
-                                } catch (Exception e) {
-                                    logger.warn("Unable to configure {}", visitorClass.getName(), e);
-                                }
-                            }
-                        }
-                    }
-                }
+            if(profile != null) {
+                //noinspection unchecked
+                visit(profile.getVisitorsForSourceType((Class<T>) original.getClass()));
             }
         }
 
@@ -170,7 +112,7 @@ public class Refactor<S extends SourceFile, T extends Tree> {
                 acc = transformPipeline(acc, visitor);
 
                 if (before != acc) {
-                    // TODO we should only report on the top-level visitors, not any andThen() visitors that
+                    // we should only report on the top-level visitors, not any andThen() visitors that
                     // are applied as part of the top-level visitor's pipeline
                     rulesThatMadeChangesThisCycle.add(visitor.getClass().getName());
                 }

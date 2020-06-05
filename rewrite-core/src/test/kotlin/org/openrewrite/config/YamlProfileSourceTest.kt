@@ -39,7 +39,7 @@ class YamlProfileSourceTest {
         val changeText = ChangeText()
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
-        assertThat(profile.accept(changeText)).isTrue()
+        assertThat(profile.maybeAdd(changeText)).isTrue()
     }
 
     @Test

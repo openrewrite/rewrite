@@ -13,21 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.Validated;
-import org.openrewrite.ValidationException;
+import org.openrewrite.config.CompositeSourceVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyMap;
@@ -38,45 +40,48 @@ import static java.util.stream.Collectors.toUnmodifiableSet;
 public class Profile {
     private static final Logger logger = LoggerFactory.getLogger(Profile.class);
     private static final ObjectMapper propertyConverter = new ObjectMapper()
-            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES);
+            .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private String name = "default";
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
+    private Set<String> extend = emptySet();
 
-    private List<CompositeSourceVisitor<?>> define = new ArrayList<>();
+    private final List<CompositeSourceVisitor<?>> define = new ArrayList<>();
 
     @SuppressWarnings("rawtypes")
     private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
+
+    private final Map<Type, Collection<SourceVisitor<?>>> visitorsBySourceType = new HashMap<>();
 
     /**
      * Normalized to lower case
      */
     private Map<String, Object> configure = emptyMap();
 
-    public Profile setName(@Nullable String name) {
-        this.name = name;
-        return this;
+    public void setName(@Nullable String name) {
+        this.name = name == null ? "default" : name;
     }
 
-    public Profile setProfile(String name) {
-        this.name = name;
-        return this;
+    public void setProfile(@Nullable String name) {
+        setName(name);
     }
 
-    public Profile setInclude(Set<String> include) {
+    public void setInclude(Set<String> include) {
         this.include = toPatternSet(include);
-        return this;
     }
 
-    public Profile setExclude(Set<String> exclude) {
+    public void setExclude(Set<String> exclude) {
         this.exclude = toPatternSet(exclude);
-        return this;
     }
 
-    public Profile setConfigure(Map<String, Object> configure) {
+    public void setExtend(Set<String> extend) {
+        this.extend = extend;
+    }
+
+    public void setConfigure(Map<String, Object> configure) {
         this.configure = configure;
-        return this;
     }
 
     public Profile setDefine(Map<String, Object> define) {
@@ -124,14 +129,15 @@ public class Profile {
     private Map<String, List<Object>> definitionsByName(String prefix, Map<String, Object> define) {
         return define.entrySet().stream()
                 .flatMap(e -> {
+                    String nextPrefix = prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey();
                     Object value = e.getValue();
                     if (value instanceof Map) {
                         //noinspection unchecked
-                        return definitionsByName(prefix + "." + e.getKey(), (Map<String, Object>) value)
+                        return definitionsByName(nextPrefix, (Map<String, Object>) value)
                                 .entrySet().stream();
                     } else if (value instanceof List) {
                         //noinspection unchecked
-                        return Stream.of(Map.entry(prefix + "." + e.getKey(), (List<Object>) value));
+                        return Stream.of(Map.entry(nextPrefix, (List<Object>) value));
                     } else {
                         throw new ValidationException(Validated.invalid("define." + prefix + "." + e.getKey(),
                                 value, "should be a list of visitors"));
@@ -227,17 +233,19 @@ public class Profile {
         return this;
     }
 
-    /**
-     * If a visitor is accepted by ANY profile, it will execute.
-     *
-     * @param visitor The visitor to test.
-     * @return {@code true} if the visitor should run.
-     */
-    public boolean accept(SourceVisitor<?> visitor) {
+    public boolean maybeAdd(SourceVisitor<?> visitor) {
         String visitorName = visitor.getClass().getName();
-        return visitor.validate().isValid() &&
+        if (visitor.validate().isValid() &&
                 include.stream().anyMatch(i -> i.matcher(visitorName).matches()) &&
-                exclude.stream().noneMatch(e -> e.matcher(visitorName).matches());
+                exclude.stream().noneMatch(e -> e.matcher(visitorName).matches())) {
+            Type genericSuperclass = visitor.getClass().getGenericSuperclass();
+            if (genericSuperclass instanceof ParameterizedType) {
+                Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
+                this.visitorsBySourceType.computeIfAbsent(sourceFileType[0], t -> new ArrayList<>()).add(visitor);
+            }
+            return true;
+        }
+        return false;
     }
 
     public String getName() {
@@ -246,5 +254,12 @@ public class Profile {
 
     public List<CompositeSourceVisitor<?>> getDefinitions() {
         return define;
+    }
+
+    <T extends Tree> Collection<SourceVisitor<T>> getVisitorsForSourceType(Class<T> t) {
+        //noinspection unchecked
+        return visitorsBySourceType.get(t).stream()
+                .map(v -> (SourceVisitor<T>) v)
+                .collect(Collectors.toList());
     }
 }

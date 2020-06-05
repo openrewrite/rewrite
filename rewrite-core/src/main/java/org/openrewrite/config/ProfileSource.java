@@ -15,6 +15,8 @@
  */
 package org.openrewrite.config;
 
+import org.openrewrite.Profile;
+
 import java.util.Collection;
 
 public interface ProfileSource {
