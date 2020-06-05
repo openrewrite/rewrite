@@ -32,8 +32,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toUnmodifiableSet;
 
@@ -42,6 +41,8 @@ public class Profile {
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    public static final Profile EMPTY = new Profile();
 
     private String name = "default";
     private Set<Pattern> include = emptySet();
@@ -53,7 +54,7 @@ public class Profile {
     @SuppressWarnings("rawtypes")
     private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
-    private final Map<Type, Collection<SourceVisitor<?>>> visitorsBySourceType = new HashMap<>();
+    private final Map<Type, Collection<SourceVisitor<?>>> includedVisitorsBySourceType = new HashMap<>();
 
     /**
      * Normalized to lower case
@@ -84,7 +85,7 @@ public class Profile {
         this.configure = configure;
     }
 
-    public Profile setDefine(Map<String, Object> define) {
+    public void setDefine(Map<String, Object> define) {
         Map<String, List<Object>> definitionsByName = definitionsByName("", define);
 
         for (Map.Entry<String, List<Object>> visitorsByCompositeName : definitionsByName.entrySet()) {
@@ -122,8 +123,6 @@ public class Profile {
 
             this.define.add(new CompositeSourceVisitor(visitorsByCompositeName.getKey(), visitors));
         }
-
-        return this;
     }
 
     private Map<String, List<Object>> definitionsByName(String prefix, Map<String, Object> define) {
@@ -165,7 +164,7 @@ public class Profile {
         return visitor;
     }
 
-    private Map<String, Object> propertyMap(SourceVisitor<?> visitor) {
+    protected Map<String, Object> propertyMap(SourceVisitor<?> visitor) {
         return propertiesByVisitor.computeIfAbsent(visitor.getClass(),
                 clazz -> propertyMap(clazz.getName(), configure));
     }
@@ -236,12 +235,12 @@ public class Profile {
     public boolean maybeAdd(SourceVisitor<?> visitor) {
         String visitorName = visitor.getClass().getName();
         if (visitor.validate().isValid() &&
-                include.stream().anyMatch(i -> i.matcher(visitorName).matches()) &&
-                exclude.stream().noneMatch(e -> e.matcher(visitorName).matches())) {
+                getInclude().stream().anyMatch(i -> i.matcher(visitorName).matches()) &&
+                getExclude().stream().noneMatch(e -> e.matcher(visitorName).matches())) {
             Type genericSuperclass = visitor.getClass().getGenericSuperclass();
             if (genericSuperclass instanceof ParameterizedType) {
                 Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
-                this.visitorsBySourceType.computeIfAbsent(sourceFileType[0], t -> new ArrayList<>()).add(visitor);
+                this.includedVisitorsBySourceType.computeIfAbsent(sourceFileType[0], t -> new ArrayList<>()).add(visitor);
             }
             return true;
         }
@@ -252,14 +251,28 @@ public class Profile {
         return name;
     }
 
-    public List<CompositeSourceVisitor<?>> getDefinitions() {
+    protected List<CompositeSourceVisitor<?>> getDefinitions() {
         return define;
     }
 
     <T extends Tree> Collection<SourceVisitor<T>> getVisitorsForSourceType(Class<T> t) {
         //noinspection unchecked
-        return visitorsBySourceType.get(t).stream()
-                .map(v -> (SourceVisitor<T>) v)
-                .collect(Collectors.toList());
+        return Stream.concat(
+                includedVisitorsBySourceType.getOrDefault(t, emptyList()).stream(),
+                getDefinitions().stream()
+                        .filter(definition -> getInclude().stream().anyMatch(i -> i.matcher(definition.getName()).matches()))
+        ).map(v -> (SourceVisitor<T>) v).collect(Collectors.toList());
+    }
+
+    protected Set<String> getExtend() {
+        return extend;
+    }
+
+    protected Set<Pattern> getInclude() {
+        return include;
+    }
+
+    protected Set<Pattern> getExclude() {
+        return exclude;
     }
 }

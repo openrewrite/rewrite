@@ -60,12 +60,9 @@ public class Refactor<S extends SourceFile, T extends Tree> {
 
     public final Refactor<S, T> activateProfiles(Environment environment, String... profiles) {
         for (String profileName : profiles) {
-            Profile profile = environment.getProfile(profileName);
-
-            if(profile != null) {
-                //noinspection unchecked
-                visit(profile.getVisitorsForSourceType((Class<T>) original.getClass()));
-            }
+            //noinspection unchecked
+            visit(environment.getProfile(profileName)
+                    .getVisitorsForSourceType((Class<T>) original.getClass()));
         }
 
         return this;

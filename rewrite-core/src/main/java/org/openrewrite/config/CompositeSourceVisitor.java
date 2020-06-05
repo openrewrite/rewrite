@@ -37,6 +37,10 @@ public class CompositeSourceVisitor<T> extends SourceVisitor<T> {
         return Tags.of("name", name);
     }
 
+    public String getName() {
+        return name;
+    }
+
     public List<SourceVisitor<T>> getDelegates() {
         return delegates;
     }
