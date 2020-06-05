@@ -54,7 +54,6 @@ class ChangeTest {
                 setOf("logger.Fix")
         ).diff
 
-        val filePathEscaped = filePath.toString().replace("\\", "\\\\")
         assertThat("""
             |diff --git ${ab("a")} ${ab("b")}
             |index 3490cbf..5d64ae4 100644
