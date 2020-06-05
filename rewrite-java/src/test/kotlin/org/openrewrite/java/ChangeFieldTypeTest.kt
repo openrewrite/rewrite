@@ -20,15 +20,15 @@ import org.openrewrite.java.ChangeFieldType
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.assertRefactored
 
-open class ChangeFieldTypeTest : JavaParser() {
-    val a = """
+open class ChangeFieldTypeTest {
+    private val a = """
             import java.util.List;
             public class A {
                List collection;
             }
         """.trimIndent()
 
-    val refactored = """
+    private val refactored = """
             import java.util.Collection;
             
             public class A {
@@ -38,7 +38,7 @@ open class ChangeFieldTypeTest : JavaParser() {
 
     @Test
     fun changeFieldTypeDeclarative() {
-        val cu = parse(a)
+        val cu = JavaParser().parse(a)
 
         val fixed = cu.refactor()
                 .visit(ChangeFieldType().apply { setType("java.util.List"); setTargetType("java.util.Collection") })
@@ -49,7 +49,7 @@ open class ChangeFieldTypeTest : JavaParser() {
 
     @Test
     fun changeFieldType() {
-        val cu = parse(a)
+        val cu = JavaParser().parse(a)
 
         val fixed = cu.refactor()
                 .visit(ChangeFieldType.Scoped(cu.classes[0].findFields("java.util.List")[0], "java.util.Collection"))
