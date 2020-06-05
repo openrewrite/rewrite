@@ -19,14 +19,13 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.Validated;
+import org.openrewrite.ValidationException;
 import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -45,6 +44,8 @@ public class Profile {
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
 
+    private List<CompositeSourceVisitor<?>> define = new ArrayList<>();
+
     @SuppressWarnings("rawtypes")
     private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
@@ -53,55 +54,98 @@ public class Profile {
      */
     private Map<String, Object> configure = emptyMap();
 
-    public Profile(String name, Set<String> include, Set<String> exclude,
-                   Map<String, Object> configure) {
+    public Profile setName(@Nullable String name) {
         this.name = name;
+        return this;
+    }
+
+    public Profile setProfile(String name) {
+        this.name = name;
+        return this;
+    }
+
+    public Profile setInclude(Set<String> include) {
         this.include = toPatternSet(include);
+        return this;
+    }
+
+    public Profile setExclude(Set<String> exclude) {
         this.exclude = toPatternSet(exclude);
-        setConfigure(configure);
+        return this;
     }
 
-    public Profile() {
+    public Profile setConfigure(Map<String, Object> configure) {
+        this.configure = configure;
+        return this;
     }
 
-    public void setName(@Nullable String name) {
-        this.name = name;
+    public Profile setDefine(Map<String, Object> define) {
+        Map<String, List<Object>> definitionsByName = definitionsByName("", define);
+
+        for (Map.Entry<String, List<Object>> visitorsByCompositeName : definitionsByName.entrySet()) {
+            List<SourceVisitor<?>> visitors = new ArrayList<>();
+
+            for (Object visitorObject : visitorsByCompositeName.getValue()) {
+                Object value = null;
+                Object visitorClassName = visitorObject;
+
+                if (visitorObject instanceof Map) {
+                    @SuppressWarnings("unchecked") Map.Entry<String, ?> visitorEntry = ((Map<String, ?>) visitorObject)
+                            .entrySet().iterator().next();
+                    visitorClassName = visitorEntry.getKey();
+                    value = visitorEntry.getValue();
+                }
+
+                try {
+                    Class<?> visitorClass;
+                    try {
+                        visitorClass = Class.forName(visitorClassName.toString());
+                    } catch (ClassNotFoundException ignored) {
+                        visitorClass = Class.forName("org.openrewrite." + visitorClassName);
+                    }
+
+                    SourceVisitor<?> visitor = (SourceVisitor<?>) visitorClass
+                            .getDeclaredConstructor().newInstance();
+                    propertyConverter.updateValue(visitor, value);
+                    visitors.add(visitor);
+                } catch (Exception e) {
+                    throw new ValidationException(
+                            Validated.invalid("define", visitorClassName, "must be constructable", e)
+                    );
+                }
+            }
+
+            this.define.add(new CompositeSourceVisitor(visitorsByCompositeName.getKey(), visitors));
+        }
+
+        return this;
     }
 
-    public void setProfile(String name) {
-        this.name = name;
-    }
-
-    public void setInclude(Set<String> include) {
-        this.include = toPatternSet(include);
-    }
-
-    public void setExclude(Set<String> exclude) {
-        this.exclude = toPatternSet(exclude);
-    }
-
-    public void setConfigure(Map<String, Object> configure) {
-        this.configure = toLowerCaseMap(configure);
-    }
-
-    private Map<String, Object> toLowerCaseMap(Map<String, Object> configure) {
-        return configure.entrySet().stream()
-                .map(e -> {
+    private Map<String, List<Object>> definitionsByName(String prefix, Map<String, Object> define) {
+        return define.entrySet().stream()
+                .flatMap(e -> {
                     Object value = e.getValue();
                     if (value instanceof Map) {
                         //noinspection unchecked
-                        value = toLowerCaseMap((Map<String, Object>) value);
+                        return definitionsByName(prefix + "." + e.getKey(), (Map<String, Object>) value)
+                                .entrySet().stream();
+                    } else if (value instanceof List) {
+                        //noinspection unchecked
+                        return Stream.of(Map.entry(prefix + "." + e.getKey(), (List<Object>) value));
+                    } else {
+                        throw new ValidationException(Validated.invalid("define." + prefix + "." + e.getKey(),
+                                value, "should be a list of visitors"));
                     }
-                    return Map.entry(e.getKey().toLowerCase()
-                            .replace("-", "")
-                            .replace("_", ""), value);
                 })
                 .collect(toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 
     private Set<Pattern> toPatternSet(Set<String> set) {
         return set.stream()
-                .map(i -> i.replace("*", ".+"))
+                .map(i -> i
+                        .replace(".", "\\.")
+                        .replace("*", ".+"))
+                .map(i -> "(org\\.openrewrite\\.)?" + i)
                 .map(Pattern::compile)
                 .collect(toUnmodifiableSet());
     }
@@ -117,7 +161,7 @@ public class Profile {
 
     private Map<String, Object> propertyMap(SourceVisitor<?> visitor) {
         return propertiesByVisitor.computeIfAbsent(visitor.getClass(),
-                clazz -> propertyMap(clazz.getName().toLowerCase(), configure));
+                clazz -> propertyMap(clazz.getName(), configure));
     }
 
     private Map<String, Object> propertyMap(String partialName, @Nullable Object config) {
@@ -143,7 +187,7 @@ public class Profile {
             String keyPart = configEntry.getKey();
 
             Map<String, Object> value;
-            if(configEntry.getValue() instanceof Map) {
+            if (configEntry.getValue() instanceof Map) {
                 //noinspection unchecked
                 value = (Map<String, Object>) configEntry.getValue();
             } else {
@@ -161,7 +205,7 @@ public class Profile {
                     value = Map.of(keyPart.substring(keyPart.lastIndexOf('.') + 1), value);
                     keyPart = keyPart.substring(0, keyPart.lastIndexOf('.'));
                 }
-            } while(matcher.hitEnd());
+            } while (matcher.hitEnd());
         }
 
         return properties;
@@ -198,5 +242,9 @@ public class Profile {
 
     public String getName() {
         return name;
+    }
+
+    public List<CompositeSourceVisitor<?>> getDefinitions() {
+        return define;
     }
 }

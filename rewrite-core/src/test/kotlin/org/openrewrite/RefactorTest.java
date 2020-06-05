@@ -22,6 +22,7 @@ import org.openrewrite.config.ProfileSource;
 import org.openrewrite.text.PlainText;
 
 import java.util.Map;
+import java.util.Set;
 
 import static java.util.Collections.*;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -31,9 +32,9 @@ import static org.openrewrite.Tree.randomId;
 public class RefactorTest {
     @Test
     void scanAutoConfigurableRules() {
-        ProfileSource fixedProfileSource = () -> singletonList(
-                new Profile("default", singleton("*"), emptySet(),
-                        Map.of("org.openrewrite.text.ChangeText.toText", "Hello Jon!"))
+        ProfileSource fixedProfileSource = () -> singletonList(new Profile()
+                .setInclude(Set.of("*"))
+                .setConfigure(Map.of("org.openrewrite.text.ChangeText.toText", "Hello Jon!"))
         );
 
         Environment environment = new Environment().load(fixedProfileSource);

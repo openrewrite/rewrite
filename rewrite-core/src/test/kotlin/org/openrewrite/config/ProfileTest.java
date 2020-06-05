@@ -15,20 +15,20 @@
  */
 package org.openrewrite.config;
 
+import io.micrometer.core.instrument.Tag;
 import org.junit.jupiter.api.Test;
 import org.openrewrite.text.ChangeText;
 
+import java.util.List;
 import java.util.Map;
 
-import static java.util.Collections.emptySet;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class ProfileTest {
     @Test
     void configureSourceVisitor() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of(
-                        "org.openrewrite.text.ChangeText",
+        Profile profile = new Profile().setConfigure(
+                Map.of("org.openrewrite.text.ChangeText",
                         Map.of("toText", "Hello Jon!")
                 )
         );
@@ -38,30 +38,48 @@ class ProfileTest {
     }
 
     @Test
-    void propertyNameCombinedWithVisitorName() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of("org.openrewrite.text.ChangeText.toText", "Hello Jon!")
+    void defineDeclarativeVisitor() {
+        Profile profile = new Profile().setDefine(
+                Map.of("org.openrewrite.text.ChangeTextTwice",
+                        List.of(
+                                Map.of("org.openrewrite.text.ChangeText",
+                                        Map.of(
+                                                "toText", "Hello Jon"
+                                        )
+                                ),
+                                Map.of("text.ChangeText",
+                                        Map.of(
+                                                "toText", "Hello Jonathan!"
+                                        )
+                                )
+                        )
+                )
         );
 
+        assertThat(profile.getDefinitions()).hasSize(1);
+
+        CompositeSourceVisitor<?> declarative = profile.getDefinitions().iterator().next();
+        assertThat(declarative.getTags()).contains(Tag.of("name", "org.openrewrite.text.ChangeTextTwice"));
+    }
+
+    @Test
+    void propertyNameCombinedWithVisitorName() {
+        Profile profile = new Profile().setConfigure(Map.of("org.openrewrite.text.ChangeText.toText", "Hello Jon!"));
         ChangeText changeText = new ChangeText();
         assertThat(profile.configure(changeText).getToText()).isEqualTo("Hello Jon!");
     }
 
     @Test
     void propertyNameCombinedWithWildcardVisitor() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of("org.openrewrite.text.*.toText", "Hello Jon!")
-        );
-
+        Profile profile = new Profile().setConfigure(Map.of("org.openrewrite.text.*.toText", "Hello Jon!"));
         ChangeText changeText = new ChangeText();
         assertThat(profile.configure(changeText).getToText()).isEqualTo("Hello Jon!");
     }
 
     @Test
     void splitPackageWildcard() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of(
-                        "org.openrewrite",
+        Profile profile = new Profile().setConfigure(
+                Map.of("org.openrewrite",
                         Map.of("text.*",
                                 Map.of("TOTEXT", "Hello Jon!")
                         )
@@ -73,39 +91,12 @@ class ProfileTest {
     }
 
     @Test
-    void lowerCase() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of(
-                        "org.openrewrite.TEXT.changetext",
-                        Map.of("totext", "Hello Jon!")
-                )
-        );
-
-        ChangeText changeText = new ChangeText();
-        assertThat(profile.configure(changeText).getToText()).isEqualTo("Hello Jon!");
-    }
-
-    @Test
     void splitPackage() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of(
-                        "org.openrewrite",
+        Profile profile = new Profile().setConfigure(
+                Map.of("org.openrewrite",
                         Map.of("text.ChangeText",
                                 Map.of("TOTEXT", "Hello Jon!")
                         )
-                )
-        );
-
-        ChangeText changeText = new ChangeText();
-        assertThat(profile.configure(changeText).getToText()).isEqualTo("Hello Jon!");
-    }
-
-    @Test
-    void kebabAndSnakeCases() {
-        Profile profile = new Profile("test", emptySet(), emptySet(),
-                Map.of(
-                        "org.openrewrite.text.change-text",
-                        Map.of("to_text", "Hello Jon!")
                 )
         );
 

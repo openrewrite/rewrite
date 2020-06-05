@@ -15,28 +15,28 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
+import org.openrewrite.java.tree.J;
 
-public class RetrieveCursor extends JavaSourceVisitor<Cursor> {
-    private final Tree scope;
+public class ChangeMethodName extends JavaRefactorVisitor {
+    private final J.MethodInvocation scope;
+    private final String name;
 
-    public RetrieveCursor(Tree scope) {
+    public ChangeMethodName(J.MethodInvocation scope, String name) {
         this.scope = scope;
-        setCursoringOn();
+        this.name = name;
     }
 
     @Override
-    public Cursor defaultTo(Tree t) {
-        return null;
+    public Iterable<Tag> getTags() {
+        return Tags.of("name", name);
     }
 
     @Override
-    public Cursor visitTree(Tree tree) {
-        if (scope.isScope(tree)) {
-            return getCursor();
-        }
-        return super.visitTree(tree);
+    public J visitMethodInvocation(J.MethodInvocation method) {
+        return scope.isScope(method) ?
+                method.withName(method.getName().withName(name)) :
+                super.visitMethodInvocation(method);
     }
 }
