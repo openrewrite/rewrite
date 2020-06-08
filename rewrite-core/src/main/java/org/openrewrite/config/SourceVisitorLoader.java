@@ -20,5 +20,5 @@ import org.openrewrite.SourceVisitor;
 import java.util.Collection;
 
 public interface SourceVisitorLoader {
-    Collection<SourceVisitor<?>> load();
+    Collection<SourceVisitor<?>> loadVisitors();
 }

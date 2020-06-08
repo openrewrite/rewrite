@@ -55,8 +55,8 @@ public class RefactorPlan {
                     Type genericSuperclass = v.getClass().getGenericSuperclass();
 
                     // TODO better way to handle this?
-                    if(YamlSourceVisitorLoader.CompositeSourceVisitor.class.equals(v.getClass())) {
-                        genericSuperclass = ((YamlSourceVisitorLoader.CompositeSourceVisitor) v).getVisitorType()
+                    if(CompositeSourceVisitor.class.equals(v.getClass())) {
+                        genericSuperclass = ((CompositeSourceVisitor) v).getVisitorType()
                                 .getGenericSuperclass();
                     }
 
@@ -86,18 +86,13 @@ public class RefactorPlan {
             return this;
         }
 
-        public Builder scanProfiles() {
-            new ClasspathProfileConfigurationLoader(compileClasspath).load().forEach(this::loadProfile);
-            return this;
-        }
-
         public Builder scanVisitors(String... whitelistVisitorPackages) {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader(whitelistVisitorPackages).load());
+            visitors.addAll(new AutoConfigureSourceVisitorLoader(whitelistVisitorPackages).loadVisitors());
             return this;
         }
 
         public Builder loadVisitors(SourceVisitorLoader sourceVisitorLoader) {
-            visitors.addAll(sourceVisitorLoader.load());
+            visitors.addAll(sourceVisitorLoader.loadVisitors());
             return this;
         }
 
@@ -107,7 +102,7 @@ public class RefactorPlan {
         }
 
         public Builder loadProfiles(ProfileConfigurationLoader profileConfigurationLoader) {
-            profileConfigurationLoader.load().forEach(this::loadProfile);
+            profileConfigurationLoader.loadProfiles().forEach(this::loadProfile);
             return this;
         }
 
@@ -118,8 +113,11 @@ public class RefactorPlan {
         }
 
         public RefactorPlan build() {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").load());
-            visitors.addAll(new ClasspathSourceVisitorLoader(compileClasspath).load());
+            visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").loadVisitors());
+
+            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
+            visitors.addAll(classpathResourceLoader.loadVisitors());
+            classpathResourceLoader.loadProfiles().forEach(this::loadProfile);
 
             return new RefactorPlan(profileConfigurations.values().stream()
                     .map(pc -> pc.build(profileConfigurations.values()))

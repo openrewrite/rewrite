@@ -50,7 +50,7 @@ public class ProfileConfiguration {
     private Set<String> extend = emptySet();
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
-    private Map<String, Object> configure = emptyMap();
+    private Map<String, Object> configure = new HashMap<>();
 
     public String getName() {
         return name;
@@ -58,15 +58,6 @@ public class ProfileConfiguration {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    /**
-     * Alias for {@link #setName(String)}.
-     *
-     * @param name The profile name.
-     */
-    public void setProfile(String name) {
-        setName(name);
     }
 
     public void setExtend(Set<String> extend) {

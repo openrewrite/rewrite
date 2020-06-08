@@ -36,7 +36,7 @@ public class AutoConfigureSourceVisitorLoader implements SourceVisitorLoader {
         this.whitelistVisitorPackages = whitelistVisitorPackages;
     }
 
-    public Collection<SourceVisitor<?>> load() {
+    public Collection<SourceVisitor<?>> loadVisitors() {
         try(ScanResult scanResult = new ClassGraph()
                 .whitelistPackages(whitelistVisitorPackages)
                 .enableMemoryMapping()

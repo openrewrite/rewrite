@@ -18,10 +18,17 @@ package org.openrewrite.config
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-class ClasspathProfileConfigurationLoaderTest {
+class ClasspathResourceLoaderTest {
+    @Test
+    fun loadDeclarativeVisitorFromClasspath() {
+        val visitors = ClasspathResourceLoader(emptyList()).loadVisitors()
+        assertThat(visitors.map { it.name })
+                .containsExactly("org.openrewrite.text.ChangeTextToJon")
+    }
+
     @Test
     fun loadProfileFromClasspath() {
-        val profiles = ClasspathProfileConfigurationLoader(emptyList()).load()
-        assertThat(profiles).hasSize(1)
+        val profiles = ClasspathResourceLoader(emptyList()).loadProfiles()
+        assertThat(profiles.map { it.name }).containsExactly("hello-jon")
     }
 }
