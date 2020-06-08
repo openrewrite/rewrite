@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test
 class ClasspathProfileConfigurationLoaderTest {
     @Test
     fun loadProfileFromClasspath() {
-        val profiles = ClasspathProfileConfigurationLoader().load()
+        val profiles = ClasspathProfileConfigurationLoader(emptyList()).load()
         assertThat(profiles).hasSize(1)
     }
 }

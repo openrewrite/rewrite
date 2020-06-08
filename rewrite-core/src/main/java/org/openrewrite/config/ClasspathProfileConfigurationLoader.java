@@ -19,24 +19,43 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 
 public class ClasspathProfileConfigurationLoader implements ProfileConfigurationLoader {
+    private final Iterable<Path> compileClasspath;
+
+    public ClasspathProfileConfigurationLoader(Iterable<Path> compileClasspath) {
+        this.compileClasspath = compileClasspath;
+    }
+
     @Override
     public Collection<ProfileConfiguration> load() {
+        Collection<ProfileConfiguration> profiles = new ArrayList<>();
+
         try (ScanResult scanResult = new ClassGraph()
                 .whitelistPaths("META-INF/rewrite-profiles")
                 .enableMemoryMapping()
                 .scan()) {
-            ResourceList yml = scanResult.getResourcesWithExtension("yml");
-            Collection<ProfileConfiguration> profiles = new ArrayList<>();
-
-            yml.forEachInputStreamIgnoringIOException((res, ymlIn) -> {
-                profiles.addAll(new YamlProfileConfigurationLoader(ymlIn).load());
-            });
-
-            return profiles;
+            loadScannedProfileYamls(profiles, scanResult);
         }
+
+        try (ScanResult scanResult = new ClassGraph()
+                .overrideClasspath(compileClasspath)
+                .whitelistPaths("META-INF/rewrite-profiles")
+                .enableMemoryMapping()
+                .scan()) {
+            loadScannedProfileYamls(profiles, scanResult);
+        }
+
+        return profiles;
+    }
+
+    private void loadScannedProfileYamls(Collection<ProfileConfiguration> profiles, ScanResult scanResult) {
+        ResourceList yml = scanResult.getResourcesWithExtension("yml");
+        yml.forEachInputStreamIgnoringIOException((res, ymlIn) -> {
+            profiles.addAll(new YamlProfileConfigurationLoader(ymlIn).load());
+        });
     }
 }

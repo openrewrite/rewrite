@@ -19,9 +19,11 @@ import org.openrewrite.config.*;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
@@ -77,14 +79,15 @@ public class RefactorPlan {
     public static class Builder {
         private final Map<String, ProfileConfiguration> profileConfigurations = new HashMap<>();
         private final Collection<SourceVisitor<?>> visitors = new ArrayList<>();
+        private Iterable<Path> compileClasspath = emptyList();
 
-        public Builder() {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").load());
-            visitors.addAll(new ClasspathSourceVisitorLoader().load());
+        public Builder compileClasspath(Iterable<Path> compileClasspath) {
+            this.compileClasspath = emptyList();
+            return this;
         }
 
         public Builder scanProfiles() {
-            new ClasspathProfileConfigurationLoader().load().forEach(this::loadProfile);
+            new ClasspathProfileConfigurationLoader(compileClasspath).load().forEach(this::loadProfile);
             return this;
         }
 
@@ -115,6 +118,9 @@ public class RefactorPlan {
         }
 
         public RefactorPlan build() {
+            visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").load());
+            visitors.addAll(new ClasspathSourceVisitorLoader(compileClasspath).load());
+
             return new RefactorPlan(profileConfigurations.values().stream()
                     .map(pc -> pc.build(profileConfigurations.values()))
                     .collect(Collectors.toList()),

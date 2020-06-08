@@ -20,6 +20,7 @@ import io.github.classgraph.ResourceList;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.SourceVisitor;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -27,23 +28,41 @@ import java.util.Collection;
  * Scans for YAML definitions of {@link SourceVisitor} in META-INF/rewrite-definitions.
  */
 public class ClasspathSourceVisitorLoader implements SourceVisitorLoader {
+    private final Iterable<Path> compileClasspath;
+
+    public ClasspathSourceVisitorLoader(Iterable<Path> compileClasspath) {
+        this.compileClasspath = compileClasspath;
+    }
+
     @Override
     public Collection<SourceVisitor<?>> load() {
+        Collection<SourceVisitor<?>> sourceVisitors = new ArrayList<>();
+
         try (ScanResult scanResult = new ClassGraph()
                 .whitelistPaths("META-INF/rewrite-definitions")
                 .enableMemoryMapping()
                 .scan()) {
-            ResourceList yml = scanResult.getResourcesWithExtension("yml");
-            Collection<SourceVisitor<?>> sourceVisitors = new ArrayList<>();
-
-            yml.forEachInputStreamIgnoringIOException((res, ymlIn) -> {
-                String path = res.getPath();
-                String name = path.substring(path.lastIndexOf('/') + 1)
-                        .replaceAll(".yml$", "");
-                sourceVisitors.addAll(new YamlSourceVisitorLoader(name, ymlIn).load());
-            });
-
-            return sourceVisitors;
+            loadSourceVisitorYamls(sourceVisitors, scanResult);
         }
+
+        try (ScanResult scanResult = new ClassGraph()
+                .overrideClasspath(compileClasspath)
+                .whitelistPaths("META-INF/rewrite-definitions")
+                .enableMemoryMapping()
+                .scan()) {
+            loadSourceVisitorYamls(sourceVisitors, scanResult);
+        }
+
+        return sourceVisitors;
+    }
+
+    private void loadSourceVisitorYamls(Collection<SourceVisitor<?>> sourceVisitors, ScanResult scanResult) {
+        ResourceList yml = scanResult.getResourcesWithExtension("yml");
+        yml.forEachInputStreamIgnoringIOException((res, ymlIn) -> {
+            String path = res.getPath();
+            String name = path.substring(path.lastIndexOf('/') + 1)
+                    .replaceAll(".yml$", "");
+            sourceVisitors.addAll(new YamlSourceVisitorLoader(name, ymlIn).load());
+        });
     }
 }

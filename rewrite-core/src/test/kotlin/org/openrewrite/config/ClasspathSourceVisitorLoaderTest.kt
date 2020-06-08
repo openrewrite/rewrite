@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test
 class ClasspathSourceVisitorLoaderTest {
     @Test
     fun loadDeclarativeVisitorFromClasspath() {
-        val visitors = ClasspathSourceVisitorLoader().load()
+        val visitors = ClasspathSourceVisitorLoader(emptyList()).load()
         assertThat(visitors.map { it.name })
                 .containsExactly("org.openrewrite.text.ChangeTextToJon")
     }
