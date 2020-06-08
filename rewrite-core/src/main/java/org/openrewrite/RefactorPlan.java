@@ -16,7 +16,12 @@
 package org.openrewrite;
 
 import org.openrewrite.config.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
@@ -29,6 +34,8 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 
 public class RefactorPlan {
+    private static final Logger logger = LoggerFactory.getLogger(RefactorPlan.class);
+
     private final Map<String, Profile> profilesByName;
     private final Collection<SourceVisitor<?>> visitors;
 
@@ -86,6 +93,27 @@ public class RefactorPlan {
             return this;
         }
 
+        public Builder scanResources() {
+            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
+            loadVisitors(classpathResourceLoader);
+            loadProfiles(classpathResourceLoader);
+            return this;
+        }
+
+        public Builder scanUserHome() {
+            File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
+            if(userHomeRewriteConfig.exists()) {
+                try(FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
+                    YamlResourceLoader resourceLoader = new YamlResourceLoader(is);
+                    loadVisitors(resourceLoader);
+                    loadProfiles(resourceLoader);
+                } catch(IOException e) {
+                    logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);
+                }
+            }
+            return this;
+        }
+
         public Builder scanVisitors(String... whitelistVisitorPackages) {
             visitors.addAll(new AutoConfigureSourceVisitorLoader(whitelistVisitorPackages).loadVisitors());
             return this;
@@ -114,10 +142,6 @@ public class RefactorPlan {
 
         public RefactorPlan build() {
             visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").loadVisitors());
-
-            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
-            visitors.addAll(classpathResourceLoader.loadVisitors());
-            classpathResourceLoader.loadProfiles().forEach(this::loadProfile);
 
             return new RefactorPlan(profileConfigurations.values().stream()
                     .map(pc -> pc.build(profileConfigurations.values()))

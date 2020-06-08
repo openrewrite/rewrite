@@ -45,8 +45,8 @@ class RefactorTest {
 
     @Test
     fun scanProfileAndDeclarativeRule() {
-        // visitors and profiles scanned by default
         val plan = RefactorPlan.builder()
+                .scanResources()
                 .build()
 
         val visitors = plan.visitors(PlainText::class.java, "hello-jon")
