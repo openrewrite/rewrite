@@ -22,9 +22,9 @@ import java.lang.reflect.Type;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.StreamSupport.stream;
 
 public class RefactorPlan {
     private final Map<String, Profile> profilesByName;
@@ -35,9 +35,14 @@ public class RefactorPlan {
         this.visitors = visitors;
     }
 
-    public <S extends SourceFile, T extends SourceVisitor<S>> Collection<T> visitors(
-            Class<S> sourceType, String... profiles) {
-        List<Profile> loadedProfiles = stream(profiles)
+    public <T extends Tree, S extends SourceVisitor<T>> Collection<S> visitors(
+            Class<T> sourceType, String... profiles) {
+        return visitors(sourceType, Arrays.asList(profiles));
+    }
+
+    public <T extends Tree, S extends SourceVisitor<T>> Collection<S> visitors(
+            Class<T> sourceType, Iterable<String> profiles) {
+        List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
                 .map(profilesByName::get)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
@@ -59,9 +64,9 @@ public class RefactorPlan {
                     }
                     return true;
                 })
-                .map(v -> (T) v)
-                .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
+                .map(v -> (S) v)
                 .map(v -> loadedProfiles.stream().reduce(v, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1))
+                .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
                 .collect(Collectors.toList());
     }
 

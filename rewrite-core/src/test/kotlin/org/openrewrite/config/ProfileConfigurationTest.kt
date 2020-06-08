@@ -36,6 +36,24 @@ internal class ProfileConfigurationTest {
     }
 
     @Test
+    fun everyProfileImplicitlyExtendsDefault() {
+        val default = ProfileConfiguration().apply {
+            name = "default"
+            setConfigure(
+                    mapOf("org.openrewrite.text.ChangeText" to
+                            mapOf("toText" to "Hello Jon!")
+                    )
+            )
+        }
+
+        val profile = ProfileConfiguration().apply {
+            name = "hello-jon"
+        }.build(listOf(default))
+
+        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+    }
+
+    @Test
     fun propertyNameCombinedWithVisitorName() {
         val profile = ProfileConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))

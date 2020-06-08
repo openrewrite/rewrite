@@ -127,6 +127,10 @@ public class ProfileConfiguration {
                     .forEach(configs::add);
         }
 
+        if(!name.equals("default") && configsByName.containsKey("default")) {
+            inOrderConfigurations.add(configsByName.get("default"));
+        }
+
         return new Profile() {
             @Override
             public String getName() {
@@ -214,7 +218,7 @@ public class ProfileConfiguration {
     }
 
     private Profile.FilterReply accept(SourceVisitor<?> visitor) {
-        if (exclude.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
+        if (visitor.validate().isInvalid() || exclude.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
             return Profile.FilterReply.DENY;
         }
 

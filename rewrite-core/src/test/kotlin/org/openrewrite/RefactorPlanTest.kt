@@ -22,19 +22,19 @@ import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 
 class RefactorPlanTest {
-    val parent = ProfileConfiguration().apply {
+    private val parent = ProfileConfiguration().apply {
         name = "parent"
         setInclude(setOf("org.openrewrite.text.*"))
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "hi"));
     }
 
-    val child = ProfileConfiguration().apply {
+    private val child = ProfileConfiguration().apply {
         name = "child"
         setExtend(setOf("parent"))
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "overridden"))
     }
 
-    val planBuilder = RefactorPlan.builder()
+    private val planBuilder = RefactorPlan.builder()
             .loadProfile(parent)
             .loadProfile(child)
             .visitor(ChangeText())
