@@ -13,22 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.config
 
-public interface Profile {
-    Profile ALL = () -> "__all__";
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 
-    String getName();
-
-    default <S, T extends SourceVisitor<S>> FilterReply accept(T visitor) {
-        return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
-    }
-
-    default <S, T extends SourceVisitor<S>> T configure(T visitor) {
-        return visitor;
-    }
-
-    enum FilterReply {
-        ACCEPT, DENY, NEUTRAL;
+class ClasspathProfileConfigurationLoaderTest {
+    @Test
+    fun loadProfileFromClasspath() {
+        val profiles = ClasspathProfileConfigurationLoader().load()
+        assertThat(profiles).hasSize(1)
     }
 }

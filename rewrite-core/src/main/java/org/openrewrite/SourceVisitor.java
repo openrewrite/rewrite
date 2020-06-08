@@ -80,6 +80,10 @@ public abstract class SourceVisitor<R> {
         return Validated.none();
     }
 
+    public String getName() {
+        return getClass().getName();
+    }
+
     public Cursor getCursor() {
         if (cursor.get() == null) {
             throw new IllegalStateException("Cursoring is not enabled for this visitor. " +

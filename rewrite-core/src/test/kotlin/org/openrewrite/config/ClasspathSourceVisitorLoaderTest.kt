@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite.config
 
-import org.openrewrite.Profile;
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
 
-import java.util.Collection;
-
-public interface ProfileSource {
-    Collection<Profile> load();
+class ClasspathSourceVisitorLoaderTest {
+    @Test
+    fun loadDeclarativeVisitorFromClasspath() {
+        val visitors = ClasspathSourceVisitorLoader().load()
+        assertThat(visitors.map { it.name })
+                .containsExactly("org.openrewrite.text.ChangeTextToJon")
+    }
 }

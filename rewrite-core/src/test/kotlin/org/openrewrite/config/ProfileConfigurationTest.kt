@@ -13,76 +13,49 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite
+package org.openrewrite.config
 
-import io.micrometer.core.instrument.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.text.ChangeText
 
-internal class ProfileTest {
+internal class ProfileConfigurationTest {
     private val changeText = ChangeText()
 
     @Test
     fun configureSourceVisitor() {
-        val profile: Profile = Profile().apply {
+        val profile = ProfileConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite.text.ChangeText" to
                             mapOf("toText" to "Hello Jon!")
                     )
             )
-        }
+        }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
-    fun defineDeclarativeVisitor() {
-        val profile = Profile().apply {
-            setDefine(
-                    mapOf("org.openrewrite.text.ChangeTextTwice" to
-                            listOf(
-                                    mapOf("org.openrewrite.text.ChangeText" to
-                                            mapOf(
-                                                    "toText" to "Hello Jon"
-                                            )
-                                    ),
-                                    mapOf("text.ChangeText" to
-                                            mapOf(
-                                                    "toText" to "Hello Jonathan!"
-                                            )
-                                    )
-                            )
-                    )
-            )
-        }
-
-        assertThat(profile.definitions).hasSize(1)
-        assertThat(profile.definitions.iterator().next().tags)
-                .contains(Tag.of("name", "org.openrewrite.text.ChangeTextTwice"))
-    }
-
-    @Test
     fun propertyNameCombinedWithVisitorName() {
-        val profile: Profile = Profile().apply {
+        val profile = ProfileConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
-        }
+        }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun propertyNameCombinedWithWildcardVisitor() {
-        val profile: Profile = Profile().apply {
+        val profile = ProfileConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.*.toText" to "Hello Jon!"))
-        }
+        }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun splitPackageWildcard() {
-        val profile: Profile = Profile().apply {
+        val profile = ProfileConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.*" to
@@ -90,14 +63,14 @@ internal class ProfileTest {
                             )
                     )
             )
-        }
+        }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun splitPackage() {
-        val profile: Profile = Profile().apply {
+        val profile = ProfileConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.ChangeText" to
@@ -105,7 +78,7 @@ internal class ProfileTest {
                             )
                     )
             )
-        }
+        }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
     }

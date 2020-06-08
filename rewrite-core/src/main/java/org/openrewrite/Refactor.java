@@ -58,16 +58,6 @@ public class Refactor<S extends SourceFile, T extends Tree> {
         return this;
     }
 
-    public final Refactor<S, T> activateProfiles(Environment environment, String... profiles) {
-        for (String profileName : profiles) {
-            //noinspection unchecked
-            visit(environment.getProfile(profileName)
-                    .getVisitorsForSourceType((Class<T>) original.getClass()));
-        }
-
-        return this;
-    }
-
     /**
      * Shortcut for building refactoring operations for a collection of like-typed {@link Tree} elements.
      *

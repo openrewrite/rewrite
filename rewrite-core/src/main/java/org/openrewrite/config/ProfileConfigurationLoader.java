@@ -13,22 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.config;
 
-public interface Profile {
-    Profile ALL = () -> "__all__";
+import java.util.Collection;
 
-    String getName();
-
-    default <S, T extends SourceVisitor<S>> FilterReply accept(T visitor) {
-        return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
-    }
-
-    default <S, T extends SourceVisitor<S>> T configure(T visitor) {
-        return visitor;
-    }
-
-    enum FilterReply {
-        ACCEPT, DENY, NEUTRAL;
-    }
+public interface ProfileConfigurationLoader {
+    Collection<ProfileConfiguration> load();
 }

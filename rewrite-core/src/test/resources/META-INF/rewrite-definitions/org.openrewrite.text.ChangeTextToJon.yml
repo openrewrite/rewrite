@@ -14,13 +14,6 @@
 # limitations under the License.
 #
 
-conditions=\
-  org.openrewrite.spring.OnCompileClasspath,\
-  org.openrewrite.spring.Version
-
-conditions.[org.openrewrite.spring.Version].at-least=2.0
-
-include=org.openrewrite.spring.*
-exclude=org.openrewrite.spring.ConfigurationProperties
-
-configure.[org.openrewrite.spring.TrackLatestVersion].version=2.x
+visitors:
+  - org.openrewrite.text.ChangeText:
+      toText: Hello Jon!

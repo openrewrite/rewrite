@@ -17,28 +17,41 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.config.ProfileSource
+import org.openrewrite.config.ProfileConfiguration
+import org.openrewrite.config.ProfileConfigurationLoader
 import org.openrewrite.text.PlainText
 
 class RefactorTest {
     @Test
     fun scanAutoConfigurableRules() {
-        val fixedProfileSource = ProfileSource {
-            listOf(Profile().apply {
-                setInclude(setOf("*"))
-                setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
-            })
-        }
+        val plan = RefactorPlan.builder()
+                .scanVisitors("org.openrewrite.text")
+                .loadProfile(ProfileConfiguration().apply {
+                    name = "hello-jon"
+                    setInclude(setOf("*"))
+                    setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
+                })
+                .build()
 
-        val environment = Environment.builder()
-                .loadProfile(fixedProfileSource)
-                .scan("org.openrewrite")
+        val visitors = plan.visitors(PlainText::class.java, "hello-jon")
 
         val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY)
                 .refactor()
-                .activateProfiles(environment, "default")
+                .visit(visitors)
                 .fix().fixed
 
         assertThat(fixed.print()).isEqualTo("Hello Jon!")
+    }
+
+    @Test
+    fun scanProfileAndDeclarativeRule() {
+        // visitors scanned by default
+        val plan = RefactorPlan.builder()
+                .scanProfiles()
+                .build()
+
+        val visitors = plan.visitors(PlainText::class.java, "hello-jon")
+
+        assertThat(visitors).hasSize(1)
     }
 }

@@ -17,12 +17,13 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Profile
 import org.openrewrite.text.ChangeText
 
-class YamlProfileSourceTest {
+class YamlProfileConfigurationLoaderTest {
     @Test
     fun loadYaml() {
-        val profile = YamlProfileSource("""
+        val profile = YamlProfileConfigurationLoader("""
             profile: test
 
             include:
@@ -34,23 +35,23 @@ class YamlProfileSourceTest {
             configure:
               org.openrewrite.text.ChangeText:
                 toText: 'Hello Jon!'
-        """.trimIndent().byteInputStream()).load().first()
+        """.trimIndent().byteInputStream()).load().first().build(emptyList())
 
         val changeText = ChangeText()
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
-        assertThat(profile.maybeAdd(changeText)).isTrue()
+        assertThat(profile.accept(changeText)).isEqualTo(Profile.FilterReply.ACCEPT)
     }
 
     @Test
     fun loadMultiYaml() {
-        val profiles = YamlProfileSource("""
+        val profileConfigs = YamlProfileConfigurationLoader("""
             ---
             profile: checkstyle
             ---
             profile: spring
         """.trimIndent().byteInputStream()).load()
 
-        assertThat(profiles.map { it.name }).containsOnly("checkstyle", "spring")
+        assertThat(profileConfigs.map { it.name }).containsOnly("checkstyle", "spring")
     }
 }

@@ -17,20 +17,8 @@ package org.openrewrite.config;
 
 import org.openrewrite.SourceVisitor;
 
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
+import java.util.Collection;
 
-/**
- * Annotate on any {@link SourceVisitor} that contains setters configuring it for use.
- *
- * Different mechanisms may scan for {@link AutoConfigure} enabled visitor builder methods to
- * automatically wire visitors found on the classpath. For example, we could scan for all
- * Java refactoring visitors and apply all auto-configurable visitors to the Java source files
- * in a project.
- */
-@Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface AutoConfigure {
+public interface SourceVisitorLoader {
+    Collection<SourceVisitor<?>> load();
 }

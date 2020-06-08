@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.Profile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.TypeDescription;
@@ -28,20 +27,20 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
-public class YamlProfileSource implements ProfileSource {
-    private static final Logger logger = LoggerFactory.getLogger(YamlProfileSource.class);
-    private final Map<String, Profile> profiles = new HashMap<>();
+public class YamlProfileConfigurationLoader implements ProfileConfigurationLoader {
+    private static final Logger logger = LoggerFactory.getLogger(YamlProfileConfigurationLoader.class);
+    private final Map<String, ProfileConfiguration> profiles = new HashMap<>();
 
-    public YamlProfileSource(InputStream yaml) {
+    public YamlProfileConfigurationLoader(InputStream yaml) {
         try (InputStream i = yaml) {
-            Constructor constructor = new Constructor(Profile.class);
-            TypeDescription profileDesc = new TypeDescription(Profile.class);
+            Constructor constructor = new Constructor(ProfileConfiguration.class);
+            TypeDescription profileDesc = new TypeDescription(ProfileConfiguration.class);
             profileDesc.substituteProperty("profile", String.class,
                     "getName", "setName");
             constructor.addTypeDescription(profileDesc);
 
             for (Object profileObj : new Yaml(constructor).loadAll(i)) {
-                Profile profile = (Profile) profileObj;
+                ProfileConfiguration profile = (ProfileConfiguration) profileObj;
                 profiles.compute(profile.getName(), (name, existing) -> profile.merge(existing));
             }
         } catch (IOException e) {
@@ -50,7 +49,7 @@ public class YamlProfileSource implements ProfileSource {
     }
 
     @Override
-    public Collection<Profile> load() {
+    public Collection<ProfileConfiguration> load() {
         return profiles.values();
     }
 }
