@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -97,8 +98,14 @@ public class AddImport extends JavaRefactorVisitor {
 
         cu = cu.withImports(orderImports.addImport(cu));
 
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
         if (cu.getClasses().size() > 0 && cu.getImports().isEmpty() ||
-                cu.getClasses().get(0).getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() < 2) {
+                cu.getClasses().get(0).getFormatting().getPrefix().chars()
+                        .filter(c -> {
+                            takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
+                            return takeWhile.get();
+                        })
+                        .count() < 2) {
             List<J.ClassDecl> classes = new ArrayList<>(cu.getClasses());
             classes.set(0, classes.get(0).withPrefix("\n\n"));
             cu = cu.withClasses(classes);

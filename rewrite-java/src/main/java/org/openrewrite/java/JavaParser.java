@@ -72,7 +72,7 @@ public interface JavaParser {
             Function<String, Path> sourceFile = sourceText -> {
                 Path file = temp.resolve(simpleName.apply(sourceText) + ".java");
                 try {
-                    Files.writeString(file, sourceText);
+                    Files.write(file, sourceText.getBytes(Charset.defaultCharset()));
                 } catch (IOException e) {
                     throw new UncheckedIOException(e);
                 }

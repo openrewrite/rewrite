@@ -21,6 +21,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.refactor.Formatter;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 public class JavaFormatter extends Formatter {
     public JavaFormatter(J.CompilationUnit cu) {
         super(cu);
@@ -29,10 +31,10 @@ public class JavaFormatter extends Formatter {
     public Formatting format(Tree relativeToEnclosing) {
         Tree[] siblings = new Tree[0];
         if(relativeToEnclosing instanceof J.Block) {
-            siblings = ((J.Block<?>) relativeToEnclosing).getStatements().toArray(Tree[]::new);
+            siblings = ((J.Block<?>) relativeToEnclosing).getStatements().toArray(new Tree[0]);
         }
         else if(relativeToEnclosing instanceof J.Case) {
-            siblings = ((J.Case) relativeToEnclosing).getStatements().toArray(Tree[]::new);
+            siblings = ((J.Case) relativeToEnclosing).getStatements().toArray(new Tree[0]);
         }
 
         Result indentation = findIndent(enclosingIndent(relativeToEnclosing), siblings);
@@ -56,9 +58,20 @@ public class JavaFormatter extends Formatter {
     }
 
     public static int enclosingIndent(Tree enclosesBoth) {
-        return enclosesBoth instanceof J.Block ? ((J.Block<?>) enclosesBoth).getIndent() :
-                (int) enclosesBoth.getFormatting().getPrefix().chars().dropWhile(c -> c == '\n' || c == '\r')
-                        .takeWhile(Character::isWhitespace).count();
+        AtomicBoolean dropWhile = new AtomicBoolean(false);
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
+        return enclosesBoth instanceof J.Block ?
+                ((J.Block<?>) enclosesBoth).getIndent() :
+                (int) enclosesBoth.getFormatting().getPrefix().chars()
+                        .filter(c -> {
+                            dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
+                            return dropWhile.get();
+                        })
+                        .filter(c -> {
+                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
+                            return takeWhile.get();
+                        })
+                        .count();
     }
 
     public boolean isIndentedWithSpaces() {

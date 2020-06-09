@@ -11,6 +11,7 @@ tasks.named<JavaCompile>("compileJava") {
     sourceCompatibility = JavaVersion.VERSION_11.toString()
     targetCompatibility = JavaVersion.VERSION_11.toString()
 
+    options.compilerArgs.clear()
     options.compilerArgs.addAll(listOf(
             "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",

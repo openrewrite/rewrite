@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
@@ -83,6 +84,12 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     private boolean isOnOwnLine(Tree tree) {
-        return tree.getFormatting().getPrefix().chars().takeWhile(c -> c == '\n' || c == '\r').count() > 0;
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
+        return tree.getFormatting().getPrefix().chars()
+                .filter(c -> {
+                    takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
+                    return takeWhile.get();
+                })
+                .count() > 0;
     }
 }

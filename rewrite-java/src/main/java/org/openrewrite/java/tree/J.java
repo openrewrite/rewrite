@@ -29,6 +29,7 @@ import org.openrewrite.java.search.*;
 import java.io.Serializable;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1622,8 +1623,12 @@ public interface J extends Serializable, Tree {
                 return importType.getPackageName();
             }
 
+            AtomicBoolean takeWhile = new AtomicBoolean(true);
             return stream(qualid.getTarget().printTrimmed().split("\\."))
-                    .takeWhile(pkg -> !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)))
+                    .filter(pkg -> {
+                        takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
+                        return takeWhile.get();
+                    })
                     .collect(joining("."));
         }
 
@@ -1632,8 +1637,8 @@ public interface J extends Serializable, Tree {
             String p1 = this.getPackageName();
             String p2 = o.getPackageName();
 
-            var p1s = p1.split("\\.");
-            var p2s = p2.split("\\.");
+            String[] p1s = p1.split("\\.");
+            String[] p2s = p2.split("\\.");
 
             for (int i = 0; i < p1s.length; i++) {
                 String s = p1s[i];

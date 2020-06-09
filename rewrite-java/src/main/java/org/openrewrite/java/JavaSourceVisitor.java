@@ -20,6 +20,8 @@ import org.openrewrite.SourceVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import static java.util.stream.Collectors.toList;
 
 public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
@@ -45,6 +47,7 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     public boolean isInSameNameScope(Cursor higher, Cursor lower) {
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
         return higher.getPathAsStream()
                 .filter(t -> t instanceof J.Block ||
                         t instanceof J.MethodDecl ||
@@ -52,10 +55,13 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
                         t instanceof J.ForLoop ||
                         t instanceof J.ForEachLoop).findAny()
                 .map(higherNameScope -> lower.getPathAsStream()
-                        .takeWhile(t -> !(t instanceof J.ClassDecl) ||
-                                (((J.ClassDecl) t).getKind() instanceof J.ClassDecl.Kind.Class &&
-                                        !((J.ClassDecl) t).hasModifier("static"))
-                        )
+                        .filter(t -> {
+                            takeWhile.set(takeWhile.get() && (
+                                    !(t instanceof J.ClassDecl) ||
+                                            (((J.ClassDecl) t).getKind() instanceof J.ClassDecl.Kind.Class &&
+                                                    !((J.ClassDecl) t).hasModifier("static"))));
+                            return takeWhile.get();
+                        })
                         .anyMatch(higherNameScope::equals))
                 .orElse(false);
     }
@@ -84,15 +90,14 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     public R visitExpression(Expression expr) {
-        if(expr.getType() instanceof JavaType.FullyQualified) {
+        if (expr.getType() instanceof JavaType.FullyQualified) {
             JavaType.FullyQualified exprType = (JavaType.FullyQualified) expr.getType();
             if (expr instanceof J.FieldAccess) {
-                if(((J.FieldAccess) expr).getSimpleName().equals(exprType.getClassName())) {
+                if (((J.FieldAccess) expr).getSimpleName().equals(exprType.getClassName())) {
                     return reduce(defaultTo(expr), visitTypeName((NameTree) expr));
                 }
-            }
-            else if(expr instanceof J.Ident) {
-                if(((J.Ident) expr).getSimpleName().equals(exprType.getClassName())) {
+            } else if (expr instanceof J.Ident) {
+                if (((J.Ident) expr).getSimpleName().equals(exprType.getClassName())) {
                     return reduce(defaultTo(expr), visitTypeName((NameTree) expr));
                 }
             }
@@ -619,7 +624,7 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
                                         visitAfter(
                                                 visitAfter(
                                                         visit(newClass.getBody()),
-                                                        newClass.getArgs().getArgs()
+                                                        newClass.getArgs() == null ? null : newClass.getArgs().getArgs()
                                                 ),
                                                 newClass.getClazz()
                                         ),
