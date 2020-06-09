@@ -88,7 +88,7 @@ interface ReorderMethodArgumentsTest {
                    a.foo("s", 0, 1);
                }
             }
-        """
+        """.trimIndent()
 
         val cu = jp.parse(b, a)
         val fixed = cu.refactor()
@@ -126,7 +126,7 @@ interface ReorderMethodArgumentsTest {
                    a.foo("mystring", 0, "a", "b");
                }
             }
-        """
+        """.trimIndent()
 
         val cu = jp.parse(b, a)
 
@@ -161,7 +161,7 @@ interface ReorderMethodArgumentsTest {
                    new A().foo("mystring");
                }
             }
-        """
+        """.trimIndent()
 
         val cu = jp.parse(b, a)
         val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {

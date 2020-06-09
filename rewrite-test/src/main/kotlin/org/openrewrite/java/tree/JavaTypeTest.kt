@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
@@ -94,15 +95,18 @@ interface JavaTypeTest {
     @Test
     fun typeFlyweightsAreSharedBetweenParsers(jp: JavaParser) {
         val a = jp.parse("public class A {}")
-        val a2 = jp.parse("public class A {}")
+        val a2 = jp.reset().parse("public class A {}")
 
-        assertTrue(a.classes[0].type === a2.classes[0].type)
+        val t1 = a.classes[0].type
+        val t2 = a2.classes[0].type
+
+        assertThat(t1).isSameAs(t2)
     }
 
     @Test
     fun sameFullyQualifiedNameWithDifferentMembers(jp: JavaParser) {
         val a = jp.parse("public class A { String foo; }")
-        val a2 = jp.parse("public class A { String bar; }")
+        val a2 = jp.reset().parse("public class A { String bar; }")
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }

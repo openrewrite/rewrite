@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.*
 
 interface MethodInvocationTest {
-    private fun J.CompilationUnit.allInvs() = fields(0..4)
+    private fun J.CompilationUnit.allInvs() = classes[0].fields
             .map { it.vars[0].initializer as J.MethodInvocation }
 
     @Test
@@ -28,14 +28,8 @@ interface MethodInvocationTest {
         val a = jp.parse("""
             public class A {
                 Integer m = foo ( 0, 1, 2 );
-                Integer n = staticFoo ( 0 );
-                Integer o = generic ( 0, 1, 2 );
-                Integer p = this. < Integer > generic ( 0, 1, 2 );
-                Integer q = staticFoo ( );
     
-                public static int staticFoo(int... args) { return 0; }
                 public Integer foo(Integer n, Integer... ns) { return n; }
-                public <T> T generic(T n, T... ns) { return n; }
             }
         """)
 

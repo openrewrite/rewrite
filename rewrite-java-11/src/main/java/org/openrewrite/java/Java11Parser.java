@@ -194,6 +194,9 @@ public class Java11Parser implements JavaParser {
         compilerLog.reset();
         pfm.flush();
         Check.instance(context).newRound();
+        Annotate.instance(context).newRound();
+        Enter.instance(context).newRound();
+        Modules.instance(context).newRound();
         return this;
     }
 

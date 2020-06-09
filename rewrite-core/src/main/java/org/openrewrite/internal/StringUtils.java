@@ -34,7 +34,7 @@ public class StringUtils {
 
         StringBuilder trimmed = new StringBuilder();
         AtomicBoolean dropWhile = new AtomicBoolean(false);
-        int[] charArray = text.chars()
+        int[] charArray = text.replaceAll("\\s+$", "").chars()
                 .filter(c -> {
                     dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
                     return dropWhile.get();
@@ -69,12 +69,15 @@ public class StringUtils {
                     dropWhile.set(dropWhile.get() || !l.isEmpty());
                     return dropWhile.get();
                 })
-                .map(l -> (int) l.chars()
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                            return takeWhile.get();
-                        })
-                        .count())
+                .map(l -> {
+                    takeWhile.set(true);
+                    return (int) l.chars()
+                            .filter(c -> {
+                                takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
+                                return takeWhile.get();
+                            })
+                            .count();
+                })
                 .collect(groupingBy(identity(), TreeMap::new, counting()));
         return mostCommonIndent(indentFrequencies);
     }
