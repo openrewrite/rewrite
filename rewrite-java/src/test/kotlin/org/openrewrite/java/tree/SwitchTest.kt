@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class SwitchTest : JavaParser() {
+interface SwitchTest {
     
     @Test
-    fun switch() {
-        val a = parse("""
+    fun switch(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -46,8 +46,8 @@ open class SwitchTest : JavaParser() {
     }
     
     @Test
-    fun switchWithDefault() {
-        val a = parse("""
+    fun switchWithDefault(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -68,8 +68,8 @@ open class SwitchTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -89,8 +89,8 @@ open class SwitchTest : JavaParser() {
     }
     
     @Test
-    fun switchWithNoCases() {
-        val a = parse("""
+    fun switchWithNoCases(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -105,7 +105,7 @@ open class SwitchTest : JavaParser() {
     }
 
     @Test
-    fun multipleCases() {
+    fun multipleCases(jp: JavaParser) {
         val aSrc = """
             public class A {
                 int n;
@@ -122,6 +122,6 @@ open class SwitchTest : JavaParser() {
             }
         """.trimIndent()
 
-        assertEquals(aSrc, parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
     }
 }

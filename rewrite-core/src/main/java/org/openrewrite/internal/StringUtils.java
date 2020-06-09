@@ -15,9 +15,13 @@
  */
 package org.openrewrite.internal;
 
+import io.micrometer.core.lang.Nullable;
+
+import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
@@ -29,7 +33,14 @@ public class StringUtils {
         int indentLevel = indentLevel(text);
 
         StringBuilder trimmed = new StringBuilder();
-        int[] charArray = text.stripTrailing().chars().dropWhile(c -> c == '\n' || c == '\r').toArray();
+        AtomicBoolean dropWhile = new AtomicBoolean(false);
+        int[] charArray = text.chars()
+                .filter(c -> {
+                    dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
+                    return dropWhile.get();
+                })
+                .toArray();
+
         for (int i = 0; i < charArray.length; i++) {
             boolean nonWhitespaceEncountered = false;
             int j = i;
@@ -49,10 +60,21 @@ public class StringUtils {
     }
 
     static int indentLevel(String text) {
-        Stream<String> lines = text.stripTrailing().lines();
+        Stream<String> lines = Arrays.stream(text.replaceAll("\\s+$", "").split("\\r?\\n"));
+
+        AtomicBoolean dropWhile = new AtomicBoolean(false);
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
         SortedMap<Integer, Long> indentFrequencies = lines
-                .dropWhile(String::isEmpty)
-                .map(l -> (int) l.chars().takeWhile(Character::isWhitespace).count())
+                .filter(l -> {
+                    dropWhile.set(dropWhile.get() || !l.isEmpty());
+                    return dropWhile.get();
+                })
+                .map(l -> (int) l.chars()
+                        .filter(c -> {
+                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
+                            return takeWhile.get();
+                        })
+                        .count())
                 .collect(groupingBy(identity(), TreeMap::new, counting()));
         return mostCommonIndent(indentFrequencies);
     }
@@ -87,7 +109,7 @@ public class StringUtils {
 
         return indentFrequencyAsDivisors.entrySet().stream()
                 .max((e1, e2) -> {
-                    var valCompare = e1.getValue().compareTo(e2.getValue());
+                    int valCompare = e1.getValue().compareTo(e2.getValue());
                     return valCompare != 0 ?
                             valCompare :
                             // take the smallest indent otherwise, unless it would be zero
@@ -99,5 +121,25 @@ public class StringUtils {
 
     static int gcd(int n1, int n2) {
         return n2 == 0 ? n1 : gcd(n2, n1 % n2);
+    }
+
+    /**
+     * Check if the String is null or has only whitespaces.
+     *
+     * Modified from apache commons lang StringUtils.
+     *
+     * @param string String to check
+     * @return {@code true} if the String is null or has only whitespaces
+     */
+    public static boolean isBlank(@Nullable String string) {
+        if (string == null || string.isEmpty()) {
+            return true;
+        }
+        for (int i = 0; i < string.length(); i++) {
+            if (!Character.isWhitespace(string.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 }

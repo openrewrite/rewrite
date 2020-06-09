@@ -21,24 +21,18 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class EmptyTest : JavaParser() {
-    val a: J.CompilationUnit by lazy {
-        parse("""
+interface EmptyTest {
+    @Test
+    fun empty(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     ;
                 }
             }
         """)
-    }
 
-    @Test
-    fun empty() {
         assertTrue(a.firstMethodStatement() is J.Empty)
-    }
-
-    @Test
-    fun format() {
         assertEquals("""
             |public void test() {
             |    ;

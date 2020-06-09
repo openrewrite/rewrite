@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 
-open class FindMethodTest : JavaParser() {
+interface FindMethodTest {
 
     @Test
-    fun findStaticMethodCalls() {
-        val a = parse("""
+    fun findStaticMethodCalls(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.Collections;
             public class A {
                Object o = Collections.emptyList();
@@ -39,8 +39,8 @@ open class FindMethodTest : JavaParser() {
     }
 
     @Test
-    fun findStaticallyImportedMethodCalls() {
-        val a = parse("""
+    fun findStaticallyImportedMethodCalls(jp: JavaParser) {
+        val a = jp.parse("""
             import static java.util.Collections.emptyList;
             public class A {
                Object o = emptyList();
@@ -52,7 +52,7 @@ open class FindMethodTest : JavaParser() {
     }
 
     @Test
-    fun matchVarargs() {
+    fun matchVarargs(jp: JavaParser) {
         val a = """
             public class A {
                 public void foo(String s, Object... o) {}
@@ -67,11 +67,11 @@ open class FindMethodTest : JavaParser() {
             }
         """
 
-        assertTrue(parse(b, a).classes[0].findMethodCalls("A foo(String, Object...)").isNotEmpty())
+        assertTrue(jp.parse(b, a).classes[0].findMethodCalls("A foo(String, Object...)").isNotEmpty())
     }
 
     @Test
-    fun matchOnInnerClass() {
+    fun matchOnInnerClass(jp: JavaParser) {
         val b = """
             public class B {
                public static class C {
@@ -88,6 +88,6 @@ open class FindMethodTest : JavaParser() {
             }
         """
 
-        assertEquals(1, parse(a, b).classes[0].findMethodCalls("B.C foo()").size)
+        assertEquals(1, jp.parse(a, b).classes[0].findMethodCalls("B.C foo()").size)
     }
 }

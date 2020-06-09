@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class AssignTest : JavaParser() {
+interface AssignTest {
     
     @Test
-    fun assignmentToField() {
-        val a = parse("""
+    fun assignmentToField(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 String s;
                 public void test() {
@@ -40,8 +40,8 @@ open class AssignTest : JavaParser() {
     }
     
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             @SuppressWarnings(value = "ALL")
             public class A {}
         """)

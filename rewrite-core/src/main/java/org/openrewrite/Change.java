@@ -22,6 +22,7 @@ import org.eclipse.jgit.internal.storage.dfs.DfsRepositoryDescription;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.FileMode;
+import org.eclipse.jgit.lib.ObjectInserter;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -75,7 +76,7 @@ public class Change<S extends SourceFile> {
             this.changeType = ChangeType.MODIFY;
             this.rulesThatMadeChanges = rulesThatMadeChanges;
 
-            var relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
+            Path relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
             this.oldPath = relativePath.toString();
             this.newPath = relativePath.toString();
 
@@ -84,7 +85,7 @@ public class Change<S extends SourceFile> {
                         .setRepositoryDescription(new DfsRepositoryDescription())
                         .build();
 
-                var inserter = repo.getObjectDatabase().newInserter();
+                ObjectInserter inserter = repo.getObjectDatabase().newInserter();
                 oldId = inserter.insert(Constants.OBJ_BLOB, oldSource.getBytes()).abbreviate(40);
                 newId = inserter.insert(Constants.OBJ_BLOB, newSource.getBytes()).abbreviate(40);
                 inserter.flush();
@@ -102,8 +103,8 @@ public class Change<S extends SourceFile> {
                 return "";
             }
 
-            var patch = new ByteArrayOutputStream();
-            var formatter = new DiffFormatter(patch);
+            ByteArrayOutputStream patch = new ByteArrayOutputStream();
+            DiffFormatter formatter = new DiffFormatter(patch);
             formatter.setRepository(repo);
             try {
                 formatter.format(this);

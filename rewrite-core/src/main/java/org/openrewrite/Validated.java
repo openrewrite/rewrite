@@ -15,13 +15,13 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -67,7 +67,7 @@ public interface Validated extends Iterable<Validated> {
     }
 
     static Validated notBlank(String property, @Nullable String value) {
-        return test(property, "must not be blank", value, s -> value != null && !value.isBlank());
+        return test(property, "must not be blank", value, s -> value != null && !StringUtils.isBlank(value));
     }
 
     static Missing missing(String property, @Nullable Object value, String message) {

@@ -23,10 +23,10 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.RetrieveCursor
 import org.openrewrite.java.JavaSourceVisitor
 
-open class CursorTest : JavaParser() {
+interface CursorTest {
     @Test
-    fun inSameNameScope() {
-        val a = parse("""
+    fun inSameNameScope(jp: JavaParser) {
+        val a = jp.parse("""
             public class A extends B {
                 int n;
                 

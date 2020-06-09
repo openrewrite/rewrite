@@ -17,10 +17,10 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class AddImportTest : JavaParser() {
+interface AddImportTest {
     @Test
-    fun addMultipleImports() {
-        val a = parse("class A {}")
+    fun addMultipleImports(jp: JavaParser) {
+        val a = jp.parse("class A {}")
 
         val fixed = a.refactor()
                 .visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
@@ -36,8 +36,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun addNamedImport() {
-        val a = parse("class A {}")
+    fun addNamedImport(jp: JavaParser) {
+        val a = jp.parse("class A {}")
 
         val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
                 .fix().fixed
@@ -50,8 +50,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun addNamedImportByClass() {
-        val a = parse("class A {}")
+    fun addNamedImportByClass(jp: JavaParser) {
+        val a = jp.parse("class A {}")
 
         val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
                 .fix().fixed
@@ -64,8 +64,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun namedImportAddedAfterPackageDeclaration() {
-        val a = parse("""
+    fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             class A {}
         """.trimIndent())
@@ -83,7 +83,7 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun importsAddedInAlphabeticalOrder() {
+    fun importsAddedInAlphabeticalOrder(jp: JavaParser) {
         val otherPackages = listOf("c", "c.c", "c.c.c")
         val otherImports = otherPackages.mapIndexed { i, pkg ->
             "package $pkg;\npublic class C$i {}"
@@ -97,7 +97,7 @@ open class AddImportTest : JavaParser() {
                 public class B {}
             """
 
-            val cu = parse("""
+            val cu = jp.parse("""
                 package a;
                 
                 import c.C0;
@@ -113,13 +113,13 @@ open class AddImportTest : JavaParser() {
             expectedImports.add(order, "$pkg.B")
             assertRefactored(fixed, "package a;\n\n${expectedImports.joinToString("\n") { fqn -> "import $fqn;" }}\n\nclass A {}")
 
-            reset()
+            jp.reset()
         }
     }
 
     @Test
-    fun doNotAddImportIfAlreadyExists() {
-        val a = parse("""
+    fun doNotAddImportIfAlreadyExists(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             import java.util.List;
@@ -138,8 +138,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun doNotAddImportIfCoveredByStarImport() {
-        val a = parse("""
+    fun doNotAddImportIfCoveredByStarImport(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             import java.util.*;
@@ -158,8 +158,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun addNamedImportIfStarStaticImportExists() {
-        val a = parse("""
+    fun addNamedImportIfStarStaticImportExists(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             import static java.util.List.*;
@@ -181,8 +181,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun addNamedStaticImport() {
-        val a = parse("""
+    fun addNamedStaticImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             class A {}
         """.trimIndent())
@@ -205,8 +205,8 @@ open class AddImportTest : JavaParser() {
     }
 
     @Test
-    fun dontAddImportWhenClassHasNoPackage() {
-        val a = parse("class A {}")
+    fun dontAddImportWhenClassHasNoPackage(jp: JavaParser) {
+        val a = jp.parse("class A {}")
 
         val fixed = a.refactor().visit(AddImport().apply {
             setType("C")

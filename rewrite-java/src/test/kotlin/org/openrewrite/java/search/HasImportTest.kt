@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class HasImportTest : JavaParser() {
+interface HasImportTest {
     
     @Test
-    fun hasImport() {
-        val a = parse("""
+    fun hasImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             class A {}
         """)
@@ -34,8 +34,8 @@ open class HasImportTest : JavaParser() {
     }
 
     @Test
-    fun hasStarImport() {
-        val a = parse("""
+    fun hasStarImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             class A {}
         """)
@@ -44,7 +44,7 @@ open class HasImportTest : JavaParser() {
     }
 
     @Test
-    fun hasStarImportOnInnerClass() {
+    fun hasStarImportOnInnerClass(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -59,7 +59,7 @@ open class HasImportTest : JavaParser() {
             }
         """
 
-        assertTrue(parse(c, a).hasImport("a.A.B"))
-        assertTrue(parse(c, a).hasImport("a.A"))
+        assertTrue(jp.parse(c, a).hasImport("a.A.B"))
+        assertTrue(jp.parse(c, a).hasImport("a.A"))
     }
 }

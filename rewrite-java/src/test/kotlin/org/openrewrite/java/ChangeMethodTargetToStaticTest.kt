@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
 
-open class ChangeMethodTargetToStaticTest : JavaParser() {
+interface ChangeMethodTargetToStaticTest {
 
     @Test
-    fun refactorTargetToStatic() {
+    fun refactorTargetToStatic(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -47,7 +47,7 @@ open class ChangeMethodTargetToStaticTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(c, a, b)
+        val cu = jp.parse(c, a, b)
         val targets = cu.findMethodCalls("a.A nonStatic()")
         val fixed = cu.refactor()
                 .fold(targets) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
@@ -69,7 +69,7 @@ open class ChangeMethodTargetToStaticTest : JavaParser() {
     }
 
     @Test
-    fun refactorStaticTargetToStatic() {
+    fun refactorStaticTargetToStatic(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -93,7 +93,7 @@ open class ChangeMethodTargetToStaticTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(c, a, b)
+        val cu = jp.parse(c, a, b)
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("a.A foo()")) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
                 .fix().fixed

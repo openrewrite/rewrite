@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class FindInheritedFieldsTest : JavaParser() {
+interface FindInheritedFieldsTest {
 
     @Test
-    fun findInheritedField() {
+    fun findInheritedField(jp: JavaParser) {
         val a = """
             import java.util.*;
             public class A {
@@ -32,7 +32,7 @@ open class FindInheritedFieldsTest : JavaParser() {
             }
         """
 
-        val b = parse("public class B extends A { }", a)
+        val b = jp.parse("public class B extends A { }", a)
 
         assertEquals("list", b.classes[0].findInheritedFields("java.util.List").firstOrNull()?.name)
 
@@ -42,14 +42,14 @@ open class FindInheritedFieldsTest : JavaParser() {
     }
 
     @Test
-    fun findArrayOfType() {
+    fun findArrayOfType(jp: JavaParser) {
         val a = """
             public class A {
                String[] s;
             }
         """
 
-        val b = parse("public class B extends A { }", a)
+        val b = jp.parse("public class B extends A { }", a)
 
         val fields = b.classes[0].findInheritedFields("java.lang.String")
         assertEquals(1, fields.size)

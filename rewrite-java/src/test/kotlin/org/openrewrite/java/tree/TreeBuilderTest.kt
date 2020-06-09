@@ -19,16 +19,12 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.RetrieveCursor
-import org.openrewrite.java.asClass
-import org.openrewrite.java.assertRefactored
-import org.openrewrite.java.JavaRefactorVisitor
+import org.openrewrite.java.*
 
-class TreeBuilderTest {
+interface TreeBuilderTest {
     @Test
-    fun buildSnippet() {
-        val a = JavaParser().parse("""
+    fun buildSnippet(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {
                 int n = 0;
@@ -47,8 +43,8 @@ class TreeBuilderTest {
     }
 
     @Test
-    fun injectSnippetIntoMethod() {
-        val a = JavaParser().parse("""
+    fun injectSnippetIntoMethod(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {
                 int n = 0;
@@ -89,7 +85,7 @@ class TreeBuilderTest {
     }
 
     @Test
-    fun buildFullyQualifiedClassName() {
+    fun buildFullyQualifiedClassName(jp: JavaParser) {
         val name = TreeBuilder.buildName("java.util.List", EMPTY) as J.FieldAccess
 
         assertEquals("java.util.List", name.printTrimmed())
@@ -97,7 +93,7 @@ class TreeBuilderTest {
     }
 
     @Test
-    fun buildFullyQualifiedInnerClassName() {
+    fun buildFullyQualifiedInnerClassName(jp: JavaParser) {
         val name = TreeBuilder.buildName("a.Outer.Inner", EMPTY) as J.FieldAccess
 
         assertEquals("a.Outer.Inner", name.printTrimmed())
@@ -110,7 +106,7 @@ class TreeBuilderTest {
     }
 
     @Test
-    fun buildStaticImport() {
+    fun buildStaticImport(jp: JavaParser) {
         val name = TreeBuilder.buildName("a.A.*", EMPTY) as J.FieldAccess
 
         assertEquals("a.A.*", name.printTrimmed())

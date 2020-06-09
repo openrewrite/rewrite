@@ -60,11 +60,10 @@ public interface Tree {
     }
 
     default String printTrimmed() {
-        return StringUtils.trimIndent(print().stripLeading());
+        return StringUtils.trimIndent(print().trim());
     }
 
     String print();
-
     @SuppressWarnings("unchecked")
     default <T extends Tree> Optional<T> whenType(Class<T> treeType) {
         return treeType.isAssignableFrom(this.getClass()) ? Optional.of((T) this) : Optional.empty();

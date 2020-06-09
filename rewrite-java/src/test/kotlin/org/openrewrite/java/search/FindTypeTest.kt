@@ -19,18 +19,19 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class FindTypeTest : JavaParser() {
-
-    private val a1 = """
-        package a;
-        public class A1 extends Exception {
-            public static void stat() {}
-        }
-    """
+interface FindTypeTest {
+    companion object {
+        private const val a1 = """
+            package a;
+            public class A1 extends Exception {
+                public static void stat() {}
+            }
+        """
+    }
 
     @Test
-    fun simpleName() {
-        val b = parse("""
+    fun simpleName(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             
             public class B extends A1 {}
@@ -40,21 +41,21 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun fullyQualifiedName() {
-        val b = parse("public class B extends a.A1 {}", a1)
+    fun fullyQualifiedName(jp: JavaParser) {
+        val b = jp.parse("public class B extends a.A1 {}", a1)
         assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
-    fun annotation() {
+    fun annotation(jp: JavaParser) {
         val a1 = "public @interface A1 {}"
-        val b = parse("@A1 public class B {}", a1)
+        val b = jp.parse("@A1 public class B {}", a1)
         assertEquals(1, b.findType("A1").size)
     }
 
     @Test
-    fun array() { // array types and new arrays
-        val b = parse("""
+    fun array(jp: JavaParser) { // array types and new arrays
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1[] a = new A1[0];
@@ -65,10 +66,10 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun classDecl() {
+    fun classDecl(jp: JavaParser) {
         val i1 = "public interface I1 {}"
 
-        val b = parse("""
+        val b = jp.parse("""
             import a.A1;
             public class B extends A1 implements I1 {}
         """, a1, i1)
@@ -78,8 +79,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun method() {
-        val b = parse("""
+    fun method(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                public A1 foo() throws A1 { return null; }
@@ -90,8 +91,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun methodInvocationTypeParametersAndWildcard() {
-        val b = parse("""
+    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             import java.util.List;
             public class B {
@@ -107,8 +108,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun multiCatch() {
-        val b = parse("""
+    fun multiCatch(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                public void test() {
@@ -122,8 +123,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun multiVariable() {
-        val b = parse("""
+    fun multiVariable(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 f1, f2;
@@ -134,8 +135,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun newClass() {
-        val b = parse("""
+    fun newClass(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 a = new A1();
@@ -146,8 +147,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun paramaterizedType() {
-        val b = parse("""
+    fun paramaterizedType(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                Map<A1, A1> m;
@@ -158,8 +159,8 @@ open class FindTypeTest : JavaParser() {
     }
 
     @Test
-    fun typeCast() {
-        val b = parse("""
+    fun typeCast(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 a = (A1) null;

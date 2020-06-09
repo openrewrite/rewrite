@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ForLoopTest : JavaParser() {
+interface ForLoopTest {
     
     @Test
-    fun forLoop() {
-        val a = parse("""
+    fun forLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for(int i = 0; i < 10; i++) {
@@ -41,8 +41,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun infiniteLoop() {
-        val a = parse("""
+    fun infiniteLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for(;;) {
@@ -58,8 +58,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for ( int i = 0 ; i < 10 ; i++ ) {
@@ -73,8 +73,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun formatInfiniteLoop() {
-        val a = parse("""
+    fun formatInfiniteLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for ( ; ; ) {}
@@ -87,8 +87,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun formatLoopNoInit() {
-        val a = parse("""
+    fun formatLoopNoInit(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     int i = 0;
@@ -103,8 +103,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun formatLoopNoCondition() {
-        val a = parse("""
+    fun formatLoopNoCondition(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     int i = 0;
@@ -118,8 +118,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun statementTerminatorForSingleLineForLoops() {
-        val a = parse("""
+    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for(;;) test();
@@ -132,8 +132,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun initializerIsAnAssignment() {
-        val a = parse("""
+    fun initializerIsAnAssignment(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[] a;
                 public void test() {
@@ -148,8 +148,8 @@ open class ForLoopTest : JavaParser() {
     }
 
     @Test
-    fun multiVariableInitialization() {
-        val a = parse("""
+    fun multiVariableInitialization(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     for(int i, j = 0;;) {}

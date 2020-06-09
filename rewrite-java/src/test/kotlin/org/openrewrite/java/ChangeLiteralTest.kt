@@ -16,22 +16,20 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeLiteral
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.J
 
-open class ChangeLiteralTest : JavaParser() {
-
-    val b: String = """
-        package b;
-        public class B {
-           public void singleArg(String s) {}
-        }
-    """.trimIndent()
+interface ChangeLiteralTest {
+    companion object {
+        private val b: String = """
+            package b;
+            public class B {
+               public void singleArg(String s) {}
+            }
+        """.trimIndent()
+    }
 
     @Test
-    fun changeStringLiteralArgument() {
+    fun changeStringLiteralArgument(jp: JavaParser) {
         val a = """
             import b.*;
             class A {
@@ -42,7 +40,7 @@ open class ChangeLiteralTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
         val fixed = cu.findMethodCalls("b.B singleArg(String)").changeLiterals(cu)
 
         assertRefactored(fixed, """
@@ -57,7 +55,7 @@ open class ChangeLiteralTest : JavaParser() {
     }
 
     @Test
-    fun changeStringLiteralArgumentWithEscapableCharacters() {
+    fun changeStringLiteralArgumentWithEscapableCharacters(jp: JavaParser) {
         val a = """
             import b.*;
             public class A {
@@ -68,7 +66,7 @@ open class ChangeLiteralTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
         val fixed = cu.findMethodCalls("b.B singleArg(..)").changeLiterals(cu)
 
         assertRefactored(fixed, """

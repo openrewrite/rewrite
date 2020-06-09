@@ -21,11 +21,11 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asArray
 import org.openrewrite.java.asClass
 
-open class CyclicTypeTest : JavaParser() {
+interface CyclicTypeTest {
 
     @Test
-    fun genericNesting() {
-        parse("""
+    fun genericNesting(jp: JavaParser) {
+        jp.parse("""
             import java.util.*;
 
             public class A {
@@ -43,8 +43,8 @@ open class CyclicTypeTest : JavaParser() {
     }
 
     @Test
-    fun nestedTypes() {
-        parse("""
+    fun nestedTypes(jp: JavaParser) {
+        jp.parse("""
             public class A {
                 B b;
                 public static class B {
@@ -55,8 +55,8 @@ open class CyclicTypeTest : JavaParser() {
     }
 
     @Test
-    fun interdependentTypes() {
-        parse("""
+    fun interdependentTypes(jp: JavaParser) {
+        jp.parse("""
             public class A {
                 B b;
             }
@@ -68,8 +68,8 @@ open class CyclicTypeTest : JavaParser() {
     }
 
     @Test
-    fun cyclicType() {
-        parse("""
+    fun cyclicType(jp: JavaParser) {
+        jp.parse("""
             public class A<T> {
                 A<?> a;
             }
@@ -77,8 +77,8 @@ open class CyclicTypeTest : JavaParser() {
     }
 
     @Test
-    fun cyclicTypeInArray() {
-        val a = parse("""
+    fun cyclicTypeInArray(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 A[] nested = new A[0];
             }

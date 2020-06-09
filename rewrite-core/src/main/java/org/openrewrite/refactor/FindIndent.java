@@ -22,6 +22,7 @@ import org.openrewrite.internal.StringUtils;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -53,7 +54,14 @@ public class FindIndent extends SourceVisitor<Void> {
     @Override
     public Void visitTree(Tree tree) {
         String prefix = tree.getFormatting().getPrefix();
-        if (prefix.chars().takeWhile(c -> c == '\n' || c == '\r').count() > 0) {
+
+        AtomicBoolean takeWhile = new AtomicBoolean(true);
+        if (prefix.chars()
+                .filter(c -> {
+                    takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
+                    return takeWhile.get();
+                })
+                .count() > 0) {
             int indent = 0;
             char[] chars = MULTI_LINE_COMMENT.matcher(SINGLE_LINE_COMMENT.matcher(prefix)
                     .replaceAll("")).replaceAll("").toCharArray();
@@ -69,8 +77,18 @@ public class FindIndent extends SourceVisitor<Void> {
 
             indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
 
-            Map<Boolean, Long> indentTypeCounts = prefix.chars().dropWhile(c -> c == '\n' || c == '\r')
-                    .takeWhile(Character::isWhitespace)
+
+            AtomicBoolean dropWhile = new AtomicBoolean(false);
+            takeWhile.set(true);
+            Map<Boolean, Long> indentTypeCounts = prefix.chars()
+                    .filter(c -> {
+                        dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
+                        return dropWhile.get();
+                    })
+                    .filter(c -> {
+                        takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
+                        return takeWhile.get();
+                    })
                     .mapToObj(c -> c == ' ')
                     .collect(Collectors.groupingBy(identity(), counting()));
 

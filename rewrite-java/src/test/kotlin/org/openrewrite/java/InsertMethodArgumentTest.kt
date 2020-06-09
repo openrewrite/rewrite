@@ -17,9 +17,9 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class InsertMethodArgumentTest : JavaParser() {
-
-    val b = """
+interface InsertMethodArgumentTest {
+    companion object {
+        val b = """
             class B {
                public void foo() {}
                public void foo(String s) {}
@@ -31,7 +31,7 @@ open class InsertMethodArgumentTest : JavaParser() {
             }
         """.trimIndent()
 
-    val a = """
+        val a = """
             class A {
                public void test() {
                    B b = new B();
@@ -40,10 +40,11 @@ open class InsertMethodArgumentTest : JavaParser() {
                }
             }
         """.trimIndent()
+    }
 
     @Test
-    fun insertArgumentDeclarative() {
-        val cu = parse(a, b)
+    fun insertArgumentDeclarative(jp: JavaParser) {
+        val cu = jp.parse(a, b)
 
         val fixed = cu.refactor().visit(InsertMethodArgument().apply {
             setMethod("B foo(String)")
@@ -63,8 +64,8 @@ open class InsertMethodArgumentTest : JavaParser() {
     }
 
     @Test
-    fun insertArgument() {
-        val cu = parse(a, b)
+    fun insertArgument(jp: JavaParser) {
+        val cu = jp.parse(a, b)
         val oneParamFoos = cu.findMethodCalls("B foo(String)")
 
         val fixed = cu.refactor()

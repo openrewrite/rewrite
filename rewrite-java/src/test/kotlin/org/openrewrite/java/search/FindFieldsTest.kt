@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.hasElementType
 
-open class FindFieldsTest : JavaParser() {
+interface FindFieldsTest {
 
     @Test
-    fun findPrivateNonInheritedField() {
-        val a = parse("""
+    fun findPrivateNonInheritedField(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                private List list;
@@ -41,8 +41,8 @@ open class FindFieldsTest : JavaParser() {
     }
     
     @Test
-    fun findArrayOfType() {
-        val a = parse("""
+    fun findArrayOfType(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                private String[] s;
@@ -57,8 +57,8 @@ open class FindFieldsTest : JavaParser() {
     }
 
     @Test
-    fun skipsMultiCatches() {
-        val a = parse("""
+    fun skipsMultiCatches(jp: JavaParser) {
+        val a = jp.parse("""
             import java.io.*;
             public class A {
                 File f;

@@ -20,9 +20,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ForEachLoopTest : JavaParser() {
-
-    val a: J.CompilationUnit by lazy { parse("""
+interface ForEachLoopTest {
+    @Test
+    fun format(jp: JavaParser) {
+        val a= jp.parse("""
             public class A {
                 public void test() {
                     for(Integer n: new Integer[] { 0, 1 }) {
@@ -30,18 +31,15 @@ open class ForEachLoopTest : JavaParser() {
                 }
             }
         """)
-    }
 
-    private val forEachLoop by lazy { a.firstMethodStatement() as J.ForEachLoop }
+        val forEachLoop = a.firstMethodStatement() as J.ForEachLoop
 
-    @Test
-    fun format() {
         assertEquals("for(Integer n: new Integer[] { 0, 1 }) {\n}", forEachLoop.printTrimmed())
     }
 
     @Test
-    fun statementTerminatorForSingleLineForLoops() {
-        val a = parse("""
+    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Integer[] n;
                 public void test() {

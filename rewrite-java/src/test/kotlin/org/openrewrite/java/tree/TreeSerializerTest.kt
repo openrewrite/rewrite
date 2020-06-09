@@ -24,11 +24,12 @@ import org.openrewrite.java.JavaParser
 /**
  * Test that flyweights survive a serialization/deserialization cycle
  */
-open class TreeSerializerTest : JavaParser() {
+interface TreeSerializerTest {
 
-    private val serializer = TreeSerializer()
+    companion object {
+        private val serializer = TreeSerializer()
 
-    private val aSource = """
+        private const val aSource = """
             public class A {
                 A a = foo();
                 A a2 = foo();
@@ -36,10 +37,11 @@ open class TreeSerializerTest : JavaParser() {
                 public A foo() { return null; }
             }
         """
+    }
 
     @Test
-    fun `round trip serialization of AST preserves flyweights`() {
-        val a = parse(aSource).withMetadata(mapOf(GitMetadata.HEAD_COMMIT_ID to "123"))
+    fun `round trip serialization of AST preserves flyweights`(jp: JavaParser) {
+        val a = jp.parse(aSource).withMetadata(mapOf(GitMetadata.HEAD_COMMIT_ID to "123"))
 
         println(serializer.writePretty(a))
 
@@ -55,8 +57,8 @@ open class TreeSerializerTest : JavaParser() {
     }
 
     @Test
-    fun `round trip serialization of AST list`() {
-        val a = parse(aSource)
+    fun `round trip serialization of AST list`(jp: JavaParser) {
+        val a = jp.parse(aSource)
         val aBytes = serializer.write(listOf(a))
         assertEquals(a, serializer.readList(aBytes)[0])
     }

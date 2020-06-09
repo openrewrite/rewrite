@@ -19,9 +19,9 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-class EnumTest: JavaParser() {
+interface EnumTest {
     @Test
-    fun anonymousClassInitializer() {
+    fun anonymousClassInitializer(jp: JavaParser) {
         val aSource = """
             public enum A {
                 A1(1) {
@@ -41,20 +41,20 @@ class EnumTest: JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse(aSource)
+        val a = jp.parse(aSource)
 
         assertEquals(aSource, a.printTrimmed())
     }
 
     @Test
-    fun noArguments() {
+    fun noArguments(jp: JavaParser) {
         val aSource = """
             public enum A {
                 A1, A2();
             }
         """.trimIndent()
 
-        val a = parse(aSource)
+        val a = jp.parse(aSource)
 
         assertEquals(aSource, a.printTrimmed())
     }

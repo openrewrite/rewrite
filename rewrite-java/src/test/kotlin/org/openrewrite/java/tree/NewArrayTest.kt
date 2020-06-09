@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asArray
 
-open class NewArrayTest : JavaParser() {
+interface NewArrayTest {
     
     @Test
-    fun newArray() {
-        val a = parse("""
+    fun newArray(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[] n = new int[0];
             }
@@ -39,8 +39,8 @@ open class NewArrayTest : JavaParser() {
     }
 
     @Test
-    fun newArrayWithInitializers() {
-        val a = parse("""
+    fun newArrayWithInitializers(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[] n = new int[] { 0, 1, 2 };
             }
@@ -54,8 +54,8 @@ open class NewArrayTest : JavaParser() {
     }
 
     @Test
-    fun formatWithDimensions() {
-        val a = parse("""
+    fun formatWithDimensions(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[][] n = new int [ 0 ] [ 1 ];
             }
@@ -66,8 +66,8 @@ open class NewArrayTest : JavaParser() {
     }
 
     @Test
-    fun formatWithEmptyDimension() {
-        val a = parse("""
+    fun formatWithEmptyDimension(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[][] n = new int [ 0 ] [ ];
             }
@@ -78,8 +78,8 @@ open class NewArrayTest : JavaParser() {
     }
 
     @Test
-    fun formatWithInitializers() {
-        val a = parse("""
+    fun formatWithInitializers(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int[] m = new int[] { 0 };
                 int[][] n = new int [ ] [ ] { m, m, m };
@@ -91,7 +91,7 @@ open class NewArrayTest : JavaParser() {
     }
 
     @Test
-    fun newArrayShortcut() {
+    fun newArrayShortcut(jp: JavaParser) {
         val produces = """
             import java.lang.annotation.*;
             @Target({ElementType.TYPE})
@@ -100,7 +100,7 @@ open class NewArrayTest : JavaParser() {
             }
         """
 
-        val a = parse("""@Produces({"something"}) class A {}""", produces)
+        val a = jp.parse("""@Produces({"something"}) class A {}""", produces)
         val arr = a.classes[0].annotations[0].args!!.args[0] as J.NewArray
 
         assertNull(arr.typeExpr)

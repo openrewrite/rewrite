@@ -19,113 +19,113 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-class ModifierTest {
+interface ModifierTest {
     @Test
-    fun addStaticModifierToClass() {
-        assertEquals("private static final ", modifiersOnClass("private final ")
+    fun addStaticModifierToClass(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnClass("private final ")
                 .withModifiers("static").printMods())
-        assertEquals("private static ", modifiersOnClass("private ")
+        assertEquals("private static ", jp.modifiersOnClass("private ")
                 .withModifiers("static").printMods())
-        assertEquals("\tstatic ", modifiersOnClass("\t")
-                .withModifiers("static").printMods())
-    }
-
-    @Test
-    fun addFinalModifierToClass() {
-        assertEquals("private static final ", modifiersOnClass("private static ")
-                .withModifiers("final").printMods())
-        assertEquals("private final ", modifiersOnClass("private ")
-                .withModifiers("final").printMods())
-        assertEquals("\tfinal ", modifiersOnClass("\t")
-                .withModifiers("final").printMods())
-    }
-
-    @Test
-    fun addVisibilityModifierToClass() {
-        assertEquals("public ", modifiersOnClass("protected ")
-                .withModifiers("public").printMods())
-        assertEquals("\tpublic final ", modifiersOnClass("\tfinal ")
-                .withModifiers("public").printMods())
-        assertEquals("\tpublic ", modifiersOnClass("\t")
-                .withModifiers("public").printMods())
-    }
-
-    @Test
-    fun addStaticModifierToField() {
-        assertEquals("private static final ", modifiersOnField("private final ")
-                .withModifiers("static").printMods())
-        assertEquals("private static ", modifiersOnField("private ")
-                .withModifiers("static").printMods())
-        assertEquals("\tstatic ", modifiersOnField("\t")
+        assertEquals("\tstatic ", jp.modifiersOnClass("\t")
                 .withModifiers("static").printMods())
     }
 
     @Test
-    fun addFinalModifierToField() {
-        assertEquals("private static final ", modifiersOnField("private static ")
+    fun addFinalModifierToClass(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnClass("private static ")
                 .withModifiers("final").printMods())
-        assertEquals("private final ", modifiersOnField("private ")
+        assertEquals("private final ", jp.modifiersOnClass("private ")
                 .withModifiers("final").printMods())
-        assertEquals("\tfinal ", modifiersOnField("\t")
+        assertEquals("\tfinal ", jp.modifiersOnClass("\t")
                 .withModifiers("final").printMods())
     }
 
     @Test
-    fun addVisibilityModifierToField() {
-        assertEquals("public ", modifiersOnField("protected ")
+    fun addVisibilityModifierToClass(jp: JavaParser) {
+        assertEquals("public ", jp.modifiersOnClass("protected ")
                 .withModifiers("public").printMods())
-        assertEquals("\tpublic final ", modifiersOnField("\tfinal ")
+        assertEquals("\tpublic final ", jp.modifiersOnClass("\tfinal ")
                 .withModifiers("public").printMods())
-        assertEquals("\tpublic ", modifiersOnField("\t")
+        assertEquals("\tpublic ", jp.modifiersOnClass("\t")
                 .withModifiers("public").printMods())
     }
 
     @Test
-    fun addMultipleModifiersToField() {
-        assertEquals("\tprivate final ", modifiersOnField("\t")
+    fun addStaticModifierToField(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnField("private final ")
+                .withModifiers("static").printMods())
+        assertEquals("private static ", jp.modifiersOnField("private ")
+                .withModifiers("static").printMods())
+        assertEquals("\tstatic ", jp.modifiersOnField("\t")
+                .withModifiers("static").printMods())
+    }
+
+    @Test
+    fun addFinalModifierToField(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnField("private static ")
+                .withModifiers("final").printMods())
+        assertEquals("private final ", jp.modifiersOnField("private ")
+                .withModifiers("final").printMods())
+        assertEquals("\tfinal ", jp.modifiersOnField("\t")
+                .withModifiers("final").printMods())
+    }
+
+    @Test
+    fun addVisibilityModifierToField(jp: JavaParser) {
+        assertEquals("public ", jp.modifiersOnField("protected ")
+                .withModifiers("public").printMods())
+        assertEquals("\tpublic final ", jp.modifiersOnField("\tfinal ")
+                .withModifiers("public").printMods())
+        assertEquals("\tpublic ", jp.modifiersOnField("\t")
+                .withModifiers("public").printMods())
+    }
+
+    @Test
+    fun addMultipleModifiersToField(jp: JavaParser) {
+        assertEquals("\tprivate final ", jp.modifiersOnField("\t")
                 .withModifiers("private", "final").printMods())
-        assertEquals("private final ", modifiersOnField("private ")
+        assertEquals("private final ", jp.modifiersOnField("private ")
                 .withModifiers("private", "final").printMods())
     }
 
     @Test
-    fun addStaticModifierToMethod() {
-        assertEquals("private static final ", modifiersOnMethod("private final ")
+    fun addStaticModifierToMethod(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnMethod("private final ")
                 .withModifiers("static").printMods())
-        assertEquals("private static ", modifiersOnMethod("private ")
+        assertEquals("private static ", jp.modifiersOnMethod("private ")
                 .withModifiers("static").printMods())
-        assertEquals("\tstatic ", modifiersOnMethod("\t")
+        assertEquals("\tstatic ", jp.modifiersOnMethod("\t")
                 .withModifiers("static").printMods())
     }
 
     @Test
-    fun addFinalModifierToMethod() {
-        assertEquals("private static final ", modifiersOnMethod("private static ")
+    fun addFinalModifierToMethod(jp: JavaParser) {
+        assertEquals("private static final ", jp.modifiersOnMethod("private static ")
                 .withModifiers("final").printMods())
-        assertEquals("private final ", modifiersOnMethod("private ")
+        assertEquals("private final ", jp.modifiersOnMethod("private ")
                 .withModifiers("final").printMods())
-        assertEquals("\tfinal ", modifiersOnMethod("\t")
+        assertEquals("\tfinal ", jp.modifiersOnMethod("\t")
                 .withModifiers("final").printMods())
     }
 
     @Test
-    fun addVisibilityModifierToMethod() {
-        assertEquals("public ", modifiersOnMethod("protected ")
+    fun addVisibilityModifierToMethod(jp: JavaParser) {
+        assertEquals("public ", jp.modifiersOnMethod("protected ")
                 .withModifiers("public").printMods())
-        assertEquals("\tpublic final ", modifiersOnMethod("\tfinal ")
+        assertEquals("\tpublic final ", jp.modifiersOnMethod("\tfinal ")
                 .withModifiers("public").printMods())
-        assertEquals("\tpublic ", modifiersOnMethod("\t")
+        assertEquals("\tpublic ", jp.modifiersOnMethod("\t")
                 .withModifiers("public").printMods())
     }
 
-    private fun modifiersOnClass(modifiers: String): J.ClassDecl =
-            JavaParser().parse("public class A {${modifiers}class B {}}").classes[0].body.statements[0] as J.ClassDecl
+    private fun JavaParser.modifiersOnClass(modifiers: String): J.ClassDecl =
+            reset().parse("public class A {${modifiers}class B {}}").classes[0].body.statements[0] as J.ClassDecl
 
-    private fun modifiersOnField(modifiers: String): J.VariableDecls =
-            JavaParser().parse("public class A {${modifiers}int n;").classes[0].body.statements[0] as J.VariableDecls
+    private fun JavaParser.modifiersOnField(modifiers: String): J.VariableDecls =
+            reset().parse("public class A {${modifiers}int n;").classes[0].body.statements[0] as J.VariableDecls
 
-    private fun modifiersOnMethod(modifiers: String): J.MethodDecl =
-            JavaParser().parse("public class A {${modifiers}void foo() {}").classes[0].body.statements[0] as J.MethodDecl
+    private fun JavaParser.modifiersOnMethod(modifiers: String): J.MethodDecl =
+            reset().parse("public class A {${modifiers}void foo() {}").classes[0].body.statements[0] as J.MethodDecl
 
     private fun J.ClassDecl.printMods() = print().substringBefore("class")
     private fun J.VariableDecls.printMods() = print().substringBefore("int")

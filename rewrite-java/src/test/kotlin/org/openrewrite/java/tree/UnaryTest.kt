@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class UnaryTest : JavaParser() {
+interface UnaryTest {
     
     @Test
-    fun negation() {
-        val a = parse("""
+    fun negation(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 boolean b = !(1 == 2);
             }
@@ -36,8 +36,8 @@ open class UnaryTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int i = 0;
                 int j = ++i;

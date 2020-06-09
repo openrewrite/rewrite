@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class TypeCastTest : JavaParser() {
+interface TypeCastTest {
 
     @Test
-    fun cast() {
-        val a = parse("""
+    fun cast(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Object o = (Class<String>) Class.forName("java.lang.String");
             }

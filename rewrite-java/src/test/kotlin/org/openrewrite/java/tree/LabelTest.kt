@@ -21,10 +21,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class LabelTest : JavaParser() {
+interface LabelTest {
     
     @Test
-    fun labeledWhileLoop() {
+    fun labeledWhileLoop(jp: JavaParser) {
         val orig = """
             |public class A {
             |    public void test() {
@@ -33,7 +33,7 @@ open class LabelTest : JavaParser() {
             |    }
             |}
         """.trimMargin()
-        val a = parse(orig)
+        val a = jp.parse(orig)
         
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("labeled", labeled.label.simpleName)
@@ -42,7 +42,7 @@ open class LabelTest : JavaParser() {
     }
 
     @Test
-    fun nonEmptyLabeledWhileLoop() {
+    fun nonEmptyLabeledWhileLoop(jp: JavaParser) {
         val orig = """
             |public class A {
             |    public void test() {
@@ -55,7 +55,7 @@ open class LabelTest : JavaParser() {
             |}
         """.trimMargin()
 
-        val a = parse(orig)
+        val a = jp.parse(orig)
 
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("outer", labeled.label.simpleName)

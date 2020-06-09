@@ -19,11 +19,13 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class TypeParameterAndWildcardTest : JavaParser() {
-    private val bc = listOf("public interface B {}", "public interface C {}")
+interface TypeParameterAndWildcardTest {
+    companion object {
+        private val bc = listOf("public interface B {}", "public interface C {}")
+    }
 
     @Test
-    fun annotatedTypeParametersOnWildcardBounds() {
+    fun annotatedTypeParametersOnWildcardBounds(jp: JavaParser) {
         val aSource = """
             import java.util.List;
             public class A {
@@ -31,13 +33,13 @@ open class TypeParameterAndWildcardTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse(aSource, "public class B {}")
+        val a = jp.parse(aSource, "public class B {}")
 
         assertEquals(aSource, a.print())
     }
 
     @Test
-    fun annotatedTypeParametersOnReturnTypeExpression() {
+    fun annotatedTypeParametersOnReturnTypeExpression(jp: JavaParser) {
         val aSource = """
             import java.util.List;
             public class A {
@@ -50,14 +52,14 @@ open class TypeParameterAndWildcardTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse(aSource, "public class B {}")
+        val a = jp.parse(aSource, "public class B {}")
 
         assertEquals(aSource, a.print())
     }
 
     @Test
-    fun extendsAndSuper() {
-        val a = parse("""
+    fun extendsAndSuper(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {
                 public <P  extends B> void foo(List<P> out, List<? super C> in) {}
@@ -69,14 +71,14 @@ open class TypeParameterAndWildcardTest : JavaParser() {
     }
 
     @Test
-    fun multipleExtends() {
-        val a = parse("public class A< T extends  B & C > {}", bc)
+    fun multipleExtends(jp: JavaParser) {
+        val a = jp.parse("public class A< T extends  B & C > {}", bc)
         assertEquals("public class A< T extends  B & C > {}", a.printTrimmed())
     }
 
     @Test
-    fun wildcardExtends() {
-        val a = parse("""
+    fun wildcardExtends(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List< ?  extends  B > bs;
@@ -88,8 +90,8 @@ open class TypeParameterAndWildcardTest : JavaParser() {
     }
 
     @Test
-    fun emptyWildcard() {
-        val a = parse("""
+    fun emptyWildcard(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List< ? > a;

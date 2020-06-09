@@ -18,10 +18,10 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
 
-open class ReorderMethodArgumentsTest : JavaParser() {
+interface ReorderMethodArgumentsTest {
 
     @Test
-    fun refactorReorderArguments() {
+    fun refactorReorderArguments(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -71,7 +71,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
     }
 
     @Test
-    fun refactorReorderArgumentsWithNoSourceAttachment() {
+    fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -109,7 +109,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
     }
 
     @Test
-    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg() {
+    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -146,7 +146,7 @@ open class ReorderMethodArgumentsTest : JavaParser() {
     }
 
     @Test
-    fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation() {
+    fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) {
         val a = """
             package a;
             public class A {

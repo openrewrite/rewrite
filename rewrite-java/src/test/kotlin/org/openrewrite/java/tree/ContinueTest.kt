@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ContinueTest : JavaParser() {
+interface ContinueTest {
     
     @Test
-    fun continueFromWhileLoop() {
-        val a = parse("""
+    fun continueFromWhileLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     while(true) continue;
@@ -38,8 +38,8 @@ open class ContinueTest : JavaParser() {
     }
 
     @Test
-    fun continueFromLabeledWhileLoop() {
-        val a = parse("""
+    fun continueFromLabeledWhileLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     labeled: while(true)
@@ -54,8 +54,8 @@ open class ContinueTest : JavaParser() {
     }
 
     @Test
-    fun formatContinueLabeled() {
-        val a = parse("""
+    fun formatContinueLabeled(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     labeled : while(true)

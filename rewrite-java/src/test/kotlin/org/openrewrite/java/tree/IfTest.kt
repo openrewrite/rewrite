@@ -20,9 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class IfTest : JavaParser() {
-    val a: J.CompilationUnit by lazy {
-        parse("""
+interface IfTest {
+
+    @Test
+    fun ifElse(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -35,12 +37,9 @@ open class IfTest : JavaParser() {
                 }
             }
         """)
-    }
 
-    private val iff by lazy { a.firstMethodStatement() as J.If }
+        val iff = a.firstMethodStatement() as J.If
 
-    @Test
-    fun ifElse() {
         assertTrue(iff.ifCondition.tree is J.Binary)
         assertTrue(iff.thenPart is J.Block<*>)
         
@@ -49,11 +48,20 @@ open class IfTest : JavaParser() {
         assertTrue(elseIf.ifCondition.tree is J.Binary)
         assertTrue(elseIf.thenPart is J.Block<*>)
         assertTrue(elseIf.elsePart?.statement is J.Block<*>)
+
+        assertEquals("""
+            if(n == 0) {
+            }
+            else if(n == 1) {
+            }
+            else {
+            }
+        """.trimIndent(), iff.printTrimmed())
     }
     
     @Test
-    fun noElse() {
-        val a = parse("""
+    fun noElse(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {
@@ -67,20 +75,8 @@ open class IfTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        assertEquals("""
-            if(n == 0) {
-            }
-            else if(n == 1) {
-            }
-            else {
-            }
-        """.trimIndent(), iff.printTrimmed())
-    }
-
-    @Test
-    fun singleLineIfElseStatements() {
-        val a = parse("""
+    fun singleLineIfElseStatements(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void test() {

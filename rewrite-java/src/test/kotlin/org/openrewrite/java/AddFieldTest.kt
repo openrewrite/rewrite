@@ -21,12 +21,14 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
 import java.util.Collections.singletonList
 
-open class AddFieldTest : JavaParser() {
-    val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), EMPTY) as J.Modifier)
+interface AddFieldTest {
+    companion object {
+        val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), EMPTY) as J.Modifier)
+    }
 
     @Test
-    fun addFieldDefaultIndent() {
-        val a = parse("""
+    fun addFieldDefaultIndent(jp: JavaParser) {
+        val a = jp.parse("""
             class A {
             }
         """.trimIndent())
@@ -45,8 +47,8 @@ open class AddFieldTest : JavaParser() {
     }
 
     @Test
-    fun addFieldMatchSpaces() {
-        val a = parse("""
+    fun addFieldMatchSpaces(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             
             class A {
@@ -69,8 +71,8 @@ open class AddFieldTest : JavaParser() {
     }
 
     @Test
-    fun addFieldMatchTabs() {
-        val a = parse("""
+    fun addFieldMatchTabs(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             
             class A {

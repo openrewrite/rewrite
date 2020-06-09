@@ -17,10 +17,10 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class ChangeMethodTargetToVariableTest : JavaParser() {
+interface ChangeMethodTargetToVariableTest {
 
     @Test
-    fun refactorExplicitStaticToVariable() {
+    fun refactorExplicitStaticToVariable(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -46,7 +46,7 @@ open class ChangeMethodTargetToVariableTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(c, a, b)
+        val cu = jp.parse(c, a, b)
         val f = cu.classes[0].findFields("a.A")[0]
 
         val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
@@ -65,7 +65,7 @@ open class ChangeMethodTargetToVariableTest : JavaParser() {
     }
 
     @Test
-    fun refactorStaticImportToVariable() {
+    fun refactorStaticImportToVariable(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -91,7 +91,7 @@ open class ChangeMethodTargetToVariableTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(c, a, b)
+        val cu = jp.parse(c, a, b)
 
         val f = cu.classes[0].findFields("a.A")[0]
         val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {

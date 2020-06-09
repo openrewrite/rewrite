@@ -27,6 +27,7 @@ import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
@@ -115,19 +116,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
         for (int i = 0; i < text.length(); i++) {
             if (!prefixDone) {
-                if(Character.isWhitespace(text.charAt(i))) {
+                if (Character.isWhitespace(text.charAt(i))) {
                     prefix.append(text.charAt(i));
-                }
-                else {
+                } else {
                     prefixDone = true;
                     value.append(text.charAt(i));
                 }
-            }
-            else {
-                if(Character.isWhitespace(text.charAt(i))) {
+            } else {
+                if (Character.isWhitespace(text.charAt(i))) {
                     suffix.append(text.charAt(i));
-                }
-                else {
+                } else {
                     suffix.setLength(0);
                 }
                 value.append(text.charAt(i));
@@ -135,8 +133,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         }
 
         String valueStr = value.toString();
-        return Map.of(Formatting.format(prefix.toString(), suffix.toString()),
-                valueStr.substring(0, valueStr.length() - suffix.length())).entrySet().iterator().next();
+        Map<Formatting, String> charDataFormat = new HashMap<>(1);
+        charDataFormat.put(Formatting.format(prefix.toString(), suffix.toString()),
+                valueStr.substring(0, valueStr.length() - suffix.length()));
+        return charDataFormat.entrySet().iterator().next();
     }
 
     @Override
@@ -261,7 +261,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     private Formatting format(Token token) {
         int start = token.getStartIndex();
-        if(start < cursor) {
+        if (start < cursor) {
             return Formatting.EMPTY;
         }
         String prefix = source.substring(cursor, start);

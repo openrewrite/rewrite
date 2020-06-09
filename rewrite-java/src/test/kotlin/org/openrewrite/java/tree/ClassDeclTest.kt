@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class ClassDeclTest : JavaParser() {
+interface ClassDeclTest {
     
     @Test
-    fun multipleClassDeclarationsInOneCompilationUnit() {
-        val a = parse("""
+    fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {}
             class B {}
         """)
@@ -32,15 +32,15 @@ open class ClassDeclTest : JavaParser() {
     }
 
     @Test
-    fun modifiers() {
-        val a = parse("public class A {}")
+    fun modifiers(jp: JavaParser) {
+        val a = jp.parse("public class A {}")
 
         assertTrue(a.classes[0].hasModifier("public"))
     }
     
     @Test
-    fun fields() {
-        val a = parse("""
+    fun fields(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List l;
@@ -51,8 +51,8 @@ open class ClassDeclTest : JavaParser() {
     }
 
     @Test
-    fun methods() {
-        val a = parse("""
+    fun methods(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void fun() {}
             }
@@ -62,44 +62,44 @@ open class ClassDeclTest : JavaParser() {
     }
     
     @Test
-    fun implements() {
+    fun implements(jp: JavaParser) {
         val b = "public interface B {}"
         val a = "public class A implements B {}"
         
-        assertEquals(1, parse(a, b).classes[0].implements?.from?.size)
+        assertEquals(1, jp.parse(a, b).classes[0].implements?.from?.size)
     }
 
     @Test
-    fun extends() {
+    fun extends(jp: JavaParser) {
         val b = "public class B {}"
         val a = "public class A extends B {}"
 
-        val aClass = parse(a, b).classes[0]
+        val aClass = jp.parse(a, b).classes[0]
         assertNotNull(aClass.extends)
     }
 
     @Test
-    fun format() {
+    fun format(jp: JavaParser) {
         val b = "public class B<T> {}"
         val a = "@Deprecated public class A < T > extends B < T > {}"
-        assertEquals(a, parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
+        assertEquals(a, jp.parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
     }
 
     @Test
-    fun formatInterface() {
+    fun formatInterface(jp: JavaParser) {
         val b = "public interface B {}"
         val a = "public interface A extends B {}"
-        assertEquals(a, parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
+        assertEquals(a, jp.parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
     }
 
     @Test
-    fun formatAnnotation() {
+    fun formatAnnotation(jp: JavaParser) {
         val a = "public @interface Produces { }"
-        assertEquals(a, parse(a).classes[0].printTrimmed())
+        assertEquals(a, jp.parse(a).classes[0].printTrimmed())
     }
 
     @Test
-    fun enumWithParameters() {
+    fun enumWithParameters(jp: JavaParser) {
         val aSrc = """
             public enum A {
                 ONE(1),
@@ -109,7 +109,7 @@ open class ClassDeclTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse(aSrc)
+        val a = jp.parse(aSrc)
 
         assertTrue(a.classes[0].kind is J.ClassDecl.Kind.Enum)
         assertEquals("ONE(1),\nTWO(2);", a.classes[0].enumValues?.printTrimmed())
@@ -117,21 +117,21 @@ open class ClassDeclTest : JavaParser() {
     }
 
     @Test
-    fun enumWithoutParameters() {
-        val a = parse("public enum A { ONE, TWO }")
+    fun enumWithoutParameters(jp: JavaParser) {
+        val a = jp.parse("public enum A { ONE, TWO }")
         assertEquals("public enum A { ONE, TWO }", a.classes[0].printTrimmed())
         assertEquals("ONE, TWO", a.classes[0].enumValues?.printTrimmed())
     }
 
     @Test
-    fun enumUnnecessarilyTerminatedWithSemicolon() {
-        val a = parse("public enum A { ONE ; }")
+    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) {
+        val a = jp.parse("public enum A { ONE ; }")
         assertEquals("{ ONE ; }", a.classes[0].body.printTrimmed())
     }
 
     @Test
-    fun enumWithEmptyParameters() {
-        val a = parse("public enum A { ONE ( ), TWO ( ) }")
+    fun enumWithEmptyParameters(jp: JavaParser) {
+        val a = jp.parse("public enum A { ONE ( ), TWO ( ) }")
         assertEquals("public enum A { ONE ( ), TWO ( ) }", a.classes[0].printTrimmed())
         assertEquals("ONE ( ), TWO ( )", a.classes[0].enumValues?.printTrimmed())
     }
@@ -140,13 +140,13 @@ open class ClassDeclTest : JavaParser() {
      * OpenJDK does NOT preserve the order of modifiers in its AST representation
      */
     @Test
-    fun modifierOrdering() {
-        val a = parse("public /* abstract */ final abstract class A {}")
+    fun modifierOrdering(jp: JavaParser) {
+        val a = jp.parse("public /* abstract */ final abstract class A {}")
         assertEquals("public /* abstract */ final abstract class A {}", a.printTrimmed())
     }
 
     @Test
-    fun innerClass() {
+    fun innerClass(jp: JavaParser) {
         val aSrc = """
             public class A {
                 public enum B {
@@ -158,12 +158,12 @@ open class ClassDeclTest : JavaParser() {
             }
         """.trimIndent()
 
-        assertEquals(aSrc, parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
     }
 
     @Test
-    fun strictfpClass() {
-        val a = parse("public strictfp class A {}")
+    fun strictfpClass(jp: JavaParser) {
+        val a = jp.parse("public strictfp class A {}")
         assertEquals(a.classes[0].printTrimmed(), "public strictfp class A {}")
     }
 }

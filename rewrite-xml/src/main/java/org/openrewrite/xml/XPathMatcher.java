@@ -47,12 +47,12 @@ public class XPathMatcher {
                 .collect(Collectors.toList());
 
         if (expression.startsWith("//") || !expression.startsWith("/")) {
-            var parts = new ArrayList<>(Arrays.asList((expression.startsWith("//") ?
+            List<String> parts = new ArrayList<>(Arrays.asList((expression.startsWith("//") ?
                     expression.substring(2) : expression).split("/")));
             Collections.reverse(parts);
 
             for (int i = 0; i < parts.size(); i++) {
-                var part = parts.remove(0);
+                String part = parts.remove(0);
                 if (part.startsWith("@")) {
                     if (!(cursor.getTree() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1))) ||
@@ -73,9 +73,9 @@ public class XPathMatcher {
         } else if (expression.startsWith("/")) {
             Collections.reverse(path);
 
-            var parts = expression.substring(1).split("/");
+            String[] parts = expression.substring(1).split("/");
             for (int i = 0; i < parts.length; i++) {
-                var part = parts[i];
+                String part = parts[i];
                 if (part.startsWith("@")) {
                     return cursor.getTree() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1)) ||

@@ -18,11 +18,11 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.JavaType
 
-open class ChangeFieldNameTest : JavaParser() {
+interface ChangeFieldNameTest {
 
     @Test
-    fun changeFieldName() {
-        val a = parse("""
+    fun changeFieldName(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {
                List collection = null;
@@ -42,8 +42,8 @@ open class ChangeFieldNameTest : JavaParser() {
     }
 
     @Test
-    fun changeFieldNameReferences() {
-        val b = parse("""
+    fun changeFieldNameReferences(jp: JavaParser) {
+        val b = jp.parse("""
             public class B {
                int n;
                
@@ -83,14 +83,14 @@ open class ChangeFieldNameTest : JavaParser() {
     }
 
     @Test
-    fun changeFieldNameReferencesInOtherClass() {
+    fun changeFieldNameReferencesInOtherClass(jp: JavaParser) {
         val b = """
             public class B {
                int n;
             }
         """.trimIndent()
 
-        val a = parse("""
+        val a = jp.parse("""
             public class A {
                 B b = new B();
                 {

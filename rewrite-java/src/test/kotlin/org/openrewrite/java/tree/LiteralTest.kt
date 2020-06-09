@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.fields
 
-open class LiteralTest : JavaParser() {
+interface LiteralTest {
 
     @Test
-    fun literalField() {
-        val a = parse("""
+    fun literalField(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n = 0;
             }
@@ -37,8 +37,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun literalCharacter() {
-        val a = parse("""
+    fun literalCharacter(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 char c = 'a';
             }
@@ -51,8 +51,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun literalNumerics() {
-        val a = parse("""
+    fun literalNumerics(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 double d1 = 1.0d;
                 double d2 = 1.0;
@@ -69,8 +69,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun literalOctal() {
-        val a = parse("""
+    fun literalOctal(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 long l = 01L;
                 byte b = 01;
@@ -87,8 +87,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun literalBinary() {
-        val a = parse("""
+    fun literalBinary(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 long l = 0b10L;
                 byte b = 0b10;
@@ -103,8 +103,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun literalHex() {
-        val a = parse("""
+    fun literalHex(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 long l = 0xA0L;
                 byte b = 0xA0;
@@ -119,8 +119,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun transformString() {
-        val a = parse("""
+    fun transformString(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 String s = "foo ''";
             }
@@ -131,8 +131,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun nullLiteral() {
-        val a = parse("""
+    fun nullLiteral(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 String s = null;
             }
@@ -142,8 +142,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun transformLong() {
-        val a = parse("""
+    fun transformLong(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Long l = 2L;
             }
@@ -154,8 +154,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun variationInSuffixCasing() {
-        val a = parse("""
+    fun variationInSuffixCasing(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Long l = 0l;
                 Long m = 0L;
@@ -169,8 +169,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun escapedString() {
-        val a = parse("""
+    fun escapedString(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 String s = "\"";
             }
@@ -181,8 +181,8 @@ open class LiteralTest : JavaParser() {
     }
 
     @Test
-    fun escapedCharacter() {
-        val a = parse("""
+    fun escapedCharacter(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 char c = '\'';
             }

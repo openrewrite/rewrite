@@ -16,15 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.DeleteStatement
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
-open class DeleteStatementTest : JavaParser() {
+interface DeleteStatementTest {
 
     @Test
-    fun deleteField() {
-        val a = parse("""
+    fun deleteField(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {
                List collection = null;

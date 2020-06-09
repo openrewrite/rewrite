@@ -17,18 +17,19 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class ChangeMethodNameTest : JavaParser() {
-
-    private val b: String = """
+interface ChangeMethodNameTest {
+    companion object {
+        private val b: String = """
                 class B {
                    public void singleArg(String s) {}
                    public void arrArg(String[] s) {}
                    public void varargArg(String... s) {}
                 }
             """.trimIndent()
+    }
 
     @Test
-    fun refactorMethodNameForMethodWithSingleArgDeclarative() {
+    fun refactorMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -37,7 +38,7 @@ open class ChangeMethodNameTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
                 .visit(ChangeMethodName().apply { setMethod("B singleArg(String)"); setName("bar") })
@@ -53,7 +54,7 @@ open class ChangeMethodNameTest : JavaParser() {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithSingleArg() {
+    fun refactorMethodNameForMethodWithSingleArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -62,7 +63,7 @@ open class ChangeMethodNameTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("B singleArg(String)")) { ChangeMethodName.Scoped(it, "bar") }
@@ -78,7 +79,7 @@ open class ChangeMethodNameTest : JavaParser() {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithArrayArg() {
+    fun refactorMethodNameForMethodWithArrayArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -87,7 +88,7 @@ open class ChangeMethodNameTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("B arrArg(String[])")) { ChangeMethodName.Scoped(it, "bar") }
@@ -103,7 +104,7 @@ open class ChangeMethodNameTest : JavaParser() {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithVarargArg() {
+    fun refactorMethodNameForMethodWithVarargArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -112,7 +113,7 @@ open class ChangeMethodNameTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("B varargArg(String...)")) { ChangeMethodName.Scoped(it, "bar") }
@@ -128,7 +129,7 @@ open class ChangeMethodNameTest : JavaParser() {
     }
 
     @Test
-    fun refactorMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken() {
+    fun refactorMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken(jp: JavaParser) {
         val b = """
             class B {
                public void error() {}
@@ -144,7 +145,7 @@ open class ChangeMethodNameTest : JavaParser() {
             }
         """.trimIndent()
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("B error()")) { ChangeMethodName.Scoped(it, "foo") }
                 .fix().fixed

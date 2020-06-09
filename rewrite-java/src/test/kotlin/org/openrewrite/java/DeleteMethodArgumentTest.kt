@@ -19,20 +19,21 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
 
-open class DeleteMethodArgumentTest : JavaParser() {
-
-    val b = """
-        class B {
-           public static void foo() {}
-           public static void foo(int n) {}
-           public static void foo(int n1, int n2) {}
-           public static void foo(int n1, int n2, int n3) {}
-        }
-    """.trimIndent()
+interface DeleteMethodArgumentTest {
+    companion object {
+        val b = """
+            class B {
+               public static void foo() {}
+               public static void foo(int n) {}
+               public static void foo(int n1, int n2) {}
+               public static void foo(int n1, int n2, int n3) {}
+            }
+        """.trimIndent()
+    }
 
     @Test
-    fun deleteMiddleArgumentDeclarative() {
-        val a = parse("public class A {{ B.foo(0, 1, 2); }}", b)
+    fun deleteMiddleArgumentDeclarative(jp: JavaParser) {
+        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
         val fixed = a.refactor()
                 .visit(DeleteMethodArgument().apply { setMethod("B foo(..)"); setIndex(1) })
                 .fix().fixed
@@ -40,8 +41,8 @@ open class DeleteMethodArgumentTest : JavaParser() {
     }
 
     @Test
-    fun deleteMiddleArgument() {
-        val a = parse("public class A {{ B.foo(0, 1, 2); }}", b)
+    fun deleteMiddleArgument(jp: JavaParser) {
+        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
         val fixed = a.refactor()
                 .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 1) }
                 .fix().fixed
@@ -49,8 +50,8 @@ open class DeleteMethodArgumentTest : JavaParser() {
     }
 
     @Test
-    fun deleteArgumentsConsecutively() {
-        val a = parse("public class A {{ B.foo(0, 1, 2); }}", b)
+    fun deleteArgumentsConsecutively(jp: JavaParser) {
+        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
         val foos = a.findMethodCalls("B foo(..)")
         val fixed = a.refactor()
                 .fold(foos) { DeleteMethodArgument.Scoped(it, 1) }
@@ -60,8 +61,8 @@ open class DeleteMethodArgumentTest : JavaParser() {
     }
 
     @Test
-    fun doNotDeleteEmptyContainingFormatting() {
-        val a = parse("public class A {{ B.foo( ); }}", b)
+    fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) {
+        val a = jp.parse("public class A {{ B.foo( ); }}", b)
         val fixed = a.refactor()
                 .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 0) }
                 .fix().fixed
@@ -69,8 +70,8 @@ open class DeleteMethodArgumentTest : JavaParser() {
     }
 
     @Test
-    fun insertEmptyWhenLastArgumentIsDeleted() {
-        val a = parse("public class A {{ B.foo( ); }}", b)
+    fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) {
+        val a = jp.parse("public class A {{ B.foo( ); }}", b)
         val fixed = a.refactor()
                 .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 0) }
                 .fix().fixed

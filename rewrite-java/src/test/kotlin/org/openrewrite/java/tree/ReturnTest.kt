@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ReturnTest : JavaParser() {
+interface ReturnTest {
     
     @Test
-    fun returnValue() {
-        val a = parse("""
+    fun returnValue(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public String test() {
                     return "";
@@ -37,8 +37,8 @@ open class ReturnTest : JavaParser() {
     }
 
     @Test
-    fun returnVoid() {
-        val a = parse("""
+    fun returnVoid(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     return;
@@ -51,8 +51,8 @@ open class ReturnTest : JavaParser() {
     }
     
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public int test() {
                     return 0;

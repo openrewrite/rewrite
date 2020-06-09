@@ -22,11 +22,11 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
 
-open class AnnotationTest : JavaParser() {
+interface AnnotationTest {
     
     @Test
-    fun annotation() {
-        val a = parse("""
+    fun annotation(jp: JavaParser) {
+        val a = jp.parse("""
             @SuppressWarnings("ALL")
             public class A {}
         """)
@@ -38,8 +38,8 @@ open class AnnotationTest : JavaParser() {
     }
     
     @Test
-    fun formatImplicitDefaultArgument() {
-        val a = parse("""
+    fun formatImplicitDefaultArgument(jp: JavaParser) {
+        val a = jp.parse("""
             @SuppressWarnings("ALL")
             public class A {}
         """)
@@ -50,8 +50,8 @@ open class AnnotationTest : JavaParser() {
     }
 
     @Test
-    fun preserveOptionalEmptyParentheses() {
-        val a = parse("""
+    fun preserveOptionalEmptyParentheses(jp: JavaParser) {
+        val a = jp.parse("""
             @Deprecated ( )
             public class A {}
         """)
@@ -62,8 +62,8 @@ open class AnnotationTest : JavaParser() {
     }
 
     @Test
-    fun default() {
-        val a = parse("""
+    fun default(jp: JavaParser) {
+        val a = jp.parse("""
             public @interface A {
                 String foo() default "foo";
             }
@@ -73,8 +73,8 @@ open class AnnotationTest : JavaParser() {
     }
 
     @Test
-    fun newArrayArgument() {
-        val a = parse("""
+    fun newArrayArgument(jp: JavaParser) {
+        val a = jp.parse("""
             import java.lang.annotation.Target;
             import static java.lang.annotation.ElementType.*;
 
@@ -86,8 +86,8 @@ open class AnnotationTest : JavaParser() {
     }
 
     @Test
-    fun annotationArgTypesVisited() {
-        val a = parse("""
+    fun annotationArgTypesVisited(jp: JavaParser) {
+        val a = jp.parse("""
             import java.lang.annotation.Target;
             import static java.lang.annotation.ElementType.*;
 

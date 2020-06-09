@@ -40,8 +40,8 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
     private final Map<String, ProfileConfiguration> profiles = new HashMap<>();
     private final Collection<SourceVisitor<?>> visitors = new ArrayList<>();
 
-    public YamlResourceLoader(InputStream yamlInput) {
-        try (yamlInput) {
+    public YamlResourceLoader(InputStream yamlInput) throws UncheckedIOException {
+        try {
             Yaml yaml = new Yaml();
             for (Object resource : yaml.loadAll(yamlInput)) {
                 if (resource instanceof Map) {
@@ -57,8 +57,12 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
                     }
                 }
             }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } finally {
+            try {
+                yamlInput.close();
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
         }
     }
 

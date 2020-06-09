@@ -20,15 +20,15 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.JavaType
 
-class MethodMatcherTest {
+interface MethodMatcherTest {
     @Test
-    fun matchesSuperclassType() {
+    fun matchesSuperclassType(jp: JavaParser) {
         assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
         assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
     }
 
     @Test
-    fun matchesMethodTargetType() {
+    fun matchesMethodTargetType(jp: JavaParser) {
         val typeRegex = { signature: String -> MethodMatcher(signature).targetTypePattern.toRegex() }
 
         assertTrue(typeRegex("*..MyClass foo()").matches("com.bar.MyClass"))
@@ -38,7 +38,7 @@ class MethodMatcherTest {
     }
 
     @Test
-    fun matchesMethodName() {
+    fun matchesMethodName(jp: JavaParser) {
         val nameRegex = { signature: String -> MethodMatcher(signature).methodNamePattern.toRegex() }
 
         assertTrue(nameRegex("A foo()").matches("foo"))
@@ -47,28 +47,30 @@ class MethodMatcherTest {
         assertTrue(nameRegex("A *oo()").matches("foo"))
     }
 
-    val argRegex = { signature: String -> MethodMatcher(signature).argumentPattern.toRegex() }
+    companion object {
+        private val argRegex = { signature: String -> MethodMatcher(signature).argumentPattern.toRegex() }
+    }
 
     @Test
-    fun matchesArguments() {
+    fun matchesArguments(jp: JavaParser) {
         assertTrue(argRegex("A foo()").matches(""))
         assertTrue(argRegex("A foo(int)").matches("int"))
         assertTrue(argRegex("A foo(java.util.Map)").matches("java.util.Map"))
     }
 
     @Test
-    fun matchesUnqualifiedJavaLangArguments() {
+    fun matchesUnqualifiedJavaLangArguments(jp: JavaParser) {
         assertTrue(argRegex("A foo(String)").matches("java.lang.String"))
     }
 
     @Test
-    fun matchesArgumentsWithWildcards() {
+    fun matchesArgumentsWithWildcards(jp: JavaParser) {
         assertTrue(argRegex("A foo(java.util.*)").matches("java.util.Map"))
         assertTrue(argRegex("A foo(java..*)").matches("java.util.Map"))
     }
 
     @Test
-    fun matchesArgumentsWithDotDot() {
+    fun matchesArgumentsWithDotDot(jp: JavaParser) {
         assertTrue(argRegex("A foo(.., int)").matches("int"))
         assertTrue(argRegex("A foo(.., int)").matches("int,int"))
 
@@ -81,23 +83,23 @@ class MethodMatcherTest {
     }
 
     @Test
-    fun matchesSuperclassArgumentTypes() {
+    fun matchesSuperclassArgumentTypes(jp: JavaParser) {
         assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
         assertFalse(MethodMatcher("String equals(String)").matchesTargetType(JavaType.Class.build("java.lang.Object")))
     }
 
     @Test
-    fun matchesMethodSymbolsWithVarargs() {
+    fun matchesMethodSymbolsWithVarargs(jp: JavaParser) {
         argRegex("A foo(String, Object...)").matches("String,Object[]")
     }
 
     @Test
-    fun dotDotMatchesArrayArgs() {
+    fun dotDotMatchesArrayArgs(jp: JavaParser) {
         argRegex("A foo(..)").matches("String,Object[]")
     }
 
     @Test
-    fun matchesArrayArguments() {
+    fun matchesArrayArguments(jp: JavaParser) {
         assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
     }
 }

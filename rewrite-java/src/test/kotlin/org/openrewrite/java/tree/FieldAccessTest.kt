@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.fields
 
-open class FieldAccessTest : JavaParser() {
+interface FieldAccessTest {
     
     @Test
-    fun fieldAccess() {
+    fun fieldAccess(jp: JavaParser) {
         val b = """
             public class B {
                 public B field = new B();
@@ -37,7 +37,7 @@ open class FieldAccessTest : JavaParser() {
             }
         """
 
-        val cu = parse(a, b)
+        val cu = jp.parse(a, b)
 
         val acc = cu.fields(0..1).flatMap { it.vars }.find { it.initializer is J.FieldAccess }?.initializer as J.FieldAccess?
         assertEquals("b . field . field", acc?.printTrimmed())

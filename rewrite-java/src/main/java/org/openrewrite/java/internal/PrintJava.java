@@ -42,8 +42,8 @@ public class PrintJava extends JavaSourceVisitor<String> {
     }
 
     private String visit(Collection<? extends Tree> nodes, String suffixBetween, String suffixEnd) {
-        var acc = "";
-        Tree[] array = nodes.toArray(Tree[]::new);
+        String acc = "";
+        Tree[] array = nodes.toArray(new Tree[0]);
         for (int i = 0; i < array.length; i++) {
             Tree node = array[i];
             acc = reduce(acc, visit(node) + (i == array.length - 1 ? suffixEnd : suffixBetween));
@@ -113,20 +113,20 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitAnnotation(Annotation annotation) {
-        var args = annotation.getArgs() == null ? "" :
+        String args = annotation.getArgs() == null ? "" :
                 fmt(annotation.getArgs(), "(" + visit(annotation.getArgs().getArgs(), ",") + ")");
         return fmt(annotation, "@" + visit(annotation.getAnnotationType()) + args);
     }
 
     @Override
     public String visitArrayAccess(ArrayAccess arrayAccess) {
-        var dimension = fmt(arrayAccess.getDimension(), "[" + visit(arrayAccess.getDimension().getIndex()) + "]");
+        String dimension = fmt(arrayAccess.getDimension(), "[" + visit(arrayAccess.getDimension().getIndex()) + "]");
         return fmt(arrayAccess, visit(arrayAccess.getIndexed()) + dimension);
     }
 
     @Override
     public String visitArrayType(ArrayType arrayType) {
-        var dimension = arrayType.getDimensions().stream()
+        String dimension = arrayType.getDimensions().stream()
                 .map(d -> fmt(d, "[" + visit(d.getInner()) + "]"))
                 .reduce("", this::reduce);
         return fmt(arrayType, visit(arrayType.getElementType()) + dimension);
@@ -240,9 +240,9 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitClassDecl(ClassDecl classDecl) {
-        var modifiers = visitModifiers(classDecl.getModifiers());
+        String modifiers = visitModifiers(classDecl.getModifiers());
 
-        var kind = "";
+        String kind = "";
         if (classDecl.getKind() instanceof ClassDecl.Kind.Class) {
             kind = "class";
         } else if (classDecl.getKind() instanceof ClassDecl.Kind.Enum) {
@@ -290,7 +290,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitEnumValue(EnumValue enoom) {
-        var init = "";
+        String init = "";
 
         NewClass initializer = enoom.getInitializer();
         if (initializer != null) {
@@ -321,14 +321,14 @@ public class PrintJava extends JavaSourceVisitor<String> {
     @Override
     public String visitForLoop(ForLoop forLoop) {
         ForLoop.Control ctrl = forLoop.getControl();
-        var expr = fmt(ctrl, "(" + visit(ctrl.getInit()) + ";" + visit(ctrl.getCondition()) + ";" + visit(ctrl.getUpdate(), ",", "") + ")");
+        String expr = fmt(ctrl, "(" + visit(ctrl.getInit()) + ";" + visit(ctrl.getCondition()) + ";" + visit(ctrl.getUpdate(), ",", "") + ")");
         return fmt(forLoop, "for" + expr + fmtStatement(forLoop.getBody()));
     }
 
     @Override
     public String visitForEachLoop(ForEachLoop forEachLoop) {
         ForEachLoop.Control ctrl = forEachLoop.getControl();
-        var expr = fmt(ctrl, "(" + visit(ctrl.getVariable()) + ":" + visit(ctrl.getIterable()) + ")");
+        String expr = fmt(ctrl, "(" + visit(ctrl.getVariable()) + ":" + visit(ctrl.getIterable()) + ")");
         return fmt(forEachLoop, "for" + expr + fmtStatement(forEachLoop.getBody()));
     }
 
@@ -339,7 +339,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitIf(If iff) {
-        var elsePart = iff.getElsePart() == null ? "" :
+        String elsePart = iff.getElsePart() == null ? "" :
                 fmt(iff.getElsePart(), "else" + fmtStatement(iff.getElsePart().getStatement()));
         return fmt(iff, "if" + visit(iff.getIfCondition()) + fmtStatement(iff.getThenPart()) + elsePart);
     }
@@ -361,8 +361,8 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitLambda(Lambda lambda) {
-        var params = visit(lambda.getParamSet().getParams(), ",");
-        var paramSet = fmt(lambda.getParamSet(), lambda.getParamSet().isParenthesized() ? "(" + params + ")" : params);
+        String params = visit(lambda.getParamSet().getParams(), ",");
+        String paramSet = fmt(lambda.getParamSet(), lambda.getParamSet().isParenthesized() ? "(" + params + ")" : params);
         return fmt(lambda, paramSet + fmt(lambda.getArrow(), "->") + visit(lambda.getBody()));
     }
 
@@ -379,11 +379,11 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitMethod(MethodDecl method) {
-        var modifiers = visitModifiers(method.getModifiers());
-        var params = fmt(method.getParams(), "(" + visit(method.getParams().getParams(), ",")) + ")";
-        var defaultValue = method.getDefaultValue() == null ? "" :
+        String modifiers = visitModifiers(method.getModifiers());
+        String params = fmt(method.getParams(), "(" + visit(method.getParams().getParams(), ",")) + ")";
+        String defaultValue = method.getDefaultValue() == null ? "" :
                 fmt(method.getDefaultValue(), "default" + visit(method.getDefaultValue().getValue()));
-        var thrown = method.getThrows() == null ? "" :
+        String thrown = method.getThrows() == null ? "" :
                 fmt(method.getThrows(), "throws" + visit(method.getThrows().getExceptions(), ","));
 
         return fmt(method, visit(method.getAnnotations()) + modifiers + visit(method.getTypeParameters()) +
@@ -393,10 +393,10 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitMethodInvocation(MethodInvocation method) {
-        var args = fmt(method.getArgs(), "(" + visit(method.getArgs().getArgs(), ",") + ")");
-        var typeParams = method.getTypeParameters() == null ? "" :
+        String args = fmt(method.getArgs(), "(" + visit(method.getArgs().getArgs(), ",") + ")");
+        String typeParams = method.getTypeParameters() == null ? "" :
                 fmt(method.getTypeParameters(), "<" + visit(method.getTypeParameters().getParams(), ",") + ">");
-        var selectSeparator = method.getSelect() == null ? "" : ".";
+        String selectSeparator = method.getSelect() == null ? "" : ".";
         return fmt(method, visit(method.getSelect()) + selectSeparator + typeParams + visit(method.getName()) + args);
     }
 
@@ -407,8 +407,8 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitMultiVariable(VariableDecls multiVariable) {
-        var modifiers = visitModifiers(multiVariable.getModifiers());
-        var varargs = multiVariable.getVarargs() == null ? "" :
+        String modifiers = visitModifiers(multiVariable.getModifiers());
+        String varargs = multiVariable.getVarargs() == null ? "" :
                 fmt(multiVariable.getVarargs(), "...");
 
         return fmt(multiVariable, visit(multiVariable.getAnnotations()) + modifiers +
@@ -418,12 +418,12 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitNewArray(NewArray newArray) {
-        var typeExpr = newArray.getTypeExpr() == null ? "" :
+        String typeExpr = newArray.getTypeExpr() == null ? "" :
                 "new" + visit(newArray.getTypeExpr());
-        var dimensions = newArray.getDimensions().stream()
+        String dimensions = newArray.getDimensions().stream()
                 .map(d -> fmt(d, "[" + visit(d.getSize()) + "]"))
                 .reduce("", this::reduce);
-        var init = newArray.getInitializer() == null ? "" :
+        String init = newArray.getInitializer() == null ? "" :
                 fmt(newArray.getInitializer(), "{" + visit(newArray.getInitializer().getElements(), ",") + "}");
 
         return fmt(newArray, typeExpr + dimensions + init);
@@ -431,7 +431,8 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitNewClass(NewClass newClass) {
-        var args = fmt(newClass.getArgs(), "(" + visit(newClass.getArgs().getArgs(), ",") + ")");
+        String args = newClass.getArgs() == null ? "" :
+                fmt(newClass.getArgs(), "(" + visit(newClass.getArgs().getArgs(), ",") + ")");
         return fmt(newClass, "new" + visit(newClass.getClazz()) + args + visit(newClass.getBody()));
     }
 
@@ -526,7 +527,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitTry(Try tryable) {
-        var resources = tryable.getResources() == null ? "" :
+        String resources = tryable.getResources() == null ? "" :
                 fmt(tryable.getResources(), "(" + visit(tryable.getResources().getDecls(), ";") + ")");
 
         return fmt(tryable, "try" + resources + visit(tryable.getBody()) + visit(tryable.getCatches()) + visit(tryable.getFinally()));
@@ -544,7 +545,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitTypeParameter(TypeParameter typeParam) {
-        var bounds = typeParam.getBounds() == null ? "" :
+        String bounds = typeParam.getBounds() == null ? "" :
                 fmt(typeParam.getBounds(), "extends" + visit(typeParam.getBounds().getTypes(), "&"));
         return fmt(typeParam, visit(typeParam.getAnnotations(), "") + visit(typeParam.getName()) + bounds);
     }
@@ -580,7 +581,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitVariable(VariableDecls.NamedVar variable) {
-        var init = variable.getInitializer() == null ? "" :
+        String init = variable.getInitializer() == null ? "" :
                 "=" + visit(variable.getInitializer());
         return fmt(variable, visit(variable.getName()) + visitDims(variable.getDimensionsAfterName()) + init);
     }
@@ -592,7 +593,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitWildcard(Wildcard wildcard) {
-        var bound = "";
+        String bound = "";
         if (wildcard.getBound() instanceof Wildcard.Bound.Extends) {
             bound = fmt(wildcard.getBound(), "extends");
         } else if (wildcard.getBound() instanceof Wildcard.Bound.Super) {

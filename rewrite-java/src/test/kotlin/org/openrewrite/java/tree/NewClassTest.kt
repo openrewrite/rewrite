@@ -20,16 +20,18 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 
-open class NewClassTest : JavaParser() {
-    val a = """
-        package a;
-        public class A {
-           public static class B { }
-        }
-    """
+interface NewClassTest {
+    companion object {
+        val a = """
+            package a;
+            public class A {
+               public static class B { }
+            }
+        """
+    }
     
     @Test
-    fun anonymousInnerClass() {
+    fun anonymousInnerClass(jp: JavaParser) {
         val c = """
             import a.*;
             public class C {
@@ -37,12 +39,12 @@ open class NewClassTest : JavaParser() {
             }
         """
         
-        val b = parse(c, a).classes[0].fields[0].vars[0]
+        val b = jp.parse(c, a).classes[0].fields[0].vars[0]
         assertEquals("a.A.B", b.type.asClass()?.fullyQualifiedName)
     }
 
     @Test
-    fun concreteInnerClass() {
+    fun concreteInnerClass(jp: JavaParser) {
         val c = """
             import a.*;
             public class C {
@@ -50,15 +52,15 @@ open class NewClassTest : JavaParser() {
             }
         """
 
-        val cu = parse(c, a)
+        val cu = jp.parse(c, a)
         val b = cu.classes[0].fields[0].vars[0]
         assertEquals("a.A.B", b.type.asClass()?.fullyQualifiedName)
-        assertEquals("A.B", (b.initializer as J.NewClass).clazz.printTrimmed())
+        assertEquals("A.B", (b.initializer as J.NewClass).clazz?.printTrimmed())
     }
     
     @Test
-    fun concreteClassWithParams() {
-        val a = parse("""
+    fun concreteClassWithParams(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 Object l = new ArrayList<String>(0);
@@ -66,12 +68,12 @@ open class NewClassTest : JavaParser() {
         """)
 
         val newClass = a.classes[0].fields[0].vars[0].initializer as J.NewClass
-        assertEquals(1, newClass.args.args.size)
+        assertEquals(1, newClass.args?.args?.size)
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 Object l = new ArrayList< String > ( 0 ) { };
@@ -83,8 +85,8 @@ open class NewClassTest : JavaParser() {
     }
 
     @Test
-    fun formatRawType() {
-        val a = parse("""
+    fun formatRawType(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List<String> l = new ArrayList < > ();

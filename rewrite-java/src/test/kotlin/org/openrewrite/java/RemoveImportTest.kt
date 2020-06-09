@@ -17,11 +17,11 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class RemoveImportTest : JavaParser() {
+interface RemoveImportTest {
 
     @Test
-    fun removeNamedImport() {
-        val a = parse("""
+    fun removeNamedImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             class A {}
         """.trimIndent())
@@ -32,8 +32,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun leaveImportIfRemovedTypeIsStillReferredTo() {
-        val a = parse("""
+    fun leaveImportIfRemovedTypeIsStillReferredTo(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             class A {
                List list;
@@ -51,8 +51,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun removeStarImportIfNoTypesReferredTo() {
-        val a = parse("""
+    fun removeStarImportIfNoTypesReferredTo(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             class A {}
         """.trimIndent())
@@ -63,8 +63,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains() {
-        val a = parse("""
+    fun replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             class A {
                Collection c;
@@ -82,8 +82,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun leaveStarImportInPlaceIfMoreThanTwoTypesStillReferredTo() {
-        val a = parse("""
+    fun leaveStarImportInPlaceIfMoreThanTwoTypesStillReferredTo(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             class A {
                Collection c;
@@ -103,8 +103,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun removeStarStaticImport() {
-        val a = parse("""
+    fun removeStarStaticImport(jp: JavaParser) {
+        val a = jp.parse("""
             import static java.util.Collections.*;
             class A {}
         """.trimIndent())
@@ -115,8 +115,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun leaveStarStaticImportIfReferenceStillExists() {
-        val a = parse("""
+    fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) {
+        val a = jp.parse("""
             import static java.util.Collections.*;
             class A {
                Object o = emptyList();
@@ -134,8 +134,8 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun leaveNamedStaticImportIfReferenceStillExists() {
-        val a = parse("""
+    fun leaveNamedStaticImportIfReferenceStillExists(jp: JavaParser) {
+        val a = jp.parse("""
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptySet;
             class A {
@@ -154,7 +154,7 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun leaveNamedStaticImportOnFieldIfReferenceStillExists() {
+    fun leaveNamedStaticImportOnFieldIfReferenceStillExists(jp: JavaParser) {
         val bSource = """
             package foo;
             public class B {
@@ -170,7 +170,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse("""
+        val a = jp.parse("""
             import static foo.B.STRING;
             import static foo.B.STRING2;
             import static foo.C.*;
@@ -193,7 +193,7 @@ open class RemoveImportTest : JavaParser() {
     }
 
     @Test
-    fun removeImportForChangedMethodArgument() {
+    fun removeImportForChangedMethodArgument(jp: JavaParser) {
         val b = """
             package b;
             public interface B {
@@ -208,7 +208,7 @@ open class RemoveImportTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse("""
+        val a = jp.parse("""
             import b.B;
             
             class A {

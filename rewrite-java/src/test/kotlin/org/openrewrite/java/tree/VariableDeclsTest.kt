@@ -22,11 +22,11 @@ import org.openrewrite.java.asClass
 import org.openrewrite.java.fields
 import org.openrewrite.java.firstMethodStatement
 
-open class VariableDeclsTest : JavaParser() {
+interface VariableDeclsTest {
     
     @Test
-    fun fieldDefinition() {
-        val a = parse("""
+    fun fieldDefinition(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public String a = "";
             }
@@ -45,8 +45,8 @@ open class VariableDeclsTest : JavaParser() {
     }
 
     @Test
-    fun localVariableDefinition() {
-        val a = parse("""
+    fun localVariableDefinition(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     String a = "";
@@ -62,8 +62,8 @@ open class VariableDeclsTest : JavaParser() {
     }
 
     @Test
-    fun fieldWithNoInitializer() {
-        val a = parse("""
+    fun fieldWithNoInitializer(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 String a;
             }
@@ -74,8 +74,8 @@ open class VariableDeclsTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public static int n = 0;
             }
@@ -86,8 +86,8 @@ open class VariableDeclsTest : JavaParser() {
     }
 
     @Test
-    fun formatArrayVariables() {
-        val a = parse("""
+    fun formatArrayVariables(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                int n [ ];
                String s [ ] [ ];
@@ -105,8 +105,8 @@ open class VariableDeclsTest : JavaParser() {
     }
 
     @Test
-    fun multipleDeclarationOneAssignment() {
-        val a = parse("""
+    fun multipleDeclarationOneAssignment(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int i, j = 0;
             }
@@ -117,8 +117,8 @@ open class VariableDeclsTest : JavaParser() {
 
     @Suppress("UNCHECKED_CAST")
     @Test
-    fun multipleDeclaration() {
-        val a = parse("""
+    fun multipleDeclaration(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 static {
                     Integer[] m = { 0 }, n[] = { { 0 } };
@@ -142,8 +142,8 @@ open class VariableDeclsTest : JavaParser() {
      * OpenJDK does NOT preserve the order of modifiers in its AST representation
      */
     @Test
-    fun modifierOrdering() {
-        val a = parse("""
+    fun modifierOrdering(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public /* static */ final static Integer n = 0;
             }
@@ -152,4 +152,3 @@ open class VariableDeclsTest : JavaParser() {
         assertEquals("public /* static */ final static Integer n = 0", a.classes[0].fields[0].printTrimmed())
     }
 }
-

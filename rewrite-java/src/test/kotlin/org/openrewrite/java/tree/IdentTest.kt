@@ -21,11 +21,11 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 import org.openrewrite.java.fields
 
-open class IdentTest : JavaParser() {
+interface IdentTest {
     
     @Test
-    fun referToField() {
-        val a = parse("""
+    fun referToField(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Integer n = 0;
                 Integer m = n;

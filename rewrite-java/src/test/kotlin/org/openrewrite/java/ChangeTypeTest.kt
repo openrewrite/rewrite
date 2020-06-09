@@ -17,35 +17,37 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-open class ChangeTypeTest : JavaParser() {
-    private val changeType = ChangeType().apply { setType("a.A1"); setTargetType("a.A2") }
+interface ChangeTypeTest {
+    companion object {
+        private val changeType = ChangeType().apply { setType("a.A1"); setTargetType("a.A2") }
 
-    private val a1 = """
-        package a;
-        public class A1 extends Exception {
-            public static void stat() {}
-            public void foo() {}
-        }
-    """.trimIndent()
+        private val a1 = """
+            package a;
+            public class A1 extends Exception {
+                public static void stat() {}
+                public void foo() {}
+            }
+        """.trimIndent()
 
-    private val a2 = """
-        package a;
-        public class A2 extends Exception {
-            public static void stat() {}
-            public void foo() {}
-        }
-    """.trimIndent()
+        private val a2 = """
+            package a;
+            public class A2 extends Exception {
+                public static void stat() {}
+                public void foo() {}
+            }
+        """.trimIndent()
+    }
 
     @Test
-    fun dontAddImportWhenNoChangesWereMade() {
-        val b = parse("public class B {}")
+    fun dontAddImportWhenNoChangesWereMade(jp: JavaParser) {
+        val b = jp.parse("public class B {}")
         val fixed = b.refactor().visit(changeType).fix().fixed
         assertRefactored(fixed, "public class B {}")
     }
 
     @Test
-    fun simpleName() {
-        val b = parse("""
+    fun simpleName(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             
             public class B extends A1 {}
@@ -61,8 +63,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun fullyQualifiedName() {
-        val b = parse("public class B extends a.A1 {}", a1, a2)
+    fun fullyQualifiedName(jp: JavaParser) {
+        val b = jp.parse("public class B extends a.A1 {}", a1, a2)
         val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
@@ -73,10 +75,10 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun annotation() {
+    fun annotation(jp: JavaParser) {
         val a1 = "package a;\npublic @interface A1 {}"
         val a2 = "package a;\npublic @interface A2 {}"
-        val b = parse("@a.A1 public class B {}", a1, a2)
+        val b = jp.parse("@a.A1 public class B {}", a1, a2)
 
         val fixed = b.refactor().visit(changeType).fix().fixed
 
@@ -84,8 +86,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun array() { // array types and new arrays
-        val b = parse("""
+    fun array(jp: JavaParser) { // array types and new arrays
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1[] a = new A1[0];
@@ -104,11 +106,11 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun classDecl() {
+    fun classDecl(jp: JavaParser) {
         val i1 = "public interface I1 {}"
         val i2 = "public interface I2 {}"
 
-        val b = parse("""
+        val b = jp.parse("""
             import a.A1;
             public class B extends A1 implements I1 {}
         """.trimIndent(), a1, a2, i1, i2)
@@ -126,8 +128,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun method() {
-        val b = parse("""
+    fun method(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                public A1 foo() throws A1 { return null; }
@@ -146,8 +148,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun methodInvocationTypeParametersAndWildcard() {
-        val b = parse("""
+    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                public <T extends A1> T generic(T n, List<? super A1> in);
@@ -174,8 +176,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun multiCatch() {
-        val b = parse("""
+    fun multiCatch(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                public void test() {
@@ -200,8 +202,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun multiVariable() {
-        val b = parse("""
+    fun multiVariable(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 f1, f2;
@@ -220,8 +222,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun newClass() {
-        val b = parse("""
+    fun newClass(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 a = new A1();
@@ -240,8 +242,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun parameterizedType() {
-        val b = parse("""
+    fun parameterizedType(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                Map<A1, A1> m;
@@ -260,8 +262,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun typeCast() {
-        val b = parse("""
+    fun typeCast(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 a = (A1) null;
@@ -280,8 +282,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun classReference() {
-        val a = parse("""
+    fun classReference(jp: JavaParser) {
+        val a = jp.parse("""
             import a.A1;
             public class A {
                 Class<?> clazz = A1.class;
@@ -299,8 +301,8 @@ open class ChangeTypeTest : JavaParser() {
     }
 
     @Test
-    fun methodSelect() {
-        val b = parse("""
+    fun methodSelect(jp: JavaParser) {
+        val b = jp.parse("""
             import a.A1;
             public class B {
                A1 a = null;

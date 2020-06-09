@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class BodyTest : JavaParser() {
+interface BodyTest {
 
     @Test
-    fun body() {
-        val a = parse("""
+    fun body(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     int i = 0;

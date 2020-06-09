@@ -21,16 +21,16 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 
-open class JavaTypeTest : JavaParser() {
+interface JavaTypeTest {
     @Test
-    fun memberVisibility() {
+    fun memberVisibility(jp: JavaParser) {
         val b = """
             public class B {
                 protected int n;
             }
         """.trimIndent()
 
-        val a = parse("""
+        val a = jp.parse("""
             public class A extends B {
             }
         """.trimIndent(), b)
@@ -40,8 +40,8 @@ open class JavaTypeTest : JavaParser() {
 
     @Disabled("flaky on collection.isAssignableFrom(list)")
     @Test
-    fun isAssignableFrom() {
-        val a = parse("""
+    fun isAssignableFrom(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             import java.util.Collection;
             public class A {
@@ -62,14 +62,14 @@ open class JavaTypeTest : JavaParser() {
     }
 
     @Test
-    fun innerClassType() {
+    fun innerClassType(jp: JavaParser) {
         val t = JavaType.Class.build("com.foo.Foo.Bar")
         assertEquals("com.foo.Foo.Bar", t.fullyQualifiedName)
         assertEquals("com.foo", t.packageName)
     }
 
     @Test
-    fun packageName() {
+    fun packageName(jp: JavaParser) {
         val t = JavaType.Class.build("com.foo.Foo")
         assertEquals("com.foo", t.packageName)
 
@@ -84,37 +84,37 @@ open class JavaTypeTest : JavaParser() {
     }
 
     @Test
-    fun selfReferentialTypeIsShared() {
-        val a = JavaParser().parse("public class A { A a; }")
+    fun selfReferentialTypeIsShared(jp: JavaParser) {
+        val a = jp.parse("public class A { A a; }")
         val outerType = a.classes[0].type
         val fieldType = a.classes[0].fields[0].typeExpr?.type
         assertTrue(outerType === fieldType)
     }
 
     @Test
-    fun typeFlyweightsAreSharedBetweenParsers() {
-        val a = JavaParser().parse("public class A {}")
-        val a2 = JavaParser().parse("public class A {}")
+    fun typeFlyweightsAreSharedBetweenParsers(jp: JavaParser) {
+        val a = jp.parse("public class A {}")
+        val a2 = jp.parse("public class A {}")
 
         assertTrue(a.classes[0].type === a2.classes[0].type)
     }
 
     @Test
-    fun sameFullyQualifiedNameWithDifferentMembers() {
-        val a = JavaParser().parse("public class A { String foo; }")
-        val a2 = JavaParser().parse("public class A { String bar; }")
+    fun sameFullyQualifiedNameWithDifferentMembers(jp: JavaParser) {
+        val a = jp.parse("public class A { String foo; }")
+        val a2 = jp.parse("public class A { String bar; }")
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }
 
     @Test
-    fun sameFullyQualifiedNameWithDifferentTypeHierarchy() {
-        val a = JavaParser().parse("""
+    fun sameFullyQualifiedNameWithDifferentTypeHierarchy(jp: JavaParser) {
+        val a = jp.parse("""
             public class A extends B {}
             class B {}
         """)
 
-        val a2 = JavaParser().parse("""
+        val a2 = jp.parse("""
             public class A {}
             class B {}
         """)

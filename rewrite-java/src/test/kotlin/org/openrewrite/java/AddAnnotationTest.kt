@@ -17,10 +17,10 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 
-class AddAnnotationTest : JavaParser() {
+interface AddAnnotationTest {
     @Test
-    fun addAnnotationToClass() {
-        val a = parse("""
+    fun addAnnotationToClass(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             public class UsersController {
@@ -49,8 +49,8 @@ class AddAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun addAnnotationToField() {
-        val a = parse("""
+    fun addAnnotationToField(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             public class UsersController {
@@ -80,8 +80,8 @@ class AddAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun addAnnotationToMethod() {
-        val a = parse("""
+    fun addAnnotationToMethod(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             public class UsersController {
@@ -131,8 +131,8 @@ class AddAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun addAnnotationToMethodParameters() {
-        val a = parse("""
+    fun addAnnotationToMethodParameters(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             
             public class UsersController {

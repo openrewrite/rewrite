@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class HasTypeTest : JavaParser() {
+interface HasTypeTest {
     
     @Test
-    fun hasType() {
-        val a = parse("""
+    fun hasType(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             class A {
                List list;
@@ -34,8 +34,8 @@ open class HasTypeTest : JavaParser() {
     }
 
     @Test
-    fun hasTypeBasedOnStaticImport() {
-        val a = parse("""
+    fun hasTypeBasedOnStaticImport(jp: JavaParser) {
+        val a = jp.parse("""
             import static java.util.Collections.emptyList;
             class A {
                Object o = emptyList();
@@ -46,7 +46,7 @@ open class HasTypeTest : JavaParser() {
     }
     
     @Test
-    fun hasTypeBasedOnStaticChainedCalls() {
+    fun hasTypeBasedOnStaticChainedCalls(jp: JavaParser) {
         val a = """
             package a;
             public class A { 
@@ -61,12 +61,12 @@ open class HasTypeTest : JavaParser() {
             }
         """
 
-        assertTrue(parse(b, a).classes[0].hasType("a.A"))
+        assertTrue(jp.parse(b, a).classes[0].hasType("a.A"))
     }
 
     @Test
-    fun hasTypeInLocalVariable() {
-        val a = parse("""
+    fun hasTypeInLocalVariable(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             class A {
                public void test() {
@@ -79,8 +79,8 @@ open class HasTypeTest : JavaParser() {
     }
 
     @Test
-    fun unresolvableMethodSymbol() {
-        val a = parse("""
+    fun unresolvableMethodSymbol(jp: JavaParser) {
+        val a = jp.parse("""
             public class B {
                 public static void baz() {
                     // the parse tree inside this anonymous class will be un-attributed because

@@ -29,6 +29,7 @@ commands:
       - save_cache:
           key: gradle-dependencies-{{ checksum "build.gradle.kts" }}
           paths:
+            - ~/rewrite/rewrite-java-8/.tools/
             - ~/.gradle
       - run:
           name: run gradle command

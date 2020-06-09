@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class AssertTest : JavaParser() {
+interface AssertTest {
 
     @Test
-    fun assertStatement() {
-        val a = parse("""
+    fun assertStatement(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 void test() {
                     assert 1 == 1;

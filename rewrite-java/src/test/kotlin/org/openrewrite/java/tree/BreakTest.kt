@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class BreakTest : JavaParser() {
+interface BreakTest {
 
     @Test
-    fun breakFromWhileLoop() {
-        val a = parse("""
+    fun breakFromWhileLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     while(true) break;
@@ -38,8 +38,8 @@ open class BreakTest : JavaParser() {
     }
 
     @Test
-    fun breakFromLabeledWhileLoop() {
-        val a = parse("""
+    fun breakFromLabeledWhileLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     labeled: while(true)
@@ -54,8 +54,8 @@ open class BreakTest : JavaParser() {
     }
 
     @Test
-    fun formatLabeledBreak() {
-        val a = parse("""
+    fun formatLabeledBreak(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     labeled : while(true)

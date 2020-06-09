@@ -21,11 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class TryCatchTest : JavaParser() {
+interface TryCatchTest {
     
     @Test
-    fun tryFinally() {
-        val a = parse("""
+    fun tryFinally(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     try {
@@ -42,8 +42,8 @@ open class TryCatchTest : JavaParser() {
     }
     
     @Test
-    fun tryCatchNoFinally() {
-        val a = parse("""
+    fun tryCatchNoFinally(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     try {
@@ -59,8 +59,8 @@ open class TryCatchTest : JavaParser() {
     }
     
     @Test
-    fun tryWithResources() {
-        val a = parse("""
+    fun tryWithResources(jp: JavaParser) {
+        val a = jp.parse("""
             import java.io.*;
             public class A {
                 File f;
@@ -78,8 +78,8 @@ open class TryCatchTest : JavaParser() {
     }
 
     @Test
-    fun formatTryWithResources() {
-        val a = parse("""
+    fun formatTryWithResources(jp: JavaParser) {
+        val a = jp.parse("""
             import java.io.*;
             public class A {
                 File f;
@@ -95,8 +95,8 @@ open class TryCatchTest : JavaParser() {
     }
 
     @Test
-    fun formatMultiCatch() {
-        val a = parse("""
+    fun formatMultiCatch(jp: JavaParser) {
+        val a = jp.parse("""
             import java.io.*;
             public class A {
                 File f;
@@ -112,8 +112,8 @@ open class TryCatchTest : JavaParser() {
     }
 
     @Test
-    fun formatTryCatchFinally() {
-        val a = parse("""
+    fun formatTryCatchFinally(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     try {}

@@ -21,34 +21,28 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class WhileLoopTest : JavaParser() {
+interface WhileLoopTest {
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun whileLoop(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     while ( true ) { }
                 }
             }
         """)
-    }
 
-    private val whileLoop by lazy { a.firstMethodStatement() as J.WhileLoop }
+        val whileLoop = a.firstMethodStatement() as J.WhileLoop
 
-    @Test
-    fun whileLoop() {
-            assertTrue(whileLoop.condition.tree is J.Literal)
+        assertTrue(whileLoop.condition.tree is J.Literal)
         assertTrue(whileLoop.body is J.Block<*>)
-    }
-
-    @Test
-    fun format() {
         assertEquals("while ( true ) { }", whileLoop.printTrimmed())
     }
 
     @Test
-    fun statementTerminatorForSingleLineWhileLoops() {
-        val a = parse("""
+    fun statementTerminatorForSingleLineWhileLoops(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     while(true) test();

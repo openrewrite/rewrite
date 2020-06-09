@@ -20,33 +20,27 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class LambdaTest : JavaParser() {
+interface LambdaTest {
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun lambda(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.function.Function;
             public class A {
                 Function<String, String> func = (String s) -> "";
             }
         """)
-    }
 
-    private val lambda by lazy { a.classes[0].fields[0].vars[0].initializer as J.Lambda }
+        val lambda = a.classes[0].fields[0].vars[0].initializer as J.Lambda
 
-    @Test
-    fun lambda() {
         assertEquals(1, lambda.paramSet.params.size)
         assertTrue(lambda.body is J.Literal)
-    }
-
-    @Test
-    fun format() {
         assertEquals("(String s) -> \"\"", lambda.printTrimmed())
     }
 
     @Test
-    fun untypedLambdaParameter() {
-        val a = parse("""
+    fun untypedLambdaParameter(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List<String> list = new ArrayList<>();
@@ -61,8 +55,8 @@ open class LambdaTest : JavaParser() {
     }
 
     @Test
-    fun optionalSingleParameterParentheses() {
-        val a = parse("""
+    fun optionalSingleParameterParentheses(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {
                 List<String> list = new ArrayList<>();
@@ -77,8 +71,8 @@ open class LambdaTest : JavaParser() {
     }
 
     @Test
-    fun rightSideBlock() {
-        val a = parse("""
+    fun rightSideBlock(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Action a = ( ) -> { };
             }
@@ -93,8 +87,8 @@ open class LambdaTest : JavaParser() {
     }
 
     @Test
-    fun multipleParameters() {
-        val a = parse("""
+    fun multipleParameters(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.function.BiConsumer;
             public class A {
                 BiConsumer<String, String> a = (s1, s2) -> { };

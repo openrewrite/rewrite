@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class CommentTest : JavaParser() {
+interface CommentTest {
 
     @Test
-    fun comments() {
+    fun comments(jp: JavaParser) {
         val aSrc = """
             // About me
             public class A {
@@ -32,7 +32,7 @@ open class CommentTest : JavaParser() {
             // Trailing
         """.trimIndent()
 
-        val a = parse(aSrc)
+        val a = jp.parse(aSrc)
         assertEquals(aSrc, a.printTrimmed())
     }
 }

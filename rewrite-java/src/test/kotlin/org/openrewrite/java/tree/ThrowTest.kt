@@ -21,29 +21,21 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ThrowTest : JavaParser() {
+interface ThrowTest {
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun throwException(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() throws Exception {
                     throw new UnsupportedOperationException();
                 }
             }
         """)
-    }
 
-    private val thrown by lazy {
-        a.firstMethodStatement() as J.Throw
-    }
+        val thrown = a.firstMethodStatement() as J.Throw
 
-    @Test
-    fun throwException() {
         assertTrue(thrown.exception is J.NewClass)
-    }
-
-    @Test
-    fun format() {
         assertEquals("throw new UnsupportedOperationException()", thrown.printTrimmed())
     }
 }

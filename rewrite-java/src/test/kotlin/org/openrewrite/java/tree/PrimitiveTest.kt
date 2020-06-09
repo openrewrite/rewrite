@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.fields
 
-open class PrimitiveTest : JavaParser() {
+interface PrimitiveTest {
 
     @Test
-    fun primitiveField() {
-        val a = parse("""
+    fun primitiveField(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n = 0;
                 char c = 'a';

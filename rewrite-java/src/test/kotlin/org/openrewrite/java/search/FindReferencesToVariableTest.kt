@@ -20,10 +20,10 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.J
 
-class FindReferencesToVariableTest : JavaParser() {
+interface FindReferencesToVariableTest {
     @Test
-    fun findReferences() {
-        val a = parse("""
+    fun findReferences(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n;
                 public void foo() {
@@ -38,7 +38,6 @@ class FindReferencesToVariableTest : JavaParser() {
         """.trimIndent())
 
         val n = (a.classes[0]!!.methods[0]!!.body!!.statements[0] as J.VariableDecls).vars[0]
-
         val refs = FindReferencesToVariable(n.name).visit(a.classes[0])
 
         assertEquals(4, refs.size)

@@ -19,34 +19,28 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.*
 
-open class MethodInvocationTest : JavaParser() {
+interface MethodInvocationTest {
+    private fun J.CompilationUnit.allInvs() = fields(0..4)
+            .map { it.vars[0].initializer as J.MethodInvocation }
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun methodInvocation(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Integer m = foo ( 0, 1, 2 );
                 Integer n = staticFoo ( 0 );
                 Integer o = generic ( 0, 1, 2 );
                 Integer p = this. < Integer > generic ( 0, 1, 2 );
                 Integer q = staticFoo ( );
-
+    
                 public static int staticFoo(int... args) { return 0; }
                 public Integer foo(Integer n, Integer... ns) { return n; }
                 public <T> T generic(T n, T... ns) { return n; }
             }
         """)
-    }
 
-    private val allInvs by lazy { a.fields(0..4).map { it.vars[0].initializer as J.MethodInvocation } }
+        val (inv) = a.allInvs()
 
-    private val inv by lazy { allInvs[0] }
-    private val staticInv by lazy { allInvs[1] }
-    private val genericInv by lazy { allInvs[2] }
-    private val explicitGenericInv by lazy { allInvs[3] }
-    private val parameterlessStaticInv by lazy { allInvs[4] }
-
-    @Test
-    fun methodInvocation() {
         // check assumptions about the call site
         assertEquals("foo", inv.name.printTrimmed())
         assertEquals("java.lang.Integer", inv.returnType.asClass()?.fullyQualifiedName)
@@ -61,10 +55,23 @@ open class MethodInvocationTest : JavaParser() {
         assertEquals(inv.type!!.resolvedSignature, inv.type!!.genericSignature)
 
         assertEquals("A", inv.type?.declaringType?.fullyQualifiedName)
+
+        assertEquals("foo ( 0, 1, 2 )", inv.printTrimmed())
     }
 
     @Test
-    fun genericMethodInvocation() {
+    fun genericMethodInvocation(jp: JavaParser) {
+        val a = jp.parse("""
+            public class A {
+                Integer o = generic ( 0, 1, 2 );
+                Integer p = this. < Integer > generic ( 0, 1, 2 );
+    
+                public <T> T generic(T n, T... ns) { return n; }
+            }
+        """)
+
+        val (genericInv, explicitGenericInv) = a.allInvs()
+
         listOf(genericInv, explicitGenericInv).forEach { test: J.MethodInvocation ->
             // check assumptions about the call site
             assertEquals("java.lang.Integer", test.returnType.asClass()?.fullyQualifiedName)
@@ -82,25 +89,32 @@ open class MethodInvocationTest : JavaParser() {
             assertEquals("T", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
             assertTrue(methType.paramTypes[1].hasElementType("T"))
         }
+
+        assertEquals("this. < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
     }
 
     @Test
-    fun staticMethodInvocation() {
+    fun staticMethodInvocation(jp: JavaParser) {
+        val a = jp.parse("""
+            public class A {
+                Integer n = staticFoo ( 0 );
+                Integer o = staticFoo ( );
+    
+                public static int staticFoo(int... args) { return 0; }
+            }
+        """)
+
+        val (staticInv, parameterlessStaticInv) = a.allInvs()
+
         assertEquals("staticFoo", staticInv.name.printTrimmed())
         assertEquals("A", staticInv.type?.declaringType?.fullyQualifiedName)
-    }
-
-    @Test
-    fun format() {
-        assertEquals("foo ( 0, 1, 2 )", inv.printTrimmed())
         assertEquals("staticFoo ( 0 )", staticInv.printTrimmed())
-        assertEquals("this. < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
         assertEquals("staticFoo ( )", parameterlessStaticInv.printTrimmed())
     }
 
     @Test
-    fun methodThatDoesNotExist() {
-        val a = parse("""
+    fun methodThatDoesNotExist(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Integer n = doesNotExist();
             }

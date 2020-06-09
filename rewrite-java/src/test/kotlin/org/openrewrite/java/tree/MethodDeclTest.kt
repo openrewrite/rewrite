@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class MethodDeclTest : JavaParser() {
+interface MethodDeclTest {
 
     @Test
-    fun constructor() {
-        val a = parse("""
+    fun constructor(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             public class A {
                 public A() { }
@@ -34,8 +34,8 @@ open class MethodDeclTest : JavaParser() {
     }
 
     @Test
-    fun methodDecl() {
-        val a = parse("""
+    fun methodDecl(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public <P, R> R foo(P p, String s, String... args) {
                     return null;
@@ -53,19 +53,19 @@ open class MethodDeclTest : JavaParser() {
     }
 
     @Test
-    fun interfaceMethodDecl() {
+    fun interfaceMethodDecl(jp: JavaParser) {
         val aSrc = """
             public interface A {
                 String getName() ;
             }
         """.trimIndent()
 
-        assertEquals(aSrc, parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
     }
     
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public < P > P foo(P p, String s, String ... args)  throws Exception { return p; }
             }
@@ -76,8 +76,8 @@ open class MethodDeclTest : JavaParser() {
     }
 
     @Test
-    fun formatDefaultMethod() {
-        val a = parse("""
+    fun formatDefaultMethod(jp: JavaParser) {
+        val a = jp.parse("""
             public interface A {
                 default int foo() { return 0; }
             }
@@ -88,8 +88,8 @@ open class MethodDeclTest : JavaParser() {
     }
 
     @Test
-    fun formatConstructor() {
-        val a = parse("""
+    fun formatConstructor(jp: JavaParser) {
+        val a = jp.parse("""
             package a;
             public class A {
                 public A() { }
@@ -101,8 +101,8 @@ open class MethodDeclTest : JavaParser() {
     }
 
     @Test
-    fun nativeModifier() {
-        val a = parse("""
+    fun nativeModifier(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public native void foo();
             }

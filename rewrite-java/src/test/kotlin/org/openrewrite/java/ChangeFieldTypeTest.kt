@@ -17,30 +17,29 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ChangeFieldType
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
-open class ChangeFieldTypeTest {
-    private val a = """
+interface ChangeFieldTypeTest {
+    companion object {
+        private val a = """
             import java.util.List;
             public class A {
                List collection;
             }
         """.trimIndent()
 
-    private val refactored = """
+        private val refactored = """
             import java.util.Collection;
             
             public class A {
                Collection collection;
             }
         """.trimIndent()
+    }
 
     @Disabled("flaky")
     @Test
-    fun changeFieldTypeDeclarative() {
-        val cu = JavaParser().parse(a)
+    fun changeFieldTypeDeclarative(jp: JavaParser) {
+        val cu = jp.parse(a)
 
         val fixed = cu.refactor()
                 .visit(ChangeFieldType().apply { setType("java.util.List"); setTargetType("java.util.Collection") })
@@ -50,8 +49,8 @@ open class ChangeFieldTypeTest {
     }
 
     @Test
-    fun changeFieldType() {
-        val cu = JavaParser().parse(a)
+    fun changeFieldType(jp: JavaParser) {
+        val cu = jp.parse(a)
 
         val fixed = cu.refactor()
                 .visit(ChangeFieldType.Scoped(cu.classes[0].findFields("java.util.List")[0], "java.util.Collection"))

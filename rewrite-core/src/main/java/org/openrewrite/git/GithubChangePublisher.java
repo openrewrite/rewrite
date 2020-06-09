@@ -31,6 +31,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Scanner;
 
 /**
  * Uses the GitHub update content API, which posts a commit for each changed file per repository.
@@ -65,7 +66,7 @@ public class GithubChangePublisher implements ChangePublisher {
         String organization = metadata.getOrDefault(GithubMetadata.ORGANIZATION, null);
         String repository = metadata.getOrDefault(GithubMetadata.REPOSITORY, null);
 
-        if(organization == null || repository == null) {
+        if (organization == null || repository == null) {
             return;
         }
 
@@ -82,16 +83,17 @@ public class GithubChangePublisher implements ChangePublisher {
                 GHContent fileContent = ghRepo.getFileContent(change.getFixed().getSourcePath());
 
                 if (verifyOriginal && change.getOriginal() != null) {
-                    if(!change.getOriginal().print().equals(new String(fileContent.read().readAllBytes(), StandardCharsets.UTF_8))) {
-                        logger.warn("Attempting to make a change to " + organization +
-                                "/" + repository + ":" + change.getOriginal().getSourcePath() +
-                                " in repository, but the contents in GitHub do not match the original source");
-                        sample.stop(timer.tag("outcome", "Original not up-to-date").register(Metrics.globalRegistry));
-                        return;
-                    }
-                    else {
-                        logger.info("Change is already present in " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " in GitHub");
-                        sample.stop(timer.tag("outcome", "Already changed").register(Metrics.globalRegistry));
+                    try (Scanner scanner = new Scanner(fileContent.read(), StandardCharsets.UTF_8.name())) {
+                        String fileContentString = scanner.useDelimiter("\\A").next();
+                        if (!change.getOriginal().print().equals(fileContentString)) {
+                            logger.warn("Attempting to make a change to " + organization +
+                                    "/" + repository + ":" + change.getOriginal().getSourcePath() +
+                                    " in repository, but the contents in GitHub do not match the original source");
+                            sample.stop(timer.tag("outcome", "Original not up-to-date").register(Metrics.globalRegistry));
+                        } else {
+                            logger.info("Change is already present in " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " in GitHub");
+                            sample.stop(timer.tag("outcome", "Already changed").register(Metrics.globalRegistry));
+                        }
                         return;
                     }
                 }

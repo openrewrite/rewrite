@@ -16,15 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.RenameVariable
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.J
 
-open class RenameVariableTest : JavaParser() {
+interface RenameVariableTest {
     @Test
-    fun renameVariable() {
-        val a = parse("""
+    fun renameVariable(jp: JavaParser) {
+        val a = jp.parse("""
             public class B {
                int n;
             

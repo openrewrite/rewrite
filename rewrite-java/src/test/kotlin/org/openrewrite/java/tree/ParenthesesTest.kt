@@ -21,27 +21,21 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class ParenthesesTest : JavaParser() {
+interface ParenthesesTest {
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun parentheses(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void test() {
                     int n = ( 0 );
                 }
             }
         """)
-    }
 
-    private val variable by lazy { (a.firstMethodStatement() as J.VariableDecls).vars[0].initializer }
+        val variable by lazy { (a.firstMethodStatement() as J.VariableDecls).vars[0].initializer }
 
-    @Test
-    fun parentheses() {
         assertTrue(variable is J.Parentheses<*>)
-    }
-
-    @Test
-    fun format() {
         assertEquals("( 0 )", variable?.printTrimmed())
     }
 }

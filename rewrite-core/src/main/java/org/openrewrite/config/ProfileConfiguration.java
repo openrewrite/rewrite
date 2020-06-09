@@ -34,7 +34,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toMap;
-import static java.util.stream.Collectors.toUnmodifiableSet;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Profile.FilterReply.NEUTRAL;
 
 public class ProfileConfiguration {
@@ -83,15 +83,15 @@ public class ProfileConfiguration {
                         .replace("*", ".+"))
                 .map(i -> "(org\\.openrewrite\\.)?" + i)
                 .map(Pattern::compile)
-                .collect(toUnmodifiableSet());
+                .collect(toSet());
     }
 
     public ProfileConfiguration merge(@Nullable ProfileConfiguration profile) {
         if (profile != null && profile.name.equals(name)) {
             ProfileConfiguration merged = new ProfileConfiguration();
             merged.name = name;
-            merged.include = Stream.concat(this.include.stream(), profile.include.stream()).collect(toUnmodifiableSet());
-            merged.exclude = Stream.concat(this.exclude.stream(), profile.exclude.stream()).collect(toUnmodifiableSet());
+            merged.include = Stream.concat(this.include.stream(), profile.include.stream()).collect(toSet());
+            merged.exclude = Stream.concat(this.exclude.stream(), profile.exclude.stream()).collect(toSet());
 
             merged.configure = configure;
             merged.configure.putAll(profile.configure);
@@ -188,7 +188,8 @@ public class ProfileConfiguration {
                 //noinspection unchecked
                 value = (Map<String, Object>) configEntry.getValue();
             } else {
-                value = Map.of(keyPart.substring(keyPart.lastIndexOf('.') + 1), configEntry.getValue());
+                value = new HashMap<>();
+                value.put(keyPart.substring(keyPart.lastIndexOf('.') + 1), configEntry.getValue());
                 keyPart = keyPart.substring(0, Math.max(0, keyPart.lastIndexOf('.')));
             }
 
@@ -199,7 +200,9 @@ public class ProfileConfiguration {
                     properties.putAll(value);
                     break;
                 } else if (matcher.hitEnd()) {
-                    value = Map.of(keyPart.substring(keyPart.lastIndexOf('.') + 1), value);
+                    Map<String, Object> value2 = new HashMap<>();
+                    value2.put(keyPart.substring(keyPart.lastIndexOf('.') + 1), value);
+                    value = value2;
                     keyPart = keyPart.substring(0, keyPart.lastIndexOf('.'));
                 }
             } while (matcher.hitEnd());

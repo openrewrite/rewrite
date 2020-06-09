@@ -16,14 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.GenerateConstructorUsingFields
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
-class GenerateConstructorUsingFieldsTest : JavaParser() {
+interface GenerateConstructorUsingFieldsTest {
     @Test
-    fun generateConstructorUsingFields() {
-        val a = parse("""
+    fun generateConstructorUsingFields(jp: JavaParser) {
+        val a = jp.parse("""
             public class UsersController {
                 private final UsersService usersService;
                 private final UsernameService usernameService;

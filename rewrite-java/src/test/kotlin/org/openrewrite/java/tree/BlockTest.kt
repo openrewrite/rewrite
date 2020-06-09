@@ -19,11 +19,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class BlockTest : JavaParser() {
+interface BlockTest {
     
     @Test
-    fun methodBlock() {
-        val a = parse("""
+    fun methodBlock(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void foo() {
                     System.out.println("foo");
@@ -35,8 +35,8 @@ open class BlockTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 public void foo() {  }
             }
@@ -46,8 +46,8 @@ open class BlockTest : JavaParser() {
     }
 
     @Test
-    fun staticInitBlock() {
-        val a = parse("""
+    fun staticInitBlock(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 static {}
             }

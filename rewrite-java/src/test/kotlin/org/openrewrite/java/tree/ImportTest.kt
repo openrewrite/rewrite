@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class ImportTest : JavaParser() {
+interface ImportTest {
 
     @Test
-    fun matchImport() {
-        val a = parse("""
+    fun matchImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             public class A {}
         """)
@@ -33,8 +33,8 @@ open class ImportTest : JavaParser() {
     }
 
     @Test
-    fun matchStarImport() {
-        val a = parse("""
+    fun matchStarImport(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             public class A {}
         """)
@@ -43,7 +43,7 @@ open class ImportTest : JavaParser() {
     }
 
     @Test
-    fun hasStarImportOnInnerClass() {
+    fun hasStarImportOnInnerClass(jp: JavaParser) {
         val a = """
             package a;
             public class A {
@@ -58,15 +58,15 @@ open class ImportTest : JavaParser() {
             }
         """
 
-        val cu = parse(c, a)
+        val cu = jp.parse(c, a)
         val import = cu.imports.first()
         assertTrue(import.isFromType("a.A.B"))
         assertTrue(import.isFromType("a.A"))
     }
     
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             import static java.util.Collections.*;
             public class A {}
@@ -77,8 +77,8 @@ open class ImportTest : JavaParser() {
     }
 
     @Test
-    fun compare() {
-        val a = parse("""
+    fun compare(jp: JavaParser) {
+        val a = jp.parse("""
             import b.B;
             import c.c.C;
         """.trimIndent())
@@ -90,8 +90,8 @@ open class ImportTest : JavaParser() {
     }
 
     @Test
-    fun compareSamePackageDifferentNameLengths() {
-        val a = parse("""
+    fun compareSamePackageDifferentNameLengths(jp: JavaParser) {
+        val a = jp.parse("""
             import org.springframework.context.annotation.Bean;
             import org.springframework.context.annotation.Configuration;
         """.trimIndent())

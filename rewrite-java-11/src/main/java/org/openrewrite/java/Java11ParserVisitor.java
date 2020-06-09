@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal;
+package org.openrewrite.java;
 
 import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
@@ -52,8 +52,8 @@ import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
-    private static final Logger logger = LoggerFactory.getLogger(JavaParserVisitor.class);
+public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
+    private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
     private final Path path;
     private final String source;
@@ -62,7 +62,7 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public JavaParserVisitor(Path path, String source, boolean relaxedClassTypeMatching) {
+    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching) {
         this.path = path;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
@@ -1248,11 +1248,11 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
      * --------------
      */
 
-    private <T extends J> T convert(com.sun.source.tree.Tree t) {
+    private <T extends J> T convert(Tree t) {
         return convert(t, t2 -> "");
     }
 
-    private <T extends J> T convert(com.sun.source.tree.Tree t2, Function<com.sun.source.tree.Tree, String> suffix) {
+    private <T extends J> T convert(Tree t2, Function<Tree, String> suffix) {
         try {
             var prefix = source.substring(cursor, max(((JCTree) t2).getStartPosition(), cursor));
             cursor += prefix.length();
@@ -1294,12 +1294,12 @@ public class JavaParserVisitor extends TreePathScanner<J, Formatting> {
         return source.substring(0, ((JCTree) tree).getStartPosition()).chars().filter(c -> c == '\n').count() + 1;
     }
 
-    private <T extends J> T convertOrNull(@Nullable com.sun.source.tree.Tree t) {
+    private <T extends J> T convertOrNull(@Nullable Tree t) {
         return convertOrNull(t, t2 -> "");
     }
 
     @Nullable
-    private <T extends J> T convertOrNull(@Nullable com.sun.source.tree.Tree t, Function<com.sun.source.tree.Tree, String> suffix) {
+    private <T extends J> T convertOrNull(@Nullable Tree t, Function<Tree, String> suffix) {
         return t == null ? null : convert(t, suffix);
     }
 

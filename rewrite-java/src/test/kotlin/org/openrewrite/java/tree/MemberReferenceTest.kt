@@ -23,11 +23,11 @@ import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
 import java.util.concurrent.CountDownLatch
 
-open class MemberReferenceTest : JavaParser() {
+interface MemberReferenceTest {
 
     @Test
-    fun staticFunctionReference() {
-        val a = parse("""
+    fun staticFunctionReference(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.stream.Stream;
 
             public class StaticLambdaRef {
@@ -58,8 +58,8 @@ open class MemberReferenceTest : JavaParser() {
     }
 
     @Test
-    fun constructorMethodReference() {
-        val a = parse("""
+    fun constructorMethodReference(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.*;
             import java.util.stream.*;
             public class A {

@@ -20,11 +20,11 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-open class BinaryTest : JavaParser() {
+interface BinaryTest {
     
     @Test
-    fun arithmetic() {
-        val a = parse("""
+    fun arithmetic(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n = 0 + 1;
             }
@@ -37,8 +37,8 @@ open class BinaryTest : JavaParser() {
     }
 
     @Test
-    fun format() {
-        val a = parse("""
+    fun format(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 int n = 0 + 1;
             }
@@ -53,18 +53,18 @@ open class BinaryTest : JavaParser() {
      * @see com.sun.tools.javac.parser.JavacParser.allowStringFolding
      */
     @Test
-    fun formatFoldableStrings() {
+    fun formatFoldableStrings(jp: JavaParser) {
         val a = """
             public class A {
                 String s = "a" + "b";
             }
         """
 
-        assertEquals("\"a\" + \"b\"", parse(a).classes[0].fields[0].vars[0].initializer?.printTrimmed())
+        assertEquals("\"a\" + \"b\"", jp.parse(a).classes[0].fields[0].vars[0].initializer?.printTrimmed())
     }
 
     @Test
-    fun endOfLineBreaks() {
+    fun endOfLineBreaks(jp: JavaParser) {
         val aSource = """
             import java.util.Objects;
             public class A {
@@ -76,7 +76,7 @@ open class BinaryTest : JavaParser() {
             }
         """.trimIndent()
 
-        val a = parse(aSource)
+        val a = jp.parse(aSource)
 
         assertEquals(aSource, a.print())
     }

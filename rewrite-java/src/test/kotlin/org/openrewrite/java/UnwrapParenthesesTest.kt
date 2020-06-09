@@ -16,15 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.UnwrapParentheses
-import org.openrewrite.java.assertRefactored
 import org.openrewrite.java.tree.J
 
-class UnwrapParenthesesTest : JavaParser() {
+interface UnwrapParenthesesTest {
     @Test
-    fun unwrapAssignment() {
-        val a = parse("""
+    fun unwrapAssignment(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 boolean a;
                 {
@@ -47,8 +44,8 @@ class UnwrapParenthesesTest : JavaParser() {
     }
 
     @Test
-    fun unwrapIfCondition() {
-        val a = parse("""
+    fun unwrapIfCondition(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 {
                     if((true)) {}

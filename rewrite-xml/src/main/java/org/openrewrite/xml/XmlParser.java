@@ -36,18 +36,13 @@ import static java.util.stream.Collectors.toList;
 
 public class XmlParser {
     public Xml.Document parse(String source) {
+
         try {
             Path temp = Files.createTempDirectory("sources");
 
             try {
-                var file = temp.resolve("file.xml");
-                try {
-                    Files.writeString(file, source);
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-
-                return parse(file, null);
+                Path file = temp.resolve("file.xml");
+                return parseFromString(file, source);
             } finally {
                 // delete temp recursively
                 //noinspection ResultOfMethodCallIgnored
@@ -67,25 +62,25 @@ public class XmlParser {
 
     public Xml.Document parse(Path sourceFile, @Nullable Path relativeTo) {
         try {
-            var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+            XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                     CharStreams.fromPath(sourceFile))));
 
             return new XmlParserVisitor(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile),
-                    Files.readString(sourceFile, StandardCharsets.UTF_8)).visitDocument(parser.document());
+                    new String(Files.readAllBytes(sourceFile), StandardCharsets.UTF_8)).visitDocument(parser.document());
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
     }
 
     public Xml.Document parseFromString(Path sourceFileLocation, String xmlSource) {
-        var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                 CharStreams.fromString(xmlSource))));
 
         return new XmlParserVisitor(sourceFileLocation, xmlSource).visitDocument(parser.document());
     }
 
     public Xml.Tag parseTag(String snippet) {
-        var parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                 CharStreams.fromString(snippet))));
         return (Xml.Tag) new XmlParserVisitor(null, snippet).visitContent(parser.content());
     }

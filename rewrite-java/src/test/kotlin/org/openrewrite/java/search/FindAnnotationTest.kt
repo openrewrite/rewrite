@@ -24,19 +24,20 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.tree.J
 
-open class FindAnnotationTest : JavaParser() {
-
-    val foo = """
-        package com.netflix.foo;
-        public @interface Foo {
-            String bar();
-            String baz();
-        }
-    """
+interface FindAnnotationTest {
+    companion object {
+        const val foo = """
+            package com.netflix.foo;
+            public @interface Foo {
+                String bar();
+                String baz();
+            }
+        """
+    }
 
     @Test
-    fun matchesSimpleFullyQualifiedAnnotation() {
-        val a = parse("""
+    fun matchesSimpleFullyQualifiedAnnotation(jp: JavaParser) {
+        val a = jp.parse("""
             @Deprecated
             public class A {}
         """)
@@ -45,8 +46,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun matchesAnnotationOnMethod() {
-        val a = parse("""
+    fun matchesAnnotationOnMethod(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 @Deprecated
                 public void foo() {}
@@ -70,8 +71,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun matchesAnnotationOnField() {
-        val a = parse("""
+    fun matchesAnnotationOnField(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 @Deprecated String s;
             }
@@ -81,8 +82,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun doesNotMatchNotFullyQualifiedAnnotations() {
-        val a = parse("""
+    fun doesNotMatchNotFullyQualifiedAnnotations(jp: JavaParser) {
+        val a = jp.parse("""
             @Deprecated
             public class A {}
         """)
@@ -91,8 +92,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun matchesSingleAnnotationParameter() {
-        val a = parse("""
+    fun matchesSingleAnnotationParameter(jp: JavaParser) {
+        val a = jp.parse("""
             @SuppressWarnings("deprecation")
             public class A {}
         """)
@@ -102,8 +103,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun matchesNamedParameters() {
-        val a = parse("""
+    fun matchesNamedParameters(jp: JavaParser) {
+        val a = jp.parse("""
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
             public class A {}
@@ -114,8 +115,8 @@ open class FindAnnotationTest : JavaParser() {
     }
 
     @Test
-    fun matchesNamedParametersRegardlessOfOrder() {
-        val a = parse("""
+    fun matchesNamedParametersRegardlessOfOrder(jp: JavaParser) {
+        val a = jp.parse("""
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
             public class A {}

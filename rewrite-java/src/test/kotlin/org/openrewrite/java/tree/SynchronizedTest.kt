@@ -21,10 +21,11 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.firstMethodStatement
 
-open class SynchronizedTest : JavaParser() {
+interface SynchronizedTest {
 
-    val a: J.CompilationUnit by lazy {
-        parse("""
+    @Test
+    fun synchronized(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {
                 Integer n = 0;
                 public void test() {
@@ -33,17 +34,10 @@ open class SynchronizedTest : JavaParser() {
                 }
             }
         """)
-    }
 
-    private val sync by lazy { a.firstMethodStatement() as J.Synchronized }
+        val sync = a.firstMethodStatement() as J.Synchronized
 
-    @Test
-    fun synchronized() {
         assertTrue(sync.lock.tree is J.Ident)
-    }
-
-    @Test
-    fun format() {
         assertEquals("synchronized(n) {\n}", sync.printTrimmed())
     }
 }

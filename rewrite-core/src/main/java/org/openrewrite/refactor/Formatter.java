@@ -50,7 +50,7 @@ public class Formatter {
 
     protected Result wholeSourceIndent() {
         if (wholeSourceIndent == null) {
-            var wholeSourceIndentVisitor = new FindIndent(0);
+            FindIndent wholeSourceIndentVisitor = new FindIndent(0);
             wholeSourceIndentVisitor.visit(root);
             wholeSourceIndent = new Result(0, wholeSourceIndentVisitor.getMostCommonIndent() > 0 ?
                     wholeSourceIndentVisitor.getMostCommonIndent() : 4 /* default to 4 spaces */,
@@ -60,15 +60,15 @@ public class Formatter {
     }
 
     public Result findIndent(int enclosingIndent, Tree... trees) {
-        var findIndentVisitor = new FindIndent(enclosingIndent);
+        FindIndent findIndentVisitor = new FindIndent(enclosingIndent);
         for (Tree tree : trees) {
             findIndentVisitor.visit(tree);
         }
 
-        var indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?
+        int indentToUse = findIndentVisitor.getMostCommonIndent() > 0 ?
                 findIndentVisitor.getMostCommonIndent() :
                 wholeSourceIndent().getIndentToUse();
-        var indentedWithSpaces = findIndentVisitor.getTotalLines() > 0 ? findIndentVisitor.isIndentedWithSpaces() :
+        boolean indentedWithSpaces = findIndentVisitor.getTotalLines() > 0 ? findIndentVisitor.isIndentedWithSpaces() :
                 wholeSourceIndent().isIndentedWithSpaces();
 
         return new Result(enclosingIndent, indentToUse, indentedWithSpaces);

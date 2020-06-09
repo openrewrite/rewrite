@@ -21,10 +21,10 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.assertRefactored
 import java.nio.file.Path
 
-open class CompilationUnitTest : JavaParser() {
+interface CompilationUnitTest {
 
     @Test
-    fun newClass() {
+    fun newClass(jp: JavaParser) {
         val a = J.CompilationUnit.buildEmptyClass(Path.of("sourceSet"), "my.org", "MyClass")
 
         assertRefactored(a, """
@@ -36,8 +36,8 @@ open class CompilationUnitTest : JavaParser() {
     }
 
     @Test
-    fun imports() {
-        val a = parse("""
+    fun imports(jp: JavaParser) {
+        val a = jp.parse("""
             import java.util.List;
             import java.io.*;
             public class A {}
@@ -47,8 +47,8 @@ open class CompilationUnitTest : JavaParser() {
     }
 
     @Test
-    fun classes() {
-        val a = parse("""
+    fun classes(jp: JavaParser) {
+        val a = jp.parse("""
             public class A {}
             class B{}
         """)
@@ -57,7 +57,7 @@ open class CompilationUnitTest : JavaParser() {
     }
     
     @Test
-    fun format() {
+    fun format(jp: JavaParser) {
         val a = """
             /* Comment */
             package a;
@@ -66,6 +66,6 @@ open class CompilationUnitTest : JavaParser() {
             public class A { }
         """
         
-        assertEquals(a.trimIndent(), parse(a).printTrimmed())
+        assertEquals(a.trimIndent(), jp.parse(a).printTrimmed())
     }
 }

@@ -16,17 +16,16 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.ImplementInterface
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
 
-class ImplementInterfaceTest : JavaParser() {
-    val b = "package b;\ninterface B {}"
-    val c = "package c;\ninterface C {}"
+interface ImplementInterfaceTest {
+    companion object {
+        val b = "package b;\ninterface B {}"
+        val c = "package c;\ninterface C {}"
+    }
 
     @Test
-    fun firstImplementedInterface() {
-        val a = parse("""
+    fun firstImplementedInterface(jp: JavaParser) {
+        val a = jp.parse("""
             class A {
             }
         """.trimIndent(), b)
@@ -42,8 +41,8 @@ class ImplementInterfaceTest : JavaParser() {
     }
 
     @Test
-    fun addAnImplementedInterface() {
-        val a = parse("""
+    fun addAnImplementedInterface(jp: JavaParser) {
+        val a = jp.parse("""
             import b.B;
             
             class A implements B {
