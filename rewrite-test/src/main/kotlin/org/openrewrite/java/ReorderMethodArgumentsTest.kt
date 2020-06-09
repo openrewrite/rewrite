@@ -44,7 +44,7 @@ interface ReorderMethodArgumentsTest {
             }
         """.trimIndent()
 
-        val cu = parse(b, a)
+        val cu = jp.parse(b, a)
         val foos = cu.findMethodCalls("a.A foo(..)")
         val fixed = cu.refactor()
                 .fold(foos) {
@@ -90,7 +90,7 @@ interface ReorderMethodArgumentsTest {
             }
         """
 
-        val cu = parse(b, a)
+        val cu = jp.parse(b, a)
         val fixed = cu.refactor()
                 .fold(cu.findMethodCalls("a.A foo(..)")) {
                     ReorderMethodArguments.Scoped(it, arrayOf("n", "s"), arrayOf("s", "n"))
@@ -128,7 +128,7 @@ interface ReorderMethodArgumentsTest {
             }
         """
 
-        val cu = parse(b, a)
+        val cu = jp.parse(b, a)
 
         val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
             ReorderMethodArguments.Scoped(it, arrayOf("s", "o", "n"), arrayOf())
@@ -163,7 +163,7 @@ interface ReorderMethodArgumentsTest {
             }
         """
 
-        val cu = parse(b, a)
+        val cu = jp.parse(b, a)
         val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
             ReorderMethodArguments.Scoped(it, arrayOf("o", "s"), arrayOf())
         }.fix().fixed

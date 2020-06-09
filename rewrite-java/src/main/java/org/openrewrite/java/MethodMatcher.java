@@ -43,7 +43,7 @@ public class MethodMatcher {
     private Pattern argumentPattern;
 
     public MethodMatcher(String signature) {
-        var parser = new RefactorMethodSignatureParser(new CommonTokenStream(new AspectJLexer(
+        RefactorMethodSignatureParser parser = new RefactorMethodSignatureParser(new CommonTokenStream(new AspectJLexer(
                 CharStreams.fromString(signature))));
 
         new RefactorMethodSignatureParserBaseVisitor<Void>() {

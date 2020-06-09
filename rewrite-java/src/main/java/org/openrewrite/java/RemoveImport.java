@@ -149,15 +149,15 @@ public class RemoveImport extends JavaRefactorVisitor {
 
     private J.CompilationUnit staticImportDeletions(J.CompilationUnit cu) {
         if (staticStarImport != null) {
-            var qualidType = TypeUtils.asClass(staticStarImport.getQualid().getTarget().getType());
+            JavaType.Class qualidType = TypeUtils.asClass(staticStarImport.getQualid().getTarget().getType());
             if (referencedMethods.isEmpty() && noFieldReferences(qualidType, null)) {
                 cu = delete(cu, staticStarImport);
             }
         }
 
         for (J.Import staticImport : staticNamedImports) {
-            var methodOrField = staticImport.getQualid().getSimpleName();
-            var qualidType = TypeUtils.asClass(staticImport.getQualid().getTarget().getType());
+            String methodOrField = staticImport.getQualid().getSimpleName();
+            JavaType.Class qualidType = TypeUtils.asClass(staticImport.getQualid().getTarget().getType());
             if (referencedMethods.stream().noneMatch(m -> m.getSimpleName().equals(methodOrField)) &&
                     noFieldReferences(qualidType, methodOrField)) {
                 cu = delete(cu, staticImport);

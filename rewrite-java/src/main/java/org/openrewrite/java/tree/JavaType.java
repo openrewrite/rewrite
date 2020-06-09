@@ -29,8 +29,10 @@ import java.io.Serializable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -73,15 +75,23 @@ public interface JavaType extends Serializable {
 
         @JsonIgnore
         public String getClassName() {
+            AtomicBoolean dropWhile = new AtomicBoolean(false);
             return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .dropWhile(part -> Character.isLowerCase(part.charAt(0)))
+                    .filter(part -> {
+                        dropWhile.set(dropWhile.get() || !Character.isLowerCase(part.charAt(0)));
+                        return dropWhile.get();
+                    })
                     .collect(joining("."));
         }
 
         @JsonIgnore
         public String getPackageName() {
+            AtomicBoolean takeWhile = new AtomicBoolean(true);
             return Arrays.stream(getFullyQualifiedName().split("\\."))
-                    .takeWhile(part -> part.length() > 0 && !Character.isUpperCase(part.charAt(0)))
+                    .filter(part -> {
+                        takeWhile.set(takeWhile.get() && !Character.isUpperCase(part.charAt(0)));
+                        return takeWhile.get();
+                    })
                     .collect(joining("."));
         }
 
@@ -177,12 +187,12 @@ public interface JavaType extends Serializable {
             // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
             // name, where equality is determined by whether the supertype hierarchy and members through the entire
             // supertype hierarchy are equal
-            var test = new Class(fullyQualifiedName,
+            JavaType.Class test = new Class(fullyQualifiedName,
                     members.stream().sorted(comparing(Var::getName)).collect(toList()),
                     typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
-                var variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
                 return (!relaxedClassTypeMatching ? variants.stream().filter(v -> v.deepEquals(test)) : variants.stream())
                         .findAny()
                         .orElseGet(() -> {
@@ -222,7 +232,7 @@ public interface JavaType extends Serializable {
                         // by JavaParser, which may have richer information but which would only be available for types found in the source
                         // repository.
                         reflectedConstructors.add(Method.build(selfType, "<reflection_constructor>", resolvedSignature, resolvedSignature,
-                                parameterNames, Set.of(Flag.Public)));
+                                parameterNames, singleton(Flag.Public)));
                     }
                 } catch (ClassNotFoundException ignored) {
                     // oh well, we tried
@@ -329,7 +339,7 @@ public interface JavaType extends Serializable {
                                    @JsonProperty("resolvedSignature") Signature resolvedSignature,
                                    @JsonProperty("paramNames") List<String> paramNames,
                                    @JsonProperty("flags") Set<Flag> flags) {
-            var test = new Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flags);
+            Method test = new Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flags);
 
             synchronized (flyweights) {
                 Set<Method> methods = flyweights

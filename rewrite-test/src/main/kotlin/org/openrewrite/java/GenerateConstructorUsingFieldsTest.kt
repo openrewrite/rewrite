@@ -28,7 +28,7 @@ interface GenerateConstructorUsingFieldsTest {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .visit(GenerateConstructorUsingFields(a.classes[0], a.classes[0].fields))
+                .visit(GenerateConstructorUsingFields(jp, a.classes[0], a.classes[0].fields))
                 .fix().fixed
 
         assertRefactored(fixed, """

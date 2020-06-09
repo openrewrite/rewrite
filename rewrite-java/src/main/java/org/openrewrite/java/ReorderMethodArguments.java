@@ -82,7 +82,7 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method) && method.getType() != null) {
-                var paramNames = originalOrder.length == 0 ? method.getType().getParamNames() :
+                List<String> paramNames = originalOrder.length == 0 ? method.getType().getParamNames() :
                         Arrays.asList(originalOrder);
 
                 if (paramNames == null) {
@@ -92,7 +92,7 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
 
                 List<Expression> originalArgs = method.getArgs().getArgs();
 
-                var resolvedParamCount = method.getType().getResolvedSignature() == null ? originalArgs.size() :
+                int resolvedParamCount = method.getType().getResolvedSignature() == null ? originalArgs.size() :
                         method.getType().getResolvedSignature().getParamTypes().size();
 
                 int i = 0;

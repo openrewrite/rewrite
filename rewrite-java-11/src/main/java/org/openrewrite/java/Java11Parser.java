@@ -119,7 +119,7 @@ public class Java11Parser implements JavaParser {
         }));
     }
 
-    public static Builder build() {
+    public static Builder builder() {
         return new Builder();
     }
 

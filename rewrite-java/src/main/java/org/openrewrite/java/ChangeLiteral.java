@@ -39,7 +39,7 @@ public class ChangeLiteral extends JavaRefactorVisitor {
     @Override
     public J visitLiteral(J.Literal literal) {
         if (getCursor().isScopeInPath(scope)) {
-            var transformed = transform.apply(literal.getValue());
+            Object transformed = transform.apply(literal.getValue());
 
             if (transformed == literal.getValue() || literal.getType() == null) {
                 return literal;
@@ -55,7 +55,7 @@ public class ChangeLiteral extends JavaRefactorVisitor {
                     transformedSource = transformed.toString();
                     break;
                 case Char:
-                    var escaped = StringEscapeUtils.escapeJavaScript(transformed.toString());
+                    String escaped = StringEscapeUtils.escapeJavaScript(transformed.toString());
 
                     // there are two differences between javascript escaping and character escaping
                     switch (escaped) {

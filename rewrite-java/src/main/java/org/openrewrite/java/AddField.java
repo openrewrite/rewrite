@@ -64,12 +64,12 @@ public final class AddField {
                     .filter(s -> s instanceof J.VariableDecls)
                     .map(J.VariableDecls.class::cast)
                     .noneMatch(mv -> mv.getVars().stream().anyMatch(var -> var.getSimpleName().equals(name)))) {
-                var body = c.getBody();
-                var classType = JavaType.Class.build(clazz);
+                J.Block<J> body = c.getBody();
+                JavaType.FullyQualified classType = JavaType.Class.build(clazz);
 
                 maybeAddImport(classType);
 
-                var newField = new J.VariableDecls(randomId(),
+                J.VariableDecls newField = new J.VariableDecls(randomId(),
                         emptyList(),
                         modifiers,
                         J.Ident.build(randomId(), classType.getClassName(), classType, modifiers.isEmpty() ? EMPTY : format(" ")),

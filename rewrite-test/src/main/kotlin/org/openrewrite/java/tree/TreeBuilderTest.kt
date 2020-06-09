@@ -38,7 +38,10 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, "others.add(${paramName.printTrimmed()});")
+        val snippets = TreeBuilder.buildSnippet<Statement>(
+                jp, a, methodBodyCursor,
+                "others.add(${paramName.printTrimmed()});")
+
         assertTrue(snippets[0] is J.MethodInvocation)
     }
 
@@ -58,12 +61,13 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
 
-        val snippets = TreeBuilder.buildSnippet<Statement>(a, methodBodyCursor, """
-            others.add(${paramName});
-            if(others.contains(${paramName})) {
-                others.remove(${paramName});
-            }
-        """.trimIndent())
+        val snippets = TreeBuilder.buildSnippet<Statement>(
+                jp, a, methodBodyCursor, """
+                    others.add(${paramName});
+                    if(others.contains(${paramName})) {
+                        others.remove(${paramName});
+                    }
+                """.trimIndent())
 
         val fixed = a.refactor().visit(object : JavaRefactorVisitor() {
             override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))

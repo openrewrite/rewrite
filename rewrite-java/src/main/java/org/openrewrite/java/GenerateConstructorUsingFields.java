@@ -31,10 +31,14 @@ import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
 public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
+    private final JavaParser javaParser;
     private final J.ClassDecl scope;
     private final List<J.VariableDecls> fields;
 
-    public GenerateConstructorUsingFields(J.ClassDecl scope, List<J.VariableDecls> fields) {
+    public GenerateConstructorUsingFields(JavaParser javaParser,
+                                          J.ClassDecl scope,
+                                          List<J.VariableDecls> fields) {
+        this.javaParser = javaParser;
         this.scope = scope;
         this.fields = fields;
         setCursoringOn();
@@ -76,7 +80,8 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
                     new J.MethodDecl.Parameters(randomId(), constructorParams, EMPTY),
                     null,
                     new J.Block<>(randomId(), null, emptyList(), format(" "),
-                            formatter.findIndent(classDecl.getBody().getIndent(), classDecl.getBody().getStatements().toArray(Tree[]::new)).getPrefix()),
+                            formatter.findIndent(classDecl.getBody().getIndent(),
+                                    classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()),
                     null,
                     constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()));
 
@@ -117,7 +122,9 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
         public J visitMethod(J.MethodDecl method) {
             if (scope.isScope(method)) {
                 return method.withBody(method.getBody().withStatements(
-                        TreeBuilder.buildSnippet(enclosingCompilationUnit(),
+                        TreeBuilder.buildSnippet(
+                                javaParser,
+                                enclosingCompilationUnit(),
                                 getCursor(),
                                 fields.stream().map(mv -> {
                                     String name = mv.getVars().get(0).getSimpleName();

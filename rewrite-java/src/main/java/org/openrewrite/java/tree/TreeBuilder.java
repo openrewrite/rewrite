@@ -21,13 +21,13 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.JavaFormatter;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.ShiftFormatRightVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -70,11 +70,11 @@ public class TreeBuilder {
                 fullName += "." + part;
 
                 Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
-                var identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Formatting.EMPTY;
+                Formatting identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Formatting.EMPTY;
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 whitespaceSuffix.matches();
-                var partFmt = i == parts.length - 1 ? Formatting.EMPTY : format("", whitespaceSuffix.group(1));
+                Formatting partFmt = i == parts.length - 1 ? Formatting.EMPTY : format("", whitespaceSuffix.group(1));
 
                 expr = new J.FieldAccess(randomId(),
                         expr,
@@ -92,11 +92,12 @@ public class TreeBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    public static <T extends J> List<T> buildSnippet(J.CompilationUnit containing,
+    public static <T extends J> List<T> buildSnippet(JavaParser parser,
+                                                     J.CompilationUnit containing,
                                                      Cursor insertionScope,
                                                      String snippet,
                                                      JavaType.Class... imports) {
-        JavaParser parser = new JavaParser(emptyList(), Charset.defaultCharset(), true);
+        parser.reset();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off

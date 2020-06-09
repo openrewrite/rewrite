@@ -72,7 +72,7 @@ public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method)) {
-                var classType = JavaType.Class.build(targetType);
+                JavaType.FullyQualified classType = JavaType.Class.build(targetType);
                 J.MethodInvocation m = method.withSelect(
                         J.Ident.build(randomId(), classType.getClassName(), classType,
                                 method.getSelect() == null ? EMPTY : method.getSelect().getFormatting()));

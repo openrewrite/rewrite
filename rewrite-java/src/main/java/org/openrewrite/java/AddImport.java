@@ -109,7 +109,7 @@ public class AddImport extends JavaRefactorVisitor {
 
     @Override
     public J visitImport(J.Import impoort) {
-        var importedType = impoort.getQualid().getSimpleName();
+        String importedType = impoort.getQualid().getSimpleName();
 
         if (staticMethod != null) {
             if (impoort.isFromType(type) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {

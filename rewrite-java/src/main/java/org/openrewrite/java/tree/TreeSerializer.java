@@ -37,19 +37,19 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 public class TreeSerializer {
-    private final TypeReference<List<J.CompilationUnit>> cuListType = new TypeReference<>() {
+    private final TypeReference<List<J.CompilationUnit>> cuListType = new TypeReference<List<J.CompilationUnit>>() {
     };
 
     private final ObjectMapper mapper;
 
-    private SimpleModule metadataModule;
+    private final SimpleModule metadataModule;
 
     public TreeSerializer() {
         this.metadataModule = new SimpleModule();
         metadataModule.addKeySerializer(Metadata.class, new MetadataKeySerializer());
         metadataModule.addKeyDeserializer(Metadata.class, new MetadataKeyDeserializer());
 
-        var f = new SmileFactory();
+        SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
         this.mapper = new ObjectMapper(f)
                 .registerModule(metadataModule)
