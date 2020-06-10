@@ -1,1 +1,7 @@
-include("rewrite-core", "rewrite-java", "rewrite-java-8", "rewrite-java-11", "rewrite-xml", "rewrite-test")
+include(
+        "rewrite-core",
+        "rewrite-java",
+        "rewrite-java-11",
+        "rewrite-xml",
+        "rewrite-test"
+)

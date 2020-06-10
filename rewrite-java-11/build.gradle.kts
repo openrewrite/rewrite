@@ -11,7 +11,7 @@ tasks.named<JavaCompile>("compileJava") {
     sourceCompatibility = JavaVersion.VERSION_11.toString()
     targetCompatibility = JavaVersion.VERSION_11.toString()
 
-    options.compilerArgs.clear()
+    options.compilerArgs.clear() // remove `--release 8` set in root gradle build
     options.compilerArgs.addAll(listOf(
             "--add-exports", "jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED",
             "--add-exports", "jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED",

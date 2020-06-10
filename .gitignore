@@ -2,4 +2,3 @@ build/
 .gradle/
 gradle.properties
 .java-version
-.tools/

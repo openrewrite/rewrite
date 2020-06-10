@@ -9,4 +9,6 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 
     implementation("org.assertj:assertj-core:latest.release")
+
+    testImplementation("me.lucko:jar-relocator:1.4")
 }
