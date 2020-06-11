@@ -140,6 +140,6 @@ public interface JavaParser {
             return (B) this;
         }
 
-        abstract P build();
+        public abstract P build();
     }
 }

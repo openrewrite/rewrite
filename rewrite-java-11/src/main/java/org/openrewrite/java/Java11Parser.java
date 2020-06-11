@@ -263,7 +263,7 @@ public class Java11Parser implements JavaParser {
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
         @Override
-        Java11Parser build() {
+        public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
                     meterRegistry, logCompilationWarningsAndErrors);
         }
