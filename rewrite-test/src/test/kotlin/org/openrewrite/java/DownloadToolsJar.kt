@@ -12,7 +12,7 @@ import java.util.zip.ZipOutputStream
 object DownloadToolsJar {
     @JvmStatic
     fun main(args: Array<String>) {
-        shade(minify(toolsJar()))
+        minify(toolsJar())
     }
 
     fun toolsJar(): File {
@@ -63,16 +63,5 @@ object DownloadToolsJar {
             }
         }
         return minified
-    }
-
-    fun shade(toolsJar: File) {
-        val rules: MutableList<Relocation> = ArrayList<Relocation>()
-        rules.add(Relocation("com.google.common", "me.lucko.test.lib.guava"))
-
-        val relocator = JarRelocator(toolsJar, File(".tools/tools-shaded.jar"), listOf(
-                Relocation("com.sun", "java8tools.com.sun")
-        ))
-
-        relocator.run()
     }
 }

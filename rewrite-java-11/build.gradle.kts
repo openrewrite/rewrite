@@ -23,5 +23,5 @@ tasks.named<JavaCompile>("compileJava") {
 }
 
 tasks.withType<Javadoc> {
-    exclude("**/JavaParser**")
+    exclude("**/Java11Parser**")
 }

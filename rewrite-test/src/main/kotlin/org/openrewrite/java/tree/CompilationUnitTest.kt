@@ -20,12 +20,13 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.assertRefactored
 import java.nio.file.Path
+import java.nio.file.Paths
 
 interface CompilationUnitTest {
 
     @Test
     fun newClass(jp: JavaParser) {
-        val a = J.CompilationUnit.buildEmptyClass(Path.of("sourceSet"), "my.org", "MyClass")
+        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
 
         assertRefactored(a, """
             package my.org;
