@@ -23,22 +23,25 @@ import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
+import org.openrewrite.java.search.HasType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Formatting.EMPTY;
+import static org.openrewrite.Formatting.formatFirstPrefix;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaRefactorVisitor {
-    // TODO make this configurable
-    OrderImports orderImports = new IntellijOrderImports();
+    private final OrderImports orderImports = OrderImports.intellij();
 
     @EqualsAndHashCode.Include
     private String type;
@@ -52,7 +55,9 @@ public class AddImport extends JavaRefactorVisitor {
 
     private JavaType.Class classType;
 
-    private boolean coveredByExistingImport;
+    public AddImport() {
+        orderImports.setRemoveUnused(false);
+    }
 
     public void setType(String type) {
         this.type = type;
@@ -79,16 +84,9 @@ public class AddImport extends JavaRefactorVisitor {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
-        coveredByExistingImport = false;
-        boolean hasReferences = !new FindType(type).visit(cu).isEmpty();
+        boolean hasReferences = new HasType(type).visit(cu);
 
         if (onlyIfReferenced && !hasReferences) {
-            return cu;
-        }
-
-        cu = refactor(cu, super::visitCompilationUnit);
-
-        if (coveredByExistingImport) {
             return cu;
         }
 
@@ -96,159 +94,41 @@ public class AddImport extends JavaRefactorVisitor {
             return cu;
         }
 
-        cu = cu.withImports(orderImports.addImport(cu));
-
-        AtomicBoolean takeWhile = new AtomicBoolean(true);
-        if (cu.getClasses().size() > 0 && cu.getImports().isEmpty() ||
-                cu.getClasses().get(0).getFormatting().getPrefix().chars()
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                            return takeWhile.get();
-                        })
-                        .count() < 2) {
-            List<J.ClassDecl> classes = new ArrayList<>(cu.getClasses());
-            classes.set(0, classes.get(0).withPrefix("\n\n"));
-            cu = cu.withClasses(classes);
+        if (cu.getImports().stream().anyMatch(i -> {
+            String ending = i.getQualid().getSimpleName();
+            if (staticMethod == null) {
+                return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
+                        (ending.equals(classType.getClassName()) ||
+                                ending.equals("*"));
+            }
+            return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
+                    (ending.equals(staticMethod) ||
+                            ending.equals("*"));
+        })) {
+            return cu;
         }
+
+        J.Import importToAdd = new J.Import(randomId(),
+                TreeBuilder.buildName(classType.getFullyQualifiedName() +
+                        (staticMethod == null ? "" : "." + staticMethod), Formatting.format(" ")),
+                staticMethod != null,
+                EMPTY);
+
+        List<J.Import> imports = new ArrayList<>(cu.getImports());
+
+        if (imports.isEmpty()) {
+            importToAdd = cu.getPackageDecl() == null ?
+                    importToAdd.withPrefix(cu.getClasses().get(0).getFormatting().getPrefix() + "\n\n") :
+                    importToAdd.withPrefix("\n\n");
+        }
+
+        cu = cu.withClasses(formatFirstPrefix(cu.getClasses(), "\n\n"));
+
+        imports.add(importToAdd);
+        cu = cu.withImports(imports);
+
+        andThen(orderImports);
 
         return cu;
-    }
-
-    @Override
-    public J visitImport(J.Import impoort) {
-        String importedType = impoort.getQualid().getSimpleName();
-
-        if (staticMethod != null) {
-            if (impoort.isFromType(type) && impoort.isStatic() && (importedType.equals(staticMethod) || importedType.equals("*"))) {
-                coveredByExistingImport = true;
-            }
-        } else {
-            if (impoort.isFromType(type)) {
-                coveredByExistingImport = true;
-            } else if (importedType.equals("*") && impoort.getQualid().getTarget().printTrimmed().equals(classType.getPackageName())) {
-                coveredByExistingImport = true;
-            }
-        }
-
-        return super.visitImport(impoort);
-    }
-
-    public abstract class OrderImports {
-        public abstract List<J.Import> addImport(J.CompilationUnit cu);
-
-        /**
-         * @return The list of imports that could, together with the import to add, be replaced by a star import.
-         */
-        protected List<J.Import> importsThatCouldBeStarReplaced(J.CompilationUnit cu) {
-            return staticMethod == null ?
-                    cu.getImports().stream()
-                            .filter(i -> !i.isStatic() && i.getPackageName().equals(classType.getPackageName()))
-                            .collect(toList()) :
-                    cu.getImports().stream()
-                            .filter(i -> {
-                                String fqn = i.getQualid().getTarget().printTrimmed();
-                                return i.isStatic() && fqn.substring(0, Math.max(0, fqn.lastIndexOf('.'))).equals(type);
-                            })
-                            .collect(toList());
-        }
-    }
-
-    @RequiredArgsConstructor
-    public class IntellijOrderImports extends OrderImports {
-        private final int classCountToUseStarImport;
-        private final int namesCountToUseStarImport;
-
-        public IntellijOrderImports() {
-            this(5, 3);
-        }
-
-        @Override
-        public List<J.Import> addImport(J.CompilationUnit cu) {
-            List<J.Import> importsThatCouldBeStarReplaced = importsThatCouldBeStarReplaced(cu);
-            boolean starImporting = importsThatCouldBeStarReplaced.size() > (staticMethod == null ? classCountToUseStarImport : namesCountToUseStarImport);
-
-            List<J.Import> importsWithAdded = new ArrayList<>(cu.getImports());
-            if (starImporting) {
-                importsWithAdded.removeAll(importsThatCouldBeStarReplaced);
-            }
-
-            J.FieldAccess classImportField = TreeBuilder.buildName(type, Formatting.format(" "));
-            J.Import importStatementToAdd;
-            if (staticMethod == null) {
-                importStatementToAdd = new J.Import(randomId(),
-                        starImporting ?
-                                (J.FieldAccess) TreeBuilder.buildName(classType.getPackageName() + ".*", Formatting.format(" ")) :
-                                classImportField,
-                        false,
-                        Formatting.format("\n"));
-
-                boolean added = false;
-                for (int i = 0; i < importsWithAdded.size(); i++) {
-                    J.Import anImport = importsWithAdded.get(i);
-                    if (anImport.isStatic() || importStatementToAdd.compareTo(anImport) < 0) {
-                        importsWithAdded.add(i, importStatementToAdd);
-                        added = true;
-                        break;
-                    }
-                }
-
-                if (!added) {
-                    importsWithAdded.add(importStatementToAdd);
-                }
-
-                boolean encounteredJavaImport = false;
-                for (int i = 0; i < importsWithAdded.size(); i++) {
-                    J.Import anImport = importsWithAdded.get(i);
-                    if (i == 0) {
-                        encounteredJavaImport = anImport.getPackageName().startsWith("java");
-                        if (cu.getPackageDecl() == null) {
-                            continue;
-                        }
-                    }
-                    if (i == 0 || (!encounteredJavaImport && (encounteredJavaImport = anImport.getPackageName().startsWith("java"))) ||
-                            anImport.isStatic()) {
-                        importsWithAdded.set(i, anImport.withPrefix("\n\n"));
-                        if (anImport.isStatic()) {
-                            // don't attempt any other formatting, because we will not have modified this list
-                            break;
-                        }
-                    } else {
-                        importsWithAdded.set(i, anImport.withPrefix("\n"));
-                    }
-                }
-            } else {
-                importStatementToAdd = new J.Import(randomId(),
-                        new J.FieldAccess(randomId(), classImportField,
-                                J.Ident.build(randomId(), starImporting ? "*" : staticMethod, null, Formatting.EMPTY), null, Formatting.EMPTY),
-                        true,
-                        Formatting.format("\n"));
-
-                boolean added = false;
-                for (int i = 0; i < importsWithAdded.size(); i++) {
-                    J.Import anImport = importsWithAdded.get(i);
-                    if (anImport.isStatic() && importStatementToAdd.compareTo(anImport) < 0) {
-                        importsWithAdded.add(i, importStatementToAdd);
-                        added = true;
-                        break;
-                    }
-                }
-
-                if (!added) {
-                    importsWithAdded.add(importStatementToAdd);
-                }
-
-                boolean encounteredStatic = false;
-                for (int i = 0; i < importsWithAdded.size(); i++) {
-                    J.Import anImport = importsWithAdded.get(i);
-                    if (!encounteredStatic && (encounteredStatic = anImport.isStatic())) {
-                        importsWithAdded.set(i, anImport.withPrefix("\n\n"));
-                    } else if (anImport.isStatic()) {
-                        importsWithAdded.set(i, anImport.withPrefix("\n"));
-                    }
-                }
-            }
-
-            return importsWithAdded;
-        }
     }
 }

@@ -50,20 +50,6 @@ interface AddImportTest {
     }
 
     @Test
-    fun addNamedImportByClass(jp: JavaParser) {
-        val a = jp.parse("class A {}")
-
-        val fixed = a.refactor().visit(AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            
-            class A {}
-        """)
-    }
-
-    @Test
     fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) {
         val a = jp.parse("""
             package a;
@@ -175,7 +161,7 @@ interface AddImportTest {
             import java.util.List;
             
             import static java.util.List.*;
-            
+
             class A {}
         """)
     }

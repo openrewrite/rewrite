@@ -21,7 +21,10 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.Set;
 
 public class HasType extends JavaSourceVisitor<Boolean> {
     private final String clazz;
@@ -41,23 +44,11 @@ public class HasType extends JavaSourceVisitor<Boolean> {
     }
 
     @Override
-    public Boolean visitIdentifier(J.Ident ident) {
-        JavaType.Class asClass = TypeUtils.asClass(ident.getType());
-        return asClass != null && asClass.getFullyQualifiedName().equals(clazz);
-    }
-
-    @Override
-    public Boolean visitMethodInvocation(J.MethodInvocation method) {
-        if(firstMethodInChain(method).getSelect() == null) {
-            // either a same-class instance method or a statically imported method
-            return method.getType() != null && method.getType().getDeclaringType().getFullyQualifiedName().equals(clazz);
+    public Boolean visitTypeName(NameTree name) {
+        JavaType.Class asClass = TypeUtils.asClass(name.getType());
+        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
+            return true;
         }
-        return super.visitMethodInvocation(method);
-    }
-
-    private J.MethodInvocation firstMethodInChain(J.MethodInvocation method) {
-        return method.getSelect() instanceof J.MethodInvocation ?
-                firstMethodInChain((J.MethodInvocation) method.getSelect()) :
-                method;
+        return super.visitTypeName(name);
     }
 }

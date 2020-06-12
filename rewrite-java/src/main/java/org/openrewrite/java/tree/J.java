@@ -1616,6 +1616,10 @@ public interface J extends Serializable, Tree {
             return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
         }
 
+        public String getTypeName() {
+            return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
+        }
+
         @JsonIgnore
         public String getPackageName() {
             JavaType.Class importType = TypeUtils.asClass(qualid.getType());

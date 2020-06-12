@@ -18,6 +18,14 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 
 interface AddAnnotationTest {
+    companion object {
+        private const val annot = """
+            package b;
+            public @interface MyAnnotation {
+            }
+        """
+    }
+
     @Test
     fun addAnnotationToClass(jp: JavaParser) {
         val a = jp.parse("""
@@ -57,23 +65,23 @@ interface AddAnnotationTest {
                 private final UserService userService;
                 NameService nameService;
             }
-        """.trimIndent())
+        """.trimIndent(), annot)
 
         val fixed = a.refactor()
-                .visit(AddAnnotation.Scoped(a.classes[0].fields[0], "javax.inject.Inject"))
-                .visit(AddAnnotation.Scoped(a.classes[0].fields[1], "javax.inject.Inject"))
+                .visit(AddAnnotation.Scoped(a.classes[0].fields[0], "b.MyAnnotation"))
+                .visit(AddAnnotation.Scoped(a.classes[0].fields[1], "b.MyAnnotation"))
                 .fix().fixed
 
         assertRefactored(fixed, """
             package a;
             
-            import javax.inject.Inject;
+            import b.MyAnnotation;
             
             public class UsersController {
-                @Inject
+                @MyAnnotation
                 private final UserService userService;
             
-                @Inject
+                @MyAnnotation
                 NameService nameService;
             }
         """)
@@ -98,31 +106,32 @@ interface AddAnnotationTest {
                     return null;
                 }
             }
-        """.trimIndent())
+        """.trimIndent(), annot)
 
         val fixed = a.classes[0].methods
-                .fold(a.refactor()) { refactor, method -> refactor.visit(AddAnnotation.Scoped(method, "javax.annotation.PostConstruct")) }
+                .fold(a.refactor()) { refactor, method -> refactor.visit(
+                        AddAnnotation.Scoped(method, "b.MyAnnotation")) }
                 .fix().fixed
 
         assertRefactored(fixed, """
             package a;
             
-            import javax.annotation.PostConstruct;
+            import b.MyAnnotation;
             
             public class UsersController {
-                @PostConstruct
+                @MyAnnotation
                 UsersController() {
                 }
             
-                @PostConstruct
+                @MyAnnotation
                 public void onInit() {
                 }
             
-                @PostConstruct
+                @MyAnnotation
                 void onInit2() {
                 }
                 
-                @PostConstruct
+                @MyAnnotation
                 <T> T onInit3() {
                     return null;
                 }
@@ -139,19 +148,20 @@ interface AddAnnotationTest {
                 public void getUsers(Integer maxUsers) {
                 }
             }
-        """.trimIndent())
+        """.trimIndent(), annot)
 
         val fixed = a.refactor()
-                .visit(AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0], "javax.annotation.Nonnull"))
+                .visit(AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0],
+                        "b.MyAnnotation"))
                 .fix().fixed
 
         assertRefactored(fixed, """
             package a;
             
-            import javax.annotation.Nonnull;
+            import b.MyAnnotation;
             
             public class UsersController {
-                public void getUsers(@Nonnull Integer maxUsers) {
+                public void getUsers(@MyAnnotation Integer maxUsers) {
                 }
             }
         """)

@@ -53,6 +53,9 @@ abstract class JavaRefactorCompatibilityKit {
     inner class MethodMatcherTck : MethodMatcherTest
 
     @Nested
+    inner class OrderImportTck : OrderImportTest
+
+    @Nested
     inner class RemoveImportTck : RemoveImportTest
 
     @Nested

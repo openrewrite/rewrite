@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
 interface HasTypeTest {
-    
     @Test
     fun hasType(jp: JavaParser) {
         val a = jp.parse("""
@@ -34,34 +33,37 @@ interface HasTypeTest {
     }
 
     @Test
-    fun hasTypeBasedOnStaticImport(jp: JavaParser) {
+    fun hasTypeBasedOnAnnotation(jp: JavaParser) {
+        val b = """
+            package b;
+            public @interface MyAnnotation {
+            }
+        """
+
         val a = jp.parse("""
-            import static java.util.Collections.emptyList;
+            import b.MyAnnotation;
             class A {
-               Object o = emptyList();
+               @MyAnnotation
+               public void post() {
+               }
+            }
+        """, b)
+
+        assertTrue(a.classes[0].hasType("b.MyAnnotation"))
+    }
+
+    @Test
+    fun hasTypeInStaticMethodTarget(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.*;
+            class A {
+               public void test() {
+                   List list = Collections.emptyList();
+               }
             }
         """)
 
         assertTrue(a.classes[0].hasType("java.util.Collections"))
-    }
-    
-    @Test
-    fun hasTypeBasedOnStaticChainedCalls(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A { 
-                public static A none() { return null; }
-            }
-        """
-        
-        val b = """
-            import static a.A.none;
-            class B {
-               Object o = none().none().none();
-            }
-        """
-
-        assertTrue(jp.parse(b, a).classes[0].hasType("a.A"))
     }
 
     @Test
