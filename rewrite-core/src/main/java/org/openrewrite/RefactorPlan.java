@@ -44,8 +44,24 @@ public class RefactorPlan {
         this.visitors = visitors;
     }
 
+    public <T extends Tree, S extends SourceVisitor<T>> S configure(S visitor, String... profiles) {
+        return configure(visitor, Arrays.asList(profiles));
+    }
+
+    public <T extends Tree, S extends SourceVisitor<T>> S configure(S visitor, Iterable<String> profiles) {
+        List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
+                .map(profilesByName::get)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        visitor = loadedProfiles.stream().reduce(visitor, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1);
+
+        return visitor;
+    }
+
     public <T extends Tree, S extends SourceVisitor<T>> Collection<S> visitors(
             Class<T> sourceType, String... profiles) {
+
         return visitors(sourceType, Arrays.asList(profiles));
     }
 
