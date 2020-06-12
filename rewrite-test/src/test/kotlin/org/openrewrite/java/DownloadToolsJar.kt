@@ -15,14 +15,10 @@
  */
 package org.openrewrite.java
 
-import me.lucko.jarrelocator.JarRelocator
-import me.lucko.jarrelocator.Relocation
 import java.io.File
 import java.net.URL
-import java.util.*
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-
 
 object DownloadToolsJar {
     @JvmStatic
