@@ -28,6 +28,8 @@ dependencies {
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
+
+    testImplementation("org.yaml:snakeyaml:latest.release")
 }
 
 tasks.withType<Javadoc> {

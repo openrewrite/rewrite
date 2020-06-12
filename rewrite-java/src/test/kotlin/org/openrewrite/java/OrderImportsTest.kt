@@ -24,7 +24,7 @@ class OrderImportsTest {
     @Test
     fun fromYaml() {
         val yaml = Yaml()
-        val orderImportsConfig: Map<String, Object> = yaml.load("""
+        val orderImportsConfig: Map<String, Any> = yaml.load("""
             removeUnused: true
             layout:
                 classCountToUseStarImport: 5
@@ -38,7 +38,7 @@ class OrderImportsTest {
                     - import static all other imports
         """.trimIndent())
 
-        val orderImports: OrderImports = OrderImports()
+        val orderImports = OrderImports()
         ObjectMapper().updateValue(orderImports, orderImportsConfig)
 
         assertThat(orderImports.layout.blocks[0]).isInstanceOf(OrderImports.Layout.Block.AllOthers::class.java)
