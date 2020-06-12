@@ -137,7 +137,7 @@ public class TreeSerializer {
 
         @Override
         public Metadata deserializeKey(String key, DeserializationContext ctxt) {
-            String[] classAndValue = key.split("#");
+            String[] classAndValue = key.split("#", 2);
             return metadataValueByName.computeIfAbsent(classAndValue[0], this::loadMetadataClass).apply(classAndValue[1]);
         }
 

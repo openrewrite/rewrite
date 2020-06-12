@@ -18,11 +18,9 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
-import lombok.RequiredArgsConstructor;
 import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.search.HasType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -30,10 +28,7 @@ import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.formatFirstPrefix;
 import static org.openrewrite.Tree.randomId;
@@ -41,7 +36,9 @@ import static org.openrewrite.Validated.required;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaRefactorVisitor {
-    private final OrderImports orderImports = OrderImports.intellij();
+    // TODO find a way to stuff this on J.CompilationUnit metadata
+    // so it's particular per class and not static.
+    public static OrderImports orderImports = OrderImports.intellij();
 
     @EqualsAndHashCode.Include
     private String type;
