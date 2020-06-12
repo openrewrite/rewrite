@@ -15,12 +15,15 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -28,11 +31,49 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.valid;
 
 public class OrderImports extends JavaRefactorVisitor {
-    private Layout layout;
+    // VisibleForTesting
+    Layout layout;
+
     private boolean removeUnused = true;
 
+    @JsonIgnore
     public void setLayout(Layout layout) {
         this.layout = layout;
+    }
+
+    @JsonProperty("layout")
+    public void setLayout(Map<String, Object> layout) {
+        Layout.Builder builder = Layout.builder(
+                (Integer) layout.getOrDefault("classCountToUseStarImport", 5),
+                (Integer) layout.getOrDefault("nameCountToUseStarImport", 3));
+
+        //noinspection unchecked
+        for (String block : (List<String>) layout.get("blocks")) {
+            block = block.trim();
+            if(block.equals("<blank line>")) {
+                builder = builder.blankLine();
+            }
+            else if(block.startsWith("import ")) {
+                block = block.substring("import ".length());
+                boolean statik = false;
+                if(block.startsWith("static")) {
+                    statik = true;
+                    block = block.substring("static ".length());
+                }
+                if(block.equals("all other imports")) {
+                    builder = statik ?
+                            builder.importStaticAllOthers() :
+                            builder.importAllOthers();
+                }
+                else {
+                    builder = statik ?
+                            builder.staticImportPackage(block) :
+                            builder.importPackage(block);
+                }
+            }
+        }
+
+        setLayout(builder.build());
     }
 
     public void setRemoveUnused(boolean removeUnused) {
@@ -112,7 +153,8 @@ public class OrderImports extends JavaRefactorVisitor {
     }
 
     public static class Layout {
-        private final List<Block> blocks;
+        // VisibleForTesting
+        final List<Block> blocks;
         private final int classCountToUseStarImport;
         private final int nameCountToUseStarImport;
 
