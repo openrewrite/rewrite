@@ -206,6 +206,7 @@ public class OrderImports extends JavaRefactorVisitor {
                     this.classCountToUseStarImport = classCountToUseStarImport;
                     this.nameCountToUseStarImport = nameCountToUseStarImport;
                     this.packageWildcard = Pattern.compile(packageWildcard
+                            .replace(".", "\\.")
                             .replace("*", withSubpackages ? ".+" : "[^.]+"));
                 }
 

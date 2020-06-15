@@ -229,4 +229,23 @@ interface OrderImportTest {
             }
         """.trimIndent())
     }
+
+    @Test
+    fun packagePatternEscapesDots(jp: JavaParser) {
+        val a = jp.parse("""
+            import javax.annotation.Nonnull;
+            
+            public class A {}
+        """.trimIndent())
+
+        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+            setRemoveUnused(false)
+        }).fix().fixed
+
+        assertRefactored(fixed, """
+            import javax.annotation.Nonnull;
+            
+            public class A {}
+        """.trimIndent())
+    }
 }
