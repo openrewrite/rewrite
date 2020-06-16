@@ -114,15 +114,20 @@ subprojects {
                 suppressPomMetadataWarningsFor("runtimeElements")
 
                 pom.withXml {
-                    (asElement().getElementsByTagName("dependencies").item(0) as Element).let { dependencies ->
+                    (asElement().getElementsByTagName("dependencies").item(0) as org.w3c.dom.Element).let { dependencies ->
                         dependencies.getElementsByTagName("dependency").let { dependencyList ->
-                            (0 until dependencyList.length).forEach { i ->
-                                (dependencyList.item(i) as Element).let { dependency ->
+                            var i = 0
+                            var length = dependencyList.length
+                            while (i < length) {
+                                (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
                                     if ((dependency.getElementsByTagName("scope")
-                                                    .item(0) as Element).textContent == "provided") {
+                                                    .item(0) as org.w3c.dom.Element).textContent == "provided") {
                                         dependencies.removeChild(dependency)
+                                        i--
+                                        length--
                                     }
                                 }
+                                i++
                             }
                         }
                     }
