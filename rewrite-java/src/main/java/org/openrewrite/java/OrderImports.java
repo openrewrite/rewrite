@@ -241,9 +241,6 @@ public class OrderImports extends JavaRefactorVisitor {
                     int consecutiveSamePackages = 0;
                     for (int i = 0; i < imports.size(); i++) {
                         consecutiveSamePackages++;
-                        if ("*".equals(imports.get(i).getQualid().getSimpleName())) {
-                            foundStar = true;
-                        }
                         if (i > 1 && !imports.get(i - 1).getPackageName().equals(imports.get(i).getPackageName())) {
                             int threshold = statik ? nameCountToUseStarImport : classCountToUseStarImport;
                             if (consecutiveSamePackages >= threshold || (consecutiveSamePackages > 1 && foundStar)) {
@@ -258,6 +255,9 @@ public class OrderImports extends JavaRefactorVisitor {
                             }
                             consecutiveSamePackages = 1;
                             foundStar = false;
+                        }
+                        if ("*".equals(imports.get(i).getQualid().getSimpleName())) {
+                            foundStar = true;
                         }
                     }
 

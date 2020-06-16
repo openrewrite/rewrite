@@ -248,4 +248,27 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
     }
+
+    @Test
+    fun twoImportsFollowedByStar(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.io.IOException;
+            import java.io.UncheckedIOException;
+            import java.nio.files.*;
+            
+            public class A {}
+        """.trimIndent())
+
+        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+            setRemoveUnused(false)
+        }).fix().fixed
+
+        assertRefactored(fixed, """
+            import java.io.IOException;
+            import java.io.UncheckedIOException;
+            import java.nio.files.*;
+            
+            public class A {}
+        """.trimIndent())
+    }
 }
