@@ -22,6 +22,7 @@ import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.openrewrite.Change;
 import org.openrewrite.ChangePublisher;
+import org.openrewrite.Incubating;
 import org.openrewrite.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +31,7 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
+@Incubating(since = "2.0.0")
 @RequiredArgsConstructor
 public class GitChangePublisher implements ChangePublisher {
     private static final Logger logger = LoggerFactory.getLogger(GitChangePublisher.class);

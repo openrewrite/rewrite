@@ -15,6 +15,7 @@
  */
 package org.openrewrite.refactor;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
@@ -32,6 +33,7 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
+@Incubating(since = "2.0.0")
 public class FindIndent extends SourceVisitor<Void> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;

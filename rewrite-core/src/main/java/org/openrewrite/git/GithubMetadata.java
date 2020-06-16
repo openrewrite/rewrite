@@ -15,8 +15,10 @@
  */
 package org.openrewrite.git;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.Metadata;
 
+@Incubating(since = "2.0.0")
 public enum GithubMetadata implements Metadata {
     REPOSITORY,
     ORGANIZATION

@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
  * Turns a set of {@link Validated.Invalid} into a throwable exception, which is used to throw an unchecked exception
  * at runtime when one or more properties are invalid.
  */
+@Incubating(since = "2.0.0")
 public class ValidationException extends IllegalStateException {
     private final Validated validation;
 

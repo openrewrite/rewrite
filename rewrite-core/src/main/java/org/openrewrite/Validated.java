@@ -28,6 +28,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.StreamSupport.stream;
 
+@Incubating(since = "2.0.0")
 public interface Validated extends Iterable<Validated> {
     boolean isValid();
 

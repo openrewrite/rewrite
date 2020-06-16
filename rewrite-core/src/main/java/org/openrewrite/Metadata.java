@@ -15,5 +15,6 @@
  */
 package org.openrewrite;
 
+@Incubating(since = "2.0.0")
 public interface Metadata {
 }

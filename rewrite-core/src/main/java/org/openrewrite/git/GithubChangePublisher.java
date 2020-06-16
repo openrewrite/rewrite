@@ -22,6 +22,7 @@ import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
 import org.openrewrite.Change;
 import org.openrewrite.ChangePublisher;
+import org.openrewrite.Incubating;
 import org.openrewrite.Metadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,7 @@ import java.util.Scanner;
  * This publisher is best suited for changes to a single file per repository. Otherwise, multiple commits
  * are generated, one for each changed file.
  */
+@Incubating(since = "2.0.0")
 public class GithubChangePublisher implements ChangePublisher {
     private static final Logger logger = LoggerFactory.getLogger(GithubChangePublisher.class);
 

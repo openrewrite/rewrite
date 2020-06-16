@@ -15,14 +15,15 @@
  */
 package org.openrewrite;
 
-import java.util.Collection;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Target;
 
 /**
- * Adds to the set of transformable sources. By applying refactoring visitors to generated sources too we can,
- * for example, format (if some of the refactoring visitors are responsible for formatting) the new generated
- * source in a manner that best suits the project being operated on.
+ * This is a feature that is experimental and may yield a breaking change in a minor release.
  */
-@Incubating(since = "2.0.0")
-public interface Generate<S extends SourceFile> {
-    Collection<S> generate();
+@Documented
+@Target({ElementType.METHOD, ElementType.TYPE, ElementType.CONSTRUCTOR})
+public @interface Incubating {
+    String since();
 }
