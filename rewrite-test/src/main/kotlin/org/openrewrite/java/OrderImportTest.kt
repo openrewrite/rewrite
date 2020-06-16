@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 interface OrderImportTest {
@@ -161,7 +161,7 @@ interface OrderImportTest {
             setRemoveUnused(false)
         }).fix()
         println(fix.fixed.printTrimmed())
-        Assertions.assertThat(fix.rulesThatMadeChanges).isEmpty()
+        assertThat(fix.rulesThatMadeChanges).isEmpty()
     }
 
     @Test
@@ -270,5 +270,100 @@ interface OrderImportTest {
             
             public class A {}
         """.trimIndent())
+    }
+
+    @Test
+    fun springCloudFormat(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.io.ByteArrayOutputStream;
+            import java.nio.charset.StandardCharsets;
+            import java.util.Collections;
+            import java.util.zip.GZIPOutputStream;
+            
+            import javax.servlet.ReadListener;
+            import javax.servlet.ServletInputStream;
+            import javax.servlet.ServletOutputStream;
+            
+            import com.fasterxml.jackson.databind.ObjectMapper;
+            import org.apache.commons.logging.Log;
+            import reactor.core.publisher.Mono;
+            
+            import org.springframework.core.io.buffer.DataBuffer;
+            import org.springframework.core.io.buffer.DataBufferFactory;
+            import org.springframework.http.HttpHeaders;
+            import org.springframework.util.MultiValueMap;
+            import org.springframework.web.bind.annotation.PathVariable;
+            import org.springframework.web.server.ServerWebExchange;
+            
+            import static java.util.Arrays.stream;
+            import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
+            
+            public class A {}
+        """.trimIndent())
+
+        val orderImports = OrderImports().apply {
+            setLayout(OrderImports.Layout.builder(999, 999)
+                    .importPackage("java.*")
+                    .blankLine()
+                    .importPackage("javax.*")
+                    .blankLine()
+                    .importAllOthers()
+                    .blankLine()
+                    .importPackage("org.springframework.*")
+                    .blankLine()
+                    .importStaticAllOthers()
+                    .build())
+
+            setRemoveUnused(false)
+        }
+
+        val fixed = a.refactor().visit(orderImports).fix().fixed
+
+        assertRefactored(fixed, """
+            import java.io.ByteArrayOutputStream;
+            import java.nio.charset.StandardCharsets;
+            import java.util.Collections;
+            import java.util.zip.GZIPOutputStream;
+            
+            import javax.servlet.ReadListener;
+            import javax.servlet.ServletInputStream;
+            import javax.servlet.ServletOutputStream;
+            
+            import com.fasterxml.jackson.databind.ObjectMapper;
+            import org.apache.commons.logging.Log;
+            import reactor.core.publisher.Mono;
+            
+            import org.springframework.core.io.buffer.DataBuffer;
+            import org.springframework.core.io.buffer.DataBufferFactory;
+            import org.springframework.http.HttpHeaders;
+            import org.springframework.util.MultiValueMap;
+            import org.springframework.web.bind.annotation.PathVariable;
+            import org.springframework.web.server.ServerWebExchange;
+            
+            import static java.util.Arrays.stream;
+            import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
+            
+            public class A {}
+        """.trimIndent())
+    }
+
+    @Test
+    fun importSorting(jp: JavaParser) {
+        val a = jp.parse("""
+            import r.core.Flux;
+            import s.core.Flux;
+            import com.fasterxml.jackson.databind.ObjectMapper;
+            import org.apache.commons.logging.Log;
+            import reactor.core.publisher.Mono;
+            
+            public class A {}
+        """.trimIndent())
+
+        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+            setRemoveUnused(false)
+        }).fix().fixed
+
+        assertThat(fixed.imports.map { it.packageName.substringBefore('.') })
+                .containsExactly("com", "org", "r", "reactor", "s")
     }
 }

@@ -20,10 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
@@ -31,6 +28,25 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.valid;
 
 public class OrderImports extends JavaRefactorVisitor {
+    // VisibleForTesting
+    final static Comparator<J.Import> IMPORT_SORTING = (i1, i2) -> {
+        String[] import1 = i1.getQualid().printTrimmed().split("\\.");
+        String[] import2 = i2.getQualid().printTrimmed().split("\\.");
+
+        for(int i = 0; i < Math.min(import1.length, import2.length); i++) {
+            int diff = import1[i].compareTo(import2[i]);
+            if(diff != 0) {
+                return diff;
+            }
+        }
+
+        if(import1.length == import2.length) {
+            return 0;
+        }
+
+        return import1.length > import2.length ? 1 : -1;
+    };
+
     // VisibleForTesting
     Layout layout;
 
@@ -227,15 +243,7 @@ public class OrderImports extends JavaRefactorVisitor {
 
                 @Override
                 public List<J.Import> orderedImports() {
-                    imports.sort((i1, i2) -> {
-                        String import1 = i1.getQualid().printTrimmed();
-                        String import2 = i2.getQualid().printTrimmed();
-                        long dots = import1.chars().filter(c -> c == '.').count() - import2.chars().filter(c -> c == '.').count();
-                        if (dots != 0) {
-                            return (int) dots;
-                        }
-                        return import1.compareTo(import2);
-                    });
+                    imports.sort(IMPORT_SORTING);
 
                     boolean foundStar = false;
                     int consecutiveSamePackages = 0;
