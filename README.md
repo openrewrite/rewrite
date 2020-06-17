@@ -10,6 +10,7 @@ The Rewrite project is a mass refactoring ecosystem for Java and other source co
 ## Table of contents
 
 * [What is this?](https://github.com/openrewrite/rewrite/wiki)
+* [Applying Rewrite to your Maven build](https://github.com/openrewrite/rewrite-maven-plugin)
 * [What is unique about the Rewrite AST?](https://github.com/openrewrite/rewrite/wiki/What-is-unique-about-the-Rewrite-AST%3F)
 * [Rewrite components](https://github.com/openrewrite/rewrite/wiki/Rewrite-components)
 * [Refactoring Java source code](https://github.com/openrewrite/rewrite/wiki/Refactoring-Java-source-code)
