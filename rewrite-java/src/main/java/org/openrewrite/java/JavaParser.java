@@ -59,6 +59,31 @@ public interface JavaParser {
                 .collect(toList());
     }
 
+    /**
+     * Builds a Java parser with a language level equal to that of the JDK running this JVM process.
+     */
+    static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
+        JavaParser.Builder<? extends JavaParser, ?> javaParser;
+        try {
+            if (System.getProperty("java.version").startsWith("1.8")) {
+                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java8Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+            } else {
+                javaParser = (JavaParser.Builder<? extends JavaParser, ?>) Class
+                        .forName("org.openrewrite.java.Java11Parser")
+                        .getDeclaredMethod("builder")
+                        .invoke(null);
+            }
+        } catch (Exception e) {
+            throw new IllegalStateException("Unable to create a Java parser instance. " +
+                    "`rewrite-java-8` or `rewrite-java-11` must be on the classpath.");
+        }
+
+        return javaParser;
+    }
+    
     List<J.CompilationUnit> parse(List<Path> sourceFiles, @Nullable Path relativeTo);
 
     default J.CompilationUnit parse(String source, String whichDependsOn) {
