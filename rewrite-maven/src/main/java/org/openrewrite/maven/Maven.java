@@ -1,4 +1,4 @@
-package org.openrewrite.xml.maven;
+package org.openrewrite.maven;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -116,6 +116,60 @@ public interface Maven extends Serializable, Tree {
         @Override
         public Pom withFormatting(Formatting fmt) {
             return new Pom(document.withFormatting(fmt));
+        }
+    }
+
+    class Parent implements Maven {
+        private final Xml.Tag tag;
+
+        public Parent(Xml.Tag tag) {
+            this.tag = tag;
+        }
+
+        @Nullable
+        public String getGroupId() {
+            return tag.getChildValue("groupId")
+                    .orElse(null);
+        }
+
+        public Parent withGroupId(String groupId) {
+            return new Parent(tag.getChildAndWithValue("groupId", groupId));
+        }
+
+        @Nullable
+        public String getArtifactId() {
+            return tag.getChildValue("artifactId")
+                    .orElse(null);
+        }
+
+        public Parent withArtifactId(String artifactId) {
+            return new Parent(tag.getChildAndWithValue("artifactId", artifactId));
+        }
+
+        @Nullable
+        public String getVersion() {
+            return tag.getChildValue("version")
+                    .orElse(null);
+        }
+
+        public Parent withVersion(String version) {
+            return new Parent(tag.getChildAndWithValue("version", version));
+        }
+
+        @Override
+        public Formatting getFormatting() {
+            return tag.getFormatting();
+        }
+
+        @Override
+        public UUID getId() {
+            return tag.getId();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Parent withFormatting(Formatting fmt) {
+            return new Parent(tag.withFormatting(fmt));
         }
     }
 }

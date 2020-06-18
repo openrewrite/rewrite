@@ -1,18 +1,8 @@
-package org.openrewrite.xml.maven;
+package org.openrewrite.maven;
 
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.internal.XmlParserVisitor;
-import org.openrewrite.xml.internal.grammar.XMLLexer;
-import org.openrewrite.xml.internal.grammar.XMLParser;
-import org.openrewrite.xml.tree.Xml;
 
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 

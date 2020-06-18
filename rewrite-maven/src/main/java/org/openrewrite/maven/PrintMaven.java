@@ -1,4 +1,4 @@
-package org.openrewrite.xml.maven;
+package org.openrewrite.maven;
 
 import org.openrewrite.Tree;
 import org.openrewrite.xml.internal.PrintXml;

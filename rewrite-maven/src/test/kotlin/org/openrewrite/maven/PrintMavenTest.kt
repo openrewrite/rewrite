@@ -1,4 +1,4 @@
-package org.openrewrite.xml.maven
+package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
