@@ -28,10 +28,8 @@ import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 
@@ -160,6 +158,11 @@ public interface Xml extends Serializable, Tree {
                     formatting);
         }
 
+        public Xml.Tag withValue(String value) {
+            Xml.CharData charData = (Xml.CharData) content.get(0);
+            return withContent(Collections.singletonList(charData.withText(value)));
+        }
+
         @With
         List<Attribute> attributes;
 
@@ -171,6 +174,25 @@ public interface Xml extends Serializable, Tree {
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
                     .findAny();
+        }
+
+        /**
+         * Locate an child tag with the given name and set its text value.
+         *
+         * @param childName The child tag to locate. This assumes there is only one.
+         * @param text      The text value to set.
+         * @return This tag.
+         */
+        public Xml.Tag getChildAndWithValue(String childName, String text) {
+            return getChild(childName)
+                    .map(tag -> this.withContent(
+                            this.getContent().stream()
+                                    .map(content -> content == tag ?
+                                            ((Tag) content).withValue(text) :
+                                            content)
+                                    .collect(Collectors.toList())
+                    ))
+                    .orElse(this);
         }
 
         /**
@@ -187,14 +209,13 @@ public interface Xml extends Serializable, Tree {
         }
 
         /**
-         * A shortcut for {@link #getChildValue(String)} and {@link #getValue()}.
+         * A shortcut for {@link #getChild(String)} and {@link #getValue()}.
          *
          * @param name The name of the child element to look for.
          * @return The character data of the first child element matching the provided name, if any.
          */
-        @Nullable
-        public String getChildValue(String name) {
-            return getChild(name).flatMap(Tag::getValue).orElse(null);
+        public Optional<String> getChildValue(String name) {
+            return getChild(name).flatMap(Tag::getValue);
         }
 
         public Optional<Tag> getSibling(String name, Cursor cursor) {
@@ -206,7 +227,7 @@ public interface Xml extends Serializable, Tree {
         }
 
         public Tag withContent(List<Content> content) {
-            if(this.content == content) {
+            if (this.content == content) {
                 return this;
             }
 

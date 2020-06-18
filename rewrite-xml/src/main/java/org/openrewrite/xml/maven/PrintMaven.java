@@ -1,0 +1,18 @@
+package org.openrewrite.xml.maven;
+
+import org.openrewrite.Tree;
+import org.openrewrite.xml.internal.PrintXml;
+
+public class PrintMaven extends MavenSourceVisitor<String> {
+    private final PrintXml printXml = new PrintXml();
+
+    @Override
+    public String defaultTo(Tree t) {
+        return "";
+    }
+
+    @Override
+    public String visitPom(Maven.Pom pom) {
+        return printXml.visitDocument(pom.getDocument());
+    }
+}
