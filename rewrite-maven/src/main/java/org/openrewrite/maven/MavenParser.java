@@ -12,6 +12,8 @@ public class MavenParser {
     private final XmlParser xmlParser = new XmlParser();
 
     public List<Maven.Pom> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
+
+
         return sourceFiles.stream().map(source -> parse(source, relativeTo)).collect(toList());
     }
 
