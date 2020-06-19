@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Refactor;
 import org.openrewrite.SourceFile;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
@@ -53,13 +54,16 @@ public class CompositeRefactorVisitor<T extends Tree> extends SourceVisitor<T> {
         return name;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public T visitTree(Tree tree) {
-        @SuppressWarnings("unchecked") T t = (T) tree;
-        for (SourceVisitor<T> delegate : delegates) {
-            t = delegate.visit(tree);
+        T t = (T) tree;
+        if(tree instanceof SourceFile) {
+            Refactor<SourceFile, T> refactor = new Refactor<>((SourceFile) t);
+            return (T) refactor.visit(delegates).fix().getFixed();
         }
-        return t;
+
+        return super.visitTree(tree);
     }
 
     @Override

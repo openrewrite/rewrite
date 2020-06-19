@@ -15,7 +15,6 @@
  */
 package org.openrewrite.config
 
-import io.micrometer.core.instrument.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
