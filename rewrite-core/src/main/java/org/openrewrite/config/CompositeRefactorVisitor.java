@@ -17,16 +17,17 @@ package org.openrewrite.config;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.SourceFile;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 
 import java.util.List;
 
-public class CompositeSourceVisitor extends SourceVisitor<Object> {
+public class CompositeRefactorVisitor<T extends Tree> extends SourceVisitor<T> {
     private String name;
-    private final List<SourceVisitor<Object>> delegates;
+    private final List<SourceVisitor<T>> delegates;
 
-    public CompositeSourceVisitor(String name, List<SourceVisitor<Object>> delegates) {
+    public CompositeRefactorVisitor(String name, List<SourceVisitor<T>> delegates) {
         this.name = name;
         this.delegates = delegates;
         delegates.forEach(this::andThen);
@@ -37,7 +38,7 @@ public class CompositeSourceVisitor extends SourceVisitor<Object> {
         return Tags.of("name", name);
     }
 
-    CompositeSourceVisitor setName(String name) {
+    CompositeRefactorVisitor<T> setName(String name) {
         this.name = name;
         return this;
     }
@@ -53,7 +54,16 @@ public class CompositeSourceVisitor extends SourceVisitor<Object> {
     }
 
     @Override
-    public Object defaultTo(Tree t) {
+    public T visitTree(Tree tree) {
+        @SuppressWarnings("unchecked") T t = (T) tree;
+        for (SourceVisitor<T> delegate : delegates) {
+            t = delegate.visit(tree);
+        }
+        return t;
+    }
+
+    @Override
+    public T defaultTo(Tree t) {
         return delegates.stream().findAny().map(v -> v.defaultTo(t)).orElse(null);
     }
 }

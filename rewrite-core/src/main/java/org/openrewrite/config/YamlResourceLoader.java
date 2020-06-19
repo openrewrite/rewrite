@@ -107,7 +107,7 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
             }
         }
 
-        this.visitors.add(new CompositeSourceVisitor(visitorMap.get("name").toString(), subVisitors));
+        this.visitors.add(new CompositeRefactorVisitor(visitorMap.get("name").toString(), subVisitors));
     }
 
     private Class<?> visitorClass(String name) throws ClassNotFoundException {

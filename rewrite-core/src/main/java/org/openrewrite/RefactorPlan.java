@@ -78,8 +78,8 @@ public class RefactorPlan {
                     Type genericSuperclass = v.getClass().getGenericSuperclass();
 
                     // TODO better way to handle this?
-                    if(CompositeSourceVisitor.class.equals(v.getClass())) {
-                        genericSuperclass = ((CompositeSourceVisitor) v).getVisitorType()
+                    if(CompositeRefactorVisitor.class.equals(v.getClass())) {
+                        genericSuperclass = ((CompositeRefactorVisitor) v).getVisitorType()
                                 .getGenericSuperclass();
                     }
 
