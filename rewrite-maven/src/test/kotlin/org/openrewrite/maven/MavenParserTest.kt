@@ -24,7 +24,8 @@ class MavenParserTest {
             """.trimIndent().trim())
         }
 
-        val pom = MavenParser().parse(pomFile.toPath(), tempDir)
+        val pom = MavenParser.builder().build()
+                .parse(pomFile.toPath(), tempDir)
 
         assertThat(pom.groupId).isEqualTo("com.mycompany.app")
         assertThat(pom.artifactId).isEqualTo("my-app")
@@ -41,6 +42,7 @@ class MavenParserTest {
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                  
+                  <packaging>pom</packaging>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
@@ -61,17 +63,26 @@ class MavenParserTest {
                     <artifactId>my-app</artifactId>
                     <version>1</version>
                   </parent>
-                 
+                
                   <artifactId>my-module</artifactId>
+                
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.junit.jupiter</groupId>
+                      <artifactId>junit-jupiter-api</artifactId>
+                      <version>5.6.2</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
                 </project>
             """.trimIndent())
         }
 
-        val pom = MavenParser()
+        val pom = MavenParser.builder().build()
                 .parse(listOf(pomFile.toPath(), parentPomFile.toPath()), tempDir)[0]
 
         assertThat(pom.groupId).isEqualTo("com.mycompany.app")
-        assertThat(pom.artifactId).isEqualTo("my-app")
+        assertThat(pom.artifactId).isEqualTo("my-module")
         assertThat(pom.version).isEqualTo("1")
     }
 

@@ -22,7 +22,8 @@ class PrintMavenTest {
         val pomFile = File(tempDir.toFile(), "pom.xml")
                 .apply { writeText(pomText) }
 
-        val pom = MavenParser().parse(pomFile.toPath(), tempDir)
+        val pom = MavenParser.builder().build()
+                .parse(pomFile.toPath(), tempDir)
 
         assertThat(pom.print()).isEqualTo(pomText)
     }

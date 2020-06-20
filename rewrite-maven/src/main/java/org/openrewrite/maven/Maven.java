@@ -29,9 +29,11 @@ public interface Maven extends Serializable, Tree {
     }
 
     class Pom implements Maven, SourceFile {
+        private final MavenModel model;
         private final Xml.Document document;
 
-        public Pom(Xml.Document document) {
+        public Pom(MavenModel model, Xml.Document document) {
+            this.model = model;
             this.document = document;
         }
 
@@ -42,33 +44,33 @@ public interface Maven extends Serializable, Tree {
         @Nullable
         public String getGroupId() {
             return document.getRoot().getChildValue("groupId")
-                    .orElse(null);
+                    .orElse(model.getModuleVersion().getGroupId());
         }
 
         public Pom withGroupId(String groupId) {
-            return new Pom(document.withRoot(document.getRoot()
+            return new Pom(model, document.withRoot(document.getRoot()
                     .getChildAndWithValue("groupId", groupId)));
         }
 
         @Nullable
         public String getArtifactId() {
             return document.getRoot().getChildValue("artifactId")
-                    .orElse(null);
+                    .orElse(model.getModuleVersion().getArtifactId());
         }
 
         public Pom withArtifactId(String artifactId) {
-            return new Pom(document.withRoot(document.getRoot()
+            return new Pom(model, document.withRoot(document.getRoot()
                     .getChildAndWithValue("artifactId", artifactId)));
         }
 
         @Nullable
         public String getVersion() {
             return document.getRoot().getChildValue("version")
-                    .orElse(null);
+                    .orElse(model.getModuleVersion().getVersion());
         }
 
         public Pom withVersion(String version) {
-            return new Pom(document.withRoot(document.getRoot()
+            return new Pom(model, document.withRoot(document.getRoot()
                     .getChildAndWithValue("version", version)));
         }
 
@@ -115,7 +117,7 @@ public interface Maven extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Pom withFormatting(Formatting fmt) {
-            return new Pom(document.withFormatting(fmt));
+            return new Pom(model, document.withFormatting(fmt));
         }
     }
 
