@@ -25,17 +25,21 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public class MavenParser {
     private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
 
     private final XmlParser xmlParser = new XmlParser();
+    private final boolean resolveDependencies;
     private final File localRepository;
 
-    private MavenParser(File localRepository) {
+    private MavenParser(boolean resolveDependencies, File localRepository) {
+        this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
     }
 
@@ -80,45 +84,50 @@ public class MavenParser {
                     result, result.getRawModel(model.getParent().getId().replace(":pom", "")));
         }
 
-        logger.debug("Maven model resolved: {}, parsing its dependencies...", model);
         List<MavenModel.Dependency> dependencies = model.getDependencies().stream().map(dependency -> {
-            logger.debug("processing dependency: {}", dependency);
-            Artifact artifact = new DefaultArtifact(
-                    dependency.getGroupId(),
-                    dependency.getArtifactId(),
-                    dependency.getType(),
-                    dependency.getVersion());
-            ArtifactRequest artifactRequest = new ArtifactRequest();
-            artifactRequest.setArtifact(artifact);
-            artifactRequest.setRepositories(singletonList(new RemoteRepository.Builder("central",
-                    "default", "http://central.maven.org/maven2/").build()));
+            if(resolveDependencies) {
+                Artifact artifact = new DefaultArtifact(
+                        dependency.getGroupId(),
+                        dependency.getArtifactId(),
+                        dependency.getType(),
+                        dependency.getVersion());
+                ArtifactRequest artifactRequest = new ArtifactRequest();
+                artifactRequest.setArtifact(artifact);
+                artifactRequest.setRepositories(singletonList(new RemoteRepository.Builder("central",
+                        "default", "http://central.maven.org/maven2/").build()));
 
-            try {
-                ArtifactResult artifactResult = repositorySystem
-                        .resolveArtifact(repositorySystemSession, artifactRequest);
-                artifact = artifactResult.getArtifact();
-                logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+                try {
+                    ArtifactResult artifactResult = repositorySystem
+                            .resolveArtifact(repositorySystemSession, artifactRequest);
+                    artifact = artifactResult.getArtifact();
+                    logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
 
-                return new MavenModel.Dependency(
-                        new MavenModel.ModuleVersionId(
-                                artifact.getGroupId(),
-                                artifact.getArtifactId(),
-                                artifact.getVersion()),
-                        dependency.getScope());
-            } catch (ArtifactResolutionException e) {
-                logger.warn("error resolving artifact: {}", e.getMessage());
-                return new MavenModel.Dependency(
-                        new MavenModel.ModuleVersionId(
-                                dependency.getGroupId(),
-                                dependency.getArtifactId(),
-                                dependency.getVersion()),
-                        dependency.getScope());
+                    return new MavenModel.Dependency(
+                            new MavenModel.ModuleVersionId(
+                                    artifact.getGroupId(),
+                                    artifact.getArtifactId(),
+                                    artifact.getVersion()),
+                            dependency.getScope());
+                } catch (ArtifactResolutionException e) {
+                    logger.warn("error resolving artifact: {}", e.getMessage());
+                }
             }
+
+            return new MavenModel.Dependency(
+                    new MavenModel.ModuleVersionId(
+                            dependency.getGroupId(),
+                            dependency.getArtifactId(),
+                            dependency.getVersion()),
+                    dependency.getScope());
         }).collect(toList());
+
+        Map<String, String> properties = model.getProperties().entrySet().stream()
+                .collect(toMap(e -> e.getKey().toString(), e -> e.getValue().toString()));
 
         return new MavenModel(parent,
                 new MavenModel.ModuleVersionId(model.getGroupId(), model.getArtifactId(), model.getVersion()),
-                dependencies);
+                dependencies,
+                properties);
     }
 
     private RepositorySystem getRepositorySystem() {
@@ -182,15 +191,21 @@ public class MavenParser {
     }
 
     public static class Builder {
-        File localRepository = new File(System.getProperty("user.home") + "/.m2");
+        private boolean resolveDependencies = true;
+        private File localRepository = new File(System.getProperty("user.home") + "/.m2");
 
         public Builder localRepository(File localRepository) {
             this.localRepository = localRepository;
             return this;
         }
 
+        public Builder resolveDependencies(boolean resolveDependencies) {
+            this.resolveDependencies = resolveDependencies;
+            return this;
+        }
+
         public MavenParser build() {
-            return new MavenParser(localRepository);
+            return new MavenParser(resolveDependencies, localRepository);
         }
     }
 }

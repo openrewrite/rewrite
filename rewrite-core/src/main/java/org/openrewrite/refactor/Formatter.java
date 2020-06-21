@@ -48,7 +48,7 @@ public class Formatter {
         }
     }
 
-    protected Result wholeSourceIndent() {
+    public Result wholeSourceIndent() {
         if (wholeSourceIndent == null) {
             FindIndent wholeSourceIndentVisitor = new FindIndent(0);
             wholeSourceIndentVisitor.visit(root);

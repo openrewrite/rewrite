@@ -1,12 +1,21 @@
 package org.openrewrite.maven;
 
-import org.openrewrite.xml.XmlSourceVisitor;
+import org.openrewrite.SourceVisitor;
 
-public abstract class MavenSourceVisitor<R> extends XmlSourceVisitor<R> {
+public abstract class MavenSourceVisitor<R> extends SourceVisitor<R> {
     public R visitPom(Maven.Pom pom) {
-        return reduce(
-                defaultTo(pom),
-                visit(pom.getDocument())
-        );
+        return defaultTo(pom);
+    }
+
+    public R visitParent(Maven.Parent parent) {
+        return defaultTo(parent);
+    }
+
+    public R visitDependency(Maven.Dependency dependency) {
+        return defaultTo(dependency);
+    }
+
+    public R visitProperty(Maven.Property property) {
+        return defaultTo(property);
     }
 }

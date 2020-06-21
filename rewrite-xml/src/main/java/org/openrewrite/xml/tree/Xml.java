@@ -31,6 +31,7 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -176,6 +177,21 @@ public interface Xml extends Serializable, Tree {
                     .findAny();
         }
 
+        public List<Tag> getChildren(String name) {
+            return content.stream()
+                    .filter(t -> t instanceof Xml.Tag)
+                    .map(Tag.class::cast)
+                    .filter(t -> t.getName().equals(name))
+                    .collect(toList());
+        }
+
+        public List<Tag> getChildren() {
+            return content.stream()
+                    .filter(t -> t instanceof Xml.Tag)
+                    .map(Tag.class::cast)
+                    .collect(toList());
+        }
+
         /**
          * Locate an child tag with the given name and set its text value.
          *
@@ -183,14 +199,14 @@ public interface Xml extends Serializable, Tree {
          * @param text      The text value to set.
          * @return This tag.
          */
-        public Xml.Tag getChildAndWithValue(String childName, String text) {
+        public Xml.Tag withChildValue(String childName, String text) {
             return getChild(childName)
                     .map(tag -> this.withContent(
                             this.getContent().stream()
                                     .map(content -> content == tag ?
                                             ((Tag) content).withValue(text) :
                                             content)
-                                    .collect(Collectors.toList())
+                                    .collect(toList())
                     ))
                     .orElse(this);
         }

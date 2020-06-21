@@ -79,7 +79,6 @@ public class FindIndent extends SourceVisitor<Void> {
 
             indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
 
-
             AtomicBoolean dropWhile = new AtomicBoolean(false);
             takeWhile.set(true);
             Map<Boolean, Long> indentTypeCounts = prefix.chars()
