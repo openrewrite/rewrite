@@ -7,6 +7,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,7 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
 public class MavenModel {
+    @With
     @Nullable
     MavenModel parent;
 
@@ -29,6 +31,16 @@ public class MavenModel {
 
     @With
     Map<String, String> properties;
+
+    /**
+     * Modules inheriting from the POM this model represents. To cut the
+     * object cycle, the parent of all of these modules will be null.
+     */
+    Collection<MavenModel> inheriting;
+
+    MavenModel withInheriting(Collection<MavenModel> inheriting) {
+        return new MavenModel(parent, moduleVersion, dependencies, properties, inheriting);
+    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data

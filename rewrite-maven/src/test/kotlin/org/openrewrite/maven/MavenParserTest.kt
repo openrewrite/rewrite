@@ -115,69 +115,16 @@ class MavenParserTest {
             """.trimIndent())
         }
 
-        val pom = MavenParser.builder()
+        val (pom, parentPom) = MavenParser.builder()
                 .resolveDependencies(false)
                 .build()
-                .parse(listOf(pomFile.toPath(), parentPomFile.toPath()), tempDir)[0]
+                .parse(listOf(pomFile.toPath(), parentPomFile.toPath()), tempDir)
 
         assertThat(pom.model.moduleVersion.groupId).isEqualTo("com.mycompany.app")
         assertThat(pom.artifactId).isEqualTo("my-module")
         assertThat(pom.model.moduleVersion.version).isEqualTo("1")
-    }
 
-    /**
-     * https://maven.apache.org/guides/introduction/introduction-to-the-pom.html#Project_Aggregation
-     * FIXME this still doesn't work correctly
-     */
-    @Test
-    fun projectAggregation(@TempDir tempDir: Path) {
-        val parentPomFile = File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <modules>
-                    <module>my-module</module>
-                  </modules>
-                </project>
-            """.trimIndent().trim())
-        }
-
-        val myModuleProject = File(tempDir.toFile(), "my-module")
-        myModuleProject.mkdirs()
-
-        val pomFile = File(myModuleProject, "pom.xml").apply {
-            writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-module</artifactId>
-                  <version>1</version>
-                
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.junit.jupiter</groupId>
-                      <artifactId>junit-jupiter-api</artifactId>
-                      <version>5.6.2</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """.trimIndent())
-        }
-
-        val pom = MavenParser.builder()
-                .resolveDependencies(false)
-                .build()
-                .parse(listOf(pomFile.toPath(), parentPomFile.toPath()), tempDir)[0]
-
-        assertThat(pom.groupId).isEqualTo("com.mycompany.app")
-        assertThat(pom.artifactId).isEqualTo("my-module")
-        assertThat(pom.version).isEqualTo("1")
+        assertThat(parentPom.model.inheriting.firstOrNull()?.moduleVersion)
+                .isEqualTo(pom.model.moduleVersion)
     }
 }
