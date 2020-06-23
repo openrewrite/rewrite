@@ -11,6 +11,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.io.Serializable;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import static java.util.Collections.emptyList;
@@ -50,6 +51,10 @@ public interface Maven extends Serializable, Tree {
         public Pom(MavenModel model, Xml.Document document) {
             this.model = model;
             this.document = document;
+        }
+
+        public Refactor<Pom, Maven> refactor() {
+            return new Refactor<>(this);
         }
 
         Xml.Document getDocument() {
@@ -100,10 +105,26 @@ public interface Maven extends Serializable, Tree {
 
         public Pom withDependencies(List<Dependency> dependencies) {
             synchronized (memoizationLock) {
-                if (dependencies != memoizedDependencies) {
+                if (dependencies != getDependencies()) {
+                    if (dependencies.size() == memoizedDependencies.size()) {
+                        boolean changed = false;
+                        for (int i = 0; i < memoizedDependencies.size(); i++) {
+                            Dependency dependency = dependencies.get(i);
+                            Dependency memoizedDependency = memoizedDependencies.get(i);
+                            if (dependency.tag != memoizedDependency.tag ||
+                                    !dependency.getModel().equals(memoizedDependency.model)) {
+                                changed = true;
+                                break;
+                            }
+                        }
+                        if (!changed) {
+                            return this;
+                        }
+                    }
+
                     memoizedDependencies = dependencies;
                     Xml.Tag dependenciesTag = document.getRoot().getChild("dependencies").orElse(null);
-                    if(dependenciesTag == null) {
+                    if (dependenciesTag == null) {
                         throw new IllegalStateException("Expecting <dependencies> to already exist in POM");
                     }
 
@@ -155,10 +176,25 @@ public interface Maven extends Serializable, Tree {
 
         public Pom withProperties(List<Property> properties) {
             synchronized (memoizationLock) {
-                if (properties != memoizedProperties) {
+                if (properties != getProperties()) {
+                    if (properties.size() == memoizedProperties.size()) {
+                        boolean changed = false;
+                        for (int i = 0; i < memoizedProperties.size(); i++) {
+                            Property property = properties.get(i);
+                            Property memoizedProperty = memoizedProperties.get(i);
+                            if (property.tag != memoizedProperty.tag) {
+                                changed = true;
+                                break;
+                            }
+                        }
+                        if (!changed) {
+                            return this;
+                        }
+                    }
+
                     memoizedProperties = properties;
                     Xml.Tag propertiesTag = document.getRoot().getChild("properties").orElse(null);
-                    if(propertiesTag == null) {
+                    if (propertiesTag == null) {
                         throw new IllegalStateException("Expecting <properties> to already exist in POM");
                     }
 
@@ -182,8 +218,20 @@ public interface Maven extends Serializable, Tree {
             return memoizeProperties();
         }
 
+        /**
+         * @param maybePropertyReference A tag value (text content) that may represent a property.
+         * @return A matching property, if the tag value is in fact a property reference
+         * and such a property is defined.
+         */
+        public Optional<Property> getPropertyFromValue(String maybePropertyReference) {
+            return getPropertyKey(maybePropertyReference)
+                    .flatMap(key -> getProperties().stream()
+                            .filter(prop -> prop.getKey().equals(key))
+                            .findAny());
+        }
+
         private List<Property> memoizeProperties() {
-            if(memoizedProperties == null) {
+            if (memoizedProperties == null) {
                 List<Property> props = document.getRoot().getChild("properties")
                         .map(properties -> properties.getContent().stream()
                                 .filter(c -> c instanceof Xml.Tag)
@@ -193,7 +241,7 @@ public interface Maven extends Serializable, Tree {
                         .orElse(emptyList());
 
                 synchronized (memoizationLock) {
-                    if(memoizedProperties == null) {
+                    if (memoizedProperties == null) {
                         memoizedProperties = props;
                     }
                 }
@@ -421,5 +469,12 @@ public interface Maven extends Serializable, Tree {
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitProperty(this);
         }
+    }
+
+    static Optional<String> getPropertyKey(String textValue) {
+        if (textValue.startsWith("${") && textValue.endsWith("}")) {
+            return Optional.of(textValue.substring(2, textValue.length() - 1));
+        }
+        return Optional.empty();
     }
 }

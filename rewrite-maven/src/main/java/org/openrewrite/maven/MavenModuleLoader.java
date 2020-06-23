@@ -23,11 +23,9 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -101,7 +99,7 @@ class MavenModuleLoader {
                 ArtifactRequest artifactRequest = new ArtifactRequest();
                 artifactRequest.setArtifact(artifact);
                 artifactRequest.setRepositories(singletonList(new RemoteRepository.Builder("central",
-                        "default", "http://central.maven.org/maven2/").build()));
+                        "default", "https://central.maven.org/maven2/").build()));
 
                 try {
                     ArtifactResult artifactResult = repositorySystem
