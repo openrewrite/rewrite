@@ -51,7 +51,8 @@ public class XPathMatcher {
                     expression.substring(2) : expression).split("/")));
             Collections.reverse(parts);
 
-            for (int i = 0, pathIndex = 0; i < parts.size(); i++, pathIndex++) {
+            int pathIndex = 0;
+            for (int i = 0; i < parts.size(); i++, pathIndex++) {
                 String part = parts.get(i);
                 if (part.startsWith("@")) {
                     if (!(cursor.getTree() instanceof Xml.Attribute &&
@@ -69,7 +70,7 @@ public class XPathMatcher {
                 }
             }
 
-            return true;
+            return expression.startsWith("/") || pathIndex == path.size();
         } else if (expression.startsWith("/")) {
             Collections.reverse(path);
 
