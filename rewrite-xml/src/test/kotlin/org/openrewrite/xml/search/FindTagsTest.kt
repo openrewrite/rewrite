@@ -25,10 +25,12 @@ import org.openrewrite.xml.tree.Xml
 class FindTagsTest : XmlParser() {
     private val x = parse("""
             <?xml version="1.0" encoding="UTF-8"?>
-            <dependencies>
-                <dependency/>
-                <dependency/>
-            </dependency>
+            <project>
+                <dependencies>
+                    <dependency/>
+                    <dependency/>
+                </dependency>
+            </project>
         """.trimIndent())
 
     private val deep = parse("""
@@ -45,7 +47,7 @@ class FindTagsTest : XmlParser() {
 
     @Test
     fun findAbsolute() {
-        assertThat(FindTags("/dependencies/dependency").visit(x).map { it.name })
+        assertThat(FindTags("/project/dependencies/dependency").visit(x).map { it.name })
                 .hasSize(2)
                 .containsExactly("dependency", "dependency")
     }

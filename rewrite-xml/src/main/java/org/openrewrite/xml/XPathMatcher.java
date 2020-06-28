@@ -70,7 +70,7 @@ public class XPathMatcher {
                 }
             }
 
-            return expression.startsWith("/") || pathIndex == path.size();
+            return expression.startsWith("/") || path.size() - pathIndex == 1;
         } else if (expression.startsWith("/")) {
             Collections.reverse(path);
 

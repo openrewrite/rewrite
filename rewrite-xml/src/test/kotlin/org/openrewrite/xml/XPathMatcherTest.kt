@@ -54,9 +54,9 @@ class XPathMatcherTest : XmlParser() {
 
     @Test
     fun matchRelativeAttribute() {
-        assertTrue(visitor("artifactId/@scope").visit(x))
-        assertTrue(visitor("artifactId/@*").visit(x))
-        assertTrue(visitor("//artifactId/@scope").visit(x))
+        assertTrue(visitor("dependency/artifactId/@scope").visit(x))
+        assertTrue(visitor("dependency/artifactId/@*").visit(x))
+        assertTrue(visitor("//dependency/artifactId/@scope").visit(x))
     }
 
     private fun visitor(xPath: String): XmlSourceVisitor<Boolean> {

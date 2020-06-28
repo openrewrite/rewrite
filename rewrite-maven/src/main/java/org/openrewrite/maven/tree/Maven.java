@@ -78,7 +78,7 @@ public interface Maven extends Serializable, Tree {
                     .map(dm -> new DependencyManagement(model.getDependencyManagement(), dm))
                     .orElse(null);
 
-            this.memoizedDependencies = new MemoizedTags<>(document.getRoot(), "project/dependencies/dependency",
+            this.memoizedDependencies = new MemoizedTags<>(document.getRoot(), "dependencies/dependency",
                     tag -> new Dependency(
                             false,
                             model.getDependencies().stream()
@@ -89,7 +89,7 @@ public interface Maven extends Serializable, Tree {
                             tag
                     ), Dependency::getTag);
 
-            this.memoizedProperties = new MemoizedTags<>(document.getRoot(), "project/properties/*",
+            this.memoizedProperties = new MemoizedTags<>(document.getRoot(), "properties/*",
                     Property::new, Property::getTag);
         }
 
@@ -475,7 +475,7 @@ public interface Maven extends Serializable, Tree {
             this.model = model;
             this.tag = tag;
 
-            this.memoizedDependencies = new MemoizedTags<>(tag, "dependencyManagement/dependencies/dependency",
+            this.memoizedDependencies = new MemoizedTags<>(tag, "dependencies/dependency",
                     dm -> new Dependency(
                             true,
                             model.getDependencies().stream()
