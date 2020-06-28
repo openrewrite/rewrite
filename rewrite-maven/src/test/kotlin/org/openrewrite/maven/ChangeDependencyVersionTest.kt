@@ -106,25 +106,25 @@ class ChangeDependencyVersionTest {
 
         assertRefactored(fixed, """
             <project>
-                  <modelVersion>4.0.0</modelVersion>
-                   
-                  <properties>
-                    <guava.version>29.0-jre</guava.version>
-                  </properties>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>${"$"}{guava.version}</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
+              <modelVersion>4.0.0</modelVersion>
+               
+              <properties>
+                <guava.version>29.0-jre</guava.version>
+              </properties>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>${"$"}{guava.version}</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
         """.trimIndent())
     }
 

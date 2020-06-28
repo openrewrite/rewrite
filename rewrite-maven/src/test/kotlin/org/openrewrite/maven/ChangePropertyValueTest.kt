@@ -2,7 +2,6 @@ package org.openrewrite.maven
 
 import assertRefactored
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.fail
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
@@ -40,16 +39,16 @@ class ChangePropertyValueTest {
 
         assertRefactored(fixed, """
             <project>
-                  <modelVersion>4.0.0</modelVersion>
-                   
-                  <properties>
-                    <guava.version>29.0-jre</guava.version>
-                  </properties>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
+              <modelVersion>4.0.0</modelVersion>
+               
+              <properties>
+                <guava.version>29.0-jre</guava.version>
+              </properties>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
         """.trimIndent())
     }
 }

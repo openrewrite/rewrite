@@ -43,7 +43,7 @@ public class ChangePropertyValue extends MavenRefactorVisitor {
         public Maven visitProperty(Maven.Property property) {
             Maven.Property p = refactor(property, super::visitProperty);
             if(this.property.isScope(p)) {
-                p.withValue(toValue);
+                p = p.withValue(toValue);
             }
             return p;
         }
