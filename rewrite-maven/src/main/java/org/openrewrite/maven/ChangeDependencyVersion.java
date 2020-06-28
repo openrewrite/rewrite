@@ -1,6 +1,22 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
 
@@ -10,7 +26,10 @@ import static org.openrewrite.Validated.required;
 
 public class ChangeDependencyVersion extends MavenRefactorVisitor {
     private String groupId;
+
+    @Nullable
     private String artifactId;
+
     private String toVersion;
 
     public ChangeDependencyVersion() {
@@ -21,7 +40,7 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
         this.groupId = groupId;
     }
 
-    public void setArtifactId(String artifactId) {
+    public void setArtifactId(@Nullable String artifactId) {
         this.artifactId = artifactId;
     }
 
@@ -38,7 +57,26 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
 
     @Override
     public Maven visitProperty(Maven.Property property) {
-        return super.visitProperty(property);
+        Maven.Property p = refactor(property, super::visitProperty);
+
+        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
+
+        if (!property.getValue().equals(toVersion) && Optional.ofNullable(pom)
+                .map(pom2 -> pom2.getModel()
+                        .getInheriting()
+                        .stream()
+                        .anyMatch(mod -> mod.getDependencies().stream()
+                            .filter(d -> Maven.getPropertyKey(d.getRequestedVersion())
+                                    .map(prop -> prop.equals(property.getKey()))
+                                    .orElse(false))
+                            .anyMatch(d -> d.getModuleVersion().getGroupId().equals(groupId) &&
+                                    (artifactId == null || d.getModuleVersion().getArtifactId().equals(artifactId))))
+                )
+                .orElse(false)) {
+            p = p.withValue(toVersion);
+        }
+
+        return p;
     }
 
     @Override
@@ -49,14 +87,13 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
         assert pom != null;
 
         MavenModel.ModuleVersionId mvid = dependency.getModel().getModuleVersion();
-        if (mvid.getGroupId().equals(groupId) && mvid.getArtifactId().equals(artifactId)) {
+        if (mvid.getGroupId().equals(groupId) && (artifactId == null || mvid.getArtifactId().equals(artifactId))) {
             if (!mvid.getVersion().equals(toVersion)) {
                 Optional<Maven.Property> property = pom.getPropertyFromValue(
                         dependency.getVersion());
-                if(property.isPresent()) {
+                if (property.isPresent()) {
                     andThen(new ChangePropertyValue.Scoped(property.get(), toVersion));
-                }
-                else {
+                } else {
                     andThen(new Scoped(d, toVersion));
                 }
             }

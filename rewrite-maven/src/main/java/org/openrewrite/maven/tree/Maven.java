@@ -1,3 +1,18 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
@@ -9,6 +24,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.maven.PrintMaven;
+import org.openrewrite.xml.ChangeTagContent;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.Serializable;
@@ -45,6 +61,10 @@ public interface Maven extends Serializable, Tree {
         private final MavenModel model;
         private final Xml.Document document;
 
+        @Nullable
+        @JsonIgnore
+        private final DependencyManagement dependencyManagement;
+
         @JsonIgnore
         private final MemoizedTags<Dependency> memoizedDependencies;
 
@@ -54,9 +74,13 @@ public interface Maven extends Serializable, Tree {
         public Pom(MavenModel model, Xml.Document document) {
             this.model = model;
             this.document = document;
+            this.dependencyManagement = document.getRoot().getChild("dependencyManagement")
+                    .map(dm -> new DependencyManagement(model.getDependencyManagement(), dm))
+                    .orElse(null);
 
-            this.memoizedDependencies = new MemoizedTags<>(document.getRoot(), "dependencies/dependency",
+            this.memoizedDependencies = new MemoizedTags<>(document.getRoot(), "project/dependencies/dependency",
                     tag -> new Dependency(
+                            false,
                             model.getDependencies().stream()
                                     .filter(d -> d.getModuleVersion().getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
                                             d.getModuleVersion().getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)))
@@ -65,7 +89,7 @@ public interface Maven extends Serializable, Tree {
                             tag
                     ), Dependency::getTag);
 
-            this.memoizedProperties = new MemoizedTags<>(document.getRoot(), "properties/*",
+            this.memoizedProperties = new MemoizedTags<>(document.getRoot(), "project/properties/*",
                     Property::new, Property::getTag);
         }
 
@@ -119,23 +143,30 @@ public interface Maven extends Serializable, Tree {
                             .orElse(null));
         }
 
-        public Pom withDependencies(List<Dependency> dependencies) {
-            return memoizedDependencies.changedTagContent(dependencies)
-                .map(root -> new Pom(
-                        model.withDependencies(dependencies.stream().map(Dependency::getModel).collect(toList())),
-                        document.withRoot(root))
-                )
-                .orElse(this);
+        @Nullable
+        public DependencyManagement getDependencyManagement() {
+            return dependencyManagement;
+        }
+
+        public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
+            return document.getRoot().getChild("dependencyManagement")
+                    .map(dm -> new Pom(model.withDependencyManagement(dependencyManagement.getModel()),
+                            document.withRoot(new Refactor<>(document.getRoot())
+                                    .visit(new ChangeTagContent(dm, dependencyManagement.tag.getContent()))
+                                    .fix()
+                                    .getFixed()))
+                    )
+                    .orElse(this);
         }
 
         public List<Dependency> getDependencies() {
             return memoizedDependencies.getModels();
         }
 
-        public Pom withProperties(List<Property> properties) {
-            return memoizedProperties.changedTagContent(properties)
+        public Pom withDependencies(List<Dependency> dependencies) {
+            return memoizedDependencies.with(dependencies)
                     .map(root -> new Pom(
-                            model.withProperties(properties.stream().collect(toMap(Property::getKey, Property::getValue))),
+                            model.withDependencies(dependencies.stream().map(Dependency::getModel).collect(toList())),
                             document.withRoot(root))
                     )
                     .orElse(this);
@@ -143,6 +174,15 @@ public interface Maven extends Serializable, Tree {
 
         public List<Property> getProperties() {
             return memoizedProperties.getModels();
+        }
+
+        public Pom withProperties(List<Property> properties) {
+            return memoizedProperties.with(properties)
+                    .map(root -> new Pom(
+                            model.withProperties(properties.stream().collect(toMap(Property::getKey, Property::getValue))),
+                            document.withRoot(root))
+                    )
+                    .orElse(this);
         }
 
         /**
@@ -281,14 +321,20 @@ public interface Maven extends Serializable, Tree {
     }
 
     class Dependency implements Maven {
+        private final boolean isManaged;
         private final MavenModel.Dependency model;
 
         @Getter
         final Xml.Tag tag;
 
-        public Dependency(MavenModel.Dependency model, Xml.Tag tag) {
+        public Dependency(boolean isManaged, MavenModel.Dependency model, Xml.Tag tag) {
+            this.isManaged = isManaged;
             this.model = model;
             this.tag = tag;
+        }
+
+        public boolean isManaged() {
+            return isManaged;
         }
 
         public MavenModel.Dependency getModel() {
@@ -300,7 +346,7 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Dependency withGroupId(String groupId) {
-            return new Dependency(model.withModuleVersion(model.getModuleVersion().withGroupId(groupId)),
+            return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withGroupId(groupId)),
                     tag.withChildValue("groupId", groupId));
         }
 
@@ -309,7 +355,7 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Dependency withArtifactId(String artifactId) {
-            return new Dependency(model.withModuleVersion(model.getModuleVersion().withArtifactId(artifactId)),
+            return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withArtifactId(artifactId)),
                     tag.withChildValue("artifactId", artifactId));
         }
 
@@ -319,7 +365,7 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Dependency withVersion(String version) {
-            return new Dependency(model.withModuleVersion(model.getModuleVersion().withVersion(version)),
+            return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withVersion(version)),
                     tag.withChildValue("version", version));
         }
 
@@ -331,7 +377,7 @@ public interface Maven extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Dependency withFormatting(Formatting fmt) {
-            return new Dependency(model, tag.withFormatting(fmt));
+            return new Dependency(isManaged, model, tag.withFormatting(fmt));
         }
 
         @Override
@@ -415,6 +461,72 @@ public interface Maven extends Serializable, Tree {
         @Override
         public int hashCode() {
             return Objects.hash(tag);
+        }
+    }
+
+    class DependencyManagement implements Maven {
+        private final MavenModel.DependencyManagement model;
+        private final Xml.Tag tag;
+
+        @JsonIgnore
+        private final MemoizedTags<Dependency> memoizedDependencies;
+
+        public DependencyManagement(MavenModel.DependencyManagement model, Xml.Tag tag) {
+            this.model = model;
+            this.tag = tag;
+
+            this.memoizedDependencies = new MemoizedTags<>(tag, "dependencyManagement/dependencies/dependency",
+                    dm -> new Dependency(
+                            true,
+                            model.getDependencies().stream()
+                                    .filter(d -> d.getModuleVersion().getGroupId().equals(dm.getChildValue("groupId").orElse(null)) &&
+                                            d.getModuleVersion().getArtifactId().equals(dm.getChildValue("artifactId").orElse(null)))
+                                    .findAny()
+                                    .orElse(null),
+                            dm
+                    ), Dependency::getTag);
+        }
+
+        public MavenModel.DependencyManagement getModel() {
+            return model;
+        }
+
+        public Xml.Tag getTag() {
+            return tag;
+        }
+
+        public DependencyManagement withDependencies(List<Dependency> dependencies) {
+            return memoizedDependencies.with(dependencies)
+                    .map(root -> new DependencyManagement(
+                            model.withDependencies(dependencies.stream().map(Dependency::getModel).collect(toList())),
+                            root)
+                    )
+                    .orElse(this);
+        }
+
+        public List<Dependency> getDependencies() {
+            return memoizedDependencies.getModels();
+        }
+
+        @Override
+        public Formatting getFormatting() {
+            return tag.getFormatting();
+        }
+
+        @Override
+        public UUID getId() {
+            return tag.getId();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T extends Tree> T withFormatting(Formatting fmt) {
+            return (T) tag.withFormatting(fmt);
+        }
+
+        @Override
+        public <R> R acceptMaven(MavenSourceVisitor<R> v) {
+            return v.visitDependencyManagement(this);
         }
     }
 
