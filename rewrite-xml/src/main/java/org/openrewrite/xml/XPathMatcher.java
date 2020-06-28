@@ -51,8 +51,8 @@ public class XPathMatcher {
                     expression.substring(2) : expression).split("/")));
             Collections.reverse(parts);
 
-            for (int i = 0; i < parts.size(); i++) {
-                String part = parts.remove(0);
+            for (int i = 0, pathIndex = 0; i < parts.size(); i++, pathIndex++) {
+                String part = parts.get(i);
                 if (part.startsWith("@")) {
                     if (!(cursor.getTree() instanceof Xml.Attribute &&
                             (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1))) ||
@@ -60,11 +60,11 @@ public class XPathMatcher {
                         return false;
                     }
 
-                    i--;
+                    pathIndex--;
                     continue;
                 }
 
-                if (path.size() < i + 1 || (!path.get(i).getName().equals(part) && !part.equals("*"))) {
+                if (path.size() < i + 1 || (!path.get(pathIndex).getName().equals(part) && !part.equals("*"))) {
                     return false;
                 }
             }

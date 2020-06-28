@@ -1,0 +1,99 @@
+package org.openrewrite.maven.tree;
+
+import org.openrewrite.Refactor;
+import org.openrewrite.xml.ChangeTagContent;
+import org.openrewrite.xml.search.FindTag;
+import org.openrewrite.xml.search.FindTags;
+import org.openrewrite.xml.tree.Content;
+import org.openrewrite.xml.tree.Xml;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.function.Function;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
+
+/**
+ * Helper to map lists of {@link Xml.Tag} to some model object that holds additional context about the contents of each tag,
+ * e.g. resolved dependency version for a Maven dependency tag.
+ *
+ * @param <M> The model type.
+ */
+class MemoizedTags<M> {
+    private final Xml.Tag root;
+    private final String pathToModel;
+    private final Function<Xml.Tag, M> buildModel;
+    private final Function<M, Xml.Tag> modelToTag;
+
+    private final Xml.Tag parent;
+
+    private List<M> memoized;
+
+    protected MemoizedTags(Xml.Tag root, String pathToModel, Function<Xml.Tag, M> buildModel,
+                           Function<M, Xml.Tag> modelToTag) {
+        this.root = root;
+        this.pathToModel = pathToModel;
+        this.buildModel = buildModel;
+        this.modelToTag = modelToTag;
+        this.parent = new FindTag(pathToModel.substring(0, pathToModel.lastIndexOf('/')))
+                .visit(root);
+    }
+
+    public List<M> getModels() {
+        return memoizeIfNecessary();
+    }
+
+    public Optional<Xml.Tag> changedTagContent(List<M> maybeMutated) {
+        if (root == null) {
+            throw new IllegalStateException("Expecting parent tag to already exist");
+        }
+
+        synchronized (this) {
+            if (maybeMutated != getModels()) {
+                if (maybeMutated.size() == memoized.size()) {
+                    for (int i = 0; i < memoized.size(); i++) {
+                        M model = maybeMutated.get(i);
+                        M memoizedModel = memoized.get(i);
+                        if (!model.equals(memoizedModel)) {
+                            memoized = maybeMutated;
+
+                            ChangeTagContent change = new ChangeTagContent(
+                                    parent,
+                                    memoized.stream()
+                                            .map(modelToTag)
+                                            .map(Content.class::cast)
+                                            .collect(toList())
+                            );
+
+                            return Optional.of(new Refactor<>(root)
+                                    .visit(change)
+                                    .fix()
+                                    .getFixed()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        return Optional.empty();
+    }
+
+    private List<M> memoizeIfNecessary() {
+        if (memoized == null) {
+            List<M> memoizable = Optional.ofNullable(root)
+                    .map(parent -> new FindTags(pathToModel).visit(root))
+                    .map(tags -> tags.stream().map(buildModel).collect(toList()))
+                    .orElse(emptyList());
+
+            synchronized (this) {
+                if (memoized == null) {
+                    memoized = memoizable;
+                }
+            }
+        }
+
+        return memoized;
+    }
+}

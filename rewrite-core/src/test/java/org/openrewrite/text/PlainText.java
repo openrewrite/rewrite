@@ -31,7 +31,7 @@ public class PlainText implements SourceFile, Tree {
         this.formatting = formatting;
     }
 
-    public Refactor<PlainText, PlainText> refactor() {
+    public Refactor<PlainText> refactor() {
         return new Refactor<>(this);
     }
 
@@ -46,7 +46,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public String getFileType() {
+    public String getTreeType() {
         return "txt";
     }
 

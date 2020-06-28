@@ -22,7 +22,7 @@ import org.openrewrite.Tree
 import org.openrewrite.xml.tree.Xml
 
 class XPathMatcherTest : XmlParser() {
-    val x = parse("""
+    private val x = parse("""
             <?xml version="1.0" encoding="UTF-8"?>
             <dependencies>
                 <dependency>

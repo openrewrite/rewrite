@@ -1,6 +1,8 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.MavenModel;
 
 import java.util.Optional;
 

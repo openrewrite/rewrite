@@ -35,18 +35,18 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-public class Change<S extends SourceFile> {
+public class Change<T extends Tree> {
     @Getter
     @Nullable
-    private final S original;
+    private final T original;
 
     @Getter
-    private final S fixed;
+    private final T fixed;
 
     @Getter
     private final Set<String> rulesThatMadeChanges;
 
-    public Change(S original, S fixed, Set<String> rulesThatMadeChanges) {
+    public Change(@Nullable T original, T fixed, Set<String> rulesThatMadeChanges) {
         this.original = original;
         this.fixed = fixed;
         this.rulesThatMadeChanges = rulesThatMadeChanges;
@@ -64,7 +64,11 @@ public class Change<S extends SourceFile> {
      * @return Git-style patch diff representing the changes to this compilation unit
      */
     public String diff(@Nullable Path relativeTo) {
-        return new InMemoryDiffEntry(Paths.get(fixed.getSourcePath()), relativeTo,
+        Path sourcePath = fixed instanceof SourceFile ?
+                Paths.get(((SourceFile) fixed).getSourcePath()) :
+                (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + fixed.getId());
+
+        return new InMemoryDiffEntry(sourcePath, relativeTo,
                 original == null ? "" : original.print(), fixed.print(), rulesThatMadeChanges).getDiff();
     }
 

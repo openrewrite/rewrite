@@ -66,7 +66,10 @@ interface ChangeMethodNameTest {
         val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B singleArg(String)")) { ChangeMethodName.Scoped(it, "bar") }
+                .visit(ChangeMethodName().apply {
+                    setMethod("B singleArg(String)")
+                    name = "bar"
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -91,7 +94,10 @@ interface ChangeMethodNameTest {
         val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B arrArg(String[])")) { ChangeMethodName.Scoped(it, "bar") }
+                .visit(ChangeMethodName().apply {
+                    setMethod("B arrArg(String[])")
+                    name = "bar"
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -116,7 +122,10 @@ interface ChangeMethodNameTest {
         val cu = jp.parse(a, b)
 
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B varargArg(String...)")) { ChangeMethodName.Scoped(it, "bar") }
+                .visit(ChangeMethodName().apply {
+                    setMethod("B varargArg(String...)")
+                    name = "bar"
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -147,7 +156,10 @@ interface ChangeMethodNameTest {
 
         val cu = jp.parse(a, b)
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("B error()")) { ChangeMethodName.Scoped(it, "foo") }
+                .visit(ChangeMethodName().apply {
+                    setMethod("B error()")
+                    name = "foo"
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """

@@ -66,12 +66,23 @@ interface InsertMethodArgumentTest {
     @Test
     fun insertArgument(jp: JavaParser) {
         val cu = jp.parse(a, b)
-        val oneParamFoos = cu.findMethodCalls("B foo(String)")
 
         val fixed = cu.refactor()
-                .fold(oneParamFoos) { InsertMethodArgument.Scoped(it, 0, "\"0\"") }
-                .fold(oneParamFoos) { InsertMethodArgument.Scoped(it, 2, "\"2\"") }
-                .fold(cu.findMethodCalls("B foo()")) { InsertMethodArgument.Scoped(it, 0, "\"0\"") }
+                .visit(InsertMethodArgument().apply {
+                    setMethod("B foo(String)")
+                    setIndex(0)
+                    setSource("\"0\"")
+                })
+                .visit(InsertMethodArgument().apply {
+                    setMethod("B foo(String)")
+                    setIndex(2)
+                    setSource("\"2\"")
+                })
+                .visit(InsertMethodArgument().apply {
+                    setMethod("B foo()")
+                    setIndex(0)
+                    setSource("\"0\"")
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """

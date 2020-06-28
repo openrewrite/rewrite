@@ -44,7 +44,10 @@ interface DeleteMethodArgumentTest {
     fun deleteMiddleArgument(jp: JavaParser) {
         val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
         val fixed = a.refactor()
-                .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 1) }
+                .visit(DeleteMethodArgument().apply {
+                    setMethod("B foo(..)")
+                    setIndex(1)
+                })
                 .fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo(0, 2); }}")
     }
@@ -52,10 +55,15 @@ interface DeleteMethodArgumentTest {
     @Test
     fun deleteArgumentsConsecutively(jp: JavaParser) {
         val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
-        val foos = a.findMethodCalls("B foo(..)")
         val fixed = a.refactor()
-                .fold(foos) { DeleteMethodArgument.Scoped(it, 1) }
-                .fold(foos) { DeleteMethodArgument.Scoped(it, 1) }
+                .visit(DeleteMethodArgument().apply {
+                    setMethod("B foo(..)")
+                    setIndex(1)
+                })
+                .visit(DeleteMethodArgument().apply {
+                    setMethod("B foo(..)")
+                    setIndex(1)
+                })
                 .fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo(0); }}")
     }
@@ -64,7 +72,10 @@ interface DeleteMethodArgumentTest {
     fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) {
         val a = jp.parse("public class A {{ B.foo( ); }}", b)
         val fixed = a.refactor()
-                .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 0) }
+                .visit(DeleteMethodArgument().apply {
+                    setMethod("B foo(..)")
+                    setIndex(0)
+                })
                 .fix().fixed
         assertRefactored(fixed, "public class A {{ B.foo( ); }}")
     }
@@ -73,7 +84,10 @@ interface DeleteMethodArgumentTest {
     fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) {
         val a = jp.parse("public class A {{ B.foo( ); }}", b)
         val fixed = a.refactor()
-                .fold(a.findMethodCalls("B foo(..)")) { DeleteMethodArgument.Scoped(it, 0) }
+                .visit(DeleteMethodArgument().apply {
+                    setMethod("B foo(..)")
+                    setIndex(0)
+                })
                 .fix().fixed
         assertTrue(fixed.findMethodCalls("B foo(..)").first().args.args[0] is J.Empty)
     }

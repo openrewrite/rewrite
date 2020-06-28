@@ -1,22 +1,22 @@
-package org.openrewrite.maven;
+package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import lombok.Getter;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSourceVisitor;
+import org.openrewrite.maven.PrintMaven;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
-import static java.util.Collections.emptyList;
 import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Maven extends Serializable, Tree {
@@ -35,29 +35,45 @@ public interface Maven extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
+    @JsonIgnore
+    @Override
+    default String getTreeType() {
+        return "pom";
+    }
+
     class Pom implements Maven, SourceFile {
         private final MavenModel model;
         private final Xml.Document document;
 
         @JsonIgnore
-        private final Object memoizationLock = new Object();
+        private final MemoizedTags<Dependency> memoizedDependencies;
 
         @JsonIgnore
-        private List<Dependency> memoizedDependencies;
-
-        @JsonIgnore
-        private List<Property> memoizedProperties;
+        private final MemoizedTags<Property> memoizedProperties;
 
         public Pom(MavenModel model, Xml.Document document) {
             this.model = model;
             this.document = document;
+
+            this.memoizedDependencies = new MemoizedTags<>(document.getRoot(), "dependencies/dependency",
+                    tag -> new Dependency(
+                            model.getDependencies().stream()
+                                    .filter(d -> d.getModuleVersion().getGroupId().equals(tag.getChildValue("groupId").orElse(null)) &&
+                                            d.getModuleVersion().getArtifactId().equals(tag.getChildValue("artifactId").orElse(null)))
+                                    .findAny()
+                                    .orElse(null),
+                            tag
+                    ), Dependency::getTag);
+
+            this.memoizedProperties = new MemoizedTags<>(document.getRoot(), "properties/*",
+                    Property::new, Property::getTag);
         }
 
-        public Refactor<Pom, Maven> refactor() {
+        public Refactor<Pom> refactor() {
             return new Refactor<>(this);
         }
 
-        Xml.Document getDocument() {
+        public Xml.Document getDocument() {
             return document;
         }
 
@@ -104,118 +120,29 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Pom withDependencies(List<Dependency> dependencies) {
-            synchronized (memoizationLock) {
-                if (dependencies != getDependencies()) {
-                    if (dependencies.size() == memoizedDependencies.size()) {
-                        boolean changed = false;
-                        for (int i = 0; i < memoizedDependencies.size(); i++) {
-                            Dependency dependency = dependencies.get(i);
-                            Dependency memoizedDependency = memoizedDependencies.get(i);
-                            if (dependency.tag != memoizedDependency.tag ||
-                                    !dependency.getModel().equals(memoizedDependency.model)) {
-                                changed = true;
-                                break;
-                            }
-                        }
-                        if (!changed) {
-                            return this;
-                        }
-                    }
-
-                    memoizedDependencies = dependencies;
-                    Xml.Tag dependenciesTag = document.getRoot().getChild("dependencies").orElse(null);
-                    if (dependenciesTag == null) {
-                        throw new IllegalStateException("Expecting <dependencies> to already exist in POM");
-                    }
-
-                    return new Pom(model, document.withRoot(document.getRoot()
-                            .withContent(document.getRoot().getContent().stream()
-                                    .map(tag -> {
-                                        if (tag == dependenciesTag) {
-                                            return ((Xml.Tag) tag).withContent(dependencies.stream()
-                                                    .map(d -> d.tag)
-                                                    .collect(toList()));
-                                        }
-                                        return tag;
-                                    })
-                                    .collect(toList()))));
-                }
-            }
-            return this;
+            return memoizedDependencies.changedTagContent(dependencies)
+                .map(root -> new Pom(
+                        model.withDependencies(dependencies.stream().map(Dependency::getModel).collect(toList())),
+                        document.withRoot(root))
+                )
+                .orElse(this);
         }
 
         public List<Dependency> getDependencies() {
-            return memoizeDependencies();
-        }
-
-        private List<Dependency> memoizeDependencies() {
-            if (memoizedDependencies == null) {
-                List<Dependency> deps = document.getRoot().getChild("dependencies")
-                        .map(dependencies -> dependencies.getChildren("dependency"))
-                        .map(dependencies -> dependencies.stream()
-                                .map(dependencyTag -> new Dependency(
-                                        model.getDependencies().stream()
-                                                .filter(d -> d.getModuleVersion().getGroupId().equals(dependencyTag.getChildValue("groupId").orElse(null)) &&
-                                                        d.getModuleVersion().getArtifactId().equals(dependencyTag.getChildValue("artifactId").orElse(null)))
-                                                .findAny()
-                                                .orElse(null),
-                                        dependencyTag
-                                )).collect(toList())
-                        )
-                        .orElse(emptyList());
-
-                synchronized (memoizationLock) {
-                    if (memoizedDependencies == null) {
-                        memoizedDependencies = deps;
-                    }
-                }
-            }
-
-            return memoizedDependencies;
+            return memoizedDependencies.getModels();
         }
 
         public Pom withProperties(List<Property> properties) {
-            synchronized (memoizationLock) {
-                if (properties != getProperties()) {
-                    if (properties.size() == memoizedProperties.size()) {
-                        boolean changed = false;
-                        for (int i = 0; i < memoizedProperties.size(); i++) {
-                            Property property = properties.get(i);
-                            Property memoizedProperty = memoizedProperties.get(i);
-                            if (property.tag != memoizedProperty.tag) {
-                                changed = true;
-                                break;
-                            }
-                        }
-                        if (!changed) {
-                            return this;
-                        }
-                    }
-
-                    memoizedProperties = properties;
-                    Xml.Tag propertiesTag = document.getRoot().getChild("properties").orElse(null);
-                    if (propertiesTag == null) {
-                        throw new IllegalStateException("Expecting <properties> to already exist in POM");
-                    }
-
-                    return new Pom(model, document.withRoot(document.getRoot()
-                            .withContent(document.getRoot().getContent().stream()
-                                    .map(tag -> {
-                                        if (tag == propertiesTag) {
-                                            return ((Xml.Tag) tag).withContent(properties.stream()
-                                                    .map(d -> d.tag)
-                                                    .collect(toList()));
-                                        }
-                                        return tag;
-                                    })
-                                    .collect(toList()))));
-                }
-            }
-            return this;
+            return memoizedProperties.changedTagContent(properties)
+                    .map(root -> new Pom(
+                            model.withProperties(properties.stream().collect(toMap(Property::getKey, Property::getValue))),
+                            document.withRoot(root))
+                    )
+                    .orElse(this);
         }
 
         public List<Property> getProperties() {
-            return memoizeProperties();
+            return memoizedProperties.getModels();
         }
 
         /**
@@ -228,26 +155,6 @@ public interface Maven extends Serializable, Tree {
                     .flatMap(key -> getProperties().stream()
                             .filter(prop -> prop.getKey().equals(key))
                             .findAny());
-        }
-
-        private List<Property> memoizeProperties() {
-            if (memoizedProperties == null) {
-                List<Property> props = document.getRoot().getChild("properties")
-                        .map(properties -> properties.getContent().stream()
-                                .filter(c -> c instanceof Xml.Tag)
-                                .map(Xml.Tag.class::cast)
-                                .map(Property::new)
-                                .collect(toList()))
-                        .orElse(emptyList());
-
-                synchronized (memoizationLock) {
-                    if (memoizedProperties == null) {
-                        memoizedProperties = props;
-                    }
-                }
-            }
-
-            return memoizedProperties;
         }
 
         /**
@@ -268,11 +175,6 @@ public interface Maven extends Serializable, Tree {
         @Override
         public Map<Metadata, String> getMetadata() {
             return document.getMetadata();
-        }
-
-        @Override
-        public String getFileType() {
-            return "POM";
         }
 
         @Override
@@ -300,6 +202,7 @@ public interface Maven extends Serializable, Tree {
     class Parent implements Maven {
         private final MavenModel model;
 
+        @Getter
         @Nullable
         private final Xml.Tag tag;
 
@@ -361,10 +264,26 @@ public interface Maven extends Serializable, Tree {
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitParent(this);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Parent parent = (Parent) o;
+            return model.equals(parent.model) &&
+                    tag == parent.tag;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(model, tag);
+        }
     }
 
     class Dependency implements Maven {
         private final MavenModel.Dependency model;
+
+        @Getter
         final Xml.Tag tag;
 
         public Dependency(MavenModel.Dependency model, Xml.Tag tag) {
@@ -424,9 +343,24 @@ public interface Maven extends Serializable, Tree {
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitDependency(this);
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Dependency that = (Dependency) o;
+            return model.equals(that.model) &&
+                    tag == that.tag;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(model, tag);
+        }
     }
 
     class Property implements Maven {
+        @Getter
         final Xml.Tag tag;
 
         public Property(Xml.Tag tag) {
@@ -468,6 +402,19 @@ public interface Maven extends Serializable, Tree {
         @Override
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitProperty(this);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Property property = (Property) o;
+            return tag == property.tag;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(tag);
         }
     }
 

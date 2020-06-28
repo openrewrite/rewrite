@@ -28,7 +28,8 @@ class ChangeTagValueTest : XmlParser() {
             </dependency>
         """.trimIndent())
 
-        val fixed = x.refactor().visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "2.0"))
+        val fixed = x.refactor()
+                .visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "2.0"))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -50,7 +51,8 @@ class ChangeTagValueTest : XmlParser() {
             </dependency>
         """.trimIndent())
 
-        val fixed = x.refactor().visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "3.0"))
+        val fixed = x.refactor()
+                .visit(ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "3.0"))
                 .fix().fixed
 
         assertRefactored(fixed, """

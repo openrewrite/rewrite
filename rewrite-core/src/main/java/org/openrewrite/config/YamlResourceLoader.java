@@ -20,6 +20,7 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.ValidationException;
 import org.yaml.snakeyaml.Yaml;
@@ -78,21 +79,21 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
             throw new ValidationException(validation);
         }
 
-        List<SourceVisitor<Object>> subVisitors = new ArrayList<>();
+        List<SourceVisitor<? extends Tree>> subVisitors = new ArrayList<>();
 
         //noinspection unchecked
         for (Object subVisitorNameAndConfig : (List<Object>) visitorMap.get("visitors")) {
             try {
                 if (subVisitorNameAndConfig instanceof String) {
                     //noinspection unchecked
-                    subVisitors.add((SourceVisitor<Object>) visitorClass((String) subVisitorNameAndConfig)
+                    subVisitors.add((SourceVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
                             .getDeclaredConstructor().newInstance());
                 } else if (subVisitorNameAndConfig instanceof Map) {
                     //noinspection unchecked
                     for (Map.Entry<String, Object> subVisitorEntry : ((Map<String, Object>) subVisitorNameAndConfig)
                             .entrySet()) {
-                        @SuppressWarnings("unchecked") SourceVisitor<Object> subVisitor =
-                                (SourceVisitor<Object>) visitorClass(subVisitorEntry.getKey())
+                        @SuppressWarnings("unchecked") SourceVisitor<Tree> subVisitor =
+                                (SourceVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
                                         .getDeclaredConstructor().newInstance();
 
                         propertyConverter.updateValue(subVisitor, subVisitorEntry.getValue());

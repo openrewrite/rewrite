@@ -1,6 +1,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.maven.tree.Maven;
 
 public abstract class MavenSourceVisitor<R> extends SourceVisitor<R> {
     public R visitPom(Maven.Pom pom) {

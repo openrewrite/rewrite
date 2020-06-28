@@ -48,10 +48,15 @@ interface ChangeMethodTargetToStaticTest {
         """.trimIndent()
 
         val cu = jp.parse(c, a, b)
-        val targets = cu.findMethodCalls("a.A nonStatic()")
         val fixed = cu.refactor()
-                .fold(targets) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
-                .fold(targets) { ChangeMethodName.Scoped(it, "foo") }
+                .visit(ChangeMethodTargetToStatic().apply {
+                    setMethod("a.A nonStatic()")
+                    setTargetType("b.B")
+                })
+                .visit(ChangeMethodName().apply {
+                    setMethod("b.B nonStatic()")
+                    name = "foo"
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -95,7 +100,10 @@ interface ChangeMethodTargetToStaticTest {
 
         val cu = jp.parse(c, a, b)
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("a.A foo()")) { ChangeMethodTargetToStatic.Scoped(it, "b.B") }
+                .visit(ChangeMethodTargetToStatic().apply {
+                    setMethod("a.A foo()")
+                    setTargetType("b.B")
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """

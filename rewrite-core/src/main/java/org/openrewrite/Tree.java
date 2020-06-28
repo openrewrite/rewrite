@@ -72,4 +72,6 @@ public interface Tree {
     default boolean isScope(@Nullable Tree tree) {
         return tree != null && tree.getId().equals(getId());
     }
+
+    String getTreeType();
 }

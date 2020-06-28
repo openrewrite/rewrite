@@ -16,6 +16,7 @@
 package org.openrewrite.xml.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -54,6 +55,12 @@ public interface Xml extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
+    @JsonIgnore
+    @Override
+    default String getTreeType() {
+        return "xml";
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -75,18 +82,13 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
-        public Refactor<Document, Xml> refactor() {
+        public Refactor<Document> refactor() {
             return new Refactor<>(this);
         }
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitDocument(this);
-        }
-
-        @Override
-        public String getFileType() {
-            return "XML";
         }
     }
 

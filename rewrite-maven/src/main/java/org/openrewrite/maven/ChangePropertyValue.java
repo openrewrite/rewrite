@@ -1,6 +1,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
+import org.openrewrite.maven.tree.Maven;
 
 import static org.openrewrite.Validated.required;
 

@@ -1,4 +1,4 @@
-package org.openrewrite.maven;
+package org.openrewrite.maven.tree;
 
 import lombok.AccessLevel;
 import lombok.Data;
@@ -37,10 +37,6 @@ public class MavenModel {
      * object cycle, the parent of all of these modules will be null.
      */
     Collection<MavenModel> inheriting;
-
-    MavenModel withInheriting(Collection<MavenModel> inheriting) {
-        return new MavenModel(parent, moduleVersion, dependencies, properties, inheriting);
-    }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data

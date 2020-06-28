@@ -1,6 +1,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Tree;
+import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.internal.PrintXml;
 
 public class PrintMaven extends MavenSourceVisitor<String> {

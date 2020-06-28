@@ -27,6 +27,4 @@ public interface SourceFile extends Tree {
      * @return A metadata map containing any additional context about this source file.
      */
     Map<Metadata, String> getMetadata();
-
-    String getFileType();
 }

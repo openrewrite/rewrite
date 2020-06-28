@@ -61,6 +61,9 @@ public abstract class SourceVisitor<R> {
         return andThen.get();
     }
 
+    /**
+     * Used to build up pipelines of visitors.
+     */
     public void andThen(SourceVisitor<R> visitor) {
         andThen.get().add(visitor);
     }

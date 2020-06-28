@@ -20,10 +20,7 @@ import io.micrometer.core.instrument.Timer;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
-import org.openrewrite.Change;
-import org.openrewrite.ChangePublisher;
-import org.openrewrite.Incubating;
-import org.openrewrite.Metadata;
+import org.openrewrite.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,11 +55,11 @@ public class GithubChangePublisher implements ChangePublisher {
     }
 
     @Override
-    public void publish(Collection<Change<?>> changes) {
+    public void publish(Collection<Change<SourceFile>> changes) {
         changes.forEach(this::publishEach);
     }
 
-    public void publishEach(Change<?> change) {
+    public void publishEach(Change<SourceFile> change) {
         Timer.Sample sample = Timer.start();
         Map<Metadata, String> metadata = change.getFixed().getMetadata();
         String organization = metadata.getOrDefault(GithubMetadata.ORGANIZATION, null);
@@ -76,7 +73,7 @@ public class GithubChangePublisher implements ChangePublisher {
                 .description("Individual source file changes published directly to the GitHub 'Create or update a file' API")
                 .tag("organization", organization)
                 .tag("repository", repository)
-                .tag("file.type", change.getFixed().getFileType());
+                .tag("tree.type", change.getFixed().getTreeType());
 
         try {
             GHRepository ghRepo = github.getRepository(organization + "/" + repository);

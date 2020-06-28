@@ -17,6 +17,7 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.openrewrite.maven.tree.MavenModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -57,8 +58,11 @@ class MavenModuleLoader {
         }
 
         return modelsByPath.entrySet().stream()
-                .collect(toMap(Map.Entry::getKey, modelByPath -> modelByPath.getValue()
-                        .withInheriting(inheriting.getOrDefault(modelByPath.getValue().getModuleVersion(), emptyList()))));
+                .collect(toMap(Map.Entry::getKey, modelByPath -> {
+                    MavenModel m = modelByPath.getValue();
+                    return new MavenModel(m.getParent(), m.getModuleVersion(), m.getDependencies(), m.getProperties(),
+                            inheriting.getOrDefault(m.getModuleVersion(), emptyList()));
+                }));
     }
 
     private MavenModel load(Path sourceFile) {

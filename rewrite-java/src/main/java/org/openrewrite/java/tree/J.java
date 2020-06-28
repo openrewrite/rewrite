@@ -60,6 +60,12 @@ public interface J extends Serializable, Tree {
         return new PrintJava().visit(this);
     }
 
+    @JsonIgnore
+    @Override
+    default String getTreeType() {
+        return "java";
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -1088,12 +1094,6 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
-        @JsonIgnore
-        @Override
-        public String getFileType() {
-            return "Java";
-        }
-
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitCompilationUnit(this);
@@ -1115,7 +1115,7 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
-        public Refactor<CompilationUnit, J> refactor() {
+        public Refactor<CompilationUnit> refactor() {
             return new Refactor<>(this);
         }
 

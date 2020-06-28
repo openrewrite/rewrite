@@ -1,11 +1,12 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.xml.XmlParser;
 
 import java.io.File;
 import java.nio.file.Path;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 

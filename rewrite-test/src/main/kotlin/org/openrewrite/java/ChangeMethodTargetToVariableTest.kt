@@ -49,9 +49,12 @@ interface ChangeMethodTargetToVariableTest {
         val cu = jp.parse(c, a, b)
         val f = cu.classes[0].findFields("a.A")[0]
 
-        val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
-            ChangeMethodTargetToVariable.Scoped(it, f.vars[0])
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .visit(ChangeMethodTargetToVariable().apply {
+                    setMethod("b.B foo()")
+                    setVariable(f.vars[0].simpleName)
+                })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.A;
@@ -94,9 +97,12 @@ interface ChangeMethodTargetToVariableTest {
         val cu = jp.parse(c, a, b)
 
         val f = cu.classes[0].findFields("a.A")[0]
-        val fixed = cu.refactor().fold(cu.findMethodCalls("b.B foo()")) {
-            ChangeMethodTargetToVariable.Scoped(it, f.vars[0])
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .visit(ChangeMethodTargetToVariable().apply {
+                    setMethod("b.B foo()")
+                    setVariable(f.vars[0].simpleName)
+                })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.A;

@@ -16,7 +16,6 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.tree.J
 
 interface ReorderMethodArgumentsTest {
 
@@ -47,12 +46,8 @@ interface ReorderMethodArgumentsTest {
         val cu = jp.parse(b, a)
         val foos = cu.findMethodCalls("a.A foo(..)")
         val fixed = cu.refactor()
-                .fold(foos) {
-                    it.args.args.firstOrNull()?.let { arg ->
-                        ChangeLiteral(arg as J.Literal) { "anotherstring" }
-                    }
-                }
-                .fold(foos) { ReorderMethodArguments.Scoped(it, arrayOf("n", "m", "s"), arrayOf()) }
+                .visit(ChangeLiteral(foos[0].args.args.first()) { "anotherstring" })
+                .visit(ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf()))
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -92,9 +87,11 @@ interface ReorderMethodArgumentsTest {
 
         val cu = jp.parse(b, a)
         val fixed = cu.refactor()
-                .fold(cu.findMethodCalls("a.A foo(..)")) {
-                    ReorderMethodArguments.Scoped(it, arrayOf("n", "s"), arrayOf("s", "n"))
-                }
+                .visit(ReorderMethodArguments().apply {
+                    setMethod("a.A foo(..)")
+                    setOrder("n", "s")
+                    setOriginalOrder("s", "n")
+                })
                 .fix().fixed
 
         assertRefactored(fixed, """
@@ -130,9 +127,12 @@ interface ReorderMethodArgumentsTest {
 
         val cu = jp.parse(b, a)
 
-        val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
-            ReorderMethodArguments.Scoped(it, arrayOf("s", "o", "n"), arrayOf())
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .visit(ReorderMethodArguments().apply {
+                    setMethod("a.A foo(..)")
+                    setOrder("s", "o", "n")
+                })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.*;
@@ -164,9 +164,12 @@ interface ReorderMethodArgumentsTest {
         """.trimIndent()
 
         val cu = jp.parse(b, a)
-        val fixed = cu.refactor().fold(cu.findMethodCalls("a.A foo(..)")) {
-            ReorderMethodArguments.Scoped(it, arrayOf("o", "s"), arrayOf())
-        }.fix().fixed
+        val fixed = cu.refactor()
+                .visit(ReorderMethodArguments().apply {
+                    setMethod("a.A foo(..)")
+                    setOrder("o", "s")
+                })
+                .fix().fixed
 
         assertRefactored(fixed, """
             import a.*;

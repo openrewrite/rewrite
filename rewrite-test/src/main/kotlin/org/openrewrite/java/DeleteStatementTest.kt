@@ -29,7 +29,7 @@ interface DeleteStatementTest {
         """.trimIndent())
 
         val fixed = a.refactor()
-                .fold(a.classes[0].findFields("java.util.List")) { DeleteStatement(it) }
+                .visit(DeleteStatement(a.classes[0].findFields("java.util.List")[0]))
                 .fix().fixed
 
         assertRefactored(fixed, """

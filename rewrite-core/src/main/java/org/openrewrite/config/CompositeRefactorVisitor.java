@@ -24,14 +24,18 @@ import org.openrewrite.Tree;
 
 import java.util.List;
 
-public class CompositeRefactorVisitor<T extends Tree> extends SourceVisitor<T> {
+public class CompositeRefactorVisitor extends SourceVisitor<Tree> {
     private String name;
-    private final List<SourceVisitor<T>> delegates;
+    private final List<SourceVisitor<? extends Tree>> delegates;
 
-    public CompositeRefactorVisitor(String name, List<SourceVisitor<T>> delegates) {
+    public CompositeRefactorVisitor(String name, List<SourceVisitor<? extends Tree>> delegates) {
         this.name = name;
         this.delegates = delegates;
-        delegates.forEach(this::andThen);
+
+        for (SourceVisitor<? extends Tree> delegate : delegates) {
+            //noinspection unchecked
+            andThen((SourceVisitor<Tree>) delegate);
+        }
     }
 
     @Override
@@ -39,7 +43,7 @@ public class CompositeRefactorVisitor<T extends Tree> extends SourceVisitor<T> {
         return Tags.of("name", name);
     }
 
-    CompositeRefactorVisitor<T> setName(String name) {
+    CompositeRefactorVisitor setName(String name) {
         this.name = name;
         return this;
     }
@@ -54,20 +58,18 @@ public class CompositeRefactorVisitor<T extends Tree> extends SourceVisitor<T> {
         return name;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public T visitTree(Tree tree) {
-        T t = (T) tree;
+    public Tree visitTree(Tree tree) {
         if(tree instanceof SourceFile) {
-            Refactor<SourceFile, T> refactor = new Refactor<>((SourceFile) t);
-            return (T) refactor.visit(delegates).fix().getFixed();
+            Refactor<Tree> refactor = new Refactor<>(tree);
+            return refactor.visit(delegates).fix().getFixed();
         }
 
         return super.visitTree(tree);
     }
 
     @Override
-    public T defaultTo(Tree t) {
+    public Tree defaultTo(Tree t) {
         return delegates.stream().findAny().map(v -> v.defaultTo(t)).orElse(null);
     }
 }
