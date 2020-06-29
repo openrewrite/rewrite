@@ -23,37 +23,19 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Comparator;
+import java.nio.file.Paths;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser {
     public Xml.Document parse(String source) {
-
-        try {
-            Path temp = Files.createTempDirectory("sources");
-
-            try {
-                Path file = temp.resolve("file.xml");
-                return parseFromString(file, source);
-            } finally {
-                // delete temp recursively
-                //noinspection ResultOfMethodCallIgnored
-                Files.walk(temp)
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return parseFromString(Paths.get("unknown.xml"), source);
     }
 
     public List<Xml.Document> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {

@@ -3,6 +3,8 @@ include(
         "rewrite-java",
         "rewrite-java-11",
         "rewrite-maven",
+        "rewrite-properties",
         "rewrite-xml",
+        "rewrite-yml",
         "rewrite-test"
 )
