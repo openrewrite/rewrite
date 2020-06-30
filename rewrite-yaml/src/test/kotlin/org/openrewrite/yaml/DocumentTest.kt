@@ -21,24 +21,27 @@ import org.junit.jupiter.api.Test
 class DocumentTest: YamlParser() {
     @Test
     fun explicit() {
-        val y = parse("""
+        val yText = """
             ---
             type: beta.openrewrite.org/v1/visitor
             ---
             type: beta.openrewrite.org/v1/profile
-        """.trimIndent())
+        """.trimIndent()
+
+        val y = parse(yText)
 
         assertThat(y.documents).hasSize(2)
         assertThat(y.documents[0].isExplicit).isTrue()
+        assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 
     @Test
     fun implicit() {
-        val y = parse("""
-            type: beta.openrewrite.org/v1/visitor
-        """.trimIndent())
+        val yText = "type: beta.openrewrite.org/v1/visitor"
+        val y = parse(yText)
 
         assertThat(y.documents).hasSize(1)
         assertThat(y.documents[0].isExplicit).isFalse()
+        assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 }

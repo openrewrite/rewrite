@@ -22,12 +22,16 @@ import org.openrewrite.yaml.tree.Yaml
 class SequenceTest : YamlParser() {
     @Test
     fun sequence() {
-        val y = parse("""
+        val yText = """
             - apples
             - oranges
-        """.trimIndent())
+        """.trimIndent()
 
-        assertThat((y.documents[0].blocks[0] as Yaml.Sequence).blocks.map { it as Yaml.Scalar }.map { it.value })
+        val y = parse(yText)
+
+        assertThat((y.documents[0].blocks[0] as Yaml.Sequence).entries.map { it.block }.map { it as Yaml.Scalar }.map { it.value })
                 .containsExactly("apples", "oranges")
+
+        assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 }

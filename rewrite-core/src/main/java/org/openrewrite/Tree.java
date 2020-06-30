@@ -64,6 +64,7 @@ public interface Tree {
     }
 
     String print();
+
     @SuppressWarnings("unchecked")
     default <T extends Tree> Optional<T> whenType(Class<T> treeType) {
         return treeType.isAssignableFrom(this.getClass()) ? Optional.of((T) this) : Optional.empty();

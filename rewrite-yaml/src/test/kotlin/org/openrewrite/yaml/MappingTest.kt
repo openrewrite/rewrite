@@ -22,24 +22,28 @@ import org.openrewrite.yaml.tree.Yaml
 class MappingTest : YamlParser() {
     @Test
     fun multipleEntries() {
-        val y = parse("""
-            type: beta.openrewrite.org/v1/visitor
-            name: org.openrewrite.text.ChangeTextToJon
-        """.trimIndent())
+        val yText = """
+            type : beta.openrewrite.org/v1/visitor
+            name : org.openrewrite.text.ChangeTextToJon
+        """.trimIndent()
+        val y = parse(yText)
 
         assertThat((y.documents[0].blocks[0] as Yaml.Mapping).entries.map { it.key.value })
                 .containsExactly("type", "name")
+        assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 
     @Test
     fun deep() {
-        val y = parse("""
+        val yText = """
             type:
                 name: org.openrewrite.text.ChangeTextToJon
-        """.trimIndent())
+        """.trimIndent()
+        val y = parse(yText)
 
         val mapping = y.documents[0].blocks[0] as Yaml.Mapping
         assertThat(mapping.entries.map { it.key.value }).containsExactly("type")
         assertThat(mapping.entries[0].value).isInstanceOf(Yaml.Mapping::class.java)
+        assertThat(y.print()).isEqualTo(yText)
     }
 }

@@ -73,6 +73,11 @@ public interface Yaml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @Override
+        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+            return v.visitDocuments(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -95,6 +100,11 @@ public interface Yaml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @Override
+        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+            return v.visitDocument(this);
+        }
+
         /**
          * https://yaml.org/spec/1.1/#c-document-end
          */
@@ -113,7 +123,7 @@ public interface Yaml extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Scalar implements Yaml, Block {
+    class Scalar implements Block {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -133,12 +143,17 @@ public interface Yaml extends Serializable, Tree {
             FOLDED,
             PLAIN
         }
+
+        @Override
+        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+            return v.visitScalar(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Mapping implements Yaml, Block {
+    class Mapping implements Block {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -147,6 +162,11 @@ public interface Yaml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @Override
+        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+            return v.visitMapping(this);
+        }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -163,19 +183,51 @@ public interface Yaml extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @Override
+            public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+                return v.visitMappingEntry(this);
+            }
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Sequence implements Yaml, Block {
+    class Sequence implements Block {
         @EqualsAndHashCode.Include
         UUID id;
 
-        List<Block> blocks;
+        List<Entry> entries;
 
         @With
         Formatting formatting;
+
+        @Override
+        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+            return v.visitSequence(this);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class Entry implements Yaml {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Block block;
+
+            @With
+            Formatting formatting;
+
+            @Override
+            public <R> R acceptYaml(YamlSourceVisitor<R> v) {
+                return v.visitSequenceEntry(this);
+            }
+        }
+    }
+
+    interface Block extends Yaml {
     }
 }
