@@ -13,24 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties;
+package org.openrewrite.yaml
 
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.properties.tree.Properties;
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.openrewrite.yaml.tree.Yaml
 
-public abstract class PropertiesSourceVisitor<R> extends SourceVisitor<R> {
-    public R visitFile(Properties.File file) {
-        return reduce(
-                defaultTo(file),
-                visit(file.getContent())
-        );
-    }
+class SequenceTest : YamlParser() {
+    @Test
+    fun sequence() {
+        val y = parse("""
+            - apples
+            - oranges
+        """.trimIndent())
 
-    public R visitEntry(Properties.Entry entry) {
-        return defaultTo(entry);
-    }
-
-    public R visitComment(Properties.Comment comment) {
-        return defaultTo(comment);
+        assertThat((y.documents[0].blocks[0] as Yaml.Sequence).blocks.map { it as Yaml.Scalar }.map { it.value })
+                .containsExactly("apples", "oranges")
     }
 }

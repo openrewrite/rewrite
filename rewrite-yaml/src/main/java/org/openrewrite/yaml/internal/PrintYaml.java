@@ -13,24 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties;
+package org.openrewrite.yaml.internal;
 
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.properties.tree.Properties;
+import org.openrewrite.Tree;
+import org.openrewrite.yaml.YamlSourceVisitor;
 
-public abstract class PropertiesSourceVisitor<R> extends SourceVisitor<R> {
-    public R visitFile(Properties.File file) {
-        return reduce(
-                defaultTo(file),
-                visit(file.getContent())
-        );
-    }
-
-    public R visitEntry(Properties.Entry entry) {
-        return defaultTo(entry);
-    }
-
-    public R visitComment(Properties.Comment comment) {
-        return defaultTo(comment);
+public class PrintYaml extends YamlSourceVisitor<String> {
+    @Override
+    public String defaultTo(Tree t) {
+        return "";
     }
 }

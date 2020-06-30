@@ -13,28 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties
+package org.openrewrite.yaml
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.properties.tree.Properties
 
-class ChangePropertyKeyTest : PropertiesParser() {
+class DocumentTest: YamlParser() {
     @Test
-    fun changeKey() {
-        val props = parse("""
-            management.metrics.binders.files.enabled=true
+    fun explicit() {
+        val y = parse("""
+            ---
+            type: beta.openrewrite.org/v1/visitor
+            ---
+            type: beta.openrewrite.org/v1/profile
         """.trimIndent())
 
-        val fixed = props.refactor()
-                .visit(ChangePropertyKey().apply {
-                    setKey("management.metrics.binders.files.enabled")
-                    setToKey("management.metrics.enable.process.files")
-                })
-                .fix().fixed
+        assertThat(y.documents).hasSize(2)
+        assertThat(y.documents[0].isExplicit).isTrue()
+    }
 
-        assertThat(fixed.content.map { it as Properties.Entry }.map { it.key })
-                .hasSize(1).containsExactly("management.metrics.enable.process.files")
+    @Test
+    fun implicit() {
+        val y = parse("""
+            type: beta.openrewrite.org/v1/visitor
+        """.trimIndent())
+
+        assertThat(y.documents).hasSize(1)
+        assertThat(y.documents[0].isExplicit).isFalse()
     }
 }
