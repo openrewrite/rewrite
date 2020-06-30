@@ -38,9 +38,9 @@ class PropertiesParserTest: PropertiesParser() {
             
         """.trimIndent())
 
-        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
-                .hasSize(1).containsExactly("key")
-        assertThat(props.formatting.suffix).isEqualTo("\n")
+        val entries = props.content.map { it as Properties.Entry }
+        assertThat(entries.map { it.key }).containsExactly("key")
+        assertThat(entries[0].formatting.suffix).isEqualTo("\n")
     }
 
     @Test
