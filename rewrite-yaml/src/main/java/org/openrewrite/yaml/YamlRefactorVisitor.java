@@ -17,9 +17,12 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.RefactorVisitorSupport;
 import org.openrewrite.Tree;
+import org.openrewrite.refactor.Formatter;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlRefactorVisitor extends YamlSourceVisitor<Yaml> implements RefactorVisitorSupport {
+    protected Formatter formatter;
+
     @Override
     public Yaml defaultTo(Tree t) {
         return (Yaml) t;
@@ -27,44 +30,40 @@ public class YamlRefactorVisitor extends YamlSourceVisitor<Yaml> implements Refa
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents) {
-        Yaml.Documents d = documents;
-        d = d.withDocuments(refactor(d.getDocuments()));
-        return d;
+        formatter = new Formatter(documents);
+        return documents.withDocuments(refactor(documents.getDocuments()));
     }
 
     @Override
     public Yaml visitDocument(Yaml.Document document) {
-        Yaml.Document d = document;
-        d = d.withBlocks(refactor(d.getBlocks()));
-        return d;
+        return document.withBlocks(refactor(document.getBlocks()));
     }
 
     @Override
     public Yaml visitMapping(Yaml.Mapping mapping) {
-        Yaml.Mapping m = mapping;
-        m = m.withEntries(refactor(m.getEntries()));
-        return m;
+        return mapping.withEntries(refactor(mapping.getEntries()));
     }
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry) {
         Yaml.Mapping.Entry e = entry;
         e = e.withKey(refactor(e.getKey()));
-        e = e.withValue(refactor(e.getValue()));
-        return e;
+        return e.withValue(refactor(e.getValue()));
     }
 
     @Override
     public Yaml visitSequence(Yaml.Sequence sequence) {
-        Yaml.Sequence s = sequence;
-        s = s.withEntries(refactor(s.getEntries()));
-        return s;
+        return sequence.withEntries(refactor(sequence.getEntries()));
     }
 
     @Override
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry) {
-        Yaml.Sequence.Entry e = entry;
-        e = e.withBlock(refactor(e.getBlock()));
-        return e;
+        return entry.withBlock(refactor(entry.getBlock()));
+    }
+
+    public void maybeCoalesceProperties() {
+        if (andThen().stream().noneMatch(CoalesceProperties.class::isInstance)) {
+            andThen(new CoalesceProperties());
+        }
     }
 }

@@ -36,6 +36,7 @@ import static org.openrewrite.Tree.randomId;
 public class ChangePropertyKey extends YamlRefactorVisitor {
     private String property;
     private String toProperty;
+    private boolean coalesce = true;
 
     public ChangePropertyKey() {
         setCursoringOn();
@@ -47,6 +48,10 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
 
     public void setToProperty(String toProperty) {
         this.toProperty = toProperty;
+    }
+
+    public void setCoalesce(boolean coalesce) {
+        this.coalesce = coalesce;
     }
 
     @Override
@@ -80,9 +85,10 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
                             propertyToTest,
                             entry.getValue()
                     ));
-
                     andThen(new DeleteProperty(entry));
-
+                    if (coalesce) {
+                        maybeCoalesceProperties();
+                    }
                     break;
                 }
 

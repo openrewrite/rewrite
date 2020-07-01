@@ -49,8 +49,7 @@ class ChangePropertyKeyTest : YamlParser() {
 
         assertRefactored(fixed, """
             management.metrics:
-                binders:
-                    jvm.enabled: true
+                binders.jvm.enabled: true
                 enable.process.files: true
         """.trimIndent())
     }
@@ -66,8 +65,7 @@ class ChangePropertyKeyTest : YamlParser() {
         val fixed = y.refactor().visit(changeProp).fix().fixed
 
         assertRefactored(fixed, """
-            management.metrics:
-                enable.process.files: true
+            management.metrics.enable.process.files: true
         """.trimIndent())
     }
 }
