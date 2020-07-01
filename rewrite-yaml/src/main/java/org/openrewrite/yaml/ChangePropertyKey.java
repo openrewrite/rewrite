@@ -41,8 +41,6 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
 
     @Override
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry) {
-        System.out.println(entry);
-
         Yaml.Mapping.Entry e = refactor(entry, super::visitMappingEntry);
 
         Deque<Yaml.Mapping.Entry> propertyEntries = getCursor().getPathAsStream()
@@ -67,7 +65,9 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
                             propertyToTest,
                             entry.getValue()
                     ));
-                    andThen(new DeleteProperty(propertyEntry));
+
+                    andThen(new DeleteProperty(entry));
+
                     break;
                 }
 
@@ -94,7 +94,7 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
             Yaml.Mapping m = refactor(mapping, super::visitMapping);
 
             if (m.getEntries().contains(scope)) {
-                Formatting newEntryFormatting = scope.getKey().getFormatting();
+                Formatting newEntryFormatting = scope.getFormatting();
                 if (newEntryFormatting.getPrefix().isEmpty()) {
                     newEntryFormatting = newEntryFormatting.withPrefix("\n");
                 }
@@ -131,7 +131,7 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
             boolean changed = false;
             List<Yaml.Mapping.Entry> entries = new ArrayList<>();
             for (Yaml.Mapping.Entry entry : m.getEntries()) {
-                if (onlyLeadsToScope(entry)) {
+                if (entry == scope || (entry.getValue() instanceof Yaml.Mapping && ((Yaml.Mapping) entry.getValue()).getEntries().isEmpty())) {
                     changed = true;
                 } else {
                     entries.add(entry);
@@ -150,17 +150,6 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
             }
 
             return m;
-        }
-
-        private boolean onlyLeadsToScope(Yaml.Mapping.Entry entry) {
-            if (scope.equals(entry)) {
-                return true;
-            }
-            if (scope.getValue() instanceof Yaml.Mapping) {
-                Yaml.Mapping mapping = (Yaml.Mapping) scope.getValue();
-                return mapping.getEntries().size() == 1 && onlyLeadsToScope(mapping.getEntries().iterator().next());
-            }
-            return false;
         }
     }
 }
