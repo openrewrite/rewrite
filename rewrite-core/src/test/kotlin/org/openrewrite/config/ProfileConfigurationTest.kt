@@ -17,10 +17,33 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Profile
 import org.openrewrite.text.ChangeText
 
 internal class ProfileConfigurationTest {
     private val changeText = ChangeText()
+
+    @Test
+    fun includeWildcard() {
+        val profile = ProfileConfiguration().apply {
+            setInclude(setOf("org.openrewrite.text.*"))
+        }.build(emptyList())
+
+        assertThat(profile.accept(ChangeText().apply {
+            toText = "hi"
+        })).isEqualTo(Profile.FilterReply.ACCEPT)
+    }
+
+    @Test
+    fun includeWildcardsDontIncludeNestedPackages() {
+        val profile = ProfileConfiguration().apply {
+            setInclude(setOf("org.openrewrite.*"))
+        }.build(emptyList())
+
+        assertThat(profile.accept(ChangeText().apply {
+            toText = "hi"
+        })).isEqualTo(Profile.FilterReply.NEUTRAL)
+    }
 
     @Test
     fun configureSourceVisitor() {

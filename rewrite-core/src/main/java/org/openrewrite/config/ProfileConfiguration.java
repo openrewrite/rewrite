@@ -80,7 +80,7 @@ public class ProfileConfiguration {
         return set.stream()
                 .map(i -> i
                         .replace(".", "\\.")
-                        .replace("*", ".+"))
+                        .replace("*", "[^.]+"))
                 .map(i -> "(org\\.openrewrite\\.)?" + i)
                 .map(Pattern::compile)
                 .collect(toSet());
