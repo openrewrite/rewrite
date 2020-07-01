@@ -21,28 +21,28 @@ import org.openrewrite.properties.tree.Properties;
 import static org.openrewrite.Validated.required;
 
 public class ChangePropertyKey extends PropertiesRefactorVisitor {
-    private String key;
-    private String toKey;
+    private String property;
+    private String toProperty;
 
-    public void setKey(String key) {
-        this.key = key;
+    public void setProperty(String property) {
+        this.property = property;
     }
 
-    public void setToKey(String toKey) {
-        this.toKey = toKey;
+    public void setToProperty(String toProperty) {
+        this.toProperty = toProperty;
     }
 
     @Override
     public Validated validate() {
-        return required("key", key)
-                .and(required("toKey", toKey));
+        return required("property", property)
+                .and(required("toProperty", toProperty));
     }
 
     @Override
     public Properties visitEntry(Properties.Entry entry) {
         Properties.Entry e = refactor(entry, super::visitEntry);
-        if (e.getKey().equals(key)) {
-            e = e.withKey(toKey);
+        if (e.getKey().equals(property)) {
+            e = e.withKey(toProperty);
         }
         return e;
     }

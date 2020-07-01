@@ -81,12 +81,16 @@ public class RefactorPlan {
                     if(CompositeRefactorVisitor.class.equals(v.getClass())) {
                         genericSuperclass = ((CompositeRefactorVisitor) v).getVisitorType()
                                 .getGenericSuperclass();
+                        while(genericSuperclass != null && !(genericSuperclass instanceof ParameterizedType)) {
+                            genericSuperclass = ((Class<?>) genericSuperclass).getGenericSuperclass();
+                        }
                     }
 
                     if (genericSuperclass instanceof ParameterizedType) {
                         Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
                         return sourceFileType[0].equals(sourceType);
                     }
+
                     return true;
                 })
                 .map(v -> (S) v)

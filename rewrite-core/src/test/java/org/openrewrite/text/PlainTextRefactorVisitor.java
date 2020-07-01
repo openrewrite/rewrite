@@ -17,38 +17,6 @@ package org.openrewrite.text;
 
 import org.openrewrite.RefactorVisitorSupport;
 import org.openrewrite.SourceVisitor;
-import org.openrewrite.Tree;
-import org.openrewrite.AutoConfigure;
-import org.openrewrite.Validated;
 
-@AutoConfigure
-public class ChangeText extends PlainTextRefactorVisitor {
-    private String toText;
-
-    public ChangeText() {
-    }
-
-    @Override
-    public Validated validate() {
-        return Validated.required("toText", toText);
-    }
-
-    public void setToText(String toText) {
-        this.toText = toText;
-    }
-
-    public String getToText() {
-        return toText;
-    }
-
-    @Override
-    public PlainText visitTree(Tree tree) {
-        PlainText text = (PlainText) tree;
-        return text.withText(toText);
-    }
-
-    @Override
-    public PlainText defaultTo(Tree t) {
-        return (PlainText) t;
-    }
+public abstract class PlainTextRefactorVisitor extends SourceVisitor<PlainText> implements RefactorVisitorSupport {
 }

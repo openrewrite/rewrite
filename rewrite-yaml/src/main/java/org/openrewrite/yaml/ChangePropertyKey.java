@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.Validated;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.*;
@@ -27,6 +28,7 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Formatting.formatFirstPrefix;
 import static org.openrewrite.Tree.randomId;
+import static org.openrewrite.Validated.required;
 
 /**
  * When nested YAML mappings are interpreted as dot
@@ -52,6 +54,12 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
 
     public void setCoalesce(boolean coalesce) {
         this.coalesce = coalesce;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("property", property)
+                .and(required("toProperty", toProperty));
     }
 
     @Override
