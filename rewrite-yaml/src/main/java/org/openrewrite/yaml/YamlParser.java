@@ -134,7 +134,6 @@ public class YamlParser {
                         break;
                     case StreamEnd:
                     case StreamStart:
-                        System.out.println(event);
                         break;
                 }
             }
@@ -173,10 +172,10 @@ public class YamlParser {
 
                 String keyPrefix = key.getFormatting().getPrefix();
                 key = key.withFormatting(format(
-                        keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1),
+                        "",
                         keySuffix.substring(0, keySuffix.lastIndexOf(':'))
                 ));
-                entries.add(new Yaml.Mapping.Entry(randomId(), key, block, Formatting.EMPTY));
+                entries.add(new Yaml.Mapping.Entry(randomId(), key, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1))));
                 key = null;
             }
         }

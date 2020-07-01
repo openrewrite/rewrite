@@ -32,21 +32,21 @@ public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implement
     @Override
     public Xml visitDocument(Xml.Document document) {
         formatter = new Formatter(document);
-        Xml.Document d = refactor(document, super::visitDocument);
+        Xml.Document d = document;
         d = d.withProlog(refactor(d.getProlog()));
         return d.withRoot(refactor(d.getRoot()));
     }
 
     @Override
     public Xml visitProlog(Xml.Prolog prolog) {
-        Xml.Prolog p = refactor(prolog, super::visitProlog);
+        Xml.Prolog p = prolog;
         p = p.withXmlDecl(refactor(p.getXmlDecl()));
         return p.withMisc(refactor(p.getMisc()));
     }
 
     @Override
     public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl) {
-        Xml.DocTypeDecl d = refactor(docTypeDecl, super::visitDocTypeDecl);
+        Xml.DocTypeDecl d = docTypeDecl;
         d = d.withName(refactor(d.getName()));
         d = d.withExternalId(refactor(d.getExternalId()));
         d = d.withExternalSubsets(refactor(d.getExternalSubsets()));
@@ -55,13 +55,12 @@ public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implement
 
     @Override
     public Xml visitElement(Xml.Element element) {
-        Xml.Element e = refactor(element, super::visitElement);
-        return e.withSubset(e.getSubset());
+        return element.withSubset(element.getSubset());
     }
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
-        Xml.Tag t = refactor(tag, super::visitTag);
+        Xml.Tag t = tag;
         t = t.withAttributes(refactor(t.getAttributes()));
         t = t.withContent(refactor(t.getContent()));
         return t.withClosing(refactor(t.getClosing()));
@@ -69,30 +68,14 @@ public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implement
 
     @Override
     public Xml visitAttribute(Xml.Attribute attribute) {
-        Xml.Attribute a = refactor(attribute, super::visitAttribute);
+        Xml.Attribute a = attribute;
         a = a.withKey(refactor(a.getKey()));
         return a.withValue(refactor(a.getValue()));
     }
 
     @Override
-    public Xml visitCharData(Xml.CharData charData) {
-        return refactor(charData, super::visitCharData);
-    }
-
-    @Override
     public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi) {
-        Xml.ProcessingInstruction p = refactor(pi, super::visitProcessingInstruction);
-        return p.withAttributes(refactor(p.getAttributes()));
-    }
-
-    @Override
-    public Xml visitComment(Xml.Comment comment) {
-        return refactor(comment, super::visitComment);
-    }
-
-    @Override
-    public Xml visitIdent(Xml.Ident ident) {
-        return refactor(ident, super::visitIdent);
+        return pi.withAttributes(refactor(pi.getAttributes()));
     }
 
     public Xml.Tag enclosingTag() {

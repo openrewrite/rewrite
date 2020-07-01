@@ -32,7 +32,7 @@ public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements R
 
     @Override
     public Maven visitPom(Maven.Pom pom) {
-        Maven.Pom p = refactor(pom, super::visitPom);
+        Maven.Pom p = pom;
         p = p.withDependencyManagement(refactor(pom.getDependencyManagement()));
         p = p.withDependencies(refactor(pom.getDependencies()));
         p = p.withProperties(refactor(pom.getProperties()));
@@ -41,28 +41,25 @@ public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements R
 
     @Override
     public Maven visitDependencyManagement(Maven.DependencyManagement dependencyManagement) {
-        Maven.DependencyManagement d = refactor(dependencyManagement, super::visitDependencyManagement);
-        d = d.withDependencies(refactor(dependencyManagement.getDependencies()));
-        return d;
+        Maven.DependencyManagement d = dependencyManagement;
+        return d.withDependencies(refactor(dependencyManagement.getDependencies()));
     }
 
     @Override
     public Maven visitDependency(Maven.Dependency dependency) {
-        Maven.Dependency d = refactor(dependency, super::visitDependency);
-        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(d.getTag());
-        if(t != d.getTag()) {
-            return new Maven.Dependency(d.isManaged(), d.getModel(), t);
+        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(dependency.getTag());
+        if(t != dependency.getTag()) {
+            return new Maven.Dependency(dependency.isManaged(), dependency.getModel(), t);
         }
-        return d;
+        return dependency;
     }
 
     @Override
     public Maven visitProperty(Maven.Property property) {
-        Maven.Property p = refactor(property, super::visitProperty);
-        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(p.getTag());
-        if(t != p.getTag()) {
+        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(property.getTag());
+        if(t != property.getTag()) {
             return new Maven.Property(t);
         }
-        return p;
+        return property;
     }
 }

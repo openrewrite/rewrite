@@ -33,6 +33,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
+
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Yaml extends Serializable, Tree {
     @Override
@@ -56,6 +59,11 @@ public interface Yaml extends Serializable, Tree {
         return "yml";
     }
 
+    /**
+     * @return A new deep copy of this block with different IDs.
+     */
+    Yaml copyPaste();
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
@@ -74,9 +82,19 @@ public interface Yaml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        public Refactor<Yaml.Documents> refactor() {
+            return new Refactor<>(this);
+        }
+
         @Override
         public <R> R acceptYaml(YamlSourceVisitor<R> v) {
             return v.visitDocuments(this);
+        }
+
+        @Override
+        public Documents copyPaste() {
+            return new Documents(randomId(), sourcePath, metadata,
+                    documents.stream().map(Document::copyPaste).collect(toList()), formatting);
         }
     }
 
@@ -105,6 +123,12 @@ public interface Yaml extends Serializable, Tree {
             return v.visitDocument(this);
         }
 
+        @Override
+        public Document copyPaste() {
+            return new Document(randomId(), explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
+                    end == null ? null : end.copyPaste(), formatting);
+        }
+
         /**
          * https://yaml.org/spec/1.1/#c-document-end
          */
@@ -117,6 +141,11 @@ public interface Yaml extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @Override
+            public End copyPaste() {
+                return new End(randomId(), formatting);
+            }
         }
     }
 
@@ -148,6 +177,11 @@ public interface Yaml extends Serializable, Tree {
         public <R> R acceptYaml(YamlSourceVisitor<R> v) {
             return v.visitScalar(this);
         }
+
+        @Override
+        public Scalar copyPaste() {
+            return new Scalar(randomId(), style, value, formatting);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -166,6 +200,11 @@ public interface Yaml extends Serializable, Tree {
         @Override
         public <R> R acceptYaml(YamlSourceVisitor<R> v) {
             return v.visitMapping(this);
+        }
+
+        @Override
+        public Mapping copyPaste() {
+            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -188,6 +227,11 @@ public interface Yaml extends Serializable, Tree {
             public <R> R acceptYaml(YamlSourceVisitor<R> v) {
                 return v.visitMappingEntry(this);
             }
+
+            @Override
+            public Entry copyPaste() {
+                return new Entry(randomId(), key.copyPaste(), value.copyPaste(), formatting);
+            }
         }
     }
 
@@ -198,6 +242,7 @@ public interface Yaml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         List<Entry> entries;
 
         @With
@@ -206,6 +251,11 @@ public interface Yaml extends Serializable, Tree {
         @Override
         public <R> R acceptYaml(YamlSourceVisitor<R> v) {
             return v.visitSequence(this);
+        }
+
+        @Override
+        public Sequence copyPaste() {
+            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -225,9 +275,18 @@ public interface Yaml extends Serializable, Tree {
             public <R> R acceptYaml(YamlSourceVisitor<R> v) {
                 return v.visitSequenceEntry(this);
             }
+
+            @Override
+            public Entry copyPaste() {
+                return new Entry(randomId(), block.copyPaste(), formatting);
+            }
         }
     }
 
     interface Block extends Yaml {
+        /**
+         * @return A new deep copy of this block with different IDs.
+         */
+        Block copyPaste();
     }
 }
