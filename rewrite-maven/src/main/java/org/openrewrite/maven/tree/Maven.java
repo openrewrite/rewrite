@@ -143,6 +143,18 @@ public interface Maven extends Serializable, Tree {
                             .orElse(null));
         }
 
+        public Pom withParent(Parent parent) {
+            //noinspection ConstantConditions
+            return document.getRoot().getChild("parent")
+                    .map(parentTag -> new Pom(model.withParent(parent.getModel()),
+                            document.withRoot(new Refactor<>(document.getRoot())
+                                    .visit(new ChangeTagContent(parentTag, parent.getTag().getContent()))
+                                    .fix()
+                                    .getFixed()))
+                    )
+                    .orElse(this);
+        }
+
         @Nullable
         public DependencyManagement getDependencyManagement() {
             return dependencyManagement;

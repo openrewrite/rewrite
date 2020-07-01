@@ -33,16 +33,16 @@ public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements R
     @Override
     public Maven visitPom(Maven.Pom pom) {
         Maven.Pom p = pom;
-        p = p.withDependencyManagement(refactor(pom.getDependencyManagement()));
-        p = p.withDependencies(refactor(pom.getDependencies()));
-        p = p.withProperties(refactor(pom.getProperties()));
+        p = p.withParent(refactor(p.getParent()));
+        p = p.withDependencyManagement(refactor(p.getDependencyManagement()));
+        p = p.withDependencies(refactor(p.getDependencies()));
+        p = p.withProperties(refactor(p.getProperties()));
         return p;
     }
 
     @Override
     public Maven visitDependencyManagement(Maven.DependencyManagement dependencyManagement) {
-        Maven.DependencyManagement d = dependencyManagement;
-        return d.withDependencies(refactor(dependencyManagement.getDependencies()));
+        return dependencyManagement.withDependencies(refactor(dependencyManagement.getDependencies()));
     }
 
     @Override

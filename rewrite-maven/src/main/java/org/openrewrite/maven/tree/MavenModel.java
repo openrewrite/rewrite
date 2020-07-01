@@ -39,6 +39,7 @@ public class MavenModel {
     MavenModel parent;
 
     @EqualsAndHashCode.Include
+    @With
     ModuleVersionId moduleVersion;
 
     @Nullable

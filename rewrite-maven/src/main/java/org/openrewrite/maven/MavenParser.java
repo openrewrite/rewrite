@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import org.eclipse.aether.repository.RemoteRepository;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
@@ -22,6 +23,7 @@ import org.openrewrite.xml.XmlParser;
 
 import java.io.File;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -32,10 +34,12 @@ public class MavenParser {
     private final XmlParser xmlParser = new XmlParser();
     private final boolean resolveDependencies;
     private final File localRepository;
+    private final List<RemoteRepository> remoteRepositories;
 
-    private MavenParser(boolean resolveDependencies, File localRepository) {
+    private MavenParser(boolean resolveDependencies, File localRepository, List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
+        this.remoteRepositories = remoteRepositories;
     }
 
     public static Builder builder() {
@@ -43,7 +47,7 @@ public class MavenParser {
     }
 
     public List<Maven.Pom> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        Map<Path, MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository)
+        Map<Path, MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
                 .load(sourceFiles);
 
         return sourceFiles.stream()
@@ -60,6 +64,13 @@ public class MavenParser {
     public static class Builder {
         private boolean resolveDependencies = true;
         private File localRepository = new File(System.getProperty("user.home") + "/.m2");
+        private List<RemoteRepository> remoteRepositories = new ArrayList<>();
+
+        public Builder() {
+            remoteRepositories.add(new RemoteRepository.Builder("central", "default",
+                    "https://repo1.maven.org/maven2/").build()
+            );
+        }
 
         public Builder localRepository(File localRepository) {
             this.localRepository = localRepository;
@@ -71,8 +82,16 @@ public class MavenParser {
             return this;
         }
 
+        public void remoteRepositories(List<RemoteRepository> remoteRepositories) {
+            this.remoteRepositories = remoteRepositories;
+        }
+
+        public void addRemoteRepository(RemoteRepository remoteRepository) {
+            this.remoteRepositories.add(remoteRepository);
+        }
+
         public MavenParser build() {
-            return new MavenParser(resolveDependencies, localRepository);
+            return new MavenParser(resolveDependencies, localRepository, remoteRepositories);
         }
     }
 }

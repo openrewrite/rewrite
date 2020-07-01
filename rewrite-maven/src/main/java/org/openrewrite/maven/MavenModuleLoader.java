@@ -33,6 +33,7 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.MavenModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,7 +43,6 @@ import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 
@@ -51,10 +51,12 @@ class MavenModuleLoader {
 
     private final boolean resolveDependencies;
     private final File localRepository;
+    private final List<RemoteRepository> remoteRepositories;
 
-    public MavenModuleLoader(boolean resolveDependencies, File localRepository) {
+    public MavenModuleLoader(boolean resolveDependencies, File localRepository, List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
+        this.remoteRepositories = remoteRepositories;
     }
 
     public Map<Path, MavenModel> load(List<Path> sourceFiles) {
@@ -88,6 +90,7 @@ class MavenModuleLoader {
             RepositorySystemSession repositorySystemSession = getRepositorySystemSession(repositorySystem);
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
+                    .setModelResolver(new ParentModelResolver(repositorySystem, repositorySystemSession, remoteRepositories))
                     .setPomFile(sourceFile.toFile());
 
             ModelBuilder modelBuilder = new DefaultModelBuilderFactory().newInstance();
@@ -140,41 +143,44 @@ class MavenModuleLoader {
     private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
                                                     RepositorySystemSession repositorySystemSession,
                                                     Dependency dependency, Model rawModel) {
-        String requestedVersion = rawModel.getDependencies().stream()
-                .filter(d -> d.getGroupId().equals(dependency.getGroupId()) &&
-                        d.getArtifactId().equals(dependency.getArtifactId()) &&
-                        (d.getScope() == null || d.getScope().equals(dependency.getScope())))
-                .map(Dependency::getVersion)
-                .filter(Objects::nonNull)
-                .findAny()
-                .orElse(dependency.getVersion());
+        String requestedVersion = dependency.getVersion();
 
-        if (resolveDependencies) {
-            Artifact artifact = new DefaultArtifact(
-                    dependency.getGroupId(),
-                    dependency.getArtifactId(),
-                    dependency.getType(),
-                    dependency.getVersion());
-            ArtifactRequest artifactRequest = new ArtifactRequest();
-            artifactRequest.setArtifact(artifact);
-            artifactRequest.setRepositories(singletonList(new RemoteRepository.Builder("central",
-                    "default", "https://central.maven.org/maven2/").build()));
+        if (rawModel != null) {
+            requestedVersion = rawModel.getDependencies().stream()
+                    .filter(d -> d.getGroupId().equals(dependency.getGroupId()) &&
+                            d.getArtifactId().equals(dependency.getArtifactId()) &&
+                            (d.getScope() == null || d.getScope().equals(dependency.getScope())))
+                    .map(Dependency::getVersion)
+                    .filter(Objects::nonNull)
+                    .findAny()
+                    .orElse(dependency.getVersion());
 
-            try {
-                ArtifactResult artifactResult = repositorySystem
-                        .resolveArtifact(repositorySystemSession, artifactRequest);
-                artifact = artifactResult.getArtifact();
-                logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+            if (resolveDependencies) {
+                Artifact artifact = new DefaultArtifact(
+                        dependency.getGroupId(),
+                        dependency.getArtifactId(),
+                        dependency.getType(),
+                        dependency.getVersion());
+                ArtifactRequest artifactRequest = new ArtifactRequest();
+                artifactRequest.setArtifact(artifact);
+                artifactRequest.setRepositories(remoteRepositories);
 
-                return new MavenModel.Dependency(
-                        new MavenModel.ModuleVersionId(
-                                artifact.getGroupId(),
-                                artifact.getArtifactId(),
-                                artifact.getVersion()),
-                        requestedVersion,
-                        dependency.getScope());
-            } catch (ArtifactResolutionException e) {
-                logger.warn("error resolving artifact: {}", e.getMessage());
+                try {
+                    ArtifactResult artifactResult = repositorySystem
+                            .resolveArtifact(repositorySystemSession, artifactRequest);
+                    artifact = artifactResult.getArtifact();
+                    logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+
+                    return new MavenModel.Dependency(
+                            new MavenModel.ModuleVersionId(
+                                    artifact.getGroupId(),
+                                    artifact.getArtifactId(),
+                                    artifact.getVersion()),
+                            requestedVersion,
+                            dependency.getScope());
+                } catch (ArtifactResolutionException e) {
+                    logger.warn("error resolving artifact: {}", e.getMessage());
+                }
             }
         }
 
