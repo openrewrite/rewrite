@@ -28,7 +28,7 @@ class RefactorTest {
                 .scanVisitors("org.openrewrite.text")
                 .loadProfile(ProfileConfiguration().apply {
                     name = "hello-jon"
-                    setInclude(setOf("*"))
+                    setInclude(setOf("org.openrewrite.text.*"))
                     setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
                 })
                 .build()
