@@ -24,6 +24,9 @@ interface GenerateConstructorUsingFieldsTest {
             public class UsersController {
                 private final UsersService usersService;
                 private final UsernameService usernameService;
+                
+                public User findUser(String name) {
+                }
             }
         """.trimIndent())
 
@@ -39,6 +42,29 @@ interface GenerateConstructorUsingFieldsTest {
                 public UsersController(UsersService usersService, UsernameService usernameService) {
                     this.usersService = usersService;
                     this.usernameService = usernameService;
+                }
+                
+                public User findUser(String name) {
+                }
+            }
+        """)
+    }
+
+    @Test
+    fun emptyListOfFields(jp: JavaParser) {
+        val a = jp.parse("""
+            public class UsersController {
+            }
+        """.trimIndent())
+
+        val fixed = a.refactor()
+                .visit(GenerateConstructorUsingFields(jp, a.classes[0], emptyList()))
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            public class UsersController {
+            
+                public UsersController() {
                 }
             }
         """)

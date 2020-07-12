@@ -49,7 +49,7 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
         if (scope.isScope(classDecl) && !hasRequiredArgsConstructor(classDecl)) {
             List<J> statements = classDecl.getBody().getStatements();
 
-            int lastField = 0;
+            int lastField = -1;
             for (int i = 0; i < statements.size(); i++) {
                 if (statements.get(i) instanceof J.VariableDecls) {
                     lastField = i;
@@ -85,8 +85,10 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
                     null,
                     constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()));
 
-            // add assignment statements to constructor
-            andThen(new AddAssignmentsToConstructor(constructor));
+            if (!fields.isEmpty()) {
+                // add assignment statements to constructor
+                andThen(new AddAssignmentsToConstructor(constructor));
+            }
 
             statements.add(lastField + 1, constructor);
 
