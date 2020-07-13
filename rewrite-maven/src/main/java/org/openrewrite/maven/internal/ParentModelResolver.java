@@ -29,6 +29,7 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
+import org.eclipse.aether.resolution.MetadataRequest;
 
 import java.util.List;
 
@@ -47,6 +48,7 @@ public class ParentModelResolver implements ModelResolver {
         this.remoteRepositories = remoteRepositories;
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version) throws UnresolvableModelException {
         Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
@@ -64,17 +66,18 @@ public class ParentModelResolver implements ModelResolver {
         return new FileModelSource(pomArtifact.getFile());
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(Parent parent) throws UnresolvableModelException {
         return resolveModel(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
     }
 
     @Override
-    public void addRepository(Repository repository) throws InvalidRepositoryException {
+    public void addRepository(Repository repository) {
     }
 
     @Override
-    public void addRepository(Repository repository, boolean replace) throws InvalidRepositoryException {
+    public void addRepository(Repository repository, boolean replace) {
     }
 
     @Override

@@ -26,13 +26,12 @@ import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.ArtifactResult;
+import org.eclipse.aether.resolution.*;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.eclipse.aether.version.Version;
 import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.MavenModel;
 import org.slf4j.Logger;
@@ -171,14 +170,30 @@ class MavenModuleLoader {
                     artifact = artifactResult.getArtifact();
                     logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
 
+                    Artifact newerArtifacts = new DefaultArtifact(
+                            artifact.getGroupId(),
+                            artifact.getArtifactId(),
+                            artifact.getClassifier(),
+                            artifact.getExtension(),
+                            "[" + artifact.getVersion() + ",)");
+
+                    VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
+                    newerArtifactsRequest.setArtifact(newerArtifacts);
+                    newerArtifactsRequest.setRepositories(remoteRepositories);
+
+                    VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
+
                     return new MavenModel.Dependency(
                             new MavenModel.ModuleVersionId(
                                     artifact.getGroupId(),
                                     artifact.getArtifactId(),
                                     artifact.getVersion()),
+                            newerArtifactsResult.getVersions().stream()
+                                .map(Version::toString)
+                                .collect(toList()),
                             requestedVersion,
                             dependency.getScope());
-                } catch (ArtifactResolutionException e) {
+                } catch (ArtifactResolutionException | VersionRangeResolutionException e) {
                     logger.warn("error resolving artifact: {}", e.getMessage());
                 }
             }
@@ -189,6 +204,7 @@ class MavenModuleLoader {
                         dependency.getGroupId(),
                         dependency.getArtifactId(),
                         dependency.getVersion()),
+                emptyList(),
                 requestedVersion,
                 dependency.getScope());
     }

@@ -19,12 +19,11 @@ import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.stream.StreamSupport.stream;
 
@@ -91,6 +90,8 @@ public interface Validated extends Iterable<Validated> {
         return new Either(this, validated);
     }
 
+    <T> T getValue();
+
     /**
      * Indicates that no validation has occurred. None is considered "valid", effectively a no-op validation.
      */
@@ -104,6 +105,11 @@ public interface Validated extends Iterable<Validated> {
         @Override
         public Iterator<Validated> iterator() {
             return Collections.emptyIterator();
+        }
+
+        @Override
+        public <T> T getValue() {
+            throw new IllegalStateException("Value does not exist");
         }
     }
 
@@ -148,6 +154,12 @@ public interface Validated extends Iterable<Validated> {
 
         public String getProperty() {
             return property;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> T getValue() {
+            return (T) value;
         }
 
         @Override
@@ -234,6 +246,20 @@ public interface Validated extends Iterable<Validated> {
         @Override
         public boolean isValid() {
             return left.isValid() && right.isValid();
+        }
+
+        public Optional<Valid> findAny() {
+            return StreamSupport.stream(Spliterators.spliteratorUnknownSize(iterator(), Spliterator.CONCURRENT), false)
+                    .filter(Valid.class::isInstance)
+                    .map(Valid.class::cast)
+                    .findAny();
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> T getValue() {
+            return (T) findAny()
+                    .orElseThrow(() -> new IllegalStateException("Value does not exist"));
         }
 
         @NonNull

@@ -64,6 +64,9 @@ public class MavenModel {
         @With
         ModuleVersionId moduleVersion;
 
+        @With
+        List<String> newerVersions;
+
         /**
          * The version written into the POM file, which may be a dynamic constraint or property reference.
          */

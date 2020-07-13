@@ -462,6 +462,33 @@ public interface Maven extends Serializable, Tree {
             return v.visitProperty(this);
         }
 
+        /**
+         * Determines if this property value is used as a dependency version for
+         * a given group and artifact.
+         *
+         * @param pom        The POM model containing dependencies.
+         * @param groupId    The group id of dependencies to match
+         * @param artifactId Optionally, an artifact id of dependencies to match.
+         *                   If this is <code>null</code>, don't atttempt to match
+         *                   on artifact id.
+         * @return <code>true</code> if this property is used for dependency version
+         * specification.
+         */
+        public boolean isDependencyVersionProperty(@Nullable Maven.Pom pom, String groupId, @Nullable String artifactId) {
+            return Optional.ofNullable(pom)
+                    .map(pom2 -> pom2.getModel()
+                            .getInheriting()
+                            .stream()
+                            .anyMatch(mod -> mod.getDependencies().stream()
+                                    .filter(d -> Maven.getPropertyKey(d.getRequestedVersion())
+                                            .map(prop -> prop.equals(getKey()))
+                                            .orElse(false))
+                                    .anyMatch(d -> d.getModuleVersion().getGroupId().equals(groupId) &&
+                                            (artifactId == null || d.getModuleVersion().getArtifactId().equals(artifactId))))
+                    )
+                    .orElse(false);
+        }
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
