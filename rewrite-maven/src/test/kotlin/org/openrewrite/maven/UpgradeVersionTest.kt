@@ -15,11 +15,80 @@
  */
 package org.openrewrite.maven
 
+import assertRefactored
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
+import java.io.File
+import java.nio.file.Path
 
 class UpgradeVersionTest {
+    @Test
+    fun validToVersion() {
+        assertThat(UpgradeVersion().apply { setToVersion("latest.release") }.versionComparator().getValue<UpgradeVersion.VersionComparator>())
+                .isInstanceOf(UpgradeVersion.LatestRelease::class.java)
+        assertThat(UpgradeVersion().apply { setToVersion("1.5 - 2") }.versionComparator().getValue<UpgradeVersion.VersionComparator>())
+                .isInstanceOf(UpgradeVersion.HyphenRange::class.java)
+        assertThat(UpgradeVersion().apply { setToVersion("1.x") }.versionComparator().getValue<UpgradeVersion.VersionComparator>())
+                .isInstanceOf(UpgradeVersion.XRange::class.java)
+        assertThat(UpgradeVersion().apply { setToVersion("~1.5") }.versionComparator().getValue<UpgradeVersion.VersionComparator>())
+                .isInstanceOf(UpgradeVersion.TildeRange::class.java)
+        assertThat(UpgradeVersion().apply { setToVersion("^1.5") }.versionComparator().getValue<UpgradeVersion.VersionComparator>())
+                .isInstanceOf(UpgradeVersion.CaretRange::class.java)
+    }
+
+    @Test
+    fun upgradeVersion(@TempDir tempDir: Path) {
+        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+            writeText("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot</artifactId>
+                      <version>1.5.1.RELEASE</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """.trimIndent().trim())
+        }
+
+        val pom = MavenParser.builder()
+                .build()
+                .parse(pomFile.toPath(), tempDir)
+
+        val fixed = pom.refactor().visit(UpgradeVersion().apply {
+            setGroupId("org.springframework.boot")
+            setToVersion("~1.5")
+        }).fix().fixed
+
+        assertRefactored(fixed, """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot</artifactId>
+                  <version>1.5.22.RELEASE</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent())
+    }
 
     @Nested
     inner class LatestReleaseTest {
@@ -70,6 +139,7 @@ class UpgradeVersionTest {
                     .getValue()
 
             assertThat(hyphenRange.isValid("1.2.2")).isFalse()
+            assertThat(hyphenRange.isValid("1.2.3.RELEASE")).isTrue()
             assertThat(hyphenRange.isValid("1.2.3")).isTrue()
             assertThat(hyphenRange.isValid("2.3.4")).isTrue()
             assertThat(hyphenRange.isValid("2.3.5")).isFalse()
@@ -125,6 +195,7 @@ class UpgradeVersionTest {
                     .getValue()
 
             assertThat(xRange.isValid("1.0.0")).isTrue()
+            assertThat(xRange.isValid("1.2.3.RELEASE")).isTrue()
             assertThat(xRange.isValid("1.9.9")).isTrue()
             assertThat(xRange.isValid("2.0.0")).isFalse()
         }
@@ -155,6 +226,7 @@ class UpgradeVersionTest {
                     .getValue()
 
             assertThat(tildeRange.isValid("1.2.3")).isTrue()
+            assertThat(tildeRange.isValid("1.2.3.RELEASE")).isTrue()
             assertThat(tildeRange.isValid("1.2.4")).isTrue()
             assertThat(tildeRange.isValid("1.3.0")).isFalse()
         }
@@ -200,6 +272,7 @@ class UpgradeVersionTest {
                     .getValue()
 
             assertThat(caretRange.isValid("1.2.3")).isTrue()
+            assertThat(caretRange.isValid("1.2.3.RELEASE")).isTrue()
             assertThat(caretRange.isValid("1.2.4")).isTrue()
             assertThat(caretRange.isValid("1.9.0")).isTrue()
             assertThat(caretRange.isValid("2.0.0")).isFalse()

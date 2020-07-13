@@ -87,6 +87,13 @@ public interface Validated extends Iterable<Validated> {
         if (this instanceof None) {
             return validated;
         }
+        return new Both(this, validated);
+    }
+
+    default Validated or(Validated validated) {
+        if (this instanceof None) {
+            return validated;
+        }
         return new Either(this, validated);
     }
 
@@ -245,7 +252,7 @@ public interface Validated extends Iterable<Validated> {
 
         @Override
         public boolean isValid() {
-            return left.isValid() && right.isValid();
+            return left.isValid() || right.isValid();
         }
 
         public Optional<Valid> findAny() {
@@ -258,8 +265,38 @@ public interface Validated extends Iterable<Validated> {
         @SuppressWarnings("unchecked")
         @Override
         public <T> T getValue() {
-            return (T) findAny()
+            return findAny()
+                    .map(v -> (T) v.getValue())
                     .orElseThrow(() -> new IllegalStateException("Value does not exist"));
+        }
+
+        @NonNull
+        @Override
+        public Iterator<Validated> iterator() {
+            return Stream.concat(
+                    stream(left.spliterator(), false),
+                    stream(right.spliterator(), false)
+            ).iterator();
+        }
+    }
+
+    class Both implements Validated {
+        private final Validated left;
+        private final Validated right;
+
+        public Both(Validated left, Validated right) {
+            this.left = left;
+            this.right = right;
+        }
+
+        @Override
+        public boolean isValid() {
+            return left.isValid() && right.isValid();
+        }
+
+        @Override
+        public <T> T getValue() {
+            throw new IllegalStateException("Cannot select a single value from two or more Validated");
         }
 
         @NonNull

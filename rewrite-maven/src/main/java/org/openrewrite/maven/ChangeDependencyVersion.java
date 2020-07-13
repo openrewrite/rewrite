@@ -61,7 +61,8 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
         Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
 
         if (!property.getValue().equals(toVersion) &&
-                property.isDependencyVersionProperty(pom, groupId, artifactId)) {
+                property.findDependencies(pom, groupId, artifactId)
+                        .anyMatch(d -> d.getRequestedVersion().equals("${" + property.getKey() + "}"))) {
             p = p.withValue(toVersion);
         }
 

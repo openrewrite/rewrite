@@ -29,6 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.io.Serializable;
 import java.util.*;
+import java.util.stream.Stream;
 
 import static java.util.UUID.randomUUID;
 import static java.util.stream.Collectors.toList;
@@ -474,19 +475,19 @@ public interface Maven extends Serializable, Tree {
          * @return <code>true</code> if this property is used for dependency version
          * specification.
          */
-        public boolean isDependencyVersionProperty(@Nullable Maven.Pom pom, String groupId, @Nullable String artifactId) {
+        public Stream<MavenModel.Dependency> findDependencies(@Nullable Maven.Pom pom, String groupId, @Nullable String artifactId) {
             return Optional.ofNullable(pom)
                     .map(pom2 -> pom2.getModel()
                             .getInheriting()
                             .stream()
-                            .anyMatch(mod -> mod.getDependencies().stream()
+                            .flatMap(mod -> mod.getDependencies().stream()
                                     .filter(d -> Maven.getPropertyKey(d.getRequestedVersion())
                                             .map(prop -> prop.equals(getKey()))
                                             .orElse(false))
-                                    .anyMatch(d -> d.getModuleVersion().getGroupId().equals(groupId) &&
+                                    .filter(d -> d.getModuleVersion().getGroupId().equals(groupId) &&
                                             (artifactId == null || d.getModuleVersion().getArtifactId().equals(artifactId))))
                     )
-                    .orElse(false);
+                    .orElse(Stream.empty());
         }
 
         @Override

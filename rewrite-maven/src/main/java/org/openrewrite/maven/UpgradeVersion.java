@@ -20,6 +20,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 
 import java.util.Comparator;
+import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,8 @@ public class UpgradeVersion extends MavenRefactorVisitor {
      */
     private String toVersion;
 
+    private VersionComparator versionComparator;
+
     public void setGroupId(String groupId) {
         this.groupId = groupId;
     }
@@ -58,23 +61,47 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId))
-                .and(required("toVersion", toVersion));
+                .and(required("toVersion", toVersion))
+                .and(versionComparator());
     }
 
     @Override
-    public Maven visitProperty(Maven.Property property) {
-        Maven.Property p = refactor(property, super::visitProperty);
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-
-        if (!property.getValue().equals(toVersion) &&
-                property.isDependencyVersionProperty(pom, groupId, artifactId)) {
-            p = p.withValue(toVersion);
-        }
-
-        return p;
+    public Maven visitPom(Maven.Pom pom) {
+        versionComparator = versionComparator().getValue();
+        return super.visitPom(pom);
     }
 
-    private interface VersionComparator extends Comparator<String> {
+    //VisibleForTesting
+    Validated versionComparator() {
+        return LatestRelease.build(toVersion)
+                .or(HyphenRange.build(toVersion))
+                .or(XRange.build(toVersion))
+                .or(TildeRange.build(toVersion))
+                .or(CaretRange.build(toVersion));
+    }
+
+    @Override
+    public Maven visitDependency(Maven.Dependency dependency) {
+        Maven.Dependency d = refactor(dependency, super::visitDependency);
+
+        Optional<String> newerVersion = d.getModel().getNewerVersions().stream()
+                .filter(v -> versionComparator.isValid(v))
+                .filter(v -> LatestRelease.INSTANCE.compare(dependency.getModel().getModuleVersion().getVersion(), v) < 0)
+                .max(versionComparator);
+
+        if (newerVersion.isPresent()) {
+            ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
+            changeDependencyVersion.setGroupId(groupId);
+            changeDependencyVersion.setArtifactId(artifactId);
+            changeDependencyVersion.setToVersion(newerVersion.get());
+            andThen(changeDependencyVersion);
+        }
+
+        return d;
+    }
+
+    //VisibleForTesting
+    interface VersionComparator extends Comparator<String> {
         Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
 
         boolean isValid(String version);
@@ -145,7 +172,7 @@ public class UpgradeVersion extends MavenRefactorVisitor {
                 return true;
             }
 
-            Matcher gav = RELEASE_PATTERN.matcher(version);
+            Matcher gav = RELEASE_PATTERN.matcher(normalizeVersion(version));
             gav.matches();
 
             if (!gav.group(1).equals(major)) {
@@ -307,16 +334,25 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     }
 
     static class LatestRelease implements VersionComparator {
+        public static final LatestRelease INSTANCE = LatestRelease.build("latest.release").getValue();
+
         @Override
         public boolean isValid(String version) {
-            return RELEASE_PATTERN.matcher(version).matches();
+            return RELEASE_PATTERN.matcher(normalizeVersion(version)).matches();
+        }
+
+        protected static String normalizeVersion(String version) {
+            if(version.endsWith(".RELEASE")) {
+                return version.substring(0, version.length() - ".RELEASE".length());
+            }
+            return version;
         }
 
         @SuppressWarnings("ResultOfMethodCallIgnored")
         @Override
         public int compare(String v1, String v2) {
-            Matcher v1Gav = RELEASE_PATTERN.matcher(v1);
-            Matcher v2Gav = RELEASE_PATTERN.matcher(v2);
+            Matcher v1Gav = RELEASE_PATTERN.matcher(normalizeVersion(v1));
+            Matcher v2Gav = RELEASE_PATTERN.matcher(normalizeVersion(v2));
 
             v1Gav.matches();
             v2Gav.matches();
@@ -336,7 +372,7 @@ public class UpgradeVersion extends MavenRefactorVisitor {
                 }
             }
 
-            return 0;
+            return v1.compareTo(v2);
         }
 
         public static Validated build(String pattern) {
