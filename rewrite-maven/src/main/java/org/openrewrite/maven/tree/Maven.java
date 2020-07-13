@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Getter;
+import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSourceVisitor;
@@ -100,6 +101,10 @@ public interface Maven extends Serializable, Tree {
 
         public Xml.Document getDocument() {
             return document;
+        }
+
+        public Pom withDocument(Xml.Document document) {
+            return new Pom(model, document);
         }
 
         public MavenModel getModel() {

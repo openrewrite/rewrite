@@ -18,10 +18,13 @@ package org.openrewrite.maven;
 import org.openrewrite.RefactorVisitorSupport;
 import org.openrewrite.Tree;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements RefactorVisitorSupport {
+    protected Formatter formatter;
+
     XmlRefactorVisitor xmlRefactorVisitor = new XmlRefactorVisitor() {
     };
 
@@ -32,6 +35,7 @@ public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements R
 
     @Override
     public Maven visitPom(Maven.Pom pom) {
+        formatter = new Formatter(pom.getDocument());
         Maven.Pom p = pom;
         p = p.withParent(refactor(p.getParent()));
         p = p.withDependencyManagement(refactor(p.getDependencyManagement()));

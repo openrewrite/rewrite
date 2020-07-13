@@ -79,7 +79,7 @@ public class MavenModel {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
-    public static class ModuleVersionId {
+    public static class ModuleVersionId implements Comparable<ModuleVersionId> {
         @With
         String groupId;
 
@@ -88,6 +88,33 @@ public class MavenModel {
 
         @With
         String version;
+
+        @Override
+        public int compareTo(ModuleVersionId v) {
+            if (!groupId.equals(v.groupId)) {
+                return comparePartByPart(groupId, v.groupId);
+            }
+            else if(!artifactId.equals(v.artifactId)) {
+                return comparePartByPart(artifactId, v.artifactId);
+            }
+
+            // in every case imagined so far, group and artifact comparison are enough,
+            // so this is just for completeness
+            return version.compareTo(v.version);
+        }
+
+        private int comparePartByPart(String d1, String d2) {
+            String[] d1Parts = d1.split("[.-]");
+            String[] d2Parts = d2.split("[.-]");
+
+            for (int i = 0; i < Math.min(d1Parts.length, d2Parts.length); i++) {
+                if (!d1Parts[i].equals(d2Parts[i])) {
+                    return d1Parts[i].compareTo(d2Parts[i]);
+                }
+            }
+
+            return d1Parts.length - d2Parts.length;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

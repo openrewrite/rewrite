@@ -22,8 +22,7 @@ import org.openrewrite.xml.search.FindTags;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
@@ -66,29 +65,25 @@ class MemoizedTags<M> {
 
         synchronized (this) {
             if (maybeMutated != getModels()) {
-                if (maybeMutated.size() == memoized.size()) {
-                    for (int i = 0; i < memoized.size(); i++) {
-                        M model = maybeMutated.get(i);
-                        M memoizedModel = memoized.get(i);
-                        if (!model.equals(memoizedModel)) {
-                            memoized = maybeMutated;
+                Map<Xml.Tag, M> modelsByTag = new HashMap<>(getModels().size());
+                getModels().forEach(m -> modelsByTag.put(modelToTag.apply(m), m));
 
-                            ChangeTagContent change = new ChangeTagContent(
-                                    parent,
-                                    memoized.stream()
-                                            .map(modelToTag)
-                                            .map(Content.class::cast)
-                                            .collect(toList())
-                            );
-
-                            return Optional.of(new Refactor<>(root)
-                                    .visit(change)
-                                    .fix()
-                                    .getFixed()
-                            );
-                        }
+                List<Content> content = new ArrayList<>();
+                for (M model : maybeMutated) {
+                    M memoizedModel = modelsByTag.get(modelToTag.apply(model));
+                    if (memoizedModel == null) {
+                        content.add(modelToTag.apply(model));
+                    } else {
+                        content.add(modelToTag.apply(model));
                     }
                 }
+
+                memoized = maybeMutated;
+                return Optional.of(new Refactor<>(root)
+                        .visit(new ChangeTagContent(parent, content))
+                        .fix()
+                        .getFixed()
+                );
             }
         }
 
