@@ -190,6 +190,56 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     }
 
     /**
+     * Allows patch-level changes if a minor version is specified on the comparator. Allows minor-level changes if not.
+     * <a href="https://github.com/npm/node-semver#tilde-ranges-123-12-1">Tilde ranges</a>.
+     */
+    static class TildeRange extends LatestRelease {
+        private static final Pattern TILDE_RANGE_PATTERN = Pattern.compile("~(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
+
+        private final String upperExclusive;
+        private final String lower;
+
+        private TildeRange(String lower, String upperExclusive) {
+            this.lower = lower;
+            this.upperExclusive = upperExclusive;
+        }
+
+        @Override
+        public boolean isValid(String version) {
+            return super.isValid(version) &&
+                    super.compare(version, upperExclusive) < 0 &&
+                    super.compare(version, lower) >= 0;
+        }
+
+        public static Validated build(String pattern) {
+            Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
+            if (!matcher.matches()) {
+                return Validated.invalid("tildeRange", pattern, "not a tilde range");
+            }
+
+            String major = matcher.group(1);
+            String minor = matcher.group(2);
+            String patch = matcher.group(3);
+
+            String lower;
+            String upper;
+
+            if (minor == null) {
+                lower = major + ".0.0";
+                upper = (parseInt(major) + 1) + ".0.0";
+            } else if (patch == null) {
+                lower = major + "." + minor + ".0";
+                upper = major + "." + (parseInt(minor) + 1) + ".0";
+            } else {
+                lower = major + "." + minor + "." + patch;
+                upper = major + "." + (parseInt(minor) + 1) + ".0";
+            }
+
+            return Validated.valid("tildeRange", new TildeRange(lower, upper));
+        }
+    }
+
+    /**
      * Allows changes that do not modify the left-most non-zero element in the [major, minor, patch] tuple.
      * <a href="https://github.com/npm/node-semver#caret-ranges-123-025-004">Caret ranges</a>.
      */
