@@ -17,18 +17,28 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.MavenModel;
+import org.openrewrite.xml.tree.Content;
 
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.required;
 
 public class ChangeDependencyScope extends MavenRefactorVisitor {
     private String groupId;
     private String artifactId;
 
+    public ChangeDependencyScope() {
+        setCursoringOn();
+    }
+
     /**
      * If null, strips the scope from an existing dependency.
      */
     @Nullable
-    private String scope;
+    private String toScope;
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
@@ -38,13 +48,61 @@ public class ChangeDependencyScope extends MavenRefactorVisitor {
         this.artifactId = artifactId;
     }
 
-    public void setScope(@Nullable String scope) {
-        this.scope = scope;
+    public void setToScope(@Nullable String toScope) {
+        this.toScope = toScope;
     }
 
     @Override
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId));
+    }
+
+    @Override
+    public Maven visitDependency(Maven.Dependency dependency) {
+        Maven.Dependency d = refactor(dependency, super::visitDependency);
+
+        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
+        assert pom != null;
+
+        MavenModel.ModuleVersionId mvid = dependency.getModel().getModuleVersion();
+        if (mvid.getGroupId().equals(groupId) && (artifactId == null || mvid.getArtifactId().equals(artifactId))) {
+            String scope = dependency.getScope();
+            if (scope == null && toScope != null) {
+                andThen(new Scoped(d, toScope));
+            } else if (toScope == null && scope != null) {
+                andThen(new Scoped(d, null));
+            } else if (scope != null && !scope.equals(toScope)) {
+                andThen(new Scoped(d, toScope));
+            }
+        }
+
+        return d;
+    }
+
+    public static class Scoped extends MavenRefactorVisitor {
+        private final Maven.Dependency scope;
+        private final String toScope;
+
+        public Scoped(Maven.Dependency scope, String toScope) {
+            this.scope = scope;
+            this.toScope = toScope;
+        }
+
+        @Override
+        public Maven visitDependency(Maven.Dependency dependency) {
+            Maven.Dependency d = refactor(dependency, super::visitDependency);
+            if (scope.isScope(dependency)) {
+                if (toScope == null) {
+                    d = d.withTag(d.getTag().withContent(d.getTag().getChildren().stream()
+                            .filter(t -> !t.getName().equals("scope"))
+                            .map(Content.class::cast)
+                            .collect(toList())));
+                } else {
+                    d = d.withScope(toScope);
+                }
+            }
+            return d;
+        }
     }
 }

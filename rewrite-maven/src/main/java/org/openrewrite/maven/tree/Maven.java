@@ -25,7 +25,10 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.maven.PrintMaven;
+import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.ChangeTagContent;
+import org.openrewrite.xml.XmlParser;
+import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.Serializable;
@@ -343,6 +346,7 @@ public interface Maven extends Serializable, Tree {
         private final MavenModel.Dependency model;
 
         @Getter
+        @With
         final Xml.Tag tag;
 
         public Dependency(boolean isManaged, MavenModel.Dependency model, Xml.Tag tag) {
@@ -383,8 +387,28 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Dependency withVersion(String version) {
-            return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withVersion(version)),
-                    tag.withChildValue("version", version));
+            Xml.Tag t = tag.withChildValue("version", version);
+            if (!t.getChild("version").isPresent()) {
+                List<Content> content = new ArrayList<>(t.getContent());
+                content.add(new XmlParser().parseTag("<version>" + version + "</version>").withFormatting(content.get(0).getFormatting()));
+                t = t.withContent(content);
+            }
+            return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withVersion(version)), t);
+        }
+
+        @Nullable
+        public String getScope() {
+            return tag.getChildValue("scope").orElse(null);
+        }
+
+        public Dependency withScope(String scope) {
+            Xml.Tag t = tag.withChildValue("scope", scope);
+            if (!t.getChild("scope").isPresent()) {
+                List<Content> content = new ArrayList<>(t.getContent());
+                content.add(new XmlParser().parseTag("<scope>" + scope + "</scope>").withFormatting(content.get(0).getFormatting()));
+                t = t.withContent(content);
+            }
+            return new Dependency(isManaged, model, t);
         }
 
         @Override

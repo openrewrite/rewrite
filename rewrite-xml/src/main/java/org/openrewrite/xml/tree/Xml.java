@@ -197,7 +197,7 @@ public interface Xml extends Serializable, Tree {
         /**
          * Locate an child tag with the given name and set its text value.
          *
-         * @param childName The child tag to locate. This assumes there is only one.
+         * @param childName The child tag to locate. This assumes there is one and only one.
          * @param text      The text value to set.
          * @return This tag.
          */
@@ -221,7 +221,7 @@ public interface Xml extends Serializable, Tree {
                 return Optional.empty();
             }
             if (content.get(0) instanceof Xml.CharData) {
-                return Optional.of(((CharData) content.get(0)).getText());
+                return Optional.ofNullable(((CharData) content.get(0)).getText());
             }
             return Optional.empty();
         }
