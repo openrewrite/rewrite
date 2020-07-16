@@ -80,6 +80,6 @@ class PomTest {
                 .build()
                 .parse(pomFile.toPath(), tempDir)
 
-        assertThat(pom.dependencies[0].model.newerVersions).contains("29.0-jre")
+        assertThat(pom.dependencies[0].model.moduleVersion.newerVersions).contains("29.0-jre")
     }
 }

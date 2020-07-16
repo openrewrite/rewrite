@@ -21,7 +21,7 @@ import org.junit.jupiter.api.io.TempDir
 import java.io.File
 import java.nio.file.Path
 
-class UpgradeVersionTest {
+class UpgradeParentVersionTest {
     @Test
     fun upgradeVersion(@TempDir tempDir: Path) {
         val pomFile = File(tempDir.toFile(), "pom.xml").apply {
@@ -29,18 +29,16 @@ class UpgradeVersionTest {
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>1.5.12.RELEASE</version>
+                    <relativePath/> <!-- lookup parent from repository -->
+                  </parent>
+                  
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot</artifactId>
-                      <version>1.5.1.RELEASE</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
                 </project>
             """.trimIndent().trim())
         }
@@ -49,8 +47,9 @@ class UpgradeVersionTest {
                 .build()
                 .parse(pomFile.toPath(), tempDir)
 
-        val fixed = pom.refactor().visit(UpgradeVersion().apply {
+        val fixed = pom.refactor().visit(UpgradeParentVersion().apply {
             setGroupId("org.springframework.boot")
+            setArtifactId("spring-boot-starter-parent")
             setToVersion("~1.5")
         }).fix().fixed
 
@@ -58,18 +57,16 @@ class UpgradeVersionTest {
             <project>
               <modelVersion>4.0.0</modelVersion>
               
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.22.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
               <groupId>com.mycompany.app</groupId>
               <artifactId>my-app</artifactId>
               <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot</artifactId>
-                  <version>1.5.22.RELEASE</version>
-                  <scope>test</scope>
-                </dependency>
-              </dependencies>
             </project>
         """.trimIndent())
     }

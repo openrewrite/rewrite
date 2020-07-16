@@ -25,7 +25,6 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.maven.PrintMaven;
-import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.ChangeTagContent;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Content;
@@ -261,6 +260,7 @@ public interface Maven extends Serializable, Tree {
     }
 
     class Parent implements Maven {
+        @Getter
         private final MavenModel model;
 
         @Getter
@@ -270,10 +270,6 @@ public interface Maven extends Serializable, Tree {
         public Parent(MavenModel model, @Nullable Xml.Tag tag) {
             this.model = model;
             this.tag = tag;
-        }
-
-        public MavenModel getModel() {
-            return model;
         }
 
         @Nullable

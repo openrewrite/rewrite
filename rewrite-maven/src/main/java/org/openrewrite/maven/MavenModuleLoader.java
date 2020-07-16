@@ -33,6 +33,7 @@ import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.eclipse.aether.version.Version;
 import org.openrewrite.maven.internal.ParentModelResolver;
+import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,6 +48,8 @@ import static java.util.stream.Collectors.toMap;
 
 class MavenModuleLoader {
     private static final Logger logger = LoggerFactory.getLogger(MavenModuleLoader.class);
+
+    private final Map<MavenModel.ModuleVersionId, MavenModel.Dependency> dependencyCache = new HashMap<>();
 
     private final boolean resolveDependencies;
     private final File localRepository;
@@ -108,14 +111,22 @@ class MavenModuleLoader {
                                                 Model model) {
         MavenModel parent = null;
         if (model.getParent() != null) {
+            Model rawParentModel = result.getRawModel(model.getParent().getId().replace(":pom", ""));
+            if (rawParentModel.getGroupId() == null) {
+                rawParentModel.setGroupId(model.getParent().getGroupId());
+            }
+            if (rawParentModel.getVersion() == null) {
+                rawParentModel.setVersion(model.getParent().getVersion());
+            }
+
             parent = buildMavenModelRecursive(repositorySystem, repositorySystemSession,
-                    result, result.getRawModel(model.getParent().getId().replace(":pom", "")));
+                    result, rawParentModel);
         }
 
         Model rawModel = result.getRawModel(model.getGroupId() + ":" + model.getArtifactId() + ":" + model.getVersion());
 
         List<MavenModel.Dependency> dependencies = model.getDependencies().stream()
-                .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, rawModel))
+                .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, model, rawModel))
                 .collect(toList());
 
         MavenModel.DependencyManagement dependencyManagement = model.getDependencyManagement() == null ?
@@ -124,7 +135,7 @@ class MavenModuleLoader {
                         .getDependencyManagement()
                         .getDependencies()
                         .stream()
-                        .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, rawModel))
+                        .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, model, rawModel))
                         .collect(toList())
                 );
 
@@ -132,81 +143,109 @@ class MavenModuleLoader {
                 .collect(toMap(e -> e.getKey().toString(), e -> e.getValue().toString()));
 
         return new MavenModel(parent,
-                new MavenModel.ModuleVersionId(model.getGroupId(), model.getArtifactId(), model.getVersion()),
+                new MavenModel.ModuleVersionId(
+                        model.getGroupId(),
+                        model.getArtifactId(),
+                        null,
+                        model.getVersion(),
+                        newerVersions(repositorySystem, repositorySystemSession,
+                                model.getGroupId(), model.getArtifactId(), model.getVersion(),
+                                "", "pom")
+                ),
                 dependencyManagement,
                 dependencies,
                 properties,
                 emptyList());
     }
 
+    private List<String> newerVersions(RepositorySystem repositorySystem,
+                                       RepositorySystemSession repositorySystemSession,
+                                       String groupId, String artifactId, String version,
+                                       String classifier, String extension) {
+        Artifact newerArtifacts = new DefaultArtifact(groupId, artifactId, classifier, extension,
+                "[" + version + ",)");
+
+        VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
+        newerArtifactsRequest.setArtifact(newerArtifacts);
+        newerArtifactsRequest.setRepositories(remoteRepositories);
+
+        try {
+            VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
+            return newerArtifactsResult.getVersions().stream()
+                    .map(Version::toString)
+                    .collect(toList());
+        } catch (VersionRangeResolutionException e) {
+            return emptyList();
+        }
+    }
+
     private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
                                                     RepositorySystemSession repositorySystemSession,
-                                                    Dependency dependency, Model rawModel) {
-        String requestedVersion = dependency.getVersion();
+                                                    Dependency dependency, Model model, Model rawModel) {
+        // This may not be the EFFECTIVE mvid, e.g. a version here could be a property reference. So two distinct
+        // "dependency" instances could ultimately refer to the same MavenModel.Dependency, and that's ok.
+        MavenModel.ModuleVersionId mvidFromDependency = new MavenModel.ModuleVersionId(
+                dependency.getGroupId(),
+                dependency.getArtifactId(),
+                dependency.getClassifier(),
+                dependency.getVersion(),
+                emptyList());
 
-        if (rawModel != null) {
-            requestedVersion = rawModel.getDependencies().stream()
-                    .filter(d -> d.getGroupId().equals(dependency.getGroupId()) &&
-                            d.getArtifactId().equals(dependency.getArtifactId()) &&
-                            (d.getScope() == null || d.getScope().equals(dependency.getScope())))
-                    .map(Dependency::getVersion)
-                    .filter(Objects::nonNull)
-                    .findAny()
-                    .orElse(dependency.getVersion());
+        return dependencyCache.computeIfAbsent(mvidFromDependency, mvid -> {
+            String requestedVersion = dependency.getVersion();
 
-            if (resolveDependencies) {
-                Artifact artifact = new DefaultArtifact(
-                        dependency.getGroupId(),
-                        dependency.getArtifactId(),
-                        dependency.getType(),
-                        dependency.getVersion());
-                ArtifactRequest artifactRequest = new ArtifactRequest();
-                artifactRequest.setArtifact(artifact);
-                artifactRequest.setRepositories(remoteRepositories);
+            if (rawModel != null) {
+                requestedVersion = rawModel.getDependencies().stream()
+                        .filter(d -> d.getGroupId().equals(dependency.getGroupId()) &&
+                                d.getArtifactId().equals(dependency.getArtifactId()) &&
+                                (d.getScope() == null || d.getScope().equals(dependency.getScope())))
+                        .map(Dependency::getVersion)
+                        .filter(Objects::nonNull)
+                        .findAny()
+                        .orElse(dependency.getVersion());
 
-                try {
-                    ArtifactResult artifactResult = repositorySystem
-                            .resolveArtifact(repositorySystemSession, artifactRequest);
-                    artifact = artifactResult.getArtifact();
-                    logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+                if (resolveDependencies) {
+                    Artifact artifact = new DefaultArtifact(
+                            dependency.getGroupId(),
+                            dependency.getArtifactId(),
+                            dependency.getClassifier(),
+                            dependency.getType(),
+                            Maven.getPropertyKey(dependency.getVersion())
+                                    .map(versionProperty -> (String) model.getProperties().get(versionProperty))
+                                    .orElse(dependency.getVersion()));
+                    ArtifactRequest artifactRequest = new ArtifactRequest();
+                    artifactRequest.setArtifact(artifact);
+                    artifactRequest.setRepositories(remoteRepositories);
 
-                    Artifact newerArtifacts = new DefaultArtifact(
-                            artifact.getGroupId(),
-                            artifact.getArtifactId(),
-                            artifact.getClassifier(),
-                            artifact.getExtension(),
-                            "[" + artifact.getVersion() + ",)");
+                    try {
+                        ArtifactResult artifactResult = repositorySystem
+                                .resolveArtifact(repositorySystemSession, artifactRequest);
+                        artifact = artifactResult.getArtifact();
+                        logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
 
-                    VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
-                    newerArtifactsRequest.setArtifact(newerArtifacts);
-                    newerArtifactsRequest.setRepositories(remoteRepositories);
-
-                    VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
-
-                    return new MavenModel.Dependency(
-                            new MavenModel.ModuleVersionId(
-                                    artifact.getGroupId(),
-                                    artifact.getArtifactId(),
-                                    artifact.getVersion()),
-                            newerArtifactsResult.getVersions().stream()
-                                .map(Version::toString)
-                                .collect(toList()),
-                            requestedVersion,
-                            dependency.getScope());
-                } catch (ArtifactResolutionException | VersionRangeResolutionException e) {
-                    logger.warn("error resolving artifact: {}", e.getMessage());
+                        return new MavenModel.Dependency(
+                                new MavenModel.ModuleVersionId(
+                                        artifact.getGroupId(),
+                                        artifact.getArtifactId(),
+                                        artifact.getClassifier(),
+                                        artifact.getVersion(),
+                                        newerVersions(repositorySystem, repositorySystemSession,
+                                                artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(),
+                                                artifact.getClassifier(), artifact.getExtension())
+                                ),
+                                requestedVersion,
+                                dependency.getScope());
+                    } catch (ArtifactResolutionException e) {
+                        logger.warn("error resolving artifact: {}", e.getMessage());
+                    }
                 }
             }
-        }
 
-        return new MavenModel.Dependency(
-                new MavenModel.ModuleVersionId(
-                        dependency.getGroupId(),
-                        dependency.getArtifactId(),
-                        dependency.getVersion()),
-                emptyList(),
-                requestedVersion,
-                dependency.getScope());
+            return new MavenModel.Dependency(
+                    mvid,
+                    requestedVersion,
+                    dependency.getScope());
+        });
     }
 
     private RepositorySystem getRepositorySystem() {

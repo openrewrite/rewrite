@@ -15,10 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -34,6 +31,7 @@ import java.util.Map;
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
 public class MavenModel {
+    @ToString.Exclude
     @With
     @Nullable
     MavenModel parent;
@@ -42,13 +40,16 @@ public class MavenModel {
     @With
     ModuleVersionId moduleVersion;
 
+    @ToString.Exclude
     @Nullable
     @With
     DependencyManagement dependencyManagement;
 
+    @ToString.Exclude
     @With
     List<Dependency> dependencies;
 
+    @ToString.Exclude
     @With
     Map<String, String> properties;
 
@@ -63,9 +64,6 @@ public class MavenModel {
     public static class Dependency {
         @With
         ModuleVersionId moduleVersion;
-
-        @With
-        List<String> newerVersions;
 
         /**
          * The version written into the POM file, which may be a dynamic constraint or property reference.
@@ -87,15 +85,32 @@ public class MavenModel {
         String artifactId;
 
         @With
+        @Nullable
+        String classifier;
+
+        @With
         String version;
+
+        @ToString.Exclude
+        @EqualsAndHashCode.Exclude
+        @With
+        List<String> newerVersions;
 
         @Override
         public int compareTo(ModuleVersionId v) {
             if (!groupId.equals(v.groupId)) {
                 return comparePartByPart(groupId, v.groupId);
-            }
-            else if(!artifactId.equals(v.artifactId)) {
+            } else if (!artifactId.equals(v.artifactId)) {
                 return comparePartByPart(artifactId, v.artifactId);
+            } else if (classifier == null && v.classifier != null) {
+                return -1;
+            } else if (classifier != null) {
+                if (v.classifier == null) {
+                    return 1;
+                }
+                if (!classifier.equals(v.classifier)) {
+                    return classifier.compareTo(v.classifier);
+                }
             }
 
             // in every case imagined so far, group and artifact comparison are enough,

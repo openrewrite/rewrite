@@ -16,30 +16,19 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.VersionComparator;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
-/**
- * Upgrade the version a group or group and artifact using Node Semver
- * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
- * more precise control over version updates to patch or minor releases.
- */
-public class UpgradeVersion extends MavenRefactorVisitor {
+public class UpgradeParentVersion extends MavenRefactorVisitor {
     private String groupId;
-
-    @Nullable
     private String artifactId;
-
-    /**
-     * Node Semver range syntax.
-     */
     private String toVersion;
 
     private VersionComparator versionComparator;
@@ -48,7 +37,7 @@ public class UpgradeVersion extends MavenRefactorVisitor {
         this.groupId = groupId;
     }
 
-    public void setArtifactId(@Nullable String artifactId) {
+    public void setArtifactId(String artifactId) {
         this.artifactId = artifactId;
     }
 
@@ -59,13 +48,9 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     @Override
     public Validated validate() {
         return required("groupId", groupId)
+                .and(required("artifactId", artifactId))
                 .and(required("toVersion", toVersion))
                 .and(Semver.validate(toVersion));
-    }
-
-    @Override
-    public boolean isIdempotent() {
-        return false;
     }
 
     @Override
@@ -75,24 +60,24 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitDependency(Maven.Dependency dependency) {
-        Maven.Dependency d = refactor(dependency, super::visitDependency);
+    public Maven visitParent(Maven.Parent parent) {
+        Maven.Parent p = refactor(parent, super::visitParent);
 
-        if (d.getGroupId().equals(groupId) && (artifactId == null || d.getArtifactId().equals(artifactId))) {
-            Optional<String> newerVersion = d.getModel().getModuleVersion().getNewerVersions().stream()
-                    .filter(v -> versionComparator.isValid(v))
-                    .filter(v -> LatestRelease.INSTANCE.compare(dependency.getModel().getModuleVersion().getVersion(), v) < 0)
-                    .max(versionComparator);
+        List<String> newerVersions = p.getModel().getModuleVersion().getNewerVersions();
 
-            if (newerVersion.isPresent()) {
-                ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                changeDependencyVersion.setGroupId(groupId);
-                changeDependencyVersion.setArtifactId(artifactId);
-                changeDependencyVersion.setToVersion(newerVersion.get());
-                andThen(changeDependencyVersion);
-            }
+        Optional<String> newerVersion = newerVersions.stream()
+                .filter(v -> versionComparator.isValid(v))
+                .filter(v -> LatestRelease.INSTANCE.compare(parent.getModel().getModuleVersion().getVersion(), v) < 0)
+                .max(versionComparator);
+
+        if (newerVersion.isPresent()) {
+            ChangeParentVersion changeParentVersion = new ChangeParentVersion();
+            changeParentVersion.setGroupId(groupId);
+            changeParentVersion.setArtifactId(artifactId);
+            changeParentVersion.setToVersion(newerVersion.get());
+            andThen(changeParentVersion);
         }
 
-        return d;
+        return p;
     }
 }

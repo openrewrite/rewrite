@@ -35,5 +35,6 @@ class MavenModelTest {
         assertThat(mvid("g", "a").compareTo(mvid("g", "a"))).isEqualTo(0)
     }
 
-    private fun mvid(group: String, artifact: String) = MavenModel.ModuleVersionId(group, artifact, "1")
+    private fun mvid(group: String, artifact: String) = MavenModel.ModuleVersionId(
+            group, artifact, null, "1", emptyList())
 }
