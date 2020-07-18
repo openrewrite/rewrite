@@ -15,7 +15,12 @@
  */
 package org.openrewrite;
 
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
+import java.util.Collection;
+import java.util.Optional;
+
+import static java.util.Collections.emptyList;
 
 public interface SourceFile extends Tree {
     String getSourcePath();
@@ -26,5 +31,28 @@ public interface SourceFile extends Tree {
      *
      * @return A metadata map containing any additional context about this source file.
      */
-    Map<Metadata, String> getMetadata();
+    Collection<Metadata> getMetadata();
+
+    default <M extends Metadata> Optional<M> getMetadata(Class<M> metadataType) {
+        return getStyles().stream().filter(metadataType::isInstance).map(metadataType::cast).findFirst();
+    }
+
+    /**
+     * Styles encode the surrounding project's expectation of formatting, etc.
+     * For example, the project's expected Java import ordering is a style.
+     *
+     * @return A list of styles.
+     */
+    default Collection<? extends Style> getStyles() {
+        return emptyList();
+    }
+
+    default <S extends Style> Optional<S> getStyle(Class<S> styleType) {
+        return getStyles().stream().filter(styleType::isInstance).map(styleType::cast).findFirst();
+    }
+
+    @JsonProperty("@c")
+    default String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
 }

@@ -1,6 +1,9 @@
 dependencies {
+    api("javax.inject:javax.inject:1")
+
     implementation("org.eclipse.jgit:org.eclipse.jgit:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")

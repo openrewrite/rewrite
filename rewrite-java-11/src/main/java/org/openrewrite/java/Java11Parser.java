@@ -77,15 +77,19 @@ public class Java11Parser implements JavaParser {
     private final Context context = new Context();
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog = new ResettableLog(context);
+    private final Collection<JavaStyle> styles;
 
-    private Java11Parser(@Nullable List<Path> classpath, Charset charset,
+    private Java11Parser(@Nullable List<Path> classpath,
+                         Charset charset,
                          boolean relaxedClassTypeMatching,
                          MeterRegistry meterRegistry,
-                         boolean logCompilationWarningsAndErrors) {
+                         boolean logCompilationWarningsAndErrors,
+                         Collection<JavaStyle> styles) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;
         this.charset = charset;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
+        this.styles = styles;
         this.pfm = new JavacFileManager(context, true, charset);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
@@ -180,7 +184,7 @@ public class Java11Parser implements JavaParser {
                                 Java11ParserVisitor parser = new Java11ParserVisitor(
                                         relativeTo == null ? path : relativeTo.relativize(path),
                                         Files.readString(path, charset),
-                                        relaxedClassTypeMatching);
+                                        relaxedClassTypeMatching, styles);
                                 return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
                             } catch (IOException e) {
                                 throw new UncheckedIOException(e);
@@ -265,7 +269,7 @@ public class Java11Parser implements JavaParser {
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    meterRegistry, logCompilationWarningsAndErrors);
+                    meterRegistry, logCompilationWarningsAndErrors, styles);
         }
     }
 }

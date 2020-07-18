@@ -134,8 +134,8 @@ public class RefactorPlan {
             return this;
         }
 
-        public Builder scanVisitors(String... whitelistVisitorPackages) {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader(whitelistVisitorPackages).loadVisitors());
+        public Builder scanVisitors(String... acceptVisitorPackages) {
+            visitors.addAll(new AutoConfigureSourceVisitorLoader(acceptVisitorPackages).loadVisitors());
             return this;
         }
 

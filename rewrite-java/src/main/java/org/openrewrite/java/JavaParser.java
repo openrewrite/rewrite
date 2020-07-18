@@ -26,6 +26,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
@@ -83,7 +84,7 @@ public interface JavaParser {
 
         return javaParser;
     }
-    
+
     List<J.CompilationUnit> parse(List<Path> sourceFiles, @Nullable Path relativeTo);
 
     default J.CompilationUnit parse(String source, String whichDependsOn) {
@@ -154,6 +155,7 @@ public interface JavaParser {
         protected boolean relaxedClassTypeMatching = false;
         protected MeterRegistry meterRegistry = Metrics.globalRegistry;
         protected boolean logCompilationWarningsAndErrors = true;
+        protected List<JavaStyle> styles = new ArrayList<>();
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
@@ -177,6 +179,11 @@ public interface JavaParser {
 
         public B classpath(List<Path> classpath) {
             this.classpath = classpath;
+            return (B) this;
+        }
+
+        public B importStyle(ImportLayoutStyle importStyle) {
+            this.styles.add(importStyle);
             return (B) this;
         }
 

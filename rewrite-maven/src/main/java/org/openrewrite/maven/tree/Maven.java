@@ -15,10 +15,7 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import lombok.Getter;
 import lombok.With;
 import org.openrewrite.*;
@@ -30,6 +27,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import java.beans.ConstructorProperties;
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Stream;
@@ -55,12 +53,7 @@ public interface Maven extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
-    @JsonIgnore
-    @Override
-    default String getTreeType() {
-        return "pom";
-    }
-
+    @JsonIgnoreProperties(value = "styles")
     class Pom implements Maven, SourceFile {
         private final MavenModel model;
         private final Xml.Document document;
@@ -75,6 +68,7 @@ public interface Maven extends Serializable, Tree {
         @JsonIgnore
         private final MemoizedTags<Property> memoizedProperties;
 
+        @ConstructorProperties({"model", "document"})
         public Pom(MavenModel model, Xml.Document document) {
             this.model = model;
             this.document = document;
@@ -113,6 +107,7 @@ public interface Maven extends Serializable, Tree {
             return model;
         }
 
+        @JsonIgnore
         @Nullable
         public String getGroupId() {
             return document.getRoot().getChildValue("groupId").orElse(null);
@@ -123,6 +118,7 @@ public interface Maven extends Serializable, Tree {
                     .withChildValue("groupId", groupId)));
         }
 
+        @JsonIgnore
         @Nullable
         public String getArtifactId() {
             return document.getRoot().getChildValue("artifactId").orElse(null);
@@ -133,6 +129,7 @@ public interface Maven extends Serializable, Tree {
                     .withChildValue("artifactId", artifactId)));
         }
 
+        @JsonIgnore
         @Nullable
         public String getVersion() {
             return document.getRoot().getChildValue("version").orElse(null);
@@ -143,6 +140,7 @@ public interface Maven extends Serializable, Tree {
                     .withChildValue("version", version)));
         }
 
+        @JsonIgnore
         @Nullable
         public Parent getParent() {
             return model.getParent() == null ?
@@ -179,6 +177,7 @@ public interface Maven extends Serializable, Tree {
                     .orElse(this);
         }
 
+        @JsonIgnore
         public List<Dependency> getDependencies() {
             return memoizedDependencies.getModels();
         }
@@ -192,6 +191,7 @@ public interface Maven extends Serializable, Tree {
                     .orElse(this);
         }
 
+        @JsonIgnore
         public List<Property> getProperties() {
             return memoizedProperties.getModels();
         }
@@ -217,26 +217,23 @@ public interface Maven extends Serializable, Tree {
                             .findAny());
         }
 
-        /**
-         * Because Jackson will not place a polymorphic type tag on the root of the AST when we are serializing a list of ASTs together
-         */
-        protected final String jacksonPolymorphicTypeTag = ".Maven$Pom";
-
-        @JsonProperty("@c")
-        public String getJacksonPolymorphicTypeTag() {
-            return jacksonPolymorphicTypeTag;
-        }
-
+        @JsonIgnore
         @Override
         public String getSourcePath() {
             return document.getSourcePath();
         }
 
+        public Pom withMetadata(Collection<Metadata> metadata) {
+            return new Pom(model, document.withMetadata(metadata));
+        }
+
+        @JsonIgnore
         @Override
-        public Map<Metadata, String> getMetadata() {
+        public Collection<Metadata> getMetadata() {
             return document.getMetadata();
         }
 
+        @JsonIgnore
         @Override
         public Formatting getFormatting() {
             return document.getFormatting();
@@ -248,6 +245,7 @@ public interface Maven extends Serializable, Tree {
             return new Pom(model, document.withFormatting(fmt));
         }
 
+        @JsonIgnore
         @Override
         public UUID getId() {
             return document.getId();
@@ -256,6 +254,21 @@ public interface Maven extends Serializable, Tree {
         @Override
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitPom(this);
+        }
+
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            Pom pom = (Pom) o;
+            return model.equals(pom.model) &&
+                    document.equals(pom.document);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(model, document);
         }
     }
 
@@ -267,11 +280,13 @@ public interface Maven extends Serializable, Tree {
         @Nullable
         private final Xml.Tag tag;
 
+        @ConstructorProperties({"model", "tag"})
         public Parent(MavenModel model, @Nullable Xml.Tag tag) {
             this.model = model;
             this.tag = tag;
         }
 
+        @JsonIgnore
         @Nullable
         public String getGroupId() {
             return tag == null ? null : tag.getChildValue("groupId").orElse(null);
@@ -281,6 +296,7 @@ public interface Maven extends Serializable, Tree {
             return tag == null ? this : new Parent(model, tag.withChildValue("groupId", groupId));
         }
 
+        @JsonIgnore
         @Nullable
         public String getArtifactId() {
             return tag == null ? null : tag.getChildValue("artifactId").orElse(null);
@@ -291,6 +307,7 @@ public interface Maven extends Serializable, Tree {
                     new Parent(model, tag.withChildValue("artifactId", artifactId));
         }
 
+        @JsonIgnore
         @Nullable
         public String getVersion() {
             return tag == null ? null : tag.getChildValue("version").orElse(null);
@@ -301,11 +318,13 @@ public interface Maven extends Serializable, Tree {
                     new Parent(model, tag.withChildValue("version", version));
         }
 
+        @JsonIgnore
         @Override
         public Formatting getFormatting() {
             return tag == null ? Formatting.EMPTY : tag.getFormatting();
         }
 
+        @JsonIgnore
         @Override
         public UUID getId() {
             return tag == null ? randomUUID() : tag.getId();
@@ -345,6 +364,7 @@ public interface Maven extends Serializable, Tree {
         @With
         final Xml.Tag tag;
 
+        @ConstructorProperties({"isManaged", "model", "tag"})
         public Dependency(boolean isManaged, MavenModel.Dependency model, Xml.Tag tag) {
             this.isManaged = isManaged;
             this.model = model;
@@ -359,6 +379,8 @@ public interface Maven extends Serializable, Tree {
             return model;
         }
 
+        @JsonIgnore
+        @Nullable
         public String getGroupId() {
             return tag.getChildValue("groupId").orElse(null);
         }
@@ -368,6 +390,8 @@ public interface Maven extends Serializable, Tree {
                     tag.withChildValue("groupId", groupId));
         }
 
+        @JsonIgnore
+        @Nullable
         public String getArtifactId() {
             return tag.getChildValue("artifactId").orElse(null);
         }
@@ -377,6 +401,7 @@ public interface Maven extends Serializable, Tree {
                     tag.withChildValue("artifactId", artifactId));
         }
 
+        @JsonIgnore
         @Nullable
         public String getVersion() {
             return tag.getChildValue("version").orElse(null);
@@ -392,6 +417,7 @@ public interface Maven extends Serializable, Tree {
             return new Dependency(isManaged, model.withModuleVersion(model.getModuleVersion().withVersion(version)), t);
         }
 
+        @JsonIgnore
         @Nullable
         public String getScope() {
             return tag.getChildValue("scope").orElse(null);
@@ -407,6 +433,7 @@ public interface Maven extends Serializable, Tree {
             return new Dependency(isManaged, model, t);
         }
 
+        @JsonIgnore
         @Override
         public Formatting getFormatting() {
             return tag.getFormatting();
@@ -418,6 +445,7 @@ public interface Maven extends Serializable, Tree {
             return new Dependency(isManaged, model, tag.withFormatting(fmt));
         }
 
+        @JsonIgnore
         @Override
         public UUID getId() {
             return tag.getId();
@@ -447,10 +475,12 @@ public interface Maven extends Serializable, Tree {
         @Getter
         final Xml.Tag tag;
 
+        @ConstructorProperties("tag")
         public Property(Xml.Tag tag) {
             this.tag = tag;
         }
 
+        @JsonIgnore
         public String getKey() {
             return tag.getName();
         }
@@ -459,6 +489,7 @@ public interface Maven extends Serializable, Tree {
             return new Property(tag.withName(key));
         }
 
+        @JsonIgnore
         public String getValue() {
             return tag.getValue().orElse("");
         }
@@ -467,6 +498,7 @@ public interface Maven extends Serializable, Tree {
             return new Property(tag.withValue(value));
         }
 
+        @JsonIgnore
         @Override
         public Formatting getFormatting() {
             return tag.getFormatting();
@@ -478,6 +510,7 @@ public interface Maven extends Serializable, Tree {
             return new Property(tag.withFormatting(fmt));
         }
 
+        @JsonIgnore
         @Override
         public UUID getId() {
             return tag.getId();
@@ -536,6 +569,7 @@ public interface Maven extends Serializable, Tree {
         @JsonIgnore
         private final MemoizedTags<Dependency> memoizedDependencies;
 
+        @ConstructorProperties({"model", "tag"})
         public DependencyManagement(MavenModel.DependencyManagement model, Xml.Tag tag) {
             this.model = model;
             this.tag = tag;
@@ -569,15 +603,18 @@ public interface Maven extends Serializable, Tree {
                     .orElse(this);
         }
 
+        @JsonIgnore
         public List<Dependency> getDependencies() {
             return memoizedDependencies.getModels();
         }
 
+        @JsonIgnore
         @Override
         public Formatting getFormatting() {
             return tag.getFormatting();
         }
 
+        @JsonIgnore
         @Override
         public UUID getId() {
             return tag.getId();
@@ -592,6 +629,20 @@ public interface Maven extends Serializable, Tree {
         @Override
         public <R> R acceptMaven(MavenSourceVisitor<R> v) {
             return v.visitDependencyManagement(this);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            DependencyManagement that = (DependencyManagement) o;
+            return model.equals(that.model) &&
+                    tag.equals(that.tag);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(model, tag);
         }
     }
 

@@ -16,6 +16,7 @@
 package org.openrewrite.properties.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -23,13 +24,12 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
-import org.openrewrite.properties.PropertiesRefactorVisitor;
 import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.internal.PrintProperties;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -49,14 +49,10 @@ public interface Properties extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
-    @Override
-    default String getTreeType() {
-        return "properties";
-    }
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @JsonIgnoreProperties(value = "styles")
     class File implements Properties, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
@@ -64,7 +60,7 @@ public interface Properties extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<Metadata, String> metadata;
+        Collection<Metadata> metadata;
 
         @With
         List<Content> content;

@@ -22,7 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.Optional;
 import java.util.UUID;
 
-@JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Tree {
     static UUID randomId() {
         return UUID.randomUUID();
@@ -73,6 +73,4 @@ public interface Tree {
     default boolean isScope(@Nullable Tree tree) {
         return tree != null && tree.getId().equals(getId());
     }
-
-    String getTreeType();
 }

@@ -28,19 +28,25 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.valid;
 
 public class OrderImports extends JavaRefactorVisitor {
+    public static OrderImports DEFAULT = new OrderImports();
+
+    static {
+        DEFAULT.setLayout(intellij());
+    }
+
     // VisibleForTesting
     final static Comparator<J.Import> IMPORT_SORTING = (i1, i2) -> {
         String[] import1 = i1.getQualid().printTrimmed().split("\\.");
         String[] import2 = i2.getQualid().printTrimmed().split("\\.");
 
-        for(int i = 0; i < Math.min(import1.length, import2.length); i++) {
+        for (int i = 0; i < Math.min(import1.length, import2.length); i++) {
             int diff = import1[i].compareTo(import2[i]);
-            if(diff != 0) {
+            if (diff != 0) {
                 return diff;
             }
         }
 
-        if(import1.length == import2.length) {
+        if (import1.length == import2.length) {
             return 0;
         }
 
@@ -48,48 +54,13 @@ public class OrderImports extends JavaRefactorVisitor {
     };
 
     // VisibleForTesting
-    Layout layout;
+    Layout importLayout = intellij();
 
     private boolean removeUnused = true;
 
     @JsonIgnore
-    public void setLayout(Layout layout) {
-        this.layout = layout;
-    }
-
-    @JsonProperty("layout")
-    public void setLayout(Map<String, Object> layout) {
-        Layout.Builder builder = Layout.builder(
-                (Integer) layout.getOrDefault("classCountToUseStarImport", 5),
-                (Integer) layout.getOrDefault("nameCountToUseStarImport", 3));
-
-        //noinspection unchecked
-        for (String block : (List<String>) layout.get("blocks")) {
-            block = block.trim();
-            if(block.equals("<blank line>")) {
-                builder = builder.blankLine();
-            }
-            else if(block.startsWith("import ")) {
-                block = block.substring("import ".length());
-                boolean statik = false;
-                if(block.startsWith("static")) {
-                    statik = true;
-                    block = block.substring("static ".length());
-                }
-                if(block.equals("all other imports")) {
-                    builder = statik ?
-                            builder.importStaticAllOthers() :
-                            builder.importAllOthers();
-                }
-                else {
-                    builder = statik ?
-                            builder.staticImportPackage(block) :
-                            builder.importPackage(block);
-                }
-            }
-        }
-
-        setLayout(builder.build());
+    public void setLayout(Layout importLayout) {
+        this.importLayout = importLayout;
     }
 
     public void setRemoveUnused(boolean removeUnused) {
@@ -99,22 +70,31 @@ public class OrderImports extends JavaRefactorVisitor {
     /**
      * @return The default import ordering of IntelliJ IDEA.
      */
-    public static OrderImports intellij() {
-        OrderImports orderImports = new OrderImports();
-        orderImports.setLayout(Layout.builder(5, 3)
+    public static OrderImports.Layout intellij() {
+        return Layout.builder(5, 3)
                 .importAllOthers()
                 .blankLine()
                 .importPackage("javax.*")
                 .importPackage("java.*")
                 .blankLine()
                 .importStaticAllOthers()
-                .build());
-        return orderImports;
+                .build();
+    }
+
+    /**
+     * @return Google Java Format import ordering, as specified <a href="https://google.github.io/styleguide/javaguide.html#s3.3.3-import-ordering-and-spacing">here</a>.
+     */
+    public static OrderImports.Layout googleJavaFormat() {
+        return Layout.builder(Integer.MAX_VALUE, Integer.MAX_VALUE)
+                .importStaticAllOthers()
+                .blankLine()
+                .importAllOthers()
+                .build();
     }
 
     @Override
     public Validated validate() {
-        return layout.validate();
+        return importLayout.validate();
     }
 
     @Override
@@ -123,11 +103,11 @@ public class OrderImports extends JavaRefactorVisitor {
 
         int importIndex = 0;
         String extraLineSpace = "";
-        List<Layout.Block> blocks = layout.blocks;
+        List<Layout.Block> blocks = importLayout.blocks;
         for (Layout.Block block : blocks) {
             if (block instanceof Layout.Block.BlankLines) {
                 extraLineSpace = "";
-                for(int i = 0; i < ((Layout.Block.BlankLines) block).count; i++) {
+                for (int i = 0; i < ((Layout.Block.BlankLines) block).count; i++) {
                     //noinspection StringConcatenationInLoop
                     extraLineSpace += "\n";
                 }
@@ -161,16 +141,15 @@ public class OrderImports extends JavaRefactorVisitor {
 
         if (removeUnused) {
             andThen(new RemoveUnusedImports(
-                    layout.classCountToUseStarImport,
-                    layout.nameCountToUseStarImport));
+                    importLayout.classCountToUseStarImport,
+                    importLayout.nameCountToUseStarImport));
         }
 
         return cu;
     }
 
     public static class Layout {
-        // VisibleForTesting
-        final List<Block> blocks;
+        private final List<Block> blocks;
         private final int classCountToUseStarImport;
         private final int nameCountToUseStarImport;
 
@@ -178,6 +157,18 @@ public class OrderImports extends JavaRefactorVisitor {
             this.blocks = blocks;
             this.classCountToUseStarImport = classCountToUseStarImport;
             this.nameCountToUseStarImport = nameCountToUseStarImport;
+        }
+
+        public List<Block> getBlocks() {
+            return blocks;
+        }
+
+        public int getClassCountToUseStarImport() {
+            return classCountToUseStarImport;
+        }
+
+        public int getNameCountToUseStarImport() {
+            return nameCountToUseStarImport;
         }
 
         public interface Block {
@@ -334,11 +325,10 @@ public class OrderImports extends JavaRefactorVisitor {
             }
 
             public Builder blankLine() {
-                if(!blocks.isEmpty() &&
+                if (!blocks.isEmpty() &&
                         blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
                     ((Block.BlankLines) blocks.get(blocks.size() - 1)).count++;
-                }
-                else {
+                } else {
                     blocks.add(new Block.BlankLines());
                 }
                 return this;

@@ -30,15 +30,15 @@ import static java.util.stream.Collectors.toList;
 public class AutoConfigureSourceVisitorLoader implements SourceVisitorLoader {
     private static final Logger logger = LoggerFactory.getLogger(AutoConfigureSourceVisitorLoader.class);
 
-    private final String[] whitelistVisitorPackages;
+    private final String[] acceptVisitorPackages;
 
-    public AutoConfigureSourceVisitorLoader(String... whitelistVisitorPackages) {
-        this.whitelistVisitorPackages = whitelistVisitorPackages;
+    public AutoConfigureSourceVisitorLoader(String... acceptVisitorPackages) {
+        this.acceptVisitorPackages = acceptVisitorPackages;
     }
 
     public Collection<SourceVisitor<?>> loadVisitors() {
         try(ScanResult scanResult = new ClassGraph()
-                .whitelistPackages(whitelistVisitorPackages)
+                .acceptPackages(acceptVisitorPackages)
                 .enableMemoryMapping()
                 .enableMethodInfo()
                 .enableAnnotationInfo()

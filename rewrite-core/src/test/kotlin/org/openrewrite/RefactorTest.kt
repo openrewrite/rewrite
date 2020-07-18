@@ -18,7 +18,6 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.config.ProfileConfiguration
-import org.openrewrite.config.ProfileConfigurationLoader
 import org.openrewrite.text.PlainText
 
 class RefactorTest {
@@ -35,7 +34,7 @@ class RefactorTest {
 
         val visitors = plan.visitors(PlainText::class.java, "hello-jon")
 
-        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY)
+        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList())
                 .refactor()
                 .visit(visitors)
                 .fix().fixed

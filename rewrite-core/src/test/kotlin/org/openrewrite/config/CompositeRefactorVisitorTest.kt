@@ -39,7 +39,7 @@ class CompositeRefactorVisitorTest {
 
         val visitors = loader.loadVisitors()
 
-        val a = PlainText(randomId(), "Hi Jon", Formatting.EMPTY)
+        val a = PlainText(randomId(), "Hi Jon", Formatting.EMPTY, emptyList())
 
         val fixed = a.refactor().visit(visitors.map {
             @Suppress("UNCHECKED_CAST")

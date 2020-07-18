@@ -90,7 +90,7 @@ public class Refactor<T extends Tree> {
 
         sample.stop(Timer.builder("rewrite.refactor.plan")
                 .description("The time it takes to execute a refactoring plan consisting of potentially more than one visitor over more than one cycle")
-                .tag("tree.type", original.getTreeType())
+                .tag("tree.type", original.getClass().getSimpleName())
                 .tag("outcome", rulesThatMadeChanges.isEmpty() ? "Unchanged" : "Changed")
                 .register(meterRegistry));
 
@@ -98,7 +98,7 @@ public class Refactor<T extends Tree> {
             Counter.builder("rewrite.refactor.plan.changes")
                     .description("The number of changes requested by a visitor.")
                     .tag("visitor", ruleThatMadeChange)
-                    .tag("tree.type", original.getTreeType())
+                    .tag("tree.type", original.getClass().getSimpleName())
                     .register(meterRegistry)
                     .increment();
         }
@@ -119,7 +119,7 @@ public class Refactor<T extends Tree> {
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
                 .tag("visitor", visitor.getClass().getName())
                 .tags(visitor.getTags())
-                .tag("tree.type", original.getTreeType())
+                .tag("tree.type", original.getClass().getSimpleName())
                 .register(meterRegistry));
 
         return acc;

@@ -35,7 +35,6 @@ import java.util.Stack;
 import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
@@ -138,7 +137,7 @@ public class YamlParser {
                 }
             }
 
-            return new Yaml.Documents(randomId(), sourceFile.toFile().getPath(), emptyMap(),
+            return new Yaml.Documents(randomId(), sourceFile.toFile().getPath(), emptyList(),
                     documents, Formatting.EMPTY);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

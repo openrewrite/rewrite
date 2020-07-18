@@ -150,7 +150,7 @@ abstract class JavaParserCompatibilityKit {
     inner class TreeBuilderTck : TreeBuilderTest
 
     @Nested
-    inner class TreeSerializerTck : TreeSerializerTest
+    inner class CompilationUnitSerializerTck : CompilationUnitSerializerTest
 
     @Nested
     inner class TryCatchTck : TryCatchTest

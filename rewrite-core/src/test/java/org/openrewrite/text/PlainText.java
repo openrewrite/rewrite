@@ -15,20 +15,35 @@
  */
 package org.openrewrite.text;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.*;
 
-import java.util.Map;
+import java.util.Collection;
 import java.util.UUID;
+
+import static java.util.Collections.emptyList;
 
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
     private final String text;
     private final Formatting formatting;
+    private final Collection<Style> styles;
 
-    public PlainText(UUID id, String text, Formatting formatting) {
+    @JsonCreator
+    public PlainText(@JsonProperty("id") UUID id,
+                     @JsonProperty("text") String text,
+                     @JsonProperty("formatting") Formatting formatting,
+                     @JsonProperty("styles") Collection<Style> styles) {
         this.id = id;
         this.text = text;
         this.formatting = formatting;
+        this.styles = styles;
+    }
+
+    @Override
+    public Collection<Style> getStyles() {
+        return styles;
     }
 
     public Refactor<PlainText> refactor() {
@@ -40,14 +55,12 @@ public class PlainText implements SourceFile, Tree {
         return null;
     }
 
-    @Override
-    public Map<Metadata, String> getMetadata() {
-        return null;
+    public void setMetadata(Collection<Metadata> ignore) {
     }
 
     @Override
-    public String getTreeType() {
-        return "txt";
+    public Collection<Metadata> getMetadata() {
+        return emptyList();
     }
 
     @Override
@@ -61,13 +74,13 @@ public class PlainText implements SourceFile, Tree {
     }
 
     public PlainText withText(String toText) {
-        return new PlainText(id, toText, formatting);
+        return new PlainText(id, toText, formatting, styles);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Tree> T withFormatting(Formatting fmt) {
-        return (T) new PlainText(id, text, fmt);
+        return (T) new PlainText(id, text, fmt, styles);
     }
 
     @Override

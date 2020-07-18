@@ -15,9 +15,7 @@
  */
 package org.openrewrite.xml.tree;
 
-import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.ObjectIdGenerators;
+import com.fasterxml.jackson.annotation.*;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -30,7 +28,6 @@ import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
@@ -55,15 +52,10 @@ public interface Xml extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
-    @JsonIgnore
-    @Override
-    default String getTreeType() {
-        return "xml";
-    }
-
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @JsonIgnoreProperties(value = "styles")
     class Document implements Xml, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
@@ -71,7 +63,7 @@ public interface Xml extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<Metadata, String> metadata;
+        Collection<Metadata> metadata;
 
         @With
         Prolog prolog;
@@ -171,6 +163,7 @@ public interface Xml extends Serializable, Tree {
 
         List<Content> content;
 
+        @JsonIgnore
         public Optional<Tag> getChild(String name) {
             return content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -179,6 +172,7 @@ public interface Xml extends Serializable, Tree {
                     .findAny();
         }
 
+        @JsonIgnore
         public List<Tag> getChildren(String name) {
             return content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -187,6 +181,7 @@ public interface Xml extends Serializable, Tree {
                     .collect(toList());
         }
 
+        @JsonIgnore
         public List<Tag> getChildren() {
             return content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -216,6 +211,7 @@ public interface Xml extends Serializable, Tree {
         /**
          * @return If this tag's content is only character data, consider it the value.
          */
+        @JsonIgnore
         public Optional<String> getValue() {
             if (content.size() != 1) {
                 return Optional.empty();
@@ -232,10 +228,12 @@ public interface Xml extends Serializable, Tree {
          * @param name The name of the child element to look for.
          * @return The character data of the first child element matching the provided name, if any.
          */
+        @JsonIgnore
         public Optional<String> getChildValue(String name) {
             return getChild(name).flatMap(Tag::getValue);
         }
 
+        @JsonIgnore
         public Optional<Tag> getSibling(String name, Cursor cursor) {
             Xml.Tag parent = cursor.getParentOrThrow().getTree();
             if (parent == null) {
@@ -354,10 +352,12 @@ public interface Xml extends Serializable, Tree {
             Formatting formatting;
         }
 
+        @JsonIgnore
         public String getKeyAsString() {
             return key.getName();
         }
 
+        @JsonIgnore
         public String getValueAsString() {
             return value.getValue();
         }

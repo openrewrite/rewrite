@@ -33,7 +33,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -63,7 +63,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -90,7 +90,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -112,7 +112,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -136,7 +136,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -157,7 +157,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fix = a.refactor().visit(OrderImports.intellij().apply {
+        val fix = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix()
         println(fix.fixed.printTrimmed())
@@ -175,7 +175,7 @@ interface OrderImportTest {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij()).fix().fixed
+        val fixed = a.refactor().visit(OrderImports()).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -196,7 +196,7 @@ interface OrderImportTest {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij()).fix().fixed
+        val fixed = a.refactor().visit(OrderImports()).fix().fixed
 
         assertRefactored(fixed, """
             
@@ -217,7 +217,7 @@ interface OrderImportTest {
             }
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij()).fix().fixed
+        val fixed = a.refactor().visit(OrderImports()).fix().fixed
 
         assertRefactored(fixed, """
             import java.util.List;
@@ -238,7 +238,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -259,7 +259,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 
@@ -359,7 +359,7 @@ interface OrderImportTest {
             public class A {}
         """.trimIndent())
 
-        val fixed = a.refactor().visit(OrderImports.intellij().apply {
+        val fixed = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix().fixed
 

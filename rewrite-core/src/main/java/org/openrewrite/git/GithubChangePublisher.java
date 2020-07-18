@@ -20,7 +20,10 @@ import io.micrometer.core.instrument.Timer;
 import org.kohsuke.github.GHContent;
 import org.kohsuke.github.GHRepository;
 import org.kohsuke.github.GitHub;
-import org.openrewrite.*;
+import org.openrewrite.Change;
+import org.openrewrite.ChangePublisher;
+import org.openrewrite.Incubating;
+import org.openrewrite.SourceFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -28,7 +31,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Map;
 import java.util.Scanner;
 
 /**
@@ -61,66 +63,67 @@ public class GithubChangePublisher implements ChangePublisher {
 
     public void publishEach(Change<SourceFile> change) {
         Timer.Sample sample = Timer.start();
-        Map<Metadata, String> metadata = change.getFixed().getMetadata();
-        String organization = metadata.getOrDefault(GithubMetadata.ORGANIZATION, null);
-        String repository = metadata.getOrDefault(GithubMetadata.REPOSITORY, null);
+        change.getFixed().getMetadata(GithubMetadata.class).ifPresent(metadata -> {
+            String organization = metadata.getOrganization();
+            String repository = metadata.getRepository();
 
-        if (organization == null || repository == null) {
-            return;
-        }
+            if (organization == null || repository == null) {
+                return;
+            }
 
-        Timer.Builder timer = Timer.builder("rewrite.publish.github")
-                .description("Individual source file changes published directly to the GitHub 'Create or update a file' API")
-                .tag("organization", organization)
-                .tag("repository", repository)
-                .tag("tree.type", change.getFixed().getTreeType());
-
-        try {
-            GHRepository ghRepo = github.getRepository(organization + "/" + repository);
+            Timer.Builder timer = Timer.builder("rewrite.publish.github")
+                    .description("Individual source file changes published directly to the GitHub 'Create or update a file' API")
+                    .tag("organization", organization)
+                    .tag("repository", repository)
+                    .tag("tree.type", change.getFixed().getClass().getSimpleName());
 
             try {
-                GHContent fileContent = ghRepo.getFileContent(change.getFixed().getSourcePath());
+                GHRepository ghRepo = github.getRepository(organization + "/" + repository);
 
-                if (verifyOriginal && change.getOriginal() != null) {
-                    try (Scanner scanner = new Scanner(fileContent.read(), StandardCharsets.UTF_8.name())) {
-                        String fileContentString = scanner.useDelimiter("\\A").next();
-                        if (!change.getOriginal().print().equals(fileContentString)) {
-                            logger.warn("Attempting to make a change to " + organization +
-                                    "/" + repository + ":" + change.getOriginal().getSourcePath() +
-                                    " in repository, but the contents in GitHub do not match the original source");
-                            sample.stop(timer.tag("outcome", "Original not up-to-date").register(Metrics.globalRegistry));
-                        } else {
-                            logger.info("Change is already present in " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " in GitHub");
-                            sample.stop(timer.tag("outcome", "Already changed").register(Metrics.globalRegistry));
+                try {
+                    GHContent fileContent = ghRepo.getFileContent(change.getFixed().getSourcePath());
+
+                    if (verifyOriginal && change.getOriginal() != null) {
+                        try (Scanner scanner = new Scanner(fileContent.read(), StandardCharsets.UTF_8.name())) {
+                            String fileContentString = scanner.useDelimiter("\\A").next();
+                            if (!change.getOriginal().print().equals(fileContentString)) {
+                                logger.warn("Attempting to make a change to " + organization +
+                                        "/" + repository + ":" + change.getOriginal().getSourcePath() +
+                                        " in repository, but the contents in GitHub do not match the original source");
+                                sample.stop(timer.tag("outcome", "Original not up-to-date").register(Metrics.globalRegistry));
+                            } else {
+                                logger.info("Change is already present in " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " in GitHub");
+                                sample.stop(timer.tag("outcome", "Already changed").register(Metrics.globalRegistry));
+                            }
+                            return;
                         }
+                    }
+
+                    fileContent.update(change.getFixed().print(), commitMessage);
+                    logger.info("Published change " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " to GitHub");
+                    sample.stop(timer.tag("outcome", "Updated").register(Metrics.globalRegistry));
+                } catch (FileNotFoundException ignored) {
+                    if (verifyOriginal && change.getOriginal() != null) {
+                        logger.warn("Attempting to make a change to " + organization +
+                                "/" + repository + ":" + change.getOriginal().getSourcePath() +
+                                " in repository, but the file unexpectedly does not exist in GitHub");
+                        sample.stop(timer.tag("outcome", "Original does not exist in remote").register(Metrics.globalRegistry));
                         return;
                     }
-                }
 
-                fileContent.update(change.getFixed().print(), commitMessage);
-                logger.info("Published change " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " to GitHub");
-                sample.stop(timer.tag("outcome", "Updated").register(Metrics.globalRegistry));
-            } catch (FileNotFoundException ignored) {
-                if (verifyOriginal && change.getOriginal() != null) {
-                    logger.warn("Attempting to make a change to " + organization +
-                            "/" + repository + ":" + change.getOriginal().getSourcePath() +
-                            " in repository, but the file unexpectedly does not exist in GitHub");
-                    sample.stop(timer.tag("outcome", "Original does not exist in remote").register(Metrics.globalRegistry));
-                    return;
+                    ghRepo.createContent()
+                            .branch("master")
+                            .path(change.getFixed().getSourcePath())
+                            .content(change.getFixed().print())
+                            .message(commitMessage)
+                            .commit();
+                    logger.info("Published change " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " to GitHub");
+                    sample.stop(timer.tag("outcome", "Success").register(Metrics.globalRegistry));
                 }
-
-                ghRepo.createContent()
-                        .branch("master")
-                        .path(change.getFixed().getSourcePath())
-                        .content(change.getFixed().print())
-                        .message(commitMessage)
-                        .commit();
-                logger.info("Published change " + organization + "/" + repository + ":" + change.getFixed().getSourcePath() + " to GitHub");
-                sample.stop(timer.tag("outcome", "Success").register(Metrics.globalRegistry));
+            } catch (IOException e) {
+                logger.warn("Unable to connect to GitHub repository " + organization + "/" + repository, e);
+                sample.stop(timer.tag("outcome", "Failed to connect to repository").register(Metrics.globalRegistry));
             }
-        } catch (IOException e) {
-            logger.warn("Unable to connect to GitHub repository " + organization + "/" + repository, e);
-            sample.stop(timer.tag("outcome", "Failed to connect to repository").register(Metrics.globalRegistry));
-        }
+        });
     }
 }

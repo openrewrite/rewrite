@@ -44,7 +44,7 @@ class RefactorPlanTest {
         val visitors = planBuilder.build()
                 .visitors(PlainText::class.java, "child")
 
-        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY)
+        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList())
                 .refactor()
                 .visit(visitors)
                 .fix().fixed

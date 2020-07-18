@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openrewrite.Profile;
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.Style;
 import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,8 +34,7 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.toMap;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.*;
 import static org.openrewrite.Profile.FilterReply.NEUTRAL;
 
 public class ProfileConfiguration {
@@ -51,6 +51,7 @@ public class ProfileConfiguration {
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
     private Map<String, Object> configure = new HashMap<>();
+    private Map<String, Object> styles = new HashMap<>();
 
     public String getName() {
         return name;
@@ -76,6 +77,10 @@ public class ProfileConfiguration {
         this.configure = configure;
     }
 
+    public void setStyles(Map<String, Object> styles) {
+        this.styles = styles;
+    }
+
     private Set<Pattern> toPatternSet(Set<String> set) {
         return set.stream()
                 .map(i -> i
@@ -95,6 +100,7 @@ public class ProfileConfiguration {
 
             merged.configure = configure;
             merged.configure.putAll(profile.configure);
+            merged.styles.putAll(profile.styles);
 
             return merged;
         }
@@ -126,6 +132,23 @@ public class ProfileConfiguration {
             @Override
             public String getName() {
                 return name;
+            }
+
+            @Override
+            public Collection<Style> getStyles() {
+                return styles.entrySet().stream()
+                        .map(styleConfigByName -> {
+                            try {
+                                Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
+                                propertyConverter.updateValue(style, styleConfigByName.getValue());
+                                return style;
+                            } catch (Exception e) {
+                                logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(toList());
             }
 
             @Override

@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
@@ -105,7 +105,7 @@ public class PropertiesParser {
         }
 
         return new Properties.File(randomId(), sourceFile.toFile().getPath(),
-                emptyMap(), contents, Formatting.format("", suffix));
+                emptyList(), contents, Formatting.format("", suffix));
     }
 
     private Properties.Comment commentFromLine(String line) {

@@ -41,8 +41,8 @@ class OrderImportsTest {
         val orderImports = OrderImports()
         ObjectMapper().updateValue(orderImports, orderImportsConfig)
 
-        assertThat(orderImports.layout.blocks[0]).isInstanceOf(OrderImports.Layout.Block.AllOthers::class.java)
-        assertThat(orderImports.layout.blocks[1]).isInstanceOf(OrderImports.Layout.Block.BlankLines::class.java)
-        assertThat(orderImports.layout.blocks[2]).isInstanceOf(OrderImports.Layout.Block.ImportPackage::class.java)
+        assertThat(orderImports.importLayout.blocks[0]).isInstanceOf(OrderImports.Layout.Block.AllOthers::class.java)
+        assertThat(orderImports.importLayout.blocks[1]).isInstanceOf(OrderImports.Layout.Block.BlankLines::class.java)
+        assertThat(orderImports.importLayout.blocks[2]).isInstanceOf(OrderImports.Layout.Block.ImportPackage::class.java)
     }
 }

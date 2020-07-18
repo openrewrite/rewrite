@@ -19,9 +19,41 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Metadata;
 
 @Incubating(since = "2.0.0")
-public enum GitMetadata implements Metadata {
-    HEAD_COMMIT_ID,
-    HEAD_TREE_ID,
-    BRANCH,
-    REMOTE
+public class GitMetadata implements Metadata {
+    private String headCommitId;
+    private String headTreeId;
+    private String branch;
+    private String remote;
+
+    public String getHeadCommitId() {
+        return headCommitId;
+    }
+
+    public void setHeadCommitId(String headCommitId) {
+        this.headCommitId = headCommitId;
+    }
+
+    public String getHeadTreeId() {
+        return headTreeId;
+    }
+
+    public void setHeadTreeId(String headTreeId) {
+        this.headTreeId = headTreeId;
+    }
+
+    public String getBranch() {
+        return branch;
+    }
+
+    public void setBranch(String branch) {
+        this.branch = branch;
+    }
+
+    public String getRemote() {
+        return remote;
+    }
+
+    public void setRemote(String remote) {
+        this.remote = remote;
+    }
 }

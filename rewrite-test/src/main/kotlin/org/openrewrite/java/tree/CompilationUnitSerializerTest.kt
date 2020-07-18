@@ -18,16 +18,17 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.TreeSerializer
 import org.openrewrite.git.GitMetadata
 import org.openrewrite.java.JavaParser
 
 /**
  * Test that flyweights survive a serialization/deserialization cycle
  */
-interface TreeSerializerTest {
+interface CompilationUnitSerializerTest {
 
     companion object {
-        private val serializer = TreeSerializer()
+        private val serializer = TreeSerializer<J.CompilationUnit>()
 
         private const val aSource = """
             public class A {
@@ -41,7 +42,7 @@ interface TreeSerializerTest {
 
     @Test
     fun `round trip serialization of AST preserves flyweights`(jp: JavaParser) {
-        val a = jp.parse(aSource).withMetadata(mapOf(GitMetadata.HEAD_COMMIT_ID to "123"))
+        val a = jp.parse(aSource).withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
 
         println(serializer.writePretty(a))
 

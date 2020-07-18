@@ -19,7 +19,23 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Metadata;
 
 @Incubating(since = "2.0.0")
-public enum GithubMetadata implements Metadata {
-    REPOSITORY,
-    ORGANIZATION
+public class GithubMetadata implements Metadata {
+    private String organization;
+    private String repository;
+
+    public String getOrganization() {
+        return organization;
+    }
+
+    public void setOrganization(String organization) {
+        this.organization = organization;
+    }
+
+    public String getRepository() {
+        return repository;
+    }
+
+    public void setRepository(String repository) {
+        this.repository = repository;
+    }
 }

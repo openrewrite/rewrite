@@ -36,10 +36,6 @@ import static org.openrewrite.Validated.required;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaRefactorVisitor {
-    // TODO find a way to stuff this on J.CompilationUnit metadata
-    // so it's particular per class and not static.
-    public static OrderImports orderImports = OrderImports.intellij();
-
     @EqualsAndHashCode.Include
     private String type;
 
@@ -51,10 +47,6 @@ public class AddImport extends JavaRefactorVisitor {
     private boolean onlyIfReferenced = true;
 
     private JavaType.Class classType;
-
-    public AddImport() {
-        orderImports.setRemoveUnused(false);
-    }
 
     public void setType(String type) {
         this.type = type;
@@ -124,6 +116,10 @@ public class AddImport extends JavaRefactorVisitor {
         imports.add(importToAdd);
         cu = cu.withImports(imports);
 
+        OrderImports orderImports = cu.getStyle(ImportLayoutStyle.class)
+                .map(ImportLayoutStyle::orderImports)
+                .orElse(OrderImports.DEFAULT);
+        orderImports.setRemoveUnused(false);
         andThen(orderImports);
 
         return cu;

@@ -16,7 +16,7 @@
 package org.openrewrite.yaml.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
@@ -29,8 +29,8 @@ import org.openrewrite.yaml.YamlSourceVisitor;
 import org.openrewrite.yaml.internal.PrintYaml;
 
 import java.io.Serializable;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static java.util.stream.Collectors.toList;
@@ -53,12 +53,6 @@ public interface Yaml extends Serializable, Tree {
         return v.defaultTo(null);
     }
 
-    @JsonIgnore
-    @Override
-    default String getTreeType() {
-        return "yml";
-    }
-
     /**
      * @return A new deep copy of this block with different IDs.
      */
@@ -67,6 +61,7 @@ public interface Yaml extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    @JsonIgnoreProperties(value = "styles")
     class Documents implements Yaml, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
@@ -74,7 +69,7 @@ public interface Yaml extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<Metadata, String> metadata;
+        Collection<Metadata> metadata;
 
         @With
         List<Document> documents;

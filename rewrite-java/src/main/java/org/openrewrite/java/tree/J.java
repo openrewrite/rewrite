@@ -23,6 +23,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.internal.PrintJava;
 import org.openrewrite.java.search.*;
 
@@ -36,7 +37,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.EMPTY;
@@ -58,12 +60,6 @@ public interface J extends Serializable, Tree {
     @Override
     default String print() {
         return new PrintJava().visit(this);
-    }
-
-    @JsonIgnore
-    @Override
-    default String getTreeType() {
-        return "java";
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1079,7 +1075,7 @@ public interface J extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Map<Metadata, String> metadata;
+        Collection<Metadata> metadata;
 
         @With
         @Nullable
@@ -1093,6 +1089,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Collection<JavaStyle> styles;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1119,16 +1118,6 @@ public interface J extends Serializable, Tree {
             return new Refactor<>(this);
         }
 
-        /**
-         * Because Jackson will not place a polymorphic type tag on the root of the AST when we are serializing a list of ASTs together
-         */
-        protected final String jacksonPolymorphicTypeTag = ".J$CompilationUnit";
-
-        @JsonProperty("@c")
-        public String getJacksonPolymorphicTypeTag() {
-            return jacksonPolymorphicTypeTag;
-        }
-
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
             String sourcePath = sourceSet
                     .resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator")))
@@ -1137,7 +1126,7 @@ public interface J extends Serializable, Tree {
 
             return new J.CompilationUnit(randomId(),
                     sourcePath,
-                    emptyMap(),
+                    emptyList(),
                     new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), EMPTY),
                     emptyList(),
                     singletonList(new J.ClassDecl(randomId(),
@@ -1151,7 +1140,8 @@ public interface J extends Serializable, Tree {
                             new Try.Block<>(randomId(), null, emptyList(), format(" "), "\n"),
                             JavaType.Class.build(packageName + "." + className),
                             format("\n\n")).withModifiers("public")),
-                    EMPTY);
+                    EMPTY,
+                    emptyList());
         }
     }
 

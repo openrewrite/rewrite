@@ -32,7 +32,7 @@ public class ClasspathResourceLoader implements ProfileConfigurationLoader, Sour
         yamlResourceLoaders = new ArrayList<>();
 
         try (ScanResult scanResult = new ClassGraph()
-                .whitelistPaths("META-INF/rewrite")
+                .acceptPaths("META-INF/rewrite")
                 .enableMemoryMapping()
                 .scan()) {
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
@@ -42,7 +42,7 @@ public class ClasspathResourceLoader implements ProfileConfigurationLoader, Sour
         if(compileClasspath.iterator().hasNext()) {
             try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(compileClasspath)
-                    .whitelistPaths("META-INF/rewrite")
+                    .acceptPaths("META-INF/rewrite")
                     .enableMemoryMapping()
                     .scan()) {
                 scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->

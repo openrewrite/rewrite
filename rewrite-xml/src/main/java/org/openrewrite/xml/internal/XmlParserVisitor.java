@@ -32,7 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-import static java.util.Collections.emptyMap;
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -52,7 +52,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
                 path.toString(),
-                emptyMap(),
+                emptyList(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 format)

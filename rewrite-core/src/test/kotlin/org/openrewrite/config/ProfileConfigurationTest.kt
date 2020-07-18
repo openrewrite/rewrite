@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Profile
 import org.openrewrite.text.ChangeText
+import org.openrewrite.text.TextStyle
 
 internal class ProfileConfigurationTest {
     private val changeText = ChangeText()
@@ -56,6 +57,20 @@ internal class ProfileConfigurationTest {
         }.build(emptyList())
 
         assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+    }
+
+    @Test
+    fun configureStyles() {
+        val profile = ProfileConfiguration().apply {
+            setStyles(
+                    mapOf("org.openrewrite.text.TextStyle" to
+                            mapOf("charset" to "UTF-8")
+                    )
+            )
+        }
+
+        assertThat(profile.build(emptyList()).styles).isInstanceOf(TextStyle::class.java)
+        assertThat((profile.build(emptyList()).styles.first() as TextStyle).charset).isEqualTo("UTF-8")
     }
 
     @Test

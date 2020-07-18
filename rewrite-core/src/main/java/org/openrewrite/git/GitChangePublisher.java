@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Optional;
 
 @Incubating(since = "2.0.0")
 @RequiredArgsConstructor
@@ -60,11 +61,7 @@ public class GitChangePublisher implements ChangePublisher {
 
     public void publishChangesForRepository(Collection<Change<SourceFile>> changes) {
         Change<SourceFile> change = changes.iterator().next();
-        Map<Metadata, String> metadata = change.getFixed().getMetadata();
-
-        String remote = metadata.getOrDefault(GitMetadata.REMOTE, null);
-        String headCommitId = metadata.getOrDefault(GitMetadata.HEAD_COMMIT_ID, null);
-        String headTreeId = metadata.getOrDefault(GitMetadata.HEAD_TREE_ID, null);
+        Optional<GitMetadata> gitMetadata = change.getFixed().getMetadata(GitMetadata.class);
 
         // git add
         // git write-tree

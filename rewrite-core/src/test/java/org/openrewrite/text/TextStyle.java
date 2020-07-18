@@ -13,24 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.text;
 
-import java.util.Collection;
+import org.openrewrite.Style;
 
-public interface Profile {
-    String getName();
+public class TextStyle implements Style {
+    private String charset;
 
-    Collection<Style> getStyles();
-
-    default <S, T extends SourceVisitor<S>> FilterReply accept(T visitor) {
-        return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
+    public String getCharset() {
+        return charset;
     }
 
-    default <S, T extends SourceVisitor<S>> T configure(T visitor) {
-        return visitor;
-    }
-
-    enum FilterReply {
-        ACCEPT, DENY, NEUTRAL;
+    public void setCharset(String charset) {
+        this.charset = charset;
     }
 }
