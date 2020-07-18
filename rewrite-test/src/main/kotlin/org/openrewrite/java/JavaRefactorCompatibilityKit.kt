@@ -81,4 +81,7 @@ abstract class JavaRefactorCompatibilityKit {
 
     @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest
+
+    @Nested
+    inner class UseStaticImportTck : UseStaticImportTest
 }

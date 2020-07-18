@@ -29,8 +29,8 @@ interface OrderImportTest {
             import java.util.Set;
             import org.openrewrite.java.tree.JavaType;
             import org.openrewrite.java.tree.TypeUtils;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -47,8 +47,8 @@ interface OrderImportTest {
             import java.util.regex.Pattern;
 
             import static java.util.stream.Collectors.joining;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -59,8 +59,8 @@ interface OrderImportTest {
             import java.util.Objects;
 
             import org.openrewrite.java.tree.JavaType;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -72,8 +72,8 @@ interface OrderImportTest {
 
             import java.util.ArrayList;
             import java.util.Objects;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -86,8 +86,8 @@ interface OrderImportTest {
             import java.util.Objects;
             import java.util.Set;
             import java.util.Map;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -97,8 +97,8 @@ interface OrderImportTest {
         assertRefactored(fixed, """
             import java.util.*;
             import java.util.regex.Pattern;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -106,10 +106,10 @@ interface OrderImportTest {
     fun blankLinesNotFollowedByBlockArentAdded(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;
-            
+
             import static java.util.Collections.*;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -118,10 +118,10 @@ interface OrderImportTest {
 
         assertRefactored(fixed, """
             import java.util.List;
-            
+
             import static java.util.Collections.*;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -132,8 +132,8 @@ interface OrderImportTest {
             import java.util.ArrayList;
             import java.util.regex.Pattern;
             import java.util.Objects;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -143,8 +143,8 @@ interface OrderImportTest {
         assertRefactored(fixed, """
             import java.util.*;
             import java.util.regex.Pattern;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -153,14 +153,16 @@ interface OrderImportTest {
         val a = jp.parse("""
             import java.util.*;
             import java.util.regex.Pattern;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fix = a.refactor().visit(OrderImports().apply {
             setRemoveUnused(false)
         }).fix()
+
         println(fix.fixed.printTrimmed())
+
         assertThat(fix.rulesThatMadeChanges).isEmpty()
     }
 
@@ -168,8 +170,8 @@ interface OrderImportTest {
     fun unfoldStar(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.*;
-            
-            public class A {
+
+            class A {
                 List list;
                 List list2;
             }
@@ -179,8 +181,8 @@ interface OrderImportTest {
 
         assertRefactored(fixed, """
             import java.util.List;
-            
-            public class A {
+
+            class A {
                 List list;
                 List list2;
             }
@@ -191,16 +193,16 @@ interface OrderImportTest {
     fun removeUnused(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.*;
-            
-            public class A {
+
+            class A {
             }
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports()).fix().fixed
 
         assertRefactored(fixed, """
-            
-            public class A {
+
+            class A {
             }
         """.trimIndent())
     }
@@ -209,10 +211,10 @@ interface OrderImportTest {
     fun unfoldStaticStar(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;
-            
+
             import static java.util.Collections.*;
-            
-            public class A {
+
+            class A {
                 List list = emptyList();
             }
         """.trimIndent())
@@ -221,10 +223,10 @@ interface OrderImportTest {
 
         assertRefactored(fixed, """
             import java.util.List;
-            
+
             import static java.util.Collections.emptyList;
-            
-            public class A {
+
+            class A {
                 List list = emptyList();
             }
         """.trimIndent())
@@ -234,8 +236,8 @@ interface OrderImportTest {
     fun packagePatternEscapesDots(jp: JavaParser) {
         val a = jp.parse("""
             import javax.annotation.Nonnull;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -244,8 +246,8 @@ interface OrderImportTest {
 
         assertRefactored(fixed, """
             import javax.annotation.Nonnull;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -255,8 +257,8 @@ interface OrderImportTest {
             import java.io.IOException;
             import java.io.UncheckedIOException;
             import java.nio.files.*;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -267,8 +269,8 @@ interface OrderImportTest {
             import java.io.IOException;
             import java.io.UncheckedIOException;
             import java.nio.files.*;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -279,26 +281,26 @@ interface OrderImportTest {
             import java.nio.charset.StandardCharsets;
             import java.util.Collections;
             import java.util.zip.GZIPOutputStream;
-            
+
             import javax.servlet.ReadListener;
             import javax.servlet.ServletInputStream;
             import javax.servlet.ServletOutputStream;
-            
+
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import reactor.core.publisher.Mono;
-            
+
             import org.springframework.core.io.buffer.DataBuffer;
             import org.springframework.core.io.buffer.DataBufferFactory;
             import org.springframework.http.HttpHeaders;
             import org.springframework.util.MultiValueMap;
             import org.springframework.web.bind.annotation.PathVariable;
             import org.springframework.web.server.ServerWebExchange;
-            
+
             import static java.util.Arrays.stream;
             import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val orderImports = OrderImports().apply {
@@ -324,26 +326,26 @@ interface OrderImportTest {
             import java.nio.charset.StandardCharsets;
             import java.util.Collections;
             import java.util.zip.GZIPOutputStream;
-            
+
             import javax.servlet.ReadListener;
             import javax.servlet.ServletInputStream;
             import javax.servlet.ServletOutputStream;
-            
+
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import reactor.core.publisher.Mono;
-            
+
             import org.springframework.core.io.buffer.DataBuffer;
             import org.springframework.core.io.buffer.DataBufferFactory;
             import org.springframework.http.HttpHeaders;
             import org.springframework.util.MultiValueMap;
             import org.springframework.web.bind.annotation.PathVariable;
             import org.springframework.web.server.ServerWebExchange;
-            
+
             import static java.util.Arrays.stream;
             import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
     }
 
@@ -355,8 +357,8 @@ interface OrderImportTest {
             import com.fasterxml.jackson.databind.ObjectMapper;
             import org.apache.commons.logging.Log;
             import reactor.core.publisher.Mono;
-            
-            public class A {}
+
+            class A {}
         """.trimIndent())
 
         val fixed = a.refactor().visit(OrderImports().apply {
@@ -365,5 +367,24 @@ interface OrderImportTest {
 
         assertThat(fixed.imports.map { it.packageName.substringBefore('.') })
                 .containsExactly("com", "org", "r", "reactor", "s")
+    }
+
+    @Test
+    fun foldGroupOfStaticImportsThatAppearLast(jp: JavaParser) {
+        val a = jp.parse("""
+            import static java.util.stream.Collectors.toList;
+            import static java.util.stream.Collectors.toMap;
+            import static java.util.stream.Collectors.toSet;
+            
+            class A {}
+        """.trimIndent())
+
+        val fixed = a.refactor().visit(OrderImports().apply { setRemoveUnused(false) }).fix().fixed
+
+        assertRefactored(fixed, """
+            import static java.util.stream.Collectors.*;
+            
+            class A {}
+        """.trimIndent())
     }
 }

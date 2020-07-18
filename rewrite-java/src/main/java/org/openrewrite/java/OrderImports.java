@@ -16,15 +16,19 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.List;
 import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.valid;
 
 public class OrderImports extends JavaRefactorVisitor {
@@ -81,17 +85,6 @@ public class OrderImports extends JavaRefactorVisitor {
                 .build();
     }
 
-    /**
-     * @return Google Java Format import ordering, as specified <a href="https://google.github.io/styleguide/javaguide.html#s3.3.3-import-ordering-and-spacing">here</a>.
-     */
-    public static OrderImports.Layout googleJavaFormat() {
-        return Layout.builder(Integer.MAX_VALUE, Integer.MAX_VALUE)
-                .importStaticAllOthers()
-                .blankLine()
-                .importAllOthers()
-                .build();
-    }
-
     @Override
     public Validated validate() {
         return importLayout.validate();
@@ -129,6 +122,12 @@ public class OrderImports extends JavaRefactorVisitor {
             }
         }
 
+        if (removeUnused) {
+            andThen(new RemoveUnusedImports(
+                    importLayout.classCountToUseStarImport,
+                    importLayout.nameCountToUseStarImport));
+        }
+
         if (orderedImports.size() != cu.getImports().size()) {
             return cu.withImports(orderedImports);
         }
@@ -137,12 +136,6 @@ public class OrderImports extends JavaRefactorVisitor {
             if (orderedImports.get(i) != cu.getImports().get(i)) {
                 return cu.withImports(orderedImports);
             }
-        }
-
-        if (removeUnused) {
-            andThen(new RemoveUnusedImports(
-                    importLayout.classCountToUseStarImport,
-                    importLayout.nameCountToUseStarImport));
         }
 
         return cu;
@@ -232,15 +225,27 @@ public class OrderImports extends JavaRefactorVisitor {
                     imports.clear();
                 }
 
+                private static final J.Import SPACER = new J.Import(randomId(),
+                        new J.FieldAccess(randomId(),
+                                J.Ident.build(randomId(), "_SPACER", null, Formatting.EMPTY),
+                                J.Ident.build(randomId(), "_SPACER", null, Formatting.EMPTY),
+                                null,
+                                Formatting.EMPTY),
+                        false,
+                        Formatting.EMPTY);
+
                 @Override
                 public List<J.Import> orderedImports() {
                     imports.sort(IMPORT_SORTING);
+
+                    // simplifies the logic of dealing with folding the last group of imports
+                    imports.add(SPACER);
 
                     boolean foundStar = false;
                     int consecutiveSamePackages = 0;
                     for (int i = 0; i < imports.size(); i++) {
                         consecutiveSamePackages++;
-                        if (i > 1 && !imports.get(i - 1).getPackageName().equals(imports.get(i).getPackageName())) {
+                        if (i >= 1 && !imports.get(i - 1).getPackageName().equals(imports.get(i).getPackageName())) {
                             int threshold = statik ? nameCountToUseStarImport : classCountToUseStarImport;
                             if (consecutiveSamePackages >= threshold || (consecutiveSamePackages > 1 && foundStar)) {
                                 int j = i - 1;
@@ -248,8 +253,10 @@ public class OrderImports extends JavaRefactorVisitor {
                                     imports.remove(j);
                                 }
                                 J.Import toStar = imports.get(j);
-                                imports.set(j, toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
-                                        .getName().withName("*"))));
+                                if (!toStar.getQualid().getSimpleName().equals("*")) {
+                                    imports.set(j, toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
+                                            .getName().withName("*"))));
+                                }
                                 i = j + 1;
                             }
                             consecutiveSamePackages = 1;
@@ -260,6 +267,7 @@ public class OrderImports extends JavaRefactorVisitor {
                         }
                     }
 
+                    imports.remove(SPACER);
                     return imports;
                 }
             }
