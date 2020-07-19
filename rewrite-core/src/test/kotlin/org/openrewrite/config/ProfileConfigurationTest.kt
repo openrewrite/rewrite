@@ -69,7 +69,7 @@ internal class ProfileConfigurationTest {
             )
         }
 
-        assertThat(profile.build(emptyList()).styles).isInstanceOf(TextStyle::class.java)
+        assertThat(profile.build(emptyList()).styles.first()).isInstanceOf(TextStyle::class.java)
         assertThat((profile.build(emptyList()).styles.first() as TextStyle).charset).isEqualTo("UTF-8")
     }
 
