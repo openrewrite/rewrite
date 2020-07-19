@@ -39,31 +39,37 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     private final Map<String, ProfileConfiguration> profiles = new HashMap<>();
-    private final Collection<SourceVisitor<?>> visitors = new ArrayList<>();
+    private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
+    private final Map<CompositeRefactorVisitor, String> visitorExtensions = new HashMap<>();
 
     public YamlResourceLoader(InputStream yamlInput) throws UncheckedIOException {
         try {
-            Yaml yaml = new Yaml();
-            for (Object resource : yaml.loadAll(yamlInput)) {
-                if (resource instanceof Map) {
-                    @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                    String type = resourceMap.getOrDefault("type", "invalid").toString();
-                    switch(type) {
-                        case "beta.openrewrite.org/v1/visitor":
-                            mapVisitor(resourceMap);
-                            break;
-                        case "beta.openrewrite.org/v1/profile":
-                            mapProfile(resourceMap);
-                            break;
+            try {
+                Yaml yaml = new Yaml();
+                for (Object resource : yaml.loadAll(yamlInput)) {
+                    if (resource instanceof Map) {
+                        @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
+                        String type = resourceMap.getOrDefault("type", "invalid").toString();
+                        switch (type) {
+                            case "beta.openrewrite.org/v1/visitor":
+                                mapVisitor(resourceMap);
+                                break;
+                            case "beta.openrewrite.org/v1/profile":
+                                mapProfile(resourceMap);
+                                break;
+                        }
                     }
                 }
-            }
-        } finally {
-            try {
+
+                for (Map.Entry<CompositeRefactorVisitor, String> extendingVisitor : visitorExtensions.entrySet()) {
+                    visitors.stream().filter(v -> v.getName().equals(extendingVisitor.getValue())).findAny()
+                            .ifPresent(v -> extendingVisitor.getKey().extendsFrom(v));
+                }
+            } finally {
                 yamlInput.close();
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
             }
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
         }
     }
 
@@ -108,7 +114,13 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
             }
         }
 
-        this.visitors.add(new CompositeRefactorVisitor(visitorMap.get("name").toString(), subVisitors));
+        CompositeRefactorVisitor visitor = new CompositeRefactorVisitor(visitorMap.get("name").toString(), subVisitors);
+
+        if (visitorMap.containsKey("extends")) {
+            visitorExtensions.put(visitor, visitorMap.get("extends").toString());
+        }
+
+        this.visitors.add(visitor);
     }
 
     private Class<?> visitorClass(String name) throws ClassNotFoundException {
@@ -136,8 +148,9 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
         return profiles.values();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Collection<SourceVisitor<?>> loadVisitors() {
-        return visitors;
+        return (Collection<SourceVisitor<?>>) (Collection) visitors;
     }
 }

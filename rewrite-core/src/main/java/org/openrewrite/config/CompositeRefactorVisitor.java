@@ -22,6 +22,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 
+import java.awt.*;
 import java.util.List;
 
 public class CompositeRefactorVisitor extends SourceVisitor<Tree> {
@@ -50,7 +51,9 @@ public class CompositeRefactorVisitor extends SourceVisitor<Tree> {
 
     public Class<?> getVisitorType() {
         return delegates.stream().findAny()
-                .map(Object::getClass)
+                .map(d -> d instanceof CompositeRefactorVisitor ?
+                        ((CompositeRefactorVisitor) d).getVisitorType() :
+                        d.getClass())
                 .orElse(null);
     }
 
@@ -60,7 +63,7 @@ public class CompositeRefactorVisitor extends SourceVisitor<Tree> {
 
     @Override
     public Tree visitTree(Tree tree) {
-        if(tree instanceof SourceFile) {
+        if (tree instanceof SourceFile) {
             Refactor<Tree> refactor = new Refactor<>(tree);
             return refactor.visit(delegates).fix().getFixed();
         }
@@ -68,8 +71,17 @@ public class CompositeRefactorVisitor extends SourceVisitor<Tree> {
         return super.visitTree(tree);
     }
 
+    void extendsFrom(CompositeRefactorVisitor delegate) {
+        delegates.add(0, delegate);
+        andThen().add(0, delegate);
+    }
+
     @Override
     public Tree defaultTo(Tree t) {
-        return delegates.stream().findAny().map(v -> v.defaultTo(t)).orElse(null);
+        return delegates.stream().findAny()
+                .map(d -> d instanceof CompositeRefactorVisitor ?
+                        ((CompositeRefactorVisitor) d).defaultTo(t) :
+                        d.defaultTo(t))
+                .orElse(null);
     }
 }
