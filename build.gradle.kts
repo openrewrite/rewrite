@@ -97,6 +97,12 @@ subprojects {
         kotlinOptions {
             jvmTarget = "1.8"
         }
+
+        // otherwise fails with:
+        // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
+        doFirst {
+            destinationDir.mkdirs()
+        }
     }
 
     configurations.all {
