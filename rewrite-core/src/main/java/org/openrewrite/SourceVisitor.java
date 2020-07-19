@@ -63,6 +63,8 @@ public abstract class SourceVisitor<R> {
 
     /**
      * Used to build up pipelines of visitors.
+     *
+     * @param visitor The visitor to run after this visitor.
      */
     public void andThen(SourceVisitor<R> visitor) {
         andThen.get().add(visitor);
