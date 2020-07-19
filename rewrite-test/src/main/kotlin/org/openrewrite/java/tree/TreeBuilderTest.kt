@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -86,6 +87,31 @@ interface TreeBuilderTest {
                 }
             }
         """)
+    }
+
+    @Test
+    fun buildMethodDeclaration(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.ArrayList;
+            import java.util.Collection;
+            
+            public class A {
+                Collection<String> list = new ArrayList<>();
+            }
+        """.trimIndent())
+
+        val methodDecl = TreeBuilder.buildMethodDeclaration(jp, a, a.classes[0],
+                """
+                    void addAll(List<String> others) {
+                        list.addAll(others);
+                    }
+                """.trimIndent(), JavaType.Class.build("java.util.List"))
+
+        assertThat(methodDecl.printTrimmed()).isEqualTo("""
+            void addAll(List<String> others) {
+                list.addAll(others);
+            }
+        """.trimIndent())
     }
 
     @Test

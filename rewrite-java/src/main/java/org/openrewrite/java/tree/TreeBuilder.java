@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaFormatter;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.ShiftFormatRightVisitor;
+import org.openrewrite.search.FindCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -91,6 +92,50 @@ public class TreeBuilder {
         return expr.withFormatting(fmt);
     }
 
+    public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
+                                                      J.CompilationUnit containing,
+                                                      J.ClassDecl insertionScope,
+                                                      String methodDeclarationSnippet,
+                                                      JavaType.Class... imports) {
+        parser.reset();
+
+        // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
+        // @formatter:off
+        String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
+                "class CodeSnippet {\n" +
+                insertionScope.getFields().stream()
+                        .flatMap(field -> field.getVars().stream().map(v -> variableDefinitionSource(field, v)))
+                        .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
+                StringUtils.trimIndent(methodDeclarationSnippet) + "\n" +
+                "}";
+        // @formatter:on
+
+        if (logger.isDebugEnabled()) {
+            logger.debug("Building code snippet using synthetic class:");
+            logger.debug(source);
+        }
+
+        J.CompilationUnit cu = parser.parse(source);
+        List<J> statements = cu.getClasses().get(0).getBody().getStatements();
+        J.MethodDecl methodDecl = (J.MethodDecl) statements.get(statements.size() - 1);
+
+        JavaFormatter formatter = new JavaFormatter(cu);
+
+        if (methodDecl.getBody() != null) {
+            // FIXME this indentation needs to be fixed to represent the indentation found in the source file
+            return methodDecl.withBody(methodDecl.getBody().withStatements(methodDecl.getBody().getStatements().stream()
+                    .map(stat -> {
+                        ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat, enclosingIndent(insertionScope) +
+                                formatter.findIndent(enclosingIndent(insertionScope), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
+                        return (Statement) shiftRight.visit(stat);
+                    })
+                    .collect(toList()))
+            );
+        }
+
+        return methodDecl;
+    }
+
     @SuppressWarnings("unchecked")
     public static <T extends J> List<T> buildSnippet(JavaParser parser,
                                                      J.CompilationUnit containing,
@@ -101,16 +146,15 @@ public class TreeBuilder {
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
-        String source =
-            stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
-            "class CodeSnippet {\n" +
+        String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
+                "class CodeSnippet {\n" +
                 new ListScopeVariables(insertionScope).visit(containing).stream()
-                    .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
+                        .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
                 "  // the contents of this block are the snippet\n" +
                 "  {\n" +
-                        StringUtils.trimIndent(snippet) + "\n" +
+                StringUtils.trimIndent(snippet) + "\n" +
                 "  }\n" +
-            "}";
+                "}";
         // @formatter:on
 
         if (logger.isDebugEnabled()) {
@@ -134,9 +178,10 @@ public class TreeBuilder {
     }
 
     private static class ListScopeVariables extends JavaSourceVisitor<List<String>> {
+        @Nullable
         private final Cursor scope;
 
-        private ListScopeVariables(Cursor scope) {
+        private ListScopeVariables(@Nullable Cursor scope) {
             this.scope = scope;
             setCursoringOn();
         }
@@ -147,26 +192,33 @@ public class TreeBuilder {
         }
 
         @Override
+        public List<String> visitCompilationUnit(J.CompilationUnit cu) {
+            return scope == null ? emptyList() : super.visitCompilationUnit(cu);
+        }
+
+        @Override
         public List<String> visitVariable(J.VariableDecls.NamedVar variable) {
             if (isInSameNameScope(scope)) {
-                J.VariableDecls variableDecls = getCursor().getParentOrThrow().getTree();
-
-                JavaType type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
-                String typeName = "";
-                if (type instanceof JavaType.Class) {
-                    typeName = ((JavaType.Class) type).getFullyQualifiedName();
-                } else if (type instanceof JavaType.ShallowClass) {
-                    typeName = ((JavaType.ShallowClass) type).getFullyQualifiedName();
-                } else if (type instanceof JavaType.GenericTypeVariable) {
-                    typeName = ((JavaType.GenericTypeVariable) type).getFullyQualifiedName();
-                } else if (type instanceof JavaType.Primitive) {
-                    typeName = ((JavaType.Primitive) type).getKeyword();
-                }
-
-                return singletonList(typeName + " " + variable.getSimpleName());
+                return singletonList(variableDefinitionSource(getCursor().getParentOrThrow().getTree(), variable));
             }
 
             return super.visitVariable(variable);
         }
+    }
+
+    private static String variableDefinitionSource(J.VariableDecls variableDecls, J.VariableDecls.NamedVar variable) {
+        JavaType type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
+        String typeName = "";
+        if (type instanceof JavaType.Class) {
+            typeName = ((JavaType.Class) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.ShallowClass) {
+            typeName = ((JavaType.ShallowClass) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.GenericTypeVariable) {
+            typeName = ((JavaType.GenericTypeVariable) type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.Primitive) {
+            typeName = ((JavaType.Primitive) type).getKeyword();
+        }
+
+        return typeName + " " + variable.getSimpleName();
     }
 }

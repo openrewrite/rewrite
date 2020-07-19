@@ -16,8 +16,9 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.tree.TreeBuilderTest
 
 @ExtendWith(JavaParserResolver::class)
-class Java11UseStaticImportTest: UseStaticImportTest {
+class Java11TreeBuilderTest: TreeBuilderTest {
     fun javaParser(): Java11Parser = Java11Parser.builder().build()
 }

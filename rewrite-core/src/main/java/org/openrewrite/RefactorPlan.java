@@ -26,10 +26,10 @@ import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.function.Function.identity;
+import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 
@@ -52,7 +52,7 @@ public class RefactorPlan {
         List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
                 .map(profilesByName::get)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         visitor = loadedProfiles.stream().reduce(visitor, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1);
 
@@ -70,7 +70,7 @@ public class RefactorPlan {
         List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
                 .map(profilesByName::get)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+                .collect(toList());
 
         //noinspection unchecked
         return visitors.stream()
@@ -96,7 +96,21 @@ public class RefactorPlan {
                 .map(v -> (S) v)
                 .map(v -> loadedProfiles.stream().reduce(v, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1))
                 .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
-                .collect(Collectors.toList());
+                .collect(toList());
+    }
+
+    public <S extends SourceFile, G extends SourceGenerator<S>> Collection<G> generators(
+            Class<G> sourceType, String... profiles) {
+        return generators(sourceType, Arrays.asList(profiles));
+    }
+
+    @SuppressWarnings("unchecked")
+    public <S extends SourceFile, G extends SourceGenerator<S>> Collection<G> generators(
+            Class<G> sourceType, Iterable<String> profiles) {
+        return (Collection<G>) visitors((Class) sourceType, profiles).stream()
+                .filter(SourceGenerator.class::isInstance)
+                .map(SourceGenerator.class::cast)
+                .collect(toList());
     }
 
     public static Builder builder() {
@@ -165,7 +179,7 @@ public class RefactorPlan {
 
             return new RefactorPlan(profileConfigurations.values().stream()
                     .map(pc -> pc.build(profileConfigurations.values()))
-                    .collect(Collectors.toList()),
+                    .collect(toList()),
                     visitors);
         }
     }

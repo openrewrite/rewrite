@@ -1036,6 +1036,11 @@ public interface J extends Serializable, Tree {
             return new FindAnnotations(signature).visit(this);
         }
 
+        public List<Annotation> findAnnotationsOnClass(String signature) {
+            FindAnnotations findAnnotations = new FindAnnotations(signature);
+            return getAnnotations().stream().flatMap(a -> findAnnotations.visitAnnotation(a).stream()).collect(toList());
+        }
+
         public boolean hasType(String clazz) {
             return new HasType(clazz).visit(this);
         }
