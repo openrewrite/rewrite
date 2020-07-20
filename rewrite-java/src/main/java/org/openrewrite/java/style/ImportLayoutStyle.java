@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java;
+package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.OrderImports;
 
 import java.util.List;
 import java.util.Map;

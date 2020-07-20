@@ -92,11 +92,11 @@ public class Formatting implements Serializable {
     }
 
     public static String firstPrefix(@Nullable List<? extends Tree> trees) {
-        return trees == null || trees.isEmpty() ? "" : trees.iterator().next().getFormatting().getPrefix();
+        return trees == null || trees.isEmpty() ? "" : trees.iterator().next().getPrefix();
     }
 
     public static String lastSuffix(@Nullable List<? extends Tree> trees) {
-        return trees == null || trees.isEmpty() ? "" : trees.get(trees.size() - 1).getFormatting().getSuffix();
+        return trees == null || trees.isEmpty() ? "" : trees.get(trees.size() - 1).getSuffix();
     }
 
     public static <T extends Tree> List<T> formatFirstPrefix(@Nullable List<T> trees, String prefix) {

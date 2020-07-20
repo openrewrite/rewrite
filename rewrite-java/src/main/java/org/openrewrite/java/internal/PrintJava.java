@@ -36,7 +36,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
     public String reduce(String r1, String r2) {
         return r1 + r2;
     }
-    
+
     private String visit(Collection<? extends Tree> nodes, String suffixBetween) {
         return visit(nodes, suffixBetween, "");
     }
@@ -64,7 +64,7 @@ public class PrintJava extends JavaSourceVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getFormatting().getPrefix() + code + tree.getFormatting().getSuffix();
+        return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
     }
 
     private String visitModifiers(Iterable<Modifier> modifiers) {
@@ -220,7 +220,8 @@ public class PrintJava extends JavaSourceVisitor<String> {
 
     @Override
     public String visitBlock(Block<J> block) {
-        return fmt(block, fmt(block.getStatic(), "static") + "{" + visitStatements(block.getStatements()) + block.getEndOfBlockSuffix() + "}");
+        return fmt(block, fmt(block.getStatic(), "static") + "{" + visitStatements(block.getStatements()) +
+                block.getEnd().getPrefix() + "}");
     }
 
     @Override

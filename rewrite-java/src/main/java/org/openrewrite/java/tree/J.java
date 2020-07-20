@@ -725,7 +725,7 @@ public interface J extends Serializable, Tree {
         Empty statik;
 
         public Block<T> withStatic(Empty statik) {
-            return new Block<>(id, statik, statements, formatting, endOfBlockSuffix);
+            return new Block<>(id, statik, statements, formatting, end);
         }
 
         @With
@@ -738,7 +738,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        String endOfBlockSuffix;
+        End end;
 
         @Nullable
         public Empty getStatic() {
@@ -753,7 +753,18 @@ public interface J extends Serializable, Tree {
 
         @JsonIgnore
         public int getIndent() {
-            return Formatting.getIndent(endOfBlockSuffix);
+            return Formatting.getIndent(end.getPrefix());
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class End implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Formatting formatting;
         }
     }
 
@@ -1142,7 +1153,8 @@ public interface J extends Serializable, Tree {
                             null,
                             null,
                             null,
-                            new Try.Block<>(randomId(), null, emptyList(), format(" "), "\n"),
+                            new Try.Block<>(randomId(), null, emptyList(), format(" "),
+                                    new Block.End(randomId(), format("\n"))),
                             JavaType.Class.build(packageName + "." + className),
                             format("\n\n")).withModifiers("public")),
                     EMPTY,
@@ -1883,13 +1895,13 @@ public interface J extends Serializable, Tree {
                 return this;
             } else if (modifiers.isEmpty()) {
                 if (typeParameters != null) {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeParameters.getFormatting().getPrefix()))
+                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeParameters.getPrefix()))
                             .withTypeParameters(typeParameters.withPrefix(" "));
                 } else if (returnTypeExpr != null) {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, returnTypeExpr.getFormatting().getPrefix()))
+                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, returnTypeExpr.getPrefix()))
                             .withReturnTypeExpr(returnTypeExpr.withPrefix(" "));
                 } else {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, name.getFormatting().getPrefix()))
+                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, name.getPrefix()))
                             .withName(name.withPrefix(" "));
                 }
             }
@@ -2143,7 +2155,7 @@ public interface J extends Serializable, Tree {
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getSuffix())));
                             finalAdded = true;
                         }
                     }
@@ -2160,15 +2172,15 @@ public interface J extends Serializable, Tree {
                         if (m instanceof Private || m instanceof Protected || m instanceof Public) {
                             afterAccessModifier = i + 1;
                         } else if (m instanceof Final) {
-                            modifiers.set(i, m.withFormatting(format(" ", m.getFormatting().getSuffix())));
-                            modifiers.add(i, new Static(randomId(), format(m.getFormatting().getPrefix())));
+                            modifiers.set(i, m.withFormatting(format(" ", m.getSuffix())));
+                            modifiers.add(i, new Static(randomId(), format(m.getPrefix())));
                             staticAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getFormatting().getSuffix())));
+                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getSuffix())));
                             staticAdded = true;
                         }
                     }
@@ -2191,8 +2203,8 @@ public interface J extends Serializable, Tree {
                         }
 
                         if (i == modifiers.size() - 1) {
-                            modifiers.add(0, buildModifier(modifier, format(modifiers.get(0).getFormatting().getPrefix(),
-                                    m.getFormatting().getSuffix())));
+                            modifiers.add(0, buildModifier(modifier, format(modifiers.get(0).getPrefix(),
+                                    m.getSuffix())));
                             modifiers.set(i + 1, m.withFormatting(format(" ", "")));
                             accessModifierAdded = true;
                         }
@@ -3208,7 +3220,7 @@ public interface J extends Serializable, Tree {
             if (fixedModifiers == modifiers) {
                 return this;
             } else if (modifiers.isEmpty()) {
-                return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeExpr.getFormatting().getPrefix()))
+                return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeExpr.getPrefix()))
                         .withTypeExpr(typeExpr.withPrefix(" "));
             }
 

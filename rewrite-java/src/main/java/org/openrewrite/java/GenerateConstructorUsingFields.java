@@ -80,8 +80,8 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
                     new J.MethodDecl.Parameters(randomId(), constructorParams, EMPTY),
                     null,
                     new J.Block<>(randomId(), null, emptyList(), format(" "),
-                            formatter.findIndent(classDecl.getBody().getIndent(),
-                                    classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()),
+                            new J.Block.End(randomId(), format(formatter.findIndent(classDecl.getBody().getIndent(),
+                                    classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()))),
                     null,
                     constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()));
 

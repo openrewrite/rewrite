@@ -166,10 +166,10 @@ public class YamlParser {
             if (key == null && block instanceof Yaml.Scalar) {
                 key = (Yaml.Scalar) block;
             } else {
-                String keySuffix = block.getFormatting().getPrefix();
+                String keySuffix = block.getPrefix();
                 block = block.withPrefix(keySuffix.substring(keySuffix.lastIndexOf(':') + 1));
 
-                String keyPrefix = key.getFormatting().getPrefix();
+                String keyPrefix = key.getPrefix();
                 key = key.withFormatting(format(
                         "",
                         keySuffix.substring(0, keySuffix.lastIndexOf(':'))
@@ -195,7 +195,7 @@ public class YamlParser {
 
         @Override
         public void push(Yaml.Block block) {
-            String entryPrefix = block.getFormatting().getPrefix();
+            String entryPrefix = block.getPrefix();
             block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
             entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
             entries.add(new Yaml.Sequence.Entry(randomId(), block, format(entryPrefix)));

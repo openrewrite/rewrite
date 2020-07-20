@@ -25,7 +25,6 @@ import org.openrewrite.java.JavaFormatter;
 import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.ShiftFormatRightVisitor;
-import org.openrewrite.search.FindCursor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -101,11 +100,16 @@ public class TreeBuilder {
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
+        String scopeVariables = insertionScope.getFields().stream()
+                .flatMap(field -> field.getVars().stream().map(v -> variableDefinitionSource(field, v)))
+                .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n";
+        if (insertionScope.getFields().isEmpty()) {
+            scopeVariables = "";
+        }
+
         String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
                 "class CodeSnippet {\n" +
-                insertionScope.getFields().stream()
-                        .flatMap(field -> field.getVars().stream().map(v -> variableDefinitionSource(field, v)))
-                        .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
+                scopeVariables +
                 StringUtils.trimIndent(methodDeclarationSnippet) + "\n" +
                 "}";
         // @formatter:on
@@ -117,23 +121,7 @@ public class TreeBuilder {
 
         J.CompilationUnit cu = parser.parse(source);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
-        J.MethodDecl methodDecl = (J.MethodDecl) statements.get(statements.size() - 1);
-
-        JavaFormatter formatter = new JavaFormatter(cu);
-
-        if (methodDecl.getBody() != null) {
-            // FIXME this indentation needs to be fixed to represent the indentation found in the source file
-            return methodDecl.withBody(methodDecl.getBody().withStatements(methodDecl.getBody().getStatements().stream()
-                    .map(stat -> {
-                        ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat, enclosingIndent(insertionScope) +
-                                formatter.findIndent(enclosingIndent(insertionScope), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
-                        return (Statement) shiftRight.visit(stat);
-                    })
-                    .collect(toList()))
-            );
-        }
-
-        return methodDecl;
+        return (J.MethodDecl) statements.get(statements.size() - 1);
     }
 
     @SuppressWarnings("unchecked")

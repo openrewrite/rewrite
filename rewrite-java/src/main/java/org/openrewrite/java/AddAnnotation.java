@@ -75,7 +75,7 @@ public final class AddAnnotation {
                         String prefix = formatter.findIndent(0, c).getPrefix();
 
                         // special case, where a top-level class is often un-indented completely
-                        String cdPrefix = c.getFormatting().getPrefix();
+                        String cdPrefix = c.getPrefix();
                         if (getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit &&
                                 cdPrefix.substring(cdPrefix.lastIndexOf('\n')).chars().noneMatch(p -> p == ' ' || p == '\t')) {
                             prefix = "\n";
@@ -108,11 +108,11 @@ public final class AddAnnotation {
                 if (v.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
                     List<J.Annotation> fixedAnnotations = new ArrayList<>(v.getAnnotations());
 
-                    if (!isMethodOrLambdaParameter && multiVariable.getFormatting().getPrefix().chars().filter(c -> c == '\n').count() < 2) {
+                    if (!isMethodOrLambdaParameter && multiVariable.getPrefix().chars().filter(c -> c == '\n').count() < 2) {
                         List<?> statements = enclosingBlock().getStatements();
                         for (int i = 1; i < statements.size(); i++) {
                             if (statements.get(i) == multiVariable) {
-                                v = v.withPrefix("\n" + v.getFormatting().getPrefix());
+                                v = v.withPrefix("\n" + v.getPrefix());
                                 break;
                             }
                         }

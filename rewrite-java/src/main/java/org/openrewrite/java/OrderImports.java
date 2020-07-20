@@ -108,10 +108,10 @@ public class OrderImports extends JavaRefactorVisitor {
                 block.reset();
                 cu.getImports().forEach(block::accept);
                 for (J.Import orderedImport : block.orderedImports()) {
-                    String prefix = importIndex == 0 ? cu.getImports().get(0).getFormatting().getPrefix() :
+                    String prefix = importIndex == 0 ? cu.getImports().get(0).getPrefix() :
                             extraLineSpace + "\n";
 
-                    if (!orderedImport.getFormatting().getPrefix().equals(prefix)) {
+                    if (!orderedImport.getPrefix().equals(prefix)) {
                         orderedImports.add(orderedImport.withPrefix(prefix));
                     } else {
                         orderedImports.add(orderedImport);

@@ -62,7 +62,7 @@ public class JavaFormatter extends Formatter {
         AtomicBoolean takeWhile = new AtomicBoolean(true);
         return enclosesBoth instanceof J.Block ?
                 ((J.Block<?>) enclosesBoth).getIndent() :
-                (int) enclosesBoth.getFormatting().getPrefix().chars()
+                (int) enclosesBoth.getPrefix().chars()
                         .filter(c -> {
                             dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
                             return dropWhile.get();

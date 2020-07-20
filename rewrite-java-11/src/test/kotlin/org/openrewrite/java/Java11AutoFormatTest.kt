@@ -13,16 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite;
+package org.openrewrite.java
 
-import org.openrewrite.internal.lang.Nullable;
+import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.tree.AutoFormatTest
+import org.openrewrite.java.tree.TreeBuilderTest
 
-public interface SourceGenerator<S extends SourceFile> {
-    /**
-     * @return The source to generate. If an existing source file exists at the same destination,
-     * it can be returned instead here to implement an "upsert" type of behavior in code generation. If
-     * {@code null}, don't generate at all.
-     */
-    @Nullable
-    S getGenerated();
+@ExtendWith(JavaParserResolver::class)
+class Java11AutoFormatTest: AutoFormatTest {
+    fun javaParser(): Java11Parser = Java11Parser.builder().build()
 }

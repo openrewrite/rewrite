@@ -36,7 +36,7 @@ public class ShiftFormatLeft extends YamlRefactorVisitor {
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry) {
         Yaml.Mapping.Entry e = refactor(entry, super::visitMappingEntry);
         if (getCursor().isScopeInPath(scope)) {
-            String prefix = e.getFormatting().getPrefix();
+            String prefix = e.getPrefix();
             e = e.withPrefix(prefix.substring(0, prefix.indexOf('\n') + 1) +
                     prefix.substring(prefix.indexOf('\n') + shift + 1));
         }

@@ -18,6 +18,8 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 
 import java.io.File;
@@ -184,6 +186,11 @@ public interface JavaParser {
 
         public B importStyle(ImportLayoutStyle importStyle) {
             this.styles.add(importStyle);
+            return (B) this;
+        }
+
+        public B tabAndIndentStyle(TabAndIndentStyle tabAndIndentStyle) {
+            this.styles.add(tabAndIndentStyle);
             return (B) this;
         }
 

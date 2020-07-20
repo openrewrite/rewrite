@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -47,8 +48,18 @@ public interface Tree {
      */
     <T extends Tree> T withFormatting(Formatting fmt);
 
+    @JsonIgnore
+    default String getPrefix() {
+        return getFormatting().getPrefix();
+    }
+
     default <T extends Tree> T withPrefix(String prefix) {
         return withFormatting(getFormatting().withPrefix(prefix));
+    }
+
+    @JsonIgnore
+    default String getSuffix() {
+        return getFormatting().getSuffix();
     }
 
     default <T extends Tree> T withSuffix(String suffix) {

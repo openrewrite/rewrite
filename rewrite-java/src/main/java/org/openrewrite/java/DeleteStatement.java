@@ -23,6 +23,7 @@ import org.openrewrite.java.search.FindReferencedTypes;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 /**
@@ -94,6 +95,6 @@ public class DeleteStatement extends JavaRefactorVisitor {
     }
 
     private J.Block<J> emptyBlock() {
-        return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, "");
+        return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, new J.Block.End(randomId(), format("")));
     }
 }

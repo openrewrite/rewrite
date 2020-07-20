@@ -27,14 +27,14 @@ public class PrintProperties extends PropertiesSourceVisitor<String> {
 
     @Override
     public String visitFile(Properties.File file) {
-        return file.getFormatting().getPrefix() + visit(file.getContent()) + file.getFormatting().getSuffix();
+        return file.getPrefix() + visit(file.getContent()) + file.getSuffix();
     }
 
     @Override
     public String visitEntry(Properties.Entry entry) {
-        return entry.getFormatting().getPrefix() + entry.getKey() +
+        return entry.getPrefix() + entry.getKey() +
                 entry.getEqualsFormatting().getPrefix() + "=" + entry.getEqualsFormatting().getSuffix() +
                 entry.getValue() +
-                entry.getFormatting().getSuffix();
+                entry.getSuffix();
     }
 }

@@ -91,7 +91,8 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     @Override
     public J visitBlock(J.Block<J> block) {
         J.Block<J> b = refactor(block, this::visitStatement);
-        return b.withStatements(refactor(b.getStatements()));
+        b = b.withStatements(refactor(b.getStatements()));
+        return b.withEnd(refactor(b.getEnd()));
     }
 
     @Override
@@ -265,6 +266,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     public J visitMethod(J.MethodDecl method) {
         J.MethodDecl m = method;
         m = m.withAnnotations(refactor(m.getAnnotations()));
+        m = m.withModifiers(refactor(m.getModifiers()));
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
         m = m.withReturnTypeExpr(refactor(m.getReturnTypeExpr()));
         m = m.withParams(refactor(m.getParams()));

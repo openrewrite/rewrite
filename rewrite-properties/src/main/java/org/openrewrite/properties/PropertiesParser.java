@@ -72,7 +72,7 @@ public class PropertiesParser {
 
             if(content != null) {
                 content = content.withFormatting(Formatting.format(prefix.toString(),
-                        content.getFormatting().getSuffix() + "\n"));
+                        content.getSuffix() + "\n"));
                 prefix = new StringBuilder();
                 contents.add(content);
             }

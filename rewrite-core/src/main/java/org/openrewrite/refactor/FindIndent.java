@@ -55,7 +55,7 @@ public class FindIndent extends SourceVisitor<Void> {
 
     @Override
     public Void visitTree(Tree tree) {
-        String prefix = tree.getFormatting().getPrefix();
+        String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);
         if (prefix.chars()

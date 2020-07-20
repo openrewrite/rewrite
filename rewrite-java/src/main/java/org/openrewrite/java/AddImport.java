@@ -22,6 +22,7 @@ import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.HasType;
+import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
@@ -107,7 +108,7 @@ public class AddImport extends JavaRefactorVisitor {
 
         if (imports.isEmpty()) {
             importToAdd = cu.getPackageDecl() == null ?
-                    importToAdd.withPrefix(cu.getClasses().get(0).getFormatting().getPrefix() + "\n\n") :
+                    importToAdd.withPrefix(cu.getClasses().get(0).getPrefix() + "\n\n") :
                     importToAdd.withPrefix("\n\n");
         }
 

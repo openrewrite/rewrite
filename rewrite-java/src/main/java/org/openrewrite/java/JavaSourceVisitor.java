@@ -214,7 +214,10 @@ public abstract class JavaSourceVisitor<R> extends SourceVisitor<R> {
                 defaultTo(block),
                 reduce(
                         visitStatement(block),
-                        visit(block.getStatements())
+                        reduce(
+                                visit(block.getStatements()),
+                                visit(block.getEnd())
+                        )
                 )
         );
     }

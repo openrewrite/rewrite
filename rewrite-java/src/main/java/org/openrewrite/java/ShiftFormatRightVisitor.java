@@ -42,10 +42,19 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
+    public J visitMethod(J.MethodDecl method) {
+        J.MethodDecl m = refactor(method, super::visitMethod);
+        if (getCursor().isScopeInPath(scope)) {
+            m = m.withPrefix(m.getPrefix() + shift);
+        }
+        return m;
+    }
+
+    @Override
     public J visitElse(J.If.Else elze) {
         J.If.Else e = refactor(elze, super::visitElse);
         if (getCursor().isScopeInPath(scope) && isOnOwnLine(elze)) {
-            e = e.withPrefix(e.getFormatting().getPrefix() + shift);
+            e = e.withPrefix(e.getPrefix() + shift);
         }
         return e;
     }
@@ -54,7 +63,7 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     public J visitStatement(Statement statement) {
         Statement s = refactor(statement, super::visitStatement);
         if (getCursor().isScopeInPath(scope) && isOnOwnLine(statement)) {
-            s = s.withPrefix(s.getFormatting().getPrefix() + shift);
+            s = s.withPrefix(s.getPrefix() + shift);
         }
         return s;
     }
@@ -63,7 +72,9 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     public J visitBlock(J.Block<J> block) {
         J.Block<J> b = refactor(block, super::visitBlock);
         if (getCursor().isScopeInPath(scope)) {
-            b = b.withEndOfBlockSuffix(b.getEndOfBlockSuffix() + shift);
+            J.Block.End end = b.getEnd();
+            b = b.withEnd(end.withFormatting(end.getFormatting().withPrefix(
+                    end.getPrefix() + shift)));
         }
         return b;
     }
@@ -76,8 +87,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
             if (suffix.contains("\n")) {
                 List<Expression> elements = formatLastSuffix(n.getInitializer().getElements(), suffix + shift);
                 n = n.withInitializer(n.getInitializer().withElements(elements.stream()
-                    .map(e -> (Expression) e.withPrefix(e.getFormatting().getPrefix() + shift))
-                    .collect(toList())));
+                        .map(e -> (Expression) e.withPrefix(e.getPrefix() + shift))
+                        .collect(toList())));
             }
         }
         return n;
@@ -85,7 +96,7 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
 
     private boolean isOnOwnLine(Tree tree) {
         AtomicBoolean takeWhile = new AtomicBoolean(true);
-        return tree.getFormatting().getPrefix().chars()
+        return tree.getPrefix().chars()
                 .filter(c -> {
                     takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
                     return takeWhile.get();

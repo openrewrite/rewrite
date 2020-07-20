@@ -259,7 +259,7 @@ public interface Xml extends Serializable, Tree {
 
                     if (content.get(0) instanceof CharData) {
                         return tag.withClosing(new Closing(randomId(), name, "",
-                                content.get(0).getFormatting().getPrefix().contains("\n") ?
+                                content.get(0).getPrefix().contains("\n") ?
                                         indentedClosingTagFormatting : Formatting.EMPTY));
                     } else {
                         return tag.withClosing(new Closing(randomId(), name, "",

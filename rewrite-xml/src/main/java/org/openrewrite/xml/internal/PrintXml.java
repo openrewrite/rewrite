@@ -101,6 +101,6 @@ public class PrintXml extends XmlSourceVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getFormatting().getPrefix() + code + tree.getFormatting().getSuffix();
+        return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
     }
 }
