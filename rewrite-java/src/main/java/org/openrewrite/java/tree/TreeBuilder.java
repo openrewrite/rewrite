@@ -21,10 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaFormatter;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.ShiftFormatRightVisitor;
+import org.openrewrite.java.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,7 +89,6 @@ public class TreeBuilder {
     }
 
     public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
-                                                      J.CompilationUnit containing,
                                                       J.ClassDecl insertionScope,
                                                       String methodDeclarationSnippet,
                                                       JavaType.Class... imports) {
@@ -121,7 +117,7 @@ public class TreeBuilder {
 
         J.CompilationUnit cu = parser.parse(source);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
-        return (J.MethodDecl) statements.get(statements.size() - 1);
+        return (J.MethodDecl) new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
     }
 
     @SuppressWarnings("unchecked")

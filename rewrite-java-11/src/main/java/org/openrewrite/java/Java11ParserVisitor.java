@@ -19,6 +19,7 @@ import com.sun.source.tree.*;
 import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
+import com.sun.tools.javac.code.Type;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -1437,6 +1438,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private JavaType type(@Nullable com.sun.tools.javac.code.Type type,
                           List<Symbol> stack, boolean shallow) {
         if (type instanceof com.sun.tools.javac.code.Type.ClassType) {
+            if(type instanceof Type.ErrorType) {
+                return null;
+            }
+            
             var sym = (Symbol.ClassSymbol) type.tsym;
 
             if (stack.contains(sym))

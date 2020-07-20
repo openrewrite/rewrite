@@ -91,6 +91,12 @@ interface TreeBuilderTest {
 
     @Test
     fun buildMethodDeclaration(jp: JavaParser) {
+        val b = """
+            package b;
+
+            public class B {}
+        """.trimIndent()
+
         val a = jp.parse("""
             import java.util.ArrayList;
             import java.util.Collection;
@@ -100,18 +106,20 @@ interface TreeBuilderTest {
             }
         """.trimIndent())
 
-        val methodDecl = TreeBuilder.buildMethodDeclaration(jp, a, a.classes[0],
+        val methodDecl = TreeBuilder.buildMethodDeclaration(jp, a.classes[0],
                 """
-                    void addAll(List<String> others) {
-                        list.addAll(others);
+                    B build() {
+                        return new B();
                     }
-                """.trimIndent(), JavaType.Class.build("java.util.List"))
+                """.trimIndent(), JavaType.Class.build("b.B"))
 
         assertThat(methodDecl.printTrimmed()).isEqualTo("""
-            void addAll(List<String> others) {
-                list.addAll(others);
+            B build() {
+                return new B();
             }
         """.trimIndent())
+
+        assertThat(methodDecl.returnTypeExpr?.type).isEqualTo(JavaType.Class.build("b.B"))
     }
 
     @Test
