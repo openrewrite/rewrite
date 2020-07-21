@@ -102,6 +102,14 @@ public interface JavaParser {
     }
 
     default J.CompilationUnit parse(String source, String... whichDependOn) {
+        return parseStrings(Stream.concat(Stream.of(source), Arrays.stream(whichDependOn)).collect(toList())).get(0);
+    }
+
+    default List<J.CompilationUnit> parseStrings(String... sources) {
+        return parseStrings(Arrays.asList(sources));
+    }
+
+    default List<J.CompilationUnit> parseStrings(List<String> sources) {
         try {
             Path temp = Files.createTempDirectory("sources");
 
@@ -123,12 +131,7 @@ public interface JavaParser {
             };
 
             try {
-                List<J.CompilationUnit> cus = parse(Stream.concat(
-                        Arrays.stream(whichDependOn).map(sourceFile),
-                        Stream.of(sourceFile.apply(source))
-                ).collect(toList()));
-
-                return cus.get(cus.size() - 1);
+                return parse(sources.stream().map(sourceFile).collect(toList()));
             } finally {
                 // delete temp recursively
                 //noinspection ResultOfMethodCallIgnored
