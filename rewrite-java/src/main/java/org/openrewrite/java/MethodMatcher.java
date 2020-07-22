@@ -60,6 +60,24 @@ public class MethodMatcher {
         }.visit(parser.methodPattern());
     }
 
+    public boolean matches(J.MethodDecl method, J.ClassDecl enclosing) {
+        if (enclosing.getType() == null) {
+            return false;
+        }
+
+        String signaturePattern = method.getParams().getParams().stream()
+                .map(v -> v instanceof J.VariableDecls ?
+                        ((J.VariableDecls) v).getTypeAsClass() : null)
+                .filter(Objects::nonNull)
+                .map(this::typePattern)
+                .filter(Objects::nonNull)
+                .collect(joining(","));
+
+        return matchesTargetType(TypeUtils.asClass(enclosing.getType())) &&
+                methodNamePattern.matcher(method.getSimpleName()).matches() &&
+                argumentPattern.matcher(signaturePattern).matches();
+    }
+
     public boolean matches(J.MethodInvocation method) {
         if (method.getType() == null || method.getType().getDeclaringType() == null) {
             return false;

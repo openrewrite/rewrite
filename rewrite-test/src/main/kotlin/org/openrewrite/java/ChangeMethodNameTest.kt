@@ -29,7 +29,7 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) {
+    fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -54,7 +54,7 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithSingleArg(jp: JavaParser) {
+    fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -82,7 +82,7 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithArrayArg(jp: JavaParser) {
+    fun changeMethodNameForMethodWithArrayArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -110,7 +110,7 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun refactorMethodNameForMethodWithVarargArg(jp: JavaParser) {
+    fun changeMethodNameForMethodWithVarargArg(jp: JavaParser) {
         val a = """
             class A {
                public void test() {
@@ -138,7 +138,7 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun refactorMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken(jp: JavaParser) {
+    fun changeMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken(jp: JavaParser) {
         val b = """
             class B {
                public void error() {}
@@ -166,6 +166,32 @@ interface ChangeMethodNameTest {
             class A {
                public void test() {
                    new B().foo();
+               }
+            }
+        """)
+    }
+
+    @Test
+    fun changeMethodDeclarationForMethodWithSingleArg(jp: JavaParser) {
+        val a = """
+            class A {
+               public void foo(String s) {
+               }
+            }
+        """.trimIndent()
+
+        val cu = jp.parse(a, b)
+
+        val fixed = cu.refactor()
+                .visit(ChangeMethodName().apply {
+                    setMethod("A foo(String)")
+                    name = "bar"
+                })
+                .fix().fixed
+
+        assertRefactored(fixed, """
+            class A {
+               public void bar(String s) {
                }
             }
         """)

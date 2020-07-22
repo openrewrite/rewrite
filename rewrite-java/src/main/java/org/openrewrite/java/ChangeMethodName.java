@@ -26,6 +26,10 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     private MethodMatcher methodMatcher;
     private String name;
 
+    public ChangeMethodName() {
+        setCursoringOn();
+    }
+
     public void setMethod(String method) {
         this.methodMatcher = new MethodMatcher(method);
     }
@@ -38,6 +42,20 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     public Validated validate() {
         return required("method", methodMatcher)
                 .and(required("name", name));
+    }
+
+    @Override
+    public J visitMethod(J.MethodDecl method) {
+        J.MethodDecl m = refactor(method, super::visitMethod);
+
+        J.ClassDecl classDecl = getCursor().firstEnclosing(J.ClassDecl.class);
+        assert classDecl != null;
+
+        if (methodMatcher.matches(method, classDecl)) {
+            m = m.withName(m.getName().withName(name));
+        }
+
+        return m;
     }
 
     @Override
