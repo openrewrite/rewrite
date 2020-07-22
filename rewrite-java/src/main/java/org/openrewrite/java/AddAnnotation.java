@@ -77,7 +77,7 @@ public final class AddAnnotation {
                         // special case, where a top-level class is often un-indented completely
                         String cdPrefix = c.getPrefix();
                         if (getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit &&
-                                cdPrefix.substring(cdPrefix.lastIndexOf('\n')).chars().noneMatch(p -> p == ' ' || p == '\t')) {
+                                cdPrefix.substring(Math.max(cdPrefix.lastIndexOf('\n'), 0)).chars().noneMatch(p -> p == ' ' || p == '\t')) {
                             prefix = "\n";
                         }
 
