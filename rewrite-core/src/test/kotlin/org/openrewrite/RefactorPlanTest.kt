@@ -30,7 +30,7 @@ class RefactorPlanTest {
 
     private val child = ProfileConfiguration().apply {
         name = "child"
-        setExtend(setOf("parent"))
+        setExtend("parent")
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "overridden"))
     }
 

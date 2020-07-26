@@ -38,7 +38,7 @@ import static java.util.stream.Collectors.*;
 import static org.openrewrite.Profile.FilterReply.NEUTRAL;
 
 public class ProfileConfiguration {
-    private static final Logger logger = LoggerFactory.getLogger(Profile.class);
+    private static final Logger logger = LoggerFactory.getLogger(ProfileConfiguration.class);
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -47,7 +47,7 @@ public class ProfileConfiguration {
     private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
     private String name = "default";
-    private Set<String> extend = emptySet();
+    private String extend = null;
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
     private Map<String, Object> configure = new HashMap<>();
@@ -61,7 +61,7 @@ public class ProfileConfiguration {
         this.name = name;
     }
 
-    public void setExtend(Set<String> extend) {
+    public void setExtend(String extend) {
         this.extend = extend;
     }
 
@@ -91,6 +91,18 @@ public class ProfileConfiguration {
                 .collect(toSet());
     }
 
+    /**
+     * Add additional configuration to this profile.
+     * Does nothing if the profile to be merged has a different name than this profile.
+     * For example, if configuration has been added to the 'default' profile in multiple places (user home, project config, etc.)
+     * this can be used to merge all of that disparate configuration together.
+     *
+     * So this should be seen as a tool for merging together the split-apart pieces of a single profile, and *not*
+     * for taking unrelated profiles and combining them together.
+     *
+     * @param profile
+     * @return this
+     */
     public ProfileConfiguration merge(@Nullable ProfileConfiguration profile) {
         if (profile != null && profile.name.equals(name)) {
             ProfileConfiguration merged = new ProfileConfiguration();
@@ -118,10 +130,12 @@ public class ProfileConfiguration {
         while (!configs.isEmpty()) {
             ProfileConfiguration config = configs.poll();
             inOrderConfigurations.add(config);
-            config.extend.stream()
-                    .map(configsByName::get)
-                    .filter(Objects::nonNull)
-                    .forEach(configs::add);
+            if(config.extend != null) {
+                ProfileConfiguration parent = configsByName.get(config.extend);
+                if(parent != null) {
+                    configs.add(parent);
+                }
+            }
         }
 
         if(!name.equals("default") && configsByName.containsKey("default")) {
