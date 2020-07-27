@@ -17,7 +17,7 @@
 type: beta.openrewrite.org/v1/profile
 name: google-java-format
 styles:
-  - org.openrewrite.java.ImportLayoutStyle:
+  org.openrewrite.java.ImportLayoutStyle:
       layout:
         blocks:
           - import static all other imports
