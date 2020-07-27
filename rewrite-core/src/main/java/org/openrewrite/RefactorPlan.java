@@ -158,6 +158,11 @@ public class RefactorPlan {
             return this;
         }
 
+        public Builder loadVisitors(Collection<SourceVisitor<?>> visitors) {
+            this.visitors.addAll(visitors);
+            return this;
+        }
+
         public Builder visitor(SourceVisitor<?> visitor) {
             this.visitors.add(visitor);
             return this;
