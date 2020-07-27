@@ -29,6 +29,6 @@ class ClasspathResourceLoaderTest {
     @Test
     fun loadProfileFromClasspath() {
         val profiles = ClasspathResourceLoader(emptyList()).loadProfiles()
-        assertThat(profiles.map { it.name }).containsExactly("hello-jon")
+        assertThat(profiles.map { it.name }).containsExactly("google-java-format","hello-jon", "hello-jon2")
     }
 }

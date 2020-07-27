@@ -192,7 +192,7 @@ subprojects {
                                     // this dependency subtree has already been printed, so skip it
                                     emptyList()
                                 }
-                                )
+                            )
                     }
 
             project.plugins.withType<InfoBrokerPlugin> {

@@ -24,3 +24,19 @@ type: beta.openrewrite.org/v1/profile
 name: hello-jon
 include:
   - org.openrewrite.text.ChangeTextToJon
+---
+type: beta.openrewrite.org/v1/profile
+name: hello-jon2
+extend: hello-jon
+include:
+  - 'org.openrewrite.text.*'
+---
+type: beta.openrewrite.org/v1/profile
+name: google-java-format
+styles:
+  org.openrewrite.java.ImportLayoutStyle:
+      layout:
+        blocks:
+          - import static all other imports
+          - <blank line>
+          - import all other imports
