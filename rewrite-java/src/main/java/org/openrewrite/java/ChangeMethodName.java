@@ -17,9 +17,20 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Tree;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TreeBuilder;
+import org.openrewrite.java.tree.TypeUtils;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
 public class ChangeMethodName extends JavaRefactorVisitor {
@@ -64,6 +75,33 @@ public class ChangeMethodName extends JavaRefactorVisitor {
             andThen(new Scoped(method, name));
         }
         return super.visitMethodInvocation(method);
+    }
+
+    @Override
+    public J visitIdentifier(J.Ident ident) {
+        J.Ident i = refactor(ident, super::visitIdentifier);
+        return i;
+    }
+
+    /**
+     * The only time field access should be relevant to changing method names is static imports.
+     * This exists to turn
+     *  import static com.abc.B.static1;
+     * into
+     *  import static com.abc.B.static2;
+     */
+    @Override
+    public J visitFieldAccess(J.FieldAccess fieldAccess) {
+        J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
+        if (f.isFullyQualifiedClassReference(methodMatcher)) {
+            Expression target = f.getTarget();
+            if(target instanceof J.FieldAccess) {
+                String className = target.printTrimmed();
+                String fullyQualified = className + "." + name;
+                return TreeBuilder.buildName(fullyQualified, f.getFormatting(), f.getId());
+            }
+        }
+        return f;
     }
 
     public static class Scoped extends JavaRefactorVisitor {
