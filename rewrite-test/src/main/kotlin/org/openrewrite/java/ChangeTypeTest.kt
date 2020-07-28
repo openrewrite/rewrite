@@ -68,9 +68,7 @@ interface ChangeTypeTest {
         val fixed = b.refactor().visit(changeType).fix().fixed
 
         assertRefactored(fixed, """
-            import a.A2;
-            
-            public class B extends A2 {}
+            public class B extends a.A2 {}
         """)
     }
 
@@ -82,7 +80,7 @@ interface ChangeTypeTest {
 
         val fixed = b.refactor().visit(changeType).fix().fixed
 
-        assertRefactored(fixed, "import a.A2;\n\n@A2 public class B {}")
+        assertRefactored(fixed, "@a.A2 public class B {}")
     }
 
     @Test
@@ -98,7 +96,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                A2[] a = new A2[0];
             }
@@ -122,7 +119,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B extends A2 implements I2 {}
         """)
     }
@@ -140,7 +136,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                public A2 foo() throws A2 { return null; }
             }
@@ -164,7 +159,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                public <T extends A2> T generic(T n, List<? super A2> in);
                public void test() {
@@ -191,7 +185,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                public void test() {
                    try {}
@@ -214,7 +207,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                A2 f1, f2;
             }
@@ -234,7 +226,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                A2 a = new A2();
             }
@@ -254,7 +245,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                Map<A2, A2> m;
             }
@@ -274,7 +264,6 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                A2 a = (A2) null;
             }
@@ -293,7 +282,6 @@ interface ChangeTypeTest {
         val fixed = a.refactor().visit(changeType).fix().fixed
         assertRefactored(fixed, """
             import a.A2;
-            
             public class A {
                 Class<?> clazz = A2.class;
             }
@@ -317,11 +305,33 @@ interface ChangeTypeTest {
 
         assertRefactored(fixed, """
             import a.A2;
-            
             public class B {
                A2 a = null;
                public void test() { a.foo(); }
             }
         """)
     }
+
+    @Test
+    fun staticImport(jp: JavaParser) {
+        val b = jp.parse("""
+            import static a.A1.stat;
+            public class B {
+                public void test() {
+                    stat();
+                }
+            }
+        """.trimIndent(), a1, a2)
+
+        val fixed = b.refactor().visit(changeType).fix().fixed
+        assertRefactored(fixed, """
+            import static a.A2.stat;
+            public class B {
+                public void test() {
+                    stat();
+                }
+            }
+        """.trimIndent())
+    }
+
 }

@@ -37,7 +37,7 @@ interface FindTypeTest {
             public class B extends A1 {}
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
@@ -62,7 +62,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(3, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -74,7 +74,7 @@ interface FindTypeTest {
             public class B extends A1 implements I1 {}
         """, a1, i1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(1, b.findType("a.A1").size)
         assertEquals(1, b.findType("I1").size)
     }
 
@@ -87,7 +87,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(3, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -104,7 +104,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(5, b.findType("a.A1").size)
+        assertEquals(4, b.findType("a.A1").size)
     }
 
     @Test
@@ -119,7 +119,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
@@ -131,7 +131,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(2, b.findType("a.A1").size)
+        assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
@@ -143,7 +143,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(3, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -155,7 +155,7 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(3, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 
     @Test
@@ -167,6 +167,6 @@ interface FindTypeTest {
             }
         """, a1)
 
-        assertEquals(3, b.findType("a.A1").size)
+        assertEquals(2, b.findType("a.A1").size)
     }
 }

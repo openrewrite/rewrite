@@ -1368,6 +1368,26 @@ public interface J extends Serializable, Tree {
             }
             return null;
         }
+
+        public boolean isFullyQualifiedClassReference(String className) {
+            return isFullyQualifiedClassReference(this, className);
+        }
+
+        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
+            if (!className.contains(".")) {
+                return false;
+            }
+            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+                return false;
+            }
+            if (fieldAccess.getTarget() instanceof J.FieldAccess) {
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+            }
+            if (fieldAccess.getTarget() instanceof J.Ident) {
+                return ((J.Ident) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+            }
+            return false;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

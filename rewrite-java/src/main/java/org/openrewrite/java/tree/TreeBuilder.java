@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -54,6 +55,11 @@ public class TreeBuilder {
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
     public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
+        return buildName(fullyQualifiedName, fmt, randomId());
+    }
+
+    @SuppressWarnings("ResultOfMethodCallIgnored")
+    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt, UUID id) {
         String[] parts = fullyQualifiedName.split("\\.");
 
         String fullName = "";
@@ -73,7 +79,8 @@ public class TreeBuilder {
                 whitespaceSuffix.matches();
                 Formatting partFmt = i == parts.length - 1 ? Formatting.EMPTY : format("", whitespaceSuffix.group(1));
 
-                expr = new J.FieldAccess(randomId(),
+                expr = new J.FieldAccess(
+                        i == parts.length - 1 ? id : randomId(),
                         expr,
                         J.Ident.build(randomId(), part.trim(), null, identFmt),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?

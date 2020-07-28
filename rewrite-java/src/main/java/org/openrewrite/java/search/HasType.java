@@ -31,6 +31,7 @@ public class HasType extends JavaSourceVisitor<Boolean> {
 
     public HasType(String clazz) {
         this.clazz = clazz;
+        setCursoringOn();
     }
 
     @Override
@@ -46,7 +47,8 @@ public class HasType extends JavaSourceVisitor<Boolean> {
     @Override
     public Boolean visitTypeName(NameTree name) {
         JavaType.Class asClass = TypeUtils.asClass(name.getType());
-        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
+        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
+                getCursor().firstEnclosing(J.Import.class) == null) {
             return true;
         }
         return super.visitTypeName(name);

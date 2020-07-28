@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
@@ -35,6 +36,7 @@ public class FindType extends JavaSourceVisitor<Set<NameTree>> {
 
     public FindType(String clazz) {
         this.clazz = clazz;
+        setCursoringOn();
     }
 
     @Override
@@ -56,7 +58,8 @@ public class FindType extends JavaSourceVisitor<Set<NameTree>> {
     @Override
     public Set<NameTree> visitTypeName(NameTree name) {
         JavaType.Class asClass = TypeUtils.asClass(name.getType());
-        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz)) {
+        if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
+                getCursor().firstEnclosing(J.Import.class) == null) {
             Set<NameTree> names = defaultTo(name);
             names.add(name);
             return names;

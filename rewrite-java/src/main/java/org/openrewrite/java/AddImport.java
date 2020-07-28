@@ -21,6 +21,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.search.HasType;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
@@ -74,7 +75,11 @@ public class AddImport extends JavaRefactorVisitor {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
-        boolean hasReferences = new HasType(type).visit(cu);
+        // note that using anyMatch here would return true for an empty list returned by FindType!
+        @SuppressWarnings("SimplifyStreamApiCallChains") boolean hasReferences = new FindType(type).visit(cu).stream()
+                .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))
+                .findAny()
+                .isPresent();
 
         if (onlyIfReferenced && !hasReferences) {
             return cu;

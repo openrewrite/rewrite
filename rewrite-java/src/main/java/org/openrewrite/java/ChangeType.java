@@ -95,11 +95,11 @@ public class ChangeType extends JavaRefactorVisitor {
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
 
-        if(c.getExtends() != null) {
+        if (c.getExtends() != null) {
             c = c.withExtends(c.getExtends().withFrom(transformName(c.getExtends().getFrom())));
         }
 
-        if(c.getImplements() != null) {
+        if (c.getImplements() != null) {
             c = c.withImplements(c.getImplements().withFrom(transformNames(c.getImplements().getFrom())));
         }
 
@@ -109,7 +109,25 @@ public class ChangeType extends JavaRefactorVisitor {
     @Override
     public J visitFieldAccess(J.FieldAccess fieldAccess) {
         J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
-        return f.withTarget(transformName(f.getTarget()));
+        if (f.isFullyQualifiedClassReference(type)) {
+            return TreeBuilder.buildName(targetType.getFullyQualifiedName(), f.getFormatting(), f.getId());
+        }
+        return f;
+    }
+
+    @Override
+    public J visitIdentifier(J.Ident ident) {
+        // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
+        // Then transform it, otherwise leave it alone
+        J.Ident i = refactor(ident, super::visitIdentifier);
+        JavaType.Class originalType = JavaType.Class.build(type);
+
+        if (TypeUtils.isOfClassType(i.getType(), type) && i.getSimpleName().equals(originalType.getClassName())) {
+            i = i.withName(targetType.getClassName());
+            i = i.withType(targetType);
+        }
+
+        return i;
     }
 
     @Override
@@ -117,7 +135,7 @@ public class ChangeType extends JavaRefactorVisitor {
         J.MethodDecl m = refactor(method, super::visitMethod);
         m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
         return m.withThrows(m.getThrows() == null ? null :
-                        m.getThrows().withExceptions(transformNames(m.getThrows().getExceptions())));
+                m.getThrows().withExceptions(transformNames(m.getThrows().getExceptions())));
     }
 
     @Override
