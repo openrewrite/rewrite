@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface MethodMatcherTest {
@@ -101,5 +102,23 @@ interface MethodMatcherTest {
     @Test
     fun matchesArrayArguments(jp: JavaParser) {
         assertTrue(argRegex("A foo(String[])").matches("java.lang.String[]"))
+    }
+
+    @Test
+    fun matchesConstructorUsage(jp: JavaParser) {
+        val cu = jp.parse("""
+            package a;
+
+            class A { 
+                {
+                    A a = new A(); 
+                }
+            }
+        """.trimIndent())
+
+        assertTrue(MethodMatcher("a.A A()").matches(
+                ((cu.classes.first().body.statements.first() as J.Block<*>)
+                        .statements
+                        .first() as J.VariableDecls).vars.first().initializer as J.NewClass))
     }
 }

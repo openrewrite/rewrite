@@ -25,6 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -32,6 +33,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.joining;
@@ -96,6 +98,26 @@ public class MethodMatcher {
         return matchesTargetType(method.getType().getDeclaringType()) &&
                 methodNamePattern.matcher(method.getSimpleName()).matches() &&
                 argumentPattern.matcher(resolvedSignaturePattern).matches();
+    }
+
+    public boolean matches(J.NewClass constructor) {
+        if (constructor.getType() == null) {
+            return false;
+        }
+        String signaturePattern = Optional.ofNullable(constructor.getArgs())
+                .map(args ->
+                        args.getArgs().stream()
+                                .map(Expression::getType)
+                                .map(this::typePattern)
+                                .filter(Objects::nonNull)
+                                .collect(joining(","))
+                ).orElse("");
+
+        JavaType.Class type = TypeUtils.asClass(constructor.getType());
+        assert type != null;
+        return matchesTargetType(type) &&
+                methodNamePattern.matcher(type.getClassName()).matches() &&
+                argumentPattern.matcher(signaturePattern).matches();
     }
 
     boolean matchesTargetType(@Nullable JavaType.FullyQualified type) {
