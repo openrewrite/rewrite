@@ -39,7 +39,7 @@ interface NewClassTest {
             }
         """
         
-        val b = jp.parse(c, a).classes[0].fields[0].vars[0]
+        val b = jp.parse(c, a)[0].classes[0].fields[0].vars[0]
         assertEquals("a.A.B", b.type.asClass()?.fullyQualifiedName)
     }
 
@@ -52,7 +52,7 @@ interface NewClassTest {
             }
         """
 
-        val cu = jp.parse(c, a)
+        val cu = jp.parse(c, a)[0]
         val b = cu.classes[0].fields[0].vars[0]
         assertEquals("a.A.B", b.type.asClass()?.fullyQualifiedName)
         assertEquals("A.B", (b.initializer as J.NewClass).clazz?.printTrimmed())
@@ -65,7 +65,7 @@ interface NewClassTest {
             public class A {
                 Object l = new ArrayList<String>(0);
             }
-        """)
+        """)[0]
 
         val newClass = a.classes[0].fields[0].vars[0].initializer as J.NewClass
         assertEquals(1, newClass.args?.args?.size)
@@ -78,7 +78,7 @@ interface NewClassTest {
             public class A {
                 Object l = new ArrayList< String > ( 0 ) { };
             }
-        """)
+        """)[0]
 
         val newClass = a.classes[0].fields[0].vars[0].initializer as J.NewClass
         assertEquals("new ArrayList< String > ( 0 ) { }", newClass.printTrimmed())
@@ -91,7 +91,7 @@ interface NewClassTest {
             public class A {
                 List<String> l = new ArrayList < > ();
             }
-        """)
+        """)[0]
 
         val newClass = a.classes[0].fields[0].vars[0].initializer as J.NewClass
         assertEquals("new ArrayList < > ()", newClass.printTrimmed())

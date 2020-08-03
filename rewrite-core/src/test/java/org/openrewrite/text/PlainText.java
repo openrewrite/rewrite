@@ -46,10 +46,6 @@ public class PlainText implements SourceFile, Tree {
         return styles;
     }
 
-    public Refactor<PlainText> refactor() {
-        return new Refactor<>(this);
-    }
-
     @Override
     public String getSourcePath() {
         return null;

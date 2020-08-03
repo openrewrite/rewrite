@@ -36,7 +36,7 @@ interface IfTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val iff = a.firstMethodStatement() as J.If
 
@@ -68,7 +68,7 @@ interface IfTest {
                     if(n == 0) {} 
                 }
             }
-        """)
+        """)[0]
         
         val iff = a.firstMethodStatement() as J.If
         assertNull(iff.elsePart)
@@ -85,7 +85,7 @@ interface IfTest {
                     else test();
                 }
             }
-        """)
+        """)[0]
 
         assertEquals("""
             public void test() {

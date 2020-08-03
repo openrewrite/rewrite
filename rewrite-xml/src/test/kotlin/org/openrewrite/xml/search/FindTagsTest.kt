@@ -16,8 +16,6 @@
 package org.openrewrite.xml.search
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.XmlParser
 import org.openrewrite.xml.tree.Xml
@@ -31,7 +29,7 @@ class FindTagsTest : XmlParser() {
                     <dependency/>
                 </dependency>
             </project>
-        """.trimIndent())
+        """.trimIndent())[0]
 
     private val deep = parse("""
             <?xml version="1.0" encoding="UTF-8"?>
@@ -43,7 +41,7 @@ class FindTagsTest : XmlParser() {
                     </dependency>
                 </dependencyManagement>
             </project>
-        """.trimIndent())
+        """.trimIndent())[0]
 
     @Test
     fun findAbsolute() {

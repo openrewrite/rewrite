@@ -27,7 +27,7 @@ interface ImportTest {
         val a = jp.parse("""
             import java.util.List;
             public class A {}
-        """)
+        """)[0]
 
         assertTrue(a.imports.first().isFromType("java.util.List"))
     }
@@ -37,7 +37,7 @@ interface ImportTest {
         val a = jp.parse("""
             import java.util.*;
             public class A {}
-        """)
+        """)[0]
 
         assertTrue(a.imports.first().isFromType("java.util.List"))
     }
@@ -58,7 +58,7 @@ interface ImportTest {
             }
         """
 
-        val cu = jp.parse(c, a)
+        val cu = jp.parse(c, a)[0]
         val import = cu.imports.first()
         assertTrue(import.isFromType("a.A.B"))
         assertTrue(import.isFromType("a.A"))
@@ -70,7 +70,7 @@ interface ImportTest {
             import java.util.List;
             import static java.util.Collections.*;
             public class A {}
-        """)
+        """)[0]
         
         assertEquals("import java.util.List", a.imports[0].printTrimmed())
         assertEquals("import static java.util.Collections.*", a.imports[1].printTrimmed())
@@ -81,7 +81,7 @@ interface ImportTest {
         val a = jp.parse("""
             import b.B;
             import c.c.C;
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val (b, c) = a.imports
 
@@ -94,7 +94,7 @@ interface ImportTest {
         val a = jp.parse("""
             import org.springframework.context.annotation.Bean;
             import org.springframework.context.annotation.Configuration;
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val (b, c) = a.imports
 

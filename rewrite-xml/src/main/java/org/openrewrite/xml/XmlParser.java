@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.XmlParserVisitor;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
@@ -33,37 +34,39 @@ import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 
-public class XmlParser {
-    public Xml.Document parse(String source) {
-        return parseFromString(Paths.get("unknown.xml"), source);
-    }
-
+public class XmlParser implements Parser<Xml.Document> {
+    @Override
     public List<Xml.Document> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream().map(source -> parse(source, relativeTo)).collect(toList());
+        return sourceFiles.stream()
+                .map(sourceFile -> {
+                    try {
+                        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                                CharStreams.fromPath(sourceFile))));
+
+                        return new XmlParserVisitor(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile),
+                                new String(Files.readAllBytes(sourceFile), StandardCharsets.UTF_8)).visitDocument(parser.document());
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                })
+                .collect(toList());
     }
 
-    public Xml.Document parse(Path sourceFile, @Nullable Path relativeTo) {
-        try {
-            XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                    CharStreams.fromPath(sourceFile))));
-
-            return new XmlParserVisitor(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile),
-                    new String(Files.readAllBytes(sourceFile), StandardCharsets.UTF_8)).visitDocument(parser.document());
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @Override
+    public List<Xml.Document> parse(List<String> xmlSources) {
+        return xmlSources.stream()
+                .map(xmlSource -> {
+                    XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
+                            CharStreams.fromString(xmlSource))));
+                    return new XmlParserVisitor(Paths.get("unknown.xml"), xmlSource)
+                            .visitDocument(parser.document());
+                })
+                .collect(toList());
     }
 
-    public Xml.Document parseFromString(Path sourceFileLocation, String xmlSource) {
+    public Xml.Tag parseTag(String tag) {
         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                CharStreams.fromString(xmlSource))));
-
-        return new XmlParserVisitor(sourceFileLocation, xmlSource).visitDocument(parser.document());
-    }
-
-    public Xml.Tag parseTag(String snippet) {
-        XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                CharStreams.fromString(snippet))));
-        return (Xml.Tag) new XmlParserVisitor(null, snippet).visitContent(parser.content());
+                CharStreams.fromString(tag))));
+        return (Xml.Tag) new XmlParserVisitor(null, tag).visitContent(parser.content());
     }
 }

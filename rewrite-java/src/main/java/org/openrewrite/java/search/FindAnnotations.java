@@ -19,7 +19,7 @@ import lombok.Data;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.tree.J;
@@ -32,7 +32,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public class FindAnnotations extends JavaSourceVisitor<List<J.Annotation>> {
+public class FindAnnotations extends AbstractJavaSourceVisitor<List<J.Annotation>> {
     private final AnnotationMatcher matcher;
 
     public FindAnnotations(String signature) {
@@ -91,13 +91,13 @@ public class FindAnnotations extends JavaSourceVisitor<List<J.Annotation>> {
                 return true;
             }
 
-            return annotation.getArgs() == null ? true : annotation.getArgs().getArgs().stream()
+            return annotation.getArgs() == null || annotation.getArgs().getArgs().stream()
                     .findAny()
                     .map(arg -> {
-                        if(arg instanceof J.Assign) {
+                        if (arg instanceof J.Assign) {
                             return ((J.Assign) arg).getAssignment().printTrimmed().equals(match.elementValue().getText());
                         }
-                        if(arg instanceof J.Literal) {
+                        if (arg instanceof J.Literal) {
                             return ((J.Literal) arg).getValueSource().equals(match.elementValue().getText());
                         }
                         return false;

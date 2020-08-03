@@ -28,7 +28,7 @@ interface UnaryTest {
             public class A {
                 boolean b = !(1 == 2);
             }
-        """)
+        """)[0]
 
         val unary = a.classes[0].fields[0].vars[0].initializer as J.Unary
         assertTrue(unary.operator is J.Unary.Operator.Not)
@@ -43,7 +43,7 @@ interface UnaryTest {
                 int j = ++i;
                 int k = i ++;
             }
-        """)
+        """)[0]
 
         val (prefix, postfix) = a.classes[0].fields.subList(1, 3)
         assertEquals("int j = ++i", prefix.printTrimmed())

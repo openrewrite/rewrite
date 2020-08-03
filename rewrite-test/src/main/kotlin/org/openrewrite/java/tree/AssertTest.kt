@@ -29,7 +29,7 @@ interface AssertTest {
                     assert 1 == 1;
                 }
             }
-        """)
+        """)[0]
 
         assertEquals("assert 1 == 1", a.classes[0].methods[0].body!!.statements[0].printTrimmed())
     }

@@ -15,11 +15,10 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
-import java.nio.file.Path
 import java.nio.file.Paths
 
 interface CompilationUnitTest {
@@ -28,12 +27,12 @@ interface CompilationUnitTest {
     fun newClass(jp: JavaParser) {
         val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
 
-        assertRefactored(a, """
+        assertThat(a.printTrimmed()).isEqualTo("""
             package my.org;
             
             public class MyClass {
             }
-        """)
+        """.trimIndent())
     }
 
     @Test
@@ -42,7 +41,7 @@ interface CompilationUnitTest {
             import java.util.List;
             import java.io.*;
             public class A {}
-        """)
+        """)[0]
 
         assertEquals(2, a.imports.size)
     }
@@ -52,7 +51,7 @@ interface CompilationUnitTest {
         val a = jp.parse("""
             public class A {}
             class B{}
-        """)
+        """)[0]
 
         assertEquals(2, a.classes.size)
     }
@@ -67,6 +66,6 @@ interface CompilationUnitTest {
             public class A { }
         """
         
-        assertEquals(a.trimIndent(), jp.parse(a).printTrimmed())
+        assertEquals(a.trimIndent(), jp.parse(a)[0].printTrimmed())
     }
 }

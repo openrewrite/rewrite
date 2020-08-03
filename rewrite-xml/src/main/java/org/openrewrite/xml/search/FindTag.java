@@ -16,11 +16,12 @@
 package org.openrewrite.xml.search;
 
 import org.openrewrite.Tree;
+import org.openrewrite.xml.AbstractXmlSourceVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class FindTag extends XmlSourceVisitor<Xml.Tag> {
+public class FindTag extends AbstractXmlSourceVisitor<Xml.Tag> {
     private final XPathMatcher xPathMatcher;
 
     public FindTag(String xpath) {

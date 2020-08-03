@@ -19,7 +19,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -30,7 +30,7 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 
-public class FindInheritedFields extends JavaSourceVisitor<List<JavaType.Var>> {
+public class FindInheritedFields extends AbstractJavaSourceVisitor<List<JavaType.Var>> {
     private final String fullyQualifiedClassName;
 
     public FindInheritedFields(String fullyQualifiedClassName) {

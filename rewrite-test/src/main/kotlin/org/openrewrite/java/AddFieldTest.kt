@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
+import org.openrewrite.whenParsedBy
 import java.util.Collections.singletonList
 
 interface AddFieldTest {
@@ -28,69 +29,60 @@ interface AddFieldTest {
 
     @Test
     fun addFieldDefaultIndent(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             class A {
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()"))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            
-            class A {
-                private List list = new ArrayList<>();
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> AddField.Scoped(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()") }
+                .isRefactoredTo("""
+                    import java.util.List;
+                    
+                    class A {
+                        private List list = new ArrayList<>();
+                    }
+                """)
     }
 
     @Test
     fun addFieldMatchSpaces(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             
             class A {
               List l;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", null))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            
-            class A {
-              private List list;
-              List l;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> AddField.Scoped(a.classes[0], private, "java.util.List", "list", null) }
+                .isRefactoredTo("""
+                    import java.util.List;
+                    
+                    class A {
+                      private List list;
+                      List l;
+                    }
+                """)
     }
 
     @Test
     fun addFieldMatchTabs(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             
             class A {
                        List l;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(AddField.Scoped(a.classes[0], private, "java.util.List", "list", null))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            
-            class A {
-                       private List list;
-                       List l;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> AddField.Scoped(a.classes[0], private, "java.util.List", "list", null) }
+                .isRefactoredTo("""
+                    import java.util.List;
+                    
+                    class A {
+                               private List list;
+                               List l;
+                    }
+                """)
     }
 }

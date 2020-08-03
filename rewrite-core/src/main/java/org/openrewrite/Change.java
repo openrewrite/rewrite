@@ -35,18 +35,25 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-public class Change<T extends Tree> {
+public class Change {
+    /**
+     * Possible {@code null} if a new file is being created.
+     */
     @Getter
     @Nullable
-    private final T original;
+    private final SourceFile original;
 
+    /**
+     * Possibly {@code null} if the change results in the file being deleted.
+     */
     @Getter
-    private final T fixed;
+    @Nullable
+    private final SourceFile fixed;
 
     @Getter
     private final Set<String> rulesThatMadeChanges;
 
-    public Change(@Nullable T original, T fixed, Set<String> rulesThatMadeChanges) {
+    public Change(@Nullable SourceFile original, @Nullable SourceFile fixed, Set<String> rulesThatMadeChanges) {
         this.original = original;
         this.fixed = fixed;
         this.rulesThatMadeChanges = rulesThatMadeChanges;
@@ -64,12 +71,19 @@ public class Change<T extends Tree> {
      * @return Git-style patch diff representing the changes to this compilation unit
      */
     public String diff(@Nullable Path relativeTo) {
+        // FIXME fix source path when deleting files
         Path sourcePath = fixed instanceof SourceFile ?
                 Paths.get(((SourceFile) fixed).getSourcePath()) :
                 (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + fixed.getId());
 
         return new InMemoryDiffEntry(sourcePath, relativeTo,
                 original == null ? "" : original.print(), fixed.print(), rulesThatMadeChanges).getDiff();
+    }
+
+    public Class<? extends Tree> getTreeType() {
+        return original == null ?
+                (fixed == null ? null : fixed.getClass()) :
+                original.getClass();
     }
 
     static class InMemoryDiffEntry extends DiffEntry {

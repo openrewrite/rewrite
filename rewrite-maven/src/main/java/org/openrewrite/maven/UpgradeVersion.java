@@ -78,7 +78,7 @@ public class UpgradeVersion extends MavenRefactorVisitor {
     public Maven visitDependency(Maven.Dependency dependency) {
         Maven.Dependency d = refactor(dependency, super::visitDependency);
 
-        if (d.getGroupId().equals(groupId) && (artifactId == null || d.getArtifactId().equals(artifactId))) {
+        if (groupId.equals(d.getGroupId()) && (artifactId == null || artifactId.equals(d.getArtifactId()))) {
             Optional<String> newerVersion = d.getModel().getModuleVersion().getNewerVersions().stream()
                     .filter(v -> versionComparator.isValid(v))
                     .filter(v -> LatestRelease.INSTANCE.compare(dependency.getModel().getModuleVersion().getVersion(), v) < 0)

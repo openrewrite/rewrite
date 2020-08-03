@@ -35,7 +35,7 @@ interface FindReferencesToVariableTest {
                     this.n = 1;
                 }
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val n = (a.classes[0]!!.methods[0]!!.body!!.statements[0] as J.VariableDecls).vars[0]
         val refs = FindReferencesToVariable(n.name).visit(a.classes[0])

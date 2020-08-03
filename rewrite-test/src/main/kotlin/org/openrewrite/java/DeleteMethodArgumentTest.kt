@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
+import org.openrewrite.whenParsedBy
 
 interface DeleteMethodArgumentTest {
     companion object {
@@ -33,62 +34,65 @@ interface DeleteMethodArgumentTest {
 
     @Test
     fun deleteMiddleArgumentDeclarative(jp: JavaParser) {
-        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
-        val fixed = a.refactor()
-                .visit(DeleteMethodArgument().apply { setMethod("B foo(..)"); setIndex(1) })
-                .fix().fixed
-        assertRefactored(fixed, "public class A {{ B.foo(0, 2); }}")
+        "public class A {{ B.foo(0, 1, 2); }}"
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedBy(DeleteMethodArgument().apply { setMethod("B foo(..)"); setIndex(1) })
+                .isRefactoredTo("public class A {{ B.foo(0, 2); }}")
     }
 
     @Test
     fun deleteMiddleArgument(jp: JavaParser) {
-        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
-        val fixed = a.refactor()
-                .visit(DeleteMethodArgument().apply {
+        "public class A {{ B.foo(0, 1, 2); }}"
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedBy(DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
                 })
-                .fix().fixed
-        assertRefactored(fixed, "public class A {{ B.foo(0, 2); }}")
+                .isRefactoredTo("public class A {{ B.foo(0, 2); }}")
     }
 
     @Test
     fun deleteArgumentsConsecutively(jp: JavaParser) {
-        val a = jp.parse("public class A {{ B.foo(0, 1, 2); }}", b)
-        val fixed = a.refactor()
-                .visit(DeleteMethodArgument().apply {
+        "public class A {{ B.foo(0, 1, 2); }}"
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedBy(DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
                 })
-                .visit(DeleteMethodArgument().apply {
+                .whenVisitedBy(DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
                 })
-                .fix().fixed
-        assertRefactored(fixed, "public class A {{ B.foo(0); }}")
+                .isRefactoredTo("public class A {{ B.foo(0); }}")
     }
 
     @Test
     fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) {
-        val a = jp.parse("public class A {{ B.foo( ); }}", b)
-        val fixed = a.refactor()
-                .visit(DeleteMethodArgument().apply {
+        "public class A {{ B.foo( ); }}"
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedBy(DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(0)
                 })
-                .fix().fixed
-        assertRefactored(fixed, "public class A {{ B.foo( ); }}")
+                .isUnchanged()
     }
 
     @Test
     fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) {
-        val a = jp.parse("public class A {{ B.foo( ); }}", b)
-        val fixed = a.refactor()
-                .visit(DeleteMethodArgument().apply {
+        val fixed = "public class A {{ B.foo(1); }}"
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedBy(DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(0)
                 })
-                .fix().fixed
+                .isRefactoredTo("public class A {{ B.foo(); }}")
+                .fixed()[0]
+
         assertTrue(fixed.findMethodCalls("B foo(..)").first().args.args[0] is J.Empty)
     }
 }

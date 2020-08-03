@@ -28,7 +28,7 @@ interface MethodDeclTest {
             public class A {
                 public A() { }
             }
-        """)
+        """)[0]
 
         assertNull(a.classes[0].methods[0].returnTypeExpr)
     }
@@ -41,7 +41,7 @@ interface MethodDeclTest {
                     return null;
                 }
             }
-        """)
+        """)[0]
         
         val meth = a.classes[0].methods[0]
         assertEquals("foo", meth.simpleName)
@@ -60,7 +60,7 @@ interface MethodDeclTest {
             }
         """.trimIndent()
 
-        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc)[0].printTrimmed())
     }
     
     @Test
@@ -69,7 +69,7 @@ interface MethodDeclTest {
             public class A {
                 public < P > P foo(P p, String s, String ... args)  throws Exception { return p; }
             }
-        """)
+        """)[0]
 
         val meth = a.classes[0].methods[0]
         assertEquals("public < P > P foo(P p, String s, String ... args)  throws Exception { return p; }", meth.printTrimmed())
@@ -81,7 +81,7 @@ interface MethodDeclTest {
             public interface A {
                 default int foo() { return 0; }
             }
-        """)
+        """)[0]
 
         val meth = a.classes[0].methods[0]
         assertEquals("default int foo() { return 0; }", meth.printTrimmed())
@@ -94,7 +94,7 @@ interface MethodDeclTest {
             public class A {
                 public A() { }
             }
-        """)
+        """)[0]
 
         val meth = a.classes[0].methods[0]
         assertEquals("public A() { }", meth.printTrimmed())
@@ -106,7 +106,7 @@ interface MethodDeclTest {
             public class A {
                 public native void foo();
             }
-        """)
+        """)[0]
 
         val meth = a.classes[0].methods[0]
         assertEquals("public native void foo()", meth.printTrimmed())

@@ -32,7 +32,7 @@ interface AssignTest {
                     s = "foo";
                 }
             }
-        """)
+        """)[0]
         
         val assign = a.firstMethodStatement() as J.Assign
         assertEquals("s", (assign.variable as J.Ident).simpleName)
@@ -44,7 +44,7 @@ interface AssignTest {
         val a = jp.parse("""
             @SuppressWarnings(value = "ALL")
             public class A {}
-        """)
+        """)[0]
         
         val assign = a.classes[0].annotations[0].args!!.args[0] as J.Assign
         

@@ -74,10 +74,6 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
-        public Refactor<Document> refactor() {
-            return new Refactor<>(this);
-        }
-
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitDocument(this);

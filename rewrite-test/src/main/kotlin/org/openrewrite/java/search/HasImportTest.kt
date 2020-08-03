@@ -27,7 +27,7 @@ interface HasImportTest {
         val a = jp.parse("""
             import java.util.List;
             class A {}
-        """)
+        """)[0]
         
         assertTrue(a.hasImport("java.util.List"))
         assertFalse(a.hasImport("java.util.Set"))
@@ -38,7 +38,7 @@ interface HasImportTest {
         val a = jp.parse("""
             import java.util.*;
             class A {}
-        """)
+        """)[0]
 
         assertTrue(a.hasImport("java.util.List"))
     }
@@ -59,7 +59,7 @@ interface HasImportTest {
             }
         """
 
-        assertTrue(jp.parse(c, a).hasImport("a.A.B"))
-        assertTrue(jp.parse(c, a).hasImport("a.A"))
+        assertTrue(jp.parse(c, a)[0].hasImport("a.A.B"))
+        assertTrue(jp.parse(c, a)[0].hasImport("a.A"))
     }
 }

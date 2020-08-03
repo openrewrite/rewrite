@@ -30,7 +30,7 @@ class MavenTagInsertionComparatorTest {
                 <groupId>com.group</group>
                 <version>1</version>
             </project>
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val existing = a.root.content.map(Xml.Tag::class.java::cast)
 

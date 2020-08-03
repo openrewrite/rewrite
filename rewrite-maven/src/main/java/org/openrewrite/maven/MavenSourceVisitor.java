@@ -18,36 +18,11 @@ package org.openrewrite.maven;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.maven.tree.Maven;
 
-public abstract class MavenSourceVisitor<R> extends SourceVisitor<R> {
-    public R visitPom(Maven.Pom pom) {
-        return reduce(
-                defaultTo(pom),
-                reduce(
-                        reduce(
-                                visit(pom.getDependencyManagement()),
-                                visit(pom.getDependencies())
-                        ),
-                        visit(pom.getProperties())
-                )
-        );
-    }
+public interface MavenSourceVisitor<R> extends SourceVisitor<R> {
 
-    public R visitParent(Maven.Parent parent) {
-        return defaultTo(parent);
-    }
-
-    public R visitDependency(Maven.Dependency dependency) {
-        return defaultTo(dependency);
-    }
-
-    public R visitDependencyManagement(Maven.DependencyManagement dependencyManagement) {
-        return reduce(
-                defaultTo(dependencyManagement),
-                visit(dependencyManagement.getDependencies())
-        );
-    }
-
-    public R visitProperty(Maven.Property property) {
-        return defaultTo(property);
-    }
+    R visitPom(Maven.Pom pom);
+    R visitParent(Maven.Parent parent);
+    R visitDependency(Maven.Dependency dependency);
+    R visitDependencyManagement(Maven.DependencyManagement dependencyManagement);
+    R visitProperty(Maven.Property property);
 }

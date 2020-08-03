@@ -1131,10 +1131,6 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
-        public Refactor<CompilationUnit> refactor() {
-            return new Refactor<>(this);
-        }
-
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
             String sourcePath = sourceSet
                     .resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator")))

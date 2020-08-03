@@ -34,7 +34,7 @@ interface SwitchTest {
                     }
                 }
             }
-        """)
+        """)[0]
         
         val switch = a.firstMethodStatement() as J.Switch
         assertTrue(switch.selector.tree is J.Ident)
@@ -56,7 +56,7 @@ interface SwitchTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val switch = a.firstMethodStatement() as J.Switch
         assertTrue(switch.selector.tree is J.Ident)
@@ -78,7 +78,7 @@ interface SwitchTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val switch = a.firstMethodStatement() as J.Switch
         assertEquals("""
@@ -97,7 +97,7 @@ interface SwitchTest {
                     switch(n) {}
                 }
             }
-        """)
+        """)[0]
 
         val switch = a.firstMethodStatement() as J.Switch
         assertTrue(switch.selector.tree is J.Ident)
@@ -122,6 +122,6 @@ interface SwitchTest {
             }
         """.trimIndent()
 
-        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc)[0].printTrimmed())
     }
 }

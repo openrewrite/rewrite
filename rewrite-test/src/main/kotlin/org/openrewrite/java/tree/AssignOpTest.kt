@@ -31,7 +31,7 @@ interface AssignOpTest {
                     n += 1;
                 }
             }
-        """)
+        """)[0]
 
         val assign = a.firstMethodStatement() as J.AssignOp
 

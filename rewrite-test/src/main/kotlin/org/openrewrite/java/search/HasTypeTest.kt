@@ -27,7 +27,7 @@ interface HasTypeTest {
             class A {
                List list;
             }
-        """)
+        """)[0]
 
         assertTrue(a.classes[0].hasType("java.util.List"))
     }
@@ -47,7 +47,7 @@ interface HasTypeTest {
                public void post() {
                }
             }
-        """, b)
+        """, b)[0]
 
         assertTrue(a.classes[0].hasType("b.MyAnnotation"))
     }
@@ -61,7 +61,7 @@ interface HasTypeTest {
                    List list = Collections.emptyList();
                }
             }
-        """)
+        """)[0]
 
         assertTrue(a.classes[0].hasType("java.util.Collections"))
     }
@@ -75,7 +75,7 @@ interface HasTypeTest {
                    List list;
                }
             }
-        """)
+        """)[0]
 
         assertTrue(a.classes[0].hasType("java.util.List"))
     }
@@ -95,7 +95,7 @@ interface HasTypeTest {
                 }
                 public static void bar() {}
             }
-        """)
+        """)[0]
 
         a.classes[0].hasType("DoesNotMatter") // doesn't throw an exception
     }

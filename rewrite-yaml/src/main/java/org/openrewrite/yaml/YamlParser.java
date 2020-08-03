@@ -39,21 +39,24 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class YamlParser {
-    public Yaml.Documents parse(String source) {
-        return parseFromInput(Paths.get("unknown.properties"), new ByteArrayInputStream(source.getBytes()));
-    }
-
+public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
+    @Override
     public List<Yaml.Documents> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream().map(source -> parse(source, relativeTo)).collect(toList());
+        return sourceFiles.stream().map(sourceFile -> {
+            try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
+                return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }).collect(toList());
     }
 
-    public Yaml.Documents parse(Path sourceFile, @Nullable Path relativeTo) {
-        try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
-            return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @Override
+    public List<Yaml.Documents> parse(List<String> sourceFiles) {
+        return sourceFiles.stream()
+            .map(sourceFile -> parseFromInput(Paths.get("unknown.properties"),
+                    new ByteArrayInputStream(sourceFile.getBytes())))
+            .collect(toList());
     }
 
     private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {

@@ -22,8 +22,6 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -37,18 +35,18 @@ public class RefactorPlan {
     private static final Logger logger = LoggerFactory.getLogger(RefactorPlan.class);
 
     private final Map<String, Profile> profilesByName;
-    private final Collection<SourceVisitor<?>> visitors;
+    private final Collection<RefactorVisitor<?>> visitors;
 
-    public RefactorPlan(Collection<Profile> profiles, Collection<SourceVisitor<?>> visitors) {
+    public RefactorPlan(Collection<Profile> profiles, Collection<RefactorVisitor<?>> visitors) {
         this.profilesByName = profiles.stream().collect(toMap(Profile::getName, identity()));
         this.visitors = visitors;
     }
 
-    public <T extends Tree, S extends SourceVisitor<T>> S configure(S visitor, String... profiles) {
+    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, String... profiles) {
         return configure(visitor, Arrays.asList(profiles));
     }
 
-    public <T extends Tree, S extends SourceVisitor<T>> S configure(S visitor, Iterable<String> profiles) {
+    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, Iterable<String> profiles) {
         List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
                 .map(profilesByName::get)
                 .filter(Objects::nonNull)
@@ -59,57 +57,19 @@ public class RefactorPlan {
         return visitor;
     }
 
-    public <T extends Tree, S extends SourceVisitor<T>> Collection<S> visitors(
-            Class<T> sourceType, String... profiles) {
-
-        return visitors(sourceType, Arrays.asList(profiles));
+    public Collection<RefactorVisitor<?>> visitors(String... profiles) {
+        return visitors(Arrays.asList(profiles));
     }
 
-    public <T extends Tree, S extends SourceVisitor<T>> Collection<S> visitors(
-            Class<T> sourceType, Iterable<String> profiles) {
+    public Collection<RefactorVisitor<?>> visitors(Iterable<String> profiles) {
         List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
                 .map(profilesByName::get)
                 .filter(Objects::nonNull)
                 .collect(toList());
 
-        //noinspection unchecked
         return visitors.stream()
-                .filter(v -> {
-                    Type genericSuperclass = v.getClass().getGenericSuperclass();
-
-                    // TODO better way to handle this?
-                    if(CompositeRefactorVisitor.class.equals(v.getClass())) {
-                        genericSuperclass = ((CompositeRefactorVisitor) v).getVisitorType()
-                                .getGenericSuperclass();
-                        while(genericSuperclass != null && !(genericSuperclass instanceof ParameterizedType)) {
-                            genericSuperclass = ((Class<?>) genericSuperclass).getGenericSuperclass();
-                        }
-                    }
-
-                    if (genericSuperclass instanceof ParameterizedType) {
-                        Type[] sourceFileType = ((ParameterizedType) genericSuperclass).getActualTypeArguments();
-                        return sourceFileType[0].equals(sourceType);
-                    }
-
-                    return true;
-                })
-                .map(v -> (S) v)
                 .map(v -> loadedProfiles.stream().reduce(v, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1))
                 .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
-                .collect(toList());
-    }
-
-    public <S extends SourceFile, G extends SourceGenerator<S>> Collection<G> generators(
-            Class<G> sourceType, String... profiles) {
-        return generators(sourceType, Arrays.asList(profiles));
-    }
-
-    @SuppressWarnings("unchecked")
-    public <S extends SourceFile, G extends SourceGenerator<S>> Collection<G> generators(
-            Class<G> sourceType, Iterable<String> profiles) {
-        return (Collection<G>) visitors((Class) sourceType, profiles).stream()
-                .filter(SourceGenerator.class::isInstance)
-                .map(SourceGenerator.class::cast)
                 .collect(toList());
     }
 
@@ -119,7 +79,7 @@ public class RefactorPlan {
 
     public static class Builder {
         private final Map<String, ProfileConfiguration> profileConfigurations = new HashMap<>();
-        private final Collection<SourceVisitor<?>> visitors = new ArrayList<>();
+        private final Collection<RefactorVisitor<?>> visitors = new ArrayList<>();
         private Iterable<Path> compileClasspath = emptyList();
 
         public Builder compileClasspath(Iterable<Path> compileClasspath) {
@@ -136,12 +96,12 @@ public class RefactorPlan {
 
         public Builder scanUserHome() {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
-            if(userHomeRewriteConfig.exists()) {
-                try(FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
+            if (userHomeRewriteConfig.exists()) {
+                try (FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
                     YamlResourceLoader resourceLoader = new YamlResourceLoader(is);
                     loadVisitors(resourceLoader);
                     loadProfiles(resourceLoader);
-                } catch(IOException e) {
+                } catch (IOException e) {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);
                 }
             }
@@ -149,21 +109,21 @@ public class RefactorPlan {
         }
 
         public Builder scanVisitors(String... acceptVisitorPackages) {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader(acceptVisitorPackages).loadVisitors());
+            visitors.addAll(new AutoConfigureRefactorVisitorLoader(acceptVisitorPackages).loadVisitors());
             return this;
         }
 
-        public Builder loadVisitors(SourceVisitorLoader sourceVisitorLoader) {
-            visitors.addAll(sourceVisitorLoader.loadVisitors());
+        public Builder loadVisitors(RefactorVisitorLoader refactorVisitorLoader) {
+            visitors.addAll(refactorVisitorLoader.loadVisitors());
             return this;
         }
 
-        public Builder loadVisitors(Collection<SourceVisitor<?>> visitors) {
+        public Builder loadVisitors(Collection<? extends RefactorVisitor<?>> visitors) {
             this.visitors.addAll(visitors);
             return this;
         }
 
-        public Builder visitor(SourceVisitor<?> visitor) {
+        public Builder visitor(RefactorVisitor<?> visitor) {
             this.visitors.add(visitor);
             return this;
         }
@@ -180,7 +140,7 @@ public class RefactorPlan {
         }
 
         public RefactorPlan build() {
-            visitors.addAll(new AutoConfigureSourceVisitorLoader("org.openrewrite").loadVisitors());
+            visitors.addAll(new AutoConfigureRefactorVisitorLoader("org.openrewrite").loadVisitors());
 
             return new RefactorPlan(profileConfigurations.values().stream()
                     .map(pc -> pc.build(profileConfigurations.values()))

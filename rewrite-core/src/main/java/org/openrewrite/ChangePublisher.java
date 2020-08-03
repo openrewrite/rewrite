@@ -21,9 +21,5 @@ import static java.util.stream.Collectors.toList;
 
 @Incubating(since = "2.0.0")
 public interface ChangePublisher {
-    void publish(Collection<Change<SourceFile>> changes);
-
-    default void refactorAndPublish(Collection<Refactor<SourceFile>> refactor) {
-        publish(refactor.stream().map(Refactor::fix).collect(toList()));
-    }
+    void publish(Collection<Change> changes);
 }

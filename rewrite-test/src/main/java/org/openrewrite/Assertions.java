@@ -1,0 +1,163 @@
+package org.openrewrite;
+
+import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
+
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.function.Function;
+
+import static java.util.stream.Collectors.toList;
+import static org.assertj.core.api.Assertions.assertThat;
+
+public class Assertions {
+    public static <S extends SourceFile> StringSourceFileAssert<S> whenParsedBy(Parser<S> parser, String source) {
+        return new StringSourceFileAssert<>(parser, source);
+    }
+
+    public static <S extends SourceFile> PathSourceFileAssert<S> whenParsedBy(Parser<S> parser, Path source) {
+        return new PathSourceFileAssert<>(parser, source);
+    }
+
+    public static class StringSourceFileAssert<S extends SourceFile> {
+        private final Parser<S> parser;
+        private final String primarySource;
+        private final List<String> sourceFiles = new ArrayList<>();
+
+        public StringSourceFileAssert(Parser<S> parser, String source) {
+            this.parser = parser;
+            this.primarySource = StringUtils.trimIndent(source);
+            this.sourceFiles.add(primarySource);
+        }
+
+        public StringSourceFileAssert<S> whichDependsOn(String... sources) {
+            for (String source : sources) {
+                sourceFiles.add(StringUtils.trimIndent(source));
+            }
+            return this;
+        }
+
+        public RefactoringAssert<S> whenVisitedBy(RefactorVisitor<?> visitor) {
+            List<S> sources = parser.parse(sourceFiles);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitor);
+        }
+
+        public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
+            List<S> sources = parser.parse(sourceFiles);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
+        }
+
+        public RefactoringAssert<S> whenVisitedByMany(Function<S, Iterable<RefactorVisitor<? super S>>> visitorFunction) {
+            List<S> sources = parser.parse(sourceFiles);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMany(visitorFunction);
+        }
+
+        private S primary(List<S> sources) {
+            return sources.stream().filter(s -> s.print().equals(primarySource)).findAny()
+                    .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
+        }
+    }
+
+    public static class PathSourceFileAssert<S extends SourceFile> {
+        private final Parser<S> parser;
+
+        private final Path primarySource;
+        private final List<Path> sourceFiles = new ArrayList<>();
+
+        @Nullable
+        private Path relativeTo;
+
+        public PathSourceFileAssert(Parser<S> parser, Path source) {
+            this.parser = parser;
+            this.primarySource = source;
+            this.sourceFiles.add(source);
+        }
+
+        public PathSourceFileAssert<S> relativeTo(@Nullable Path relativeTo) {
+            this.relativeTo = relativeTo;
+            return this;
+        }
+
+        public PathSourceFileAssert<S> whichDependsOn(Path... sources) {
+            Collections.addAll(sourceFiles, sources);
+            return this;
+        }
+
+        public RefactoringAssert<S> whenVisitedBy(RefactorVisitor<?> visitor) {
+            List<S> sources = parser.parse(sourceFiles, relativeTo);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitor);
+        }
+
+        public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
+            List<S> sources = parser.parse(sourceFiles, relativeTo);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
+        }
+
+        public RefactoringAssert<S> whenVisitedByMany(Function<S, Iterable<RefactorVisitor<? super S>>> visitorFunction) {
+            List<S> sources = parser.parse(sourceFiles, relativeTo);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMany(visitorFunction);
+        }
+
+        private S primary(List<S> sources) {
+            return sources.stream().filter(s -> s.getSourcePath().equals(primarySource.toString())).findAny()
+                    .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
+        }
+    }
+
+    public static class RefactoringAssert<S extends SourceFile> {
+        private final Refactor refactor = new Refactor();
+
+        private final S primarySource;
+        private final List<S> sources;
+
+        public RefactoringAssert(S primarySource, List<S> sources) {
+            this.primarySource = primarySource;
+            this.sources = sources;
+        }
+
+        public RefactoringAssert<S> whenVisitedBy(RefactorVisitor<?> visitor) {
+            refactor.visit(visitor);
+            return this;
+        }
+
+        public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
+            assertThat(sources).isNotEmpty();
+            return whenVisitedBy(visitorFunction.apply(sources.iterator().next()));
+        }
+
+        public RefactoringAssert<S> whenVisitedByMany(Function<S, Iterable<RefactorVisitor<? super S>>> visitorFunction) {
+            assertThat(sources).isNotEmpty();
+            visitorFunction.apply(sources.iterator().next()).forEach(refactor::visit);
+            return this;
+        }
+
+        public RefactoringAssert<S> isRefactoredTo(String expected) {
+            Collection<Change> fixes = refactor.fix(sources);
+            assertThat(fixes).isNotEmpty();
+
+            SourceFile fixed = fixes.stream().filter(f -> primarySource.equals(f.getOriginal())).findAny()
+                    .map(Change::getFixed)
+                    .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
+            assertThat(fixed).isNotNull();
+            assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
+
+            return this;
+        }
+
+        public RefactoringAssert<S> isUnchanged() {
+            assertThat(refactor.fix(sources)).isEmpty();
+            return this;
+        }
+
+        @SuppressWarnings("unchecked")
+        public List<S> fixed() {
+            return refactor.fix(sources).stream()
+                    .map(Change::getFixed)
+                    .map(s -> (S) s)
+                    .collect(toList());
+        }
+    }
+}

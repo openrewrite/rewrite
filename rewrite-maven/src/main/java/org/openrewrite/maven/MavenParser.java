@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.eclipse.aether.repository.RemoteRepository;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
@@ -30,7 +31,7 @@ import java.util.Map;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public class MavenParser {
+public class MavenParser implements Parser<Maven.Pom> {
     private final XmlParser xmlParser = new XmlParser();
     private final boolean resolveDependencies;
     private final File localRepository;
@@ -46,6 +47,7 @@ public class MavenParser {
         return new Builder();
     }
 
+    @Override
     public List<Maven.Pom> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
         Map<Path, MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
                 .load(sourceFiles);
@@ -57,8 +59,9 @@ public class MavenParser {
                 .collect(toList());
     }
 
-    public Maven.Pom parse(Path sourceFile, @Nullable Path relativeTo) {
-        return parse(singletonList(sourceFile), relativeTo).get(0);
+    @Override
+    public List<Maven.Pom> parse(List<String> sources) {
+        throw new UnsupportedOperationException("Hard to do in general because the directory structure matters");
     }
 
     public static class Builder {

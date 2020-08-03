@@ -26,14 +26,14 @@ interface ClassDeclTest {
         val a = jp.parse("""
             public class A {}
             class B {}
-        """)
+        """)[0]
 
         assertEquals(listOf("A", "B"), a.classes.map { it.simpleName }.sorted())
     }
 
     @Test
     fun modifiers(jp: JavaParser) {
-        val a = jp.parse("public class A {}")
+        val a = jp.parse("public class A {}")[0]
 
         assertTrue(a.classes[0].hasModifier("public"))
     }
@@ -45,7 +45,7 @@ interface ClassDeclTest {
             public class A {
                 List l;
             }
-        """)
+        """)[0]
 
         assertEquals(1, a.classes[0].fields.size)
     }
@@ -56,7 +56,7 @@ interface ClassDeclTest {
             public class A {
                 public void fun() {}
             }
-        """)
+        """)[0]
 
         assertEquals(1, a.classes[0].methods.size)
     }
@@ -66,7 +66,7 @@ interface ClassDeclTest {
         val b = "public interface B {}"
         val a = "public class A implements B {}"
         
-        assertEquals(1, jp.parse(a, b).classes[0].implements?.from?.size)
+        assertEquals(1, jp.parse(a, b)[0].classes[0].implements?.from?.size)
     }
 
     @Test
@@ -74,7 +74,7 @@ interface ClassDeclTest {
         val b = "public class B {}"
         val a = "public class A extends B {}"
 
-        val aClass = jp.parse(a, b).classes[0]
+        val aClass = jp.parse(a, b)[0].classes[0]
         assertNotNull(aClass.extends)
     }
 
@@ -82,20 +82,20 @@ interface ClassDeclTest {
     fun format(jp: JavaParser) {
         val b = "public class B<T> {}"
         val a = "@Deprecated public class A < T > extends B < T > {}"
-        assertEquals(a, jp.parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
+        assertEquals(a, jp.parse(a, b)[0].classes.find { it.simpleName == "A" }?.printTrimmed())
     }
 
     @Test
     fun formatInterface(jp: JavaParser) {
         val b = "public interface B {}"
         val a = "public interface A extends B {}"
-        assertEquals(a, jp.parse(a, b).classes.find { it.simpleName == "A" }?.printTrimmed())
+        assertEquals(a, jp.parse(a, b)[0].classes.find { it.simpleName == "A" }?.printTrimmed())
     }
 
     @Test
     fun formatAnnotation(jp: JavaParser) {
         val a = "public @interface Produces { }"
-        assertEquals(a, jp.parse(a).classes[0].printTrimmed())
+        assertEquals(a, jp.parse(a)[0].classes[0].printTrimmed())
     }
 
     @Test
@@ -109,7 +109,7 @@ interface ClassDeclTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSrc)
+        val a = jp.parse(aSrc)[0]
 
         assertTrue(a.classes[0].kind is J.ClassDecl.Kind.Enum)
         assertEquals("ONE(1),\nTWO(2);", a.classes[0].enumValues?.printTrimmed())
@@ -118,20 +118,20 @@ interface ClassDeclTest {
 
     @Test
     fun enumWithoutParameters(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE, TWO }")
+        val a = jp.parse("public enum A { ONE, TWO }")[0]
         assertEquals("public enum A { ONE, TWO }", a.classes[0].printTrimmed())
         assertEquals("ONE, TWO", a.classes[0].enumValues?.printTrimmed())
     }
 
     @Test
     fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE ; }")
+        val a = jp.parse("public enum A { ONE ; }")[0]
         assertEquals("{ ONE ; }", a.classes[0].body.printTrimmed())
     }
 
     @Test
     fun enumWithEmptyParameters(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE ( ), TWO ( ) }")
+        val a = jp.parse("public enum A { ONE ( ), TWO ( ) }")[0]
         assertEquals("public enum A { ONE ( ), TWO ( ) }", a.classes[0].printTrimmed())
         assertEquals("ONE ( ), TWO ( )", a.classes[0].enumValues?.printTrimmed())
     }
@@ -141,7 +141,7 @@ interface ClassDeclTest {
      */
     @Test
     fun modifierOrdering(jp: JavaParser) {
-        val a = jp.parse("public /* abstract */ final abstract class A {}")
+        val a = jp.parse("public /* abstract */ final abstract class A {}")[0]
         assertEquals("public /* abstract */ final abstract class A {}", a.printTrimmed())
     }
 
@@ -158,12 +158,12 @@ interface ClassDeclTest {
             }
         """.trimIndent()
 
-        assertEquals(aSrc, jp.parse(aSrc).printTrimmed())
+        assertEquals(aSrc, jp.parse(aSrc)[0].printTrimmed())
     }
 
     @Test
     fun strictfpClass(jp: JavaParser) {
-        val a = jp.parse("public strictfp class A {}")
+        val a = jp.parse("public strictfp class A {}")[0]
         assertEquals(a.classes[0].printTrimmed(), "public strictfp class A {}")
     }
 }

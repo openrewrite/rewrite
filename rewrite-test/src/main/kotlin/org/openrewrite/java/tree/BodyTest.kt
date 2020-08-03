@@ -30,7 +30,7 @@ interface BodyTest {
                     char c = 'c';
                 }
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         assertEquals("""
             {

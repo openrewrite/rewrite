@@ -33,7 +33,7 @@ interface TernaryTest {
                     String evenOrOdd = n % 2 == 0 ? "even" : "odd";
                 }
             }
-        """)
+        """)[0]
 
         val evenOrOdd = a.firstMethodStatement() as J.VariableDecls
         val ternary = evenOrOdd.vars[0].initializer as J.Ternary

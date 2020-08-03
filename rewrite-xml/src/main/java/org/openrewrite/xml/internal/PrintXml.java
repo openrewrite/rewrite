@@ -17,10 +17,11 @@ package org.openrewrite.xml.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.AbstractXmlSourceVisitor;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class PrintXml extends XmlSourceVisitor<String> {
+public class PrintXml extends AbstractXmlSourceVisitor<String> {
     @Override
     public String defaultTo(Tree t) {
         return "";

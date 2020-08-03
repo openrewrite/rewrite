@@ -31,7 +31,7 @@ interface ParenthesesTest {
                     int n = ( 0 );
                 }
             }
-        """)
+        """)[0]
 
         val variable by lazy { (a.firstMethodStatement() as J.VariableDecls).vars[0].initializer }
 

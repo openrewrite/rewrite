@@ -18,8 +18,8 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree
+import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
 
 interface AnnotationTest {
@@ -29,7 +29,7 @@ interface AnnotationTest {
         val a = jp.parse("""
             @SuppressWarnings("ALL")
             public class A {}
-        """)
+        """)[0]
         
         val ann = a.classes[0].annotations[0]
         
@@ -42,7 +42,7 @@ interface AnnotationTest {
         val a = jp.parse("""
             @SuppressWarnings("ALL")
             public class A {}
-        """)
+        """)[0]
         
         val ann = a.classes[0].annotations[0]
         
@@ -54,7 +54,7 @@ interface AnnotationTest {
         val a = jp.parse("""
             @Deprecated ( )
             public class A {}
-        """)
+        """)[0]
 
         val ann = a.classes[0].annotations[0]
 
@@ -67,7 +67,7 @@ interface AnnotationTest {
             public @interface A {
                 String foo() default "foo";
             }
-        """)
+        """)[0]
 
         assertEquals("""String foo() default "foo"""", a.classes[0].methods[0].printTrimmed())
     }
@@ -80,7 +80,7 @@ interface AnnotationTest {
 
             @Target({ FIELD, PARAMETER })
             public @interface Annotation {}
-        """)
+        """)[0]
 
         assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[0].printTrimmed())
     }
@@ -93,9 +93,9 @@ interface AnnotationTest {
 
             @Target({ FIELD, PARAMETER })
             public @interface Annotation {}
-        """)
+        """)[0]
 
-        assertEquals(true, object: JavaSourceVisitor<Boolean>() {
+        assertEquals(true, object: AbstractJavaSourceVisitor<Boolean>() {
             override fun defaultTo(t: Tree?): Boolean = false
 
             override fun visitTypeName(name: NameTree): Boolean = name.type.asClass()?.fullyQualifiedName == "java.lang.annotation.ElementType"

@@ -17,9 +17,8 @@ package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
 
-public class RetrieveCursor extends JavaSourceVisitor<Cursor> {
+public class RetrieveCursor extends AbstractJavaSourceVisitor<Cursor> {
     private final Tree scope;
 
     public RetrieveCursor(Tree scope) {

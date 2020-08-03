@@ -31,7 +31,7 @@ interface ThrowTest {
                     throw new UnsupportedOperationException();
                 }
             }
-        """)
+        """)[0]
 
         val thrown = a.firstMethodStatement() as J.Throw
 

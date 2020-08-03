@@ -41,7 +41,7 @@ interface EnumTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSource)
+        val a = jp.parse(aSource)[0]
 
         assertEquals(aSource, a.printTrimmed())
     }
@@ -54,7 +54,7 @@ interface EnumTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSource)
+        val a = jp.parse(aSource)[0]
 
         assertEquals(aSource, a.printTrimmed())
     }

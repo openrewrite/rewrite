@@ -17,33 +17,31 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.JavaType
+import org.openrewrite.whenParsedBy
 
 interface ChangeFieldNameTest {
 
     @Test
     fun changeFieldName(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             public class A {
                List collection = null;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(ChangeFieldName.Scoped(a.classes[0].type.asClass(), "collection", "list"))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            public class A {
-               List list = null;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> ChangeFieldName.Scoped(a.classes[0].type.asClass(), "collection", "list") }
+                .isRefactoredTo("""
+                    import java.util.List;
+                    public class A {
+                       List list = null;
+                    }
+                """)
     }
 
     @Test
     fun changeFieldNameReferences(jp: JavaParser) {
-        val b = jp.parse("""
+        """
             public class B {
                int n;
                
@@ -58,58 +56,51 @@ interface ChangeFieldNameTest {
                    return n + this.n;
                }
             }
-        """.trimIndent())
-
-        val fixed = b.refactor()
-                .visit(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            public class B {
-               int n1;
-               
-               {
-                   n1 = 1;
-                   n1 /= 2;
-                   if(n1 + 1 == 2) {}
-                   n1++;
-               }
-               
-               public int foo(int n) {
-                   return n + this.n1;
-               }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
+                .isRefactoredTo("""
+                    public class B {
+                       int n1;
+                       
+                       {
+                           n1 = 1;
+                           n1 /= 2;
+                           if(n1 + 1 == 2) {}
+                           n1++;
+                       }
+                       
+                       public int foo(int n) {
+                           return n + this.n1;
+                       }
+                    }
+                """)
     }
 
     @Test
     fun changeFieldNameReferencesInOtherClass(jp: JavaParser) {
-        val b = """
-            public class B {
-               int n;
-            }
-        """.trimIndent()
-
-        val a = jp.parse("""
+        """
             public class A {
                 B b = new B();
                 {
                     b.n = 1;
                 }
             }
-        """.trimIndent(), b)
-
-        val fixed = a.refactor()
-                .visit(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            public class A {
-                B b = new B();
-                {
-                    b.n1 = 1;
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    public class B {
+                       int n;
+                    }
+                """)
+                .whenVisitedBy(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
+                .isRefactoredTo("""
+                    public class A {
+                        B b = new B();
+                        {
+                            b.n1 = 1;
+                        }
+                    }
+                """)
     }
 }

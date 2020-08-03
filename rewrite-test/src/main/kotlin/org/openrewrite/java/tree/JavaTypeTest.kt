@@ -34,7 +34,7 @@ interface JavaTypeTest {
         val a = jp.parse("""
             public class A extends B {
             }
-        """.trimIndent(), b)
+        """.trimIndent(), b)[0]
 
         assertTrue(a.classes[0].type.asClass()!!.supertype!!.members[0].flags.contains(Flag.Protected))
     }
@@ -49,7 +49,7 @@ interface JavaTypeTest {
                 public List[] listArr;
                 public Collection[] collArr;
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val (list, collection) = a.imports.map { TypeUtils.asClass(it.qualid.type)!! }
         val (listArr, collectionArr) = a.classes[0].fields.map { TypeUtils.asClass(it.typeExpr!!.type)!! }
@@ -86,7 +86,7 @@ interface JavaTypeTest {
 
     @Test
     fun selfReferentialTypeIsShared(jp: JavaParser) {
-        val a = jp.parse("public class A { A a; }")
+        val a = jp.parse("public class A { A a; }")[0]
         val outerType = a.classes[0].type
         val fieldType = a.classes[0].fields[0].typeExpr?.type
         assertTrue(outerType === fieldType)
@@ -94,8 +94,8 @@ interface JavaTypeTest {
 
     @Test
     fun typeFlyweightsAreSharedBetweenParsers(jp: JavaParser) {
-        val a = jp.parse("public class A {}")
-        val a2 = jp.reset().parse("public class A {}")
+        val a = jp.parse("public class A {}")[0]
+        val a2 = jp.reset().parse("public class A {}")[0]
 
         val t1 = a.classes[0].type
         val t2 = a2.classes[0].type
@@ -105,8 +105,8 @@ interface JavaTypeTest {
 
     @Test
     fun sameFullyQualifiedNameWithDifferentMembers(jp: JavaParser) {
-        val a = jp.parse("public class A { String foo; }")
-        val a2 = jp.reset().parse("public class A { String bar; }")
+        val a = jp.parse("public class A { String foo; }")[0]
+        val a2 = jp.reset().parse("public class A { String bar; }")[0]
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }
@@ -116,12 +116,12 @@ interface JavaTypeTest {
         val a = jp.parse("""
             public class A extends B {}
             class B {}
-        """)
+        """)[0]
 
         val a2 = jp.parse("""
             public class A {}
             class B {}
-        """)
+        """)[0]
 
         assertTrue(a.classes[0].type !== a2.classes[0].type)
     }

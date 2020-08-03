@@ -32,7 +32,7 @@ interface CommentTest {
             // Trailing
         """.trimIndent()
 
-        val a = jp.parse(aSrc)
+        val a = jp.parse(aSrc)[0]
         assertEquals(aSrc, a.printTrimmed())
     }
 }

@@ -34,7 +34,7 @@ interface TryCatchTest {
                     }
                 }
             }
-        """)
+        """)[0]
         
         val tryable = a.firstMethodStatement() as J.Try
         assertEquals(0, tryable.catches.size)
@@ -52,7 +52,7 @@ interface TryCatchTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val tryable = a.firstMethodStatement() as J.Try
         assertEquals(1, tryable.catches.size)
@@ -71,7 +71,7 @@ interface TryCatchTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val tryable = a.firstMethodStatement() as J.Try
         assertEquals(1, tryable.resources?.decls?.size ?: -1)
@@ -87,7 +87,7 @@ interface TryCatchTest {
                     try(FileInputStream fis = new FileInputStream(f)) { }
                 }
             }
-        """)
+        """)[0]
 
         val tryable = a.firstMethodStatement() as J.Try
         assertEquals("try(FileInputStream fis = new FileInputStream(f)) { }",
@@ -105,7 +105,7 @@ interface TryCatchTest {
                     catch(FileNotFoundException | RuntimeException e) {}
                 }
             }
-        """)
+        """)[0]
 
         val multiCatch = (a.firstMethodStatement() as J.Try).catches[0].param.tree.typeExpr as J.MultiCatch
         assertEquals("FileNotFoundException | RuntimeException", multiCatch.printTrimmed())
@@ -123,7 +123,7 @@ interface TryCatchTest {
                     finally {}
                 }
             }
-        """)
+        """)[0]
 
         val tryable = a.firstMethodStatement() as J.Try
         assertEquals("try {}\ncatch(Exception e) {}\ncatch(RuntimeException e) {}\ncatch(Throwable t) {}\nfinally {}", tryable.printTrimmed())

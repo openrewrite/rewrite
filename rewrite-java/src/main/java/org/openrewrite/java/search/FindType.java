@@ -18,6 +18,7 @@ package org.openrewrite.java.search;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -31,7 +32,7 @@ import java.util.Set;
 /**
  * Find places where a type is mentioned explicitly, excluding imports.
  */
-public class FindType extends JavaSourceVisitor<Set<NameTree>> {
+public class FindType extends AbstractJavaSourceVisitor<Set<NameTree>> {
     private final String clazz;
 
     public FindType(String clazz) {

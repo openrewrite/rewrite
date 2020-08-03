@@ -15,16 +15,16 @@
  */
 package org.openrewrite.maven
 
-import assertRefactored
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.whenParsedBy
 import java.io.File
 import java.nio.file.Path
 
 class UpgradeVersionTest {
     @Test
     fun upgradeVersion(@TempDir tempDir: Path) {
-        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+        File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -44,33 +44,29 @@ class UpgradeVersionTest {
                 </project>
             """.trimIndent().trim())
         }
-
-        val pom = MavenParser.builder()
-                .build()
-                .parse(pomFile.toPath(), tempDir)
-
-        val fixed = pom.refactor().visit(UpgradeVersion().apply {
-            setGroupId("org.springframework.boot")
-            setToVersion("~1.5")
-        }).fix().fixed
-
-        assertRefactored(fixed, """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot</artifactId>
-                  <version>1.5.22.RELEASE</version>
-                  <scope>test</scope>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent())
+                .toPath()
+                .whenParsedBy(MavenParser.builder().build())
+                .whenVisitedBy(UpgradeVersion().apply {
+                    setGroupId("org.springframework.boot")
+                    setToVersion("~1.5")
+                })
+                .isRefactoredTo("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.springframework.boot</groupId>
+                          <artifactId>spring-boot</artifactId>
+                          <version>1.5.22.RELEASE</version>
+                          <scope>test</scope>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """)
     }
 }

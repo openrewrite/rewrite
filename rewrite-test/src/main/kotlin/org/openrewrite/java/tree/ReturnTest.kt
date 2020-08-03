@@ -30,7 +30,7 @@ interface ReturnTest {
                     return "";
                 }
             }
-        """)
+        """)[0]
         
         val rtn = a.firstMethodStatement() as J.Return
         assertTrue(rtn.expr is J.Literal)
@@ -44,7 +44,7 @@ interface ReturnTest {
                     return;
                 }
             }
-        """)
+        """)[0]
 
         val rtn = a.firstMethodStatement() as J.Return
         assertNull(rtn.expr)
@@ -58,7 +58,7 @@ interface ReturnTest {
                     return 0;
                 }
             }
-        """)
+        """)[0]
 
         val rtn = a.firstMethodStatement() as J.Return
         assertEquals("return 0", rtn.printTrimmed())

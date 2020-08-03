@@ -15,20 +15,24 @@
  */
 package org.openrewrite.properties;
 
-import org.openrewrite.RefactorVisitorSupport;
-import org.openrewrite.Tree;
+import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-public class PropertiesRefactorVisitor extends PropertiesSourceVisitor<Properties> implements RefactorVisitorSupport {
-    @Override
-    public Properties defaultTo(Tree t) {
-        return (Properties) t;
-    }
+public class PropertiesRefactorVisitor extends AbstractRefactorVisitor<Properties>
+        implements PropertiesSourceVisitor<Properties> {
 
     @Override
     public Properties visitFile(Properties.File file) {
-        Properties.File f = refactor(file, super::visitFile);
-        f = f.withContent(refactor(f.getContent()));
-        return f;
+        return file.withContent(refactor(file.getContent()));
+    }
+
+    @Override
+    public Properties visitEntry(Properties.Entry entry) {
+        return entry;
+    }
+
+    @Override
+    public Properties visitComment(Properties.Comment comment) {
+        return comment;
     }
 }

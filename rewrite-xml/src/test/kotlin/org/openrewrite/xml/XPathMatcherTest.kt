@@ -62,7 +62,7 @@ class XPathMatcherTest : XmlParser() {
     private fun visitor(xPath: String): XmlSourceVisitor<Boolean> {
         val matcher = XPathMatcher(xPath)
 
-        return object : XmlSourceVisitor<Boolean>() {
+        return object : AbstractXmlSourceVisitor<Boolean>() {
             init {
                 setCursoringOn()
             }

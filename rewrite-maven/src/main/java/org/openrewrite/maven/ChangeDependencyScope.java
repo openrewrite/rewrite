@@ -21,8 +21,6 @@ import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.xml.tree.Content;
 
-import java.util.stream.Collectors;
-
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.required;
 

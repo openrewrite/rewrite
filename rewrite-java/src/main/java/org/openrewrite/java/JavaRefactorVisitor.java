@@ -15,24 +15,27 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.Cursor;
-import org.openrewrite.RefactorVisitorSupport;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
 
-public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implements RefactorVisitorSupport {
+public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements JavaSourceVisitor<J> {
     protected JavaFormatter formatter;
 
     @Override
-    public J defaultTo(Tree t) {
-        return (J) t;
+    public J visitStatement(Statement statement) {
+        return statement;
+    }
+
+    @Override
+    public J visitTypeName(NameTree name) {
+        return name;
     }
 
     @Override
     public J visitAnnotatedType(J.AnnotatedType annotatedType) {
-        J.AnnotatedType a = refactor(annotatedType, super::visitExpression);
+        J.AnnotatedType a = refactor(annotatedType, this::visitExpression);
         a = a.withAnnotations(refactor(a.getAnnotations()));
         return a.withTypeExpr(refactor(a.getTypeExpr()));
     }
@@ -207,7 +210,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
 
     @Override
     public J visitIdentifier(J.Ident ident) {
-        return super.visitIdentifier(refactor(ident, this::visitExpression));
+        return refactor(ident, this::visitExpression);
     }
 
     @Override
@@ -416,7 +419,7 @@ public abstract class JavaRefactorVisitor extends JavaSourceVisitor<J> implement
     public J visitUnparsedSource(J.UnparsedSource unparsed) {
         J.UnparsedSource u = refactor(unparsed, this::visitStatement);
         u = refactor(u, this::visitExpression);
-        return super.visitUnparsedSource(u);
+        return u;
     }
 
     @Override

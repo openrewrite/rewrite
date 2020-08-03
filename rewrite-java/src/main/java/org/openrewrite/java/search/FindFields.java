@@ -18,7 +18,7 @@ package org.openrewrite.java.search;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -27,7 +27,7 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-public class FindFields extends JavaSourceVisitor<List<J.VariableDecls>> {
+public class FindFields extends AbstractJavaSourceVisitor<List<J.VariableDecls>> {
     private final String fullyQualifiedName;
 
     public FindFields(String fullyQualifiedName) {

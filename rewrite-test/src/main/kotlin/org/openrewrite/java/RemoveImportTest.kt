@@ -16,199 +16,157 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface RemoveImportTest {
 
     @Test
     fun removeNamedImport(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             class A {}
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
-
-        assertRefactored(fixed, "class A {}")
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.List") })
+                .isRefactoredTo("class A {}")
     }
 
     @Test
     fun leaveImportIfRemovedTypeIsStillReferredTo(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             class A {
                List list;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            class A {
-               List list;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.List") })
+                .isUnchanged()
     }
 
     @Test
     fun removeStarImportIfNoTypesReferredTo(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.*;
             class A {}
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
-
-        assertRefactored(fixed, "class A {}")
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.List") })
+                .isRefactoredTo("class A {}")
     }
 
     @Test
     fun replaceStarImportWithNamedImportIfOnlyOneReferencedTypeRemains(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.*;
             class A {
                Collection c;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.Collection;
-            class A {
-               Collection c;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.List") })
+                .isRefactoredTo("""
+                    import java.util.Collection;
+                    class A {
+                       Collection c;
+                    }
+                """)
     }
 
     @Test
     fun leaveStarImportInPlaceIfMoreThanTwoTypesStillReferredTo(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.*;
             class A {
                Collection c;
                Set s;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.List") }).fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.*;
-            class A {
-               Collection c;
-               Set s;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.List") })
+                .isUnchanged()
     }
 
     @Test
     fun removeStarStaticImport(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import static java.util.Collections.*;
             class A {}
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
-
-        assertRefactored(fixed, "class A {}")
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.Collections") })
+                .isRefactoredTo("class A {}")
     }
 
     @Test
     fun leaveStarStaticImportIfReferenceStillExists(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import static java.util.Collections.*;
             class A {
                Object o = emptyList();
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
-
-        assertRefactored(fixed, """
-            import static java.util.Collections.*;
-            class A {
-               Object o = emptyList();
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.Collections") })
+                .isUnchanged()
     }
 
     @Test
     fun leaveNamedStaticImportIfReferenceStillExists(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import static java.util.Collections.emptyList;
             import static java.util.Collections.emptySet;
             class A {
                Object o = emptyList();
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(RemoveImport().apply { setType("java.util.Collections") }).fix().fixed
-
-        assertRefactored(fixed, """
-            import static java.util.Collections.emptyList;
-            class A {
-               Object o = emptyList();
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(RemoveImport().apply { setType("java.util.Collections") })
+                .isRefactoredTo("""
+                    import static java.util.Collections.emptyList;
+                    class A {
+                       Object o = emptyList();
+                    }
+                """)
     }
 
     @Test
     fun leaveNamedStaticImportOnFieldIfReferenceStillExists(jp: JavaParser) {
-        val bSource = """
-            package foo;
-            public class B {
-                public static final String STRING = "string";
-                public static final String STRING2 = "string2";
-            }
-        """.trimIndent()
-
-        val cSource = """
-            package foo;
-            public class C {
-                public static final String ANOTHER = "string";
-            }
-        """.trimIndent()
-
-        val a = jp.parse("""
+        """
             import static foo.B.STRING;
             import static foo.B.STRING2;
             import static foo.C.*;
             public class A {
                 String a = STRING;
             }
-        """.trimIndent(), bSource, cSource)
-
-        val fixed = a.refactor()
-                .visit(RemoveImport().apply { setType("foo.B") })
-                .visit(RemoveImport().apply { setType("foo.C") })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import static foo.B.STRING;
-            public class A {
-                String a = STRING;
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package foo;
+                    public class B {
+                        public static final String STRING = "string";
+                        public static final String STRING2 = "string2";
+                    }
+                """)
+                .whichDependsOn("""
+                    package foo;
+                    public class C {
+                        public static final String ANOTHER = "string";
+                    }
+                """)
+                .whenVisitedBy(RemoveImport().apply { setType("foo.B") })
+                .whenVisitedBy(RemoveImport().apply { setType("foo.C") })
+                .isRefactoredTo("""
+                    import static foo.B.STRING;
+                    public class A {
+                        String a = STRING;
+                    }
+                """)
     }
 
     @Test
     fun removeImportForChangedMethodArgument(jp: JavaParser) {
-        val b = """
-            package b;
-            public interface B {
-                void doSomething();
-            }
-        """.trimIndent()
-
-        val c = """
-            package c;
-            public interface C {
-                void doSomething();
-            }
-        """.trimIndent()
-
-        val a = jp.parse("""
+        """
             import b.B;
             
             class A {
@@ -216,19 +174,29 @@ interface RemoveImportTest {
                     arg.doSomething();
                 }
             }
-        """.trimIndent(), b, c)
-
-        val fixed = a.refactor().visit(ChangeType().apply { setType("b.B"); setTargetType("c.C") })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import c.C;
-            
-            class A {
-                void foo(C arg) {
-                    arg.doSomething();
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package b;
+                    public interface B {
+                        void doSomething();
+                    }
+                """)
+                .whichDependsOn("""
+                    package c;
+                    public interface C {
+                        void doSomething();
+                    }
+                """)
+                .whenVisitedBy(ChangeType().apply { setType("b.B"); setTargetType("c.C") })
+                .isRefactoredTo("""
+                    import c.C;
+                    
+                    class A {
+                        void foo(C arg) {
+                            arg.doSomething();
+                        }
+                    }
+                """)
     }
 }

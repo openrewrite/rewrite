@@ -13,12 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.config;
+package org.openrewrite.maven.internal;
 
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.Tree;
+import org.openrewrite.maven.AbstractMavenSourceVisitor;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.internal.PrintXml;
 
-import java.util.Collection;
+public class PrintMaven extends AbstractMavenSourceVisitor<String> {
+    private final PrintXml printXml = new PrintXml();
 
-public interface SourceVisitorLoader {
-    Collection<SourceVisitor<?>> loadVisitors();
+    @Override
+    public String defaultTo(Tree t) {
+        return "";
+    }
+
+    @Override
+    public String visitPom(Maven.Pom pom) {
+        return printXml.visitDocument(pom.getDocument());
+    }
 }

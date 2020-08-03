@@ -15,16 +15,20 @@
  */
 package org.openrewrite.maven
 
-import assertRefactored
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.whenParsedBy
 import java.io.File
 import java.nio.file.Path
 
 class ChangeParentVersionTest {
+    private val parser = MavenParser.builder()
+            .resolveDependencies(false)
+            .build()
+
     @Test
     fun fixedVersion(@TempDir tempDir: Path) {
-        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+        File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -42,33 +46,28 @@ class ChangeParentVersionTest {
                 </project>
             """.trimIndent().trim())
         }
-
-        val pom = MavenParser.builder()
-                .resolveDependencies(false)
-                .build()
-                .parse(pomFile.toPath(), tempDir)
-
-        val fixed = pom.refactor().visit(ChangeParentVersion().apply {
-            setGroupId("org.springframework.boot")
-            setArtifactId("spring-boot-starter-parent")
-            setToVersion("2.3.1.RELEASE")
-        }).fix().fixed
-
-        assertRefactored(fixed, """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <parent>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-starter-parent</artifactId>
-                <version>2.3.1.RELEASE</version>
-                <relativePath/> <!-- lookup parent from repository -->
-              </parent>
-            </project>
-        """.trimIndent())
+                .toPath()
+                .whenParsedBy(parser)
+                .whenVisitedBy(ChangeParentVersion().apply {
+                    setGroupId("org.springframework.boot")
+                    setArtifactId("spring-boot-starter-parent")
+                    setToVersion("2.3.1.RELEASE")
+                })
+                .isRefactoredTo("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.3.1.RELEASE</version>
+                        <relativePath/> <!-- lookup parent from repository -->
+                      </parent>
+                    </project>
+                """)
     }
 }

@@ -15,14 +15,17 @@
  */
 package org.openrewrite.maven
 
-import assertRefactored
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.whenParsedBy
 import java.io.File
 import java.nio.file.Path
 
 class ChangeDependencyScopeTest {
+    private val parser = MavenParser.builder()
+            .resolveDependencies(false)
+            .build()
+
     private val guavaToTest = ChangeDependencyScope().apply {
         setGroupId("com.google.guava")
         setArtifactId("guava")
@@ -31,7 +34,7 @@ class ChangeDependencyScopeTest {
 
     @Test
     fun noScopeToScope(@TempDir tempDir: Path) {
-        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+        File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -50,37 +53,32 @@ class ChangeDependencyScopeTest {
                 </project>
             """.trimIndent().trim())
         }
-
-        val pom = MavenParser.builder()
-                .resolveDependencies(false)
-                .build()
-                .parse(pomFile.toPath(), tempDir)
-
-        val fixed = pom.refactor().visit(guavaToTest).fix().fixed
-
-        assertRefactored(fixed, """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>28.2-jre</version>
-                  <scope>test</scope>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent())
+                .toPath()
+                .whenParsedBy(parser)
+                .whenVisitedBy(guavaToTest)
+                .isRefactoredTo("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>28.2-jre</version>
+                          <scope>test</scope>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """)
     }
 
     @Test
     fun scopeToScope(@TempDir tempDir: Path) {
-        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+        File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -100,37 +98,32 @@ class ChangeDependencyScopeTest {
                 </project>
             """.trimIndent().trim())
         }
-
-        val pom = MavenParser.builder()
-                .resolveDependencies(false)
-                .build()
-                .parse(pomFile.toPath(), tempDir)
-
-        val fixed = pom.refactor().visit(guavaToTest).fix().fixed
-
-        assertRefactored(fixed, """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>28.2-jre</version>
-                  <scope>test</scope>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent())
+                .toPath()
+                .whenParsedBy(parser)
+                .whenVisitedBy(guavaToTest)
+                .isRefactoredTo("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>28.2-jre</version>
+                          <scope>test</scope>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """)
     }
 
     @Test
     fun scopeToNoScope(@TempDir tempDir: Path) {
-        val pomFile = File(tempDir.toFile(), "pom.xml").apply {
+        File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -150,30 +143,25 @@ class ChangeDependencyScopeTest {
                 </project>
             """.trimIndent().trim())
         }
-
-        val pom = MavenParser.builder()
-                .resolveDependencies(false)
-                .build()
-                .parse(pomFile.toPath(), tempDir)
-
-        val fixed = pom.refactor().visit(guavaToTest.apply { setToScope(null) }).fix().fixed
-
-        assertRefactored(fixed, """
-            <project>
-              <modelVersion>4.0.0</modelVersion>
-              
-              <groupId>com.mycompany.app</groupId>
-              <artifactId>my-app</artifactId>
-              <version>1</version>
-              
-              <dependencies>
-                <dependency>
-                  <groupId>com.google.guava</groupId>
-                  <artifactId>guava</artifactId>
-                  <version>28.2-jre</version>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent())
+                .toPath()
+                .whenParsedBy(parser)
+                .whenVisitedBy(guavaToTest.apply { setToScope(null) })
+                .isRefactoredTo("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencies>
+                        <dependency>
+                          <groupId>com.google.guava</groupId>
+                          <artifactId>guava</artifactId>
+                          <version>28.2-jre</version>
+                        </dependency>
+                      </dependencies>
+                    </project>
+                """)
     }
 }

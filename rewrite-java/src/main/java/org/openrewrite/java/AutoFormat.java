@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.AbstractSourceVisitor;
 import org.openrewrite.Incubating;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
@@ -111,7 +112,7 @@ public class AutoFormat extends JavaRefactorVisitor {
         return j;
     }
 
-    private class FindIndentExceptScope extends SourceVisitor<Void> {
+    private class FindIndentExceptScope extends AbstractSourceVisitor<Void> {
         private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
         private final int enclosingIndent;
 

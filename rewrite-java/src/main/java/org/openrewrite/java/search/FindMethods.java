@@ -16,7 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 
@@ -25,7 +25,7 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
-public class FindMethods extends JavaSourceVisitor<List<J.MethodInvocation>> {
+public class FindMethods extends AbstractJavaSourceVisitor<List<J.MethodInvocation>> {
     private final MethodMatcher matcher;
 
     public FindMethods(String signature) {

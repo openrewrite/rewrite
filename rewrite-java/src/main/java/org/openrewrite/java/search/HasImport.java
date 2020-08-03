@@ -18,10 +18,10 @@ package org.openrewrite.java.search;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 
-public class HasImport extends JavaSourceVisitor<Boolean> {
+public class HasImport extends AbstractJavaSourceVisitor<Boolean> {
     private final String clazz;
 
     public HasImport(String clazz) {

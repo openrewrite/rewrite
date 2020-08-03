@@ -31,7 +31,7 @@ interface InstanceOfTest {
                     boolean b = o instanceof String;
                 }
             }
-        """)
+        """)[0]
 
         val variable by lazy { a.firstMethodStatement() as J.VariableDecls }
         val instanceof by lazy { variable.vars[0].initializer as J.InstanceOf }

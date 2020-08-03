@@ -29,7 +29,7 @@ interface BlockTest {
                     System.out.println("foo");
                 }
             }
-        """)
+        """)[0]
         
         assertEquals(1, a.classes[0].methods[0].body!!.statements.size)
     }
@@ -40,7 +40,7 @@ interface BlockTest {
             public class A {
                 public void foo() {  }
             }
-        """)
+        """)[0]
         
         assertEquals("{  }", a.classes[0].methods[0].body!!.printTrimmed())
     }
@@ -51,7 +51,7 @@ interface BlockTest {
             public class A {
                 static {}
             }
-        """)
+        """)[0]
 
         assertEquals("static {}", a.classes[0].body.statements[0].printTrimmed())
     }

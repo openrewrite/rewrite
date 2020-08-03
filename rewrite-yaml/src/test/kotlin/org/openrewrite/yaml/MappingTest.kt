@@ -26,7 +26,7 @@ class MappingTest : YamlParser() {
             type : beta.openrewrite.org/v1/visitor
             name : org.openrewrite.text.ChangeTextToJon
         """.trimIndent()
-        val y = parse(yText)
+        val y = parse(yText)[0]
 
         assertThat((y.documents[0].blocks[0] as Yaml.Mapping).entries.map { it.key.value })
                 .containsExactly("type", "name")
@@ -39,7 +39,7 @@ class MappingTest : YamlParser() {
             type:
                 name: org.openrewrite.text.ChangeTextToJon
         """.trimIndent()
-        val y = parse(yText)
+        val y = parse(yText)[0]
 
         val mapping = y.documents[0].blocks[0] as Yaml.Mapping
         assertThat(mapping.entries.map { it.key.value }).containsExactly("type")

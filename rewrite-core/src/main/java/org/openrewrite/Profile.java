@@ -22,11 +22,11 @@ public interface Profile {
 
     Collection<Style> getStyles();
 
-    default <S, T extends SourceVisitor<S>> FilterReply accept(T visitor) {
+    default FilterReply accept(RefactorVisitor<?> visitor) {
         return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
     }
 
-    default <S, T extends SourceVisitor<S>> T configure(T visitor) {
+    default <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor) {
         return visitor;
     }
 

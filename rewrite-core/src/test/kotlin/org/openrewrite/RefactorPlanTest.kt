@@ -25,7 +25,7 @@ class RefactorPlanTest {
     private val parent = ProfileConfiguration().apply {
         name = "parent"
         setInclude(setOf("org.openrewrite.text.*"))
-        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "hi"));
+        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "hi"))
     }
 
     private val child = ProfileConfiguration().apply {
@@ -41,13 +41,11 @@ class RefactorPlanTest {
 
     @Test
     fun nearestConfigurationTakesPrecedence() {
-        val visitors = planBuilder.build()
-                .visitors(PlainText::class.java, "child")
+        val visitors = planBuilder.build().visitors("child")
 
-        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList())
-                .refactor()
+        val fixed: PlainText = Refactor()
                 .visit(visitors)
-                .fix().fixed
+                .fixed(PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList()))!!
 
         assertThat(fixed.print()).isEqualTo("overridden")
     }
@@ -59,7 +57,7 @@ class RefactorPlanTest {
         }
 
         val visitors = planBuilder.build()
-                .visitors(PlainText::class.java, "child")
+                .visitors("child")
 
         assertThat(visitors).isEmpty()
     }

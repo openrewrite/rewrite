@@ -34,7 +34,7 @@ class FormatPreservingReaderTest {
     fun allInPreviousBuffer() {
         val text = "0123456789"
         val reader = text.reader()
-        val formatPreservingReader = FormatPreservingReader(reader);
+        val formatPreservingReader = FormatPreservingReader(reader)
 
         val charArray = CharArray(10)
 
@@ -48,7 +48,7 @@ class FormatPreservingReaderTest {
     fun splitBetweenPrevAndCurrentBuffer() {
         val text = "0123456789"
         val reader = text.reader()
-        val formatPreservingReader = FormatPreservingReader(reader);
+        val formatPreservingReader = FormatPreservingReader(reader)
 
         val charArray = CharArray(10)
 

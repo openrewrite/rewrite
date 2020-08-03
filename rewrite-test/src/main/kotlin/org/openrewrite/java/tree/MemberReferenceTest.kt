@@ -18,8 +18,8 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree
+import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaSourceVisitor
 import org.openrewrite.java.asClass
 import java.util.concurrent.CountDownLatch
 
@@ -39,11 +39,11 @@ interface MemberReferenceTest {
             class A {
                 static void func(String s) {}
             }
-        """)
+        """)[0]
 
         val memberRefLatch = CountDownLatch(1)
 
-        object: JavaSourceVisitor<Unit?>() {
+        object: AbstractJavaSourceVisitor<Unit?>() {
             override fun defaultTo(t: Tree?): Nothing? = null
 
             override fun visitMemberReference(memberRef: J.MemberReference): Unit? {
@@ -66,7 +66,7 @@ interface MemberReferenceTest {
                 Stream<Integer> n = Stream.of(1, 2);
                 Set<Integer> n2 = n.collect(HashSet<Integer>::new, HashSet::add);
             }
-        """)
+        """)[0]
 
         val collect = a.classes[0].fields[1].vars[0].initializer!!
         assertEquals("n.collect(HashSet<Integer>::new, HashSet::add)", collect.printTrimmed())

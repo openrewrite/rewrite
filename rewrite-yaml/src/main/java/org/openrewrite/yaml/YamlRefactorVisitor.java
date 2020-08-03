@@ -15,12 +15,14 @@
  */
 package org.openrewrite.yaml;
 
-import org.openrewrite.RefactorVisitorSupport;
+import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.refactor.Formatter;
 import org.openrewrite.yaml.tree.Yaml;
 
-public class YamlRefactorVisitor extends YamlSourceVisitor<Yaml> implements RefactorVisitorSupport {
+public class YamlRefactorVisitor extends AbstractRefactorVisitor<Yaml>
+        implements YamlSourceVisitor<Yaml> {
+
     protected Formatter formatter;
 
     @Override
@@ -49,6 +51,11 @@ public class YamlRefactorVisitor extends YamlSourceVisitor<Yaml> implements Refa
         Yaml.Mapping.Entry e = entry;
         e = e.withKey(refactor(e.getKey()));
         return e.withValue(refactor(e.getValue()));
+    }
+
+    @Override
+    public Yaml visitScalar(Yaml.Scalar scalar) {
+        return scalar;
     }
 
     @Override

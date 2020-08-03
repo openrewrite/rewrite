@@ -20,14 +20,14 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.openrewrite.*;
+import org.openrewrite.Change;
+import org.openrewrite.ChangePublisher;
+import org.openrewrite.Incubating;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.Map;
-import java.util.Optional;
 
 @Incubating(since = "2.0.0")
 @RequiredArgsConstructor
@@ -39,7 +39,7 @@ public class GitChangePublisher implements ChangePublisher {
     private final String commitMessage;
 
     @Override
-    public void publish(Collection<Change<SourceFile>> changes) {
+    public void publish(Collection<Change> changes) {
         UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(user, password);
 
         try {
@@ -59,9 +59,9 @@ public class GitChangePublisher implements ChangePublisher {
         }
     }
 
-    public void publishChangesForRepository(Collection<Change<SourceFile>> changes) {
-        Change<SourceFile> change = changes.iterator().next();
-        Optional<GitMetadata> gitMetadata = change.getFixed().getMetadata(GitMetadata.class);
+    public void publishChangesForRepository(Collection<Change> changes) {
+//        Change change = changes.iterator().next();
+//        Optional<GitMetadata> gitMetadata = change.getFixed().getMetadata(GitMetadata.class);
 
         // git add
         // git write-tree

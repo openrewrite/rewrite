@@ -30,7 +30,7 @@ interface BreakTest {
                     while(true) break;
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = a.firstMethodStatement() as J.WhileLoop
         assertTrue(whileLoop.body is J.Break)
@@ -46,7 +46,7 @@ interface BreakTest {
                         break labeled;
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
         assertTrue(whileLoop.body is J.Break)
@@ -62,7 +62,7 @@ interface BreakTest {
                         break labeled;
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
         assertEquals("break labeled", whileLoop.body.printTrimmed())

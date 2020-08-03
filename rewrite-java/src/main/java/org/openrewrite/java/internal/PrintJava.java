@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -26,7 +27,7 @@ import java.util.Collection;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.java.tree.J.Modifier.*;
 
-public class PrintJava extends JavaSourceVisitor<String> {
+public class PrintJava extends AbstractJavaSourceVisitor<String> {
     @Override
     public String defaultTo(Tree t) {
         return "";

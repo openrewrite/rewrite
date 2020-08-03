@@ -53,7 +53,6 @@ public class TreeBuilder {
         return buildName(fullyQualifiedName, Formatting.EMPTY);
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
         return buildName(fullyQualifiedName, fmt, randomId());
     }
@@ -122,7 +121,7 @@ public class TreeBuilder {
             logger.debug(source);
         }
 
-        J.CompilationUnit cu = parser.parse(source);
+        J.CompilationUnit cu = parser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         return (J.MethodDecl) new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
     }
@@ -153,7 +152,7 @@ public class TreeBuilder {
             logger.debug(source);
         }
 
-        J.CompilationUnit cu = parser.parse(source);
+        J.CompilationUnit cu = parser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
@@ -168,7 +167,7 @@ public class TreeBuilder {
                 .collect(toList());
     }
 
-    private static class ListScopeVariables extends JavaSourceVisitor<List<String>> {
+    private static class ListScopeVariables extends AbstractJavaSourceVisitor<List<String>> {
         @Nullable
         private final Cursor scope;
 

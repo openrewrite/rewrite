@@ -31,7 +31,7 @@ interface WhileLoopTest {
                     while ( true ) { }
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = a.firstMethodStatement() as J.WhileLoop
 
@@ -48,7 +48,7 @@ interface WhileLoopTest {
                     while(true) test();
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.classes[0].methods[0].body!!.statements[0] as J.WhileLoop
         assertEquals("while(true) test();", forLoop.printTrimmed())

@@ -21,97 +21,151 @@ import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.openrewrite.internal.lang.NonNullApi;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toSet;
 
 /**
- * A refactoring operation on a single source file involving one or more top-level refactoring visitors.
- *
- * @param <T> The common interface to all AST elements for a particular language.
+ * A refactoring operation to be executed on a set of source files involving
+ * one or more top-level refactoring visitors.
  */
 @NonNullApi
-public class Refactor<T extends Tree> {
-    @Getter
-    private final T original;
-
+public class Refactor {
     private MeterRegistry meterRegistry = Metrics.globalRegistry;
 
     @Getter
-    private final List<SourceVisitor<? extends Tree>> visitors = new ArrayList<>();
-
-    public Refactor(T original) {
-        this.original = original;
-    }
+    private final Collection<RefactorVisitor<? extends Tree>> visitors = new ArrayList<>();
 
     @SafeVarargs
-    public final Refactor<T> visit(SourceVisitor<? extends Tree>... visitors) {
+    public final Refactor visit(RefactorVisitor<? extends Tree>... visitors) {
         Collections.addAll(this.visitors, visitors);
         return this;
     }
 
-    public final Refactor<T> visit(Iterable<SourceVisitor<? extends Tree>> visitors) {
+    public final Refactor visit(Iterable<RefactorVisitor<? extends Tree>> visitors) {
         visitors.forEach(this.visitors::add);
         return this;
     }
 
-    public Change<T> fix() {
-        return fix(10);
+    @SuppressWarnings("unchecked")
+    @Nullable
+    public <S extends SourceFile> S fixed(S tree) {
+        return (S) fix(Collections.singletonList(tree)).iterator().next().getFixed();
     }
 
-    public Change<T> fix(int maxCycles) {
+    /**
+     * Generate a change set by visiting a collection of sources.
+     *
+     * @param sources The collection of sources don't have to have the same type. They can be a mixture of, for example,
+     *                Java source files and Maven POMs.
+     * @return A change set.
+     */
+    public Collection<Change> fix(Iterable<? extends SourceFile> sources) {
+        return fix(sources, 3);
+    }
+
+    /**
+     * Generate a change set by visiting a collection of sources.
+     *
+     * @param sources   The collection of sources don't have to have the same type. They can be a mixture of, for example,
+     *                  Java source files and Maven POMs.
+     * @param maxCycles The maximum number of iterations to visit the files.
+     * @return A change set.
+     */
+    public Collection<Change> fix(Iterable<? extends SourceFile> sources, int maxCycles) {
         Timer.Sample sample = Timer.start();
 
-        T acc = original;
-        Set<String> rulesThatMadeChanges = new HashSet<>();
+        Map<SourceFile, Change> changesByTree = new HashMap<>();
+
+        List<SourceFile> accumulatedSources = new ArrayList<>();
+        sources.forEach(accumulatedSources::add);
 
         for (int i = 0; i < maxCycles; i++) {
-            Set<String> rulesThatMadeChangesThisCycle = new HashSet<>();
-            for (SourceVisitor<? extends Tree> visitor : visitors) {
-                visitor.nextCycle();
-
-                if (!visitor.isIdempotent() && i > 0) {
+            int rulesThatMadeChangesThisCycle = 0;
+            for (int j = 0; j < accumulatedSources.size(); j++) {
+                SourceFile prev = accumulatedSources.get(j);
+                if (prev == null) {
+                    // source was deleted in a previous iteration
                     continue;
                 }
 
-                T before = acc;
-                acc = transformPipeline(acc, visitor);
+                SourceFile acc = prev;
 
-                if (before != acc) {
-                    // we should only report on the top-level visitors, not any andThen() visitors that
-                    // are applied as part of the top-level visitor's pipeline
-                    rulesThatMadeChangesThisCycle.add(visitor.getClass().getName());
+                for (RefactorVisitor<? extends Tree> visitor : visitors) {
+                    try {
+                        visitor.next();
+
+                        if (!visitor.isIdempotent() && i > 0) {
+                            continue;
+                        }
+
+                        SourceFile before = acc;
+                        acc = (SourceFile) transformPipeline(acc, visitor);
+
+                        if (before != acc) {
+                            // we should only report on the top-level visitors, not any andThen() visitors that
+                            // are applied as part of the top-level visitor's pipeline
+                            changesByTree.compute(acc, (acc2, prevChange) -> prevChange == null ?
+                                    new Change(prev, acc2, Collections.singleton(visitor.getClass().getName())) :
+                                    new Change(prev, acc2, Stream
+                                            .concat(prevChange.getRulesThatMadeChanges().stream(), Stream.of(visitor.getClass().getName()))
+                                            .collect(toSet()))
+                            );
+                            rulesThatMadeChangesThisCycle++;
+                        }
+                    } catch (Throwable t) {
+                        Counter.builder("rewrite.visitor.errors")
+                                .baseUnit("errors")
+                                .description("Visitors that threw exceptions")
+                                .tag("visitor", visitor.getClass().getName())
+                                .tag("tree.type", prev.getClass().getName())
+                                .register(meterRegistry)
+                                .increment();
+                    }
                 }
+
+                // we've seen all the files once, so if any new source files needs to be generated by any of the visitors,
+                // let's do that now. On the next cycle, these visitors shouldn't generate these files again, but update
+                // them in place as necessary.
+                for (RefactorVisitor<? extends Tree> visitor : visitors) {
+                    visitor.generate().forEach(g -> accumulatedSources.add((SourceFile) g));
+                }
+
+                if (rulesThatMadeChangesThisCycle == 0) {
+                    break;
+                }
+
+                accumulatedSources.set(j, acc);
             }
-            if (rulesThatMadeChangesThisCycle.isEmpty()) {
-                break;
-            }
-            rulesThatMadeChanges.addAll(rulesThatMadeChangesThisCycle);
         }
 
         sample.stop(Timer.builder("rewrite.refactor.plan")
                 .description("The time it takes to execute a refactoring plan consisting of potentially more than one visitor over more than one cycle")
-                .tag("tree.type", original.getClass().getSimpleName())
-                .tag("outcome", rulesThatMadeChanges.isEmpty() ? "Unchanged" : "Changed")
+                .tag("outcome", changesByTree.isEmpty() ? "unchanged" : "changed")
                 .register(meterRegistry));
 
-        for (String ruleThatMadeChange : rulesThatMadeChanges) {
-            Counter.builder("rewrite.refactor.plan.changes")
-                    .description("The number of changes requested by a visitor.")
-                    .tag("visitor", ruleThatMadeChange)
-                    .tag("tree.type", original.getClass().getSimpleName())
-                    .register(meterRegistry)
-                    .increment();
+        for (Change change : changesByTree.values()) {
+            for (String ruleThatMadeChange : change.getRulesThatMadeChanges()) {
+                Counter.builder("rewrite.refactor.plan.changes")
+                        .description("The number of changes requested by a visitor")
+                        .tag("visitor", ruleThatMadeChange)
+                        .tag("tree.type", change.getTreeType() == null ? "unknown" : change.getTreeType().getName())
+                        .register(meterRegistry)
+                        .increment();
+            }
         }
 
-        return new Change<>(original, acc, rulesThatMadeChanges);
+        return changesByTree.values();
     }
 
-    @SuppressWarnings("unchecked")
-    private T transformPipeline(T acc, SourceVisitor<? extends Tree> visitor) {
+    private Tree transformPipeline(Tree acc, RefactorVisitor<? extends Tree> visitor) {
         // by transforming the AST for each op, we allow for the possibility of overlapping changes
         Timer.Sample sample = Timer.start();
-        acc = (T) visitor.visit(acc);
-        for (SourceVisitor<? extends Tree> vis : visitor.andThen()) {
+        acc = visitor.visit(acc);
+        for (RefactorVisitor<? extends Tree> vis : visitor.andThen()) {
             acc = transformPipeline(acc, vis);
         }
 
@@ -119,13 +173,13 @@ public class Refactor<T extends Tree> {
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
                 .tag("visitor", visitor.getClass().getName())
                 .tags(visitor.getTags())
-                .tag("tree.type", original.getClass().getSimpleName())
+                .tag("tree.type", acc.getClass().getSimpleName())
                 .register(meterRegistry));
 
         return acc;
     }
 
-    public Refactor<T> setMeterRegistry(MeterRegistry meterRegistry) {
+    public Refactor setMeterRegistry(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
         return this;
     }

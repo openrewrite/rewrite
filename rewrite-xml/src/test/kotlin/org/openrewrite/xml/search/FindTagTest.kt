@@ -28,7 +28,7 @@ class FindTagTest : XmlParser() {
                     <artifactId scope="compile">org.openrewrite</artifactId>
                 </dependency>
             </dependency>
-        """.trimIndent())
+        """.trimIndent())[0]
 
     @Test
     fun matchAbsolute() {

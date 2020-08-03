@@ -24,7 +24,7 @@ class PropertiesParserTest: PropertiesParser() {
     fun noEndOfLine() {
         val props = parse("""
             key=value
-        """.trimIndent())
+        """.trimIndent())[0]
 
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
                 .hasSize(1).containsExactly("key")
@@ -36,7 +36,7 @@ class PropertiesParserTest: PropertiesParser() {
         val props = parse("""
             key=value
             
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries.map { it.key }).containsExactly("key")
@@ -48,7 +48,7 @@ class PropertiesParserTest: PropertiesParser() {
         val props = parse("""
             # this is a comment
             key=value
-        """.trimIndent())
+        """.trimIndent())[0]
 
         assertThat(props.content[0].let { it as Properties.Comment }.message).isEqualTo(" this is a comment")
         assertThat(props.content[1].let { it as Properties.Entry }.key).isEqualTo("key")
@@ -59,7 +59,7 @@ class PropertiesParserTest: PropertiesParser() {
         val props = parse("""
             key=value
             key2 = value2
-        """.trimIndent())
+        """.trimIndent())[0]
 
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
                 .hasSize(2).containsExactly("key", "key2")

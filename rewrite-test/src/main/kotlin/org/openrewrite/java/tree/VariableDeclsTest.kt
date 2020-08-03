@@ -30,7 +30,7 @@ interface VariableDeclsTest {
             public class A {
                 public String a = "";
             }
-        """)
+        """)[0]
         
         val varDecl = a.classes[0].fields[0]
         assertTrue(varDecl.typeExpr is J.Ident)
@@ -52,7 +52,7 @@ interface VariableDeclsTest {
                     String a = "";
                 }
             }
-        """)
+        """)[0]
 
         val varDecl = a.firstMethodStatement() as J.VariableDecls
 
@@ -67,7 +67,7 @@ interface VariableDeclsTest {
             public class A {
                 String a;
             }
-        """)
+        """)[0]
 
         val varDecl = a.classes[0].fields[0]
         assertNull(varDecl.vars[0].initializer)
@@ -79,7 +79,7 @@ interface VariableDeclsTest {
             public class A {
                 public static int n = 0;
             }
-        """)
+        """)[0]
         
         val varDecl = a.classes[0].fields[0]
         assertEquals("public static int n = 0", varDecl.printTrimmed())
@@ -94,7 +94,7 @@ interface VariableDeclsTest {
                int [ ] n2;
                String [ ] [ ] s2;
             }
-        """)
+        """)[0]
 
         val (n, s, n2, s2) = a.fields(0..3)
 
@@ -110,7 +110,7 @@ interface VariableDeclsTest {
             public class A {
                 int i, j = 0;
             }
-        """)
+        """)[0]
 
         assertEquals("int i, j = 0", a.classes[0].fields[0].printTrimmed())
     }
@@ -127,7 +127,7 @@ interface VariableDeclsTest {
 
                 Integer m = 0, n = 0;
             }
-        """)
+        """)[0]
 
         assertEquals("Integer m = 0, n = 0", a.classes[0].fields[0].printTrimmed())
 
@@ -147,7 +147,7 @@ interface VariableDeclsTest {
             public class A {
                 public /* static */ final static Integer n = 0;
             }
-        """)
+        """)[0]
 
         assertEquals("public /* static */ final static Integer n = 0", a.classes[0].fields[0].printTrimmed())
     }

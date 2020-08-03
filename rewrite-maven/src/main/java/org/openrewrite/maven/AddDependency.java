@@ -149,7 +149,7 @@ public class AddDependency extends MavenRefactorVisitor {
                             (scope == null ? "" :
                                     indent.getPrefix(2) + "<scope>" + scope + "</scope>") +
                             indent.getPrefix(1) + "</dependency>"
-            ).getRoot().withFormatting(format(indent.getPrefix(1)));
+            ).get(0).getRoot().withFormatting(format(indent.getPrefix(1)));
 
             Maven.Dependency toAdd = new Maven.Dependency(false,
                     new MavenModel.Dependency(

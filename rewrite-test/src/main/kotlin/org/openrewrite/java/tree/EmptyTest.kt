@@ -30,7 +30,7 @@ interface EmptyTest {
                     ;
                 }
             }
-        """)
+        """)[0]
 
         assertTrue(a.firstMethodStatement() is J.Empty)
         assertEquals("""

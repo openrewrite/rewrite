@@ -31,7 +31,7 @@ interface FindFieldsTest {
                private List list;
                private Set set;
             }
-        """)
+        """)[0]
 
         val fields = a.classes[0].findFields("java.util.List")
 
@@ -47,7 +47,7 @@ interface FindFieldsTest {
             public class A {
                private String[] s;
             }
-        """)
+        """)[0]
 
         val fields = a.classes[0].findFields("java.lang.String")
 
@@ -67,7 +67,7 @@ interface FindFieldsTest {
                     catch(FileNotFoundException | RuntimeException e) {}
                 }
             }
-        """)
+        """)[0]
 
         assertEquals(1, a.classes[0].findFields("java.io.File").size)
     }

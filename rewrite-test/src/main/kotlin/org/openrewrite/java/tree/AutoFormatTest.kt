@@ -18,12 +18,12 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.AutoFormat
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.assertRefactored
+import org.openrewrite.whenParsedBy
 
 interface AutoFormatTest {
     @Test
     fun methodDeclaration(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.*;
             
             public class A {
@@ -36,23 +36,22 @@ interface AutoFormatTest {
               }
             }
             }
-        """.trimIndent())
-
-        val fixed = a.refactor().visit(AutoFormat(a.classes[0].methods[0])).fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.*;
-            
-            public class A {
-                List<String> l = new ArrayList<>();
-                
-                @Deprecated
-                public void method() {
-                    if(true) {
-                        l.add("value");
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> AutoFormat(a.classes[0].methods[0]) }
+                .isRefactoredTo("""
+                    import java.util.*;
+                    
+                    public class A {
+                        List<String> l = new ArrayList<>();
+                        
+                        @Deprecated
+                        public void method() {
+                            if(true) {
+                                l.add("value");
+                            }
+                        }
                     }
-                }
-            }
-        """.trimIndent())
+                """)
     }
 }

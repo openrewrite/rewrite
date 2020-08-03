@@ -54,10 +54,9 @@ class RemoveUnusedImports extends JavaRefactorVisitor {
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (methods.size() < nameCountToUseStarImport) {
-                        methods.stream().sorted().forEach(method -> {
-                            importsWithoutUnused.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
-                                    .withName(method))));
-                        });
+                        methods.stream().sorted().forEach(method ->
+                                importsWithoutUnused.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
+                        );
                         changed = true;
                     } else {
                         importsWithoutUnused.add(anImport);
@@ -73,10 +72,10 @@ class RemoveUnusedImports extends JavaRefactorVisitor {
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (types.size() < classCountToUseStarImport) {
-                        types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName -> {
+                        types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
                             importsWithoutUnused.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
-                                    .withName(typeClassName))));
-                        });
+                                    .withName(typeClassName))))
+                        );
                         changed = true;
                     } else {
                         importsWithoutUnused.add(anImport);
@@ -90,7 +89,7 @@ class RemoveUnusedImports extends JavaRefactorVisitor {
         return changed ? cu.withImports(importsWithoutUnused) : cu;
     }
 
-    static class TypesByPackage extends JavaSourceVisitor<Map<String, Set<JavaType.Class>>> {
+    static class TypesByPackage extends AbstractJavaSourceVisitor<Map<String, Set<JavaType.Class>>> {
         TypesByPackage() {
             setCursoringOn();
         }
@@ -131,7 +130,7 @@ class RemoveUnusedImports extends JavaRefactorVisitor {
         }
     }
 
-    static class MethodsByType extends JavaSourceVisitor<Map<String, Set<String>>> {
+    static class MethodsByType extends AbstractJavaSourceVisitor<Map<String, Set<String>>> {
         @Override
         public Map<String, Set<String>> reduce(Map<String, Set<String>> r1,
                                                Map<String, Set<String>> r2) {

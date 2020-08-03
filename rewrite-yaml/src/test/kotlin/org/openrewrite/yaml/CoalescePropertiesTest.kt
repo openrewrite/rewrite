@@ -16,11 +16,13 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 class CoalescePropertiesTest : YamlParser() {
+
     @Test
     fun fold() {
-        val y = parse("""
+        """
             management:
                 metrics:
                     enable.process.files: true
@@ -28,17 +30,16 @@ class CoalescePropertiesTest : YamlParser() {
                     health:
                         show-components: always
                         show-details: always
-        """.trimIndent())
-
-        val fixed = y.refactor().visit(CoalesceProperties()).fix().fixed
-
-        assertRefactored(fixed, """
-            management:
-                metrics.enable.process.files: true
-                endpoint.health:
-                    show-components: always
-                    show-details: always
-        """.trimIndent())
+        """
+                .whenParsedBy(this)
+                .whenVisitedBy(CoalesceProperties())
+                .isRefactoredTo("""
+                    management:
+                        metrics.enable.process.files: true
+                        endpoint.health:
+                            show-components: always
+                            show-details: always
+                """)
     }
 
 //    @Test

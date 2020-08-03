@@ -16,21 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface UseStaticImportTest {
     @Test
     fun replaceWithStaticImports(jp: JavaParser) {
-        val asserts = """
-            package asserts;
-            
-            public class Assert {
-                public static void assertTrue(boolean b) {}
-                public static void assertFalse(boolean b) {}
-                public static void assertEquals(int m, int n) {}
-            }
-        """.trimIndent()
-
-        val test = """
+        """
             package test;
             
             import asserts.Assert;
@@ -42,24 +33,30 @@ interface UseStaticImportTest {
                     Assert.assertEquals(1, 2);
                 }
             }
-        """.trimIndent()
-
-        val fixed = jp.parse(test, asserts).refactor().visit(UseStaticImport().apply {
-            setMethod("asserts.Assert assert*(..)")
-        }).fix().fixed
-
-        assertRefactored(fixed, """
-            package test;
-            
-            import static asserts.Assert.*;
-            
-            class Test {
-                void test() {
-                    assertTrue(true);
-                    assertFalse(false);
-                    assertEquals(1, 2);
-                }
-            }
-        """.trimIndent())
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package asserts;
+                    
+                    public class Assert {
+                        public static void assertTrue(boolean b) {}
+                        public static void assertFalse(boolean b) {}
+                        public static void assertEquals(int m, int n) {}
+                    }
+                """)
+                .whenVisitedBy(UseStaticImport().apply { setMethod("asserts.Assert assert*(..)") })
+                .isRefactoredTo("""
+                    package test;
+                    
+                    import static asserts.Assert.*;
+                    
+                    class Test {
+                        void test() {
+                            assertTrue(true);
+                            assertFalse(false);
+                            assertEquals(1, 2);
+                        }
+                    }
+                """)
     }
 }

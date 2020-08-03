@@ -33,7 +33,7 @@ interface TypeParameterAndWildcardTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSource, "public class B {}")
+        val a = jp.parse(aSource, "public class B {}")[0]
 
         assertEquals(aSource, a.print())
     }
@@ -52,19 +52,19 @@ interface TypeParameterAndWildcardTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSource, "public class B {}")
+        val a = jp.parse(aSource, "public class B {}")[0]
 
         assertEquals(aSource, a.print())
     }
 
     @Test
     fun extendsAndSuper(jp: JavaParser) {
-        val a = jp.parse("""
+        val a = jp.parse(*arrayOf("""
             import java.util.List;
             public class A {
                 public <P  extends B> void foo(List<P> out, List<? super C> in) {}
             }
-        """, bc)
+        """).plus(bc))[0]
 
         assertEquals("public <P  extends B> void foo(List<P> out, List<? super C> in) {}",
                 a.classes[0].methods[0].printTrimmed())
@@ -72,7 +72,7 @@ interface TypeParameterAndWildcardTest {
 
     @Test
     fun multipleExtends(jp: JavaParser) {
-        val a = jp.parse("public class A< T extends  B & C > {}", bc)
+        val a = jp.parse(*arrayOf("public class A< T extends  B & C > {}").plus(bc))[0]
         assertEquals("public class A< T extends  B & C > {}", a.printTrimmed())
     }
 
@@ -83,7 +83,7 @@ interface TypeParameterAndWildcardTest {
             public class A {
                 List< ?  extends  B > bs;
             }
-        """, "public class B {}")
+        """, "public class B {}")[0]
 
         val typeParam = a.classes[0].fields[0].typeExpr as J.ParameterizedType
         assertEquals("List< ?  extends  B >", typeParam.print())
@@ -96,7 +96,7 @@ interface TypeParameterAndWildcardTest {
             public class A {
                 List< ? > a;
             }
-        """)
+        """)[0]
 
         val typeParam = a.classes[0].fields[0].typeExpr as J.ParameterizedType
         assertEquals("List< ? >", typeParam.print())

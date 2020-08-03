@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Statement
@@ -29,10 +28,6 @@ fun J.CompilationUnit.firstMethodStatement(): Statement =
 
 fun J.CompilationUnit.fields(ns: IntRange = 0..0) =
         classes[0].fields.subList(ns.first, ns.last + 1)
-
-fun assertRefactored(cu: J.CompilationUnit, refactored: String) {
-    assertEquals(refactored.trimIndent(), cu.printTrimmed())
-}
 
 fun JavaType?.hasElementType(clazz: String) = TypeUtils.hasElementType(this, clazz)
 

@@ -28,7 +28,7 @@ interface BinaryTest {
             public class A {
                 int n = 0 + 1;
             }
-        """)
+        """)[0]
         
         val bin = a.classes[0].fields[0].vars[0].initializer as J.Binary
         assertTrue(bin.operator is J.Binary.Operator.Addition)
@@ -42,7 +42,7 @@ interface BinaryTest {
             public class A {
                 int n = 0 + 1;
             }
-        """)
+        """)[0]
 
         val bin = a.classes[0].fields[0].vars[0].initializer as J.Binary
         assertEquals("0 + 1", bin.printTrimmed())
@@ -60,7 +60,7 @@ interface BinaryTest {
             }
         """
 
-        assertEquals("\"a\" + \"b\"", jp.parse(a).classes[0].fields[0].vars[0].initializer?.printTrimmed())
+        assertEquals("\"a\" + \"b\"", jp.parse(a)[0].classes[0].fields[0].vars[0].initializer?.printTrimmed())
     }
 
     @Test
@@ -76,7 +76,7 @@ interface BinaryTest {
             }
         """.trimIndent()
 
-        val a = jp.parse(aSource)
+        val a = jp.parse(aSource)[0]
 
         assertEquals(aSource, a.print())
     }

@@ -33,7 +33,8 @@ interface LabelTest {
             |    }
             |}
         """.trimMargin()
-        val a = jp.parse(orig)
+
+        val a = jp.parse(orig)[0]
         
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("labeled", labeled.label.simpleName)
@@ -55,7 +56,7 @@ interface LabelTest {
             |}
         """.trimMargin()
 
-        val a = jp.parse(orig)
+        val a = jp.parse(orig)[0]
 
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("outer", labeled.label.simpleName)

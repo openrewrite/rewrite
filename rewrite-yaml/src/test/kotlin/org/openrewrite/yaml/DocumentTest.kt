@@ -28,7 +28,7 @@ class DocumentTest: YamlParser() {
             type: beta.openrewrite.org/v1/profile
         """.trimIndent()
 
-        val y = parse(yText)
+        val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(2)
         assertThat(y.documents[0].isExplicit).isTrue()
@@ -38,7 +38,7 @@ class DocumentTest: YamlParser() {
     @Test
     fun implicit() {
         val yText = "type: beta.openrewrite.org/v1/visitor"
-        val y = parse(yText)
+        val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)
         assertThat(y.documents[0].isExplicit).isFalse()

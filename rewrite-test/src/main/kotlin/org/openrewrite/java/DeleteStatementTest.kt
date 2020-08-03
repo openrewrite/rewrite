@@ -16,25 +16,23 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface DeleteStatementTest {
 
     @Test
     fun deleteField(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             public class A {
                List collection = null;
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(DeleteStatement(a.classes[0].findFields("java.util.List")[0]))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            public class A {
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> DeleteStatement(a.classes[0].findFields("java.util.List")[0]) }
+                .isRefactoredTo("""
+                    public class A {
+                    }
+                """)
     }
 }

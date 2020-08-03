@@ -32,7 +32,7 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse("public class B extends A { }", a)
+        val b = jp.parse("public class B extends A { }", a)[0]
 
         assertEquals("list", b.classes[0].findInheritedFields("java.util.List").firstOrNull()?.name)
 
@@ -49,7 +49,7 @@ interface FindInheritedFieldsTest {
             }
         """
 
-        val b = jp.parse("public class B extends A { }", a)
+        val b = jp.parse("public class B extends A { }", a)[0]
 
         val fields = b.classes[0].findInheritedFields("java.lang.String")
         assertEquals(1, fields.size)

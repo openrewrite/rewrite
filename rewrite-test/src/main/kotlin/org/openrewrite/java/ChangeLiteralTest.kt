@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
+import org.openrewrite.whenParsedBy
 
 interface ChangeLiteralTest {
     companion object {
@@ -40,23 +41,23 @@ interface ChangeLiteralTest {
             }
         """.trimIndent()
 
-        val cu = jp.parse(a, b)
-        val fixed = cu.findMethodCalls("b.B singleArg(String)").changeLiterals(cu)
-
-        assertRefactored(fixed, """
-            import b.*;
-            class A {
-               public void test() {
-                   String s = "bar";
-                   new B().singleArg("foo ({})" + s + 0L);
-               }
-            }
-        """)
+        a.whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedByMany { cu -> cu.findMethodCalls("b.B singleArg(String)").changeLiterals() }
+                .isRefactoredTo("""
+                    import b.*;
+                    class A {
+                       public void test() {
+                           String s = "bar";
+                           new B().singleArg("foo ({})" + s + 0L);
+                       }
+                    }
+                """)
     }
 
     @Test
     fun changeStringLiteralArgumentWithEscapableCharacters(jp: JavaParser) {
-        val a = """
+        """
             import b.*;
             public class A {
                 B b;
@@ -64,28 +65,26 @@ interface ChangeLiteralTest {
                     b.singleArg("mystring '%s'");
                 }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(a, b)
-        val fixed = cu.findMethodCalls("b.B singleArg(..)").changeLiterals(cu)
-
-        assertRefactored(fixed, """
-            import b.*;
-            public class A {
-                B b;
-                public void test() {
-                    b.singleArg("mystring '{}'");
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedByMany { cu -> cu.findMethodCalls("b.B singleArg(..)").changeLiterals() }
+                .isRefactoredTo("""
+                    import b.*;
+                    public class A {
+                        B b;
+                        public void test() {
+                            b.singleArg("mystring '{}'");
+                        }
+                    }
+                """)
     }
 
-    private fun List<J.MethodInvocation>.changeLiterals(cu: J.CompilationUnit) = fold(cu.refactor()) { acc, meth ->
-        meth.args.args
-                .fold(acc, { acc2, exp ->
-                    acc2.visit(ChangeLiteral(exp) { s ->
-                        s?.toString()?.replace("%s", "{}") ?: s
-                    })
-                })
-    }.fix().fixed
+    private fun List<J.MethodInvocation>.changeLiterals() = flatMap { meth ->
+        meth.args.args.map { exp ->
+            ChangeLiteral(exp) { s ->
+                s?.toString()?.replace("%s", "{}") ?: s
+            }
+        }
+    }
 }

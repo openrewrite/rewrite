@@ -47,6 +47,9 @@ abstract class JavaRefactorCompatibilityKit {
     inner class ChangeMethodTargetToStaticTck : ChangeMethodTargetToStaticTest
 
     @Nested
+    inner class ChangeMethodTargetToVariableTck: ChangeMethodTargetToVariableTest
+
+    @Nested
     inner class ChangeTypeTck : ChangeTypeTest
 
     @Nested

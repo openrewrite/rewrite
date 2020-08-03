@@ -16,27 +16,15 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface ChangeMethodTargetToVariableTest {
 
     @Test
     fun refactorExplicitStaticToVariable(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo() {}
-            }
-        """.trimIndent()
-
-        val b = """
-            package b;
-            public class B {
-               public static void foo() {}
-            }
-        """.trimIndent()
-
-        val c = """
+        """
             import a.*;
+            
             import b.B;
             public class C {
                A a;
@@ -44,46 +32,41 @@ interface ChangeMethodTargetToVariableTest {
                    B.foo();
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(c, a, b)
-        val f = cu.classes[0].findFields("a.A")[0]
-
-        val fixed = cu.refactor()
-                .visit(ChangeMethodTargetToVariable().apply {
-                    setMethod("b.B foo()")
-                    setVariable(f.vars[0].simpleName)
-                })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.A;
-            public class C {
-               A a;
-               public void test() {
-                   a.foo();
-               }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn(""" 
+                    package a;
+                    public class A {
+                       public void foo() {}
+                    }
+                """)
+                .whichDependsOn("""
+                    package b;
+                    public class B {
+                       public static void foo() {}
+                    }
+                """)
+                .whenVisitedByMapped { cu ->
+                    val f = cu.classes[0].findFields("a.A")[0]
+                    ChangeMethodTargetToVariable().apply {
+                        setMethod("b.B foo()")
+                        setVariable(f.vars[0].simpleName)
+                    }
+                }
+                .isRefactoredTo("""
+                    import a.A;
+                    public class C {
+                       A a;
+                       public void test() {
+                           a.foo();
+                       }
+                    }
+                """)
     }
 
     @Test
     fun refactorStaticImportToVariable(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo() {}
-            }
-        """.trimIndent()
-
-        val b = """
-            package b;
-            public class B {
-               public static void foo() {}
-            }
-        """.trimIndent()
-
-        val c = """
+        """
             import a.*;
             import static b.B.*;
             public class C {
@@ -92,26 +75,35 @@ interface ChangeMethodTargetToVariableTest {
                    foo();
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(c, a, b)
-
-        val f = cu.classes[0].findFields("a.A")[0]
-        val fixed = cu.refactor()
-                .visit(ChangeMethodTargetToVariable().apply {
-                    setMethod("b.B foo()")
-                    setVariable(f.vars[0].simpleName)
-                })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.A;
-            public class C {
-               A a;
-               public void test() {
-                   a.foo();
-               }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void foo() {}
+                    }
+                """)
+                .whichDependsOn("""
+                    package b;
+                    public class B {
+                       public static void foo() {}
+                    }
+                """)
+                .whenVisitedByMapped { cu ->
+                    val f = cu.classes[0].findFields("a.A")[0]
+                    ChangeMethodTargetToVariable().apply {
+                        setMethod("b.B foo()")
+                        setVariable(f.vars[0].simpleName)
+                    }
+                }
+                .isRefactoredTo("""
+                    import a.A;
+                    public class C {
+                       A a;
+                       public void test() {
+                           a.foo();
+                       }
+                    }
+                """)
     }
 }

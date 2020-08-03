@@ -32,7 +32,7 @@ interface ForLoopTest {
                     }
                 }
             }
-        """)
+        """)[0]
         
         val forLoop = a.firstMethodStatement() as J.ForLoop
         assertTrue(forLoop.control.init is J.VariableDecls)
@@ -49,7 +49,7 @@ interface ForLoopTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.firstMethodStatement() as J.ForLoop
         assertTrue(forLoop.control.init is J.Empty)
@@ -66,7 +66,7 @@ interface ForLoopTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.firstMethodStatement() as J.ForLoop
         assertEquals("for ( int i = 0 ; i < 10 ; i++ ) {\n}", forLoop.printTrimmed())
@@ -80,7 +80,7 @@ interface ForLoopTest {
                     for ( ; ; ) {}
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.firstMethodStatement() as J.ForLoop
         assertEquals("for ( ; ; ) {}", forLoop.printTrimmed())
@@ -95,9 +95,8 @@ interface ForLoopTest {
                     for ( ; i < 10 ; i++ ) {}
                 }
             }
-        """)
+        """)[0]
 
-        // FIXME are body statements printed out of order?
         val forLoop = a.classes[0].methods[0].body!!.statements[1] as J.ForLoop
         assertEquals("for ( ; i < 10 ; i++ ) {}", forLoop.printTrimmed())
     }
@@ -111,7 +110,7 @@ interface ForLoopTest {
                     for(; i < 10; i++) {}
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.classes[0].methods[0].body!!.statements[1] as J.ForLoop
         assertEquals("for(; i < 10; i++) {}", forLoop.printTrimmed())
@@ -125,7 +124,7 @@ interface ForLoopTest {
                     for(;;) test();
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.classes[0].methods[0].body!!.statements[0] as J.ForLoop
         assertEquals("for(;;) test();", forLoop.printTrimmed())
@@ -141,7 +140,7 @@ interface ForLoopTest {
                     for(i=0; i<a.length; i++) {}
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.classes[0].methods[0].body!!.statements[1]
         assertEquals("for(i=0; i<a.length; i++) {}", forLoop.printTrimmed())
@@ -155,7 +154,7 @@ interface ForLoopTest {
                     for(int i, j = 0;;) {}
                 }
             }
-        """)
+        """)[0]
 
         assertEquals("for(int i, j = 0;;) {}", a.classes[0].methods[0].body!!.statements[0].printTrimmed())
     }

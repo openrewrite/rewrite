@@ -19,9 +19,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.openrewrite.Profile;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.Style;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -96,12 +94,12 @@ public class ProfileConfiguration {
      * Does nothing if the profile to be merged has a different name than this profile.
      * For example, if configuration has been added to the 'default' profile in multiple places (user home, project config, etc.)
      * this can be used to merge all of that disparate configuration together.
-     *
+     * <p>
      * So this should be seen as a tool for merging together the split-apart pieces of a single profile, and *not*
      * for taking unrelated profiles and combining them together.
      *
-     * @param profile
-     * @return this
+     * @param profile The profile to merge.
+     * @return this The merged profile.
      */
     public ProfileConfiguration merge(@Nullable ProfileConfiguration profile) {
         if (profile != null && profile.name.equals(name)) {
@@ -130,15 +128,15 @@ public class ProfileConfiguration {
         while (!configs.isEmpty()) {
             ProfileConfiguration config = configs.poll();
             inOrderConfigurations.add(config);
-            if(config.extend != null) {
+            if (config.extend != null) {
                 ProfileConfiguration parent = configsByName.get(config.extend);
-                if(parent != null) {
+                if (parent != null) {
                     configs.add(parent);
                 }
             }
         }
 
-        if(!name.equals("default") && configsByName.containsKey("default")) {
+        if (!name.equals("default") && configsByName.containsKey("default")) {
             inOrderConfigurations.add(configsByName.get("default"));
         }
 
@@ -166,7 +164,7 @@ public class ProfileConfiguration {
             }
 
             @Override
-            public <S, T extends SourceVisitor<S>> FilterReply accept(T visitor) {
+            public FilterReply accept(RefactorVisitor<?> visitor) {
                 return inOrderConfigurations.stream().reduce(
                         NEUTRAL,
                         (reply, config) -> reply.equals(NEUTRAL) ? config.accept(visitor) : reply,
@@ -175,9 +173,9 @@ public class ProfileConfiguration {
             }
 
             @Override
-            public <S, T extends SourceVisitor<S>> T configure(T visitor) {
+            public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor) {
                 Iterator<ProfileConfiguration> configs = inOrderConfigurations.descendingIterator();
-                while(configs.hasNext()) {
+                while (configs.hasNext()) {
                     configs.next().configure(visitor);
                 }
                 return visitor;

@@ -17,10 +17,11 @@ package org.openrewrite.yaml.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.yaml.AbstractYamlSourceVisitor;
 import org.openrewrite.yaml.YamlSourceVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-public class PrintYaml extends YamlSourceVisitor<String> {
+public class PrintYaml extends AbstractYamlSourceVisitor<String> {
     @Override
     public String defaultTo(Tree t) {
         return "";

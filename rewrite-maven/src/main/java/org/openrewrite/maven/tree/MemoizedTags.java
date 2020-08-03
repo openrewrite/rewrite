@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.Refactor;
 import org.openrewrite.xml.ChangeTagContent;
 import org.openrewrite.xml.search.FindTag;
 import org.openrewrite.xml.search.FindTags;
@@ -79,11 +78,7 @@ class MemoizedTags<M> {
                 }
 
                 memoized = maybeMutated;
-                return Optional.of(new Refactor<>(root)
-                        .visit(new ChangeTagContent(parent, content))
-                        .fix()
-                        .getFixed()
-                );
+                return Optional.ofNullable((Xml.Tag) new ChangeTagContent(parent, content).visit(root));
             }
         }
 

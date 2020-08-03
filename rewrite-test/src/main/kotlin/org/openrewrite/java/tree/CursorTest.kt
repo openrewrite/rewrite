@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree
+import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.RetrieveCursor
 import org.openrewrite.java.JavaSourceVisitor
@@ -53,7 +54,7 @@ interface CursorTest {
                     void foo(int n) {}
                 }
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         fun Tree.cursor() = RetrieveCursor(this).visit(a)
 
@@ -61,7 +62,7 @@ interface CursorTest {
         val methodParamScope = a.classes[0].methods[0].params.params[0].cursor()!!
         val forInitScope = a.classes[0].methods[0].body!!.statements.filterIsInstance<J.ForLoop>()[0].control.init.cursor()!!
 
-        assertThat(object : JavaSourceVisitor<Int>() {
+        assertThat(object : AbstractJavaSourceVisitor<Int>() {
             init {
                 setCursoringOn()
             }

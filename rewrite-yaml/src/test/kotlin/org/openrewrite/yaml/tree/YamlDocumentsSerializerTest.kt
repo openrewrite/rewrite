@@ -26,7 +26,7 @@ class YamlDocumentsSerializerTest {
     @Test
     fun roundTripSerialization() {
         val serializer = TreeSerializer<Yaml.Documents>()
-        val a = YamlParser().parse("key: value").withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val a = YamlParser().parse("key: value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
 
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
@@ -37,8 +37,8 @@ class YamlDocumentsSerializerTest {
     @Test
     fun roundTripSerializationList() {
         val serializer = TreeSerializer<Yaml.Documents>()
-        val y1 = YamlParser().parse("key: value").withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
-        val y2 = YamlParser().parse("key: value").withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val y1 = YamlParser().parse("key: value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val y2 = YamlParser().parse("key: value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
 
         val serialized = serializer.write(listOf(y1, y2))
         val deserialized = serializer.readList(serialized)

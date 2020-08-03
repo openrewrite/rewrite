@@ -19,55 +19,51 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
+import org.openrewrite.whenParsedBy
 
 interface ChangeMethodTargetToStaticTest {
 
     @Test
     fun refactorTargetToStatic(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void nonStatic() {}
-            }
-        """.trimIndent()
-
-        val b = """
-            package b;
-            public class B {
-               public static void foo() {}
-            }
-        """.trimIndent()
-
-        val c = """
+        val fixed = """
             import a.*;
             class C {
                public void test() {
                    new A().nonStatic();
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(c, a, b)
-        val fixed = cu.refactor()
-                .visit(ChangeMethodTargetToStatic().apply {
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void nonStatic() {}
+                    }
+                """)
+                .whichDependsOn("""
+                    package b;
+                    public class B {
+                       public static void foo() {}
+                    }
+                """)
+                .whenVisitedBy(ChangeMethodTargetToStatic().apply {
                     setMethod("a.A nonStatic()")
                     setTargetType("b.B")
                 })
-                .visit(ChangeMethodName().apply {
+                .whenVisitedBy(ChangeMethodName().apply {
                     setMethod("b.B nonStatic()")
                     name = "foo"
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import b.B;
-            
-            class C {
-               public void test() {
-                   B.foo();
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    import b.B;
+                    
+                    class C {
+                       public void test() {
+                           B.foo();
+                       }
+                    }
+                """)
+                .fixed()[0]
 
         val refactoredInv = fixed.classes[0].methods[0].body!!.statements[0] as J.MethodInvocation
         assertTrue(refactoredInv.type?.hasFlags(Flag.Static) ?: false)
@@ -75,45 +71,39 @@ interface ChangeMethodTargetToStaticTest {
 
     @Test
     fun refactorStaticTargetToStatic(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public static void foo() {}
-            }
-        """.trimIndent()
-
-        val b = """
-            package b;
-            public class B {
-               public static void foo() {}
-            }
-        """.trimIndent()
-
-        val c = """
+        """
             import static a.A.*;
             class C {
                public void test() {
                    foo();
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(c, a, b)
-        val fixed = cu.refactor()
-                .visit(ChangeMethodTargetToStatic().apply {
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package b;
+                    public class B {
+                       public static void foo() {}
+                    }
+                """)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public static void foo() {}
+                    }
+                """)
+                .whenVisitedBy(ChangeMethodTargetToStatic().apply {
                     setMethod("a.A foo()")
                     setTargetType("b.B")
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import b.B;
-            
-            class C {
-               public void test() {
-                   B.foo();
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    import b.B;
+                    
+                    class C {
+                       public void test() {
+                           B.foo();
+                       }
+                    }
+                """)
     }
 }

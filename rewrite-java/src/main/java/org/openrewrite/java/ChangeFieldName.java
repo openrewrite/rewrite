@@ -89,7 +89,7 @@ public final class ChangeFieldName {
                     .getTree() instanceof J.ClassDecl;
         }
 
-        private static class FindVariableDefinition extends JavaSourceVisitor<Cursor> {
+        private static class FindVariableDefinition extends AbstractJavaSourceVisitor<Cursor> {
             private final J.Ident ident;
             private final Cursor referenceScope;
 

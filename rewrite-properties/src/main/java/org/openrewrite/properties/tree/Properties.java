@@ -73,10 +73,6 @@ public interface Properties extends Serializable, Tree {
             return formatting;
         }
 
-        public Refactor<Properties.File> refactor() {
-            return new Refactor<>(this);
-        }
-
         @Override
         public <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
             return v.visitFile(this);

@@ -16,10 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface InsertMethodArgumentTest {
     companion object {
-        val b = """
+        const val b = """
             class B {
                public void foo() {}
                public void foo(String s) {}
@@ -29,9 +30,9 @@ interface InsertMethodArgumentTest {
                public void bar(String s, String s2) {}
                public void bar(String s, String s2, String s3) {}
             }
-        """.trimIndent()
+        """
 
-        val a = """
+        const val a = """
             class A {
                public void test() {
                    B b = new B();
@@ -39,60 +40,54 @@ interface InsertMethodArgumentTest {
                    b.foo("1");
                }
             }
-        """.trimIndent()
+        """
     }
 
     @Test
     fun insertArgumentDeclarative(jp: JavaParser) {
-        val cu = jp.parse(a, b)
-
-        val fixed = cu.refactor().visit(InsertMethodArgument().apply {
-            setMethod("B foo(String)")
-            setIndex(0)
-            setSource("\"0\"")
-        }).fix().fixed
-
-        assertRefactored(fixed, """
-            class A {
-               public void test() {
-                   B b = new B();
-                   b.foo();
-                   b.foo("0", "1");
-               }
-            }
-        """)
+        a.whenParsedBy(jp).whichDependsOn(b)
+                .whenVisitedBy(InsertMethodArgument().apply {
+                    setMethod("B foo(String)")
+                    setIndex(0)
+                    setSource("\"0\"")
+                })
+                .isRefactoredTo("""
+                    class A {
+                       public void test() {
+                           B b = new B();
+                           b.foo();
+                           b.foo("0", "1");
+                       }
+                    }
+                """)
     }
 
     @Test
     fun insertArgument(jp: JavaParser) {
-        val cu = jp.parse(a, b)
-
-        val fixed = cu.refactor()
-                .visit(InsertMethodArgument().apply {
+        a.whenParsedBy(jp).whichDependsOn(b)
+                .whenVisitedBy(InsertMethodArgument().apply {
                     setMethod("B foo(String)")
                     setIndex(0)
                     setSource("\"0\"")
                 })
-                .visit(InsertMethodArgument().apply {
+                .whenVisitedBy(InsertMethodArgument().apply {
                     setMethod("B foo(String)")
                     setIndex(2)
                     setSource("\"2\"")
                 })
-                .visit(InsertMethodArgument().apply {
+                .whenVisitedBy(InsertMethodArgument().apply {
                     setMethod("B foo()")
                     setIndex(0)
                     setSource("\"0\"")
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            class A {
-               public void test() {
-                   B b = new B();
-                   b.foo("0");
-                   b.foo("0", "1", "2");
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    class A {
+                       public void test() {
+                           B b = new B();
+                           b.foo("0");
+                           b.foo("0", "1", "2");
+                       }
+                    }
+                """)
     }
 }

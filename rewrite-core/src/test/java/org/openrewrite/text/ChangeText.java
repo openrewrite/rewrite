@@ -15,8 +15,6 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.RefactorVisitorSupport;
-import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.AutoConfigure;
 import org.openrewrite.Validated;

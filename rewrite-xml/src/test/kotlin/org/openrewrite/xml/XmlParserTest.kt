@@ -32,7 +32,7 @@ class XmlParserTest: XmlParser() {
             </beans>
         """.trimIndent()
 
-        val x = parse(xSource)
+        val x = parse(xSource)[0]
 
         assertEquals(xSource, x.printTrimmed())
     }
@@ -56,7 +56,7 @@ class XmlParserTest: XmlParser() {
             </project>
         """.trimIndent()
 
-        val x = parse(xSource)
+        val x = parse(xSource)[0]
 
         assertEquals(xSource, x.printTrimmed())
     }

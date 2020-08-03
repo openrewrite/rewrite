@@ -33,7 +33,7 @@ interface SynchronizedTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val sync = a.firstMethodStatement() as J.Synchronized
 

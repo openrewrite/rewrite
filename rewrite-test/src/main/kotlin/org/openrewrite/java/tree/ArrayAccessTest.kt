@@ -31,7 +31,7 @@ interface ArrayAccessTest {
                     int m = n[0];
                 }
             }
-        """)
+        """)[0]
 
         val vars = a.firstMethodStatement() as J.VariableDecls
         val arrAccess = vars.vars[0].initializer as J.ArrayAccess

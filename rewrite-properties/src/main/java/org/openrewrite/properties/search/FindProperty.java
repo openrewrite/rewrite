@@ -17,12 +17,13 @@ package org.openrewrite.properties.search;
 
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
+import org.openrewrite.properties.AbstractPropertiesSourceVisitor;
 import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.tree.Properties;
 
 import static org.openrewrite.Validated.required;
 
-public class FindProperty extends PropertiesSourceVisitor<Properties.Entry> {
+public class FindProperty extends AbstractPropertiesSourceVisitor<Properties.Entry> {
     private String key;
 
     public void setKey(String key) {

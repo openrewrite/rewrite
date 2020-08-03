@@ -17,7 +17,7 @@ package org.openrewrite.config;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.RefactorVisitor;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -25,7 +25,7 @@ import java.util.Collection;
 
 import static java.util.stream.Collectors.toList;
 
-public class ClasspathResourceLoader implements ProfileConfigurationLoader, SourceVisitorLoader {
+public class ClasspathResourceLoader implements ProfileConfigurationLoader, RefactorVisitorLoader {
     private final Collection<YamlResourceLoader> yamlResourceLoaders;
 
     public ClasspathResourceLoader(Iterable<Path> compileClasspath) {
@@ -57,7 +57,7 @@ public class ClasspathResourceLoader implements ProfileConfigurationLoader, Sour
     }
 
     @Override
-    public Collection<SourceVisitor<?>> loadVisitors() {
+    public Collection<? extends RefactorVisitor<?>> loadVisitors() {
         return yamlResourceLoaders.stream().flatMap(loader -> loader.loadVisitors().stream()).collect(toList());
     }
 }

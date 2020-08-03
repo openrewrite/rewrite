@@ -29,7 +29,7 @@ interface LambdaTest {
             public class A {
                 Function<String, String> func = (String s) -> "";
             }
-        """)
+        """)[0]
 
         val lambda = a.classes[0].fields[0].vars[0].initializer as J.Lambda
 
@@ -48,7 +48,7 @@ interface LambdaTest {
                     list.stream().filter(s -> s.isEmpty());
                 }
             }
-        """)
+        """)[0]
 
         assertEquals("list.stream().filter(s -> s.isEmpty())",
                 a.classes[0].methods[0].body!!.statements[0].printTrimmed())
@@ -64,7 +64,7 @@ interface LambdaTest {
                     list.stream().filter((s) -> s.isEmpty());
                 }
             }
-        """)
+        """)[0]
 
         assertEquals("list.stream().filter((s) -> s.isEmpty())",
                 a.classes[0].methods[0].body!!.statements[0].printTrimmed())
@@ -80,7 +80,7 @@ interface LambdaTest {
             interface Action {
                 void call();
             }
-        """)
+        """)[0]
 
         val lambda = a.classes[0].fields[0].vars[0].initializer!!
         assertEquals("( ) -> { }", lambda.printTrimmed())
@@ -93,7 +93,7 @@ interface LambdaTest {
             public class A {
                 BiConsumer<String, String> a = (s1, s2) -> { };
             }
-        """)
+        """)[0]
 
         val lambda = a.classes[0].fields[0].vars[0].initializer!!
         assertEquals("(s1, s2) -> { }", lambda.printTrimmed())

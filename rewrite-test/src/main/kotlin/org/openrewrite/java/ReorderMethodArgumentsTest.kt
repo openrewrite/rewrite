@@ -16,20 +16,13 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface ReorderMethodArgumentsTest {
 
     @Test
     fun refactorReorderArguments(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo(String s, Integer m, Integer n) {}
-               public void foo(Integer n, Integer m, String s) {}
-            }
-        """.trimIndent()
-
-        val b = """
+        """
             import a.*;
             public class B {
                A a;
@@ -41,41 +34,40 @@ interface ReorderMethodArgumentsTest {
                    );
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(b, a)
-        val foos = cu.findMethodCalls("a.A foo(..)")
-        val fixed = cu.refactor()
-                .visit(ChangeLiteral(foos[0].args.args.first()) { "anotherstring" })
-                .visit(ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf()))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo(
-                       2,
-                       1,
-                       "anotherstring"
-                   );
-               }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void foo(String s, Integer m, Integer n) {}
+                       public void foo(Integer n, Integer m, String s) {}
+                    }
+                """)
+                .whenVisitedByMany { cu ->
+                    val foos = cu.findMethodCalls("a.A foo(..)")
+                    listOf(
+                            ChangeLiteral(foos[0].args.args.first()) { "anotherstring" },
+                            ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf())
+                    )
+                }
+                .isRefactoredTo("""
+                    import a.*;
+                    public class B {
+                       A a;
+                       public void test() {
+                           a.foo(
+                               2,
+                               1,
+                               "anotherstring"
+                           );
+                       }
+                    }
+                """)
     }
 
     @Test
     fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo(String arg0, Integer... arg1) {}
-               public void foo(Integer arg0, Integer arg1, String arg2) {}
-            }
         """
-
-        val b = """
             import a.*;
             public class B {
                A a;
@@ -83,39 +75,34 @@ interface ReorderMethodArgumentsTest {
                    a.foo("s", 0, 1);
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(b, a)
-        val fixed = cu.refactor()
-                .visit(ReorderMethodArguments().apply {
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void foo(String arg0, Integer... arg1) {}
+                       public void foo(Integer arg0, Integer arg1, String arg2) {}
+                    }
+                """)
+                .whenVisitedBy(ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("n", "s")
                     setOriginalOrder("s", "n")
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo(0, 1, "s");
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    import a.*;
+                    public class B {
+                       A a;
+                       public void test() {
+                           a.foo(0, 1, "s");
+                       }
+                    }
+                """)
     }
 
     @Test
     fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo(String s, Integer n, Object... o) {}
-               public void bar(String s, Object... o) {}
-            }
         """
-
-        val b = """
             import a.*;
             public class B {
                A a;
@@ -123,61 +110,58 @@ interface ReorderMethodArgumentsTest {
                    a.foo("mystring", 0, "a", "b");
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(b, a)
-
-        val fixed = cu.refactor()
-                .visit(ReorderMethodArguments().apply {
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void foo(String s, Integer n, Object... o) {}
+                       public void bar(String s, Object... o) {}
+                    }
+                """)
+                .whenVisitedBy(ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("s", "o", "n")
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo("mystring", "a", "b", 0);
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    import a.*;
+                    public class B {
+                       A a;
+                       public void test() {
+                           a.foo("mystring", "a", "b", 0);
+                       }
+                    }
+                """)
     }
 
     @Test
     fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public void foo(String s, Object... o) {}
-            }
         """
-
-        val b = """
             import a.*;
             public class B {
                public void test() {
                    new A().foo("mystring");
                }
             }
-        """.trimIndent()
-
-        val cu = jp.parse(b, a)
-        val fixed = cu.refactor()
-                .visit(ReorderMethodArguments().apply {
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn("""
+                    package a;
+                    public class A {
+                       public void foo(String s, Object... o) {}
+                    }
+                """)
+                .whenVisitedBy(ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("o", "s")
                 })
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            import a.*;
-            public class B {
-               public void test() {
-                   new A().foo("mystring");
-               }
-            }
-        """)
+                .isRefactoredTo("""
+                    import a.*;
+                    public class B {
+                       public void test() {
+                           new A().foo("mystring");
+                       }
+                    }
+                """)
     }
 }

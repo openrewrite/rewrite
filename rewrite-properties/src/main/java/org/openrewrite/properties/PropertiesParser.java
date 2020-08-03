@@ -16,6 +16,7 @@
 package org.openrewrite.properties;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
@@ -32,21 +33,25 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class PropertiesParser {
-    public Properties.File parse(String source) {
-        return parseFromInput(Paths.get("unknown.properties"), new ByteArrayInputStream(source.getBytes()));
-    }
+public class PropertiesParser implements Parser<Properties.File> {
 
+    @Override
     public List<Properties.File> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream().map(source -> parse(source, relativeTo)).collect(toList());
+        return sourceFiles.stream().map(sourceFile -> {
+            try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
+                return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }).collect(toList());
     }
 
-    public Properties.File parse(Path sourceFile, @Nullable Path relativeTo) {
-        try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
-            return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+    @Override
+    public List<Properties.File> parse(List<String> sourceFiles) {
+        return sourceFiles.stream()
+                .map(sourceFile -> parseFromInput(Paths.get("unknown.properties"),
+                        new ByteArrayInputStream(sourceFile.getBytes())))
+                .collect(toList());
     }
 
     private Properties.File parseFromInput(Path sourceFile, InputStream source) {
@@ -60,17 +65,15 @@ public class PropertiesParser {
             String line = scanner.next();
             Properties.Content content = null;
 
-            if(line.trim().startsWith("#")) {
+            if (line.trim().startsWith("#")) {
                 content = commentFromLine(line);
-            }
-            else if(line.contains("=")) {
+            } else if (line.contains("=")) {
                 content = entryFromLine(line);
-            }
-            else {
+            } else {
                 prefix.append(line).append("\n");
             }
 
-            if(content != null) {
+            if (content != null) {
                 content = content.withFormatting(Formatting.format(prefix.toString(),
                         content.getSuffix() + "\n"));
                 prefix = new StringBuilder();
@@ -91,16 +94,14 @@ public class PropertiesParser {
             buffer.flush();
             String line = new String(buffer.toByteArray());
 
-            if(line.trim().startsWith("#")) {
+            if (line.trim().startsWith("#")) {
                 contents.add(commentFromLine(line));
-            }
-            else if(line.contains("=")) {
+            } else if (line.contains("=")) {
                 contents.add(entryFromLine(line));
-            }
-            else {
+            } else {
                 suffix = line;
             }
-        } catch(IOException e) {
+        } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
 
@@ -114,8 +115,8 @@ public class PropertiesParser {
                 suffix = new StringBuilder();
 
         int state = 0;
-        for(char c: line.toCharArray()) {
-            switch(state) {
+        for (char c : line.toCharArray()) {
+            switch (state) {
                 case 0:
                     if (Character.isWhitespace(c)) {
                         prefix.append(c);
@@ -123,24 +124,22 @@ public class PropertiesParser {
                     }
                     state++;
                 case 1:
-                    if(c == '#') {
+                    if (c == '#') {
                         continue;
-                    }
-                    else if(!Character.isWhitespace(c)) {
+                    } else if (!Character.isWhitespace(c)) {
                         message.append(c);
                         break;
                     }
                     state++;
                 case 2:
-                    if(!Character.isWhitespace(c)) {
+                    if (!Character.isWhitespace(c)) {
                         // multi-word comment
                         message.append(suffix);
                         message.append(c);
                         suffix = new StringBuilder();
                         state--;
                         break;
-                    }
-                    else {
+                    } else {
                         suffix.append(c);
                     }
             }
@@ -158,8 +157,8 @@ public class PropertiesParser {
                 suffix = new StringBuilder();
 
         int state = 0;
-        for(char c: line.toCharArray()) {
-            switch(state) {
+        for (char c : line.toCharArray()) {
+            switch (state) {
                 case 0:
                     if (Character.isWhitespace(c)) {
                         prefix.append(c);
@@ -167,14 +166,12 @@ public class PropertiesParser {
                     }
                     state++;
                 case 1:
-                    if(c == '=') {
+                    if (c == '=') {
                         state += 2;
-                    }
-                    else if (!Character.isWhitespace(c)) {
+                    } else if (!Character.isWhitespace(c)) {
                         key.append(c);
                         break;
-                    }
-                    else {
+                    } else {
                         state++;
                     }
                 case 2:
@@ -186,28 +183,26 @@ public class PropertiesParser {
                 case 3:
                     if (c == '=') {
                         continue;
-                    }
-                    else if (Character.isWhitespace(c)) {
+                    } else if (Character.isWhitespace(c)) {
                         equalsSuffix.append(c);
                         break;
                     }
                     state++;
                 case 4:
-                    if(!Character.isWhitespace(c)) {
+                    if (!Character.isWhitespace(c)) {
                         value.append(c);
                         break;
                     }
                     state++;
                 case 5:
-                    if(!Character.isWhitespace(c)) {
+                    if (!Character.isWhitespace(c)) {
                         // multi-word value
                         value.append(suffix);
                         value.append(c);
                         suffix = new StringBuilder();
                         state--;
                         break;
-                    }
-                    else {
+                    } else {
                         suffix.append(c);
                     }
             }

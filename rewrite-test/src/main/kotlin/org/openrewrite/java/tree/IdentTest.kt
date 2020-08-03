@@ -30,8 +30,8 @@ interface IdentTest {
                 Integer n = 0;
                 Integer m = n;
             }
-        """)
-        
+        """)[0]
+
         val ident = a.fields(1..1)[0].vars[0].initializer as J.Ident
         assertEquals("n", ident.simpleName)
         assertEquals("java.lang.Integer", ident.type.asClass()?.fullyQualifiedName)

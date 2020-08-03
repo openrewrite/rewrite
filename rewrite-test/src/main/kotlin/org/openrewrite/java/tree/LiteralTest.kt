@@ -28,7 +28,7 @@ interface LiteralTest {
             public class A {
                 int n = 0;
             }
-        """)
+        """)[0]
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals(0, literal.value)
@@ -42,7 +42,7 @@ interface LiteralTest {
             public class A {
                 char c = 'a';
             }
-        """)
+        """)[0]
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals('a', literal.value)
@@ -59,7 +59,7 @@ interface LiteralTest {
                 long l1 = 1L;
                 long l2 = 1;
             }
-        """)
+        """)[0]
 
         val (d1, d2, l1, l2) = a.fields(0..3).map { it.vars[0].initializer as J.Literal }
         assertEquals("1.0d", d1.printTrimmed())
@@ -79,7 +79,7 @@ interface LiteralTest {
                 double d = 01;
                 float f = 01;
             }
-        """)
+        """)[0]
 
         a.fields(0..5).map { it.vars[0].initializer as J.Literal }.forEach {
             assertEquals("01", it.printTrimmed().trimEnd('L'), "expected octal notation for ${it.type}")
@@ -95,7 +95,7 @@ interface LiteralTest {
                 short s = 0b10;
                 int i = 0b10;
             }
-        """)
+        """)[0]
 
         a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
             assertEquals("0b10", it.printTrimmed().trimEnd('L'), "expected binary notation for ${it.type}")
@@ -111,7 +111,7 @@ interface LiteralTest {
                 short s = 0xA0;
                 int i = 0xA0;
             }
-        """)
+        """)[0]
 
         a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
             assertEquals("0xA0", it.printTrimmed().trimEnd('L'), "expected hex notation for ${it.type}")
@@ -124,7 +124,7 @@ interface LiteralTest {
             public class A {
                 String s = "foo ''";
             }
-        """)
+        """)[0]
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals("\"foo\"", literal.transformValue<String> { it.substringBefore(' ') })
@@ -136,7 +136,7 @@ interface LiteralTest {
             public class A {
                 String s = null;
             }
-        """)
+        """)[0]
 
         assertEquals("null", a.classes[0].fields[0].vars[0].initializer?.printTrimmed())
     }
@@ -147,7 +147,7 @@ interface LiteralTest {
             public class A {
                 Long l = 2L;
             }
-        """)
+        """)[0]
 
         val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals("4L", literal.transformValue<Long> { it * 2 })
@@ -160,7 +160,7 @@ interface LiteralTest {
                 Long l = 0l;
                 Long m = 0L;
             }
-        """)
+        """)[0]
 
         val (lower, upper) = a.fields(0..1).map { it.vars[0].initializer as J.Literal }
 
@@ -174,7 +174,7 @@ interface LiteralTest {
             public class A {
                 String s = "\"";
             }
-        """)
+        """)[0]
 
         val s = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals("\"\\\"\"", s.printTrimmed())
@@ -186,7 +186,7 @@ interface LiteralTest {
             public class A {
                 char c = '\'';
             }
-        """)
+        """)[0]
 
         val s = a.classes[0].fields[0].vars[0].initializer as J.Literal
         assertEquals("'\\''", s.printTrimmed())

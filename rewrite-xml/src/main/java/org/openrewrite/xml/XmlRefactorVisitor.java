@@ -15,13 +15,13 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.RefactorVisitorSupport;
+import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.refactor.Formatter;
-import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implements RefactorVisitorSupport {
+public class XmlRefactorVisitor extends AbstractRefactorVisitor<Xml>
+        implements XmlSourceVisitor<Xml> {
     protected Formatter formatter;
 
     @Override
@@ -42,6 +42,11 @@ public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implement
         Xml.Prolog p = prolog;
         p = p.withXmlDecl(refactor(p.getXmlDecl()));
         return p.withMisc(refactor(p.getMisc()));
+    }
+
+    @Override
+    public Xml visitIdent(Xml.Ident ident) {
+        return ident;
     }
 
     @Override
@@ -71,6 +76,16 @@ public abstract class XmlRefactorVisitor extends XmlSourceVisitor<Xml> implement
         Xml.Attribute a = attribute;
         a = a.withKey(refactor(a.getKey()));
         return a.withValue(refactor(a.getValue()));
+    }
+
+    @Override
+    public Xml visitCharData(Xml.CharData charData) {
+        return charData;
+    }
+
+    @Override
+    public Xml visitComment(Xml.Comment comment) {
+        return comment;
     }
 
     @Override

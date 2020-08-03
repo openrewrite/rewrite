@@ -16,47 +16,48 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface ImplementInterfaceTest {
     companion object {
-        val b = "package b;\ninterface B {}"
-        val c = "package c;\ninterface C {}"
+        const val b = "package b;\ninterface B {}"
+        const val c = "package c;\ninterface C {}"
     }
 
     @Test
     fun firstImplementedInterface(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             class A {
             }
-        """.trimIndent(), b)
-
-        val fixed = a.refactor().visit(ImplementInterface(a.classes[0], "b.B")).fix().fixed
-
-        assertRefactored(fixed, """
-            import b.B;
-            
-            class A implements B {
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedByMapped { a -> ImplementInterface(a.classes[0], "b.B") }
+                .isRefactoredTo("""
+                    import b.B;
+                    
+                    class A implements B {
+                    }
+                """)
     }
 
     @Test
     fun addAnImplementedInterface(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import b.B;
             
             class A implements B {
             }
-        """.trimIndent(), b)
-
-        val fixed = a.refactor().visit(ImplementInterface(a.classes[0], "c.C")).fix().fixed
-
-        assertRefactored(fixed, """
-            import b.B;
-            import c.C;
-            
-            class A implements C, B {
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whichDependsOn(b)
+                .whenVisitedByMapped { a -> ImplementInterface(a.classes[0], "c.C") }
+                .isRefactoredTo("""
+                    import b.B;
+                    import c.C;
+                    
+                    class A implements C, B {
+                    }
+                """)
     }
 }

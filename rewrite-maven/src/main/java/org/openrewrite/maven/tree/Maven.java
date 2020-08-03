@@ -21,7 +21,7 @@ import lombok.With;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSourceVisitor;
-import org.openrewrite.maven.PrintMaven;
+import org.openrewrite.maven.internal.PrintMaven;
 import org.openrewrite.xml.ChangeTagContent;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Content;
@@ -91,10 +91,6 @@ public interface Maven extends Serializable, Tree {
                     Property::new, Property::getTag);
         }
 
-        public Refactor<Pom> refactor() {
-            return new Refactor<>(this);
-        }
-
         public Xml.Document getDocument() {
             return document;
         }
@@ -153,10 +149,7 @@ public interface Maven extends Serializable, Tree {
             //noinspection ConstantConditions
             return document.getRoot().getChild("parent")
                     .map(parentTag -> new Pom(model.withParent(parent.getModel()),
-                            document.withRoot(new Refactor<>(document.getRoot())
-                                    .visit(new ChangeTagContent(parentTag, parent.getTag().getContent()))
-                                    .fix()
-                                    .getFixed()))
+                            document.withRoot((Xml.Tag) new ChangeTagContent(parentTag, parent.getTag().getContent()).visit(document.getRoot())))
                     )
                     .orElse(this);
         }
@@ -169,10 +162,7 @@ public interface Maven extends Serializable, Tree {
         public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
             return document.getRoot().getChild("dependencyManagement")
                     .map(dm -> new Pom(model.withDependencyManagement(dependencyManagement.getModel()),
-                            document.withRoot(new Refactor<>(document.getRoot())
-                                    .visit(new ChangeTagContent(dm, dependencyManagement.tag.getContent()))
-                                    .fix()
-                                    .getFixed()))
+                            document.withRoot((Xml.Tag) new ChangeTagContent(dm, dependencyManagement.tag.getContent()).visit(document.getRoot())))
                     )
                     .orElse(this);
         }

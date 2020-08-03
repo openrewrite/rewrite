@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface ChangeFieldTypeTest {
     companion object {
@@ -39,23 +40,15 @@ interface ChangeFieldTypeTest {
     @Disabled("flaky")
     @Test
     fun changeFieldTypeDeclarative(jp: JavaParser) {
-        val cu = jp.parse(a)
-
-        val fixed = cu.refactor()
-                .visit(ChangeFieldType().apply { setType("java.util.List"); setTargetType("java.util.Collection") })
-                .fix().fixed
-
-        assertRefactored(fixed, refactored)
+        a.whenParsedBy(jp)
+                .whenVisitedBy(ChangeFieldType().apply { setType("java.util.List"); setTargetType("java.util.Collection") })
+                .isRefactoredTo(refactored)
     }
 
     @Test
     fun changeFieldType(jp: JavaParser) {
-        val cu = jp.parse(a)
-
-        val fixed = cu.refactor()
-                .visit(ChangeFieldType.Scoped(cu.classes[0].findFields("java.util.List")[0], "java.util.Collection"))
-                .fix().fixed
-
-        assertRefactored(fixed, refactored)
+        a.whenParsedBy(jp)
+                .whenVisitedByMapped { cu -> ChangeFieldType.Scoped(cu.classes[0].findFields("java.util.List")[0], "java.util.Collection") }
+                .isRefactoredTo(refactored)
     }
 }

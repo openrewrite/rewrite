@@ -15,14 +15,14 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.RefactorVisitorSupport;
+import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements RefactorVisitorSupport {
+public class MavenRefactorVisitor extends AbstractRefactorVisitor<Maven> implements MavenSourceVisitor<Maven> {
     protected Formatter formatter;
 
     XmlRefactorVisitor xmlRefactorVisitor = new XmlRefactorVisitor() {
@@ -65,5 +65,10 @@ public class MavenRefactorVisitor extends MavenSourceVisitor<Maven> implements R
             return new Maven.Property(t);
         }
         return property;
+    }
+
+    @Override
+    public Maven visitParent(Maven.Parent parent) {
+        return parent;
     }
 }

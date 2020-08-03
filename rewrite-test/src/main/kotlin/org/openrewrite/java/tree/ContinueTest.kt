@@ -30,7 +30,7 @@ interface ContinueTest {
                     while(true) continue;
                 }
             }
-        """)
+        """)[0]
         
         val whileLoop = a.firstMethodStatement() as J.WhileLoop
         assertTrue(whileLoop.body is J.Continue)
@@ -46,7 +46,7 @@ interface ContinueTest {
                         continue labeled;
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
         assertTrue(whileLoop.body is J.Continue)
@@ -62,7 +62,7 @@ interface ContinueTest {
                         continue labeled;
                 }
             }
-        """)
+        """)[0]
 
         val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
         assertEquals("continue labeled", whileLoop.body.printTrimmed())

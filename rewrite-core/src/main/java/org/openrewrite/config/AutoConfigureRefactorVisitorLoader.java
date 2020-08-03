@@ -18,7 +18,7 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.AutoConfigure;
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.RefactorVisitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -27,16 +27,16 @@ import java.util.Collection;
 
 import static java.util.stream.Collectors.toList;
 
-public class AutoConfigureSourceVisitorLoader implements SourceVisitorLoader {
-    private static final Logger logger = LoggerFactory.getLogger(AutoConfigureSourceVisitorLoader.class);
+public class AutoConfigureRefactorVisitorLoader implements RefactorVisitorLoader {
+    private static final Logger logger = LoggerFactory.getLogger(AutoConfigureRefactorVisitorLoader.class);
 
     private final String[] acceptVisitorPackages;
 
-    public AutoConfigureSourceVisitorLoader(String... acceptVisitorPackages) {
+    public AutoConfigureRefactorVisitorLoader(String... acceptVisitorPackages) {
         this.acceptVisitorPackages = acceptVisitorPackages;
     }
 
-    public Collection<SourceVisitor<?>> loadVisitors() {
+    public Collection<? extends RefactorVisitor<?>> loadVisitors() {
         try(ScanResult scanResult = new ClassGraph()
                 .acceptPackages(acceptVisitorPackages)
                 .enableMemoryMapping()
@@ -51,7 +51,7 @@ public class AutoConfigureSourceVisitorLoader implements SourceVisitorLoader {
                         try {
                             Constructor<?> constructor = visitorClass.getConstructor();
                             constructor.setAccessible(true);
-                            return (SourceVisitor<?>) constructor.newInstance();
+                            return (RefactorVisitor<?>) constructor.newInstance();
                         } catch (Exception e) {
                             logger.warn("Unable to configure {}", visitorClass.getName(), e);
                         }

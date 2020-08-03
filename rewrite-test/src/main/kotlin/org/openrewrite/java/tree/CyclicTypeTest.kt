@@ -82,7 +82,7 @@ interface CyclicTypeTest {
             public class A {
                 A[] nested = new A[0];
             }
-        """)
+        """)[0]
         
         val fieldType = a.classes[0].fields[0].vars[0].type.asArray()
         assertTrue(fieldType is JavaType.Array)

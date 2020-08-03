@@ -28,7 +28,7 @@ interface DoWhileLoopTest {
             public class A {
                 public void test() { do { } while ( true ) ; }
             }
-        """)
+        """)[0]
 
         val whileLoop = a.firstMethodStatement() as J.DoWhileLoop
 

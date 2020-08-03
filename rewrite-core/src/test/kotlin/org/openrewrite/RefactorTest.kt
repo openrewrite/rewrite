@@ -32,14 +32,13 @@ class RefactorTest {
                 })
                 .build()
 
-        val visitors = plan.visitors(PlainText::class.java, "hello-jon")
+        val visitors = plan.visitors("hello-jon")
 
-        val fixed = PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList())
-                .refactor()
+        val fixed = Refactor()
                 .visit(visitors)
-                .fix().fixed
+                .fixed(PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList()))
 
-        assertThat(fixed.print()).isEqualTo("Hello Jon!")
+        assertThat(fixed!!.print()).isEqualTo("Hello Jon!")
     }
 
     @Test
@@ -48,7 +47,7 @@ class RefactorTest {
                 .scanResources()
                 .build()
 
-        val visitors = plan.visitors(PlainText::class.java, "hello-jon")
+        val visitors = plan.visitors("hello-jon")
 
         assertThat(visitors).hasSize(1)
     }

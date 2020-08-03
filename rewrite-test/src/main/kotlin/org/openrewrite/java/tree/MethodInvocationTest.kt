@@ -31,7 +31,7 @@ interface MethodInvocationTest {
     
                 public Integer foo(Integer n, Integer... ns) { return n; }
             }
-        """)
+        """)[0]
 
         val (inv) = a.allInvs()
 
@@ -62,7 +62,7 @@ interface MethodInvocationTest {
     
                 public <T> T generic(T n, T... ns) { return n; }
             }
-        """)
+        """)[0]
 
         val (genericInv, explicitGenericInv) = a.allInvs()
 
@@ -96,7 +96,7 @@ interface MethodInvocationTest {
     
                 public static int staticFoo(int... args) { return 0; }
             }
-        """)
+        """)[0]
 
         val (staticInv, parameterlessStaticInv) = a.allInvs()
 
@@ -112,7 +112,7 @@ interface MethodInvocationTest {
             public class A {
                 Integer n = doesNotExist();
             }
-        """)
+        """)[0]
 
         val inv = a.classes[0].fields[0].vars[0].initializer as J.MethodInvocation
         assertNull(inv.type?.declaringType)

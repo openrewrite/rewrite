@@ -77,10 +77,6 @@ public interface Yaml extends Serializable, Tree {
         @With
         Formatting formatting;
 
-        public Refactor<Yaml.Documents> refactor() {
-            return new Refactor<>(this);
-        }
-
         @Override
         public <R> R acceptYaml(YamlSourceVisitor<R> v) {
             return v.visitDocuments(this);

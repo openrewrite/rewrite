@@ -30,7 +30,7 @@ interface FindMethodTest {
             public class A {
                Object o = Collections.emptyList();
             }
-        """)
+        """)[0]
         
         val m = a.classes[0].findMethodCalls("java.util.Collections emptyList()").first()
         
@@ -45,7 +45,7 @@ interface FindMethodTest {
             public class A {
                Object o = emptyList();
             }
-        """)
+        """)[0]
 
         val m = a.classes[0].findMethodCalls("java.util.Collections emptyList()").firstOrNull()
         assertEquals("java.util.Collections", m?.type?.declaringType.asClass()?.fullyQualifiedName)
@@ -67,7 +67,7 @@ interface FindMethodTest {
             }
         """
 
-        assertTrue(jp.parse(b, a).classes[0].findMethodCalls("A foo(String, Object...)").isNotEmpty())
+        assertTrue(jp.parse(b, a)[0].classes[0].findMethodCalls("A foo(String, Object...)").isNotEmpty())
     }
 
     @Test
@@ -88,6 +88,6 @@ interface FindMethodTest {
             }
         """
 
-        assertEquals(1, jp.parse(a, b).classes[0].findMethodCalls("B.C foo()").size)
+        assertEquals(1, jp.parse(a, b)[0].classes[0].findMethodCalls("B.C foo()").size)
     }
 }

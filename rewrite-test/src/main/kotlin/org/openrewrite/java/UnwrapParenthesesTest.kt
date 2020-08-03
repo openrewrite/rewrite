@@ -17,51 +17,48 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
+import org.openrewrite.whenParsedBy
 
 interface UnwrapParenthesesTest {
     @Test
     fun unwrapAssignment(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             public class A {
                 boolean a;
                 {
                     a = (true);
                 }
             }
-        """.trimIndent())
-
-        val assignment = ((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign).assignment as J.Parentheses<*>
-        val fixed = a.refactor().visit(UnwrapParentheses(assignment)).fix().fixed
-
-        assertRefactored(fixed, """
-            public class A {
-                boolean a;
-                {
-                    a = true;
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> UnwrapParentheses(((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign).assignment as J.Parentheses<*>) }
+                .isRefactoredTo("""
+                    public class A {
+                        boolean a;
+                        {
+                            a = true;
+                        }
+                    }
+                """)
     }
 
     @Test
     fun unwrapIfCondition(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             public class A {
                 {
                     if((true)) {}
                 }
             }
-        """.trimIndent())
-
-        val cond = ((a.classes[0].body.statements[0] as J.Block<*>).statements[0] as J.If).ifCondition.tree as J.Parentheses<*>
-        val fixed = a.refactor().visit(UnwrapParentheses(cond)).fix().fixed
-
-        assertRefactored(fixed, """
-            public class A {
-                {
-                    if(true) {}
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> UnwrapParentheses(((a.classes[0].body.statements[0] as J.Block<*>).statements[0] as J.If).ifCondition.tree as J.Parentheses<*>) }
+                .isRefactoredTo("""
+                    public class A {
+                        {
+                            if(true) {}
+                        }
+                    }
+                """)
     }
 }

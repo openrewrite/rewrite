@@ -29,7 +29,7 @@ interface PrimitiveTest {
                 int n = 0;
                 char c = 'a';
             }
-        """)
+        """)[0]
 
         assertThat(a.fields(0..1).map { it.typeExpr?.type })
                 .containsExactlyInAnyOrder(JavaType.Primitive.Int, JavaType.Primitive.Char)

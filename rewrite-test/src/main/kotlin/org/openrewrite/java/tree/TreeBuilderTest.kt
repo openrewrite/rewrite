@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.java.*
+import org.openrewrite.whenParsedBy
 
 interface TreeBuilderTest {
     @Test
@@ -33,7 +34,7 @@ interface TreeBuilderTest {
                 void foo(String m, List<String> others) {
                 }
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val method = a.classes[0].methods[0]
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
@@ -48,7 +49,7 @@ interface TreeBuilderTest {
 
     @Test
     fun injectSnippetIntoMethod(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             import java.util.List;
             public class A {
                 int n = 0;
@@ -56,37 +57,38 @@ interface TreeBuilderTest {
                 void foo(String m, List<String> others) {
                 }
             }
-        """.trimIndent())
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a ->
+                    val method = a.classes[0].methods[0]
+                    val methodBodyCursor = RetrieveCursor(method.body).visit(a)
+                    val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
 
-        val method = a.classes[0].methods[0]
-        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
-        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
+                    val snippets = TreeBuilder.buildSnippet<Statement>(
+                            jp, a, methodBodyCursor, """
+                            others.add(${paramName});
+                            if(others.contains(${paramName})) {
+                                others.remove(${paramName});
+                            }
+                        """.trimIndent())
 
-        val snippets = TreeBuilder.buildSnippet<Statement>(
-                jp, a, methodBodyCursor, """
-                    others.add(${paramName});
-                    if(others.contains(${paramName})) {
-                        others.remove(${paramName});
-                    }
-                """.trimIndent())
-
-        val fixed = a.refactor().visit(object : JavaRefactorVisitor() {
-            override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
-        }).fix().fixed
-
-        assertRefactored(fixed, """
-            import java.util.List;
-            public class A {
-                int n = 0;
-                
-                void foo(String m, List<String> others) {
-                    others.add(m);
-                    if(others.contains(m)) {
-                        others.remove(m);
+                    object : JavaRefactorVisitor() {
+                        override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
                     }
                 }
-            }
-        """)
+                .isRefactoredTo("""
+                    import java.util.List;
+                    public class A {
+                        int n = 0;
+                        
+                        void foo(String m, List<String> others) {
+                            others.add(m);
+                            if(others.contains(m)) {
+                                others.remove(m);
+                            }
+                        }
+                    }
+                """)
     }
 
     @Test
@@ -104,7 +106,7 @@ interface TreeBuilderTest {
             public class A {
                 Collection<String> list = new ArrayList<>();
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         val methodDecl = TreeBuilder.buildMethodDeclaration(jp, a.classes[0],
                 """

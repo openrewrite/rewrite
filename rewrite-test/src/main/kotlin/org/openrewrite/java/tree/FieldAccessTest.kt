@@ -37,7 +37,7 @@ interface FieldAccessTest {
             }
         """
 
-        val cu = jp.parse(a, b)
+        val cu = jp.parse(a, b)[0]
 
         val acc = cu.fields(0..1).flatMap { it.vars }.find { it.initializer is J.FieldAccess }?.initializer as J.FieldAccess?
         assertEquals("b . field . field", acc?.printTrimmed())

@@ -16,11 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 interface GenerateConstructorUsingFieldsTest {
     @Test
     fun generateConstructorUsingFields(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             public class UsersController {
                 private final UsersService usersService;
                 private final UsernameService usernameService;
@@ -28,45 +29,39 @@ interface GenerateConstructorUsingFieldsTest {
                 public User findUser(String name) {
                 }
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(GenerateConstructorUsingFields(jp, a.classes[0], a.classes[0].fields))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            public class UsersController {
-                private final UsersService usersService;
-                private final UsernameService usernameService;
-            
-                public UsersController(UsersService usersService, UsernameService usernameService) {
-                    this.usersService = usersService;
-                    this.usernameService = usernameService;
-                }
-                
-                public User findUser(String name) {
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> GenerateConstructorUsingFields(jp, a.classes[0], a.classes[0].fields) }
+                .isRefactoredTo("""
+                    public class UsersController {
+                        private final UsersService usersService;
+                        private final UsernameService usernameService;
+                    
+                        public UsersController(UsersService usersService, UsernameService usernameService) {
+                            this.usersService = usersService;
+                            this.usernameService = usernameService;
+                        }
+                        
+                        public User findUser(String name) {
+                        }
+                    }
+                """)
     }
 
     @Test
     fun emptyListOfFields(jp: JavaParser) {
-        val a = jp.parse("""
+        """
             public class UsersController {
             }
-        """.trimIndent())
-
-        val fixed = a.refactor()
-                .visit(GenerateConstructorUsingFields(jp, a.classes[0], emptyList()))
-                .fix().fixed
-
-        assertRefactored(fixed, """
-            public class UsersController {
-            
-                public UsersController() {
-                }
-            }
-        """)
+        """
+                .whenParsedBy(jp)
+                .whenVisitedByMapped { a -> GenerateConstructorUsingFields(jp, a.classes[0], emptyList()) }
+                .isRefactoredTo("""
+                    public class UsersController {
+                    
+                        public UsersController() {
+                        }
+                    }
+                """)
     }
 }

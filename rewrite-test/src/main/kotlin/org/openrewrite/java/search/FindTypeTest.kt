@@ -35,21 +35,21 @@ interface FindTypeTest {
             import a.A1;
             
             public class B extends A1 {}
-        """, a1)
+        """, a1)[0]
 
         assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
     fun fullyQualifiedName(jp: JavaParser) {
-        val b = jp.parse("public class B extends a.A1 {}", a1)
+        val b = jp.parse("public class B extends a.A1 {}", a1)[0]
         assertEquals(1, b.findType("a.A1").size)
     }
 
     @Test
     fun annotation(jp: JavaParser) {
         val a1 = "public @interface A1 {}"
-        val b = jp.parse("@A1 public class B {}", a1)
+        val b = jp.parse("@A1 public class B {}", a1)[0]
         assertEquals(1, b.findType("A1").size)
     }
 
@@ -60,7 +60,7 @@ interface FindTypeTest {
             public class B {
                A1[] a = new A1[0];
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(2, b.findType("a.A1").size)
     }
@@ -72,7 +72,7 @@ interface FindTypeTest {
         val b = jp.parse("""
             import a.A1;
             public class B extends A1 implements I1 {}
-        """, a1, i1)
+        """, a1, i1)[0]
 
         assertEquals(1, b.findType("a.A1").size)
         assertEquals(1, b.findType("I1").size)
@@ -85,7 +85,7 @@ interface FindTypeTest {
             public class B {
                public A1 foo() throws A1 { return null; }
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(2, b.findType("a.A1").size)
     }
@@ -102,7 +102,7 @@ interface FindTypeTest {
                    this.<A1>generic(null, null);
                }
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(4, b.findType("a.A1").size)
     }
@@ -117,7 +117,7 @@ interface FindTypeTest {
                    catch(A1 | RuntimeException e) {}
                }
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(1, b.findType("a.A1").size)
     }
@@ -129,7 +129,7 @@ interface FindTypeTest {
             public class B {
                A1 f1, f2;
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(1, b.findType("a.A1").size)
     }
@@ -141,7 +141,7 @@ interface FindTypeTest {
             public class B {
                A1 a = new A1();
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(2, b.findType("a.A1").size)
     }
@@ -153,7 +153,7 @@ interface FindTypeTest {
             public class B {
                Map<A1, A1> m;
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(2, b.findType("a.A1").size)
     }
@@ -165,7 +165,7 @@ interface FindTypeTest {
             public class B {
                A1 a = (A1) null;
             }
-        """, a1)
+        """, a1)[0]
 
         assertEquals(2, b.findType("a.A1").size)
     }

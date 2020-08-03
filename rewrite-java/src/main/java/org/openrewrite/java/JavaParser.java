@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
+import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.TabAndIndentStyle;
@@ -35,12 +36,10 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
-public interface JavaParser {
+public interface JavaParser extends Parser<J.CompilationUnit> {
     /**
      * Convenience utility for constructing a parser with binary dependencies on the runtime classpath of the process
      * constructing the parser.
@@ -87,29 +86,8 @@ public interface JavaParser {
         return javaParser;
     }
 
-    List<J.CompilationUnit> parse(List<Path> sourceFiles, @Nullable Path relativeTo);
-
-    default J.CompilationUnit parse(String source, String whichDependsOn) {
-        return parse(source, singletonList(whichDependsOn));
-    }
-
-    default J.CompilationUnit parse(String source, List<String> whichDependOn) {
-        return parse(source, whichDependOn.toArray(new String[0]));
-    }
-
-    default List<J.CompilationUnit> parse(List<Path> sourceFiles) {
-        return parse(sourceFiles, null);
-    }
-
-    default J.CompilationUnit parse(String source, String... whichDependOn) {
-        return parseStrings(Stream.concat(Stream.of(source), Arrays.stream(whichDependOn)).collect(toList())).get(0);
-    }
-
-    default List<J.CompilationUnit> parseStrings(String... sources) {
-        return parseStrings(Arrays.asList(sources));
-    }
-
-    default List<J.CompilationUnit> parseStrings(List<String> sources) {
+    @Override
+    default List<J.CompilationUnit> parse(List<String> sources) {
         try {
             Path temp = Files.createTempDirectory("sources");
 
@@ -131,7 +109,7 @@ public interface JavaParser {
             };
 
             try {
-                return parse(sources.stream().map(sourceFile).collect(toList()));
+                return parse(sources.stream().map(sourceFile).collect(toList()), null);
             } finally {
                 // delete temp recursively
                 //noinspection ResultOfMethodCallIgnored

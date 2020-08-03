@@ -28,7 +28,7 @@ interface ArrayTypeTest {
             public class A {
                 public String[][] foo() { return null; }
             }
-        """)
+        """)[0]
 
         val meth = a.classes[0].methods[0]
         assertEquals("public String[][] foo() { return null; }", meth.printTrimmed())

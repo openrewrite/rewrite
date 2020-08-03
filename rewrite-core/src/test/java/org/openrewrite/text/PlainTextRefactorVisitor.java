@@ -15,8 +15,9 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.RefactorVisitorSupport;
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.AbstractSourceVisitor;
+import org.openrewrite.RefactorVisitor;
 
-public abstract class PlainTextRefactorVisitor extends SourceVisitor<PlainText> implements RefactorVisitorSupport {
+public class PlainTextRefactorVisitor extends AbstractSourceVisitor<PlainText>
+        implements RefactorVisitor<PlainText> {
 }

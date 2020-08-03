@@ -16,6 +16,7 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.whenParsedBy
 
 class ChangePropertyKeyTest : YamlParser() {
     private val changeProp = ChangePropertyKey().apply {
@@ -25,47 +26,38 @@ class ChangePropertyKeyTest : YamlParser() {
 
     @Test
     fun singleEntry() {
-        val y = parse("""
-            management.metrics.binders.files.enabled: true
-        """.trimIndent())
-
-        val fixed = y.refactor().visit(changeProp).fix().fixed
-
-        assertRefactored(fixed, """
-            management.metrics.enable.process.files: true
-        """.trimIndent())
+        "management.metrics.binders.files.enabled: true"
+                .whenParsedBy(this)
+                .whenVisitedBy(changeProp)
+                .isRefactoredTo("management.metrics.enable.process.files: true")
     }
 
     @Test
     fun nestedEntry() {
-        val y = parse("""
+        """
             management.metrics:
                 binders:
                     jvm.enabled: true
                     files.enabled: true
-        """.trimIndent())
-
-        val fixed = y.refactor().visit(changeProp).fix().fixed
-
-        assertRefactored(fixed, """
-            management.metrics:
-                binders.jvm.enabled: true
-                enable.process.files: true
-        """.trimIndent())
+        """
+                .whenParsedBy(this)
+                .whenVisitedBy(changeProp)
+                .isRefactoredTo("""
+                    management.metrics:
+                        binders.jvm.enabled: true
+                        enable.process.files: true
+                """)
     }
 
     @Test
     fun nestedEntryEmptyPartialPathRemoved() {
-        val y = parse("""
+        """
             management.metrics:
                 binders:
                     files.enabled: true
-        """.trimIndent())
-
-        val fixed = y.refactor().visit(changeProp).fix().fixed
-
-        assertRefactored(fixed, """
-            management.metrics.enable.process.files: true
-        """.trimIndent())
+        """
+                .whenParsedBy(this)
+                .whenVisitedBy(changeProp)
+                .isRefactoredTo("management.metrics.enable.process.files: true")
     }
 }

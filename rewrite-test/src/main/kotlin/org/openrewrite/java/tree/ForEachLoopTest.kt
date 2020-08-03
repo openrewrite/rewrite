@@ -30,7 +30,7 @@ interface ForEachLoopTest {
                     }
                 }
             }
-        """)
+        """)[0]
 
         val forEachLoop = a.firstMethodStatement() as J.ForEachLoop
 
@@ -46,7 +46,7 @@ interface ForEachLoopTest {
                     for(Integer i : n) test();
                 }
             }
-        """)
+        """)[0]
 
         val forLoop = a.classes[0].methods[0].body!!.statements[0] as J.ForEachLoop
         assertEquals("for(Integer i : n) test();", forLoop.printTrimmed())

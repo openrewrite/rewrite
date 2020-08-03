@@ -16,10 +16,11 @@
 package org.openrewrite.properties.internal;
 
 import org.openrewrite.Tree;
+import org.openrewrite.properties.AbstractPropertiesSourceVisitor;
 import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-public class PrintProperties extends PropertiesSourceVisitor<String> {
+public class PrintProperties extends AbstractPropertiesSourceVisitor<String> {
     @Override
     public String defaultTo(Tree t) {
         return "";

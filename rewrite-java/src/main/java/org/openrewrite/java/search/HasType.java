@@ -18,15 +18,13 @@ package org.openrewrite.java.search;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Tree;
-import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.Set;
-
-public class HasType extends JavaSourceVisitor<Boolean> {
+public class HasType extends AbstractJavaSourceVisitor<Boolean> {
     private final String clazz;
 
     public HasType(String clazz) {

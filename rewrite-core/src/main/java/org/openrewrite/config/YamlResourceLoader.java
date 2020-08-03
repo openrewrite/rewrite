@@ -19,10 +19,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.Tree;
-import org.openrewrite.Validated;
-import org.openrewrite.ValidationException;
+import org.openrewrite.*;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
@@ -33,7 +30,7 @@ import java.util.*;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 
-public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVisitorLoader {
+public class YamlResourceLoader implements ProfileConfigurationLoader, RefactorVisitorLoader {
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -85,21 +82,21 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
             throw new ValidationException(validation);
         }
 
-        List<SourceVisitor<? extends Tree>> subVisitors = new ArrayList<>();
+        List<RefactorVisitor<? extends Tree>> subVisitors = new ArrayList<>();
 
         //noinspection unchecked
         for (Object subVisitorNameAndConfig : (List<Object>) visitorMap.get("visitors")) {
             try {
                 if (subVisitorNameAndConfig instanceof String) {
                     //noinspection unchecked
-                    subVisitors.add((SourceVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
+                    subVisitors.add((RefactorVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
                             .getDeclaredConstructor().newInstance());
                 } else if (subVisitorNameAndConfig instanceof Map) {
                     //noinspection unchecked
                     for (Map.Entry<String, Object> subVisitorEntry : ((Map<String, Object>) subVisitorNameAndConfig)
                             .entrySet()) {
-                        @SuppressWarnings("unchecked") SourceVisitor<Tree> subVisitor =
-                                (SourceVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
+                        @SuppressWarnings("unchecked") RefactorVisitor<Tree> subVisitor =
+                                (RefactorVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
                                         .getDeclaredConstructor().newInstance();
 
                         propertyConverter.updateValue(subVisitor, subVisitorEntry.getValue());
@@ -148,9 +145,8 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, SourceVis
         return profiles.values();
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public Collection<SourceVisitor<?>> loadVisitors() {
-        return (Collection<SourceVisitor<?>>) (Collection) visitors;
+    public Collection<? extends RefactorVisitor<?>> loadVisitors() {
+        return visitors;
     }
 }

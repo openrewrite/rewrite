@@ -119,13 +119,13 @@ interface ModifierTest {
     }
 
     private fun JavaParser.modifiersOnClass(modifiers: String): J.ClassDecl =
-            reset().parse("public class A {${modifiers}class B {}}").classes[0].body.statements[0] as J.ClassDecl
+            reset().parse("public class A {${modifiers}class B {}}")[0].classes[0].body.statements[0] as J.ClassDecl
 
     private fun JavaParser.modifiersOnField(modifiers: String): J.VariableDecls =
-            reset().parse("public class A {${modifiers}int n;").classes[0].body.statements[0] as J.VariableDecls
+            reset().parse("public class A {${modifiers}int n;")[0].classes[0].body.statements[0] as J.VariableDecls
 
     private fun JavaParser.modifiersOnMethod(modifiers: String): J.MethodDecl =
-            reset().parse("public class A {${modifiers}void foo() {}").classes[0].body.statements[0] as J.MethodDecl
+            reset().parse("public class A {${modifiers}void foo() {}")[0].classes[0].body.statements[0] as J.MethodDecl
 
     private fun J.ClassDecl.printMods() = print().substringBefore("class")
     private fun J.VariableDecls.printMods() = print().substringBefore("int")

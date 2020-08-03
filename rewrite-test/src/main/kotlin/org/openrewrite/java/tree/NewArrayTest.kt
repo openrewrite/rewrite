@@ -28,8 +28,8 @@ interface NewArrayTest {
             public class A {
                 int[] n = new int[0];
             }
-        """)
-        
+        """)[0]
+
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertNull(newArr.initializer)
         assertTrue(newArr.type is JavaType.Array)
@@ -44,7 +44,7 @@ interface NewArrayTest {
             public class A {
                 int[] n = new int[] { 0, 1, 2 };
             }
-        """)
+        """)[0]
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertTrue(newArr.dimensions[0].size is J.Empty)
@@ -59,7 +59,7 @@ interface NewArrayTest {
             public class A {
                 int[][] n = new int [ 0 ] [ 1 ];
             }
-        """)
+        """)[0]
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertEquals("new int [ 0 ] [ 1 ]", newArr.printTrimmed())
@@ -71,7 +71,7 @@ interface NewArrayTest {
             public class A {
                 int[][] n = new int [ 0 ] [ ];
             }
-        """)
+        """)[0]
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertEquals("new int [ 0 ] [ ]", newArr.printTrimmed())
@@ -84,7 +84,7 @@ interface NewArrayTest {
                 int[] m = new int[] { 0 };
                 int[][] n = new int [ ] [ ] { m, m, m };
             }
-        """)
+        """)[0]
 
         val newArr = a.classes[0].fields[1].vars[0].initializer as J.NewArray
         assertEquals("new int [ ] [ ] { m, m, m }", newArr.printTrimmed())
@@ -100,7 +100,7 @@ interface NewArrayTest {
             }
         """
 
-        val a = jp.parse("""@Produces({"something"}) class A {}""", produces)
+        val a = jp.parse("""@Produces({"something"}) class A {}""", produces)[0]
         val arr = a.classes[0].annotations[0].args!!.args[0] as J.NewArray
 
         assertNull(arr.typeExpr)

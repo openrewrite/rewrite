@@ -41,8 +41,8 @@ interface CompilationUnitSerializerTest {
     }
 
     @Test
-    fun `round trip serialization of AST preserves flyweights`(jp: JavaParser) {
-        val a = jp.parse(aSource).withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+    fun roundTripSerializationPreservesFlyweights(jp: JavaParser) {
+        val a = jp.parse(aSource)[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
 
         println(serializer.writePretty(a))
 
@@ -58,8 +58,8 @@ interface CompilationUnitSerializerTest {
     }
 
     @Test
-    fun `round trip serialization of AST list`(jp: JavaParser) {
-        val a = jp.parse(aSource)
+    fun roundTripSerializationOfList(jp: JavaParser) {
+        val a = jp.parse(aSource)[0]
         val aBytes = serializer.write(listOf(a))
         assertEquals(a, serializer.readList(aBytes)[0])
     }
