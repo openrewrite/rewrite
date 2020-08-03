@@ -101,13 +101,12 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
 
                 JavaType.Method methodType = null;
                 if (method.getType() != null) {
-                    // if the original is a static method invocation, the import on it's type may no longer be needed
-                    andThen(orderImports);
-
                     Set<Flag> flags = new LinkedHashSet<>(method.getType().getFlags());
                     flags.remove(Flag.Static);
                     methodType = method.getType().withDeclaringType(this.type).withFlags(flags);
                 }
+
+                andThen(orderImports);
 
                 return method
                         .withSelect(J.Ident.build(randomId(), variable, type, select == null ? Formatting.EMPTY : select.getFormatting()))
