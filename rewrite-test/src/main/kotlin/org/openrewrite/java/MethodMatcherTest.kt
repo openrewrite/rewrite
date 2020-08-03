@@ -114,7 +114,7 @@ interface MethodMatcherTest {
                     A a = new A(); 
                 }
             }
-        """.trimIndent())
+        """.trimIndent())[0]
 
         assertTrue(MethodMatcher("a.A A()").matches(
                 ((cu.classes.first().body.statements.first() as J.Block<*>)

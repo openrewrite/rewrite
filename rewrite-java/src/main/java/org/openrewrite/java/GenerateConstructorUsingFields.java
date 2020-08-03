@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TreeBuilder;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -47,7 +48,7 @@ public class GenerateConstructorUsingFields extends JavaRefactorVisitor {
     @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         if (scope.isScope(classDecl) && !hasRequiredArgsConstructor(classDecl)) {
-            List<J> statements = classDecl.getBody().getStatements();
+            List<J> statements = new ArrayList<>(classDecl.getBody().getStatements());
 
             int lastField = -1;
             for (int i = 0; i < statements.size(); i++) {
