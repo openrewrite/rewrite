@@ -16,11 +16,14 @@ interface RefactoringVisitorTests<T: Parser<*>> {
      */
     fun assertRefactored(
             visitors: Iterable<RefactorVisitor<*>> = this.visitors,
+            dependencies: List<String> = listOf(),
             before: String,
             after: String) {
-        before.whenParsedBy(parser)
+        before.trimIndent()
+                .whenParsedBy(parser)
+                .whichDependsOn(*dependencies.toTypedArray())
                 .whenVisitedBy(visitors)
-                .isRefactoredTo(after)
+                .isRefactoredTo(after.trimIndent())
     }
 
     @BeforeEach
