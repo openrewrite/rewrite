@@ -16,18 +16,12 @@
 package org.openrewrite.xml;
 
 import org.openrewrite.AbstractRefactorVisitor;
-import org.openrewrite.Tree;
 import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.tree.Xml;
 
 public class XmlRefactorVisitor extends AbstractRefactorVisitor<Xml>
         implements XmlSourceVisitor<Xml> {
     protected Formatter formatter;
-
-    @Override
-    public Xml defaultTo(Tree t) {
-        return (Xml) t;
-    }
 
     @Override
     public Xml visitDocument(Xml.Document document) {

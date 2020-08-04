@@ -20,6 +20,7 @@ import org.openrewrite.properties.tree.Properties;
 
 public abstract class AbstractPropertiesSourceVisitor<R> extends AbstractSourceVisitor<R>
         implements PropertiesSourceVisitor<R> {
+
     public R visitFile(Properties.File file) {
         return reduce(
                 defaultTo(file),

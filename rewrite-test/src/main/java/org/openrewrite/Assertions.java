@@ -76,7 +76,7 @@ public class Assertions {
         }
 
         private S primary(List<S> sources) {
-            return sources.stream().filter(s -> s.print().equals(primarySource)).findAny()
+            return sources.stream().filter(s -> s.print().trim().equals(primarySource)).findAny()
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
         }
     }

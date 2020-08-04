@@ -16,7 +16,6 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.AbstractRefactorVisitor;
-import org.openrewrite.Tree;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.XmlRefactorVisitor;
@@ -27,11 +26,6 @@ public class MavenRefactorVisitor extends AbstractRefactorVisitor<Maven> impleme
 
     XmlRefactorVisitor xmlRefactorVisitor = new XmlRefactorVisitor() {
     };
-
-    @Override
-    public Maven defaultTo(Tree t) {
-        return (Maven) t;
-    }
 
     @Override
     public Maven visitPom(Maven.Pom pom) {

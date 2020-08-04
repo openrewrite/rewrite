@@ -16,7 +16,6 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.AbstractRefactorVisitor;
-import org.openrewrite.Tree;
 import org.openrewrite.refactor.Formatter;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -24,11 +23,6 @@ public class YamlRefactorVisitor extends AbstractRefactorVisitor<Yaml>
         implements YamlSourceVisitor<Yaml> {
 
     protected Formatter formatter;
-
-    @Override
-    public Yaml defaultTo(Tree t) {
-        return (Yaml) t;
-    }
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents) {
