@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.Parser;
-import org.openrewrite.SourceFile;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.TabAndIndentStyle;
@@ -163,6 +162,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B classpath(List<Path> classpath) {
             this.classpath = classpath;
+            return (B) this;
+        }
+
+        public B classpath(String... classpath) {
+            this.classpath = dependenciesFromClasspath(classpath);
             return (B) this;
         }
 

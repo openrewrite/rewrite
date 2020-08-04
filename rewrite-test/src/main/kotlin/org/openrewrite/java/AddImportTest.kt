@@ -16,9 +16,10 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.whenParsedBy
 
-interface AddImportTest {
+interface AddImportTest: RefactorVisitorTest {
     @Test
     fun addMultipleImports(jp: JavaParser) {
         "class A {}"
