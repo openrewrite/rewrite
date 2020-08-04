@@ -52,3 +52,8 @@ fun loadRefactorPlan(profileName: String): RefactorPlan {
             .loadVisitors(visitors)
             .build()
 }
+
+/**
+ * Retrieve the visitors for the named profile from the classpath
+ */
+fun loadVisitors(profileName: String): Collection<RefactorVisitor<*>> = loadRefactorPlan(profileName).visitors(profileName)
