@@ -61,7 +61,7 @@ public interface SourceVisitor<R> {
             return (R) (Boolean) ((Boolean) r1 || (Boolean) r2);
         }
         else if (r1 instanceof String) {
-            return (R) (r1.toString() + r2.toString());
+            return (R) (r1.toString() + (r2 == null ? "" : r2.toString()));
         }
         else if (r1 instanceof Set) {
             return (R) Stream.concat(

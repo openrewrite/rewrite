@@ -15,6 +15,34 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.search.*
+
 class Java11SearchCompatibilityTest: JavaSearchCompatibilityKit() {
     override fun javaParser(): Java11Parser = Java11Parser.builder().build()
 }
+
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindAnnotationTest: Java11Test(), FindAnnotationTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindFieldsTest: Java11Test(), FindFieldsTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindInheritedFieldsTest: Java11Test(), FindInheritedFieldsTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindMethodTest: Java11Test(), FindMethodTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindReferencesToVariableTest: Java11Test(), FindReferencesToVariableTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11FindTypeTest: Java11Test(), FindTypeTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11HasImportTest: Java11Test(), HasImportTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11HasTypeTest: Java11Test(), HasTypeTest
