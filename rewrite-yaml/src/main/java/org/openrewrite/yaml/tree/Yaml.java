@@ -24,6 +24,7 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlSourceVisitor;
 import org.openrewrite.yaml.internal.PrintYaml;
@@ -41,6 +42,20 @@ public interface Yaml extends Serializable, Tree {
     @Override
     default String print() {
         return new PrintYaml().visit(this);
+    }
+
+    @SuppressWarnings("StatementWithEmptyBody")
+    default String printTrimmed() {
+        String print = print();
+
+        int i = 0;
+        for (; i < print.toCharArray().length && (print.charAt(i) == '\n' || print.charAt(i) == '\r'); i++) {
+        }
+        print = print.substring(i);
+
+        return print.isEmpty() || !Character.isWhitespace(print.charAt(0)) ?
+                print :
+                StringUtils.trimIndent(print.trim());
     }
 
     @Override
