@@ -36,4 +36,8 @@ public interface Parser<S extends SourceFile> {
     }
 
     List<S> parse(List<String> sources);
+
+    default Parser<S> reset() {
+        return this;
+    }
 }

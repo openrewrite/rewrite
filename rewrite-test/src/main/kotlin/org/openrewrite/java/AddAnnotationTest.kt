@@ -16,9 +16,10 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 
-interface AddAnnotationTest {
+interface AddAnnotationTest : RefactorVisitorTest {
     companion object {
         private const val annot = """
             package b;
@@ -28,133 +29,140 @@ interface AddAnnotationTest {
     }
 
     @Test
-    fun addAnnotationToClass(jp: JavaParser) {
-        """
-            package a;
-            
-            public class UsersController {
-                class Inner {
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> AddAnnotation.Scoped(a.classes[0], "lombok.RequiredArgsConstructor") }
-                .whenVisitedByMapped { a -> AddAnnotation.Scoped(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor") }
-                .isRefactoredTo("""
-                    package a;
-                    
-                    import lombok.RequiredArgsConstructor;
-                    
-                    @RequiredArgsConstructor
-                    public class UsersController {
-                        @RequiredArgsConstructor
-                        class Inner {
-                        }
-                    }
-                """)
-    }
-
-    @Test
-    fun addAnnotationToField(jp: JavaParser) {
-        """
-            package a;
-            
-            public class UsersController {
-                private final UserService userService;
-                NameService nameService;
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(annot)
-                .whenVisitedByMapped { a -> AddAnnotation.Scoped(a.classes[0].fields[0], "b.MyAnnotation") }
-                .whenVisitedByMapped { a -> AddAnnotation.Scoped(a.classes[0].fields[1], "b.MyAnnotation") }
-                .isRefactoredTo("""
-                    package a;
-                    
-                    import b.MyAnnotation;
-                    
-                    public class UsersController {
-                        @MyAnnotation
-                        private final UserService userService;
-                    
-                        @MyAnnotation
-                        NameService nameService;
-                    }
-                """)
-    }
-
-    @Test
-    fun addAnnotationToMethod(jp: JavaParser) {
-        """
-            package a;
-            
-            public class UsersController {
-                UsersController() {
-                }
-            
-                public void onInit() {
-                }
-            
-                void onInit2() {
-                }
+    fun addAnnotationToClass(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                package a;
                 
-                <T> T onInit3() {
-                    return null;
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(annot)
-                .whenVisitedByMany { a -> a.classes[0].methods.map { m -> AddAnnotation.Scoped(m, "b.MyAnnotation") } }
-                .isRefactoredTo("""
-                    package a;
-                    
-                    import b.MyAnnotation;
-                    
-                    public class UsersController {
-                        @MyAnnotation
-                        UsersController() {
-                        }
-                    
-                        @MyAnnotation
-                        public void onInit() {
-                        }
-                    
-                        @MyAnnotation
-                        void onInit2() {
-                        }
-                        
-                        @MyAnnotation
-                        <T> T onInit3() {
-                            return null;
-                        }
+                public class UsersController {
+                    class Inner {
                     }
-                """)
-    }
+                }
+            """,
+            visitorsMapped = listOf(
+                    { a -> AddAnnotation.Scoped(a.classes[0], "lombok.RequiredArgsConstructor") },
+                    { a -> AddAnnotation.Scoped(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor") }
+            ),
+            after = """
+                package a;
+                
+                import lombok.RequiredArgsConstructor;
+                
+                @RequiredArgsConstructor
+                public class UsersController {
+                    @RequiredArgsConstructor
+                    class Inner {
+                    }
+                }
+            """
+    )
 
     @Test
-    fun addAnnotationToMethodParameters(jp: JavaParser) {
-        """
-            package a;
-            
-            public class UsersController {
-                public void getUsers(Integer maxUsers) {
+    fun addAnnotationToField(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                package a;
+                
+                public class UsersController {
+                    private final UserService userService;
+                    NameService nameService;
                 }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(annot)
-                .whenVisitedByMapped { a -> AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0],
-                        "b.MyAnnotation") }
-                .isRefactoredTo("""
-                    package a;
-                    
-                    import b.MyAnnotation;
-                    
-                    public class UsersController {
-                        public void getUsers(@MyAnnotation Integer maxUsers) {
-                        }
+            """,
+            visitorsMapped = listOf(
+                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[0], "b.MyAnnotation") },
+                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[1], "b.MyAnnotation") }
+            ),
+            after = """
+                package a;
+                
+                import b.MyAnnotation;
+                
+                public class UsersController {
+                    @MyAnnotation
+                    private final UserService userService;
+                
+                    @MyAnnotation
+                    NameService nameService;
+                }
+            """
+    )
+
+    @Test
+    fun addAnnotationToMethod(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                package a;
+                
+                public class UsersController {
+                    UsersController() {
                     }
-                """)
-    }
+                
+                    public void onInit() {
+                    }
+                
+                    void onInit2() {
+                    }
+                    
+                    <T> T onInit3() {
+                        return null;
+                    }
+                }
+            """,
+            dependencies = listOf(annot),
+            visitorsMappedToMany = listOf { a: J.CompilationUnit ->
+                a.classes[0].methods.map { m -> AddAnnotation.Scoped(m, "b.MyAnnotation") }
+            },
+            after = """
+                package a;
+                
+                import b.MyAnnotation;
+                
+                public class UsersController {
+                    @MyAnnotation
+                    UsersController() {
+                    }
+                
+                    @MyAnnotation
+                    public void onInit() {
+                    }
+                
+                    @MyAnnotation
+                    void onInit2() {
+                    }
+                    
+                    @MyAnnotation
+                    <T> T onInit3() {
+                        return null;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun addAnnotationToMethodParameters(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                package a;
+                
+                public class UsersController {
+                    public void getUsers(Integer maxUsers) {
+                    }
+                }
+            """,
+            dependencies = listOf(annot),
+            visitorsMapped = listOf { a ->
+                AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0],
+                        "b.MyAnnotation")
+            },
+            after = """
+                package a;
+                
+                import b.MyAnnotation;
+                
+                public class UsersController {
+                    public void getUsers(@MyAnnotation Integer maxUsers) {
+                    }
+                }
+            """
+    )
 }

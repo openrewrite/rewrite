@@ -23,11 +23,11 @@ class Java11RefactorCompatibilityTest: JavaRefactorCompatibilityKit() {
     override fun javaParser(): Java11Parser = Java11Parser.builder().build()
 }
 
-//@ExtendWith(JavaParserResolver::class)
-//class Java11AddAnnotationTest: Java11Test(), AddAnnotationTest
-//
-//@ExtendWith(JavaParserResolver::class)
-//class Java11AddFieldTest: Java11Test(), AddFieldTest
+@ExtendWith(JavaParserResolver::class)
+class Java11AddAnnotationTest: Java11Test(), AddAnnotationTest
+
+@ExtendWith(JavaParserResolver::class)
+class Java11AddFieldTest: Java11Test(), AddFieldTest
 //
 //@ExtendWith(JavaParserResolver::class)
 //class Java11AddImportTest: Java11Test(), AddImportTest

@@ -111,6 +111,11 @@ public class Assertions {
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitor);
         }
 
+        public RefactoringAssert<S> whenVisitedBy(Iterable<RefactorVisitor<?>> visitors) {
+            List<S> sources = parser.parse(sourceFiles, relativeTo);
+            return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitors);
+        }
+
         public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
             List<S> sources = parser.parse(sourceFiles, relativeTo);
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
