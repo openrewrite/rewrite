@@ -64,20 +64,8 @@ class MemoizedTags<M> {
 
         synchronized (this) {
             if (maybeMutated != getModels()) {
-                Map<Xml.Tag, M> modelsByTag = new HashMap<>(getModels().size());
-                getModels().forEach(m -> modelsByTag.put(modelToTag.apply(m), m));
-
                 List<Content> content = new ArrayList<>();
-                for (M model : maybeMutated) {
-                    M memoizedModel = modelsByTag.get(modelToTag.apply(model));
-                    if (memoizedModel == null) {
-                        content.add(modelToTag.apply(model));
-                    } else {
-                        content.add(modelToTag.apply(model));
-                    }
-                }
-
-                memoized = maybeMutated;
+                maybeMutated.forEach(model -> content.add(modelToTag.apply(model)));
                 return Optional.ofNullable((Xml.Tag) new ChangeTagContent(parent, content).visit(root));
             }
         }

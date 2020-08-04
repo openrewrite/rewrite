@@ -348,11 +348,14 @@ public interface Maven extends Serializable, Tree {
 
     class Dependency implements Maven {
         private final boolean isManaged;
+
+        @Getter
+        @With
         private final MavenModel.Dependency model;
 
         @Getter
         @With
-        final Xml.Tag tag;
+        private final Xml.Tag tag;
 
         @ConstructorProperties({"isManaged", "model", "tag"})
         public Dependency(boolean isManaged, MavenModel.Dependency model, Xml.Tag tag) {
@@ -363,10 +366,6 @@ public interface Maven extends Serializable, Tree {
 
         public boolean isManaged() {
             return isManaged;
-        }
-
-        public MavenModel.Dependency getModel() {
-            return model;
         }
 
         @JsonIgnore

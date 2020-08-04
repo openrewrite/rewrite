@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven
 
-import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.whenParsedBy
@@ -212,7 +212,7 @@ class ChangeDependencyVersionTest {
         val myModuleProject = File(tempDir.toFile(), "my-module")
         myModuleProject.mkdirs()
 
-        val pom = File(tempDir.toFile(), "pom.xml").apply {
+        assertTrue(File(tempDir.toFile(), "pom.xml").apply {
             writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -269,9 +269,12 @@ class ChangeDependencyVersionTest {
                       </properties>
                     </project>
                 """)
-                .fixed()[0]
-
-        assertThat(pom.dependencies[0].model.moduleVersion.version).isEqualTo("28.2-jre")
+                .fixed()
+                .any { pom ->
+                    pom.dependencies.firstOrNull()?.model?.moduleVersion?.version ==
+                            "29.0-jre"
+                }
+        )
     }
 
     @Test
