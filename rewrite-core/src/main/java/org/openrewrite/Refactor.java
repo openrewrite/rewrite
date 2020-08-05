@@ -137,10 +137,10 @@ public class Refactor {
                 }
 
                 accumulatedSources.set(j, acc);
+            }
 
-                if (rulesThatMadeChangesThisCycle == 0) {
-                    break;
-                }
+            if (rulesThatMadeChangesThisCycle == 0) {
+                break;
             }
         }
 
