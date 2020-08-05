@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.function.Function;
 
 public class AbstractRefactorVisitor<T extends Tree> extends AbstractSourceVisitor<T> implements RefactorVisitor<T> {
-    private final ThreadLocal<List<RefactorVisitor<T>>> andThen = new ThreadLocal<>();
+    private final ThreadLocal<List<RefactorVisitor<? extends T>>> andThen = new ThreadLocal<>();
 
     public AbstractRefactorVisitor() {
         andThen.set(new ArrayList<>());
@@ -33,7 +33,7 @@ public class AbstractRefactorVisitor<T extends Tree> extends AbstractSourceVisit
      *
      * @return Other visitors that are run after this one.
      */
-    public List<RefactorVisitor<T>> andThen() {
+    public List<RefactorVisitor<? extends T>> andThen() {
         return andThen.get();
     }
 

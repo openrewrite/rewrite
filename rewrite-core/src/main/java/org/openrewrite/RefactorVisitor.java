@@ -30,7 +30,7 @@ public interface RefactorVisitor<T extends Tree> extends SourceVisitor<T> {
     /**
      * @return Other visitors that are run after this one.
      */
-    default List<RefactorVisitor<T>> andThen() {
+    default List<RefactorVisitor<? extends T>> andThen() {
         return emptyList();
     }
 

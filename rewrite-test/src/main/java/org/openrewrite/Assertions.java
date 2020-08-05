@@ -24,6 +24,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import static java.util.stream.Collectors.toList;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -164,15 +165,26 @@ public class Assertions {
             return this;
         }
 
-        public RefactoringAssert<S> isRefactoredTo(String expected) {
+        private SourceFile doRefactor() {
             Collection<Change> fixes = refactor.fix(sources);
             assertThat(fixes).isNotEmpty();
 
-            SourceFile fixed = fixes.stream().filter(f -> primarySource.equals(f.getOriginal())).findAny()
+            return fixes.stream().filter(f -> primarySource.equals(f.getOriginal())).findAny()
                     .map(Change::getFixed)
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
+        }
+
+        public RefactoringAssert<S> isRefactoredTo(String expected) {
+            SourceFile fixed = doRefactor();
             assertThat(fixed).isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
+
+            return this;
+        }
+        public RefactoringAssert<S> isRefactoredTo(Supplier<String> expected) {
+            SourceFile fixed = doRefactor();
+            assertThat(fixed).isNotNull();
+            assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected.get()));
 
             return this;
         }

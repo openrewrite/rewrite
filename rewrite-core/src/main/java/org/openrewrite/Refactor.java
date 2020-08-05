@@ -134,11 +134,11 @@ public class Refactor {
                     visitor.generate().forEach(g -> accumulatedSources.add((SourceFile) g));
                 }
 
+                accumulatedSources.set(j, acc);
+
                 if (rulesThatMadeChangesThisCycle == 0) {
                     break;
                 }
-
-                accumulatedSources.set(j, acc);
             }
         }
 

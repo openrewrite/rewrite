@@ -18,10 +18,10 @@ package org.openrewrite;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 
@@ -36,17 +36,7 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
 
     @Override
     public Tree visit(Tree tree) {
-        Tree acc = tree;
-        for (RefactorVisitor<? extends Tree> delegate : delegates) {
-            Tree next = delegate.visit(acc);
-
-            // FIXME effectively means a composite cannot delete a file.
-            // what can we do about this?
-            if (next != null) {
-                acc = next;
-            }
-        }
-        return acc;
+        return tree;
     }
 
     @Override
@@ -78,5 +68,18 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
                 .filter(Objects::nonNull)
                 .findAny()
                 .orElse(null);
+    }
+
+    private final List<RefactorVisitor<? extends Tree>> andThen = new ArrayList<>();
+
+    @Override
+    public List<RefactorVisitor<? extends Tree>> andThen() {
+        return andThen;
+    }
+
+    @Override
+    public void next() {
+        andThen.clear();
+        andThen.addAll(delegates);
     }
 }
