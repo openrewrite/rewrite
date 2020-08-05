@@ -131,7 +131,9 @@ public class Refactor {
                 // let's do that now. On the next cycle, these visitors shouldn't generate these files again, but update
                 // them in place as necessary.
                 for (RefactorVisitor<? extends Tree> visitor : visitors) {
-                    visitor.generate().forEach(g -> accumulatedSources.add((SourceFile) g));
+                    rulesThatMadeChangesThisCycle += visitor.generate().stream()
+                            .map(g -> accumulatedSources.add((SourceFile) g))
+                            .count();
                 }
 
                 accumulatedSources.set(j, acc);
