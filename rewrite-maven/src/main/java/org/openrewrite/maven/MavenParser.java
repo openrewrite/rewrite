@@ -85,12 +85,14 @@ public class MavenParser implements Parser<Maven.Pom> {
             return this;
         }
 
-        public void remoteRepositories(List<RemoteRepository> remoteRepositories) {
+        public Builder remoteRepositories(List<RemoteRepository> remoteRepositories) {
             this.remoteRepositories = remoteRepositories;
+            return this;
         }
 
-        public void addRemoteRepository(RemoteRepository remoteRepository) {
+        public Builder addRemoteRepository(RemoteRepository remoteRepository) {
             this.remoteRepositories.add(remoteRepository);
+            return this;
         }
 
         public MavenParser build() {
