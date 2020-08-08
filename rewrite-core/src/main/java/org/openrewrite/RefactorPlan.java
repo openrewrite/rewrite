@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import org.openrewrite.config.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,14 +48,21 @@ public class RefactorPlan {
     }
 
     public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, Iterable<String> profiles) {
-        List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
-                .map(profilesByName::get)
+        return loadedProfiles(profiles).stream()
+                .reduce(visitor, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1);
+    }
+
+    @Nullable
+    public <S extends Style> S style(Class<S> styleClass, Iterable<String> profiles) {
+        return loadedProfiles(profiles).stream()
+                .map(profile -> profile.getStyles().stream()
+                        .filter(styleClass::isInstance)
+                        .findFirst()
+                        .orElse(null))
                 .filter(Objects::nonNull)
-                .collect(toList());
-
-        visitor = loadedProfiles.stream().reduce(visitor, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1);
-
-        return visitor;
+                .map(styleClass::cast)
+                .findFirst()
+                .orElse(null);
     }
 
     public Collection<RefactorVisitor<?>> visitors(String... profiles) {
@@ -62,14 +70,17 @@ public class RefactorPlan {
     }
 
     public Collection<RefactorVisitor<?>> visitors(Iterable<String> profiles) {
-        List<Profile> loadedProfiles = stream(profiles.spliterator(), false)
-                .map(profilesByName::get)
-                .filter(Objects::nonNull)
-                .collect(toList());
-
+        List<Profile> loadedProfiles = loadedProfiles(profiles);
         return visitors.stream()
                 .map(v -> loadedProfiles.stream().reduce(v, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1))
                 .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
+                .collect(toList());
+    }
+
+    private List<Profile> loadedProfiles(Iterable<String> profiles) {
+        return stream(profiles.spliterator(), false)
+                .map(profilesByName::get)
+                .filter(Objects::nonNull)
                 .collect(toList());
     }
 
