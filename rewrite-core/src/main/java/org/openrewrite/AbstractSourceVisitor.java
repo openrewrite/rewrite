@@ -21,7 +21,8 @@ import java.lang.management.ManagementFactory;
 import java.util.List;
 
 public abstract class AbstractSourceVisitor<R> implements SourceVisitor<R> {
-    private static final boolean IS_DEBUGGING = ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
+    private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
+            ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
     private boolean cursored = IS_DEBUGGING;
 
