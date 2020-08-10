@@ -2503,6 +2503,13 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         @With
+        J.Ident encl;
+
+        @With
+        New nooh;
+
+        @Nullable
+        @With
         TypeTree clazz;
 
         @Nullable
@@ -2546,6 +2553,17 @@ public interface J extends Serializable, Tree {
 
             @With
             List<Expression> args;
+
+            @With
+            Formatting formatting;
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class New implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
 
             @With
             Formatting formatting;

@@ -29,7 +29,24 @@ interface NewClassTest {
             }
         """
     }
-    
+
+    @Test
+    fun innerClassNew(jp: JavaParser) {
+        val a = """
+            class A {
+                void bar(B b, C c) {}
+                void foo() {
+                    bar(this . new B(), this.new C());
+                }
+                class B { }
+                class C { }
+            }
+        """.trimIndent()
+
+        assertEquals(a, jp.parse(a).first().printTrimmed())
+    }
+
+
     @Test
     fun anonymousInnerClass(jp: JavaParser) {
         val c = """

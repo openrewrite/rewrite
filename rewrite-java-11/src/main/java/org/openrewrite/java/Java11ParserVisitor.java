@@ -901,6 +901,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitNewClass(NewClassTree node, Formatting fmt) {
+        J.Ident encl = convert(node.getEnclosingExpression());
+
+        if(encl != null) {
+            encl = encl.withSuffix(sourceBefore("."));
+        }
+
         skip("new");
 
         // for enum definitions with anonymous class initializers, endPos of node identifier will be -1
@@ -929,7 +935,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
         }
 
-        return new J.NewClass(randomId(), clazz, args, body, type(((JCNewClass) node).type), fmt);
+        return new J.NewClass(randomId(), encl, clazz, args, body, type(((JCNewClass) node).type), fmt);
     }
 
     @Override
