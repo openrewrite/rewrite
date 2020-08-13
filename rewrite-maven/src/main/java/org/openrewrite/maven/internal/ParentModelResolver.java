@@ -19,7 +19,6 @@ import org.apache.maven.model.Parent;
 import org.apache.maven.model.Repository;
 import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
-import org.apache.maven.model.resolution.InvalidRepositoryException;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.eclipse.aether.RepositorySystem;
@@ -29,7 +28,8 @@ import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactRequest;
 import org.eclipse.aether.resolution.ArtifactResolutionException;
-import org.eclipse.aether.resolution.MetadataRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 
@@ -38,6 +38,8 @@ import java.util.List;
  */
 @SuppressWarnings("JavadocReference")
 public class ParentModelResolver implements ModelResolver {
+    private static final Logger logger = LoggerFactory.getLogger(ParentModelResolver.class);
+
     private final RepositorySystem repositorySystem;
     private final RepositorySystemSession repositorySystemSession;
     private final List<RemoteRepository> remoteRepositories;
@@ -51,6 +53,7 @@ public class ParentModelResolver implements ModelResolver {
     @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version) throws UnresolvableModelException {
+        logger.info("resolving model for: {}:{}", groupId, artifactId);
         Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
 
         try {
@@ -59,6 +62,7 @@ public class ParentModelResolver implements ModelResolver {
             artifactRequest.setRepositories(remoteRepositories);
 
             pomArtifact = repositorySystem.resolveArtifact(repositorySystemSession, artifactRequest).getArtifact();
+            logger.info("  complete");
         } catch (ArtifactResolutionException e) {
             throw new UnresolvableModelException(e.getMessage(), groupId, artifactId, version, e);
         }
