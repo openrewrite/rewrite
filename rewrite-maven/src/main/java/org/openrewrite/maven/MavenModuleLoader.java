@@ -22,15 +22,21 @@ import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.*;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.collection.CollectRequest;
+import org.eclipse.aether.collection.CollectResult;
+import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
+import org.eclipse.aether.graph.Exclusion;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
+import org.eclipse.aether.repository.RepositoryPolicy;
 import org.eclipse.aether.resolution.*;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 import org.eclipse.aether.version.Version;
 import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.Maven;
@@ -163,7 +169,7 @@ class MavenModuleLoader {
                                        String groupId, String artifactId, String version,
                                        String classifier, String extension) {
         Artifact newerArtifacts = new DefaultArtifact(groupId, artifactId, classifier, extension,
-                "[" + version + ",)");
+                "(" + version + ",)");
 
         VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
         newerArtifactsRequest.setArtifact(newerArtifacts);
@@ -182,6 +188,7 @@ class MavenModuleLoader {
     private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
                                                     RepositorySystemSession repositorySystemSession,
                                                     Dependency dependency, Model model, Model rawModel) {
+
         // This may not be the EFFECTIVE mvid, e.g. a version here could be a property reference. So two distinct
         // "dependency" instances could ultimately refer to the same MavenModel.Dependency, and that's ok.
         MavenModel.ModuleVersionId mvidFromDependency = new MavenModel.ModuleVersionId(
@@ -205,39 +212,22 @@ class MavenModuleLoader {
                         .orElse(dependency.getVersion());
 
                 if (resolveDependencies) {
-                    Artifact artifact = new DefaultArtifact(
-                            dependency.getGroupId(),
-                            dependency.getArtifactId(),
-                            dependency.getClassifier(),
-                            dependency.getType(),
-                            Maven.getPropertyKey(dependency.getVersion())
-                                    .map(versionProperty -> (String) model.getProperties().get(versionProperty))
-                                    .orElse(dependency.getVersion()));
-                    ArtifactRequest artifactRequest = new ArtifactRequest();
-                    artifactRequest.setArtifact(artifact);
-                    artifactRequest.setRepositories(remoteRepositories);
+                    Artifact artifact = collectIfNecessary(repositorySystem, repositorySystemSession,
+                            model, dependency);
 
-                    try {
-                        ArtifactResult artifactResult = repositorySystem
-                                .resolveArtifact(repositorySystemSession, artifactRequest);
-                        artifact = artifactResult.getArtifact();
-                        logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+                    return new MavenModel.Dependency(
+                            new MavenModel.ModuleVersionId(
+                                    artifact.getGroupId(),
+                                    artifact.getArtifactId(),
+                                    artifact.getClassifier(),
+                                    artifact.getVersion(),
+                                    newerVersions(repositorySystem, repositorySystemSession,
+                                            artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(),
+                                            artifact.getClassifier(), artifact.getExtension())
+                            ),
+                            requestedVersion,
+                            dependency.getScope());
 
-                        return new MavenModel.Dependency(
-                                new MavenModel.ModuleVersionId(
-                                        artifact.getGroupId(),
-                                        artifact.getArtifactId(),
-                                        artifact.getClassifier(),
-                                        artifact.getVersion(),
-                                        newerVersions(repositorySystem, repositorySystemSession,
-                                                artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(),
-                                                artifact.getClassifier(), artifact.getExtension())
-                                ),
-                                requestedVersion,
-                                dependency.getScope());
-                    } catch (ArtifactResolutionException e) {
-                        logger.warn("error resolving artifact: {}", e.getMessage());
-                    }
                 }
             }
 
@@ -246,6 +236,55 @@ class MavenModuleLoader {
                     requestedVersion,
                     dependency.getScope());
         });
+    }
+
+    private Artifact collectIfNecessary(RepositorySystem repositorySystem,
+                                        RepositorySystemSession repositorySystemSession,
+                                        Model model,
+                                        Dependency dependency) {
+        Artifact artifact = new DefaultArtifact(
+                dependency.getGroupId(),
+                dependency.getArtifactId(),
+                dependency.getClassifier(),
+                dependency.getType(),
+                Maven.getPropertyKey(dependency.getVersion())
+                        .map(versionProperty -> (String) model.getProperties().get(versionProperty))
+                        .orElse(dependency.getVersion()));
+
+        if (!artifact.getVersion().contains("[") && !artifact.getVersion().contains("(")) {
+            return artifact;
+        }
+
+        CollectRequest collectRequest = new CollectRequest();
+        collectRequest.addDependency(
+                new org.eclipse.aether.graph.Dependency(
+                        artifact,
+                        dependency.getScope(),
+                        dependency.getOptional() != null && dependency.getOptional().equals("true"),
+                        dependency.getExclusions().stream()
+                                .map(exclusion -> new Exclusion(
+                                        exclusion.getGroupId(),
+                                        exclusion.getArtifactId(),
+                                        null,
+                                        null
+                                ))
+                                .collect(toList())
+                )
+        );
+        collectRequest.setRepositories(remoteRepositories);
+
+        if (resolveDependencies) {
+            try {
+                CollectResult collectResult = repositorySystem
+                        .collectDependencies(repositorySystemSession, collectRequest);
+                artifact = collectResult.getRoot().getChildren().iterator().next().getArtifact();
+                logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
+            } catch (DependencyCollectionException e) {
+                logger.warn("error collecting dependencies: {}", e.getMessage());
+            }
+        }
+
+        return artifact;
     }
 
     private RepositorySystem getRepositorySystem() {
@@ -266,7 +305,15 @@ class MavenModuleLoader {
         repositorySystemSession.setLocalRepositoryManager(
                 system.newLocalRepositoryManager(repositorySystemSession, localRepository));
 
+        repositorySystemSession.setChecksumPolicy(RepositoryPolicy.CHECKSUM_POLICY_IGNORE);
+        repositorySystemSession.setCache(new DefaultRepositoryCache());
+        repositorySystemSession.setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.IGNORE_ERRORS));
+
+        // TODO can we share resolution state across partitions with some implementation of this?
+        // repositorySystemSession.setWorkspaceReader()
+
         repositorySystemSession.setRepositoryListener(new ConsoleRepositoryEventListener());
+        repositorySystemSession.setReadOnly();
 
         return repositorySystemSession;
     }

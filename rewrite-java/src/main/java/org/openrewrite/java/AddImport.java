@@ -31,8 +31,7 @@ import org.openrewrite.java.tree.TreeBuilder;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.openrewrite.Formatting.EMPTY;
-import static org.openrewrite.Formatting.formatFirstPrefix;
+import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
@@ -117,7 +116,12 @@ public class AddImport extends JavaRefactorVisitor {
                     importToAdd.withPrefix("\n\n");
         }
 
-        cu = cu.withClasses(formatFirstPrefix(cu.getClasses(), "\n\n"));
+        // add just enough newlines to yield a blank line between imports and the first class declaration
+        if(cu.getClasses().iterator().hasNext()) {
+            while (!firstPrefix(cu.getClasses()).startsWith("\n\n")) {
+                cu = cu.withClasses(formatFirstPrefix(cu.getClasses(), "\n" + firstPrefix(cu.getClasses())));
+            }
+        }
 
         imports.add(importToAdd);
         cu = cu.withImports(imports);

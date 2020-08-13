@@ -109,9 +109,9 @@ public class Refactor {
                             // we should only report on the top-level visitors, not any andThen() visitors that
                             // are applied as part of the top-level visitor's pipeline
                             changesByTree.compute(acc, (acc2, prevChange) -> prevChange == null ?
-                                    new Change(prev, acc2, Collections.singleton(visitor.getClass().getName())) :
+                                    new Change(prev, acc2, Collections.singleton(visitor.getName())) :
                                     new Change(prev, acc2, Stream
-                                            .concat(prevChange.getRulesThatMadeChanges().stream(), Stream.of(visitor.getClass().getName()))
+                                            .concat(prevChange.getRulesThatMadeChanges().stream(), Stream.of(visitor.getName()))
                                             .collect(toSet()))
                             );
                             rulesThatMadeChangesThisCycle++;

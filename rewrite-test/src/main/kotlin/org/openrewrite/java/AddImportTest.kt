@@ -47,6 +47,34 @@ interface AddImportTest: RefactorVisitorTest {
     }
 
     @Test
+    fun lastImportWhenFirstClassDeclarationHasJavadoc(jp: JavaParser) {
+        """
+            import java.util.List;
+            
+            /**
+             * My type
+             */
+            class A {}
+        """
+                .whenParsedBy(jp)
+                .whenVisitedBy(AddImport().apply {
+                    setType("java.util.Collections")
+                    setStaticMethod("*")
+                    setOnlyIfReferenced(false)
+                })
+                .isRefactoredTo("""
+                    import java.util.List;
+                    
+                    import static java.util.Collections.*;
+                    
+                    /**
+                     * My type
+                     */
+                    class A {}
+                """)
+    }
+
+    @Test
     fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) {
         """
             package a;

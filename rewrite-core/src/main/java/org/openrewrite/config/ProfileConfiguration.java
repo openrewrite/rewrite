@@ -148,18 +148,20 @@ public class ProfileConfiguration {
 
             @Override
             public Collection<Style> getStyles() {
-                return styles.entrySet().stream()
-                        .map(styleConfigByName -> {
-                            try {
-                                Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
-                                propertyConverter.updateValue(style, styleConfigByName.getValue());
-                                return style;
-                            } catch (Exception e) {
-                                logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
-                                return null;
-                            }
-                        })
-                        .filter(Objects::nonNull)
+                return inOrderConfigurations.stream()
+                        .flatMap(conf -> conf.styles.entrySet().stream()
+                            .map(styleConfigByName -> {
+                                try {
+                                    Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
+                                    propertyConverter.updateValue(style, styleConfigByName.getValue());
+                                    return style;
+                                } catch (Exception e) {
+                                    logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
+                                    return null;
+                                }
+                            })
+                            .filter(Objects::nonNull)
+                        )
                         .collect(toList());
             }
 

@@ -170,8 +170,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
-        public B importStyle(ImportLayoutStyle importStyle) {
-            this.styles.add(importStyle);
+        public B importStyle(@Nullable ImportLayoutStyle importStyle) {
+            if(importStyle != null) {
+                this.styles.add(importStyle);
+            }
             return (B) this;
         }
 

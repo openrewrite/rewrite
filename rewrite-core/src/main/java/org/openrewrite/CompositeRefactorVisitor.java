@@ -80,6 +80,7 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
     @Override
     public void next() {
         andThen.clear();
+        delegates.forEach(RefactorVisitor::next);
         andThen.addAll(delegates);
     }
 }

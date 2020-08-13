@@ -25,7 +25,7 @@ interface UseStaticImportTest {
             package test;
             
             import asserts.Assert;
-                        
+            
             class Test {
                 void test() {
                     Assert.assertTrue(true);

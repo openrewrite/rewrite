@@ -16,248 +16,237 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface OrderImportTest {
-    @Test
-    fun orderImports(jp: JavaParser) {
-        """
-            import static java.util.stream.Collectors.joining;
-            import java.util.ArrayList;
-            import java.util.regex.Pattern;
-            import java.util.Objects;
-            import java.util.Set;
-            import org.openrewrite.java.tree.JavaType;
-            import org.openrewrite.java.tree.TypeUtils;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import org.openrewrite.java.tree.JavaType;
-                    import org.openrewrite.java.tree.TypeUtils;
-                    
-                    import java.util.ArrayList;
-                    import java.util.Objects;
-                    import java.util.Set;
-                    import java.util.regex.Pattern;
-                    
-                    import static java.util.stream.Collectors.joining;
-                    
-                    class A {}
-                """.trimIndent())
-    }
+interface OrderImportTest : RefactorVisitorTest {
 
     @Test
-    fun blankLineThenEmptyBlockThenNonEmptyBlock(jp: JavaParser) {
-        """
-            import java.util.ArrayList;
-            import java.util.Objects;
-
-            import org.openrewrite.java.tree.JavaType;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import org.openrewrite.java.tree.JavaType;
-                    
-                    import java.util.ArrayList;
-                    import java.util.Objects;
-                    
-                    class A {}
-                """)
-    }
-
-    @Test
-    fun foldIntoStar(jp: JavaParser) {
-        """
-            import java.util.List;
-            import java.util.ArrayList;
-            import java.util.regex.Pattern;
-            import java.util.Objects;
-            import java.util.Set;
-            import java.util.Map;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import java.util.*;
-                    import java.util.regex.Pattern;
-                    
-                    class A {}
-                """)
-    }
+    fun orderImports(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import static java.util.stream.Collectors.joining;
+                import java.util.ArrayList;
+                import java.util.regex.Pattern;
+                import java.util.Objects;
+                import java.util.Set;
+                import org.openrewrite.java.tree.JavaType;
+                import org.openrewrite.java.tree.TypeUtils;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import org.openrewrite.java.tree.JavaType;
+                import org.openrewrite.java.tree.TypeUtils;
+                
+                import java.util.ArrayList;
+                import java.util.Objects;
+                import java.util.Set;
+                import java.util.regex.Pattern;
+                
+                import static java.util.stream.Collectors.joining;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun blankLinesNotFollowedByBlockArentAdded(jp: JavaParser) {
-        """
-            import java.util.List;
-            
-            import static java.util.Collections.*;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isUnchanged()
-    }
+    fun blankLineThenEmptyBlockThenNonEmptyBlock(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.ArrayList;
+                import java.util.Objects;
+    
+                import org.openrewrite.java.tree.JavaType;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import org.openrewrite.java.tree.JavaType;
+                
+                import java.util.ArrayList;
+                import java.util.Objects;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun foldIntoExistingStar(jp: JavaParser) {
-        """
-            import java.util.*;
-            import java.util.ArrayList;
-            import java.util.regex.Pattern;
-            import java.util.Objects;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import java.util.*;
-                    import java.util.regex.Pattern;
-                    
-                    class A {}
-                """)
-    }
+    fun foldIntoStar(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.List;
+                import java.util.ArrayList;
+                import java.util.regex.Pattern;
+                import java.util.Objects;
+                import java.util.Set;
+                import java.util.Map;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import java.util.*;
+                import java.util.regex.Pattern;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun idempotence(jp: JavaParser) {
-        """
-            import java.util.*;
-            import java.util.regex.Pattern;
-
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isUnchanged()
-    }
-
-    @Test
-    fun unfoldStar(jp: JavaParser) {
-        """
-            import java.util.*;
-            
-            class A {
-                List list;
-                List list2;
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports())
-                .isRefactoredTo("""
-                    import java.util.List;
-                    
-                    class A {
-                        List list;
-                        List list2;
-                    }
-                """)
-    }
+    fun blankLinesNotFollowedByBlockArentAdded(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+                import java.util.List;
+                
+                import static java.util.Collections.*;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) })
+    )
 
     @Test
-    fun removeUnused(jp: JavaParser) {
-        """
-            import java.util.*;
-            
-            class A {
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports())
-                .isRefactoredTo("""
-                    class A {
-                    }
-                """)
-    }
+    fun foldIntoExistingStar(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.*;
+                import java.util.ArrayList;
+                import java.util.regex.Pattern;
+                import java.util.Objects;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import java.util.*;
+                import java.util.regex.Pattern;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun unfoldStaticStar(jp: JavaParser) {
-        """
-            import java.util.List;
-            
-            import static java.util.Collections.*;
-            
-            class A {
-                List list = emptyList();
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports())
-                .isRefactoredTo("""
-                    import java.util.List;
-                    
-                    import static java.util.Collections.emptyList;
-                    
-                    class A {
-                        List list = emptyList();
-                    }
-                """)
-    }
+    fun idempotence(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+                import java.util.*;
+                import java.util.regex.Pattern;
+    
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) })
+    )
 
     @Test
-    fun packagePatternEscapesDots(jp: JavaParser) {
-        """
-            import javax.annotation.Nonnull;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isUnchanged()
-    }
+    fun unfoldStar(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.*;
+                
+                class A {
+                    List list;
+                    List list2;
+                }
+            """,
+            visitors = listOf(OrderImports()),
+            after = """
+                import java.util.List;
+                
+                class A {
+                    List list;
+                    List list2;
+                }
+            """
+    )
 
     @Test
-    fun twoImportsFollowedByStar(jp: JavaParser) {
-        """
-            import java.io.IOException;
-            import java.io.UncheckedIOException;
-            import java.nio.files.*;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isUnchanged()
-    }
+    fun removeUnused(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.*;
+                
+                class A {
+                }
+            """,
+            visitors = listOf(OrderImports()),
+            after = """
+                class A {
+                }
+            """
+    )
 
     @Test
-    fun springCloudFormat(jp: JavaParser) {
-        """
-            import java.io.ByteArrayOutputStream;
-            import java.nio.charset.StandardCharsets;
-            import java.util.Collections;
-            import java.util.zip.GZIPOutputStream;
-            
-            import javax.servlet.ReadListener;
-            import javax.servlet.ServletInputStream;
-            import javax.servlet.ServletOutputStream;
-            
-            import com.fasterxml.jackson.databind.ObjectMapper;
-            import org.apache.commons.logging.Log;
-            import reactor.core.publisher.Mono;
-            
-            import org.springframework.core.io.buffer.DataBuffer;
-            import org.springframework.core.io.buffer.DataBufferFactory;
-            import org.springframework.http.HttpHeaders;
-            import org.springframework.util.MultiValueMap;
-            import org.springframework.web.bind.annotation.PathVariable;
-            import org.springframework.web.server.ServerWebExchange;
-            
-            import static java.util.Arrays.stream;
-            import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply {
+    fun unfoldStaticStar(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import java.util.List;
+                
+                import static java.util.Collections.*;
+                
+                class A {
+                    List list = emptyList();
+                }
+            """,
+            visitors = listOf(OrderImports()),
+            after = """
+                import java.util.List;
+                
+                import static java.util.Collections.emptyList;
+                
+                class A {
+                    List list = emptyList();
+                }
+            """
+    )
+
+    @Test
+    fun packagePatternEscapesDots(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+                import javax.annotation.Nonnull;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) })
+    )
+
+    @Test
+    fun twoImportsFollowedByStar(jp: JavaParser) = assertUnchanged(
+            jp,
+            before = """
+                import java.io.IOException;
+                import java.io.UncheckedIOException;
+                import java.nio.files.*;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) })
+    )
+
+    @Test
+    fun springCloudFormat(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import com.fasterxml.jackson.databind.ObjectMapper;
+                import org.apache.commons.logging.Log;
+                import reactor.core.publisher.Mono;
+                
+                import org.springframework.core.io.buffer.DataBuffer;
+                
+                import java.io.ByteArrayOutputStream;
+                import java.nio.charset.StandardCharsets;
+                import java.util.Collections;
+                
+                import javax.servlet.ReadListener;
+                
+                import static java.util.Arrays.stream;
+                import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply {
                     setLayout(OrderImports.Layout.builder(999, 999)
                             .importPackage("java.*")
                             .blankLine()
@@ -271,49 +260,66 @@ interface OrderImportTest {
                             .build())
 
                     setRemoveUnused(false)
-                })
-                .isUnchanged()
-    }
+            }),
+            after = """
+                import java.io.ByteArrayOutputStream;
+                import java.nio.charset.StandardCharsets;
+                import java.util.Collections;
+                
+                import javax.servlet.ReadListener;
+                
+                import com.fasterxml.jackson.databind.ObjectMapper;
+                import org.apache.commons.logging.Log;
+                import reactor.core.publisher.Mono;
+                
+                import org.springframework.core.io.buffer.DataBuffer;
+                
+                import static java.util.Arrays.stream;
+                import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.toAsyncPredicate;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun importSorting(jp: JavaParser) {
-        """
-            import r.core.Flux;
-            import s.core.Flux;
-            import com.fasterxml.jackson.databind.ObjectMapper;
-            import org.apache.commons.logging.Log;
-            import reactor.core.publisher.Mono;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import com.fasterxml.jackson.databind.ObjectMapper;
-                    import org.apache.commons.logging.Log;
-                    import r.core.Flux;
-                    import reactor.core.publisher.Mono;
-                    import s.core.Flux;
-                    
-                    class A {}
-                """)
-    }
+    fun importSorting(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import r.core.Flux;
+                import s.core.Flux;
+                import com.fasterxml.jackson.databind.ObjectMapper;
+                import org.apache.commons.logging.Log;
+                import reactor.core.publisher.Mono;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import com.fasterxml.jackson.databind.ObjectMapper;
+                import org.apache.commons.logging.Log;
+                import r.core.Flux;
+                import reactor.core.publisher.Mono;
+                import s.core.Flux;
+                
+                class A {}
+            """
+    )
 
     @Test
-    fun foldGroupOfStaticImportsThatAppearLast(jp: JavaParser) {
-        """
-            import static java.util.stream.Collectors.toList;
-            import static java.util.stream.Collectors.toMap;
-            import static java.util.stream.Collectors.toSet;
-            
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(OrderImports().apply { setRemoveUnused(false) })
-                .isRefactoredTo("""
-                    import static java.util.stream.Collectors.*;
-                    
-                    class A {}
-                """)
-    }
+    fun foldGroupOfStaticImportsThatAppearLast(jp: JavaParser) = assertRefactored(
+            jp,
+            before = """
+                import static java.util.stream.Collectors.toList;
+                import static java.util.stream.Collectors.toMap;
+                import static java.util.stream.Collectors.toSet;
+                
+                class A {}
+            """,
+            visitors = listOf(OrderImports().apply { setRemoveUnused(false) }),
+            after = """
+                import static java.util.stream.Collectors.*;
+                
+                class A {}
+            """
+    )
 }
