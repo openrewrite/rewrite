@@ -434,9 +434,10 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
     @Override
     public String visitNewClass(NewClass newClass) {
         String encl = newClass.getEncl() == null ? "" : visit(newClass.getEncl()) + ".";
+        String nooh = newClass.getNooh() == null ? "" : newClass.getNooh().getFormatting().getPrefix();
         String args = newClass.getArgs() == null ? "" :
                 fmt(newClass.getArgs(), "(" + visit(newClass.getArgs().getArgs(), ",") + ")");
-        return fmt(newClass, encl + "new" + visit(newClass.getClazz()) + args + visit(newClass.getBody()));
+        return fmt(newClass, encl + nooh + "new" + visit(newClass.getClazz()) + args + visit(newClass.getBody()));
     }
 
     @Override
