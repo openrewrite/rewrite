@@ -2503,6 +2503,16 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         @With
+        J.Ident encl;
+
+        New nooh;
+
+        public NewClass withNew(New nooh) {
+            return new NewClass(id, encl, nooh, clazz, args, body, type, formatting);
+        }
+
+        @Nullable
+        @With
         TypeTree clazz;
 
         @Nullable
@@ -2546,6 +2556,17 @@ public interface J extends Serializable, Tree {
 
             @With
             List<Expression> args;
+
+            @With
+            Formatting formatting;
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static class New implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
 
             @With
             Formatting formatting;
@@ -2606,7 +2627,7 @@ public interface J extends Serializable, Tree {
 
         public static ParameterizedType build(String typeName, String... genericTypeNames) {
             JavaType.Class typeNameType = JavaType.Class.build(typeName);
-            
+
             return new J.ParameterizedType(
                     randomId(),
                     J.Ident.build(
