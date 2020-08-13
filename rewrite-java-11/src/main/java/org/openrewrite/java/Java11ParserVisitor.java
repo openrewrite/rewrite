@@ -935,7 +935,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
         }
 
-        return new J.NewClass(randomId(), encl, clazz, args, body, type(((JCNewClass) node).type), fmt);
+        return new J.NewClass(randomId(), encl, new J.NewClass.New(UUID.randomUUID(), format(sourceBefore("new"))), clazz, args, body, type(((JCNewClass) node).type), fmt);
     }
 
     @Override
