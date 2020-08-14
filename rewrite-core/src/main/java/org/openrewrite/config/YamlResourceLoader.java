@@ -42,6 +42,9 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
     public static final String visitorType = "openrewrite.org/v1beta/visitor";
     public static final String recipeType = "openrewrite.org/v1beta/recipe";
 
+    private static final Set<String> validTypes = new LinkedHashSet<>(Arrays.asList(visitorType, recipeType));
+    private static final String validTypesString = String.join(", ", validTypes);
+
     public YamlResourceLoader(InputStream yamlInput) throws UncheckedIOException {
         try {
             try {
@@ -50,6 +53,14 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
                     if (resource instanceof Map) {
                         @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
                         String type = resourceMap.getOrDefault("type", "missing").toString();
+                        Validated validation = required("type", type)
+                                .and(test("type",
+                                        "must be a valid rewrite type. These are the valid types: " + validTypesString,
+                                        type,
+                                        validTypes::contains));
+                        if(validation.isInvalid()) {
+                            throw new ValidationException(validation);
+                        }
                         switch (type) {
                             case visitorType:
                                 mapVisitor(resourceMap);
@@ -57,10 +68,6 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
                             case recipeType:
                                 mapRecipe(resourceMap);
                                 break;
-                            default:
-                                String validTypes = String.join(", ", visitorType, recipeType);
-                                throw new RewriteConfigurationException(
-                                        "type: '" + type + "' is not a valid rewrite type. These are the valid types: " + validTypes);
                         }
                     }
                 }

@@ -18,6 +18,7 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.RefactorVisitor;
+import org.openrewrite.ValidationException;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -38,8 +39,8 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                 try {
                     yamlResourceLoaders.add(new YamlResourceLoader(input));
-                } catch (RewriteConfigurationException e) {
-                    throw new RewriteConfigurationException(e, res.getURI());
+                } catch (ValidationException e) {
+                    throw new ValidationException(e, res.getURI());
                 }
             });
         }
@@ -53,8 +54,8 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
                 scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
                     try {
                         yamlResourceLoaders.add(new YamlResourceLoader(input));
-                    } catch (RewriteConfigurationException e) {
-                        throw new RewriteConfigurationException(e, res.getClasspathElementURI());
+                    } catch (ValidationException e) {
+                        throw new ValidationException(e, res.getURI());
                     }
                 });
             }

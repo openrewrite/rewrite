@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import java.net.URI;
 import java.util.stream.Collectors;
 
 /**
@@ -22,10 +23,29 @@ import java.util.stream.Collectors;
  * at runtime when one or more properties are invalid.
  */
 @Incubating(since = "2.0.0")
-public class ValidationException extends IllegalStateException {
+public class ValidationException extends RuntimeException {
     private final Validated validation;
 
+    public URI getSource() {
+        return source;
+    }
+
+    public void setSource(URI source) {
+        this.source = source;
+    }
+
+    private URI source = null;
+
     public ValidationException(Validated validation) {
+        this(validation, null);
+    }
+
+    public ValidationException(ValidationException other, URI source) {
+        this(other.validation, source);
+        this.setStackTrace(other.getStackTrace());
+    }
+
+    public ValidationException(Validated validation, URI source) {
         super(validation.failures().stream()
                 .map(invalid -> invalid.getProperty() + " was '" +
                         (invalid.getValue() == null ? "null" : invalid.getValue()) +
@@ -36,9 +56,19 @@ public class ValidationException extends IllegalStateException {
                         ""
                 )));
         this.validation = validation;
+        this.source = source;
     }
 
     public Validated getValidation() {
         return validation;
+    }
+
+    @Override
+    public String getMessage() {
+        if(source != null) {
+            return "Problem parsing rewrite configuration from: " + source + " \n" + super.getMessage();
+        } else {
+            return super.getMessage();
+        }
     }
 }
