@@ -17,26 +17,26 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.config.ProfileConfiguration
+import org.openrewrite.config.RecipeConfiguration
 import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 
 class RefactorPlanTest {
-    private val parent = ProfileConfiguration().apply {
+    private val parent = RecipeConfiguration().apply {
         name = "parent"
         setInclude(setOf("org.openrewrite.text.*"))
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "hi"))
     }
 
-    private val child = ProfileConfiguration().apply {
+    private val child = RecipeConfiguration().apply {
         name = "child"
         setExtend("parent")
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "overridden"))
     }
 
     private val planBuilder = RefactorPlan.builder()
-            .loadProfile(parent)
-            .loadProfile(child)
+            .loadRecipe(parent)
+            .loadRecipe(child)
             .visitor(ChangeText())
 
     @Test

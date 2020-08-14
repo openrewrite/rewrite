@@ -17,7 +17,7 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.config.ProfileConfiguration
+import org.openrewrite.config.RecipeConfiguration
 import org.openrewrite.text.PlainText
 
 class RefactorTest {
@@ -25,7 +25,7 @@ class RefactorTest {
     fun scanAutoConfigurableRules() {
         val plan = RefactorPlan.builder()
                 .scanVisitors("org.openrewrite.text")
-                .loadProfile(ProfileConfiguration().apply {
+                .loadRecipe(RecipeConfiguration().apply {
                     name = "hello-jon"
                     setInclude(setOf("org.openrewrite.text.*"))
                     setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
@@ -42,7 +42,7 @@ class RefactorTest {
     }
 
     @Test
-    fun scanProfileAndDeclarativeRule() {
+    fun scanRecipeAndDeclarativeRule() {
         val plan = RefactorPlan.builder()
                 .scanResources()
                 .build()

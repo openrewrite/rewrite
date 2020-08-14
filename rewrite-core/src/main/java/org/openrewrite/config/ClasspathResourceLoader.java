@@ -25,7 +25,7 @@ import java.util.Collection;
 
 import static java.util.stream.Collectors.toList;
 
-public class ClasspathResourceLoader implements ProfileConfigurationLoader, RefactorVisitorLoader {
+public class ClasspathResourceLoader implements RecipeConfigurationLoader, RefactorVisitorLoader {
     private final Collection<YamlResourceLoader> yamlResourceLoaders;
 
     public ClasspathResourceLoader(Iterable<Path> compileClasspath) {
@@ -52,8 +52,8 @@ public class ClasspathResourceLoader implements ProfileConfigurationLoader, Refa
     }
 
     @Override
-    public Collection<ProfileConfiguration> loadProfiles() {
-        return yamlResourceLoaders.stream().flatMap(loader -> loader.loadProfiles().stream()).collect(toList());
+    public Collection<RecipeConfiguration> loadRecipes() {
+        return yamlResourceLoaders.stream().flatMap(loader -> loader.loadRecipes().stream()).collect(toList());
     }
 
     @Override

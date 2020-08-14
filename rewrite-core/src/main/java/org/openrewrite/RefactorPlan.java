@@ -35,27 +35,27 @@ import static java.util.stream.StreamSupport.stream;
 public class RefactorPlan {
     private static final Logger logger = LoggerFactory.getLogger(RefactorPlan.class);
 
-    private final Map<String, Profile> profilesByName;
+    private final Map<String, Recipe> recipesByName;
     private final Collection<RefactorVisitor<?>> visitors;
 
-    public RefactorPlan(Collection<Profile> profiles, Collection<RefactorVisitor<?>> visitors) {
-        this.profilesByName = profiles.stream().collect(toMap(Profile::getName, identity()));
+    public RefactorPlan(Collection<Recipe> recipes, Collection<RefactorVisitor<?>> visitors) {
+        this.recipesByName = recipes.stream().collect(toMap(Recipe::getName, identity()));
         this.visitors = visitors;
     }
 
-    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, String... profiles) {
-        return configure(visitor, Arrays.asList(profiles));
+    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, String... recipes) {
+        return configure(visitor, Arrays.asList(recipes));
     }
 
-    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, Iterable<String> profiles) {
-        return loadedProfiles(profiles).stream()
-                .reduce(visitor, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1);
+    public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, Iterable<String> recipes) {
+        return loadedRecipes(recipes).stream()
+                .reduce(visitor, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1);
     }
 
     @Nullable
-    public <S extends Style> S style(Class<S> styleClass, Iterable<String> profiles) {
-        return loadedProfiles(profiles).stream()
-                .map(profile -> profile.getStyles().stream()
+    public <S extends Style> S style(Class<S> styleClass, Iterable<String> recipes) {
+        return loadedRecipes(recipes).stream()
+                .map(recipe -> recipe.getStyles().stream()
                         .filter(styleClass::isInstance)
                         .findFirst()
                         .orElse(null))
@@ -65,21 +65,21 @@ public class RefactorPlan {
                 .orElse(null);
     }
 
-    public Collection<RefactorVisitor<?>> visitors(String... profiles) {
-        return visitors(Arrays.asList(profiles));
+    public Collection<RefactorVisitor<?>> visitors(String... recipes) {
+        return visitors(Arrays.asList(recipes));
     }
 
-    public Collection<RefactorVisitor<?>> visitors(Iterable<String> profiles) {
-        List<Profile> loadedProfiles = loadedProfiles(profiles);
+    public Collection<RefactorVisitor<?>> visitors(Iterable<String> recipes) {
+        List<Recipe> loadedRecipes = loadedRecipes(recipes);
         return visitors.stream()
-                .map(v -> loadedProfiles.stream().reduce(v, (v2, profile) -> profile.configure(v2), (v1, v2) -> v1))
-                .filter(v -> loadedProfiles.stream().anyMatch(p -> p.accept(v).equals(Profile.FilterReply.ACCEPT)))
+                .map(v -> loadedRecipes.stream().reduce(v, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1))
+                .filter(v -> loadedRecipes.stream().anyMatch(p -> p.accept(v).equals(Recipe.FilterReply.ACCEPT)))
                 .collect(toList());
     }
 
-    private List<Profile> loadedProfiles(Iterable<String> profiles) {
-        return stream(profiles.spliterator(), false)
-                .map(profilesByName::get)
+    private List<Recipe> loadedRecipes(Iterable<String> recipes) {
+        return stream(recipes.spliterator(), false)
+                .map(recipesByName::get)
                 .filter(Objects::nonNull)
                 .collect(toList());
     }
@@ -89,7 +89,7 @@ public class RefactorPlan {
     }
 
     public static class Builder {
-        private final Map<String, ProfileConfiguration> profileConfigurations = new HashMap<>();
+        private final Map<String, RecipeConfiguration> recipesConfigurations = new HashMap<>();
         private final Collection<RefactorVisitor<?>> visitors = new ArrayList<>();
         private Iterable<Path> compileClasspath = emptyList();
 
@@ -101,7 +101,7 @@ public class RefactorPlan {
         public Builder scanResources() {
             ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
             loadVisitors(classpathResourceLoader);
-            loadProfiles(classpathResourceLoader);
+            loadRecipes(classpathResourceLoader);
             return this;
         }
 
@@ -111,7 +111,7 @@ public class RefactorPlan {
                 try (FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
                     YamlResourceLoader resourceLoader = new YamlResourceLoader(is);
                     loadVisitors(resourceLoader);
-                    loadProfiles(resourceLoader);
+                    loadRecipes(resourceLoader);
                 } catch (IOException e) {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);
                 }
@@ -139,22 +139,22 @@ public class RefactorPlan {
             return this;
         }
 
-        public Builder loadProfiles(ProfileConfigurationLoader profileConfigurationLoader) {
-            profileConfigurationLoader.loadProfiles().forEach(this::loadProfile);
+        public Builder loadRecipes(RecipeConfigurationLoader recipeConfigurationLoader) {
+            recipeConfigurationLoader.loadRecipes().forEach(this::loadRecipe);
             return this;
         }
 
-        public Builder loadProfile(ProfileConfiguration profileConfiguration) {
-            profileConfigurations.compute(profileConfiguration.getName(),
-                    (name, existing) -> profileConfiguration.merge(existing));
+        public Builder loadRecipe(RecipeConfiguration recipeConfiguration) {
+            recipesConfigurations.compute(recipeConfiguration.getName(),
+                    (name, existing) -> recipeConfiguration.merge(existing));
             return this;
         }
 
         public RefactorPlan build() {
             visitors.addAll(new AutoConfigureRefactorVisitorLoader("org.openrewrite").loadVisitors());
 
-            return new RefactorPlan(profileConfigurations.values().stream()
-                    .map(pc -> pc.build(profileConfigurations.values()))
+            return new RefactorPlan(recipesConfigurations.values().stream()
+                    .map(pc -> pc.build(recipesConfigurations.values()))
                     .collect(toList()),
                     visitors);
         }

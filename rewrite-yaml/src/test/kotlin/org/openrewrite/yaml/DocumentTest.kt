@@ -23,9 +23,9 @@ class DocumentTest: YamlParser() {
     fun explicit() {
         val yText = """
             ---
-            type: beta.openrewrite.org/v1/visitor
+            type: openrewrite.org/v1beta/visitor
             ---
-            type: beta.openrewrite.org/v1/profile
+            type: openrewrite.org/v1beta/recipe
         """.trimIndent()
 
         val y = parse(yText)[0]
@@ -37,7 +37,7 @@ class DocumentTest: YamlParser() {
 
     @Test
     fun implicit() {
-        val yText = "type: beta.openrewrite.org/v1/visitor"
+        val yText = "type: openrewrite.org/v1beta/visitor"
         val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)

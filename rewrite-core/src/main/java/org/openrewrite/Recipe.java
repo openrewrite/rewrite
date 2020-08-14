@@ -17,7 +17,7 @@ package org.openrewrite;
 
 import java.util.Collection;
 
-public interface Profile {
+public interface Recipe {
     String getName();
 
     Collection<Style> getStyles();

@@ -30,14 +30,17 @@ import java.util.*;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 
-public class YamlResourceLoader implements ProfileConfigurationLoader, RefactorVisitorLoader {
+public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVisitorLoader {
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
-    private final Map<String, ProfileConfiguration> profiles = new HashMap<>();
+    private final Map<String, RecipeConfiguration> recipes = new HashMap<>();
     private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
     private final Map<CompositeRefactorVisitor, String> visitorExtensions = new HashMap<>();
+
+    public static final String visitorType = "openrewrite.org/v1beta/visitor";
+    public static final String recipeType = "openrewrite.org/v1beta/recipe";
 
     public YamlResourceLoader(InputStream yamlInput) throws UncheckedIOException {
         try {
@@ -46,14 +49,18 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, RefactorV
                 for (Object resource : yaml.loadAll(yamlInput)) {
                     if (resource instanceof Map) {
                         @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                        String type = resourceMap.getOrDefault("type", "invalid").toString();
+                        String type = resourceMap.getOrDefault("type", "missing").toString();
                         switch (type) {
-                            case "beta.openrewrite.org/v1/visitor":
+                            case visitorType:
                                 mapVisitor(resourceMap);
                                 break;
-                            case "beta.openrewrite.org/v1/profile":
-                                mapProfile(resourceMap);
+                            case recipeType:
+                                mapRecipe(resourceMap);
                                 break;
+                            default:
+                                String validTypes = String.join(", ", visitorType, recipeType);
+                                throw new RuntimeException(
+                                        "type: '" + type + "' is not a valid rewrite type. These are the valid types: " + validTypes);
                         }
                     }
                 }
@@ -128,21 +135,21 @@ public class YamlResourceLoader implements ProfileConfigurationLoader, RefactorV
         }
     }
 
-    private void mapProfile(Map<String, Object> profileMap) {
-        ProfileConfiguration profile = new ProfileConfiguration();
+    private void mapRecipe(Map<String, Object> recipeMap) {
+        RecipeConfiguration recipe = new RecipeConfiguration();
         try {
-            propertyConverter.updateValue(profile, profileMap);
+            propertyConverter.updateValue(recipe, recipeMap);
         } catch (JsonMappingException e) {
-            throw new ValidationException(Validated.invalid("profile", profileMap,
-                    "must be a valid profile configuration", e));
+            throw new ValidationException(Validated.invalid("recipe", recipeMap,
+                    "must be a valid recipe configuration", e));
         }
 
-        profiles.compute(profile.getName(), (name, existing) -> profile.merge(existing));
+        recipes.compute(recipe.getName(), (name, existing) -> recipe.merge(existing));
     }
 
     @Override
-    public Collection<ProfileConfiguration> loadProfiles() {
-        return profiles.values();
+    public Collection<RecipeConfiguration> loadRecipes() {
+        return recipes.values();
     }
 
     @Override
