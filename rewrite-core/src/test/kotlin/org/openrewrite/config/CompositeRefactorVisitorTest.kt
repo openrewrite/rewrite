@@ -26,7 +26,7 @@ class CompositeRefactorVisitorTest {
     @Test
     fun delegateToVisitorsInOrder() {
         val yaml = """
-            type: beta.openrewrite.org/v1/visitor
+            type: openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextTwice
             visitors:
               - org.openrewrite.text.ChangeText:

@@ -18,14 +18,14 @@ package org.openrewrite.config
 import io.micrometer.core.instrument.Tag
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Profile
+import org.openrewrite.Recipe
 import org.openrewrite.text.ChangeText
 
 class YamlResourceLoaderTest {
     @Test
     fun loadVisitorFromYaml() {
         val yaml = """
-            type: beta.openrewrite.org/v1/visitor
+            type: openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextTwice
             visitors:
               - org.openrewrite.text.ChangeText:
@@ -46,9 +46,9 @@ class YamlResourceLoaderTest {
     }
 
     @Test
-    fun loadProfileYaml() {
-        val profile = YamlResourceLoader("""
-            type: beta.openrewrite.org/v1/profile
+    fun loadRecipeYaml() {
+        val recipe = YamlResourceLoader("""
+            type: openrewrite.org/v1beta/recipe
             name: test
             include:
               - 'org.openrewrite.text.*'
@@ -57,32 +57,32 @@ class YamlResourceLoaderTest {
             configure:
               org.openrewrite.text.ChangeText:
                 toText: 'Hello Jon!'
-        """.trimIndent().byteInputStream()).loadProfiles().first().build(emptyList())
+        """.trimIndent().byteInputStream()).loadRecipes().first().build(emptyList())
 
         val changeText = ChangeText()
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
-        assertThat(profile.accept(changeText)).isEqualTo(Profile.FilterReply.ACCEPT)
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.accept(changeText)).isEqualTo(Recipe.FilterReply.ACCEPT)
     }
 
     @Test
     fun loadMultiYaml() {
         val resources = YamlResourceLoader("""
             ---
-            type: beta.openrewrite.org/v1/profile
+            type: openrewrite.org/v1beta/recipe
             name: checkstyle
             ---
-            type: beta.openrewrite.org/v1/profile
+            type: openrewrite.org/v1beta/recipe
             name: spring
             ---
-            type: beta.openrewrite.org/v1/visitor
+            type: openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextToJon
             visitors:
               - org.openrewrite.text.ChangeText:
                   toText: Hello Jon!
         """.trimIndent().byteInputStream())
 
-        assertThat(resources.loadProfiles().map { it.name }).containsOnly("checkstyle", "spring")
+        assertThat(resources.loadRecipes().map { it.name }).containsOnly("checkstyle", "spring")
         assertThat(resources.loadVisitors().map { it.name }).containsExactly("org.openrewrite.text.ChangeTextToJon")
     }
 }

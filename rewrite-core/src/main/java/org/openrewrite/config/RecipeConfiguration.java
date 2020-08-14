@@ -33,10 +33,10 @@ import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.*;
-import static org.openrewrite.Profile.FilterReply.NEUTRAL;
+import static org.openrewrite.Recipe.FilterReply.NEUTRAL;
 
-public class ProfileConfiguration {
-    private static final Logger logger = LoggerFactory.getLogger(ProfileConfiguration.class);
+public class RecipeConfiguration {
+    private static final Logger logger = LoggerFactory.getLogger(RecipeConfiguration.class);
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -90,27 +90,27 @@ public class ProfileConfiguration {
     }
 
     /**
-     * Add additional configuration to this profile.
-     * Does nothing if the profile to be merged has a different name than this profile.
-     * For example, if configuration has been added to the 'default' profile in multiple places (user home, project config, etc.)
+     * Add additional configuration to this recipe.
+     * Does nothing if the recipe to be merged has a different name than this recipe.
+     * For example, if configuration has been added to the 'default' recipe in multiple places (user home, project config, etc.)
      * this can be used to merge all of that disparate configuration together.
      * <p>
-     * So this should be seen as a tool for merging together the split-apart pieces of a single profile, and *not*
-     * for taking unrelated profiles and combining them together.
+     * So this should be seen as a tool for merging together the split-apart pieces of a single recipe, and *not*
+     * for taking unrelated recipes and combining them together.
      *
-     * @param profile The profile to merge.
-     * @return this The merged profile.
+     * @param recipe The recipe to merge.
+     * @return this The merged recipe.
      */
-    public ProfileConfiguration merge(@Nullable ProfileConfiguration profile) {
-        if (profile != null && profile.name.equals(name)) {
-            ProfileConfiguration merged = new ProfileConfiguration();
+    public RecipeConfiguration merge(@Nullable RecipeConfiguration recipe) {
+        if (recipe != null && recipe.name.equals(name)) {
+            RecipeConfiguration merged = new RecipeConfiguration();
             merged.name = name;
-            merged.include = Stream.concat(this.include.stream(), profile.include.stream()).collect(toSet());
-            merged.exclude = Stream.concat(this.exclude.stream(), profile.exclude.stream()).collect(toSet());
+            merged.include = Stream.concat(this.include.stream(), recipe.include.stream()).collect(toSet());
+            merged.exclude = Stream.concat(this.exclude.stream(), recipe.exclude.stream()).collect(toSet());
 
             merged.configure = configure;
-            merged.configure.putAll(profile.configure);
-            merged.styles.putAll(profile.styles);
+            merged.configure.putAll(recipe.configure);
+            merged.styles.putAll(recipe.styles);
 
             return merged;
         }
@@ -118,18 +118,18 @@ public class ProfileConfiguration {
         return this;
     }
 
-    public Profile build(Collection<ProfileConfiguration> otherProfileConfigurations) {
-        Map<String, ProfileConfiguration> configsByName = otherProfileConfigurations.stream()
-                .collect(toMap(ProfileConfiguration::getName, identity()));
+    public Recipe build(Collection<RecipeConfiguration> otherRecipeConfigurations) {
+        Map<String, RecipeConfiguration> configsByName = otherRecipeConfigurations.stream()
+                .collect(toMap(RecipeConfiguration::getName, identity()));
 
-        Deque<ProfileConfiguration> inOrderConfigurations = new ArrayDeque<>();
-        Queue<ProfileConfiguration> configs = new LinkedList<>();
-        configs.add(ProfileConfiguration.this);
+        Deque<RecipeConfiguration> inOrderConfigurations = new ArrayDeque<>();
+        Queue<RecipeConfiguration> configs = new LinkedList<>();
+        configs.add(RecipeConfiguration.this);
         while (!configs.isEmpty()) {
-            ProfileConfiguration config = configs.poll();
+            RecipeConfiguration config = configs.poll();
             inOrderConfigurations.add(config);
             if (config.extend != null) {
-                ProfileConfiguration parent = configsByName.get(config.extend);
+                RecipeConfiguration parent = configsByName.get(config.extend);
                 if (parent != null) {
                     configs.add(parent);
                 }
@@ -140,7 +140,7 @@ public class ProfileConfiguration {
             inOrderConfigurations.add(configsByName.get("default"));
         }
 
-        return new Profile() {
+        return new Recipe() {
             @Override
             public String getName() {
                 return name;
@@ -176,7 +176,7 @@ public class ProfileConfiguration {
 
             @Override
             public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor) {
-                Iterator<ProfileConfiguration> configs = inOrderConfigurations.descendingIterator();
+                Iterator<RecipeConfiguration> configs = inOrderConfigurations.descendingIterator();
                 while (configs.hasNext()) {
                     configs.next().configure(visitor);
                 }
@@ -248,13 +248,13 @@ public class ProfileConfiguration {
         return properties;
     }
 
-    private Profile.FilterReply accept(SourceVisitor<?> visitor) {
+    private Recipe.FilterReply accept(SourceVisitor<?> visitor) {
         if (visitor.validate().isInvalid() || exclude.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
-            return Profile.FilterReply.DENY;
+            return Recipe.FilterReply.DENY;
         }
 
         if (include.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
-            return Profile.FilterReply.ACCEPT;
+            return Recipe.FilterReply.ACCEPT;
         }
 
         return NEUTRAL;

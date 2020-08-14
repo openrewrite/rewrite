@@ -89,7 +89,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         J.Binary b = refactor(binary, this::visitExpression);
         b = b.withLeft(refactor(b.getLeft()));
         return b.withRight(refactor(b.getRight()));
-    }
+    }   
 
     @Override
     public J visitBlock(J.Block<J> block) {

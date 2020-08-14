@@ -17,6 +17,6 @@ package org.openrewrite.config;
 
 import java.util.Collection;
 
-public interface ProfileConfigurationLoader {
-    Collection<ProfileConfiguration> loadProfiles();
+public interface RecipeConfigurationLoader {
+    Collection<RecipeConfiguration> loadRecipes();
 }

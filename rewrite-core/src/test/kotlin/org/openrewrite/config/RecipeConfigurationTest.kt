@@ -17,38 +17,38 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Profile
+import org.openrewrite.Recipe
 import org.openrewrite.text.ChangeText
 import org.openrewrite.text.TextStyle
 
-internal class ProfileConfigurationTest {
+internal class RecipeConfigurationTest {
     private val changeText = ChangeText()
 
     @Test
     fun includeWildcard() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setInclude(setOf("org.openrewrite.text.*"))
         }.build(emptyList())
 
-        assertThat(profile.accept(ChangeText().apply {
+        assertThat(recipe.accept(ChangeText().apply {
             toText = "hi"
-        })).isEqualTo(Profile.FilterReply.ACCEPT)
+        })).isEqualTo(Recipe.FilterReply.ACCEPT)
     }
 
     @Test
     fun includeWildcardsDontIncludeNestedPackages() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setInclude(setOf("org.openrewrite.*"))
         }.build(emptyList())
 
-        assertThat(profile.accept(ChangeText().apply {
+        assertThat(recipe.accept(ChangeText().apply {
             toText = "hi"
-        })).isEqualTo(Profile.FilterReply.NEUTRAL)
+        })).isEqualTo(Recipe.FilterReply.NEUTRAL)
     }
 
     @Test
     fun configureSourceVisitor() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite.text.ChangeText" to
                             mapOf("toText" to "Hello Jon!")
@@ -56,12 +56,12 @@ internal class ProfileConfigurationTest {
             )
         }.build(emptyList())
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun configureStyles() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setStyles(
                     mapOf("org.openrewrite.text.TextStyle" to
                             mapOf("charset" to "UTF-8")
@@ -69,13 +69,13 @@ internal class ProfileConfigurationTest {
             )
         }
 
-        assertThat(profile.build(emptyList()).styles.first()).isInstanceOf(TextStyle::class.java)
-        assertThat((profile.build(emptyList()).styles.first() as TextStyle).charset).isEqualTo("UTF-8")
+        assertThat(recipe.build(emptyList()).styles.first()).isInstanceOf(TextStyle::class.java)
+        assertThat((recipe.build(emptyList()).styles.first() as TextStyle).charset).isEqualTo("UTF-8")
     }
 
     @Test
-    fun everyProfileImplicitlyExtendsDefault() {
-        val default = ProfileConfiguration().apply {
+    fun everyRecipeImplicitlyExtendsDefault() {
+        val default = RecipeConfiguration().apply {
             name = "default"
             setConfigure(
                     mapOf("org.openrewrite.text.ChangeText" to
@@ -84,34 +84,34 @@ internal class ProfileConfigurationTest {
             )
         }
 
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             name = "hello-jon"
         }.build(listOf(default))
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun propertyNameCombinedWithVisitorName() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
         }.build(emptyList())
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun propertyNameCombinedWithWildcardVisitor() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.*.toText" to "Hello Jon!"))
         }.build(emptyList())
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun splitPackageWildcard() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.*" to
@@ -121,12 +121,12 @@ internal class ProfileConfigurationTest {
             )
         }.build(emptyList())
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 
     @Test
     fun splitPackage() {
-        val profile = ProfileConfiguration().apply {
+        val recipe = RecipeConfiguration().apply {
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.ChangeText" to
@@ -136,6 +136,6 @@ internal class ProfileConfigurationTest {
             )
         }.build(emptyList())
 
-        assertThat(profile.configure(changeText).toText).isEqualTo("Hello Jon!")
+        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
 }
