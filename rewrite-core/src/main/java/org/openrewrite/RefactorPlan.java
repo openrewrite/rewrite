@@ -114,6 +114,8 @@ public class RefactorPlan {
                     loadRecipes(resourceLoader);
                 } catch (IOException e) {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);
+                } catch (RewriteConfigurationException e) {
+                    logger.warn("Unable to load ~/.rewrite/rewrite.yml", e);
                 }
             }
             return this;

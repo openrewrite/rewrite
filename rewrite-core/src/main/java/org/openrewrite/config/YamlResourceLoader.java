@@ -59,7 +59,7 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
                                 break;
                             default:
                                 String validTypes = String.join(", ", visitorType, recipeType);
-                                throw new RuntimeException(
+                                throw new RewriteConfigurationException(
                                         "type: '" + type + "' is not a valid rewrite type. These are the valid types: " + validTypes);
                         }
                     }

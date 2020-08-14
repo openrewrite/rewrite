@@ -35,18 +35,28 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
                 .acceptPaths("META-INF/rewrite")
                 .enableMemoryMapping()
                 .scan()) {
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                    yamlResourceLoaders.add(new YamlResourceLoader(input)));
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+                try {
+                    yamlResourceLoaders.add(new YamlResourceLoader(input));
+                } catch (RewriteConfigurationException e) {
+                    throw new RewriteConfigurationException(e, res.getURI());
+                }
+            });
         }
 
-        if(compileClasspath.iterator().hasNext()) {
+        if (compileClasspath.iterator().hasNext()) {
             try (ScanResult scanResult = new ClassGraph()
                     .overrideClasspath(compileClasspath)
                     .acceptPaths("META-INF/rewrite")
                     .enableMemoryMapping()
                     .scan()) {
-                scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                        yamlResourceLoaders.add(new YamlResourceLoader(input)));
+                scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+                    try {
+                        yamlResourceLoaders.add(new YamlResourceLoader(input));
+                    } catch (RewriteConfigurationException e) {
+                        throw new RewriteConfigurationException(e, res.getClasspathElementURI());
+                    }
+                });
             }
         }
     }
