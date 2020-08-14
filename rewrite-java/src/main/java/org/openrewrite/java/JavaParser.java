@@ -23,16 +23,15 @@ import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -87,40 +86,27 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default List<J.CompilationUnit> parse(List<String> sources) {
-        try {
-            Path temp = Files.createTempDirectory("sources");
+    default List<J.CompilationUnit> parse(String... sources) {
+        Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
 
-            Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
+        Function<String, String> simpleName = sourceStr -> {
+            Matcher classMatcher = classPattern.matcher(sourceStr);
+            return classMatcher.find() ? classMatcher.group(3) : null;
+        };
 
-            Function<String, String> simpleName = sourceStr -> {
-                Matcher classMatcher = classPattern.matcher(sourceStr);
-                return classMatcher.find() ? classMatcher.group(3) : null;
-            };
-
-            Function<String, Path> sourceFile = sourceText -> {
-                Path file = temp.resolve(simpleName.apply(sourceText) + ".java");
-                try {
-                    Files.write(file, sourceText.getBytes(Charset.defaultCharset()));
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-                return file;
-            };
-
-            try {
-                return parse(sources.stream().map(sourceFile).collect(toList()), null);
-            } finally {
-                // delete temp recursively
-                //noinspection ResultOfMethodCallIgnored
-                Files.walk(temp)
-                        .sorted(Comparator.reverseOrder())
-                        .map(Path::toFile)
-                        .forEach(File::delete);
-            }
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
+        return parseInputs(
+                Arrays.stream(sources)
+                        .map(sourceFile -> {
+                            Path path = Paths.get(Optional.ofNullable(simpleName.apply(sourceFile))
+                                .orElse("package-info.java"));
+                            return new Input(
+                                    path,
+                                    () -> new ByteArrayInputStream(sourceFile.getBytes())
+                            );
+                        })
+                        .collect(toList()),
+                null
+        );
     }
 
     /**
@@ -171,7 +157,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         }
 
         public B importStyle(@Nullable ImportLayoutStyle importStyle) {
-            if(importStyle != null) {
+            if (importStyle != null) {
                 this.styles.add(importStyle);
             }
             return (B) this;

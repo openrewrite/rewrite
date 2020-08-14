@@ -39,10 +39,8 @@ public class TreeSerializer<S extends SourceFile> {
 
     private final ObjectMapper mapper;
 
-    private final SimpleModule metadataModule;
-
     public TreeSerializer() {
-        this.metadataModule = new SimpleModule();
+        SimpleModule metadataModule = new SimpleModule();
 
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
@@ -50,18 +48,6 @@ public class TreeSerializer<S extends SourceFile> {
                 .registerModule(metadataModule)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
-    }
-
-    public String writePretty(S source) {
-        try {
-            return new ObjectMapper()
-                    .registerModule(metadataModule)
-                    .setSerializationInclusion(JsonInclude.Include.NON_NULL)
-                    .writerWithDefaultPrettyPrinter()
-                    .writeValueAsString(source);
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException(e);
-        }
     }
 
     public void write(Iterable<S> sources, OutputStream out) {

@@ -26,13 +26,16 @@ import org.yaml.snakeyaml.reader.StreamReader;
 import org.yaml.snakeyaml.scanner.Scanner;
 import org.yaml.snakeyaml.scanner.ScannerImpl;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -40,23 +43,17 @@ import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
-    @Override
-    public List<Yaml.Documents> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream().map(sourceFile -> {
-            try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
-                return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }).collect(toList());
-    }
 
     @Override
-    public List<Yaml.Documents> parse(List<String> sourceFiles) {
-        return sourceFiles.stream()
-            .map(sourceFile -> parseFromInput(Paths.get("unknown.properties"),
-                    new ByteArrayInputStream(sourceFile.getBytes())))
-            .collect(toList());
+    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+        return StreamSupport.stream(sourceFiles.spliterator(), false)
+                .map(sourceFile -> {
+                    try (InputStream is = sourceFile.getSource()) {
+                        return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }).collect(toList());
     }
 
     private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {

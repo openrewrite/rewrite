@@ -31,13 +31,17 @@ import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.repository.RepositoryPolicy;
-import org.eclipse.aether.resolution.*;
+import org.eclipse.aether.resolution.ArtifactDescriptorPolicy;
+import org.eclipse.aether.resolution.VersionRangeRequest;
+import org.eclipse.aether.resolution.VersionRangeResolutionException;
+import org.eclipse.aether.resolution.VersionRangeResult;
 import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 import org.eclipse.aether.version.Version;
+import org.openrewrite.Parser;
 import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
@@ -45,8 +49,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Function;
+import java.util.function.Supplier;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -67,13 +77,17 @@ class MavenModuleLoader {
         this.remoteRepositories = remoteRepositories;
     }
 
-    public Map<Path, MavenModel> load(List<Path> sourceFiles) {
-        Map<Path, MavenModel> modelsByPath = new HashMap<>();
+    public List<MavenModel> load(Iterable<Parser.Input> inputs) {
+        return load(InputStreamModelSource.fromInputs(inputs));
+    }
+
+    private List<MavenModel> load(Collection<InputStreamModelSource> modelSources) {
+        List<MavenModel> models = new ArrayList<>();
         Map<MavenModel.ModuleVersionId, Collection<MavenModel>> inheriting = new HashMap<>();
 
-        for (Path sourceFile : sourceFiles) {
-            MavenModel model = load(sourceFile);
-            modelsByPath.put(sourceFile, model);
+        for (InputStreamModelSource modelSource : modelSources) {
+            MavenModel model = load(modelSource);
+            models.add(model);
 
             MavenModel descendent = model;
             MavenModel ancestor = model.getParent();
@@ -83,23 +97,21 @@ class MavenModuleLoader {
             }
         }
 
-        return modelsByPath.entrySet().stream()
-                .collect(toMap(Map.Entry::getKey, modelByPath -> {
-                    MavenModel m = modelByPath.getValue();
-                    return new MavenModel(m.getParent(), m.getModuleVersion(),
-                            m.getDependencyManagement(), m.getDependencies(), m.getProperties(),
-                            inheriting.getOrDefault(m.getModuleVersion(), emptyList()));
-                }));
+        return models.stream()
+                .map(m -> new MavenModel(m.getParent(), m.getModuleVersion(),
+                        m.getDependencyManagement(), m.getDependencies(), m.getProperties(),
+                        inheriting.getOrDefault(m.getModuleVersion(), emptyList())))
+                .collect(toList());
     }
 
-    private MavenModel load(Path sourceFile) {
+    private MavenModel load(InputStreamModelSource modelSource) {
         try {
             RepositorySystem repositorySystem = getRepositorySystem();
             RepositorySystemSession repositorySystemSession = getRepositorySystemSession(repositorySystem);
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
                     .setModelResolver(new ParentModelResolver(repositorySystem, repositorySystemSession, remoteRepositories))
-                    .setPomFile(sourceFile.toFile());
+                    .setModelSource(modelSource);
 
             ModelBuilder modelBuilder = new DefaultModelBuilderFactory().newInstance();
             ModelBuildingResult modelBuildingResult = modelBuilder.build(modelBuildingRequest);
@@ -352,6 +364,51 @@ class MavenModuleLoader {
         @Override
         public void artifactResolving(RepositoryEvent event) {
             logger.debug("resolving artifact {}", event.getArtifact());
+        }
+    }
+
+    static class InputStreamModelSource implements ModelSource2 {
+        private final Path path;
+        private final Supplier<InputStream> inputStream;
+
+        private Map<Path, InputStreamModelSource> allModelSources;
+
+        public InputStreamModelSource(Path path, Supplier<InputStream> inputStream) {
+            this.path = path;
+            this.inputStream = inputStream;
+        }
+
+        @Override
+        public ModelSource2 getRelatedSource(String relPath) {
+            return allModelSources.get(path.getParent().resolve(relPath).normalize());
+        }
+
+        @Override
+        public URI getLocationURI() {
+            return path.toUri();
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            return inputStream.get();
+        }
+
+        @Override
+        public String getLocation() {
+            return path.toString();
+        }
+
+        public static Collection<InputStreamModelSource> fromInputs(Iterable<Parser.Input> inputs) {
+            Map<Path, InputStreamModelSource> modelSources = StreamSupport.stream(inputs.spliterator(), false)
+                    .map(input -> new InputStreamModelSource(input.getPath(), input::getSource))
+                    .collect(Collectors.toMap(
+                            modelSource -> modelSource.path,
+                            Function.identity(),
+                            (s1, s2) -> s1,
+                            LinkedHashMap::new));
+
+            modelSources.values().forEach(modelSource -> modelSource.allModelSources = modelSources);
+            return modelSources.values();
         }
     }
 }

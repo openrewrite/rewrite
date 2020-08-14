@@ -22,11 +22,11 @@ import org.openrewrite.properties.tree.Properties;
 
 import java.io.*;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
+import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -36,22 +36,15 @@ import static org.openrewrite.Tree.randomId;
 public class PropertiesParser implements Parser<Properties.File> {
 
     @Override
-    public List<Properties.File> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream().map(sourceFile -> {
-            try (FileInputStream fis = new FileInputStream(sourceFile.toFile())) {
-                return parseFromInput(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile), fis);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-        }).collect(toList());
-    }
-
-    @Override
-    public List<Properties.File> parse(List<String> sourceFiles) {
-        return sourceFiles.stream()
-                .map(sourceFile -> parseFromInput(Paths.get("unknown.properties"),
-                        new ByteArrayInputStream(sourceFile.getBytes())))
-                .collect(toList());
+    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+        return StreamSupport.stream(sourceFiles.spliterator(), false)
+                .map(sourceFile -> {
+                    try (InputStream is = sourceFile.getSource()) {
+                        return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }).collect(toList());
     }
 
     private Properties.File parseFromInput(Path sourceFile, InputStream source) {

@@ -44,8 +44,6 @@ interface CompilationUnitSerializerTest {
     fun roundTripSerializationPreservesFlyweights(jp: JavaParser) {
         val a = jp.parse(aSource)[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
 
-        println(serializer.writePretty(a))
-
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
 

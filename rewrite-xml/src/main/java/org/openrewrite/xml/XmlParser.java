@@ -18,48 +18,39 @@ package org.openrewrite.xml;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.XmlParserVisitor;
 import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
+import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
     @Override
-    public List<Xml.Document> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        return sourceFiles.stream()
+    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+        return StreamSupport.stream(sourceFiles.spliterator(), false)
                 .map(sourceFile -> {
                     try {
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                                CharStreams.fromPath(sourceFile))));
+                                CharStreams.fromStream(sourceFile.getSource()))));
 
-                        return new XmlParserVisitor(relativeTo == null ? sourceFile : relativeTo.relativize(sourceFile),
-                                new String(Files.readAllBytes(sourceFile), StandardCharsets.UTF_8)).visitDocument(parser.document());
+                        return new XmlParserVisitor(
+                                sourceFile.getRelativePath(relativeTo),
+                                StringUtils.readFully(sourceFile.getSource())
+                        ).visitDocument(parser.document());
                     } catch (IOException e) {
                         throw new UncheckedIOException(e);
                     }
-                })
-                .collect(toList());
-    }
-
-    @Override
-    public List<Xml.Document> parse(List<String> xmlSources) {
-        return xmlSources.stream()
-                .map(xmlSource -> {
-                    XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
-                            CharStreams.fromString(xmlSource))));
-                    return new XmlParserVisitor(Paths.get("unknown.xml"), xmlSource)
-                            .visitDocument(parser.document());
                 })
                 .collect(toList());
     }

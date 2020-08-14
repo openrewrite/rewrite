@@ -21,15 +21,13 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.xml.XmlParser;
+import org.openrewrite.xml.tree.Xml;
 
 import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-
-import static java.util.Collections.singletonList;
-import static java.util.stream.Collectors.toList;
 
 public class MavenParser implements Parser<Maven.Pom> {
     private final XmlParser xmlParser = new XmlParser();
@@ -48,20 +46,17 @@ public class MavenParser implements Parser<Maven.Pom> {
     }
 
     @Override
-    public List<Maven.Pom> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
-        Map<Path, MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
+    public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
                 .load(sourceFiles);
 
-        return sourceFiles.stream()
-                .map(sourceFile -> new Maven.Pom(
-                        modules.get(sourceFile),
-                        xmlParser.parse(sourceFile, relativeTo)))
-                .collect(toList());
-    }
+        List<Maven.Pom> poms = new ArrayList<>();
+        Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(sourceFiles, relativeTo).iterator();
+        for (MavenModel module : modules) {
+            poms.add(new Maven.Pom(module, xmlDocuments.next()));
+        }
 
-    @Override
-    public List<Maven.Pom> parse(List<String> sources) {
-        throw new UnsupportedOperationException("Hard to do in general because the directory structure matters");
+        return poms;
     }
 
     public static class Builder {

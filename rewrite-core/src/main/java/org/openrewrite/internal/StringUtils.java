@@ -16,7 +16,11 @@
 package org.openrewrite.internal;
 
 import io.micrometer.core.lang.Nullable;
+import org.apache.commons.io.Charsets;
 
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
@@ -29,6 +33,9 @@ import static java.util.stream.Collectors.counting;
 import static java.util.stream.Collectors.groupingBy;
 
 public class StringUtils {
+    private StringUtils() {
+    }
+
     public static String trimIndent(String text) {
         int indentLevel = indentLevel(text);
 
@@ -144,5 +151,20 @@ public class StringUtils {
             }
         }
         return true;
+    }
+
+    public static String readFully(InputStream inputStream) {
+        try(InputStream is = inputStream) {
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int n;
+            while ((n = is.read(buffer)) != -1) {
+                bos.write(buffer, 0, n);
+            }
+
+            return new String(bos.toByteArray(), Charsets.UTF_8);
+        } catch (IOException e) {
+            throw new UnsupportedOperationException(e);
+        }
     }
 }

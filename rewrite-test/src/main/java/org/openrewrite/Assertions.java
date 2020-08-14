@@ -57,22 +57,22 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> whenVisitedBy(RefactorVisitor<?> visitor) {
-            List<S> sources = parser.parse(sourceFiles);
+            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitor);
         }
 
         public RefactoringAssert<S> whenVisitedBy(Iterable<RefactorVisitor<?>> visitors) {
-            List<S> sources = parser.parse(sourceFiles);
+            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedBy(visitors);
         }
 
         public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles);
+            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
         }
 
         public RefactoringAssert<S> whenVisitedByMany(Function<S, Iterable<RefactorVisitor<? super S>>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles);
+            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
             return new RefactoringAssert<>(primary(sources), sources).whenVisitedByMany(visitorFunction);
         }
 

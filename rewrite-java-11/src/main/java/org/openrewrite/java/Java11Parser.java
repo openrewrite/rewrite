@@ -25,6 +25,7 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -38,17 +39,16 @@ import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.nio.charset.Charset;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.StreamSupport.stream;
 
 /**
  * This parser is NOT thread-safe, as the OpenJDK parser maintains in-memory caches in static state.
@@ -90,7 +90,11 @@ public class Java11Parser implements JavaParser {
         this.charset = charset;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
+
         this.pfm = new JavacFileManager(context, true, charset);
+//        this.pfm = new ParserInputFileManager(charset);
+//        this.pfm.setContext(context);
+        context.put(JavaFileManager.class, this.pfm);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
@@ -128,7 +132,7 @@ public class Java11Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parse(List<Path> sourceFiles, @Nullable Path relativeTo) {
+    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -141,16 +145,17 @@ public class Java11Parser implements JavaParser {
             }
         }
 
-        var fileObjects = pfm.getJavaFileObjects(filterSourceFiles(sourceFiles).toArray(Path[]::new));
-        var cus = stream(fileObjects.spliterator(), false)
+//        var fileObjects = pfm.getJavaFileObjects(sourceFiles.toArray(Path[]::new));
+
+        var cus = StreamSupport.stream(sourceFiles.spliterator(), false)
                 .collect(Collectors.toMap(
-                        p -> Paths.get(p.toUri()),
-                        filename -> Timer.builder("rewrite.parse")
+                        Function.identity(),
+                        input -> Timer.builder("rewrite.parse")
                                 .description("The time spent by the JDK in parsing and tokenizing the source file")
                                 .tag("file.type", "Java")
                                 .tag("step", "JDK parsing")
                                 .register(meterRegistry)
-                                .record(() -> compiler.parse(filename)),
+                                .record(() -> compiler.parse(new ParserInputFileObject(input))),
                         (e2, e1) -> e1, LinkedHashMap::new));
 
         try {
@@ -178,17 +183,13 @@ public class Java11Parser implements JavaParser {
                         .tag("step", "Map to Rewrite AST")
                         .register(meterRegistry)
                         .record(() -> {
-                            var path = cuByPath.getKey();
-                            logger.trace("Building AST for {}", path.toAbsolutePath().getFileName());
-                            try {
-                                Java11ParserVisitor parser = new Java11ParserVisitor(
-                                        relativeTo == null ? path : relativeTo.relativize(path),
-                                        Files.readString(path, charset),
-                                        relaxedClassTypeMatching, styles);
-                                return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
-                            } catch (IOException e) {
-                                throw new UncheckedIOException(e);
-                            }
+                            var input = cuByPath.getKey();
+                            logger.trace("Building AST for {}", input.getPath().getFileName());
+                            Java11ParserVisitor parser = new Java11ParserVisitor(
+                                    input.getRelativePath(relativeTo),
+                                    StringUtils.readFully(input.getSource()),
+                                    relaxedClassTypeMatching, styles);
+                            return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
                         })
         ).collect(toList());
     }
@@ -230,11 +231,6 @@ public class Java11Parser implements JavaParser {
         public void reset() {
             sourceMap.clear();
         }
-    }
-
-    private List<Path> filterSourceFiles(List<Path> sourceFiles) {
-        return sourceFiles.stream().filter(source -> source.getFileName().toString().endsWith(".java"))
-                .collect(Collectors.toList());
     }
 
     private class TimedTodo extends Todo {

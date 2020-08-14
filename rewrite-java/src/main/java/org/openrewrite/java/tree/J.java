@@ -63,10 +63,11 @@ public interface J extends Serializable, Tree {
         return new PrintJava().visit(this);
     }
 
+    @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class AnnotatedType implements J, Expression, TypeTree {
+    final class AnnotatedType implements J, Expression, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -98,7 +99,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Annotation implements J, Expression {
+    final class Annotation implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -132,7 +133,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments implements J {
+        public static final class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -152,7 +153,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ArrayAccess implements J, Expression {
+    final class ArrayAccess implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -177,7 +178,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension implements J {
+        public static final class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -192,7 +193,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ArrayType implements J, TypeTree, Expression {
+    final class ArrayType implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -224,7 +225,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension implements J {
+        public static final class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -239,7 +240,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Assert implements J, Statement {
+    final class Assert implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -264,7 +265,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Assign implements J, Statement, Expression {
+    final class Assign implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -302,7 +303,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class AssignOp implements J, Statement, Expression {
+    final class AssignOp implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -344,7 +345,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Addition extends Operator {
+            public static final class Addition extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -355,7 +356,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Subtraction extends Operator {
+            public static final class Subtraction extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -366,7 +367,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Multiplication extends Operator {
+            public static final class Multiplication extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -377,7 +378,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Division extends Operator {
+            public static final class Division extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -388,7 +389,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Modulo extends Operator {
+            public static final class Modulo extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -399,7 +400,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitAnd extends Operator {
+            public static final class BitAnd extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -410,7 +411,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitOr extends Operator {
+            public static final class BitOr extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -421,7 +422,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitXor extends Operator {
+            public static final class BitXor extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -432,7 +433,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class LeftShift extends Operator {
+            public static final class LeftShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -443,7 +444,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class RightShift extends Operator {
+            public static final class RightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -454,7 +455,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class UnsignedRightShift extends Operator {
+            public static final class UnsignedRightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -467,7 +468,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Binary implements J, Expression {
+    final class Binary implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -506,7 +507,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Addition extends Operator {
+            public static final class Addition extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -517,7 +518,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Subtraction extends Operator {
+            public static final class Subtraction extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -528,7 +529,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Multiplication extends Operator {
+            public static final class Multiplication extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -539,7 +540,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Division extends Operator {
+            public static final class Division extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -550,7 +551,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Modulo extends Operator {
+            public static final class Modulo extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -561,7 +562,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class LessThan extends Operator {
+            public static final class LessThan extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -572,7 +573,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class GreaterThan extends Operator {
+            public static final class GreaterThan extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -583,7 +584,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class LessThanOrEqual extends Operator {
+            public static final class LessThanOrEqual extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -594,7 +595,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class GreaterThanOrEqual extends Operator {
+            public static final class GreaterThanOrEqual extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -605,7 +606,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Equal extends Operator {
+            public static final class Equal extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -616,7 +617,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class NotEqual extends Operator {
+            public static final class NotEqual extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -627,7 +628,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitAnd extends Operator {
+            public static final class BitAnd extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -638,7 +639,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitOr extends Operator {
+            public static final class BitOr extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -649,7 +650,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class BitXor extends Operator {
+            public static final class BitXor extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -660,7 +661,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class LeftShift extends Operator {
+            public static final class LeftShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -671,7 +672,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class RightShift extends Operator {
+            public static final class RightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -682,7 +683,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class UnsignedRightShift extends Operator {
+            public static final class UnsignedRightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -693,7 +694,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Or extends Operator {
+            public static final class Or extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -704,7 +705,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class And extends Operator {
+            public static final class And extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -717,7 +718,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class Block<T extends J> implements J, Statement {
+    final class Block<T extends J> implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -760,7 +761,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class End implements J {
+        public static final class End implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -772,7 +773,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Break implements J, Statement {
+    final class Break implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -798,7 +799,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Case implements J, Statement {
+    final class Case implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -821,7 +822,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class ClassDecl implements J, Statement {
+    final class ClassDecl implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -952,7 +953,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Class extends Kind {
+            public static final class Class extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -963,7 +964,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Enum extends Kind {
+            public static final class Enum extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -974,7 +975,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Interface extends Kind {
+            public static final class Interface extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -985,7 +986,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Annotation extends Kind {
+            public static final class Annotation extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -997,7 +998,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Extends implements J {
+        public static final class Extends implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1011,7 +1012,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Implements implements J {
+        public static final class Implements implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1085,7 +1086,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class CompilationUnit implements J, SourceFile {
+    final class CompilationUnit implements J, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1162,7 +1163,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Continue implements J, Statement {
+    final class Continue implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1188,7 +1189,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class DoWhileLoop implements J, Statement {
+    final class DoWhileLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1215,7 +1216,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class While implements J {
+        public static final class While implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1230,7 +1231,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Empty implements J, Statement, Expression, TypeTree {
+    final class Empty implements J, Statement, Expression, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1263,7 +1264,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class EnumValue implements J, Statement {
+    final class EnumValue implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1286,7 +1287,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class EnumValueSet implements J, Statement {
+    final class EnumValueSet implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1307,7 +1308,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class FieldAccess implements J, TypeTree, Expression {
+    final class FieldAccess implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1404,7 +1405,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ForEachLoop implements J, Statement {
+    final class ForEachLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1425,7 +1426,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Control implements J {
+        public static final class Control implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1443,7 +1444,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ForLoop implements J, Statement {
+    final class ForLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1464,7 +1465,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Control implements J {
+        public static final class Control implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1485,7 +1486,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
-    class Ident implements J, TypeTree, Expression {
+    final class Ident implements J, TypeTree, Expression {
         private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
 
         @EqualsAndHashCode.Include
@@ -1555,7 +1556,7 @@ public interface J extends Serializable, Tree {
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @Data
-        public static class IdentFlyweight implements Serializable {
+        public static final class IdentFlyweight implements Serializable {
             String simpleName;
 
             @Nullable
@@ -1573,7 +1574,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class If implements J, Statement {
+    final class If implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1598,7 +1599,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Else implements J {
+        public static final class Else implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1618,7 +1619,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class Import implements J, Comparable<Import> {
+    final class Import implements J, Comparable<Import> {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1700,7 +1701,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class InstanceOf implements J, Expression {
+    final class InstanceOf implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1726,7 +1727,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Label implements J, Statement {
+    final class Label implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1748,7 +1749,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Lambda implements J, Expression {
+    final class Lambda implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1776,7 +1777,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arrow implements J {
+        public static final class Arrow implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1787,7 +1788,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Parameters implements J {
+        public static final class Parameters implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -1810,7 +1811,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Literal implements J, Expression {
+    final class Literal implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1869,7 +1870,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class MemberReference implements J, Expression {
+    final class MemberReference implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1899,7 +1900,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    class MethodDecl implements J {
+    final class MethodDecl implements J {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2021,7 +2022,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Parameters implements J {
+        public static final class Parameters implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2035,7 +2036,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Throws implements J {
+        public static final class Throws implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2049,7 +2050,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Default implements J {
+        public static final class Default implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2073,7 +2074,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class MethodInvocation implements J, Statement, Expression {
+    final class MethodInvocation implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2138,7 +2139,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments implements J {
+        public static final class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2270,7 +2271,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Default extends Modifier {
+        public static final class Default extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2281,7 +2282,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Public extends Modifier {
+        public static final class Public extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2292,7 +2293,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Protected extends Modifier {
+        public static final class Protected extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2303,7 +2304,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Private extends Modifier {
+        public static final class Private extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2314,7 +2315,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Abstract extends Modifier {
+        public static final class Abstract extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2325,7 +2326,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Static extends Modifier {
+        public static final class Static extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2336,7 +2337,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Final extends Modifier {
+        public static final class Final extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2347,7 +2348,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Native extends Modifier {
+        public static final class Native extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2358,7 +2359,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Strictfp extends Modifier {
+        public static final class Strictfp extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2369,7 +2370,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Synchronized extends Modifier {
+        public static final class Synchronized extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2380,7 +2381,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Transient extends Modifier {
+        public static final class Transient extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2391,7 +2392,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Volatile extends Modifier {
+        public static final class Volatile extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2403,7 +2404,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class MultiCatch implements J, TypeTree {
+    final class MultiCatch implements J, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2438,7 +2439,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class NewArray implements J, Expression {
+    final class NewArray implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2468,7 +2469,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension implements J {
+        public static final class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2482,7 +2483,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Initializer implements J {
+        public static final class Initializer implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2497,7 +2498,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class NewClass implements J, Statement, Expression {
+    final class NewClass implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2550,7 +2551,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Arguments implements J {
+        public static final class Arguments implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2564,7 +2565,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class New implements J {
+        public static final class New implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2576,7 +2577,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Package implements J {
+    final class Package implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2595,7 +2596,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class ParameterizedType implements J, TypeTree, Expression {
+    final class ParameterizedType implements J, TypeTree, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2665,7 +2666,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Parentheses<T extends J> implements J, Expression {
+    final class Parentheses<T extends J> implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2705,7 +2706,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class Primitive implements J, TypeTree, Expression {
+    final class Primitive implements J, TypeTree, Expression {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2740,7 +2741,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Return implements J, Statement {
+    final class Return implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2766,7 +2767,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Switch implements J, Statement {
+    final class Switch implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2788,7 +2789,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Synchronized implements J, Statement {
+    final class Synchronized implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2810,7 +2811,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Ternary implements J, Expression {
+    final class Ternary implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2839,7 +2840,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Throw implements J, Statement {
+    final class Throw implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2864,7 +2865,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    class Try implements J, Statement {
+    final class Try implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2909,7 +2910,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Resources implements J {
+        public static final class Resources implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2923,7 +2924,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Catch implements J {
+        public static final class Catch implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2945,7 +2946,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Finally implements J {
+        public static final class Finally implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -2965,7 +2966,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class TypeCast implements J, Expression {
+    final class TypeCast implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -2998,7 +2999,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class TypeParameter implements J {
+    final class TypeParameter implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3027,7 +3028,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Bounds implements J {
+        public static final class Bounds implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3042,7 +3043,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class TypeParameters implements J {
+    final class TypeParameters implements J {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3061,7 +3062,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Unary implements J, Statement, Expression {
+    final class Unary implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3103,7 +3104,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class PreIncrement extends Operator {
+            public static final class PreIncrement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3119,7 +3120,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class PreDecrement extends Operator {
+            public static final class PreDecrement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3135,7 +3136,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class PostIncrement extends Operator {
+            public static final class PostIncrement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3146,7 +3147,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class PostDecrement extends Operator {
+            public static final class PostDecrement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3157,7 +3158,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Positive extends Operator {
+            public static final class Positive extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3173,7 +3174,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Negative extends Operator {
+            public static final class Negative extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3189,7 +3190,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Complement extends Operator {
+            public static final class Complement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3200,7 +3201,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Not extends Operator {
+            public static final class Not extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3213,7 +3214,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class UnparsedSource implements J, Statement, Expression {
+    final class UnparsedSource implements J, Statement, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3243,7 +3244,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class VariableDecls implements J, Statement {
+    final class VariableDecls implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3319,7 +3320,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Varargs implements J {
+        public static final class Varargs implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3330,7 +3331,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class Dimension implements J {
+        public static final class Dimension implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3344,7 +3345,7 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static class NamedVar implements J, NameTree {
+        public static final class NamedVar implements J, NameTree {
             @EqualsAndHashCode.Include
             UUID id;
 
@@ -3393,7 +3394,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class WhileLoop implements J, Statement {
+    final class WhileLoop implements J, Statement {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3415,7 +3416,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    class Wildcard implements J, Expression {
+    final class Wildcard implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -3451,7 +3452,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Extends extends Bound {
+            public static final class Extends extends Bound {
                 @EqualsAndHashCode.Include
                 UUID id;
 
@@ -3462,7 +3463,7 @@ public interface J extends Serializable, Tree {
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
             @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
             @Data
-            public static class Super extends Bound {
+            public static final class Super extends Bound {
                 @EqualsAndHashCode.Include
                 UUID id;
 
