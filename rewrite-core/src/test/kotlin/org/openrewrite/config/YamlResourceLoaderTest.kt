@@ -17,8 +17,10 @@ package org.openrewrite.config
 
 import io.micrometer.core.instrument.Tag
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatExceptionOfType
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
+import org.openrewrite.ValidationException
 import org.openrewrite.text.ChangeText
 
 class YamlResourceLoaderTest {
@@ -49,7 +51,7 @@ class YamlResourceLoaderTest {
     fun loadRecipeYaml() {
         val recipe = YamlResourceLoader("""
             type: openrewrite.org/v1beta/recipe
-            name: test
+            name: org.openrewrite.test
             include:
               - 'org.openrewrite.text.*'
             exclude:
@@ -70,10 +72,10 @@ class YamlResourceLoaderTest {
         val resources = YamlResourceLoader("""
             ---
             type: openrewrite.org/v1beta/recipe
-            name: checkstyle
+            name: org.openrewrite.checkstyle
             ---
             type: openrewrite.org/v1beta/recipe
-            name: spring
+            name: org.openrewrite.spring
             ---
             type: openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextToJon
@@ -82,7 +84,49 @@ class YamlResourceLoaderTest {
                   toText: Hello Jon!
         """.trimIndent().byteInputStream())
 
-        assertThat(resources.loadRecipes().map { it.name }).containsOnly("checkstyle", "spring")
+        assertThat(resources.loadRecipes().map { it.name }).containsOnly("org.openrewrite.checkstyle", "org.openrewrite.spring")
         assertThat(resources.loadVisitors().map { it.name }).containsExactly("org.openrewrite.text.ChangeTextToJon")
+    }
+
+    @Test
+    fun rejectsDuplicateNames() {
+        assertThatExceptionOfType(ValidationException::class.java)
+                .isThrownBy {
+                    YamlResourceLoader("""
+                        ---
+                        type: openrewrite.org/v1beta/recipe
+                        name: org.openrewrite.spring
+                        ---
+                        type: openrewrite.org/v1beta/recipe
+                        name: org.openrewrite.spring
+                        ---
+                        type: openrewrite.org/v1beta/visitor
+                        name: org.openrewrite.text.ChangeTextToJon
+                        visitors:
+                          - org.openrewrite.text.ChangeText:
+                              toText: Hello Jon!
+                    """.trimIndent().byteInputStream())
+                }
+    }
+
+    @Test
+    fun rejectsUnqualifiedNames() {
+        assertThatExceptionOfType(ValidationException::class.java)
+                .isThrownBy {
+                    YamlResourceLoader("""
+                        ---
+                        type: openrewrite.org/v1beta/recipe
+                        name: spring
+                        ---
+                        type: openrewrite.org/v1beta/recipe
+                        name: rewrite
+                        ---
+                        type: openrewrite.org/v1beta/visitor
+                        name: org.openrewrite.text.ChangeTextToJon
+                        visitors:
+                          - org.openrewrite.text.ChangeText:
+                              toText: Hello Jon!
+                    """.trimIndent().byteInputStream())
+                }
     }
 }

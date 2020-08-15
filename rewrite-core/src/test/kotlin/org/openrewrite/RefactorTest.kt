@@ -26,13 +26,13 @@ class RefactorTest {
         val plan = RefactorPlan.builder()
                 .scanVisitors("org.openrewrite.text")
                 .loadRecipe(RecipeConfiguration().apply {
-                    name = "hello-jon"
+                    name = "org.openrewrite.hello-jon"
                     setInclude(setOf("org.openrewrite.text.*"))
                     setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
                 })
                 .build()
 
-        val visitors = plan.visitors("hello-jon")
+        val visitors = plan.visitors("org.openrewrite.hello-jon")
 
         val fixed = Refactor()
                 .visit(visitors)
@@ -47,7 +47,7 @@ class RefactorTest {
                 .scanResources()
                 .build()
 
-        val visitors = plan.visitors("hello-jon")
+        val visitors = plan.visitors("org.openrewrite.hello-jon")
 
         assertThat(visitors).hasSize(1)
     }

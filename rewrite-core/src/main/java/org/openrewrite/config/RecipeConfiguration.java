@@ -44,8 +44,7 @@ public class RecipeConfiguration {
     @SuppressWarnings("rawtypes")
     private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
-    private String name = "default";
-    private String extend = null;
+    private String name = null;
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
     private Map<String, Object> configure = new HashMap<>();
@@ -56,11 +55,16 @@ public class RecipeConfiguration {
     }
 
     public void setName(String name) {
+        Validated validated = Validated.test("name",
+                "does not appear to be fully qualified or contains disallowed characters. " +
+                        "We recommend qualifying your recipe name according to JVM package naming conventions. " +
+                        "e.g.: com.yourorg.recipename",
+                name,
+                it -> it.matches("(([a-zA-Z0-9_-]+)\\.)+([a-zA-Z0-9_-]+)"));
+        if (validated.isInvalid()) {
+            throw new ValidationException(validated);
+        }
         this.name = name;
-    }
-
-    public void setExtend(String extend) {
-        this.extend = extend;
     }
 
     public void setInclude(Set<String> include) {
@@ -84,38 +88,8 @@ public class RecipeConfiguration {
                 .map(i -> i
                         .replace(".", "\\.")
                         .replace("*", "[^.]+"))
-                .map(i -> "(org\\.openrewrite\\.)?" + i)
                 .map(Pattern::compile)
                 .collect(toSet());
-    }
-
-    /**
-     * Add additional configuration to this recipe.
-     * Does nothing if the recipe to be merged has a different name than this recipe.
-     * For example, if configuration has been added to the 'default' recipe in multiple places (user home, project config, etc.)
-     * this can be used to merge all of that disparate configuration together.
-     * <p>
-     * So this should be seen as a tool for merging together the split-apart pieces of a single recipe, and *not*
-     * for taking unrelated recipes and combining them together.
-     *
-     * @param recipe The recipe to merge.
-     * @return this The merged recipe.
-     */
-    public RecipeConfiguration merge(@Nullable RecipeConfiguration recipe) {
-        if (recipe != null && recipe.name.equals(name)) {
-            RecipeConfiguration merged = new RecipeConfiguration();
-            merged.name = name;
-            merged.include = Stream.concat(this.include.stream(), recipe.include.stream()).collect(toSet());
-            merged.exclude = Stream.concat(this.exclude.stream(), recipe.exclude.stream()).collect(toSet());
-
-            merged.configure = configure;
-            merged.configure.putAll(recipe.configure);
-            merged.styles.putAll(recipe.styles);
-
-            return merged;
-        }
-
-        return this;
     }
 
     public Recipe build(Collection<RecipeConfiguration> otherRecipeConfigurations) {
@@ -128,16 +102,6 @@ public class RecipeConfiguration {
         while (!configs.isEmpty()) {
             RecipeConfiguration config = configs.poll();
             inOrderConfigurations.add(config);
-            if (config.extend != null) {
-                RecipeConfiguration parent = configsByName.get(config.extend);
-                if (parent != null) {
-                    configs.add(parent);
-                }
-            }
-        }
-
-        if (!name.equals("default") && configsByName.containsKey("default")) {
-            inOrderConfigurations.add(configsByName.get("default"));
         }
 
         return new Recipe() {

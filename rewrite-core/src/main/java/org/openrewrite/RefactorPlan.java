@@ -147,8 +147,16 @@ public class RefactorPlan {
         }
 
         public Builder loadRecipe(RecipeConfiguration recipeConfiguration) {
-            recipesConfigurations.compute(recipeConfiguration.getName(),
-                    (name, existing) -> recipeConfiguration.merge(existing));
+            Validated validated = Validated.required("recipeConfiguration.getName()", recipeConfiguration.getName())
+                    .and(Validated.test("recipeConfiguration.getName()",
+                            "Recipe name must be unique",
+                            recipeConfiguration.getName(),
+                            it -> !recipesConfigurations.containsKey(it)));
+
+            if(validated.isInvalid()) {
+                throw new ValidationException(validated);
+            }
+            recipesConfigurations.put(recipeConfiguration.getName(), recipeConfiguration);
             return this;
         }
 

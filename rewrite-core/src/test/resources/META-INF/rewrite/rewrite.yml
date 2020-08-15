@@ -21,18 +21,12 @@ visitors:
       toText: Hello Jon!
 ---
 type: openrewrite.org/v1beta/recipe
-name: hello-jon
+name: org.openrewrite.hello-jon
 include:
   - org.openrewrite.text.ChangeTextToJon
 ---
 type: openrewrite.org/v1beta/recipe
-name: hello-jon2
-extend: hello-jon
-include:
-  - 'org.openrewrite.text.*'
----
-type: openrewrite.org/v1beta/recipe
-name: google-java-format
+name: org.openrewrite.google-java-format
 styles:
   org.openrewrite.java.ImportLayoutStyle:
       layout:

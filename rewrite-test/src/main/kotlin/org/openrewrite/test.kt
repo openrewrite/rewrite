@@ -20,10 +20,10 @@ import org.openrewrite.config.ClasspathResourceLoader
 import org.openrewrite.config.RecipeConfiguration
 import java.nio.file.Path
 
-fun <S: SourceFile> String.whenParsedBy(parser: Parser<S>): Assertions.StringSourceFileAssert<S> =
+fun <S : SourceFile> String.whenParsedBy(parser: Parser<S>): Assertions.StringSourceFileAssert<S> =
         whenParsedBy(parser, this)
 
-fun <S: SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSourceFileAssert<S> =
+fun <S : SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSourceFileAssert<S> =
         whenParsedBy(parser, this)
 
 /**
@@ -32,18 +32,13 @@ fun <S: SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSourceF
 fun loadRefactorPlan(recipeName: String): RefactorPlan {
     val crl = ClasspathResourceLoader(emptyList())
     val recipeConfig = crl.loadRecipes().asSequence()
-            .filter { it.name == recipeName }
-            .fold(
-                    RecipeConfiguration().apply {
-                        name = recipeName
-                    }) { accumulator, recipe -> accumulator.merge(recipe) }
-            ?: throw RuntimeException("Couldn't load recipe named '$recipeName'. " +
+            .find { it.name == recipeName } ?: throw RuntimeException("Couldn't load recipe named '$recipeName'. " +
                     "Verify that there's a yml file defining a recipe with this name under src/test/resources/META-INF/rewrite")
 
     val recipe = recipeConfig.build(listOf())
     val visitors = crl.loadVisitors()
             .filter { recipe.accept(it) == Recipe.FilterReply.ACCEPT }
-    if(visitors.isEmpty()) {
+    if (visitors.isEmpty()) {
         throw RuntimeException("Couldn't find any visitors for recipe named `$recipeName`. " +
                 "Verify that your recipe has an include pattern that accepts at least one visitor according to SourceVisitor<J>.accept()")
     }

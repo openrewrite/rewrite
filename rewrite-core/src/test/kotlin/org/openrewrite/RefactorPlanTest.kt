@@ -23,42 +23,24 @@ import org.openrewrite.text.PlainText
 
 class RefactorPlanTest {
     private val parent = RecipeConfiguration().apply {
-        name = "parent"
+        name = "org.openrewrite.example"
         setInclude(setOf("org.openrewrite.text.*"))
-        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "hi"))
-    }
-
-    private val child = RecipeConfiguration().apply {
-        name = "child"
-        setExtend("parent")
-        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "overridden"))
+        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello World!"))
     }
 
     private val planBuilder = RefactorPlan.builder()
             .loadRecipe(parent)
-            .loadRecipe(child)
             .visitor(ChangeText())
 
     @Test
-    fun nearestConfigurationTakesPrecedence() {
-        val visitors = planBuilder.build().visitors("child")
+    fun basicExample() {
+        val visitors = planBuilder.build().visitors("org.openrewrite.example")
 
         val fixed: PlainText = Refactor()
                 .visit(visitors)
-                .fixed(PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList()))!!
+                .fixed(PlainText(Tree.randomId(), "Goodbye World.", Formatting.EMPTY, emptyList()))!!
 
-        assertThat(fixed.print()).isEqualTo("overridden")
+        assertThat(fixed.print()).isEqualTo("Hello World!")
     }
 
-    @Test
-    fun excludes() {
-        child.apply {
-            setExclude(setOf("org.openrewrite.text.*"))
-        }
-
-        val visitors = planBuilder.build()
-                .visitors("child")
-
-        assertThat(visitors).isEmpty()
-    }
 }

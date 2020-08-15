@@ -147,11 +147,23 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
         try {
             propertyConverter.updateValue(recipe, recipeMap);
         } catch (JsonMappingException e) {
-            throw new ValidationException(Validated.invalid("recipe", recipeMap,
-                    "must be a valid recipe configuration", e));
+            if(e.getCause() != null && e.getCause() instanceof ValidationException) {
+                throw new ValidationException((ValidationException) e.getCause(), null);
+            } else {
+                throw new ValidationException(Validated.invalid("recipe", recipeMap,
+                        "must be a valid recipe configuration", e));
+            }
         }
 
-        recipes.compute(recipe.getName(), (name, existing) -> recipe.merge(existing));
+        Validated validated = Validated.required("recipe.getName()", recipe.getName())
+                .and(Validated.test("recipe.getName()",
+                        "there is already another recipe with that name",
+                        recipe.getName(),
+                        it -> !recipes.containsKey(it)));
+        if(validated.isInvalid()) {
+            throw new ValidationException(validated);
+        }
+        recipes.put(recipe.getName(), recipe);
     }
 
     @Override

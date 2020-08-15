@@ -74,24 +74,6 @@ internal class RecipeConfigurationTest {
     }
 
     @Test
-    fun everyRecipeImplicitlyExtendsDefault() {
-        val default = RecipeConfiguration().apply {
-            name = "default"
-            setConfigure(
-                    mapOf("org.openrewrite.text.ChangeText" to
-                            mapOf("toText" to "Hello Jon!")
-                    )
-            )
-        }
-
-        val recipe = RecipeConfiguration().apply {
-            name = "hello-jon"
-        }.build(listOf(default))
-
-        assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
-    }
-
-    @Test
     fun propertyNameCombinedWithVisitorName() {
         val recipe = RecipeConfiguration().apply {
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
