@@ -14,8 +14,8 @@
 # limitations under the License.
 #
 ---
-type: beta.openrewrite.org/v1/recipe
-name: google-java-format
+type: openrewrite.org/v1beta/recipe
+name: org.openrewrite.google-java-format
 styles:
   org.openrewrite.java.ImportLayoutStyle:
       layout:

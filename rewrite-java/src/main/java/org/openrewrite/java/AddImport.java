@@ -30,6 +30,7 @@ import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
@@ -71,6 +72,16 @@ public class AddImport extends JavaRefactorVisitor {
     public Validated validate() {
         return required("type", type);
     }
+
+    /**
+     * Regex intended to be used on the whitespace, possibly containing comments, between import statements and class definition.
+     * It will match() when the text begins with two `\n` characters, while allowing for other whitespace such as spaces
+     *
+     *     Fragment    Purpose
+     *     [ \t\r]*    match 0 or more whitespace characters, omitting \n
+     *     .*          match anything that's left, including multi-line comments, whitespace, etc., thanks to Pattern.DOTALL
+     */
+    private static Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
@@ -116,9 +127,9 @@ public class AddImport extends JavaRefactorVisitor {
                     importToAdd.withPrefix("\n\n");
         }
 
-        // add just enough newlines to yield a blank line between imports and the first class declaration
+        // Add just enough newlines to yield a blank line between imports and the first class declaration
         if(cu.getClasses().iterator().hasNext()) {
-            while (!firstPrefix(cu.getClasses()).startsWith("\n\n")) {
+            while (!prefixedByTwoNewlines.matcher(firstPrefix(cu.getClasses())).matches()) {
                 cu = cu.withClasses(formatFirstPrefix(cu.getClasses(), "\n" + firstPrefix(cu.getClasses())));
             }
         }

@@ -54,6 +54,12 @@ public interface Validated extends Iterable<Validated> {
         return new Valid(property, value);
     }
 
+    /**
+     * Validate that the Predicate will evaluate to 'true' on the supplied value.
+     * When the Predicate evaluates to 'false' the error message will be of the form:
+     *
+     * "[property] was '[value]' but it [message]"
+     */
     static <T> Validated test(String property, String message, @Nullable T value, Predicate<T> test) {
         return test.test(value) ?
                 valid(property, value) :

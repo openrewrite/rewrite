@@ -27,6 +27,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun includeWildcard() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setInclude(setOf("org.openrewrite.text.*"))
         }.build(emptyList())
 
@@ -38,6 +39,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun includeWildcardsDontIncludeNestedPackages() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setInclude(setOf("org.openrewrite.*"))
         }.build(emptyList())
 
@@ -49,6 +51,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun configureSourceVisitor() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setConfigure(
                     mapOf("org.openrewrite.text.ChangeText" to
                             mapOf("toText" to "Hello Jon!")
@@ -62,6 +65,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun configureStyles() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setStyles(
                     mapOf("org.openrewrite.text.TextStyle" to
                             mapOf("charset" to "UTF-8")
@@ -76,6 +80,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun propertyNameCombinedWithVisitorName() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
         }.build(emptyList())
 
@@ -85,6 +90,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun propertyNameCombinedWithWildcardVisitor() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setConfigure(mapOf("org.openrewrite.text.*.toText" to "Hello Jon!"))
         }.build(emptyList())
 
@@ -94,6 +100,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun splitPackageWildcard() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.*" to
@@ -109,6 +116,7 @@ internal class RecipeConfigurationTest {
     @Test
     fun splitPackage() {
         val recipe = RecipeConfiguration().apply {
+            name = "org.rewrite.test"
             setConfigure(
                     mapOf("org.openrewrite" to
                             mapOf("text.ChangeText" to

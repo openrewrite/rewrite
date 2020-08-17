@@ -55,12 +55,16 @@ public class RecipeConfiguration {
     }
 
     public void setName(String name) {
-        Validated validated = Validated.test("name",
-                "does not appear to be fully qualified or contains disallowed characters. " +
-                        "We recommend qualifying your recipe name according to JVM package naming conventions. " +
-                        "e.g.: com.yourorg.recipename",
-                name,
-                it -> it.matches("(([a-zA-Z0-9_-]+)\\.)+([a-zA-Z0-9_-]+)"));
+        Validated validated = Validated.notBlank("name", name)
+                .and(Validated.test("name",
+                        "contains characters other than letters, numbers, '-', and '_'",
+                        name,
+                        it -> it.matches("[\\p{L}0-9_.-]+")))
+                .and(Validated.test("name",
+                        "that is not fully qualified. Fully qualify the name '" + name +
+                                "' with a package, like 'com.myproject." + name + "'",
+                        name,
+                        it -> it.matches("(([\\p{L}0-9_-]+)\\.)+([\\p{L}0-9_-]+)")));
         if (validated.isInvalid()) {
             throw new ValidationException(validated);
         }
@@ -103,7 +107,10 @@ public class RecipeConfiguration {
             RecipeConfiguration config = configs.poll();
             inOrderConfigurations.add(config);
         }
-
+        Validated validated = Validated.required("name", name);
+        if(validated.isInvalid()) {
+            throw new ValidationException(validated);
+        }
         return new Recipe() {
             @Override
             public String getName() {
@@ -114,17 +121,17 @@ public class RecipeConfiguration {
             public Collection<Style> getStyles() {
                 return inOrderConfigurations.stream()
                         .flatMap(conf -> conf.styles.entrySet().stream()
-                            .map(styleConfigByName -> {
-                                try {
-                                    Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
-                                    propertyConverter.updateValue(style, styleConfigByName.getValue());
-                                    return style;
-                                } catch (Exception e) {
-                                    logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
-                                    return null;
-                                }
-                            })
-                            .filter(Objects::nonNull)
+                                .map(styleConfigByName -> {
+                                    try {
+                                        Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
+                                        propertyConverter.updateValue(style, styleConfigByName.getValue());
+                                        return style;
+                                    } catch (Exception e) {
+                                        logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
+                                        return null;
+                                    }
+                                })
+                                .filter(Objects::nonNull)
                         )
                         .collect(toList());
             }
