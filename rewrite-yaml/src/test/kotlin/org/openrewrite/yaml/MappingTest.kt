@@ -23,7 +23,7 @@ class MappingTest : YamlParser() {
     @Test
     fun multipleEntries() {
         val yText = """
-            type : openrewrite.org/v1beta/visitor
+            type : specs.openrewrite.org/v1beta/visitor
             name : org.openrewrite.text.ChangeTextToJon
         """.trimIndent()
         val y = parse(yText)[0]

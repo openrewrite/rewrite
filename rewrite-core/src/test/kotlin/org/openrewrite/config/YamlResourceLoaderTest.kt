@@ -27,7 +27,7 @@ class YamlResourceLoaderTest {
     @Test
     fun loadVisitorFromYaml() {
         val yaml = """
-            type: openrewrite.org/v1beta/visitor
+            type: specs.openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextTwice
             visitors:
               - org.openrewrite.text.ChangeText:
@@ -50,7 +50,7 @@ class YamlResourceLoaderTest {
     @Test
     fun loadRecipeYaml() {
         val recipe = YamlResourceLoader("""
-            type: openrewrite.org/v1beta/recipe
+            type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.test
             include:
               - 'org.openrewrite.text.*'
@@ -71,13 +71,13 @@ class YamlResourceLoaderTest {
     fun loadMultiYaml() {
         val resources = YamlResourceLoader("""
             ---
-            type: openrewrite.org/v1beta/recipe
+            type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.checkstyle
             ---
-            type: openrewrite.org/v1beta/recipe
+            type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.spring
             ---
-            type: openrewrite.org/v1beta/visitor
+            type: specs.openrewrite.org/v1beta/visitor
             name: org.openrewrite.text.ChangeTextToJon
             visitors:
               - org.openrewrite.text.ChangeText:
@@ -94,13 +94,13 @@ class YamlResourceLoaderTest {
                 .isThrownBy {
                     YamlResourceLoader("""
                         ---
-                        type: openrewrite.org/v1beta/recipe
+                        type: specs.openrewrite.org/v1beta/recipe
                         name: org.openrewrite.spring
                         ---
-                        type: openrewrite.org/v1beta/recipe
+                        type: specs.openrewrite.org/v1beta/recipe
                         name: org.openrewrite.spring
                         ---
-                        type: openrewrite.org/v1beta/visitor
+                        type: specs.openrewrite.org/v1beta/visitor
                         name: org.openrewrite.text.ChangeTextToJon
                         visitors:
                           - org.openrewrite.text.ChangeText:
@@ -115,13 +115,13 @@ class YamlResourceLoaderTest {
                 .isThrownBy {
                     YamlResourceLoader("""
                         ---
-                        type: openrewrite.org/v1beta/recipe
+                        type: specs.openrewrite.org/v1beta/recipe
                         name: spring
                         ---
-                        type: openrewrite.org/v1beta/recipe
+                        type: specs.openrewrite.org/v1beta/recipe
                         name: rewrite
                         ---
-                        type: openrewrite.org/v1beta/visitor
+                        type: specs.openrewrite.org/v1beta/visitor
                         name: org.openrewrite.text.ChangeTextToJon
                         visitors:
                           - org.openrewrite.text.ChangeText:

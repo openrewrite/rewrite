@@ -14,18 +14,18 @@
 # limitations under the License.
 #
 ---
-type: openrewrite.org/v1beta/visitor
+type: specs.openrewrite.org/v1beta/visitor
 name: org.openrewrite.text.ChangeTextToJon
 visitors:
   - org.openrewrite.text.ChangeText:
       toText: Hello Jon!
 ---
-type: openrewrite.org/v1beta/recipe
+type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.hello-jon
 include:
   - org.openrewrite.text.ChangeTextToJon
 ---
-type: openrewrite.org/v1beta/recipe
+type: specs.openrewrite.org/v1beta/recipe
 name: org.openrewrite.google-java-format
 styles:
   org.openrewrite.java.ImportLayoutStyle:

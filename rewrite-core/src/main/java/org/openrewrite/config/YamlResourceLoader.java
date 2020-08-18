@@ -39,8 +39,8 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
     private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
     private final Map<CompositeRefactorVisitor, String> visitorExtensions = new HashMap<>();
 
-    public static final String visitorType = "openrewrite.org/v1beta/visitor";
-    public static final String recipeType = "openrewrite.org/v1beta/recipe";
+    public static final String visitorType = "specs.openrewrite.org/v1beta/visitor";
+    public static final String recipeType = "specs.openrewrite.org/v1beta/recipe";
 
     private static final Set<String> validTypes = new LinkedHashSet<>(Arrays.asList(visitorType, recipeType));
     private static final String validTypesString = String.join(", ", validTypes);
