@@ -61,7 +61,7 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     public static class Builder {
         private boolean resolveDependencies = true;
-        private File localRepository = new File(System.getProperty("user.home") + "/.m2/repository");
+        private File localRepository = new File(System.getProperty("user.home") + "/.m2/rewrite");
         private List<RemoteRepository> remoteRepositories = new ArrayList<>();
 
         public Builder() {
