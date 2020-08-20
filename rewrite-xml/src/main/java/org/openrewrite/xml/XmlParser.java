@@ -25,20 +25,17 @@ import org.openrewrite.xml.internal.grammar.XMLLexer;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
     @Override
     public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
-        return StreamSupport.stream(sourceFiles.spliterator(), false)
+        return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try {
                         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
@@ -59,5 +56,10 @@ public class XmlParser implements Parser<Xml.Document> {
         XMLParser parser = new XMLParser(new CommonTokenStream(new XMLLexer(
                 CharStreams.fromString(tag))));
         return (Xml.Tag) new XmlParserVisitor(null, tag).visitContent(parser.content());
+    }
+
+    @Override
+    public boolean accept(Path path) {
+        return path.getFileName().toString().endsWith(".xml");
     }
 }

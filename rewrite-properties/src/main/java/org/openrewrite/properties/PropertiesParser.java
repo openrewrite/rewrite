@@ -20,13 +20,15 @@ import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
 
-import java.io.*;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -37,7 +39,7 @@ public class PropertiesParser implements Parser<Properties.File> {
 
     @Override
     public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
-        return StreamSupport.stream(sourceFiles.spliterator(), false)
+        return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
                         return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
@@ -204,5 +206,10 @@ public class PropertiesParser implements Parser<Properties.File> {
         return new Properties.Entry(randomId(), key.toString(), value.toString(),
                 format(equalsPrefix.toString(), equalsSuffix.toString()),
                 format(prefix.toString(), suffix.toString()));
+    }
+
+    @Override
+    public boolean accept(Path path) {
+        return path.getFileName().toString().endsWith(".properties");
     }
 }

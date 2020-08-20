@@ -27,7 +27,6 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 import java.util.function.Supplier;
 import java.util.stream.StreamSupport;
 
@@ -63,9 +62,13 @@ public interface Parser<S extends SourceFile> {
      */
     default List<S> parse(String... sources) {
         return parseInputs(
-                Arrays.stream(sources)
-                        .map(source -> Input.buildRandomPath(() -> new ByteArrayInputStream(source.getBytes())))
-                        .collect(toList()),
+                Arrays.stream(sources).map(source ->
+                        new Input(
+                                Paths.get(Long.toString(System.nanoTime())),
+                                () -> new ByteArrayInputStream(source.getBytes()),
+                                true
+                        )
+                ).collect(toList()),
                 null
         );
     }
@@ -77,6 +80,18 @@ public interface Parser<S extends SourceFile> {
      * @return A list of {@link SourceFile}.
      */
     List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo);
+
+    boolean accept(Path path);
+
+    default boolean accept(Input input) {
+        return input.isSynthetic() || accept(input.getPath());
+    }
+
+    default List<Input> acceptedInputs(Iterable<Input> input) {
+        return StreamSupport.stream(input.spliterator(), false)
+                .filter(this::accept)
+                .collect(toList());
+    }
 
     default Parser<S> reset() {
         return this;
@@ -93,12 +108,18 @@ public interface Parser<S extends SourceFile> {
      * memory.
      */
     class Input {
+        private final boolean synthetic;
         private final Path path;
         private final Supplier<InputStream> source;
 
         public Input(Path path, Supplier<InputStream> source) {
+            this(path, source, false);
+        }
+
+        public Input(Path path, Supplier<InputStream> source, boolean synthetic) {
             this.path = path;
             this.source = source;
+            this.synthetic = synthetic;
         }
 
         public Path getPath() {
@@ -113,15 +134,8 @@ public interface Parser<S extends SourceFile> {
             return source.get();
         }
 
-        /**
-         * Building an input where {@link #path} doesn't have any material impact on a {@link SourceFile}
-         * parsed from this input.
-         *
-         * @param source The contents of the source.
-         * @return An input.
-         */
-        public static Input buildRandomPath(Supplier<InputStream> source) {
-            return new Input(Paths.get(UUID.randomUUID().toString()), source);
+        public boolean isSynthetic() {
+            return synthetic;
         }
 
         @Override

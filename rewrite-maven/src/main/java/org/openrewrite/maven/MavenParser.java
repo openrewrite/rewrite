@@ -47,16 +47,23 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     @Override
     public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+        Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
+
         List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
-                .load(sourceFiles);
+                .load(pomSourceFiles);
 
         List<Maven.Pom> poms = new ArrayList<>();
-        Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(sourceFiles, relativeTo).iterator();
+        Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
         for (MavenModel module : modules) {
             poms.add(new Maven.Pom(module, xmlDocuments.next()));
         }
 
         return poms;
+    }
+
+    @Override
+    public boolean accept(Path path) {
+        return path.getFileName().toString().equals("pom.xml");
     }
 
     public static class Builder {

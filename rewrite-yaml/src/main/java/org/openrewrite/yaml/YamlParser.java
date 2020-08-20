@@ -35,7 +35,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
 import java.util.stream.Stream;
-import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -46,7 +45,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     @Override
     public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
-        return StreamSupport.stream(sourceFiles.spliterator(), false)
+        return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
                         return parseFromInput(sourceFile.getRelativePath(relativeTo), is);
@@ -142,6 +141,12 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @Override
+    public boolean accept(Path path) {
+        String fileName = path.getFileName().toString();
+        return fileName.endsWith(".yml") || fileName.endsWith(".yaml");
     }
 
     private interface BlockBuilder {

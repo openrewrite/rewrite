@@ -28,14 +28,12 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
@@ -98,7 +96,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 Arrays.stream(sources)
                         .map(sourceFile -> {
                             Path path = Paths.get(Optional.ofNullable(simpleName.apply(sourceFile))
-                                .orElse("package-info.java"));
+                                .orElse(Long.toString(System.nanoTime())) + ".java");
                             return new Input(
                                     path,
                                     () -> new ByteArrayInputStream(sourceFile.getBytes())
@@ -107,6 +105,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                         .collect(toList()),
                 null
         );
+    }
+
+    @Override
+    default boolean accept(Path path) {
+        return path.getFileName().toString().endsWith(".java");
     }
 
     /**

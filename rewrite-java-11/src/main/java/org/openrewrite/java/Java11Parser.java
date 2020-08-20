@@ -46,7 +46,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 
@@ -145,9 +144,7 @@ public class Java11Parser implements JavaParser {
             }
         }
 
-//        var fileObjects = pfm.getJavaFileObjects(sourceFiles.toArray(Path[]::new));
-
-        var cus = StreamSupport.stream(sourceFiles.spliterator(), false)
+        var cus = acceptedInputs(sourceFiles).stream()
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> Timer.builder("rewrite.parse")
