@@ -45,6 +45,8 @@ import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 import org.eclipse.aether.version.Version;
 import org.openrewrite.Parser;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.CachingWorkspaceReader;
 import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
@@ -70,14 +72,20 @@ class MavenModuleLoader {
 
     private final Map<MavenModel.ModuleVersionId, MavenModel.Dependency> dependencyCache = new HashMap<>();
 
+    private final CachingWorkspaceReader workspaceReader;
+
     private final boolean resolveDependencies;
     private final File localRepository;
     private final List<RemoteRepository> remoteRepositories;
 
-    public MavenModuleLoader(boolean resolveDependencies, File localRepository, List<RemoteRepository> remoteRepositories) {
+    public MavenModuleLoader(boolean resolveDependencies,
+                             File localRepository,
+                             @Nullable File workspaceDir,
+                             List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
         this.remoteRepositories = remoteRepositories;
+        this.workspaceReader = new CachingWorkspaceReader(workspaceDir);
     }
 
     public List<MavenModel> load(Iterable<Parser.Input> inputs) {
@@ -212,9 +220,11 @@ class MavenModuleLoader {
 
         try {
             VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
-            return newerArtifactsResult.getVersions().stream()
+            List<String> versions = newerArtifactsResult.getVersions().stream()
                     .map(Version::toString)
                     .collect(toList());
+            workspaceReader.cacheVersions(newerArtifacts, versions);
+            return versions;
         } catch (VersionRangeResolutionException e) {
             return emptyList();
         }
@@ -360,10 +370,7 @@ class MavenModuleLoader {
         repositorySystemSession.setChecksumPolicy(RepositoryPolicy.CHECKSUM_POLICY_IGNORE);
         repositorySystemSession.setCache(new DefaultRepositoryCache());
         repositorySystemSession.setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.IGNORE_ERRORS));
-
-        // TODO can we share resolution state across partitions with some implementation of this?
-        // repositorySystemSession.setWorkspaceReader()
-
+        repositorySystemSession.setWorkspaceReader(workspaceReader);
         repositorySystemSession.setRepositoryListener(new ConsoleRepositoryEventListener());
         repositorySystemSession.setReadOnly();
 
@@ -452,7 +459,7 @@ class MavenModuleLoader {
         }
     }
 
-    private class NoMavenCentralSuperPomProvider extends DefaultSuperPomProvider {
+    private static class NoMavenCentralSuperPomProvider extends DefaultSuperPomProvider {
         @Override
         public Model getSuperModel(String version) {
             Model superModel = super.getSuperModel(version);

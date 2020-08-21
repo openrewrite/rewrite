@@ -33,11 +33,17 @@ public class MavenParser implements Parser<Maven.Pom> {
     private final XmlParser xmlParser = new XmlParser();
     private final boolean resolveDependencies;
     private final File localRepository;
+
+    @Nullable
+    private final File workspaceDir;
+
     private final List<RemoteRepository> remoteRepositories;
 
-    private MavenParser(boolean resolveDependencies, File localRepository, List<RemoteRepository> remoteRepositories) {
+    private MavenParser(boolean resolveDependencies, File localRepository,
+                        @Nullable File workspaceDir, List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
+        this.workspaceDir = workspaceDir;
         this.remoteRepositories = remoteRepositories;
     }
 
@@ -49,8 +55,8 @@ public class MavenParser implements Parser<Maven.Pom> {
     public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
 
-        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository, remoteRepositories)
-                .load(pomSourceFiles);
+        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository,
+                workspaceDir, remoteRepositories).load(pomSourceFiles);
 
         List<Maven.Pom> poms = new ArrayList<>();
         Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
@@ -71,6 +77,9 @@ public class MavenParser implements Parser<Maven.Pom> {
         private File localRepository = new File(System.getProperty("user.home") + "/.m2/rewrite");
         private List<RemoteRepository> remoteRepositories = new ArrayList<>();
 
+        @Nullable
+        private File workspaceDir;
+
         public Builder() {
             remoteRepositories.add(new RemoteRepository.Builder("central", "default",
                     "https://repo1.maven.org/maven2/").build()
@@ -79,6 +88,11 @@ public class MavenParser implements Parser<Maven.Pom> {
 
         public Builder localRepository(File localRepository) {
             this.localRepository = localRepository;
+            return this;
+        }
+
+        public Builder workspaceDir(File workspaceDir) {
+            this.workspaceDir = workspaceDir;
             return this;
         }
 
@@ -98,7 +112,7 @@ public class MavenParser implements Parser<Maven.Pom> {
         }
 
         public MavenParser build() {
-            return new MavenParser(resolveDependencies, localRepository, remoteRepositories);
+            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);
         }
     }
 }
