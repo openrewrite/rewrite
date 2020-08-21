@@ -91,8 +91,6 @@ public class Java11Parser implements JavaParser {
         this.styles = styles;
 
         this.pfm = new JavacFileManager(context, true, charset);
-//        this.pfm = new ParserInputFileManager(charset);
-//        this.pfm.setContext(context);
         context.put(JavaFileManager.class, this.pfm);
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original

@@ -18,6 +18,8 @@ package org.openrewrite.maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.building.*;
+import org.apache.maven.model.superpom.DefaultSuperPomProvider;
+import org.apache.maven.model.superpom.SuperPomProvider;
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.*;
 import org.eclipse.aether.artifact.Artifact;
@@ -115,7 +117,15 @@ class MavenModuleLoader {
                     .setModelResolver(new ParentModelResolver(repositorySystem, repositorySystemSession, remoteRepositories))
                     .setModelSource(modelSource);
 
-            ModelBuilder modelBuilder = new DefaultModelBuilderFactory().newInstance();
+            DefaultModelBuilder modelBuilder = new DefaultModelBuilderFactory() {
+                @Override
+                protected SuperPomProvider newSuperPomProvider() {
+                    NoMavenCentralSuperPomProvider superPomProvider = new NoMavenCentralSuperPomProvider();
+                    superPomProvider.setModelProcessor(newModelProcessor());
+                    return superPomProvider;
+                }
+            }.newInstance();
+
             ModelBuildingResult modelBuildingResult = modelBuilder.build(modelBuildingRequest);
 
             return buildMavenModelRecursive(repositorySystem, repositorySystemSession,
@@ -178,7 +188,7 @@ class MavenModuleLoader {
                         model.getArtifactId(),
                         null,
                         model.getVersion(),
-                        newerVersions(repositorySystem, repositorySystemSession,
+                        newerVersions(repositorySystem, repositorySystemSession, model,
                                 model.getGroupId(), model.getArtifactId(), model.getVersion(),
                                 "", "pom")
                 ),
@@ -191,14 +201,14 @@ class MavenModuleLoader {
 
     private List<String> newerVersions(RepositorySystem repositorySystem,
                                        RepositorySystemSession repositorySystemSession,
+                                       Model model,
                                        String groupId, String artifactId, String version,
                                        String classifier, String extension) {
         Artifact newerArtifacts = new DefaultArtifact(groupId, artifactId, classifier, extension,
                 "(" + version + ",)");
-
         VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
         newerArtifactsRequest.setArtifact(newerArtifacts);
-        newerArtifactsRequest.setRepositories(remoteRepositories);
+        newerArtifactsRequest.setRepositories(remoteRepositoriesFromModel(model));
 
         try {
             VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
@@ -208,6 +218,15 @@ class MavenModuleLoader {
         } catch (VersionRangeResolutionException e) {
             return emptyList();
         }
+    }
+
+    private List<RemoteRepository> remoteRepositoriesFromModel(Model model) {
+        List<RemoteRepository> remotes = new ArrayList<>(remoteRepositories);
+        model.getRepositories().forEach(repo -> remotes.add(
+                new RemoteRepository.Builder(repo.getId(), "default",
+                        repo.getUrl().replace("http:", "https:")).build())
+        );
+        return remotes;
     }
 
     private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
@@ -247,7 +266,7 @@ class MavenModuleLoader {
                                     artifact.getArtifactId(),
                                     artifact.getClassifier(),
                                     artifact.getVersion(),
-                                    newerVersions(repositorySystem, repositorySystemSession,
+                                    newerVersions(repositorySystem, repositorySystemSession, model,
                                             artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(),
                                             artifact.getClassifier(), artifact.getExtension())
                             ),
@@ -281,6 +300,7 @@ class MavenModuleLoader {
         if (resolveDependencies) {
             try {
                 CollectRequest collectRequest = new CollectRequest();
+                collectRequest.setRepositories(remoteRepositoriesFromModel(model));
                 collectRequest.addDependency(
                         new org.eclipse.aether.graph.Dependency(
                                 artifact,
@@ -297,8 +317,6 @@ class MavenModuleLoader {
                         )
                 );
 
-                collectRequest.setRepositories(remoteRepositories);
-
                 CollectResult collectResult = repositorySystem
                         .collectDependencies(repositorySystemSession, collectRequest);
 
@@ -308,7 +326,7 @@ class MavenModuleLoader {
 
                 logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
             } catch (DependencyCollectionException e) {
-                logger.warn("error collecting dependencies: {}", e.getMessage());
+                logger.warn("error collecting dependencies", e);
             }
         }
 
@@ -324,8 +342,7 @@ class MavenModuleLoader {
 
     private RepositorySystem getRepositorySystem() {
         DefaultServiceLocator serviceLocator = MavenRepositorySystemUtils.newServiceLocator();
-        serviceLocator
-                .addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
+        serviceLocator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
         serviceLocator.addService(TransporterFactory.class, FileTransporterFactory.class);
         serviceLocator.addService(TransporterFactory.class, HttpTransporterFactory.class);
 
@@ -432,6 +449,15 @@ class MavenModuleLoader {
 
             modelSources.values().forEach(modelSource -> modelSource.allModelSources = modelSources);
             return modelSources.values();
+        }
+    }
+
+    private class NoMavenCentralSuperPomProvider extends DefaultSuperPomProvider {
+        @Override
+        public Model getSuperModel(String version) {
+            Model superModel = super.getSuperModel(version);
+            superModel.getRepositories().clear();
+            return superModel;
         }
     }
 }

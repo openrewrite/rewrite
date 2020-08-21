@@ -16,8 +16,11 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.DisabledIf
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.Issue
 import java.io.File
 import java.nio.file.Path
 
@@ -141,5 +144,41 @@ class MavenParserTest {
 
         assertThat(parentPom.model.inheriting.firstOrNull()?.moduleVersion)
                 .isEqualTo(pom.model.moduleVersion)
+    }
+
+    @Issue("23")
+    @Test
+    fun httpRepository(@TempDir tempDir: Path) {
+        val pom = MavenParser.builder()
+                .remoteRepositories(emptyList())
+                .localRepository(tempDir.toFile())
+                .build()
+                .parse("""
+                   <project>
+                      <modelVersion>4.0.0</modelVersion>
+                      <groupId>my-group</groupId>
+                      <artifactId>my-module</artifactId>
+                      <version>0.1.0</version>
+                      
+                      <repositories>
+                        <repository>
+                          <id>jcenter</id>
+                          <name>jcenter without https</name>
+                          <url>http://jcenter.bintray.com</url>
+                        </repository>
+                      </repositories>
+                    
+                      <dependencies>
+                        <dependency>
+                          <groupId>org.junit.jupiter</groupId>
+                          <artifactId>junit-jupiter-api</artifactId>
+                          <version>[5.6,)</version>
+                          <scope>test</scope>
+                        </dependency>
+                      </dependencies>
+                    </project> 
+                """)[0]
+
+        assertThat(pom.model.dependencies[0].moduleVersion.version).doesNotContain("[")
     }
 }
