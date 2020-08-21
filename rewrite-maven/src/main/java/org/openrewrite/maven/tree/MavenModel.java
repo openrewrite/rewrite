@@ -22,6 +22,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * A minified, serializable form of {@link org.apache.maven.model.Model}
@@ -48,6 +49,9 @@ public class MavenModel {
     @ToString.Exclude
     @With
     List<Dependency> dependencies;
+
+    @With
+    Map<String, Set<ModuleVersionId>> transitiveDependenciesByScope;
 
     @ToString.Exclude
     @With

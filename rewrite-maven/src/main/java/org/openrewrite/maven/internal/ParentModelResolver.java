@@ -53,7 +53,7 @@ public class ParentModelResolver implements ModelResolver {
     @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version) throws UnresolvableModelException {
-        logger.info("resolving model for: {}:{}", groupId, artifactId);
+        logger.trace("resolving model for: {}:{}", groupId, artifactId);
         Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
 
         try {
@@ -62,7 +62,6 @@ public class ParentModelResolver implements ModelResolver {
             artifactRequest.setRepositories(remoteRepositories);
 
             pomArtifact = repositorySystem.resolveArtifact(repositorySystemSession, artifactRequest).getArtifact();
-            logger.info("  complete");
         } catch (ArtifactResolutionException e) {
             throw new UnresolvableModelException(e.getMessage(), groupId, artifactId, version, e);
         }

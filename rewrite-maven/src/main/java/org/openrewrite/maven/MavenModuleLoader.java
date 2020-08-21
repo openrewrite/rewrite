@@ -26,6 +26,7 @@ import org.eclipse.aether.collection.CollectRequest;
 import org.eclipse.aether.collection.CollectResult;
 import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
+import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.graph.Exclusion;
 import org.eclipse.aether.impl.DefaultServiceLocator;
 import org.eclipse.aether.repository.LocalRepository;
@@ -99,7 +100,8 @@ class MavenModuleLoader {
 
         return models.stream()
                 .map(m -> new MavenModel(m.getParent(), m.getModuleVersion(),
-                        m.getDependencyManagement(), m.getDependencies(), m.getProperties(),
+                        m.getDependencyManagement(), m.getDependencies(),
+                        m.getTransitiveDependenciesByScope(), m.getProperties(),
                         inheriting.getOrDefault(m.getModuleVersion(), emptyList())))
                 .collect(toList());
     }
@@ -143,8 +145,11 @@ class MavenModuleLoader {
 
         Model rawModel = result.getRawModel(model.getGroupId() + ":" + model.getArtifactId() + ":" + model.getVersion());
 
+        Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope = new HashMap<>();
+
         List<MavenModel.Dependency> dependencies = model.getDependencies().stream()
-                .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, model, rawModel))
+                .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency,
+                        model, rawModel, transitiveDepenenciesByScope))
                 .collect(toList());
 
         MavenModel.DependencyManagement dependencyManagement = model.getDependencyManagement() == null ?
@@ -153,7 +158,14 @@ class MavenModuleLoader {
                         .getDependencyManagement()
                         .getDependencies()
                         .stream()
-                        .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency, model, rawModel))
+                        .map(dependency -> resolveDependency(
+                                repositorySystem,
+                                repositorySystemSession,
+                                dependency,
+                                model,
+                                rawModel,
+                                transitiveDepenenciesByScope)
+                        )
                         .collect(toList())
                 );
 
@@ -172,6 +184,7 @@ class MavenModuleLoader {
                 ),
                 dependencyManagement,
                 dependencies,
+                transitiveDepenenciesByScope,
                 properties,
                 emptyList());
     }
@@ -199,7 +212,8 @@ class MavenModuleLoader {
 
     private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
                                                     RepositorySystemSession repositorySystemSession,
-                                                    Dependency dependency, Model model, Model rawModel) {
+                                                    Dependency dependency, Model model, Model rawModel,
+                                                    Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope) {
 
         // This may not be the EFFECTIVE mvid, e.g. a version here could be a property reference. So two distinct
         // "dependency" instances could ultimately refer to the same MavenModel.Dependency, and that's ok.
@@ -225,7 +239,7 @@ class MavenModuleLoader {
 
                 if (resolveDependencies) {
                     Artifact artifact = collectIfNecessary(repositorySystem, repositorySystemSession,
-                            model, dependency);
+                            model, dependency, transitiveDepenenciesByScope);
 
                     return new MavenModel.Dependency(
                             new MavenModel.ModuleVersionId(
@@ -253,7 +267,8 @@ class MavenModuleLoader {
     private Artifact collectIfNecessary(RepositorySystem repositorySystem,
                                         RepositorySystemSession repositorySystemSession,
                                         Model model,
-                                        Dependency dependency) {
+                                        Dependency dependency,
+                                        Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope) {
         Artifact artifact = new DefaultArtifact(
                 dependency.getGroupId(),
                 dependency.getArtifactId(),
@@ -263,33 +278,34 @@ class MavenModuleLoader {
                         .map(versionProperty -> (String) model.getProperties().get(versionProperty))
                         .orElse(dependency.getVersion()));
 
-        if (!artifact.getVersion().contains("[") && !artifact.getVersion().contains("(")) {
-            return artifact;
-        }
-
-        CollectRequest collectRequest = new CollectRequest();
-        collectRequest.addDependency(
-                new org.eclipse.aether.graph.Dependency(
-                        artifact,
-                        dependency.getScope(),
-                        dependency.getOptional() != null && dependency.getOptional().equals("true"),
-                        dependency.getExclusions().stream()
-                                .map(exclusion -> new Exclusion(
-                                        exclusion.getGroupId(),
-                                        exclusion.getArtifactId(),
-                                        null,
-                                        null
-                                ))
-                                .collect(toList())
-                )
-        );
-        collectRequest.setRepositories(remoteRepositories);
-
         if (resolveDependencies) {
             try {
+                CollectRequest collectRequest = new CollectRequest();
+                collectRequest.addDependency(
+                        new org.eclipse.aether.graph.Dependency(
+                                artifact,
+                                dependency.getScope(),
+                                dependency.getOptional() != null && dependency.getOptional().equals("true"),
+                                dependency.getExclusions().stream()
+                                        .map(exclusion -> new Exclusion(
+                                                exclusion.getGroupId(),
+                                                exclusion.getArtifactId(),
+                                                null,
+                                                null
+                                        ))
+                                        .collect(toList())
+                        )
+                );
+
+                collectRequest.setRepositories(remoteRepositories);
+
                 CollectResult collectResult = repositorySystem
                         .collectDependencies(repositorySystemSession, collectRequest);
-                artifact = collectResult.getRoot().getChildren().iterator().next().getArtifact();
+
+                DependencyNode dependencyNode = collectResult.getRoot().getChildren().iterator().next();
+                artifact = dependencyNode.getArtifact();
+                collectTransitiveDependencies(dependencyNode, transitiveDepenenciesByScope);
+
                 logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
             } catch (DependencyCollectionException e) {
                 logger.warn("error collecting dependencies: {}", e.getMessage());
@@ -297,6 +313,13 @@ class MavenModuleLoader {
         }
 
         return artifact;
+    }
+
+    public void collectTransitiveDependencies(DependencyNode node, Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope) {
+        Artifact dep = node.getDependency().getArtifact();
+        transitiveDepenenciesByScope.computeIfAbsent(node.getDependency().getScope(), scope -> new HashSet<>())
+                .add(new MavenModel.ModuleVersionId(dep.getGroupId(), dep.getArtifactId(), dep.getClassifier(), dep.getVersion(), emptyList()));
+        node.getChildren().forEach(child -> collectTransitiveDependencies(child, transitiveDepenenciesByScope));
     }
 
     private RepositorySystem getRepositorySystem() {
