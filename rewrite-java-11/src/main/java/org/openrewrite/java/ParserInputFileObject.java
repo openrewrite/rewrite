@@ -23,16 +23,20 @@ import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
 import java.io.*;
 import java.net.URI;
+import java.nio.file.Path;
+import java.util.Objects;
 
 /**
  * So that {@link JavaParser} can ingest source files from {@link InputStream} sources
  * other than a file on disk.
  */
 public class ParserInputFileObject implements JavaFileObject {
+    private final Path path;
     private final Parser.Input input;
 
     public ParserInputFileObject(Parser.Input input) {
         this.input = input;
+        this.path = input.getPath();
     }
 
     @Override
@@ -98,5 +102,18 @@ public class ParserInputFileObject implements JavaFileObject {
     @Override
     public Modifier getAccessLevel() {
         return Modifier.PUBLIC;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        ParserInputFileObject that = (ParserInputFileObject) o;
+        return path.equals(that.path);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(path);
     }
 }

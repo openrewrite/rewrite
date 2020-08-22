@@ -118,7 +118,7 @@ interface JavaTypeTest {
             class B {}
         """)[0]
 
-        val a2 = jp.parse("""
+        val a2 = jp.reset().parse("""
             public class A {}
             class B {}
         """)[0]

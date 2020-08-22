@@ -25,8 +25,6 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
 
-    implementation("com.esotericsoftware:kryo:4.0.1")
-
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")
 
