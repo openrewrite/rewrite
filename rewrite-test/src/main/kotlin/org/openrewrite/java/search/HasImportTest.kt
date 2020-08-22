@@ -21,14 +21,14 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
 interface HasImportTest {
-    
+
     @Test
     fun hasImport(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;
             class A {}
         """)[0]
-        
+
         assertTrue(a.hasImport("java.util.List"))
         assertFalse(a.hasImport("java.util.Set"))
     }
@@ -51,7 +51,7 @@ interface HasImportTest {
                public static class B { }
             }
         """
-        
+
         val c = """
             import a.*;
             public class C {
@@ -60,6 +60,6 @@ interface HasImportTest {
         """
 
         assertTrue(jp.parse(c, a)[0].hasImport("a.A.B"))
-        assertTrue(jp.parse(c, a)[0].hasImport("a.A"))
+        assertTrue(jp.reset().parse(c, a)[0].hasImport("a.A"))
     }
 }

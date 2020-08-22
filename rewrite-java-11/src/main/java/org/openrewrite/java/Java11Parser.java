@@ -147,7 +147,17 @@ public class Java11Parser implements JavaParser {
                                 .tag("file.type", "Java")
                                 .tag("step", "JDK parsing")
                                 .register(meterRegistry)
-                                .record(() -> compiler.parse(new ParserInputFileObject(input))),
+                                .record(() -> {
+                                    try {
+                                        return compiler.parse(new ParserInputFileObject(input));
+                                    } catch (IllegalStateException e) {
+                                        if (e.getMessage().equals("endPosTable already set")) {
+                                            throw new IllegalStateException("Call reset() on JavaParser before parsing another" +
+                                                    "set of source files that have some of the same fully qualified names", e);
+                                        }
+                                        throw e;
+                                    }
+                                }),
                         (e2, e1) -> e1, LinkedHashMap::new));
 
         try {
