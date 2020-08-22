@@ -57,9 +57,7 @@ public class Java11Parser implements JavaParser {
     private static final Logger logger = LoggerFactory.getLogger(Java11Parser.class);
 
     @Nullable
-    private final List<Path> classpath;
-
-    private final Charset charset;
+    private final Collection<Path> classpath;
 
     private final MeterRegistry meterRegistry;
 
@@ -78,7 +76,7 @@ public class Java11Parser implements JavaParser {
     private final ResettableLog compilerLog = new ResettableLog(context);
     private final Collection<JavaStyle> styles;
 
-    private Java11Parser(@Nullable List<Path> classpath,
+    private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
                          MeterRegistry meterRegistry,
@@ -86,7 +84,6 @@ public class Java11Parser implements JavaParser {
                          Collection<JavaStyle> styles) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;
-        this.charset = charset;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
 

@@ -44,7 +44,8 @@ public class ParentModelResolver implements ModelResolver {
     private final RepositorySystemSession repositorySystemSession;
     private final List<RemoteRepository> remoteRepositories;
 
-    public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession, List<RemoteRepository> remoteRepositories) {
+    public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession,
+                               List<RemoteRepository> remoteRepositories) {
         this.repositorySystem = repositorySystem;
         this.repositorySystemSession = repositorySystemSession;
         this.remoteRepositories = remoteRepositories;

@@ -33,7 +33,6 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
@@ -121,7 +120,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     @SuppressWarnings("unchecked")
     abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
         @Nullable
-        protected List<Path> classpath;
+        protected Collection<Path> classpath;
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean relaxedClassTypeMatching = false;
@@ -149,7 +148,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
-        public B classpath(List<Path> classpath) {
+        public B classpath(Collection<Path> classpath) {
             this.classpath = classpath;
             return (B) this;
         }
