@@ -123,7 +123,8 @@ class MavenModuleLoader {
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
                     .setModelResolver(new ParentModelResolver(repositorySystem, repositorySystemSession, remoteRepositories))
-                    .setModelSource(modelSource);
+                    .setModelSource(modelSource)
+                    .setSystemProperties(System.getProperties());
 
             DefaultModelBuilder modelBuilder = new DefaultModelBuilderFactory() {
                 @Override
