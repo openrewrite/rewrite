@@ -87,4 +87,10 @@ abstract class JavaRefactorCompatibilityKit {
 
     @Nested
     inner class UseStaticImportTck : UseStaticImportTest
+
+    @Nested
+    inner class GenerateGetterTck : GenerateGetterTest
+
+    @Nested
+    inner class GenerateSetterTck : GenerateSetterTest
 }

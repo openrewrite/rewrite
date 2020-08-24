@@ -398,7 +398,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         var body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
 
-        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, type(node), fmt);
+        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node), fmt);
     }
 
     @Override

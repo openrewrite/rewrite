@@ -94,6 +94,11 @@ public class TypeUtils {
         return type instanceof JavaType.Primitive ? (JavaType.Primitive) type : null;
     }
 
+    @Nullable
+    public static JavaType.FullyQualified asFullyQualified(@Nullable JavaType type) {
+        return type instanceof JavaType.FullyQualified ? (JavaType.FullyQualified) type : null;
+    }
+
     public static boolean hasElementType(@Nullable JavaType type, String fullyQualifiedName) {
         if (type instanceof JavaType.Array) {
             return hasElementType(((JavaType.Array) type).getElemType(), fullyQualifiedName);

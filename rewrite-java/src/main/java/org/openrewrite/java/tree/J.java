@@ -907,7 +907,7 @@ public interface J extends Serializable, Tree {
 
         @Getter
         @Nullable
-        JavaType type;
+        JavaType.Class type;
 
         @Getter
         @With
@@ -1110,6 +1110,11 @@ public interface J extends Serializable, Tree {
 
         @With
         Collection<JavaStyle> styles;
+
+        @Override
+        public Collection<JavaStyle> getStyles() {
+            return styles;
+        }
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {

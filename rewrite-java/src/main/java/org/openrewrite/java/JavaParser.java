@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.Parser;
+import org.openrewrite.Style;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.TabAndIndentStyle;
@@ -162,6 +163,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             if (importStyle != null) {
                 this.styles.add(importStyle);
             }
+            return (B) this;
+        }
+
+        public B styles(Iterable<JavaStyle> styles) {
+            styles.forEach(this.styles::add);
             return (B) this;
         }
 

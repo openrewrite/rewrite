@@ -100,6 +100,10 @@ public class MethodMatcher {
                 argumentPattern.matcher(resolvedSignaturePattern).matches();
     }
 
+    public boolean matches(J.MethodDecl method) {
+        throw new RuntimeException("Not implemented");
+    }
+
     public boolean matches(J.NewClass constructor) {
         if (constructor.getType() == null) {
             return false;
