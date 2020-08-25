@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
@@ -57,6 +58,11 @@ public class GenerateGetter extends JavaRefactorVisitor {
     }
 
     @Override
+    public Validated validate() {
+        return Validated.required("type", type).and(Validated.required("field", field));
+    }
+
+    @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         if(TypeUtils.isOfClassType(classDecl.getType(), type.getFullyQualifiedName())) {
             classDecl.getFields().stream()
@@ -94,16 +100,20 @@ public class GenerateGetter extends JavaRefactorVisitor {
                     JavaParser jp = JavaParser.fromJavaVersion()
                             .styles(cu.getStyles())
                             .build();
-                    String fieldName = field.getVars().get(0).getSimpleName();
-                    assert field.getTypeExpr() != null;
-                    String type = field.getTypeExpr().print();
 
+                    J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+                    String fieldName = fieldVar.getSimpleName();
+
+                    assert fieldVar.getType() != null;
+                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
+
+                    assert field.getTypeExpr() != null;
                     J.MethodDecl getMethod = TreeBuilder.buildMethodDeclaration(jp,
                             classDecl,
-                            "public " + type + " get" + capitalize(fieldName) + "()" + " {\n" +
+                            "public " + field.getTypeExpr().print() + " get" + capitalize(fieldName) + "()" + " {\n" +
                                     "    return " + fieldName + ";\n" +
                                     "}\n",
-                            field.getTypeAsClass());
+                            type);
                     andThen(new AutoFormat(getMethod));
 
                     J.Block<J> body = cd.getBody();

@@ -29,6 +29,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -97,7 +99,7 @@ public class TreeBuilder {
     public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
                                                       J.ClassDecl insertionScope,
                                                       String methodDeclarationSnippet,
-                                                      JavaType.Class... imports) {
+                                                      JavaType.FullyQualified... types) {
         parser.reset();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
@@ -109,8 +111,29 @@ public class TreeBuilder {
             scopeVariables = "";
         }
 
-        String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
-                "class CodeSnippet {\n" +
+        JavaType.Class[] imports = stream(types)
+                .filter(it -> it instanceof JavaType.Class)
+                .map(it -> (JavaType.Class)it)
+                .toArray(JavaType.Class[]::new);
+
+        JavaType.GenericTypeVariable[] genericTypes = Stream.concat(
+                stream(types)
+                        .filter(it -> it instanceof JavaType.GenericTypeVariable),
+                stream(imports)
+                        .filter(it -> it.getTypeParameters().size() > 0)
+                        .flatMap(it -> it.getTypeParameters().stream()))
+                .map(it -> (JavaType.GenericTypeVariable) it)
+                .toArray(JavaType.GenericTypeVariable[]::new);
+        String typeParameters = "";
+        if(genericTypes.length > 0) {
+            typeParameters = "<" + stream(genericTypes)
+                    .map(JavaType.GenericTypeVariable::getFullyQualifiedName)
+                    .collect(joining(", ", "", "")) + ">";
+        }
+
+        String source = stream(imports)
+                .map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
+                "class CodeSnippet"+ typeParameters +" {\n" +
                 scopeVariables +
                 StringUtils.trimIndent(methodDeclarationSnippet) + "\n" +
                 "}";

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
@@ -54,6 +55,11 @@ public class GenerateSetter extends JavaRefactorVisitor {
      */
     public void setField(String field) {
         this.field = field;
+    }
+
+    @Override
+    public Validated validate() {
+        return Validated.required("type", type).and(Validated.required("field", field));
     }
 
     @Override
@@ -97,16 +103,19 @@ public class GenerateSetter extends JavaRefactorVisitor {
                     JavaParser jp = JavaParser.fromJavaVersion()
                             .styles(cu.getStyles())
                             .build();
-                    String fieldName = field.getVars().get(0).getSimpleName();
-                    assert field.getTypeExpr() != null;
-                    String type = field.getTypeExpr().print();
+                    J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+                    String fieldName = fieldVar.getSimpleName();
 
+                    assert fieldVar.getType() != null;
+                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
+
+                    assert field.getTypeExpr() != null;
                     J.MethodDecl setMethod = TreeBuilder.buildMethodDeclaration(jp,
                             classDecl,
-                            "public void set" + capitalize(fieldName) + "("+ type +" value)" + " {\n" +
+                            "public void set" + capitalize(fieldName) + "("+ field.getTypeExpr().print() +" value)" + " {\n" +
                                     "    " + ((fieldName.equals("value")) ? "this.value" : fieldName) + " = value;\n" +
                                     "}\n",
-                            field.getTypeAsClass());
+                            type);
                     andThen(new AutoFormat(setMethod));
 
                     J.Block<J> body = cd.getBody();

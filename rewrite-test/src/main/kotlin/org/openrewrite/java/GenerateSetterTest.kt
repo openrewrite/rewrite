@@ -126,4 +126,34 @@ interface GenerateSetterTest : RefactorVisitorTest {
                 }
             """.trimIndent()
     )
+
+    @Test
+    fun handlesGenerics(jp:JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateSetter().apply {
+                setField("foo")
+                setType("org.example.A")
+            }),
+            before = """ 
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A<T> {
+                    List<T> foo;
+                }
+            """.trimIndent(),
+            after = """
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A<T> {
+                    List<T> foo;
+                
+                    public void setFoo(List<T> value) {
+                        foo = value;
+                    }
+                }
+            """.trimIndent()
+    )
 }
