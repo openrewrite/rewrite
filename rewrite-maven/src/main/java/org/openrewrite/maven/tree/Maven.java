@@ -103,6 +103,10 @@ public interface Maven extends Serializable, Tree {
             return model;
         }
 
+        public Pom withModel(MavenModel model) {
+            return new Pom(model, document);
+        }
+
         @JsonIgnore
         @Nullable
         public String getGroupId() {
