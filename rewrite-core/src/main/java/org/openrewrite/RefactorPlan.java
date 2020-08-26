@@ -52,6 +52,10 @@ public class RefactorPlan {
                 .reduce(visitor, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1);
     }
 
+    public Map<String, Recipe> getRecipesByName() {
+        return new HashMap<>(recipesByName);
+    }
+
     @Nullable
     public <S extends Style> S style(Class<S> styleClass, Iterable<String> recipes) {
         return loadedRecipes(recipes).stream()
