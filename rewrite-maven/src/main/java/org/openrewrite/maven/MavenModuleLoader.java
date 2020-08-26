@@ -42,6 +42,9 @@ import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
 import org.eclipse.aether.spi.connector.transport.TransporterFactory;
 import org.eclipse.aether.transport.file.FileTransporterFactory;
 import org.eclipse.aether.transport.http.HttpTransporterFactory;
+import org.eclipse.aether.util.graph.selector.AndDependencySelector;
+import org.eclipse.aether.util.graph.selector.OptionalDependencySelector;
+import org.eclipse.aether.util.graph.selector.ScopeDependencySelector;
 import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
 import org.eclipse.aether.version.Version;
 import org.openrewrite.Parser;
@@ -373,6 +376,14 @@ class MavenModuleLoader {
         repositorySystemSession.setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.IGNORE_ERRORS));
         repositorySystemSession.setWorkspaceReader(workspaceReader);
         repositorySystemSession.setRepositoryListener(new ConsoleRepositoryEventListener());
+        repositorySystemSession.setDependencySelector(
+                new AndDependencySelector(
+                        new ScopeDependencySelector(emptyList(),
+                                Arrays.asList("provided", "test", "runtime")),
+                        new OptionalDependencySelector()
+                )
+        );
+
         repositorySystemSession.setReadOnly();
 
         return repositorySystemSession;
