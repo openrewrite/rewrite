@@ -156,6 +156,7 @@ interface TreeBuilderTest {
     @Test
     fun buildInnerClass(jp: JavaParser) {
         val cd = jp.parse("""
+            import java.util.Arrays;
             import java.util.List;
             
             class A {
