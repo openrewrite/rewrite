@@ -24,6 +24,8 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.openrewrite.internal.StringUtils.capitalize;
+
 /**
  * Generates a 'set' method for a field. For a field like:
  *
@@ -75,7 +77,7 @@ public class GenerateSetter extends JavaRefactorVisitor {
                         assert fieldType != null;
                         MethodMatcher setterMatcher = new MethodMatcher(
                                 type.getFullyQualifiedName() + " set" + capitalize(this.field) + "(" + fieldType.getFullyQualifiedName() + ")");
-                        boolean setterAlreadyExists = classDecl.getMethods().stream().anyMatch(setterMatcher::matches);
+                        boolean setterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
                         if(!setterAlreadyExists) {
                             andThen(new GenerateSetter.Scoped(field));
                         }
@@ -112,7 +114,7 @@ public class GenerateSetter extends JavaRefactorVisitor {
                     assert field.getTypeExpr() != null;
                     J.MethodDecl setMethod = TreeBuilder.buildMethodDeclaration(jp,
                             classDecl,
-                            "public void set" + capitalize(fieldName) + "("+ field.getTypeExpr().print() +" value)" + " {\n" +
+                            "public void set" + capitalize(fieldName) + "("+ field.getTypeExpr().print().trim() +" value)" + " {\n" +
                                     "    " + ((fieldName.equals("value")) ? "this.value" : fieldName) + " = value;\n" +
                                     "}\n",
                             type);
@@ -127,11 +129,6 @@ public class GenerateSetter extends JavaRefactorVisitor {
             }
             return cd;
         }
-    }
-
-    private static String capitalize(String value) {
-        return Character.toUpperCase(value.charAt(0)) +
-                value.substring(1);
     }
 }
 

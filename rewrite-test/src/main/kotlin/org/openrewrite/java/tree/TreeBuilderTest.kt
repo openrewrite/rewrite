@@ -152,4 +152,23 @@ interface TreeBuilderTest {
         assertEquals("a.A.*", name.printTrimmed())
         assertEquals("*", name.simpleName)
     }
+
+    @Test
+    fun buildInnerClass(jp: JavaParser) {
+        val cd = jp.parse("""
+            import java.util.List;
+            
+            class A {
+                List<String> foo = Arrays.asList("Hello", "World");
+            }
+        """).first().classes.first()
+        val innerClassSnippet = """
+            class B {
+                String hello = foo.get(0);
+            }
+        """.trimIndent()
+        val result = TreeBuilder.buildDeclaration(jp, cd, innerClassSnippet, JavaType.Class.build("java.util.List"))
+        assertThat(result).isExactlyInstanceOf(J.ClassDecl::class.java)
+        assertThat(result.printTrimmed()).isEqualTo(innerClassSnippet)
+    }
 }

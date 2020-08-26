@@ -167,4 +167,9 @@ public class StringUtils {
             throw new UnsupportedOperationException(e);
         }
     }
+
+    public static String capitalize(String value) {
+        return Character.toUpperCase(value.charAt(0)) +
+                value.substring(1);
+    }
 }

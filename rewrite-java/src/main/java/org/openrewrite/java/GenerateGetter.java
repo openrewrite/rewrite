@@ -24,6 +24,8 @@ import org.openrewrite.java.tree.TypeUtils;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.openrewrite.internal.StringUtils.*;
+
 /**
  * Generates a 'get' method for a field. For a field like:
  *
@@ -72,7 +74,7 @@ public class GenerateGetter extends JavaRefactorVisitor {
                     .ifPresent(field -> {
                         // If there's already a getter method do nothing
                         MethodMatcher getterMatcher = new MethodMatcher(type.getFullyQualifiedName() + " get" + capitalize(this.field) + "()");
-                        boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(getterMatcher::matches);
+                        boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
                         if(!getterAlreadyExists) {
                             andThen(new Scoped(field));
                         }
@@ -110,7 +112,7 @@ public class GenerateGetter extends JavaRefactorVisitor {
                     assert field.getTypeExpr() != null;
                     J.MethodDecl getMethod = TreeBuilder.buildMethodDeclaration(jp,
                             classDecl,
-                            "public " + field.getTypeExpr().print() + " get" + capitalize(fieldName) + "()" + " {\n" +
+                            "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
                                     "    return " + fieldName + ";\n" +
                                     "}\n",
                             type);
@@ -125,10 +127,5 @@ public class GenerateGetter extends JavaRefactorVisitor {
             }
             return cd;
         }
-    }
-
-    private static String capitalize(String value) {
-        return Character.toUpperCase(value.charAt(0)) +
-                value.substring(1);
     }
 }

@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
@@ -96,10 +95,16 @@ public class TreeBuilder {
         return expr.withFormatting(fmt);
     }
 
-    public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
-                                                      J.ClassDecl insertionScope,
-                                                      String methodDeclarationSnippet,
-                                                      JavaType.FullyQualified... types) {
+    /**
+     * Build a class-scoped declaration. A "class-scoped declaration" is anything you can put inside a class declaration.
+     * Examples of such statements include method declarations, field declarations, inner class declarations, and static initializers.
+     *
+     * @param types specify any
+     */
+    public static J buildDeclaration(JavaParser parser,
+                                     J.ClassDecl insertionScope,
+                                     String snippet,
+                                     JavaType... types) {
         parser.reset();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
@@ -135,7 +140,7 @@ public class TreeBuilder {
                 .map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
                 "class CodeSnippet"+ typeParameters +" {\n" +
                 scopeVariables +
-                StringUtils.trimIndent(methodDeclarationSnippet) + "\n" +
+                StringUtils.trimIndent(snippet) + "\n" +
                 "}";
         // @formatter:on
 
@@ -146,7 +151,28 @@ public class TreeBuilder {
 
         J.CompilationUnit cu = parser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
-        return (J.MethodDecl) new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
+        return new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
+    }
+
+    public static J.ClassDecl buildClassDeclaration(JavaParser parser,
+                                                    J.ClassDecl insertionScope,
+                                                    String classDeclarationSnippet,
+                                                    JavaType... types) {
+        return (J.ClassDecl) buildDeclaration(parser, insertionScope, classDeclarationSnippet, types);
+    }
+
+    public static J.VariableDecls buildFieldDeclaration(JavaParser parser,
+                                                        J.ClassDecl insertionScope,
+                                                        String fieldDeclarationSnippet,
+                                                        JavaType... types) {
+        return (J.VariableDecls) buildDeclaration(parser, insertionScope, fieldDeclarationSnippet, types);
+    }
+
+    public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
+                                                      J.ClassDecl insertionScope,
+                                                      String methodDeclarationSnippet,
+                                                      JavaType... types) {
+        return (J.MethodDecl) buildDeclaration(parser, insertionScope, methodDeclarationSnippet, types);
     }
 
     @SuppressWarnings("unchecked")
