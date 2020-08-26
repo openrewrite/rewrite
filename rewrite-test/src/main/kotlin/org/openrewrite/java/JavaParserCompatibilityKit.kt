@@ -126,6 +126,9 @@ abstract class JavaParserCompatibilityKit {
     inner class NewClassTck : NewClassTest
 
     @Nested
+    inner class PackageTck : PackageTest
+
+    @Nested
     inner class ParenthesesTck : ParenthesesTest
 
     @Nested

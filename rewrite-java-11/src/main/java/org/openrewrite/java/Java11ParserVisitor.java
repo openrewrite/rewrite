@@ -416,8 +416,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
-            skip("package");
-            packageDecl = new J.Package(randomId(), convert(cu.getPackageName()), format(sourceBefore(";")));
+            String packagePrefix = sourceBefore("package");
+            packageDecl = new J.Package(randomId(), convert(cu.getPackageName()), format(packagePrefix, sourceBefore(";")));
         }
 
         return new J.CompilationUnit(randomId(),
