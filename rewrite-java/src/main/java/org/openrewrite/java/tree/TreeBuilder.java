@@ -118,27 +118,27 @@ public class TreeBuilder {
 
         JavaType.Class[] imports = stream(types)
                 .filter(it -> it instanceof JavaType.Class)
-                .map(it -> (JavaType.Class)it)
+                .map(it -> (JavaType.Class) it)
                 .toArray(JavaType.Class[]::new);
 
-        JavaType.GenericTypeVariable[] genericTypes = Stream.concat(
+        JavaType.FullyQualified[] genericTypes = Stream.concat(
                 stream(types)
                         .filter(it -> it instanceof JavaType.GenericTypeVariable),
                 stream(imports)
                         .filter(it -> it.getTypeParameters().size() > 0)
                         .flatMap(it -> it.getTypeParameters().stream()))
-                .map(it -> (JavaType.GenericTypeVariable) it)
-                .toArray(JavaType.GenericTypeVariable[]::new);
+                .map(it -> (JavaType.FullyQualified) it)
+                .toArray(JavaType.FullyQualified[]::new);
         String typeParameters = "";
-        if(genericTypes.length > 0) {
+        if (genericTypes.length > 0) {
             typeParameters = "<" + stream(genericTypes)
-                    .map(JavaType.GenericTypeVariable::getFullyQualifiedName)
+                    .map(JavaType.FullyQualified::getFullyQualifiedName)
                     .collect(joining(", ", "", "")) + ">";
         }
 
         String source = stream(imports)
                 .map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
-                "class CodeSnippet"+ typeParameters +" {\n" +
+                "class CodeSnippet" + typeParameters + " {\n" +
                 scopeVariables +
                 StringUtils.trimIndent(snippet) + "\n" +
                 "}";
