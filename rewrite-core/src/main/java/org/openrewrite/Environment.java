@@ -88,15 +88,24 @@ public class Environment {
                 .collect(toList());
     }
 
+    public static Builder builder(Properties properties) {
+        return new Builder(properties);
+    }
+
     public static Builder builder() {
-        return new Builder();
+        return new Builder(new Properties());
     }
 
     public static class Builder {
+        private final Properties properties;
         private final Map<String, RecipeConfiguration> recipesConfigurations = new HashMap<>();
         private final Collection<RefactorVisitor<?>> visitors = new ArrayList<>();
         private Iterable<Path> compileClasspath = emptyList();
         private final Map<String, Collection<Style>> stylesByName = new HashMap<>();
+
+        public Builder(Properties properties) {
+            this.properties = properties;
+        }
 
         public Builder compileClasspath(Iterable<Path> compileClasspath) {
             this.compileClasspath = emptyList();
@@ -104,7 +113,8 @@ public class Environment {
         }
 
         public Builder scanResources() {
-            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
+            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(
+                    compileClasspath, properties);
             load(classpathResourceLoader);
             return this;
         }
@@ -113,7 +123,8 @@ public class Environment {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
                 try (FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
-                    YamlResourceLoader resourceLoader = new YamlResourceLoader(is, userHomeRewriteConfig.toURI());
+                    YamlResourceLoader resourceLoader = new YamlResourceLoader(is, userHomeRewriteConfig.toURI(),
+                            properties);
                     load(resourceLoader);
                 } catch (IOException e) {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);

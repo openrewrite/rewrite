@@ -21,6 +21,7 @@ import org.openrewrite.Formatting
 import org.openrewrite.Refactor
 import org.openrewrite.Tree.randomId
 import org.openrewrite.text.PlainText
+import java.util.*
 
 class CompositeRefactorVisitorTest {
     @Test
@@ -35,7 +36,7 @@ class CompositeRefactorVisitorTest {
                   toText: Hello Jonathan!
         """.trimIndent()
 
-        val loader = YamlResourceLoader(yaml.byteInputStream(), null)
+        val loader = YamlResourceLoader(yaml.byteInputStream(), null, Properties())
 
         val visitors = loader.loadVisitors()
 

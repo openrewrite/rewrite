@@ -18,6 +18,7 @@ package org.openrewrite
 import org.openrewrite.Assertions.whenParsedBy
 import org.openrewrite.config.ClasspathResourceLoader
 import java.nio.file.Path
+import java.util.*
 
 fun <S : SourceFile> String.whenParsedBy(parser: Parser<S>): Assertions.StringSourceFileAssert<S> =
         whenParsedBy(parser, this)
@@ -29,7 +30,7 @@ fun <S : SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSource
  * Retrieve an environment for the named recipe from the classpath.
  */
 fun loadRefactorPlan(recipeName: String): Environment {
-    val crl = ClasspathResourceLoader(emptyList())
+    val crl = ClasspathResourceLoader(emptyList(), Properties())
     val recipeConfig = crl.loadRecipes().asSequence()
             .find { it.name == recipeName } ?: throw RuntimeException("Couldn't load recipe named '$recipeName'. " +
                     "Verify that there's a yml file defining a recipe with this name under src/test/resources/META-INF/rewrite")

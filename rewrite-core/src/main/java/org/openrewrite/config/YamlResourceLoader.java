@@ -19,10 +19,13 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import kotlin.text.Charsets;
 import org.openrewrite.*;
+import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.yaml.snakeyaml.Yaml;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -37,6 +40,9 @@ public class YamlResourceLoader implements ResourceLoader {
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+    private static final PropertyPlaceholderHelper propertyPlaceholderHelper =
+            new PropertyPlaceholderHelper("${", "}", ":");
 
     private final Map<String, RecipeConfiguration> recipes = new HashMap<>();
     private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
@@ -69,12 +75,23 @@ public class YamlResourceLoader implements ResourceLoader {
         }
     }
 
-    public YamlResourceLoader(InputStream yamlInput, URI source) throws UncheckedIOException {
+    public YamlResourceLoader(InputStream yamlInput, URI source, Properties properties) throws UncheckedIOException {
         this.source = source;
         try {
             try {
                 Yaml yaml = new Yaml();
-                for (Object resource : yaml.loadAll(yamlInput)) {
+
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                int nRead;
+                byte[] data = new byte[1024];
+                while ((nRead = yamlInput.read(data, 0, data.length)) != -1) {
+                    buffer.write(data, 0, nRead);
+                }
+
+                String yamlSource = new String(buffer.toByteArray(), Charsets.UTF_8);
+                yamlSource = propertyPlaceholderHelper.replacePlaceholders(yamlSource, properties);
+
+                for (Object resource : yaml.loadAll(yamlSource)) {
                     if (resource instanceof Map) {
                         @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
                         String type = resourceMap

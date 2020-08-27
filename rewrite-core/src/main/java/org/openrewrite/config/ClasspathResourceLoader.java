@@ -21,17 +21,14 @@ import org.openrewrite.RefactorVisitor;
 import org.openrewrite.Style;
 
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 import static java.util.stream.Collectors.toList;
 
 public class ClasspathResourceLoader implements ResourceLoader {
     private final Collection<YamlResourceLoader> yamlResourceLoaders;
 
-    public ClasspathResourceLoader(Iterable<Path> compileClasspath) {
+    public ClasspathResourceLoader(Iterable<Path> compileClasspath, Properties properties) {
         yamlResourceLoaders = new ArrayList<>();
 
         try (ScanResult scanResult = new ClassGraph()
@@ -39,7 +36,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
                 .enableMemoryMapping()
                 .scan()) {
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI())));
+                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties)));
         }
 
         if (compileClasspath.iterator().hasNext()) {
@@ -49,7 +46,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
                     .enableMemoryMapping()
                     .scan()) {
                 scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                        yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI())));
+                        yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties)));
             }
         }
     }

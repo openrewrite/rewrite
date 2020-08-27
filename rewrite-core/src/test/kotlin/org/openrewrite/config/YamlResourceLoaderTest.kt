@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.ValidationException
 import org.openrewrite.text.ChangeText
+import java.util.*
 
 class YamlResourceLoaderTest {
     @Test
@@ -36,7 +37,7 @@ class YamlResourceLoaderTest {
                   toText: Hello Jonathan!
         """.trimIndent()
 
-        val loader = YamlResourceLoader(yaml.byteInputStream(), null)
+        val loader = YamlResourceLoader(yaml.byteInputStream(), null, Properties())
 
         val visitors = loader.loadVisitors()
 
@@ -49,6 +50,9 @@ class YamlResourceLoaderTest {
 
     @Test
     fun loadRecipeYaml() {
+        val properties = Properties()
+        properties.set("helloText", "Hello Jon!")
+
         val recipe = YamlResourceLoader("""
             type: specs.openrewrite.org/v1beta/recipe
             name: org.openrewrite.test
@@ -58,8 +62,8 @@ class YamlResourceLoaderTest {
               - org.openrewrite.text.DoesNotExist
             configure:
               org.openrewrite.text.ChangeText:
-                toText: 'Hello Jon!'
-        """.trimIndent().byteInputStream(), null).loadRecipes().first().build()
+                toText: '${"$"}{helloText}'
+        """.trimIndent().byteInputStream(), null, properties).loadRecipes().first().build()
 
         val changeText = ChangeText()
 
@@ -82,7 +86,7 @@ class YamlResourceLoaderTest {
             visitors:
               - org.openrewrite.text.ChangeText:
                   toText: Hello Jon!
-        """.trimIndent().byteInputStream(), null)
+        """.trimIndent().byteInputStream(), null, Properties())
 
         assertThat(resources.loadRecipes().map { it.name }).containsOnly("org.openrewrite.checkstyle", "org.openrewrite.spring")
         assertThat(resources.loadVisitors().map { it.name }).containsExactly("org.openrewrite.text.ChangeTextToJon")
@@ -105,7 +109,7 @@ class YamlResourceLoaderTest {
                         visitors:
                           - org.openrewrite.text.ChangeText:
                               toText: Hello Jon!
-                    """.trimIndent().byteInputStream(), null)
+                    """.trimIndent().byteInputStream(), null, Properties())
                 }
     }
 
@@ -126,7 +130,7 @@ class YamlResourceLoaderTest {
                         visitors:
                           - org.openrewrite.text.ChangeText:
                               toText: Hello Jon!
-                    """.trimIndent().byteInputStream(), null)
+                    """.trimIndent().byteInputStream(), null, Properties())
                 }
     }
 }

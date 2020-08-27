@@ -17,18 +17,19 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.util.*
 
 class ClasspathResourceLoaderTest {
     @Test
     fun loadDeclarativeVisitorFromClasspath() {
-        val visitors = ClasspathResourceLoader(emptyList()).loadVisitors()
+        val visitors = ClasspathResourceLoader(emptyList(), Properties()).loadVisitors()
         assertThat(visitors.map { it.name })
                 .containsExactly("org.openrewrite.text.ChangeTextToJon")
     }
 
     @Test
     fun loadRecipeFromClasspath() {
-        val recipes = ClasspathResourceLoader(emptyList()).loadRecipes()
+        val recipes = ClasspathResourceLoader(emptyList(), Properties()).loadRecipes()
         assertThat(recipes.map { it.name }).containsExactly(
                 "org.openrewrite.google-java-format",
                 "org.openrewrite.hello-jon")
