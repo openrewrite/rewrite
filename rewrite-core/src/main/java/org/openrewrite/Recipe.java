@@ -15,12 +15,8 @@
  */
 package org.openrewrite;
 
-import java.util.Collection;
-
 public interface Recipe {
     String getName();
-
-    Collection<Style> getStyles();
 
     default FilterReply accept(RefactorVisitor<?> visitor) {
         return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;

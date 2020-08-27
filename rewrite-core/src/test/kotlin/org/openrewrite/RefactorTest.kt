@@ -23,7 +23,7 @@ import org.openrewrite.text.PlainText
 class RefactorTest {
     @Test
     fun scanAutoConfigurableRules() {
-        val plan = RefactorPlan.builder()
+        val plan = Environment.builder()
                 .scanVisitors("org.openrewrite.text")
                 .loadRecipe(RecipeConfiguration().apply {
                     name = "org.openrewrite.hello-jon"
@@ -43,7 +43,7 @@ class RefactorTest {
 
     @Test
     fun scanRecipeAndDeclarativeRule() {
-        val plan = RefactorPlan.builder()
+        val plan = Environment.builder()
                 .scanResources()
                 .build()
 

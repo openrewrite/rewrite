@@ -36,7 +36,7 @@ class YamlResourceLoaderTest {
                   toText: Hello Jonathan!
         """.trimIndent()
 
-        val loader = YamlResourceLoader(yaml.byteInputStream())
+        val loader = YamlResourceLoader(yaml.byteInputStream(), null)
 
         val visitors = loader.loadVisitors()
 
@@ -59,7 +59,7 @@ class YamlResourceLoaderTest {
             configure:
               org.openrewrite.text.ChangeText:
                 toText: 'Hello Jon!'
-        """.trimIndent().byteInputStream()).loadRecipes().first().build(emptyList())
+        """.trimIndent().byteInputStream(), null).loadRecipes().first().build()
 
         val changeText = ChangeText()
 
@@ -82,7 +82,7 @@ class YamlResourceLoaderTest {
             visitors:
               - org.openrewrite.text.ChangeText:
                   toText: Hello Jon!
-        """.trimIndent().byteInputStream())
+        """.trimIndent().byteInputStream(), null)
 
         assertThat(resources.loadRecipes().map { it.name }).containsOnly("org.openrewrite.checkstyle", "org.openrewrite.spring")
         assertThat(resources.loadVisitors().map { it.name }).containsExactly("org.openrewrite.text.ChangeTextToJon")
@@ -105,7 +105,7 @@ class YamlResourceLoaderTest {
                         visitors:
                           - org.openrewrite.text.ChangeText:
                               toText: Hello Jon!
-                    """.trimIndent().byteInputStream())
+                    """.trimIndent().byteInputStream(), null)
                 }
     }
 
@@ -126,7 +126,7 @@ class YamlResourceLoaderTest {
                         visitors:
                           - org.openrewrite.text.ChangeText:
                               toText: Hello Jon!
-                    """.trimIndent().byteInputStream())
+                    """.trimIndent().byteInputStream(), null)
                 }
     }
 }

@@ -20,8 +20,6 @@ import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.Parser;
 import org.openrewrite.Style;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.style.ImportLayoutStyle;
-import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 
 import java.io.ByteArrayInputStream;
@@ -35,6 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.StreamSupport.stream;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
     /**
@@ -159,20 +158,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
-        public B importStyle(@Nullable ImportLayoutStyle importStyle) {
-            if (importStyle != null) {
-                this.styles.add(importStyle);
-            }
-            return (B) this;
-        }
-
-        public B styles(Iterable<JavaStyle> styles) {
-            styles.forEach(this.styles::add);
-            return (B) this;
-        }
-
-        public B tabAndIndentStyle(TabAndIndentStyle tabAndIndentStyle) {
-            this.styles.add(tabAndIndentStyle);
+        public B styles(Iterable<? extends Style> styles) {
+            stream(styles.spliterator(), false)
+                    .filter(JavaStyle.class::isInstance)
+                    .map(JavaStyle.class::cast)
+                    .forEach(this.styles::add);
             return (B) this;
         }
 

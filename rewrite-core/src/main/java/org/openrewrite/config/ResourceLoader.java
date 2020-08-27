@@ -15,8 +15,16 @@
  */
 package org.openrewrite.config;
 
-import java.util.Collection;
+import org.openrewrite.RefactorVisitor;
+import org.openrewrite.Style;
 
-public interface RecipeConfigurationLoader {
+import java.util.Collection;
+import java.util.Map;
+
+public interface ResourceLoader {
     Collection<RecipeConfiguration> loadRecipes();
+
+    Collection<? extends RefactorVisitor<?>> loadVisitors();
+
+    Map<String, Collection<Style>> loadStyles();
 }

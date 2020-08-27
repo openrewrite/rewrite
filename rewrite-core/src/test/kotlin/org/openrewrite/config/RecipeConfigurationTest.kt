@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.text.ChangeText
-import org.openrewrite.text.TextStyle
 
 internal class RecipeConfigurationTest {
     private val changeText = ChangeText()
@@ -29,7 +28,7 @@ internal class RecipeConfigurationTest {
         val recipe = RecipeConfiguration().apply {
             name = "org.rewrite.test"
             setInclude(setOf("org.openrewrite.text.*"))
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.accept(ChangeText().apply {
             toText = "hi"
@@ -41,7 +40,7 @@ internal class RecipeConfigurationTest {
         val recipe = RecipeConfiguration().apply {
             name = "org.rewrite.test"
             setInclude(setOf("org.openrewrite.*"))
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.accept(ChangeText().apply {
             toText = "hi"
@@ -57,24 +56,9 @@ internal class RecipeConfigurationTest {
                             mapOf("toText" to "Hello Jon!")
                     )
             )
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
-    }
-
-    @Test
-    fun configureStyles() {
-        val recipe = RecipeConfiguration().apply {
-            name = "org.rewrite.test"
-            setStyles(
-                    mapOf("org.openrewrite.text.TextStyle" to
-                            mapOf("charset" to "UTF-8")
-                    )
-            )
-        }
-
-        assertThat(recipe.build(emptyList()).styles.first()).isInstanceOf(TextStyle::class.java)
-        assertThat((recipe.build(emptyList()).styles.first() as TextStyle).charset).isEqualTo("UTF-8")
     }
 
     @Test
@@ -82,7 +66,7 @@ internal class RecipeConfigurationTest {
         val recipe = RecipeConfiguration().apply {
             name = "org.rewrite.test"
             setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
@@ -92,7 +76,7 @@ internal class RecipeConfigurationTest {
         val recipe = RecipeConfiguration().apply {
             name = "org.rewrite.test"
             setConfigure(mapOf("org.openrewrite.text.*.toText" to "Hello Jon!"))
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
@@ -108,7 +92,7 @@ internal class RecipeConfigurationTest {
                             )
                     )
             )
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }
@@ -124,7 +108,7 @@ internal class RecipeConfigurationTest {
                             )
                     )
             )
-        }.build(emptyList())
+        }.build()
 
         assertThat(recipe.configure(changeText).toText).isEqualTo("Hello Jon!")
     }

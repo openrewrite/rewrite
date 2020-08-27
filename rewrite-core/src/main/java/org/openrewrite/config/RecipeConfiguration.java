@@ -27,12 +27,10 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.*;
+import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Recipe.FilterReply.NEUTRAL;
 
 public class RecipeConfiguration {
@@ -48,7 +46,6 @@ public class RecipeConfiguration {
     private Set<Pattern> include = emptySet();
     private Set<Pattern> exclude = emptySet();
     private Map<String, Object> configure = new HashMap<>();
-    private Map<String, Object> styles = new HashMap<>();
 
     public String getName() {
         return name;
@@ -83,10 +80,6 @@ public class RecipeConfiguration {
         this.configure = configure;
     }
 
-    public void setStyles(Map<String, Object> styles) {
-        this.styles = styles;
-    }
-
     private Set<Pattern> toPatternSet(Set<String> set) {
         return set.stream()
                 .map(i -> i
@@ -96,10 +89,7 @@ public class RecipeConfiguration {
                 .collect(toSet());
     }
 
-    public Recipe build(Collection<RecipeConfiguration> otherRecipeConfigurations) {
-        Map<String, RecipeConfiguration> configsByName = otherRecipeConfigurations.stream()
-                .collect(toMap(RecipeConfiguration::getName, identity()));
-
+    public Recipe build() {
         Deque<RecipeConfiguration> inOrderConfigurations = new ArrayDeque<>();
         Queue<RecipeConfiguration> configs = new LinkedList<>();
         configs.add(RecipeConfiguration.this);
@@ -115,25 +105,6 @@ public class RecipeConfiguration {
             @Override
             public String getName() {
                 return name;
-            }
-
-            @Override
-            public Collection<Style> getStyles() {
-                return inOrderConfigurations.stream()
-                        .flatMap(conf -> conf.styles.entrySet().stream()
-                                .map(styleConfigByName -> {
-                                    try {
-                                        Style style = (Style) Class.forName(styleConfigByName.getKey()).getDeclaredConstructor().newInstance();
-                                        propertyConverter.updateValue(style, styleConfigByName.getValue());
-                                        return style;
-                                    } catch (Exception e) {
-                                        logger.warn("Unable to load style with class name '" + styleConfigByName + "'", e);
-                                        return null;
-                                    }
-                                })
-                                .filter(Objects::nonNull)
-                        )
-                        .collect(toList());
             }
 
             @Override

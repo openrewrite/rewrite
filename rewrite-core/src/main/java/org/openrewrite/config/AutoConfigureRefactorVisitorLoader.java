@@ -19,15 +19,19 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.AutoConfigure;
 import org.openrewrite.RefactorVisitor;
+import org.openrewrite.Style;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.util.Collection;
+import java.util.Map;
 
+import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 
-public class AutoConfigureRefactorVisitorLoader implements RefactorVisitorLoader {
+public class AutoConfigureRefactorVisitorLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(AutoConfigureRefactorVisitorLoader.class);
 
     private final String[] acceptVisitorPackages;
@@ -59,5 +63,15 @@ public class AutoConfigureRefactorVisitorLoader implements RefactorVisitorLoader
                     })
                     .collect(toList());
         }
+    }
+
+    @Override
+    public Map<String, Collection<Style>> loadStyles() {
+        return emptyMap();
+    }
+
+    @Override
+    public Collection<RecipeConfiguration> loadRecipes() {
+        return emptyList();
     }
 }

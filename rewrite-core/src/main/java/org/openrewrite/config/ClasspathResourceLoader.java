@@ -18,15 +18,17 @@ package org.openrewrite.config;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.openrewrite.RefactorVisitor;
-import org.openrewrite.ValidationException;
+import org.openrewrite.Style;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 import static java.util.stream.Collectors.toList;
 
-public class ClasspathResourceLoader implements RecipeConfigurationLoader, RefactorVisitorLoader {
+public class ClasspathResourceLoader implements ResourceLoader {
     private final Collection<YamlResourceLoader> yamlResourceLoaders;
 
     public ClasspathResourceLoader(Iterable<Path> compileClasspath) {
@@ -36,13 +38,8 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
                 .acceptPaths("META-INF/rewrite")
                 .enableMemoryMapping()
                 .scan()) {
-            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                try {
-                    yamlResourceLoaders.add(new YamlResourceLoader(input));
-                } catch (ValidationException e) {
-                    throw new ValidationException(e, res.getURI());
-                }
-            });
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
+                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI())));
         }
 
         if (compileClasspath.iterator().hasNext()) {
@@ -51,13 +48,8 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
                     .acceptPaths("META-INF/rewrite")
                     .enableMemoryMapping()
                     .scan()) {
-                scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
-                    try {
-                        yamlResourceLoaders.add(new YamlResourceLoader(input));
-                    } catch (ValidationException e) {
-                        throw new ValidationException(e, res.getURI());
-                    }
-                });
+                scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
+                        yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI())));
             }
         }
     }
@@ -70,5 +62,12 @@ public class ClasspathResourceLoader implements RecipeConfigurationLoader, Refac
     @Override
     public Collection<? extends RefactorVisitor<?>> loadVisitors() {
         return yamlResourceLoaders.stream().flatMap(loader -> loader.loadVisitors().stream()).collect(toList());
+    }
+
+    @Override
+    public Map<String, Collection<Style>> loadStyles() {
+        Map<String, Collection<Style>> styles = new HashMap<>();
+        yamlResourceLoaders.forEach(loader -> styles.putAll(loader.loadStyles()));
+        return styles;
     }
 }

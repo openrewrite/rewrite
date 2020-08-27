@@ -17,7 +17,6 @@ package org.openrewrite
 
 import org.openrewrite.Assertions.whenParsedBy
 import org.openrewrite.config.ClasspathResourceLoader
-import org.openrewrite.config.RecipeConfiguration
 import java.nio.file.Path
 
 fun <S : SourceFile> String.whenParsedBy(parser: Parser<S>): Assertions.StringSourceFileAssert<S> =
@@ -27,22 +26,22 @@ fun <S : SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSource
         whenParsedBy(parser, this)
 
 /**
- * Retrieve a refactoring plan for the named recipe from the classpath.
+ * Retrieve an environment for the named recipe from the classpath.
  */
-fun loadRefactorPlan(recipeName: String): RefactorPlan {
+fun loadRefactorPlan(recipeName: String): Environment {
     val crl = ClasspathResourceLoader(emptyList())
     val recipeConfig = crl.loadRecipes().asSequence()
             .find { it.name == recipeName } ?: throw RuntimeException("Couldn't load recipe named '$recipeName'. " +
                     "Verify that there's a yml file defining a recipe with this name under src/test/resources/META-INF/rewrite")
 
-    val recipe = recipeConfig.build(listOf())
+    val recipe = recipeConfig.build()
     val visitors = crl.loadVisitors()
             .filter { recipe.accept(it) == Recipe.FilterReply.ACCEPT }
     if (visitors.isEmpty()) {
         throw RuntimeException("Couldn't find any visitors for recipe named `$recipeName`. " +
                 "Verify that your recipe has an include pattern that accepts at least one visitor according to SourceVisitor<J>.accept()")
     }
-    return RefactorPlan.builder()
+    return Environment.builder()
             .loadRecipe(recipeConfig)
             .loadVisitors(visitors)
             .build()

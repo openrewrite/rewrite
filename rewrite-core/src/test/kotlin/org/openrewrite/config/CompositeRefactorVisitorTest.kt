@@ -35,7 +35,7 @@ class CompositeRefactorVisitorTest {
                   toText: Hello Jonathan!
         """.trimIndent()
 
-        val loader = YamlResourceLoader(yaml.byteInputStream())
+        val loader = YamlResourceLoader(yaml.byteInputStream(), null)
 
         val visitors = loader.loadVisitors()
 

@@ -20,17 +20,20 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.openrewrite.*;
+import org.openrewrite.internal.lang.Nullable;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 
-public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVisitorLoader {
+public class YamlResourceLoader implements ResourceLoader {
     private static final ObjectMapper propertyConverter = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
@@ -38,35 +41,69 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
     private final Map<String, RecipeConfiguration> recipes = new HashMap<>();
     private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
     private final Map<CompositeRefactorVisitor, String> visitorExtensions = new HashMap<>();
+    private final Map<String, Collection<Style>> styles = new HashMap<>();
 
-    public static final String visitorType = "specs.openrewrite.org/v1beta/visitor";
-    public static final String recipeType = "specs.openrewrite.org/v1beta/recipe";
+    private final URI source;
 
-    private static final Set<String> validTypes = new LinkedHashSet<>(Arrays.asList(visitorType, recipeType));
-    private static final String validTypesString = String.join(", ", validTypes);
+    private enum ResourceType {
+        Visitor("specs.openrewrite.org/v1beta/visitor"),
+        Recipe("specs.openrewrite.org/v1beta/recipe"),
+        Style("specs.openrewrite.org/v1beta/style");
 
-    public YamlResourceLoader(InputStream yamlInput) throws UncheckedIOException {
+        private final String spec;
+
+        ResourceType(String spec) {
+            this.spec = spec;
+        }
+
+        public String getSpec() {
+            return spec;
+        }
+
+        @Nullable
+        public static ResourceType fromSpec(String spec) {
+            return Arrays.stream(values())
+                    .filter(type -> type.getSpec().equals(spec))
+                    .findAny()
+                    .orElse(null);
+        }
+    }
+
+    public YamlResourceLoader(InputStream yamlInput, URI source) throws UncheckedIOException {
+        this.source = source;
         try {
             try {
                 Yaml yaml = new Yaml();
                 for (Object resource : yaml.loadAll(yamlInput)) {
                     if (resource instanceof Map) {
                         @SuppressWarnings("unchecked") Map<String, Object> resourceMap = (Map<String, Object>) resource;
-                        String type = resourceMap.getOrDefault("type", "missing").toString();
-                        Validated validation = required("type", type)
+                        String type = resourceMap
+                                .getOrDefault("type", "missing")
+                                .toString();
+
+                        Validated validated = required("type", type)
                                 .and(test("type",
-                                        "must be a valid rewrite type. These are the valid types: " + validTypesString,
+                                        "must be one of the following resource types: " +
+                                                Arrays.stream(ResourceType.values()).map(ResourceType::getSpec)
+                                                        .collect(Collectors.joining(", ")),
                                         type,
-                                        validTypes::contains));
-                        if(validation.isInvalid()) {
-                            throw new ValidationException(validation);
+                                        type2 -> ResourceType.fromSpec(type2) != null)
+                                );
+
+                        if (validated.isInvalid()) {
+                            throw new ValidationException(validated, source);
                         }
-                        switch (type) {
-                            case visitorType:
+
+                        //noinspection ConstantConditions
+                        switch (ResourceType.fromSpec(type)) {
+                            case Visitor:
                                 mapVisitor(resourceMap);
                                 break;
-                            case recipeType:
+                            case Recipe:
                                 mapRecipe(resourceMap);
+                                break;
+                            case Style:
+                                mapStyle(resourceMap);
                                 break;
                         }
                     }
@@ -93,7 +130,7 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
                         visitors -> visitors instanceof List));
 
         if (validation.isInvalid()) {
-            throw new ValidationException(validation);
+            throw new ValidationException(validation, source);
         }
 
         List<RefactorVisitor<? extends Tree>> subVisitors = new ArrayList<>();
@@ -120,7 +157,8 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
                 }
             } catch (Exception e) {
                 throw new ValidationException(
-                        Validated.invalid("visitor", subVisitorNameAndConfig, "must be constructable", e)
+                        Validated.invalid("visitor", subVisitorNameAndConfig, "must be constructable", e),
+                        source
                 );
             }
         }
@@ -147,23 +185,48 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
         try {
             propertyConverter.updateValue(recipe, recipeMap);
         } catch (JsonMappingException e) {
-            if(e.getCause() != null && e.getCause() instanceof ValidationException) {
-                throw new ValidationException((ValidationException) e.getCause(), null);
+            if (e.getCause() != null && e.getCause() instanceof ValidationException) {
+                throw (ValidationException) e.getCause();
             } else {
                 throw new ValidationException(Validated.invalid("recipe", recipeMap,
-                        "must be a valid recipe configuration", e));
+                        "must be a valid recipe configuration", e), source);
             }
         }
 
-        Validated validated = Validated.required("recipe.getName()", recipe.getName())
-                .and(Validated.test("recipe.getName()",
+        Validated validated = Validated.required("name", recipe.getName())
+                .and(Validated.test("name",
                         "there is already another recipe with that name",
                         recipe.getName(),
                         it -> !recipes.containsKey(it)));
-        if(validated.isInvalid()) {
-            throw new ValidationException(validated);
+        if (validated.isInvalid()) {
+            throw new ValidationException(validated, source);
         }
         recipes.put(recipe.getName(), recipe);
+    }
+
+    private void mapStyle(Map<String, Object> styleMap) {
+        StyleConfiguration style = new StyleConfiguration();
+        try {
+            propertyConverter.updateValue(style, styleMap);
+        } catch (JsonMappingException e) {
+            if (e.getCause() != null && e.getCause() instanceof ValidationException) {
+                throw (ValidationException) e.getCause();
+            } else {
+                throw new ValidationException(Validated.invalid("styles", styleMap,
+                        "must be a valid style configuration", e), source);
+            }
+        }
+
+        Validated validated = Validated.required("name", style.getName())
+                .and(Validated.test("name",
+                        "there is already another style configuration with that name",
+                        style.getName(),
+                        it -> !styles.containsKey(it)));
+        if (validated.isInvalid()) {
+            throw new ValidationException(validated, source);
+        }
+
+        styles.put(style.getName(), style.getStyles());
     }
 
     @Override
@@ -174,5 +237,10 @@ public class YamlResourceLoader implements RecipeConfigurationLoader, RefactorVi
     @Override
     public Collection<? extends RefactorVisitor<?>> loadVisitors() {
         return visitors;
+    }
+
+    @Override
+    public Map<String, Collection<Style>> loadStyles() {
+        return styles;
     }
 }

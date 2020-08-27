@@ -21,16 +21,16 @@ import org.openrewrite.config.RecipeConfiguration
 import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 
-class RefactorPlanTest {
+class EnvironmentTest {
     private val parent = RecipeConfiguration().apply {
         name = "org.openrewrite.example"
         setInclude(setOf("org.openrewrite.text.*"))
         setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello World!"))
     }
 
-    private val planBuilder = RefactorPlan.builder()
+    private val planBuilder = Environment.builder()
             .loadRecipe(parent)
-            .visitor(ChangeText())
+            .loadVisitors(listOf(ChangeText()))
 
     @Test
     fun basicExample() {

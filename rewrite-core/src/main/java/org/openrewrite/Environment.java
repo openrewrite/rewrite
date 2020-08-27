@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.openrewrite.config.*;
-import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,15 +31,18 @@ import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 
-public class RefactorPlan {
-    private static final Logger logger = LoggerFactory.getLogger(RefactorPlan.class);
+public class Environment {
+    private static final Logger logger = LoggerFactory.getLogger(Environment.class);
 
     private final Map<String, Recipe> recipesByName;
     private final Collection<RefactorVisitor<?>> visitors;
+    private final Map<String, Collection<Style>> stylesByName;
 
-    public RefactorPlan(Collection<Recipe> recipes, Collection<RefactorVisitor<?>> visitors) {
+    private Environment(Collection<Recipe> recipes, Collection<RefactorVisitor<?>> visitors,
+                        Map<String, Collection<Style>> stylesByName) {
         this.recipesByName = recipes.stream().collect(toMap(Recipe::getName, identity()));
         this.visitors = visitors;
+        this.stylesByName = stylesByName;
     }
 
     public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor, String... recipes) {
@@ -56,19 +58,6 @@ public class RefactorPlan {
         return new HashMap<>(recipesByName);
     }
 
-    @Nullable
-    public <S extends Style> S style(Class<S> styleClass, Iterable<String> recipes) {
-        return loadedRecipes(recipes).stream()
-                .map(recipe -> recipe.getStyles().stream()
-                        .filter(styleClass::isInstance)
-                        .findFirst()
-                        .orElse(null))
-                .filter(Objects::nonNull)
-                .map(styleClass::cast)
-                .findFirst()
-                .orElse(null);
-    }
-
     public Collection<RefactorVisitor<?>> visitors(String... recipes) {
         return visitors(Arrays.asList(recipes));
     }
@@ -78,6 +67,17 @@ public class RefactorPlan {
         return visitors.stream()
                 .map(v -> loadedRecipes.stream().reduce(v, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1))
                 .filter(v -> loadedRecipes.stream().anyMatch(p -> p.accept(v).equals(Recipe.FilterReply.ACCEPT)))
+                .collect(toList());
+    }
+
+    public Collection<Style> styles(String... styles) {
+        return styles(Arrays.asList(styles));
+    }
+
+    public Collection<Style> styles(Iterable<String> styles) {
+        return stylesByName.entrySet().stream()
+                .filter(namedStyles -> stream(styles.spliterator(), false).anyMatch(s -> namedStyles.getKey().equals(s)))
+                .flatMap(namedStyles -> namedStyles.getValue().stream())
                 .collect(toList());
     }
 
@@ -96,6 +96,7 @@ public class RefactorPlan {
         private final Map<String, RecipeConfiguration> recipesConfigurations = new HashMap<>();
         private final Collection<RefactorVisitor<?>> visitors = new ArrayList<>();
         private Iterable<Path> compileClasspath = emptyList();
+        private final Map<String, Collection<Style>> stylesByName = new HashMap<>();
 
         public Builder compileClasspath(Iterable<Path> compileClasspath) {
             this.compileClasspath = emptyList();
@@ -104,8 +105,7 @@ public class RefactorPlan {
 
         public Builder scanResources() {
             ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(compileClasspath);
-            loadVisitors(classpathResourceLoader);
-            loadRecipes(classpathResourceLoader);
+            load(classpathResourceLoader);
             return this;
         }
 
@@ -113,9 +113,8 @@ public class RefactorPlan {
             File userHomeRewriteConfig = new File(System.getProperty("user.home") + "/.rewrite/rewrite.yml");
             if (userHomeRewriteConfig.exists()) {
                 try (FileInputStream is = new FileInputStream(userHomeRewriteConfig)) {
-                    YamlResourceLoader resourceLoader = new YamlResourceLoader(is);
-                    loadVisitors(resourceLoader);
-                    loadRecipes(resourceLoader);
+                    YamlResourceLoader resourceLoader = new YamlResourceLoader(is, userHomeRewriteConfig.toURI());
+                    load(resourceLoader);
                 } catch (IOException e) {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml.", e);
                 } catch (ValidationException e) {
@@ -130,47 +129,42 @@ public class RefactorPlan {
             return this;
         }
 
-        public Builder loadVisitors(RefactorVisitorLoader refactorVisitorLoader) {
-            visitors.addAll(refactorVisitorLoader.loadVisitors());
-            return this;
-        }
-
         public Builder loadVisitors(Collection<? extends RefactorVisitor<?>> visitors) {
             this.visitors.addAll(visitors);
             return this;
         }
 
-        public Builder visitor(RefactorVisitor<?> visitor) {
-            this.visitors.add(visitor);
+        public Builder load(ResourceLoader resourceLoader) {
+            resourceLoader.loadRecipes().forEach(this::loadRecipe);
+            visitors.addAll(resourceLoader.loadVisitors());
+            stylesByName.putAll(resourceLoader.loadStyles());
             return this;
         }
 
-        public Builder loadRecipes(RecipeConfigurationLoader recipeConfigurationLoader) {
-            recipeConfigurationLoader.loadRecipes().forEach(this::loadRecipe);
-            return this;
-        }
-
-        public Builder loadRecipe(RecipeConfiguration recipeConfiguration) {
+        Builder loadRecipe(RecipeConfiguration recipeConfiguration) {
             Validated validated = Validated.required("recipeConfiguration.getName()", recipeConfiguration.getName())
                     .and(Validated.test("recipeConfiguration.getName()",
                             "Recipe name must be unique",
                             recipeConfiguration.getName(),
                             it -> !recipesConfigurations.containsKey(it)));
 
-            if(validated.isInvalid()) {
+            if (validated.isInvalid()) {
                 throw new ValidationException(validated);
             }
             recipesConfigurations.put(recipeConfiguration.getName(), recipeConfiguration);
             return this;
         }
 
-        public RefactorPlan build() {
+        public Environment build() {
             visitors.addAll(new AutoConfigureRefactorVisitorLoader("org.openrewrite").loadVisitors());
 
-            return new RefactorPlan(recipesConfigurations.values().stream()
-                    .map(pc -> pc.build(recipesConfigurations.values()))
-                    .collect(toList()),
-                    visitors);
+            return new Environment(
+                    recipesConfigurations.values().stream()
+                            .map(RecipeConfiguration::build)
+                            .collect(toList()),
+                    visitors,
+                    stylesByName
+            );
         }
     }
 }

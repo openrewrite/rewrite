@@ -24,8 +24,6 @@ import java.util.stream.Collectors;
  */
 @Incubating(since = "2.0.0")
 public class ValidationException extends RuntimeException {
-    private final Validated validation;
-
     public URI getSource() {
         return source;
     }
@@ -34,15 +32,10 @@ public class ValidationException extends RuntimeException {
         this.source = source;
     }
 
-    private URI source = null;
+    private URI source;
 
     public ValidationException(Validated validation) {
         this(validation, null);
-    }
-
-    public ValidationException(ValidationException other, URI source) {
-        this(other.validation, source);
-        this.setStackTrace(other.getStackTrace());
     }
 
     public ValidationException(Validated validation, URI source) {
@@ -55,12 +48,7 @@ public class ValidationException extends RuntimeException {
                         validation.failures().size() > 1 ? "Multiple validation failures:\n" : "",
                         ""
                 )));
-        this.validation = validation;
         this.source = source;
-    }
-
-    public Validated getValidation() {
-        return validation;
     }
 
     @Override
