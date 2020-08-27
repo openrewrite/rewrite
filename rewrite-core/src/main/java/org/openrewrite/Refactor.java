@@ -22,6 +22,8 @@ import io.micrometer.core.instrument.Timer;
 import lombok.Getter;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Stream;
@@ -34,6 +36,7 @@ import static java.util.stream.Collectors.toSet;
  */
 @NonNullApi
 public class Refactor {
+    private static final Logger logger = LoggerFactory.getLogger(Refactor.class);
     private MeterRegistry meterRegistry = Metrics.globalRegistry;
 
     @Getter
@@ -117,11 +120,13 @@ public class Refactor {
                             rulesThatMadeChangesThisCycle++;
                         }
                     } catch (Throwable t) {
+                        logger.error("refactor visitor failed", t);
                         Counter.builder("rewrite.visitor.errors")
                                 .baseUnit("errors")
                                 .description("Visitors that threw exceptions")
-                                .tag("visitor", visitor.getClass().getName())
+                                .tag("visitor", visitor.getName())
                                 .tag("tree.type", prev.getClass().getName())
+                                .tag("exception", t.getClass().getSimpleName())
                                 .register(meterRegistry)
                                 .increment();
                     }
@@ -173,7 +178,7 @@ public class Refactor {
 
         sample.stop(Timer.builder("rewrite.refactor.visit")
                 .description("The time it takes to visit a single AST with a particular refactoring visitor and its pipeline")
-                .tag("visitor", visitor.getClass().getName())
+                .tag("visitor", visitor.getName())
                 .tags(visitor.getTags())
                 .tag("tree.type", acc.getClass().getSimpleName())
                 .register(meterRegistry));

@@ -35,6 +35,13 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
     }
 
     @Override
+    public Validated validate() {
+        return delegates.stream()
+                .map(RefactorVisitor::validate)
+                .reduce(Validated.none(), (validation, acc) -> acc.and(validation));
+    }
+
+    @Override
     public Tree visit(Tree tree) {
         return tree;
     }
