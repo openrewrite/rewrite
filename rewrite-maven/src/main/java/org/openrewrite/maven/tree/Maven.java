@@ -15,7 +15,10 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Getter;
 import lombok.With;
 import org.openrewrite.*;
@@ -639,7 +642,10 @@ public interface Maven extends Serializable, Tree {
         }
     }
 
-    static Optional<String> getPropertyKey(String textValue) {
+    static Optional<String> getPropertyKey(@Nullable String textValue) {
+        if (textValue == null) {
+            return Optional.empty();
+        }
         if (textValue.startsWith("${") && textValue.endsWith("}")) {
             return Optional.of(textValue.substring(2, textValue.length() - 1));
         }

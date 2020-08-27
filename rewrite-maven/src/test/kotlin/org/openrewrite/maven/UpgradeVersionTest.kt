@@ -16,10 +16,12 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Parser
 import org.openrewrite.RefactorVisitor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
+import java.nio.file.Path
 
 class UpgradeVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
     override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
@@ -111,4 +113,74 @@ class UpgradeVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
                     </project>
                 """
     )
+
+    @Test
+    fun upgradeGuavaInParent(@TempDir tempDir: Path) {
+        val parent = tempDir.resolve("pom.xml")
+        val server = tempDir.resolve("server/pom.xml")
+        server.toFile().parentFile.mkdirs()
+
+        parent.toFile().writeText("""
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+            
+              <packaging>pom</packaging>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <properties>
+                <guava.version>25.0-jre</guava.version>
+              </properties>
+            </project>
+        """.trimIndent())
+
+        server.toFile().writeText("""
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+              </parent>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app-server</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>${"$"}{guava.version}</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent())
+
+        assertRefactored(
+                visitors = listOf(UpgradeVersion().apply {
+                    setGroupId("com.google.guava")
+                    setToVersion("25-28")
+                    setMetadataPattern("-jre")
+                }),
+                dependencies = listOf(server.toFile()),
+                before = parent.toFile(),
+                after = """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                    
+                      <packaging>pom</packaging>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <properties>
+                        <guava.version>28.0-jre</guava.version>
+                      </properties>
+                    </project>
+                """
+        )
+    }
 }
