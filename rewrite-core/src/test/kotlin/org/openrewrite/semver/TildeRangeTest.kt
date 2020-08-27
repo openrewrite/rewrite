@@ -24,7 +24,7 @@ class TildeRangeTest {
      */
     @Test
     fun updatePatch() {
-        val tildeRange: TildeRange = TildeRange.build("~1.2.3").getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1.2.3", null).getValue()
 
         assertThat(tildeRange.isValid("1.2.3")).isTrue()
         assertThat(tildeRange.isValid("1.2.3.RELEASE")).isTrue()
@@ -37,7 +37,7 @@ class TildeRangeTest {
      */
     @Test
     fun updatePatchImplicitZeroPatch() {
-        val tildeRange: TildeRange = TildeRange.build("~1.2").getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1.2", null).getValue()
 
         assertThat(tildeRange.isValid("1.2.0")).isTrue()
         assertThat(tildeRange.isValid("1.2.4")).isTrue()
@@ -49,7 +49,7 @@ class TildeRangeTest {
      */
     @Test
     fun updateMajor() {
-        val tildeRange: TildeRange = TildeRange.build("~1").getValue()
+        val tildeRange: TildeRange = TildeRange.build("~1", null).getValue()
 
         assertThat(tildeRange.isValid("1.0.1")).isTrue()
         assertThat(tildeRange.isValid("1.9.9")).isTrue()

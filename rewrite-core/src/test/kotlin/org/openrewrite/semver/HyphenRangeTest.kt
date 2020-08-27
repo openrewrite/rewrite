@@ -24,7 +24,7 @@ class HyphenRangeTest {
      */
     @Test
     fun inclusiveSet() {
-        val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4").getValue()
+        val hyphenRange: HyphenRange = HyphenRange.build("1.2.3 - 2.3.4", null).getValue()
 
         assertThat(hyphenRange.isValid("1.2.2")).isFalse()
         assertThat(hyphenRange.isValid("1.2.3.RELEASE")).isTrue()
@@ -38,7 +38,7 @@ class HyphenRangeTest {
      */
     @Test
     fun partialVersion() {
-        val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2").getValue()
+        val hyphenRange: HyphenRange = HyphenRange.build("1.2 - 2", null).getValue()
 
         assertThat(hyphenRange.isValid("1.1.9")).isFalse()
         assertThat(hyphenRange.isValid("1.2.0")).isTrue()

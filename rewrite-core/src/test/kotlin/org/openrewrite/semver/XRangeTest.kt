@@ -21,12 +21,12 @@ import org.junit.jupiter.api.Test
 class XRangeTest {
     @Test
     fun pattern() {
-        assertThat(XRange.build("*").isValid).isTrue()
-        assertThat(XRange.build("*.0.0").isValid).isFalse()
-        assertThat(XRange.build("1.x").isValid).isTrue()
-        assertThat(XRange.build("1.x.0").isValid).isFalse()
-        assertThat(XRange.build("1.1.X").isValid).isTrue()
-        assertThat(XRange.build("a").isValid).isFalse()
+        assertThat(XRange.build("*", null).isValid).isTrue()
+        assertThat(XRange.build("*.0.0", null).isValid).isFalse()
+        assertThat(XRange.build("1.x", null).isValid).isTrue()
+        assertThat(XRange.build("1.x.0", null).isValid).isFalse()
+        assertThat(XRange.build("1.1.X", null).isValid).isTrue()
+        assertThat(XRange.build("a", null).isValid).isFalse()
     }
 
     /**
@@ -34,7 +34,7 @@ class XRangeTest {
      */
     @Test
     fun anyVersion() {
-        val xRange: XRange = XRange.build("X").getValue()
+        val xRange: XRange = XRange.build("X", null).getValue()
 
         assertThat(xRange.isValid("0.0.0")).isTrue()
     }
@@ -44,7 +44,7 @@ class XRangeTest {
      */
     @Test
     fun matchingMajorVersion() {
-        val xRange: XRange = XRange.build("1.*").getValue()
+        val xRange: XRange = XRange.build("1.*", null).getValue()
 
         assertThat(xRange.isValid("1.0.0")).isTrue()
         assertThat(xRange.isValid("1.2.3.RELEASE")).isTrue()
@@ -57,7 +57,7 @@ class XRangeTest {
      */
     @Test
     fun matchingMajorAndMinorVersions() {
-        val xRange: XRange = XRange.build("1.2.X").getValue()
+        val xRange: XRange = XRange.build("1.2.X", null).getValue()
 
         assertThat(xRange.isValid("1.2.0")).isTrue()
         assertThat(xRange.isValid("1.3.0")).isFalse()

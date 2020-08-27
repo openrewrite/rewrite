@@ -31,7 +31,8 @@ public class XRange extends LatestRelease {
     private final String minor;
     private final String patch;
 
-    XRange(String major, String minor, String patch) {
+    XRange(String major, String minor, String patch, String metadataPattern) {
+        super(metadataPattern);
         this.major = major;
         this.minor = minor;
         this.patch = patch;
@@ -68,7 +69,7 @@ public class XRange extends LatestRelease {
         return gav.group(3) == null || !gav.group(3).equals(patch);
     }
 
-    public static Validated build(String pattern) {
+    public static Validated build(String pattern, String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("xRange", pattern, "not an x-range");
@@ -84,7 +85,7 @@ public class XRange extends LatestRelease {
             return Validated.invalid("xRange", pattern, "not an x-range: nothing can follow a wildcard");
         }
 
-        return Validated.valid("xRange", new XRange(major, minor, patch));
+        return Validated.valid("xRange", new XRange(major, minor, patch, metadataPattern));
     }
 
     private static String normalizeWildcard(String part) {

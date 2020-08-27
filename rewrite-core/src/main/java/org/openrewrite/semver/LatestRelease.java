@@ -16,23 +16,56 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Matcher;
 
 import static java.lang.Integer.parseInt;
 
 public class LatestRelease implements VersionComparator {
-    public static final LatestRelease INSTANCE = build("latest.release").getValue();
+    @Nullable
+    private final String metadataPattern;
+
+    public LatestRelease(@Nullable String metadataPattern) {
+        this.metadataPattern = metadataPattern;
+    }
 
     @Override
     public boolean isValid(String version) {
-        return VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version)).matches();
+        Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version));
+        if (!matcher.matches()) {
+            return false;
+        }
+        return metadataPattern == null ||
+                (matcher.group(4) != null && matcher.group(4).matches(metadataPattern));
     }
 
-    protected static String normalizeVersion(String version) {
+    static String normalizeVersion(String version) {
         if (version.endsWith(".RELEASE")) {
             return version.substring(0, version.length() - ".RELEASE".length());
         }
+
+        AtomicBoolean beforeMetadata = new AtomicBoolean(true);
+        long versionParts = version.chars()
+                .filter(c -> {
+                    if (c == '-' || c == '+') {
+                        beforeMetadata.set(false);
+                    }
+                    return beforeMetadata.get();
+                })
+                .filter(c -> c == '.')
+                .count();
+
+        if (versionParts < 2) {
+            String[] versionAndMetadata = version.split("(?=[-+])");
+            for (; versionParts < 2; versionParts++) {
+                versionAndMetadata[0] += ".0";
+            }
+            version = versionAndMetadata[0] + (versionAndMetadata.length > 1 ?
+                    versionAndMetadata[1] : "");
+        }
+
         return version;
     }
 
@@ -63,9 +96,9 @@ public class LatestRelease implements VersionComparator {
         return v1.compareTo(v2);
     }
 
-    public static Validated build(String pattern) {
-        return pattern.equals("latest.release") ?
-                Validated.valid("latestRelease", new LatestRelease()) :
-                Validated.invalid("latestRelease", pattern, "not a hyphen range");
+    public static Validated build(String toVersion, String metadataPattern) {
+        return toVersion.equals("latest.release") ?
+                Validated.valid("latestRelease", new LatestRelease(metadataPattern)) :
+                Validated.invalid("latestRelease", toVersion, "not a hyphen range");
     }
 }

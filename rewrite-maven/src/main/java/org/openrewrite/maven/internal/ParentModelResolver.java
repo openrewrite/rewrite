@@ -19,6 +19,7 @@ import org.apache.maven.model.Parent;
 import org.apache.maven.model.Repository;
 import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
+import org.apache.maven.model.building.ModelSource2;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.eclipse.aether.RepositorySystem;
@@ -31,6 +32,9 @@ import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayInputStream;
+import java.io.InputStream;
+import java.net.URI;
 import java.util.List;
 
 /**
@@ -43,17 +47,23 @@ public class ParentModelResolver implements ModelResolver {
     private final RepositorySystem repositorySystem;
     private final RepositorySystemSession repositorySystemSession;
     private final List<RemoteRepository> remoteRepositories;
+    private boolean resolveNonProjectParents;
 
     public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession,
-                               List<RemoteRepository> remoteRepositories) {
+                               List<RemoteRepository> remoteRepositories, boolean resolveNonProjectParents) {
         this.repositorySystem = repositorySystem;
         this.repositorySystemSession = repositorySystemSession;
         this.remoteRepositories = remoteRepositories;
+        this.resolveNonProjectParents = resolveNonProjectParents;
     }
 
     @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version) throws UnresolvableModelException {
+        if (!resolveNonProjectParents) {
+            return new UnresolvedModelSource(groupId, artifactId, version);
+        }
+
         logger.trace("resolving model for: {}:{}", groupId, artifactId);
         Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
 
@@ -87,5 +97,45 @@ public class ParentModelResolver implements ModelResolver {
     @Override
     public ModelResolver newCopy() {
         return this;
+    }
+
+    private static class UnresolvedModelSource implements ModelSource2 {
+        private final String groupId;
+        private final String artifactId;
+        private final String version;
+
+        private UnresolvedModelSource(String groupId, String artifactId, String version) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.version = version;
+        }
+
+        @Override
+        public ModelSource2 getRelatedSource(String relPath) {
+            return null;
+        }
+
+        @Override
+        public URI getLocationURI() {
+            return null;
+        }
+
+        @Override
+        public InputStream getInputStream() {
+            String syntheticPom = "<project>\n" +
+                    "<modelVersion>4.0.0</modelVersion>\n" +
+                    "<packaging>pom</packaging>\n" +
+                    "<groupId>" + groupId + "</groupId>\n" +
+                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                    "<version>" + version + "</version>\n" +
+                    "</project>";
+
+            return new ByteArrayInputStream(syntheticPom.getBytes());
+        }
+
+        @Override
+        public String getLocation() {
+            return null;
+        }
     }
 }

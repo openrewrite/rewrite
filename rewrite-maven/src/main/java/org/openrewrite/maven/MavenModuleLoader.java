@@ -78,14 +78,17 @@ class MavenModuleLoader {
     private final CachingWorkspaceReader workspaceReader;
 
     private final boolean resolveDependencies;
+    private boolean resolveNonProjectParents;
     private final File localRepository;
     private final List<RemoteRepository> remoteRepositories;
 
     public MavenModuleLoader(boolean resolveDependencies,
+                             boolean resolveNonProjectParents,
                              File localRepository,
                              @Nullable File workspaceDir,
                              List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
+        this.resolveNonProjectParents = resolveNonProjectParents;
         this.localRepository = localRepository;
         this.remoteRepositories = remoteRepositories;
         this.workspaceReader = new CachingWorkspaceReader(workspaceDir);
@@ -125,7 +128,8 @@ class MavenModuleLoader {
             RepositorySystemSession repositorySystemSession = getRepositorySystemSession(repositorySystem);
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
-                    .setModelResolver(new ParentModelResolver(repositorySystem, repositorySystemSession, remoteRepositories))
+                    .setModelResolver(new ParentModelResolver(repositorySystem,
+                            repositorySystemSession, remoteRepositories, resolveNonProjectParents))
                     .setModelSource(modelSource)
                     .setSystemProperties(System.getProperties());
 

@@ -33,7 +33,8 @@ public class CaretRange extends LatestRelease {
     private final String upperExclusive;
     private final String lower;
 
-    private CaretRange(String lower, String upperExclusive) {
+    private CaretRange(String lower, String upperExclusive, String metadataPattern) {
+        super(metadataPattern);
         this.lower = lower;
         this.upperExclusive = upperExclusive;
     }
@@ -45,7 +46,7 @@ public class CaretRange extends LatestRelease {
                 super.compare(version, lower) >= 0;
     }
 
-    public static Validated build(String pattern) {
+    public static Validated build(String pattern, String metadataPattern) {
         Matcher matcher = CARET_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("caretRange", pattern, "not a caret range");
@@ -82,7 +83,7 @@ public class CaretRange extends LatestRelease {
             upper = major + "." + minor + "." + patch;
         }
 
-        return Validated.valid("caretRange", new CaretRange(lower, upper));
+        return Validated.valid("caretRange", new CaretRange(lower, upper, metadataPattern));
     }
 
     private static String normalizeWildcard(@Nullable String part) {

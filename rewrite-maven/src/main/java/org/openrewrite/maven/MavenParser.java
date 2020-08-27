@@ -32,6 +32,7 @@ import java.util.List;
 public class MavenParser implements Parser<Maven.Pom> {
     private final XmlParser xmlParser = new XmlParser();
     private final boolean resolveDependencies;
+    private final boolean resolveNonProjectParents;
     private final File localRepository;
 
     @Nullable
@@ -39,9 +40,10 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     private final List<RemoteRepository> remoteRepositories;
 
-    private MavenParser(boolean resolveDependencies, File localRepository,
+    private MavenParser(boolean resolveDependencies, boolean resolveNonProjectParents, File localRepository,
                         @Nullable File workspaceDir, List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
+        this.resolveNonProjectParents = resolveNonProjectParents;
         this.localRepository = localRepository;
         this.workspaceDir = workspaceDir;
         this.remoteRepositories = remoteRepositories;
@@ -55,8 +57,8 @@ public class MavenParser implements Parser<Maven.Pom> {
     public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
 
-        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, localRepository,
-                workspaceDir, remoteRepositories).load(pomSourceFiles);
+        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies, resolveNonProjectParents,
+                localRepository, workspaceDir, remoteRepositories).load(pomSourceFiles);
 
         List<Maven.Pom> poms = new ArrayList<>();
         Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
@@ -74,6 +76,7 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     public static class Builder {
         private boolean resolveDependencies = true;
+        private boolean resolveNonProjectParents = false;
         private File localRepository = new File(System.getProperty("user.home") + "/.m2/rewrite");
         private List<RemoteRepository> remoteRepositories = new ArrayList<>();
 
@@ -101,6 +104,11 @@ public class MavenParser implements Parser<Maven.Pom> {
             return this;
         }
 
+        public Builder resolveNonProjectParents(boolean resolveNonProjectParents) {
+            this.resolveNonProjectParents = resolveNonProjectParents;
+            return this;
+        }
+
         public Builder remoteRepositories(List<RemoteRepository> remoteRepositories) {
             this.remoteRepositories = remoteRepositories;
             return this;
@@ -112,7 +120,7 @@ public class MavenParser implements Parser<Maven.Pom> {
         }
 
         public MavenParser build() {
-            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);
+            return new MavenParser(resolveDependencies, resolveNonProjectParents, localRepository, workspaceDir, remoteRepositories);
         }
     }
 }

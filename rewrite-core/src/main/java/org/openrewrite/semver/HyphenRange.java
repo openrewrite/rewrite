@@ -29,7 +29,8 @@ public class HyphenRange extends LatestRelease {
     private final String upper;
     private final String lower;
 
-    private HyphenRange(String lower, String upper) {
+    private HyphenRange(String lower, String upper, String metadataPattern) {
+        super(metadataPattern);
         this.lower = fillPartialVersionWithZeroes(lower);
         this.upper = fillPartialVersionWithZeroes(upper);
     }
@@ -48,11 +49,11 @@ public class HyphenRange extends LatestRelease {
                 super.compare(version, lower) >= 0;
     }
 
-    public static Validated build(String pattern) {
+    public static Validated build(String pattern, String metadataPattern) {
         Matcher matcher = HYPHEN_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("hyphenRange", pattern, "not a hyphen range");
         }
-        return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(4)));
+        return Validated.valid("hyphenRange", new HyphenRange(matcher.group(1), matcher.group(4), metadataPattern));
     }
 }

@@ -21,15 +21,15 @@ import org.junit.jupiter.api.Test
 class SemverTest {
     @Test
     fun validToVersion() {
-        assertThat(Semver.validate("latest.release").getValue<VersionComparator>())
+        assertThat(Semver.validate("latest.release", null).getValue<VersionComparator>())
                 .isInstanceOf(LatestRelease::class.java)
-        assertThat(Semver.validate("1.5 - 2").getValue<VersionComparator>())
+        assertThat(Semver.validate("1.5 - 2", null).getValue<VersionComparator>())
                 .isInstanceOf(HyphenRange::class.java)
-        assertThat(Semver.validate("1.x").getValue<VersionComparator>())
+        assertThat(Semver.validate("1.x", null).getValue<VersionComparator>())
                 .isInstanceOf(XRange::class.java)
-        assertThat(Semver.validate("~1.5").getValue<VersionComparator>())
+        assertThat(Semver.validate("~1.5", null).getValue<VersionComparator>())
                 .isInstanceOf(TildeRange::class.java)
-        assertThat(Semver.validate("^1.5").getValue<VersionComparator>())
+        assertThat(Semver.validate("^1.5", null).getValue<VersionComparator>())
                 .isInstanceOf(CaretRange::class.java)
     }
 }

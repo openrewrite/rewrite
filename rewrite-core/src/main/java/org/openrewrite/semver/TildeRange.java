@@ -32,7 +32,8 @@ public class TildeRange extends LatestRelease {
     private final String upperExclusive;
     private final String lower;
 
-    private TildeRange(String lower, String upperExclusive) {
+    private TildeRange(String lower, String upperExclusive, String metadataPattern) {
+        super(metadataPattern);
         this.lower = lower;
         this.upperExclusive = upperExclusive;
     }
@@ -44,7 +45,7 @@ public class TildeRange extends LatestRelease {
                 super.compare(version, lower) >= 0;
     }
 
-    public static Validated build(String pattern) {
+    public static Validated build(String pattern, String metadataPattern) {
         Matcher matcher = TILDE_RANGE_PATTERN.matcher(pattern);
         if (!matcher.matches()) {
             return Validated.invalid("tildeRange", pattern, "not a tilde range");
@@ -68,6 +69,6 @@ public class TildeRange extends LatestRelease {
             upper = major + "." + (parseInt(minor) + 1) + ".0";
         }
 
-        return Validated.valid("tildeRange", new TildeRange(lower, upper));
+        return Validated.valid("tildeRange", new TildeRange(lower, upper, metadataPattern));
     }
 }

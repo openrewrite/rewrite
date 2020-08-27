@@ -21,11 +21,11 @@ public class Semver {
     private Semver() {
     }
 
-    public static Validated validate(String toVersion) {
-        return LatestRelease.build(toVersion)
-                .or(HyphenRange.build(toVersion))
-                .or(XRange.build(toVersion))
-                .or(TildeRange.build(toVersion))
-                .or(CaretRange.build(toVersion));
+    public static Validated validate(String toVersion, String metadataPattern) {
+        return LatestRelease.build(toVersion, metadataPattern)
+                .or(HyphenRange.build(toVersion, metadataPattern))
+                .or(XRange.build(toVersion, metadataPattern))
+                .or(TildeRange.build(toVersion, metadataPattern))
+                .or(CaretRange.build(toVersion, metadataPattern));
     }
 }

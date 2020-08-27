@@ -17,14 +17,17 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.VersionComparator;
 
 import java.util.Optional;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.Validated.required;
+import static org.openrewrite.Validated.test;
 
 /**
  * Upgrade the version a group or group and artifact using Node Semver
@@ -42,6 +45,9 @@ public class UpgradeVersion extends MavenRefactorVisitor {
      */
     private String toVersion;
 
+    @Nullable
+    private String metadataPattern;
+
     private VersionComparator versionComparator;
 
     public void setGroupId(String groupId) {
@@ -56,11 +62,33 @@ public class UpgradeVersion extends MavenRefactorVisitor {
         this.toVersion = toVersion;
     }
 
+    /**
+     * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
+     * We can pair a {@link HyphenRange} of "25-29" with a metadata pattern of "-jre" to select
+     * Guava 29.0-jre
+     *
+     * @param metadataPattern The metadata pattern extending semver selection.
+     */
+    public void setMetadataPattern(@Nullable String metadataPattern) {
+        this.metadataPattern = metadataPattern;
+    }
+
     @Override
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion));
+                .and(test("metadataPattern", "must be a valid regular expression",
+                        metadataPattern, metadataPattern -> {
+                            try {
+                                if (metadataPattern != null) {
+                                    Pattern.compile(metadataPattern);
+                                }
+                                return true;
+                            } catch (Throwable e) {
+                                return false;
+                            }
+                        }))
+                .and(Semver.validate(toVersion, metadataPattern));
     }
 
     @Override
@@ -70,7 +98,7 @@ public class UpgradeVersion extends MavenRefactorVisitor {
 
     @Override
     public Maven visitPom(Maven.Pom pom) {
-        versionComparator = Semver.validate(toVersion).getValue();
+        versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
         return super.visitPom(pom);
     }
 
@@ -79,9 +107,10 @@ public class UpgradeVersion extends MavenRefactorVisitor {
         Maven.Dependency d = refactor(dependency, super::visitDependency);
 
         if (groupId.equals(d.getGroupId()) && (artifactId == null || artifactId.equals(d.getArtifactId()))) {
+            LatestRelease latestRelease = new LatestRelease(metadataPattern);
             Optional<String> newerVersion = d.getModel().getModuleVersion().getNewerVersions().stream()
                     .filter(v -> versionComparator.isValid(v))
-                    .filter(v -> LatestRelease.INSTANCE.compare(dependency.getModel().getModuleVersion().getVersion(), v) < 0)
+                    .filter(v -> latestRelease.compare(dependency.getModel().getModuleVersion().getVersion(), v) < 0)
                     .max(versionComparator);
 
             if (newerVersion.isPresent()) {

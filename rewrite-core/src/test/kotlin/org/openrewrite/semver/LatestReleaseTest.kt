@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class LatestReleaseTest {
-    private val latestRelease = LatestRelease()
+    private val latestRelease = LatestRelease(null)
 
     @Test
     fun onlyNumericPartsValid() {
@@ -56,5 +56,24 @@ class LatestReleaseTest {
     @Test
     fun guavaVariants() {
         assertThat(latestRelease.compare("25.0-jre", "29.0-jre")).isLessThan(0)
+    }
+
+    @Test
+    fun matchMetadata() {
+        assertThat(LatestRelease("-jre").isValid("29.0-jre")).isTrue()
+        assertThat(LatestRelease("-jre").isValid("29.0")).isFalse()
+        assertThat(LatestRelease("-jre").isValid("29.0-android")).isFalse()
+    }
+
+    @Test
+    fun normalizeVersionStripReleaseSuffix() {
+        assertThat(LatestRelease.normalizeVersion("1.5.1.RELEASE")).isEqualTo("1.5.1")
+    }
+
+    @Test
+    fun normalizeVersionToHaveMajorMinorPatch() {
+        assertThat(LatestRelease.normalizeVersion("29.0")).isEqualTo("29.0.0")
+        assertThat(LatestRelease.normalizeVersion("29.0-jre")).isEqualTo("29.0.0-jre")
+        assertThat(LatestRelease.normalizeVersion("29-jre")).isEqualTo("29.0.0-jre")
     }
 }

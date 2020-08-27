@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
@@ -31,6 +32,9 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
     private String artifactId;
     private String toVersion;
 
+    @Nullable
+    private String metadataPattern;
+
     private VersionComparator versionComparator;
 
     public void setGroupId(String groupId) {
@@ -45,17 +49,21 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
         this.toVersion = toVersion;
     }
 
+    public void setMetadataPattern(@Nullable String metadataPattern) {
+        this.metadataPattern = metadataPattern;
+    }
+
     @Override
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId))
                 .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion));
+                .and(Semver.validate(toVersion, metadataPattern));
     }
 
     @Override
     public Maven visitPom(Maven.Pom pom) {
-        versionComparator = Semver.validate(toVersion).getValue();
+        versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
         return super.visitPom(pom);
     }
 
@@ -65,9 +73,10 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
 
         List<String> newerVersions = p.getModel().getModuleVersion().getNewerVersions();
 
+        LatestRelease latestRelease = new LatestRelease(metadataPattern);
         Optional<String> newerVersion = newerVersions.stream()
                 .filter(v -> versionComparator.isValid(v))
-                .filter(v -> LatestRelease.INSTANCE.compare(parent.getModel().getModuleVersion().getVersion(), v) < 0)
+                .filter(v -> latestRelease.compare(parent.getModel().getModuleVersion().getVersion(), v) < 0)
                 .max(versionComparator);
 
         if (newerVersion.isPresent()) {
