@@ -47,7 +47,7 @@ public class ParentModelResolver implements ModelResolver {
     private final RepositorySystem repositorySystem;
     private final RepositorySystemSession repositorySystemSession;
     private final List<RemoteRepository> remoteRepositories;
-    private boolean resolveNonProjectParents;
+    private final boolean resolveNonProjectParents;
 
     public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession,
                                List<RemoteRepository> remoteRepositories, boolean resolveNonProjectParents) {
@@ -74,7 +74,8 @@ public class ParentModelResolver implements ModelResolver {
 
             pomArtifact = repositorySystem.resolveArtifact(repositorySystemSession, artifactRequest).getArtifact();
         } catch (ArtifactResolutionException e) {
-            throw new UnresolvableModelException(e.getMessage(), groupId, artifactId, version, e);
+            logger.error("unable to resolve model", e);
+            return new UnresolvedModelSource(groupId, artifactId, version);
         }
 
         return new FileModelSource(pomArtifact.getFile());

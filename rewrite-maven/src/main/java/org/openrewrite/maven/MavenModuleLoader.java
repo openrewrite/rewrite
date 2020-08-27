@@ -344,7 +344,7 @@ class MavenModuleLoader {
 
                 logger.debug("artifact {} resolved to {}", artifact, artifact.getFile());
             } catch (DependencyCollectionException e) {
-                logger.warn("error collecting dependencies", e);
+                logger.debug("error collecting dependencies", e);
             }
         }
 
