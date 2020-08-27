@@ -19,7 +19,7 @@ import java.util.Comparator;
 import java.util.regex.Pattern;
 
 public interface VersionComparator extends Comparator<String> {
-    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?");
+    Pattern RELEASE_PATTERN = Pattern.compile("(\\d+)(?:\\.(\\d+))?(?:\\.(\\d+))?(?:[-+].*)?");
 
     boolean isValid(String version);
 }

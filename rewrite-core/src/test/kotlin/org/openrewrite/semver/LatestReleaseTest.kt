@@ -52,4 +52,9 @@ class LatestReleaseTest {
         assertThat(latestRelease.compare("1.1", "1.1.1")).isLessThan(0)
         assertThat(latestRelease.compare("1", "1.1")).isLessThan(0)
     }
+
+    @Test
+    fun guavaVariants() {
+        assertThat(latestRelease.compare("25.0-jre", "29.0-jre")).isLessThan(0)
+    }
 }
