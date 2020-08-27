@@ -159,10 +159,11 @@ public class Environment {
                             recipeConfiguration.getName(),
                             it -> !recipesConfigurations.containsKey(it)));
 
-            if (validated.isInvalid()) {
-                throw new ValidationException(validated);
+            if(validated.isInvalid()) {
+                logger.warn(validated.toString());
+            } else {
+                recipesConfigurations.put(recipeConfiguration.getName(), recipeConfiguration);
             }
-            recipesConfigurations.put(recipeConfiguration.getName(), recipeConfiguration);
             return this;
         }
 
