@@ -42,12 +42,12 @@ interface GenerateSetterTest : RefactorVisitorTest {
                  
                 class A {
                     String foo;
+                    
+                    String bar;
                 
                     public void setFoo(String value) {
                         foo = value;
                     }
-                    
-                    String bar;
                 }
             """.trimIndent()
     )

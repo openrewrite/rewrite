@@ -172,4 +172,8 @@ public class StringUtils {
         return Character.toUpperCase(value.charAt(0)) +
                 value.substring(1);
     }
+
+    public static String uncapitalize(String value) {
+        return Character.toLowerCase(value.charAt(0)) + value.substring(1);
+    }
 }

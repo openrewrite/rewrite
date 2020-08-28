@@ -154,11 +154,19 @@ public class TreeBuilder {
         return new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
     }
 
-    public static J.ClassDecl buildClassDeclaration(JavaParser parser,
-                                                    J.ClassDecl insertionScope,
-                                                    String classDeclarationSnippet,
-                                                    JavaType... types) {
-        return (J.ClassDecl) buildDeclaration(parser, insertionScope, classDeclarationSnippet, types);
+    public static J.ClassDecl buildInnerClassDeclaration(
+            JavaParser parser,
+            J.ClassDecl insertionScope,
+            String classDeclarationSnippet,
+            JavaType... types
+    ) {
+        J.ClassDecl cd = (J.ClassDecl) buildDeclaration(parser, insertionScope, classDeclarationSnippet, types);
+        JavaType.Class clazz = cd.getType();
+        assert insertionScope.getType() != null;
+        String fullyQualifiedType = insertionScope.getType().getFullyQualifiedName() + "." + cd.getSimpleName();
+        assert clazz != null;
+        JavaType.Class newClazz = JavaType.Class.build(fullyQualifiedType, clazz.getMembers(), clazz.getTypeParameters(), clazz.getInterfaces(), clazz.getConstructors(), clazz.getSupertype());
+        return cd.withType(newClazz);
     }
 
     public static J.VariableDecls buildFieldDeclaration(JavaParser parser,

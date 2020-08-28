@@ -905,6 +905,7 @@ public interface J extends Serializable, Tree {
         @Getter
         Block<J> body;
 
+        @With
         @Getter
         @Nullable
         JavaType.Class type;

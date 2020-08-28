@@ -42,12 +42,12 @@ interface GenerateGetterTest : RefactorVisitorTest {
                  
                 class A {
                     String foo;
+                    
+                    String bar;
                 
                     public String getFoo() {
                         return foo;
                     }
-                    
-                    String bar;
                 }
             """.trimIndent()
     )

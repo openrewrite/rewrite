@@ -71,62 +71,64 @@ public class GenerateSetter extends JavaRefactorVisitor {
                     .filter(field -> field.getVars().stream()
                             .anyMatch(var -> this.field.equals(var.getSimpleName())))
                     .findAny()
-                    .ifPresent(field -> {
-                        // If there's already a setter method do nothing
-                        JavaType.FullyQualified fieldType = ((JavaType.FullyQualified) field.getVars().get(0).getType());
-                        assert fieldType != null;
-                        MethodMatcher setterMatcher = new MethodMatcher(
-                                type.getFullyQualifiedName() + " set" + capitalize(this.field) + "(" + fieldType.getFullyQualifiedName() + ")");
-                        boolean setterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
-                        if(!setterAlreadyExists) {
-                            andThen(new GenerateSetter.Scoped(field));
-                        }
-                    });
+                    .ifPresent(field -> andThen(new GenerateSetter.Scoped(classDecl, field)));
         }
         return super.visitClassDecl(classDecl);
     }
 
     public static class Scoped extends JavaRefactorVisitor {
+        private final J.ClassDecl clazz;
         private final J.VariableDecls field;
 
-        public Scoped(J.VariableDecls field) {
+        public Scoped(J.ClassDecl clazz, J.VariableDecls field) {
             setCursoringOn();
             this.field = field;
+            this.clazz = clazz;
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
             J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
-
-            for(int i = 0; i < cd.getFields().size(); i++) {
-                if(field.isScope(cd.getFields().get(i))) {
-                    J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
-                    assert cu != null;
-                    JavaParser jp = JavaParser.fromJavaVersion()
-                            .styles(cu.getStyles())
-                            .build();
-                    J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
-                    String fieldName = fieldVar.getSimpleName();
-
-                    assert fieldVar.getType() != null;
-                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
-
-                    assert field.getTypeExpr() != null;
-                    J.MethodDecl setMethod = TreeBuilder.buildMethodDeclaration(jp,
-                            classDecl,
-                            "public void set" + capitalize(fieldName) + "("+ field.getTypeExpr().print().trim() +" value)" + " {\n" +
-                                    "    " + ((fieldName.equals("value")) ? "this.value" : fieldName) + " = value;\n" +
-                                    "}\n",
-                            type);
-                    andThen(new AutoFormat(setMethod));
-
-                    J.Block<J> body = cd.getBody();
-                    List<J> statements = new ArrayList<>(body.getStatements());
-                    statements.add(i + 1, setMethod);
-                    cd = cd.withBody(body.withStatements(statements));
-                    break;
-                }
+            if(!clazz.isScope(cd)) {
+                return cd;
             }
+            assert field.getTypeExpr() != null;
+            assert clazz.getType() != null;
+            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+            String fieldName = fieldVar.getSimpleName();
+            JavaType.FullyQualified fieldType = ((JavaType.FullyQualified) fieldVar.getType());
+            MethodMatcher setterMatcher = new MethodMatcher(
+                    clazz.getType().getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + fieldType.getFullyQualifiedName() + ")");
+
+            boolean setterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
+            if (setterAlreadyExists) {
+                return cd;
+            }
+            boolean isMissingTargetField = !cd.getFields().stream().filter(field::isScope).findAny().isPresent();
+            if (isMissingTargetField) {
+                return cd;
+            }
+
+            J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+            assert cu != null;
+            JavaParser jp = JavaParser.fromJavaVersion()
+                    .styles(cu.getStyles())
+                    .build();
+
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
+            J.MethodDecl setMethod = TreeBuilder.buildMethodDeclaration(jp,
+                    classDecl,
+                    "public void set" + capitalize(fieldName) + "(" + field.getTypeExpr().print().trim() + " value)" + " {\n" +
+                            "    " + ((fieldName.equals("value")) ? "this.value" : fieldName) + " = value;\n" +
+                            "}\n",
+                    type);
+            andThen(new AutoFormat(setMethod));
+
+            J.Block<J> body = cd.getBody();
+            List<J> statements = new ArrayList<>(body.getStatements());
+            statements.add(setMethod);
+            cd = cd.withBody(body.withStatements(statements));
+
             return cd;
         }
     }

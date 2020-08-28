@@ -71,60 +71,66 @@ public class GenerateGetter extends JavaRefactorVisitor {
                     .filter(field -> field.getVars().stream()
                             .anyMatch(var -> this.field.equals(var.getSimpleName())))
                     .findAny()
-                    .ifPresent(field -> {
-                        // If there's already a getter method do nothing
-                        MethodMatcher getterMatcher = new MethodMatcher(type.getFullyQualifiedName() + " get" + capitalize(this.field) + "()");
-                        boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
-                        if(!getterAlreadyExists) {
-                            andThen(new Scoped(field));
-                        }
-                    });
+                    .ifPresent(field -> andThen(new Scoped(classDecl, field)));
         }
         return super.visitClassDecl(classDecl);
     }
 
     public static class Scoped extends JavaRefactorVisitor {
+        private final J.ClassDecl clazz;
         private final J.VariableDecls field;
 
-        public Scoped(J.VariableDecls field) {
+        public Scoped(J.ClassDecl clazz, J.VariableDecls field) {
             setCursoringOn();
             this.field = field;
+            this.clazz = clazz;
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
             J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
-
-            for(int i = 0; i < cd.getFields().size(); i++) {
-                if(field.isScope(cd.getFields().get(i))) {
-                    J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
-                    assert cu != null;
-                    JavaParser jp = JavaParser.fromJavaVersion()
-                            .styles(cu.getStyles())
-                            .build();
-
-                    J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
-                    String fieldName = fieldVar.getSimpleName();
-
-                    assert fieldVar.getType() != null;
-                    JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
-
-                    assert field.getTypeExpr() != null;
-                    J.MethodDecl getMethod = TreeBuilder.buildMethodDeclaration(jp,
-                            classDecl,
-                            "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
-                                    "    return " + fieldName + ";\n" +
-                                    "}\n",
-                            type);
-                    andThen(new AutoFormat(getMethod));
-
-                    J.Block<J> body = cd.getBody();
-                    List<J> statements = new ArrayList<>(body.getStatements());
-                    statements.add(i + 1, getMethod);
-                    cd = cd.withBody(body.withStatements(statements));
-                    break;
-                }
+            if(!clazz.isScope(cd)) {
+                return cd;
             }
+
+            assert field.getTypeExpr() != null;
+            assert clazz.getType() != null;
+            String simpleFieldName = field.getVars().get(0).getSimpleName();
+            MethodMatcher getterMatcher = new MethodMatcher(clazz.getType().getFullyQualifiedName() + " get" + capitalize(simpleFieldName) + "()");
+            boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
+            if(getterAlreadyExists) {
+                return cd;
+            }
+            boolean isMissingTargetField = !cd.getFields().stream().filter(field::isScope).findAny().isPresent();
+            if(isMissingTargetField) {
+                return cd;
+            }
+
+            J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
+            assert cu != null;
+            JavaParser jp = JavaParser.fromJavaVersion()
+                    .styles(cu.getStyles())
+                    .build();
+
+            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+            String fieldName = fieldVar.getSimpleName();
+
+            assert fieldVar.getType() != null;
+            JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
+
+            J.MethodDecl getMethod = TreeBuilder.buildMethodDeclaration(jp,
+                    classDecl,
+                    "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
+                            "    return " + fieldName + ";\n" +
+                            "}\n",
+                    type);
+            andThen(new AutoFormat(getMethod));
+
+            J.Block<J> body = cd.getBody();
+            List<J> statements = new ArrayList<>(body.getStatements());
+            statements.add(getMethod);
+            cd = cd.withBody(body.withStatements(statements));
+
             return cd;
         }
     }
