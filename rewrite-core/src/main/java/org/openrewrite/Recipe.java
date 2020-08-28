@@ -15,6 +15,9 @@
  */
 package org.openrewrite;
 
+import java.util.Set;
+import java.util.regex.Pattern;
+
 public interface Recipe {
     String getName();
 
@@ -26,7 +29,10 @@ public interface Recipe {
         return visitor;
     }
 
+    Set<Pattern> getInclude();
+    Set<Pattern> getExclude();
+
     enum FilterReply {
-        ACCEPT, DENY, NEUTRAL;
+        ACCEPT, DENY, NEUTRAL
     }
 }

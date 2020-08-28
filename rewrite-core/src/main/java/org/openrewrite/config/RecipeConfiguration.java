@@ -51,6 +51,10 @@ public class RecipeConfiguration {
         return name;
     }
 
+    public Set<Pattern> getInclude() { return this.include; }
+
+    public Set<Pattern> getExclude() { return this.exclude; }
+
     public void setName(String name) {
         Validated validated = Validated.notBlank("name", name)
                 .and(Validated.test("name",
@@ -124,6 +128,12 @@ public class RecipeConfiguration {
                 }
                 return visitor;
             }
+
+            @Override
+            public Set<Pattern> getInclude() { return include; }
+
+            @Override
+            public Set<Pattern> getExclude() { return exclude; }
         };
     }
 
