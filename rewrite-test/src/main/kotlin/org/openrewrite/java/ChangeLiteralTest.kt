@@ -82,7 +82,7 @@ interface ChangeLiteralTest {
 
     private fun List<J.MethodInvocation>.changeLiterals() = flatMap { meth ->
         meth.args.args.map { exp ->
-            ChangeLiteral(exp) { s ->
+            ChangeLiteral.Scoped(exp) { s ->
                 s?.toString()?.replace("%s", "{}") ?: s
             }
         }

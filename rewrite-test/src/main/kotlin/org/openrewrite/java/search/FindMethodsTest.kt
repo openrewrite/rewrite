@@ -21,7 +21,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 
-interface FindMethodTest {
+interface FindMethodsTest {
 
     @Test
     fun findStaticMethodCalls(jp: JavaParser) {
@@ -31,9 +31,9 @@ interface FindMethodTest {
                Object o = Collections.emptyList();
             }
         """)[0]
-        
+
         val m = a.classes[0].findMethodCalls("java.util.Collections emptyList()").first()
-        
+
         assertEquals("emptyList", m.simpleName)
         assertEquals("Collections.emptyList()", m.printTrimmed())
     }

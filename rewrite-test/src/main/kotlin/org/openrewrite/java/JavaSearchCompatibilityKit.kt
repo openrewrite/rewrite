@@ -33,7 +33,7 @@ abstract class JavaSearchCompatibilityKit {
     inner class FindInheritedFieldsTck: FindInheritedFieldsTest
 
     @Nested
-    inner class FindMethodTck: FindMethodTest
+    inner class FindMethodTck: FindMethodsTest
 
     @Nested
     inner class FindReferencesToVariableTck: FindReferencesToVariableTest
