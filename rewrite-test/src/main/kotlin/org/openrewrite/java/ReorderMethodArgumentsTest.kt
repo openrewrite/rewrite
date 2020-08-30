@@ -46,7 +46,7 @@ interface ReorderMethodArgumentsTest {
                 .whenVisitedByMany { cu ->
                     val foos = cu.findMethodCalls("a.A foo(..)")
                     listOf(
-                            ChangeLiteral(foos[0].args.args.first()) { "anotherstring" },
+                            ChangeLiteral.Scoped(foos[0].args.args.first()) { "anotherstring" },
                             ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf())
                     )
                 }
