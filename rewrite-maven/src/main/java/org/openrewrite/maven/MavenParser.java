@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class MavenParser implements Parser<Maven.Pom> {
+public class    MavenParser implements Parser<Maven.Pom> {
     private final XmlParser xmlParser = new XmlParser();
     private final boolean resolveDependencies;
     private final boolean resolveNonProjectParents;

@@ -137,9 +137,7 @@ public class AddImport extends JavaRefactorVisitor {
         imports.add(importToAdd);
         cu = cu.withImports(imports);
 
-        OrderImports orderImports = cu.getStyle(ImportLayoutStyle.class)
-                .map(ImportLayoutStyle::orderImports)
-                .orElse(OrderImports.DEFAULT);
+        OrderImports orderImports = new OrderImports();
         orderImports.setRemoveUnused(false);
         andThen(orderImports);
 

@@ -20,7 +20,6 @@ import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.LinkedHashSet;
@@ -68,8 +67,6 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
         @Nullable
         private final JavaType.Class type;
 
-        private OrderImports orderImports;
-
         public Scoped(J.MethodInvocation scope, J.VariableDecls.NamedVar namedVar) {
             this(scope, namedVar.getSimpleName(), TypeUtils.asClass(namedVar.getType()));
         }
@@ -86,15 +83,6 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu) {
-            orderImports = cu.getStyle(ImportLayoutStyle.class)
-                    .map(ImportLayoutStyle::orderImports)
-                    .orElse(OrderImports.DEFAULT);
-
-            return super.visitCompilationUnit(cu);
-        }
-
-        @Override
         public J visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method)) {
                 Expression select = method.getSelect();
@@ -106,7 +94,7 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
                     methodType = method.getType().withDeclaringType(this.type).withFlags(flags);
                 }
 
-                andThen(orderImports);
+                andThen(new OrderImports());
 
                 return method
                         .withSelect(J.Ident.build(randomId(), variable, type, select == null ? Formatting.EMPTY : select.getFormatting()))

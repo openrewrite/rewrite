@@ -17,9 +17,9 @@ package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
+import org.openrewrite.java.search.FindReferencedTypes;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.search.FindReferencedTypes;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -29,72 +29,74 @@ import static org.openrewrite.Tree.randomId;
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
  */
-public class DeleteStatement extends JavaRefactorVisitor {
-    private final Statement statement;
+public class DeleteStatement {
+    public static class Scoped extends JavaRefactorVisitor {
+        private final Statement statement;
 
-    public DeleteStatement(Statement statement) {
-        this.statement = statement;
-    }
-
-    @Override
-    public J visitIf(J.If iff) {
-        J.If i = refactor(iff, super::visitIf);
-
-        if (statement.isScope(i.getThenPart())) {
-            i = i.withThenPart(emptyBlock());
-        } else if (i.getElsePart() != null && statement.isScope(i.getElsePart())) {
-            i = i.withElsePart(i.getElsePart().withStatement(emptyBlock()));
+        public Scoped(Statement statement) {
+            this.statement = statement;
         }
 
-        return i;
-    }
+        @Override
+        public J visitIf(J.If iff) {
+            J.If i = refactor(iff, super::visitIf);
 
-    @Override
-    public J visitForLoop(J.ForLoop forLoop) {
-        return statement.isScope(forLoop.getBody()) ? forLoop.withBody(emptyBlock()) :
-                super.visitForLoop(forLoop);
-    }
+            if (statement.isScope(i.getThenPart())) {
+                i = i.withThenPart(emptyBlock());
+            } else if (i.getElsePart() != null && statement.isScope(i.getElsePart())) {
+                i = i.withElsePart(i.getElsePart().withStatement(emptyBlock()));
+            }
 
-    @Override
-    public J visitForEachLoop(J.ForEachLoop forEachLoop) {
-        return statement.isScope(forEachLoop.getBody()) ? forEachLoop.withBody(emptyBlock()) :
-                super.visitForEachLoop(forEachLoop);
-    }
-
-    @Override
-    public J visitWhileLoop(J.WhileLoop whileLoop) {
-        return statement.isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
-                super.visitWhileLoop(whileLoop);
-    }
-
-    @Override
-    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop) {
-        return statement.isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
-                super.visitDoWhileLoop(doWhileLoop);
-    }
-
-    @Override
-    public J visitBlock(J.Block<J> block) {
-        J.Block<J> b = refactor(block, super::visitBlock);
-
-        if (block.getStatements().stream().anyMatch(statement::isScope)) {
-            b = b.withStatements(b.getStatements().stream()
-                    .filter(s -> !statement.isScope(s))
-                    .collect(toList()));
+            return i;
         }
 
-        return b;
-    }
-
-    @Override
-    public J visitTree(Tree tree) {
-        if (statement.isScope(tree)) {
-            new FindReferencedTypes().visit(tree).forEach(this::maybeRemoveImport);
+        @Override
+        public J visitForLoop(J.ForLoop forLoop) {
+            return statement.isScope(forLoop.getBody()) ? forLoop.withBody(emptyBlock()) :
+                    super.visitForLoop(forLoop);
         }
-        return super.visitTree(tree);
-    }
 
-    private J.Block<J> emptyBlock() {
-        return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, new J.Block.End(randomId(), format("")));
+        @Override
+        public J visitForEachLoop(J.ForEachLoop forEachLoop) {
+            return statement.isScope(forEachLoop.getBody()) ? forEachLoop.withBody(emptyBlock()) :
+                    super.visitForEachLoop(forEachLoop);
+        }
+
+        @Override
+        public J visitWhileLoop(J.WhileLoop whileLoop) {
+            return statement.isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
+                    super.visitWhileLoop(whileLoop);
+        }
+
+        @Override
+        public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop) {
+            return statement.isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
+                    super.visitDoWhileLoop(doWhileLoop);
+        }
+
+        @Override
+        public J visitBlock(J.Block<J> block) {
+            J.Block<J> b = refactor(block, super::visitBlock);
+
+            if (block.getStatements().stream().anyMatch(statement::isScope)) {
+                b = b.withStatements(b.getStatements().stream()
+                        .filter(s -> !statement.isScope(s))
+                        .collect(toList()));
+            }
+
+            return b;
+        }
+
+        @Override
+        public J visitTree(Tree tree) {
+            if (statement.isScope(tree)) {
+                new FindReferencedTypes().visit(tree).forEach(this::maybeRemoveImport);
+            }
+            return super.visitTree(tree);
+        }
+
+        private J.Block<J> emptyBlock() {
+            return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, new J.Block.End(randomId(), format("")));
+        }
     }
 }

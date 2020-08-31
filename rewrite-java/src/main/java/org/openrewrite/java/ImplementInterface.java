@@ -28,43 +28,44 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
-public class ImplementInterface extends JavaRefactorVisitor {
-    private final J.ClassDecl scope;
-    private final String interfaze;
-    private final JavaType.Class interfaceType;
+public class ImplementInterface {
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.ClassDecl scope;
+        private final String interfaze;
+        private final JavaType.Class interfaceType;
 
-    public ImplementInterface(J.ClassDecl scope, String interfaze) {
-        this.scope = scope;
-        this.interfaze = interfaze;
-        this.interfaceType = JavaType.Class.build(interfaze);
-    }
-
-    @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("from", interfaze);
-    }
-
-    @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
-        J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
-        if (scope.isScope(classDecl) && (classDecl.getImplements() == null ||
-                classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
-            maybeAddImport(interfaze);
-
-            J.Ident lifeCycle = J.Ident.buildClassName(interfaze).withFormatting(format(" "));
-
-            if (c.getImplements() == null) {
-                c = c.withImplements(new J.ClassDecl.Implements(randomId(),
-                        singletonList(lifeCycle),
-                        format(" ")));
-            }
-            else {
-                List<TypeTree> implementings = new ArrayList<>(c.getImplements().getFrom());
-                implementings.add(0, lifeCycle);
-                c = c.withImplements(c.getImplements().withFrom(implementings));
-            }
+        public Scoped(J.ClassDecl scope, String interfaze) {
+            this.scope = scope;
+            this.interfaze = interfaze;
+            this.interfaceType = JavaType.Class.build(interfaze);
         }
 
-        return c;
+        @Override
+        public Iterable<Tag> getTags() {
+            return Tags.of("from", interfaze);
+        }
+
+        @Override
+        public J visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+            if (scope.isScope(classDecl) && (classDecl.getImplements() == null ||
+                    classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
+                maybeAddImport(interfaze);
+
+                J.Ident lifeCycle = J.Ident.buildClassName(interfaze).withFormatting(format(" "));
+
+                if (c.getImplements() == null) {
+                    c = c.withImplements(new J.ClassDecl.Implements(randomId(),
+                            singletonList(lifeCycle),
+                            format(" ")));
+                } else {
+                    List<TypeTree> implementings = new ArrayList<>(c.getImplements().getFrom());
+                    implementings.add(0, lifeCycle);
+                    c = c.withImplements(c.getImplements().withFrom(implementings));
+                }
+            }
+
+            return c;
+        }
     }
 }

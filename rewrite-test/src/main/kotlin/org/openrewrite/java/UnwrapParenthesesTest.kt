@@ -16,49 +16,62 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.tree.J
-import org.openrewrite.whenParsedBy
 
-interface UnwrapParenthesesTest {
+interface UnwrapParenthesesTest : RefactorVisitorTest {
     @Test
     fun unwrapAssignment(jp: JavaParser) {
-        """
-            public class A {
-                boolean a;
-                {
-                    a = (true);
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> UnwrapParentheses(((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign).assignment as J.Parentheses<*>) }
-                .isRefactoredTo("""
+        assertRefactored(
+                parser = jp,
+                before = """
+                    public class A {
+                        boolean a;
+                        {
+                            a = (true);
+                        }
+                    }
+                """,
+                visitorsMapped = listOf { a: J.CompilationUnit ->
+                    val parens = ((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign)
+                            .assignment as J.Parentheses<*>
+                    UnwrapParentheses.Scoped(parens)
+                },
+                after = """
                     public class A {
                         boolean a;
                         {
                             a = true;
                         }
                     }
-                """)
+                """
+        )
     }
 
     @Test
     fun unwrapIfCondition(jp: JavaParser) {
-        """
-            public class A {
-                {
-                    if((true)) {}
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> UnwrapParentheses(((a.classes[0].body.statements[0] as J.Block<*>).statements[0] as J.If).ifCondition.tree as J.Parentheses<*>) }
-                .isRefactoredTo("""
+        assertRefactored(
+                parser = jp,
+                before = """
+                    public class A {
+                        {
+                            if((true)) {}
+                        }
+                    }
+                """,
+                visitorsMapped = listOf { a ->
+                    val parens = ((a.classes[0].body.statements[0] as J.Block<*>)
+                            .statements[0] as J.If)
+                            .ifCondition.tree as J.Parentheses<*>
+                    UnwrapParentheses.Scoped(parens)
+                },
+                after = """
                     public class A {
                         {
                             if(true) {}
                         }
                     }
-                """)
+                """
+        )
     }
 }

@@ -32,7 +32,7 @@ interface ImplementInterfaceTest {
         """
                 .whenParsedBy(jp)
                 .whichDependsOn(b)
-                .whenVisitedByMapped { a -> ImplementInterface(a.classes[0], "b.B") }
+                .whenVisitedByMapped { a -> ImplementInterface.Scoped(a.classes[0], "b.B") }
                 .isRefactoredTo("""
                     import b.B;
                     
@@ -51,7 +51,7 @@ interface ImplementInterfaceTest {
         """
                 .whenParsedBy(jp)
                 .whichDependsOn(b)
-                .whenVisitedByMapped { a -> ImplementInterface(a.classes[0], "c.C") }
+                .whenVisitedByMapped { a -> ImplementInterface.Scoped(a.classes[0], "c.C") }
                 .isRefactoredTo("""
                     import b.B;
                     import c.C;

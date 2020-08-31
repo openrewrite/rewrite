@@ -31,7 +31,7 @@ interface GenerateConstructorUsingFieldsTest {
             }
         """
                 .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> GenerateConstructorUsingFields(jp, a.classes[0], a.classes[0].fields) }
+                .whenVisitedByMapped { a -> GenerateConstructorUsingFields.Scoped(jp, a.classes[0], a.classes[0].fields) }
                 .isRefactoredTo("""
                     public class UsersController {
                         private final UsersService usersService;
@@ -55,7 +55,7 @@ interface GenerateConstructorUsingFieldsTest {
             }
         """
                 .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> GenerateConstructorUsingFields(jp, a.classes[0], emptyList()) }
+                .whenVisitedByMapped { a -> GenerateConstructorUsingFields.Scoped(jp, a.classes[0], emptyList()) }
                 .isRefactoredTo("""
                     public class UsersController {
                     

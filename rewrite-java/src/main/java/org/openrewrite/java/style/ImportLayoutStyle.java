@@ -25,7 +25,7 @@ import java.util.Map;
 public class ImportLayoutStyle implements JavaStyle {
     private Map<String, Object> layout;
 
-    public OrderImports orderImports() {
+    public OrderImports.Layout orderImportLayout() {
         OrderImports.Layout.Builder builder = OrderImports.Layout.builder(
                 (Integer) layout.getOrDefault("classCountToUseStarImport", 5),
                 (Integer) layout.getOrDefault("nameCountToUseStarImport", 3));
@@ -54,16 +54,7 @@ public class ImportLayoutStyle implements JavaStyle {
             }
         }
 
-        OrderImports.Layout layout = builder.build();
-
-        OrderImports orderImports = new OrderImports();
-        orderImports.setLayout(layout);
-
-        return orderImports;
-    }
-
-    public Map<String, Object> getLayout() {
-        return this.layout;
+        return builder.build();
     }
 
     @JsonProperty("layout")

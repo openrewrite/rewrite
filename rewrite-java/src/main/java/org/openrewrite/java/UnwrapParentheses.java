@@ -18,32 +18,34 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.J;
 
-public class UnwrapParentheses extends JavaRefactorVisitor {
-    private final J.Parentheses<?> scope;
+public class UnwrapParentheses {
+    public static class Scoped extends JavaRefactorVisitor {
+        private final J.Parentheses<?> scope;
 
-    public UnwrapParentheses(J.Parentheses<?> scope) {
-        this.scope = scope;
-        setCursoringOn();
-    }
-
-    @Override
-    public <T extends J> J visitParentheses(J.Parentheses<T> parens) {
-        return scope.isScope(parens) && isUnwrappable(getCursor()) ?
-                parens.getTree().withFormatting(parens.getFormatting()) :
-                super.visitParentheses(parens);
-    }
-
-    public static boolean isUnwrappable(Cursor parensScope) {
-        if(!(parensScope.getTree() instanceof J.Parentheses)) {
-            return false;
+        public Scoped(J.Parentheses<?> scope) {
+            this.scope = scope;
+            setCursoringOn();
         }
-        J parent = parensScope.getParentOrThrow().getTree();
-        return !(parent instanceof J.DoWhileLoop.While ||
-                parent instanceof J.If ||
-                parent instanceof J.Switch ||
-                parent instanceof J.Synchronized ||
-                parent instanceof J.Try.Catch ||
-                parent instanceof J.TypeCast ||
-                parent instanceof J.WhileLoop);
+
+        @Override
+        public <T extends J> J visitParentheses(J.Parentheses<T> parens) {
+            return scope.isScope(parens) && isUnwrappable(getCursor()) ?
+                    parens.getTree().withFormatting(parens.getFormatting()) :
+                    super.visitParentheses(parens);
+        }
+
+        public static boolean isUnwrappable(Cursor parensScope) {
+            if (!(parensScope.getTree() instanceof J.Parentheses)) {
+                return false;
+            }
+            J parent = parensScope.getParentOrThrow().getTree();
+            return !(parent instanceof J.DoWhileLoop.While ||
+                    parent instanceof J.If ||
+                    parent instanceof J.Switch ||
+                    parent instanceof J.Synchronized ||
+                    parent instanceof J.Try.Catch ||
+                    parent instanceof J.TypeCast ||
+                    parent instanceof J.WhileLoop);
+        }
     }
 }

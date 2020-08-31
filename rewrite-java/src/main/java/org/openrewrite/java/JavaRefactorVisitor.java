@@ -89,7 +89,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         J.Binary b = refactor(binary, this::visitExpression);
         b = b.withLeft(refactor(b.getLeft()));
         return b.withRight(refactor(b.getRight()));
-    }   
+    }
 
     @Override
     public J visitBlock(J.Block<J> block) {
@@ -480,8 +480,8 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     }
 
     public void maybeUnwrapParentheses(Cursor parensCursor) {
-        if (UnwrapParentheses.isUnwrappable(parensCursor)) {
-            andThen(new UnwrapParentheses(parensCursor.getTree()));
+        if (UnwrapParentheses.Scoped.isUnwrappable(parensCursor)) {
+            andThen(new UnwrapParentheses.Scoped(parensCursor.getTree()));
         }
     }
 }

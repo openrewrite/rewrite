@@ -29,7 +29,7 @@ interface DeleteStatementTest {
             }
         """
                 .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> DeleteStatement(a.classes[0].findFields("java.util.List")[0]) }
+                .whenVisitedByMapped { a -> DeleteStatement.Scoped(a.classes[0].findFields("java.util.List")[0]) }
                 .isRefactoredTo("""
                     public class A {
                     }
