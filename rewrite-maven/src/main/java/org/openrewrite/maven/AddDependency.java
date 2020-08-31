@@ -37,7 +37,7 @@ import static org.openrewrite.Validated.required;
 /**
  * Adds a dependency if there is no dependency matching <code>groupId</code> and <code>artifactId</code>.
  * A matching dependency with a different version or scope does NOT have its version or scope updated.
- * Use {@link ChangeDependencyVersion} or {@link UpgradeVersion} in the case of a different version.
+ * Use {@link ChangeDependencyVersion} or {@link UpgradeDependencyVersion} in the case of a different version.
  * Use {@link ChangeDependencyScope} in the case of a different scope.
  * <p>
  * Places a new dependency as physically "near" to a group of similar dependencies as possible.
