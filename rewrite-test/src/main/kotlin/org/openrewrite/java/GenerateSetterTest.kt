@@ -18,28 +18,26 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.JavaType
 
 @ExtendWith(JavaParserResolver::class)
 interface GenerateSetterTest : RefactorVisitorTest {
 
     @Test
     fun generatesBasicSetter(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateSetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """ 
                 package org.example;
-                 
+                
                 class A {
                     String foo;
                     
                     String bar;
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
-                 
+                
                 class A {
                     String foo;
                     
@@ -49,27 +47,24 @@ interface GenerateSetterTest : RefactorVisitorTest {
                         foo = value;
                     }
                 }
-            """.trimIndent()
+            """
     )
 
     @Test
     fun generatesInnerClassSetter(jp: JavaParser) = assertRefactored( jp,
-            visitors = listOf(GenerateSetter().apply {
-                setField("foo")
-                setType("org.example.A.B")
-            }),
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A.B"), "foo")),
             before = """ 
                 package org.example;
-                 
+                
                 class A {
                     class B {
                         String foo;
                     }
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
-                 
+                
                 class A {
                     class B {
                         String foo;
@@ -79,15 +74,43 @@ interface GenerateSetterTest : RefactorVisitorTest {
                         }
                     }
                 }
-            """.trimIndent()
+            """
+    )
+
+    @Test
+    fun setterToInnerClass(jp: JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            before = """
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A {
+                    Inner foo;
+                    
+                    public static class Inner { }
+                }
+            """,
+            after = """
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A {
+                    Inner foo;
+                    
+                    public static class Inner { }
+                
+                    public void setFoo(Inner value) {
+                        foo = value;
+                    }
+                }
+            """
     )
 
     @Test
     fun doesNotDuplicateExistingSetter(jp: JavaParser) = assertUnchanged(jp,
-            visitors = listOf(GenerateSetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """
                 package org.example;
                  
@@ -98,22 +121,50 @@ interface GenerateSetterTest : RefactorVisitorTest {
                         foo = value;
                     }
                 }
-            """.trimIndent()
+            """
+    )
+
+    @Test
+    fun doesNotInterefereWithOverload(jp: JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            before = """ 
+                package org.example;
+                
+                class A {
+                    String foo;
+                
+                    public void setFoo(Integer foo) {
+                        this.foo = foo.toString();
+                    }
+                }
+            """,
+            after = """
+                package org.example;
+                
+                class A {
+                    String foo;
+                
+                    public void setFoo(Integer foo) {
+                        this.foo = foo.toString();
+                    }
+                
+                    public void setFoo(String value) {
+                        foo = value;
+                    }
+                }
+            """
     )
 
     @Test
     fun worksForFieldNamedValue(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateSetter().apply {
-                setField("value")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "value")),
             before = """ 
                 package org.example;
                  
                 class A {
                     String value;
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
                  
@@ -124,15 +175,12 @@ interface GenerateSetterTest : RefactorVisitorTest {
                         this.value = value;
                     }
                 }
-            """.trimIndent()
+            """
     )
 
     @Test
     fun handlesGenerics(jp:JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateSetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """ 
                 package org.example;
                 
@@ -141,7 +189,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
                 class A<T> {
                     List<T> foo;
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
                 
@@ -154,6 +202,6 @@ interface GenerateSetterTest : RefactorVisitorTest {
                         foo = value;
                     }
                 }
-            """.trimIndent()
+            """
     )
 }

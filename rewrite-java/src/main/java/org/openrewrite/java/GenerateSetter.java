@@ -15,15 +15,22 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Validated;
+import org.openrewrite.Formatting;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.java.tree.TreeBuilder;
+import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
+import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.capitalize;
 
 /**
@@ -42,86 +49,96 @@ import static org.openrewrite.internal.StringUtils.capitalize;
  *
  */
 public class GenerateSetter extends JavaRefactorVisitor {
-    private JavaType.Class type;
-    private String field;
-
-    /**
-     * @param enclosingClassType the fully qualified name of the class that the method should be added to
-     */
-    public void setType(String enclosingClassType) {
-        this.type = JavaType.Class.build(enclosingClassType);
-    }
-
-    /**
-     * @param field the name of the field to generate the method for
-     */
-    public void setField(String field) {
-        this.field = field;
-    }
-
-    @Override
-    public Validated validate() {
-        return Validated.required("type", type).and(Validated.required("field", field));
-    }
-
-    @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
-        if(TypeUtils.isOfClassType(classDecl.getType(), type.getFullyQualifiedName())) {
-            classDecl.getFields().stream()
-                    .filter(field -> field.getVars().stream()
-                            .anyMatch(var -> this.field.equals(var.getSimpleName())))
-                    .findAny()
-                    .ifPresent(field -> andThen(new GenerateSetter.Scoped(classDecl, field)));
-        }
-        return super.visitClassDecl(classDecl);
-    }
-
     public static class Scoped extends JavaRefactorVisitor {
-        private final J.ClassDecl clazz;
-        private final J.VariableDecls field;
+        private final JavaType.Class clazz;
+        private final String fieldName;
 
-        public Scoped(J.ClassDecl clazz, J.VariableDecls field) {
-            setCursoringOn();
-            this.field = field;
+        public Scoped(JavaType.Class clazz, String fieldName) {
+            this.fieldName = fieldName;
             this.clazz = clazz;
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
             J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
-            if(!clazz.isScope(cd)) {
+            JavaType.Class type = classDecl.getType();
+            if(type == null || !clazz.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                 return cd;
             }
-            assert field.getTypeExpr() != null;
-            assert clazz.getType() != null;
-            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
-            String fieldName = fieldVar.getSimpleName();
-            JavaType.FullyQualified fieldType = ((JavaType.FullyQualified) fieldVar.getType());
-            MethodMatcher setterMatcher = new MethodMatcher(
-                    clazz.getType().getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + fieldType.getFullyQualifiedName() + ")");
 
-            boolean setterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
+            J.VariableDecls field = cd.getFields().stream()
+                    .filter(it -> it.getVars().get(0).getSimpleName().equals(fieldName))
+                    .findAny()
+                    .orElse(null);
+            if (field == null) {
+                return cd;
+            }
+            assert field.getTypeAsClass() != null;
+            assert field.getTypeExpr() != null;
+
+            MethodMatcher setterMatcher = new MethodMatcher(
+                    type.getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + field.getTypeAsClass().getFullyQualifiedName() + ")");
+
+            boolean setterAlreadyExists = cd.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
             if (setterAlreadyExists) {
                 return cd;
             }
-            boolean isMissingTargetField = !cd.getFields().stream().filter(field::isScope).findAny().isPresent();
-            if (isMissingTargetField) {
-                return cd;
+
+            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+            JavaType fieldType = fieldVar.getType();
+
+            // TreeBuilder.buildMethodDeclaration() doesn't currently type-attribute inner classes correctly
+            // Manually construct the AST to get the types juuuust right
+            J.Ident valueArgument = J.Ident.build(randomId(), "value", fieldType, Formatting.format(" "));
+            Expression assignmentExp;
+            if(fieldVar.getSimpleName().equals("value")) {
+                assignmentExp = new J.FieldAccess(randomId(),
+                        J.Ident.build(randomId(),
+                                "this",
+                                cd.getType(),
+                                Formatting.EMPTY),
+                        fieldVar.getName(),
+                        fieldType,
+                        Formatting.format("", " "));
+            } else {
+                assignmentExp = fieldVar.getName().withFormatting(Formatting.format("", " "));
             }
-
-            J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
-            assert cu != null;
-            JavaParser jp = JavaParser.fromJavaVersion()
-                    .styles(cu.getStyles())
-                    .build();
-
-            JavaType.FullyQualified type = TypeUtils.asFullyQualified(fieldVar.getType());
-            J.MethodDecl setMethod = TreeBuilder.buildMethodDeclaration(jp,
-                    classDecl,
-                    "public void set" + capitalize(fieldName) + "(" + field.getTypeExpr().print().trim() + " value)" + " {\n" +
-                            "    " + ((fieldName.equals("value")) ? "this.value" : fieldName) + " = value;\n" +
-                            "}\n",
-                    type);
+            J.MethodDecl setMethod = new J.MethodDecl(randomId(),
+                    Collections.emptyList(),
+                    Collections.singletonList( new J.Modifier.Public(randomId(), Formatting.EMPTY)),
+                    null,
+                    JavaType.Primitive.Void.toTypeTree().withFormatting(Formatting.format(" ")),
+                    J.Ident.build(randomId(), "set" + capitalize(fieldName), null, Formatting.format(" ")),
+                    new J.MethodDecl.Parameters(randomId(),
+                            Collections.singletonList(new J.VariableDecls(randomId(),
+                                    Collections.emptyList(),
+                                    Collections.emptyList(),
+                                    field.getTypeExpr(),
+                                    null,
+                                    Collections.emptyList(),
+                                    Collections.singletonList(new J.VariableDecls.NamedVar(randomId(),
+                                            valueArgument,
+                                            Collections.emptyList(),
+                                            null,
+                                            fieldType,
+                                            Formatting.EMPTY)),
+                                    Formatting.EMPTY)),
+                            Formatting.EMPTY),
+                    null,
+                    new J.Block<>(randomId(),
+                            null,
+                            Collections.singletonList(new J.Assign(
+                                    randomId(),
+                                    assignmentExp,
+                                    valueArgument,
+                                    null,
+                                    Formatting.format("\n    ")
+                            )),
+                            Formatting.format(" "),
+                            new J.Block.End(randomId(), Formatting.format("\n"))),
+                    null,
+                    Formatting.format("\n\n")
+            );
             andThen(new AutoFormat(setMethod));
 
             J.Block<J> body = cd.getBody();
@@ -133,4 +150,3 @@ public class GenerateSetter extends JavaRefactorVisitor {
         }
     }
 }
-

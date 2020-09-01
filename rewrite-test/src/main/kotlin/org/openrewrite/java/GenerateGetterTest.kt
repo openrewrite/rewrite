@@ -18,16 +18,14 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.JavaType
 
 @ExtendWith(JavaParserResolver::class)
 interface GenerateGetterTest : RefactorVisitorTest {
 
     @Test
     fun generatesBasicGetter(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """ 
                 package org.example;
                  
@@ -36,7 +34,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
                     
                     String bar;
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
                  
@@ -49,15 +47,12 @@ interface GenerateGetterTest : RefactorVisitorTest {
                         return foo;
                     }
                 }
-            """.trimIndent()
+            """
     )
 
     @Test
-    fun generatesInnerClassGetter(jp: JavaParser) = assertRefactored( jp,
-            visitors = listOf(GenerateGetter().apply {
-                setField("foo")
-                setType("org.example.A.B")
-            }),
+    fun generatesInnerClassGetter(jp: JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A.B"), "foo")),
             before = """ 
                 package org.example;
                  
@@ -66,7 +61,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
                         String foo;
                     }
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
                  
@@ -79,15 +74,43 @@ interface GenerateGetterTest : RefactorVisitorTest {
                         }
                     }
                 }
-            """.trimIndent()
+            """
+    )
+
+    @Test
+    fun getterToInnerClass(jp: JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            before = """
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A {
+                    Inner foo;
+                    
+                    public static class Inner { }
+                }
+            """,
+            after = """
+                package org.example;
+                
+                import java.util.List;
+                 
+                class A {
+                    Inner foo;
+                    
+                    public static class Inner { }
+                
+                    public Inner getFoo() {
+                        return foo;
+                    }
+                }
+            """
     )
 
     @Test
     fun doesNotDuplicateExistingGetter(jp: JavaParser) = assertUnchanged(jp,
-            visitors = listOf(GenerateGetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """
                 package org.example;
                  
@@ -98,15 +121,12 @@ interface GenerateGetterTest : RefactorVisitorTest {
                         return foo;
                     }
                 }
-            """.trimIndent()
+            """
     )
 
     @Test
-    fun handlesGenerics(jp:JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter().apply {
-                setField("foo")
-                setType("org.example.A")
-            }),
+    fun handlesGenerics(jp: JavaParser) = assertRefactored(jp,
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
             before = """ 
                 package org.example;
                 
@@ -115,7 +135,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
                 class A<T> {
                     List<T> foo;
                 }
-            """.trimIndent(),
+            """,
             after = """
                 package org.example;
                 
@@ -128,6 +148,6 @@ interface GenerateGetterTest : RefactorVisitorTest {
                         return foo;
                     }
                 }
-            """.trimIndent()
+            """
     )
 }
