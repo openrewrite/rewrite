@@ -16,52 +16,56 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface GenerateConstructorUsingFieldsTest {
+interface GenerateConstructorUsingFieldsTest : RefactorVisitorTest {
     @Test
-    fun generateConstructorUsingFields(jp: JavaParser) {
-        """
-            public class UsersController {
-                private final UsersService usersService;
-                private final UsernameService usernameService;
-                
-                public User findUser(String name) {
+    fun generateConstructorUsingFields(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { cu ->
+                GenerateConstructorUsingFields.Scoped(jp, cu.classes[0], cu.classes[0].fields)
+            },
+            before = """
+                public class UsersController {
+                    private final UsersService usersService;
+                    private final UsernameService usernameService;
+                    
+                    public User findUser(String name) {
+                    }
                 }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> GenerateConstructorUsingFields.Scoped(jp, a.classes[0], a.classes[0].fields) }
-                .isRefactoredTo("""
-                    public class UsersController {
-                        private final UsersService usersService;
-                        private final UsernameService usernameService;
-                    
-                        public UsersController(UsersService usersService, UsernameService usernameService) {
-                            this.usersService = usersService;
-                            this.usernameService = usernameService;
-                        }
-                        
-                        public User findUser(String name) {
-                        }
+            """,
+            after = """
+                public class UsersController {
+                    private final UsersService usersService;
+                    private final UsernameService usernameService;
+                
+                    public UsersController(UsersService usersService, UsernameService usernameService) {
+                        this.usersService = usersService;
+                        this.usernameService = usernameService;
                     }
-                """)
-    }
+                    
+                    public User findUser(String name) {
+                    }
+                }
+            """
+    )
 
     @Test
-    fun emptyListOfFields(jp: JavaParser) {
-        """
-            public class UsersController {
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> GenerateConstructorUsingFields.Scoped(jp, a.classes[0], emptyList()) }
-                .isRefactoredTo("""
-                    public class UsersController {
-                    
-                        public UsersController() {
-                        }
+    fun emptyListOfFields(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { cu ->
+                GenerateConstructorUsingFields.Scoped(jp, cu.classes[0], emptyList())
+            },
+            before = """
+                public class UsersController {
+                }
+            """,
+            after = """
+                public class UsersController {
+                
+                    public UsersController() {
                     }
-                """)
-    }
+                }
+            """
+    )
 }

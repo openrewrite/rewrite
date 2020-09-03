@@ -16,91 +16,100 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
-import org.openrewrite.whenParsedBy
 
-interface ChangeFieldNameTest {
-
-    @Test
-    fun changeFieldName(jp: JavaParser) {
-        """
-            import java.util.List;
-            public class A {
-               List collection = null;
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> ChangeFieldName.Scoped(a.classes[0].type.asClass(), "collection", "list") }
-                .isRefactoredTo("""
-                    import java.util.List;
-                    public class A {
-                       List list = null;
-                    }
-                """)
-    }
+interface ChangeFieldNameTest: RefactorVisitorTest {
 
     @Test
-    fun changeFieldNameReferences(jp: JavaParser) {
-        """
-            public class B {
-               int n;
-               
-               {
-                   n = 1;
-                   n /= 2;
-                   if(n + 1 == 2) {}
-                   n++;
-               }
-               
-               public int foo(int n) {
-                   return n + this.n;
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
-                .isRefactoredTo("""
-                    public class B {
-                       int n1;
-                       
-                       {
-                           n1 = 1;
-                           n1 /= 2;
-                           if(n1 + 1 == 2) {}
-                           n1++;
-                       }
-                       
-                       public int foo(int n) {
-                           return n + this.n1;
-                       }
-                    }
-                """)
-    }
-
-    @Test
-    fun changeFieldNameReferencesInOtherClass(jp: JavaParser) {
-        """
-            public class A {
-                B b = new B();
-                {
-                    b.n = 1;
+    fun changeFieldName(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { cu: J.CompilationUnit ->
+                ChangeFieldName.Scoped(cu.classes[0].type.asClass(), "collection", "list")
+            },
+            before = """
+                import java.util.List;
+                public class A {
+                   List collection = null;
                 }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+            """,
+            after = """
+                import java.util.List;
+                public class A {
+                   List list = null;
+                }
+            """
+    )
+
+    @Test
+    fun changeFieldNameReferences(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(
+                    ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1")
+            ),
+            before = """
+                public class B {
+                   int n;
+                   
+                   {
+                       n = 1;
+                       n /= 2;
+                       if(n + 1 == 2) {}
+                       n++;
+                   }
+                   
+                   public int foo(int n) {
+                       return n + this.n;
+                   }
+                }
+            """,
+            after = """
+                public class B {
+                   int n1;
+                   
+                   {
+                       n1 = 1;
+                       n1 /= 2;
+                       if(n1 + 1 == 2) {}
+                       n1++;
+                   }
+                   
+                   public int foo(int n) {
+                       return n + this.n1;
+                   }
+                }
+            """
+    )
+
+    @Test
+    fun changeFieldNameReferencesInOtherClass(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     public class B {
                        int n;
                     }
-                """)
-                .whenVisitedBy(ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1"))
-                .isRefactoredTo("""
-                    public class A {
-                        B b = new B();
-                        {
-                            b.n1 = 1;
-                        }
+                """
+            ),
+            visitors = listOf(
+                ChangeFieldName.Scoped(JavaType.Class.build("B"), "n", "n1")
+            ),
+            before = """
+                public class A {
+                    B b = new B();
+                    {
+                        b.n = 1;
                     }
-                """)
-    }
+                }
+            """,
+            after = """
+                public class A {
+                    B b = new B();
+                    {
+                        b.n1 = 1;
+                    }
+                }
+            """
+    )
 }

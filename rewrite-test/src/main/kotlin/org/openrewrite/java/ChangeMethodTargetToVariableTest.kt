@@ -17,96 +17,101 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 
-interface ChangeMethodTargetToVariableTest {
+interface ChangeMethodTargetToVariableTest: RefactorVisitorTest {
 
     @Disabled("FIXME fix this recipe")
     @Test
-    fun refactorExplicitStaticToVariable(jp: JavaParser) {
-        """
-            import a.*;
-            
-            import b.B;
-            public class C {
-               A a;
-               public void test() {
-                   B.foo();
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(""" 
+    fun refactorExplicitStaticToVariable(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """ 
                     package a;
                     public class A {
                        public void foo() {}
                     }
-                """)
-                .whichDependsOn("""
+                """,
+                """
                     package b;
                     public class B {
                        public static void foo() {}
                     }
-                """)
-                .whenVisitedByMapped { cu ->
-                    val f = cu.classes[0].findFields("a.A")[0]
-                    ChangeMethodTargetToVariable().apply {
-                        setMethod("b.B foo()")
-                        setVariable(f.vars[0].simpleName)
-                    }
+                """
+            ),
+            visitorsMapped = listOf { cu: J.CompilationUnit ->
+                val f = cu.classes[0].findFields("a.A")[0]
+                ChangeMethodTargetToVariable().apply {
+                    setMethod("b.B foo()")
+                    setVariable(f.vars[0].simpleName)
                 }
-                .isRefactoredTo("""
-                    import a.A;
-                    public class C {
-                       A a;
-                       public void test() {
-                           a.foo();
-                       }
-                    }
-                """)
-    }
+            },
+            before =    """
+                import a.*;
+                
+                import b.B;
+                public class C {
+                   A a;
+                   public void test() {
+                       B.foo();
+                   }
+                }
+            """,
+            after = """
+                import a.A;
+                public class C {
+                   A a;
+                   public void test() {
+                       a.foo();
+                   }
+                }
+            """
+    )
 
     @Disabled("FIXME fix this recipe")
     @Test
-    fun refactorStaticImportToVariable(jp: JavaParser) {
-        """
-            import a.*;
-            import static b.B.*;
-            public class C {
-               A a;
-               public void test() {
-                   foo();
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorStaticImportToVariable(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void foo() {}
                     }
-                """)
-                .whichDependsOn("""
+                """,
+                """
                     package b;
                     public class B {
                        public static void foo() {}
                     }
-                """)
-                .whenVisitedByMapped { cu ->
-                    val f = cu.classes[0].findFields("a.A")[0]
-                    ChangeMethodTargetToVariable().apply {
-                        setMethod("b.B foo()")
-                        setVariable(f.vars[0].simpleName)
-                    }
+                """
+            ),
+            visitorsMapped = listOf { cu: J.CompilationUnit ->
+                val f = cu.classes[0].findFields("a.A")[0]
+                ChangeMethodTargetToVariable().apply {
+                    setMethod("b.B foo()")
+                    setVariable(f.vars[0].simpleName)
                 }
-                .isRefactoredTo("""
-                    import a.A;
-                    public class C {
-                       A a;
-                       public void test() {
-                           a.foo();
-                       }
-                    }
-                """)
-    }
+            },
+            before = """
+                import a.*;
+                import static b.B.*;
+                public class C {
+                   A a;
+                   public void test() {
+                       foo();
+                   }
+                }
+            """,
+            after = """
+                import a.A;
+                public class C {
+                   A a;
+                   public void test() {
+                       a.foo();
+                   }
+                }
+            """
+    )
 }

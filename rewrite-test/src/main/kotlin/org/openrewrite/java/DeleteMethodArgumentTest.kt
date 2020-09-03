@@ -15,12 +15,10 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.tree.J
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface DeleteMethodArgumentTest {
+interface DeleteMethodArgumentTest : RefactorVisitorTest {
     companion object {
         val b = """
             class B {
@@ -33,66 +31,72 @@ interface DeleteMethodArgumentTest {
     }
 
     @Test
-    fun deleteMiddleArgumentDeclarative(jp: JavaParser) {
-        "public class A {{ B.foo(0, 1, 2); }}"
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(DeleteMethodArgument().apply { setMethod("B foo(..)"); setIndex(1) })
-                .isRefactoredTo("public class A {{ B.foo(0, 2); }}")
-    }
+    fun deleteMiddleArgumentDeclarative(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                DeleteMethodArgument().apply { setMethod("B foo(..)"); setIndex(1) }
+            ),
+            before = "public class A {{ B.foo(0, 1, 2); }}",
+            after = "public class A {{ B.foo(0, 2); }}"
+    )
 
     @Test
-    fun deleteMiddleArgument(jp: JavaParser) {
-        "public class A {{ B.foo(0, 1, 2); }}"
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(DeleteMethodArgument().apply {
+    fun deleteMiddleArgument(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
-                })
-                .isRefactoredTo("public class A {{ B.foo(0, 2); }}")
-    }
+                }
+            ),
+            before = "public class A {{ B.foo(0, 1, 2); }}",
+            after = "public class A {{ B.foo(0, 2); }}"
+    )
 
     @Test
-    fun deleteArgumentsConsecutively(jp: JavaParser) {
-        "public class A {{ B.foo(0, 1, 2); }}"
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(DeleteMethodArgument().apply {
+    fun deleteArgumentsConsecutively(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
-                })
-                .whenVisitedBy(DeleteMethodArgument().apply {
+                },
+                DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(1)
-                })
-                .isRefactoredTo("public class A {{ B.foo(0); }}")
-    }
+                }
+            ),
+            before = "public class A {{ B.foo(0, 1, 2); }}",
+            after = "public class A {{ B.foo(0); }}"
+    )
 
     @Test
-    fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) {
-        "public class A {{ B.foo( ); }}"
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(DeleteMethodArgument().apply {
+    fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) = assertUnchanged(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(0)
-                })
-                .isUnchanged()
-    }
+                }
+            ),
+            before = "public class A {{ B.foo( ); }}"
+    )
 
     @Test
-    fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) {
-        val fixed = "public class A {{ B.foo(1); }}"
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(DeleteMethodArgument().apply {
+    fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                DeleteMethodArgument().apply {
                     setMethod("B foo(..)")
                     setIndex(0)
-                })
-                .isRefactoredTo("public class A {{ B.foo(); }}")
-                .fixed()[0]
-
-        assertTrue(fixed.findMethodCalls("B foo(..)").first().args.args[0] is J.Empty)
-    }
+                }
+            ),
+            before = "public class A {{ B.foo(1); }}",
+            after = "public class A {{ B.foo(); }}"
+    )
 }

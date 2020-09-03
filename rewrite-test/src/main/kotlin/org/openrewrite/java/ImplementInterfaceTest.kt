@@ -16,48 +16,52 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface ImplementInterfaceTest {
+interface ImplementInterfaceTest : RefactorVisitorTest {
     companion object {
         const val b = "package b;\ninterface B {}"
         const val c = "package c;\ninterface C {}"
     }
 
     @Test
-    fun firstImplementedInterface(jp: JavaParser) {
-        """
-            class A {
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedByMapped { a -> ImplementInterface.Scoped(a.classes[0], "b.B") }
-                .isRefactoredTo("""
-                    import b.B;
-                    
-                    class A implements B {
-                    }
-                """)
-    }
+    fun firstImplementedInterface(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitorsMapped = listOf { cu ->
+                ImplementInterface.Scoped(cu.classes[0], "b.B")
+            },
+            before = """
+                class A {
+                }
+            """,
+            after = """
+                import b.B;
+                
+                class A implements B {
+                }
+            """
+    )
 
     @Test
-    fun addAnImplementedInterface(jp: JavaParser) {
-        """
-            import b.B;
-            
-            class A implements B {
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedByMapped { a -> ImplementInterface.Scoped(a.classes[0], "c.C") }
-                .isRefactoredTo("""
-                    import b.B;
-                    import c.C;
-                    
-                    class A implements C, B {
-                    }
-                """)
-    }
+    fun addAnImplementedInterface(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitorsMapped = listOf { cu ->
+                ImplementInterface.Scoped(cu.classes[0], "c.C")
+            },
+            before = """
+                import b.B;
+                
+                class A implements B {
+                }
+            """,
+            after = """
+                import b.B;
+                import c.C;
+                
+                class A implements C, B {
+                }
+            """
+    )
 }

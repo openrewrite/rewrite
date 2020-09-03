@@ -15,95 +15,96 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import org.openrewrite.java.tree.Flag
-import org.openrewrite.java.tree.J
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface ChangeMethodTargetToStaticTest {
+interface ChangeMethodTargetToStaticTest: RefactorVisitorTest {
 
     @Test
-    fun refactorTargetToStatic(jp: JavaParser) {
-        val fixed = """
-            import a.*;
-            class C {
-               public void test() {
-                   new A().nonStatic();
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorTargetToStatic(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void nonStatic() {}
                     }
-                """)
-                .whichDependsOn("""
+                """,
+                """
                     package b;
                     public class B {
                        public static void foo() {}
                     }
-                """)
-                .whenVisitedBy(ChangeMethodTargetToStatic().apply {
+                """
+            ),
+            visitors = listOf(
+                ChangeMethodTargetToStatic().apply {
                     setMethod("a.A nonStatic()")
                     setTargetType("b.B")
-                })
-                .whenVisitedBy(ChangeMethodName().apply {
+                },
+                ChangeMethodName().apply {
                     setMethod("b.B nonStatic()")
                     name = "foo"
-                })
-                .isRefactoredTo("""
-                    import b.B;
-                    
-                    class C {
-                       public void test() {
-                           B.foo();
-                       }
-                    }
-                """)
-                .fixed()[0]
-
-        val refactoredInv = fixed.classes[0].methods[0].body!!.statements[0] as J.MethodInvocation
-        assertTrue(refactoredInv.type?.hasFlags(Flag.Static) ?: false)
-    }
+                }
+            ),
+            before = """
+                import a.*;
+                class C {
+                   public void test() {
+                       new A().nonStatic();
+                   }
+                }
+            """,
+            after = """
+                import b.B;
+                
+                class C {
+                   public void test() {
+                       B.foo();
+                   }
+                }
+            """
+    )
 
     @Test
-    fun refactorStaticTargetToStatic(jp: JavaParser) {
-        """
-            import static a.A.*;
-            class C {
-               public void test() {
-                   foo();
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorStaticTargetToStatic(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package b;
                     public class B {
                        public static void foo() {}
                     }
-                """)
-                .whichDependsOn("""
+                """,
+                """
                     package a;
                     public class A {
                        public static void foo() {}
                     }
-                """)
-                .whenVisitedBy(ChangeMethodTargetToStatic().apply {
+                """
+            ),
+            visitors = listOf(
+                ChangeMethodTargetToStatic().apply {
                     setMethod("a.A foo()")
                     setTargetType("b.B")
-                })
-                .isRefactoredTo("""
-                    import b.B;
-                    
-                    class C {
-                       public void test() {
-                           B.foo();
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                import static a.A.*;
+                class C {
+                   public void test() {
+                       foo();
+                   }
+                }
+            """,
+            after = """
+                import b.B;
+                
+                class C {
+                   public void test() {
+                       B.foo();
+                   }
+                }
+            """
+    )
 }

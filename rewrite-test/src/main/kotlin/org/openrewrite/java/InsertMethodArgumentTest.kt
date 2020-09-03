@@ -16,9 +16,9 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface InsertMethodArgumentTest {
+interface InsertMethodArgumentTest : RefactorVisitorTest {
     companion object {
         const val b = """
             class B {
@@ -44,50 +44,58 @@ interface InsertMethodArgumentTest {
     }
 
     @Test
-    fun insertArgumentDeclarative(jp: JavaParser) {
-        a.whenParsedBy(jp).whichDependsOn(b)
-                .whenVisitedBy(InsertMethodArgument().apply {
+    fun insertArgumentDeclarative(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                InsertMethodArgument().apply {
                     setMethod("B foo(String)")
                     setIndex(0)
                     setSource("\"0\"")
-                })
-                .isRefactoredTo("""
-                    class A {
-                       public void test() {
-                           B b = new B();
-                           b.foo();
-                           b.foo("0", "1");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = a,
+            after = """
+                class A {
+                   public void test() {
+                       B b = new B();
+                       b.foo();
+                       b.foo("0", "1");
+                   }
+                }
+            """
+    )
 
     @Test
-    fun insertArgument(jp: JavaParser) {
-        a.whenParsedBy(jp).whichDependsOn(b)
-                .whenVisitedBy(InsertMethodArgument().apply {
+    fun insertArgument(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                InsertMethodArgument().apply {
                     setMethod("B foo(String)")
                     setIndex(0)
                     setSource("\"0\"")
-                })
-                .whenVisitedBy(InsertMethodArgument().apply {
+                },
+                InsertMethodArgument().apply {
                     setMethod("B foo(String)")
                     setIndex(2)
                     setSource("\"2\"")
-                })
-                .whenVisitedBy(InsertMethodArgument().apply {
+                },
+                InsertMethodArgument().apply {
                     setMethod("B foo()")
                     setIndex(0)
                     setSource("\"0\"")
-                })
-                .isRefactoredTo("""
-                    class A {
-                       public void test() {
-                           B b = new B();
-                           b.foo("0");
-                           b.foo("0", "1", "2");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = a,
+            after = """
+                class A {
+                   public void test() {
+                       B b = new B();
+                       b.foo("0");
+                       b.foo("0", "1", "2");
+                   }
+                }
+            """
+    )
 }
