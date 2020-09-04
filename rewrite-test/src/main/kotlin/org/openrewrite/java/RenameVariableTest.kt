@@ -16,54 +16,57 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.tree.J
 import org.openrewrite.whenParsedBy
 
-interface RenameVariableTest {
+interface RenameVariableTest : RefactorVisitorTest {
     @Test
-    fun renameVariable(jp: JavaParser) {
-        """
-            public class B {
-               int n;
-            
-               {
-                   int n;
-                   n = 1;
-                   n /= 2;
-                   if(n + 1 == 2) {}
-                   n++;
-               }
-               
-               public int foo(int n) {
-                   return n + this.n;
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a ->
-                    val blockN = (a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.VariableDecls
+    fun renameVariable(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf(
+                { cu ->
+                    val blockN = (cu.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.VariableDecls
                     RenameVariable(blockN.vars[0], "n1")
-                }
-                .whenVisitedByMapped { a ->
-                    val paramN = (a.classes[0].methods[0]).params.params[0] as J.VariableDecls
+                },
+                { cu ->
+                    val paramN = (cu.classes[0].methods[0]).params.params[0] as J.VariableDecls
                     RenameVariable(paramN.vars[0], "n2")
                 }
-                .isRefactoredTo("""
-                    public class B {
+            ),
+            before = """
+                public class B {
+                   int n;
+                
+                   {
                        int n;
-                    
-                       {
-                           int n1;
-                           n1 = 1;
-                           n1 /= 2;
-                           if(n1 + 1 == 2) {}
-                           n1++;
-                       }
-                       
-                       public int foo(int n2) {
-                           return n2 + this.n;
-                       }
-                    }
-                """)
-    }
+                       n = 1;
+                       n /= 2;
+                       if(n + 1 == 2) {}
+                       n++;
+                   }
+                   
+                   public int foo(int n) {
+                       return n + this.n;
+                   }
+                }
+            """,
+            after = """
+                public class B {
+                   int n;
+                
+                   {
+                       int n1;
+                       n1 = 1;
+                       n1 /= 2;
+                       if(n1 + 1 == 2) {}
+                       n1++;
+                   }
+                   
+                   public int foo(int n2) {
+                       return n2 + this.n;
+                   }
+                }
+            """
+    )
 }

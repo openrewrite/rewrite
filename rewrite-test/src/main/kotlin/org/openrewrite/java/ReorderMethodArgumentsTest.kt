@@ -16,152 +16,158 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface ReorderMethodArgumentsTest {
+interface ReorderMethodArgumentsTest : RefactorVisitorTest {
 
     @Test
-    fun refactorReorderArguments(jp: JavaParser) {
-        """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo(
-                       "mystring",
-                       1,
-                       2
-                   );
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorReorderArguments(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void foo(String s, Integer m, Integer n) {}
                        public void foo(Integer n, Integer m, String s) {}
                     }
-                """)
-                .whenVisitedByMany { cu ->
-                    val foos = cu.findMethodCalls("a.A foo(..)")
-                    listOf(
-                            ChangeLiteral.Scoped(foos[0].args.args.first()) { "anotherstring" },
-                            ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf())
-                    )
+                """
+            ),
+            visitorsMappedToMany = listOf { cu ->
+                val foos = cu.findMethodCalls("a.A foo(..)")
+                listOf(
+                        ChangeLiteral.Scoped(foos[0].args.args.first()) { "anotherstring" },
+                        ReorderMethodArguments.Scoped(foos[0], arrayOf("n", "m", "s"), arrayOf())
+                )
+            },
+            before = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo(
+                           "mystring",
+                           1,
+                           2
+                       );
+                   }
                 }
-                .isRefactoredTo("""
-                    import a.*;
-                    public class B {
-                       A a;
-                       public void test() {
-                           a.foo(
-                               2,
-                               1,
-                               "anotherstring"
-                           );
-                       }
-                    }
-                """)
-    }
+            """,
+            after = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo(
+                           2,
+                           1,
+                           "anotherstring"
+                       );
+                   }
+                }
+            """
+    )
 
     @Test
-    fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) {
-        """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo("s", 0, 1);
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void foo(String arg0, Integer... arg1) {}
                        public void foo(Integer arg0, Integer arg1, String arg2) {}
                     }
-                """)
-                .whenVisitedBy(ReorderMethodArguments().apply {
+                """
+            ),
+            visitors = listOf(
+                ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("n", "s")
                     setOriginalOrder("s", "n")
-                })
-                .isRefactoredTo("""
-                    import a.*;
-                    public class B {
-                       A a;
-                       public void test() {
-                           a.foo(0, 1, "s");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo("s", 0, 1);
+                   }
+                }
+            """,
+            after = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo(0, 1, "s");
+                   }
+                }
+            """
+    )
 
     @Test
-    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) {
-        """
-            import a.*;
-            public class B {
-               A a;
-               public void test() {
-                   a.foo("mystring", 0, "a", "b");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void foo(String s, Integer n, Object... o) {}
                        public void bar(String s, Object... o) {}
                     }
-                """)
-                .whenVisitedBy(ReorderMethodArguments().apply {
+                """
+            ),
+            visitors = listOf(
+                ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("s", "o", "n")
-                })
-                .isRefactoredTo("""
-                    import a.*;
-                    public class B {
-                       A a;
-                       public void test() {
-                           a.foo("mystring", "a", "b", 0);
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo("mystring", 0, "a", "b");
+                   }
+                }
+            """,
+            after = """
+                import a.*;
+                public class B {
+                   A a;
+                   public void test() {
+                       a.foo("mystring", "a", "b", 0);
+                   }
+                }
+            """
+    )
 
     @Test
-    fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) {
-        """
-            import a.*;
-            public class B {
-               public void test() {
-                   new A().foo("mystring");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
+            jp,
+            dependencies = listOf(
+                """
                     package a;
                     public class A {
                        public void foo(String s, Object... o) {}
                     }
-                """)
-                .whenVisitedBy(ReorderMethodArguments().apply {
+                """
+            ),
+            visitors = listOf(
+                ReorderMethodArguments().apply {
                     setMethod("a.A foo(..)")
                     setOrder("o", "s")
-                })
-                .isRefactoredTo("""
-                    import a.*;
-                    public class B {
-                       public void test() {
-                           new A().foo("mystring");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                import a.*;
+                public class B {
+                   public void test() {
+                       new A().foo("mystring");
+                   }
+                }
+            """
+    )
 }

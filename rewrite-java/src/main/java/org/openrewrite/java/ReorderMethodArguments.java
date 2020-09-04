@@ -116,8 +116,9 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
                 for (Expression expression : reordered) {
                     reordered.set(i, expression.withFormatting(formattings.get(i++)));
                 }
-
-                return method.withArgs(method.getArgs().withArgs(reordered));
+                if(!method.getArgs().getArgs().equals(reordered)) {
+                    return method.withArgs(method.getArgs().withArgs(reordered));
+                }
             }
 
             return super.visitMethodInvocation(method);

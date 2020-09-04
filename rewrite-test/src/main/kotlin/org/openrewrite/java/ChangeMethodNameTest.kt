@@ -16,9 +16,9 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface ChangeMethodNameTest {
+interface ChangeMethodNameTest: RefactorVisitorTest {
     companion object {
         private val b: String = """
                 package com.abc;
@@ -33,216 +33,234 @@ interface ChangeMethodNameTest {
     }
 
     @Test
-    fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   new B().singleArg("boo");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply { setMethod("com.abc.B singleArg(String)"); setName("bar") })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           new B().bar("boo");
-                       }
-                    }
-                """)
-    }
+    fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply { setMethod("com.abc.B singleArg(String)"); setName("bar") }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().singleArg("boo");
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().bar("boo");
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   new B().singleArg("boo");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B singleArg(String)")
                     name = "bar"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           new B().bar("boo");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().singleArg("boo");
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().bar("boo");
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeMethodNameForMethodWithArrayArg(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   new B().arrArg(new String[] {"boo"});
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeMethodNameForMethodWithArrayArg(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B arrArg(String[])")
                     name = "bar"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           new B().bar(new String[] {"boo"});
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().arrArg(new String[] {"boo"});
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().bar(new String[] {"boo"});
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeMethodNameForMethodWithVarargArg(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   new B().varargArg("boo", "again");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeMethodNameForMethodWithVarargArg(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B varargArg(String...)")
                     name = "bar"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           new B().bar("boo", "again");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().varargArg("boo", "again");
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().bar("boo", "again");
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   new B().error();
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun changeMethodNameWhenMatchingAgainstMethodWithNameThatIsAnAspectjToken(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package com.abc;
                     class B {
                        public void error() {}
                        public void foo() {}
                     }
-                """)
-                .whenVisitedBy(ChangeMethodName().apply {
+                """
+            ),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B error()")
                     name = "foo"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           new B().foo();
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().error();
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       new B().foo();
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeMethodDeclarationForMethodWithSingleArg(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void foo(String s) {
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeMethodDeclarationForMethodWithSingleArg(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.A foo(String)")
                     name = "bar"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void bar(String s) {
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void foo(String s) {
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void bar(String s) {
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeStaticMethodTest(jp: JavaParser) {
-        """
-            package com.abc;
-            class A {
-               public void test() {
-                   B.static1("boo");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeStaticMethodTest(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B static1(String)")
                     name = "static2"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    class A {
-                       public void test() {
-                           B.static2("boo");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       B.static1("boo");
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                class A {
+                   public void test() {
+                       B.static2("boo");
+                   }
+                }
+            """
+    )
 
     /**
      * This test is known to be failing currently, ChangeMethodName() needs to be updated to handle this scenario
      */
     @Test
-    fun changeStaticImportTest(jp: JavaParser) {
-        """
-            package com.abc;
-            import static com.abc.B.static1;
-            class A {
-               public void test() {
-                   static1("boo");
-               }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedBy(ChangeMethodName().apply {
+    fun changeStaticImportTest(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitors = listOf(
+                ChangeMethodName().apply {
                     setMethod("com.abc.B static1(String)")
                     name = "static2"
-                })
-                .isRefactoredTo("""
-                    package com.abc;
-                    import static com.abc.B.static2;
-                    class A {
-                       public void test() {
-                           static2("boo");
-                       }
-                    }
-                """)
-    }
+                }
+            ),
+            before = """
+                package com.abc;
+                import static com.abc.B.static1;
+                class A {
+                   public void test() {
+                       static1("boo");
+                   }
+                }
+            """,
+            after = """
+                package com.abc;
+                import static com.abc.B.static2;
+                class A {
+                   public void test() {
+                       static2("boo");
+                   }
+                }
+            """
+    )
 }

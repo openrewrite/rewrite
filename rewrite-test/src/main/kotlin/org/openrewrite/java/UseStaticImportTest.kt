@@ -16,26 +16,14 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTest
 
-interface UseStaticImportTest {
+interface UseStaticImportTest : RefactorVisitorTest {
     @Test
-    fun replaceWithStaticImports(jp: JavaParser) {
-        """
-            package test;
-            
-            import asserts.Assert;
-            
-            class Test {
-                void test() {
-                    Assert.assertTrue(true);
-                    Assert.assertFalse(false);
-                    Assert.assertEquals(1, 2);
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn("""
+    fun replaceWithStaticImports(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                """
                     package asserts;
                     
                     public class Assert {
@@ -43,20 +31,36 @@ interface UseStaticImportTest {
                         public static void assertFalse(boolean b) {}
                         public static void assertEquals(int m, int n) {}
                     }
-                """)
-                .whenVisitedBy(UseStaticImport().apply { setMethod("asserts.Assert assert*(..)") })
-                .isRefactoredTo("""
-                    package test;
-                    
-                    import static asserts.Assert.*;
-                    
-                    class Test {
-                        void test() {
-                            assertTrue(true);
-                            assertFalse(false);
-                            assertEquals(1, 2);
-                        }
+                """
+            ),
+            visitors = listOf(
+                UseStaticImport().apply { setMethod("asserts.Assert assert*(..)") }
+            ),
+            before = """
+                package test;
+                
+                import asserts.Assert;
+                
+                class Test {
+                    void test() {
+                        Assert.assertTrue(true);
+                        Assert.assertFalse(false);
+                        Assert.assertEquals(1, 2);
                     }
-                """)
-    }
+                }
+            """,
+            after = """
+                package test;
+                
+                import static asserts.Assert.*;
+                
+                class Test {
+                    void test() {
+                        assertTrue(true);
+                        assertFalse(false);
+                        assertEquals(1, 2);
+                    }
+                }
+            """
+    )
 }

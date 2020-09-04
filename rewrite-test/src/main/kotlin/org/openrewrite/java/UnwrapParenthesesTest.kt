@@ -21,57 +21,53 @@ import org.openrewrite.java.tree.J
 
 interface UnwrapParenthesesTest : RefactorVisitorTest {
     @Test
-    fun unwrapAssignment(jp: JavaParser) {
-        assertRefactored(
-                parser = jp,
-                before = """
-                    public class A {
-                        boolean a;
-                        {
-                            a = (true);
-                        }
+    fun unwrapAssignment(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a: J.CompilationUnit ->
+                val parens = ((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign)
+                        .assignment as J.Parentheses<*>
+                UnwrapParentheses.Scoped(parens)
+            },
+            before = """
+                public class A {
+                    boolean a;
+                    {
+                        a = (true);
                     }
-                """,
-                visitorsMapped = listOf { a: J.CompilationUnit ->
-                    val parens = ((a.classes[0].body.statements[1] as J.Block<*>).statements[0] as J.Assign)
-                            .assignment as J.Parentheses<*>
-                    UnwrapParentheses.Scoped(parens)
-                },
-                after = """
-                    public class A {
-                        boolean a;
-                        {
-                            a = true;
-                        }
+                }
+            """,
+            after = """
+                public class A {
+                    boolean a;
+                    {
+                        a = true;
                     }
-                """
-        )
-    }
+                }
+            """
+    )
 
     @Test
-    fun unwrapIfCondition(jp: JavaParser) {
-        assertRefactored(
-                parser = jp,
-                before = """
-                    public class A {
-                        {
-                            if((true)) {}
-                        }
+    fun unwrapIfCondition(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                val parens = ((a.classes[0].body.statements[0] as J.Block<*>)
+                        .statements[0] as J.If)
+                        .ifCondition.tree as J.Parentheses<*>
+                UnwrapParentheses.Scoped(parens)
+            },
+            before = """
+                public class A {
+                    {
+                        if((true)) {}
                     }
-                """,
-                visitorsMapped = listOf { a ->
-                    val parens = ((a.classes[0].body.statements[0] as J.Block<*>)
-                            .statements[0] as J.If)
-                            .ifCondition.tree as J.Parentheses<*>
-                    UnwrapParentheses.Scoped(parens)
-                },
-                after = """
-                    public class A {
-                        {
-                            if(true) {}
-                        }
+                }
+            """,
+            after = """
+                public class A {
+                    {
+                        if(true) {}
                     }
-                """
-        )
-    }
+                }
+            """
+    )
 }

@@ -16,10 +16,10 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.tree.J
-import org.openrewrite.whenParsedBy
 
-interface ChangeLiteralTest {
+interface ChangeLiteralTest: RefactorVisitorTest {
     companion object {
         private val b: String = """
             package b;
@@ -30,55 +30,58 @@ interface ChangeLiteralTest {
     }
 
     @Test
-    fun changeStringLiteralArgument(jp: JavaParser) {
-        val a = """
-            import b.*;
-            class A {
-               public void test() {
-                   String s = "bar";
-                   new B().singleArg("foo (%s)" + s + 0L);
-               }
-            }
-        """.trimIndent()
-
-        a.whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedByMany { cu -> cu.findMethodCalls("b.B singleArg(String)").changeLiterals() }
-                .isRefactoredTo("""
-                    import b.*;
-                    class A {
-                       public void test() {
-                           String s = "bar";
-                           new B().singleArg("foo ({})" + s + 0L);
-                       }
-                    }
-                """)
-    }
+    fun changeStringLiteralArgument(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitorsMappedToMany = listOf { cu ->
+                cu.findMethodCalls("b.B singleArg(String)").changeLiterals()
+            },
+            before = """
+                import b.*;
+                class A {
+                   public void test() {
+                       String s = "bar";
+                       new B().singleArg("foo (%s)" + s + 0L);
+                   }
+                }
+            """,
+            after = """
+                import b.*;
+                class A {
+                   public void test() {
+                       String s = "bar";
+                       new B().singleArg("foo ({})" + s + 0L);
+                   }
+                }
+            """
+    )
 
     @Test
-    fun changeStringLiteralArgumentWithEscapableCharacters(jp: JavaParser) {
-        """
-            import b.*;
-            public class A {
-                B b;
-                public void test() {
-                    b.singleArg("mystring '%s'");
-                }
-            }
-        """
-                .whenParsedBy(jp)
-                .whichDependsOn(b)
-                .whenVisitedByMany { cu -> cu.findMethodCalls("b.B singleArg(..)").changeLiterals() }
-                .isRefactoredTo("""
-                    import b.*;
-                    public class A {
-                        B b;
-                        public void test() {
-                            b.singleArg("mystring '{}'");
-                        }
+    fun changeStringLiteralArgumentWithEscapableCharacters(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(b),
+            visitorsMappedToMany = listOf { cu ->
+                cu.findMethodCalls("b.B singleArg(..)").changeLiterals()
+            },
+            before = """
+                import b.*;
+                public class A {
+                    B b;
+                    public void test() {
+                        b.singleArg("mystring '%s'");
                     }
-                """)
-    }
+                }
+            """,
+            after = """
+                import b.*;
+                public class A {
+                    B b;
+                    public void test() {
+                        b.singleArg("mystring '{}'");
+                    }
+                }
+            """
+    )
 
     private fun List<J.MethodInvocation>.changeLiterals() = flatMap { meth ->
         meth.args.args.map { exp ->
