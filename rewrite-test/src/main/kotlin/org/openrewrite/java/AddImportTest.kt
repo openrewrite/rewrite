@@ -83,34 +83,6 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     @Test
-    fun lastImportWhenFirstClassDeclarationHasJavadoc2(jp: JavaParser) {
-        """
-            import java.util.List;
-            
-            /**
-             * My type
-             */
-            class A {}
-        """
-                .whenParsedBy(jp)
-                .whenVisitedBy(AddImport().apply {
-                    setType("java.util.Collections")
-                    setStaticMethod("*")
-                    setOnlyIfReferenced(false)
-                })
-                .isRefactoredTo("""
-                    import java.util.List;
-                    
-                    import static java.util.Collections.*;
-                    
-                    /**
-                     * My type
-                     */
-                    class A {}
-                """)
-    }
-
-    @Test
     fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) = assertRefactored(
             jp,
             visitors = listOf(
@@ -130,7 +102,7 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     @Test
-    fun importsAddedInAlphabeticalOrder2(jp: JavaParser) {
+    fun importsAddedInAlphabeticalOrder(jp: JavaParser) {
         val otherPackages = listOf("c", "c.c", "c.c.c")
         val otherImports = otherPackages.mapIndexed { i, pkg ->
             "package $pkg;\npublic class C$i {}"
