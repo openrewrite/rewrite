@@ -87,7 +87,7 @@ public class Refactor {
         sources.forEach(accumulatedSources::add);
 
         for (int i = 0; i < maxCycles; i++) {
-            int rulesThatMadeChangesThisCycle = 0;
+            int visitorsThatMadeChangesThisCycle = 0;
             for (int j = 0; j < accumulatedSources.size(); j++) {
                 SourceFile prev = accumulatedSources.get(j);
                 if (prev == null) {
@@ -114,10 +114,10 @@ public class Refactor {
                             changesByTree.compute(acc, (acc2, prevChange) -> prevChange == null ?
                                     new Change(prev, acc2, Collections.singleton(visitor.getName())) :
                                     new Change(prev, acc2, Stream
-                                            .concat(prevChange.getRulesThatMadeChanges().stream(), Stream.of(visitor.getName()))
+                                            .concat(prevChange.getVisitorsThatMadeChanges().stream(), Stream.of(visitor.getName()))
                                             .collect(toSet()))
                             );
-                            rulesThatMadeChangesThisCycle++;
+                            visitorsThatMadeChangesThisCycle++;
                         }
                     } catch (Throwable t) {
                         logger.error("refactor visitor failed", t);
@@ -136,17 +136,21 @@ public class Refactor {
                 // let's do that now. On the next cycle, these visitors shouldn't generate these files again, but update
                 // them in place as necessary.
                 for (RefactorVisitor<? extends Tree> visitor : visitors) {
-                    rulesThatMadeChangesThisCycle += visitor.generate().stream()
+                    visitorsThatMadeChangesThisCycle += visitor.generate().stream()
                             .map(g -> accumulatedSources.add((SourceFile) g))
                             .count();
                 }
 
                 accumulatedSources.set(j, acc);
+                for(RefactorVisitor<? extends Tree> visitor : visitors) {
+                    visitor.nextCycle();
+                }
             }
-
-            if (rulesThatMadeChangesThisCycle == 0) {
+            // Always do at least two cycles in case all the visitors were ones
+            if (visitorsThatMadeChangesThisCycle == 0 && i > 0) {
                 break;
             }
+
         }
 
         sample.stop(Timer.builder("rewrite.refactor.plan")
@@ -155,7 +159,7 @@ public class Refactor {
                 .register(meterRegistry));
 
         for (Change change : changesByTree.values()) {
-            for (String ruleThatMadeChange : change.getRulesThatMadeChanges()) {
+            for (String ruleThatMadeChange : change.getVisitorsThatMadeChanges()) {
                 Counter.builder("rewrite.refactor.plan.changes")
                         .description("The number of changes requested by a visitor")
                         .tag("visitor", ruleThatMadeChange)

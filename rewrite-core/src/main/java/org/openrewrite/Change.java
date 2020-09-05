@@ -51,12 +51,12 @@ public class Change {
     private final SourceFile fixed;
 
     @Getter
-    private final Set<String> rulesThatMadeChanges;
+    private final Set<String> visitorsThatMadeChanges;
 
-    public Change(@Nullable SourceFile original, @Nullable SourceFile fixed, Set<String> rulesThatMadeChanges) {
+    public Change(@Nullable SourceFile original, @Nullable SourceFile fixed, Set<String> visitorsThatMadeChanges) {
         this.original = original;
         this.fixed = fixed;
-        this.rulesThatMadeChanges = rulesThatMadeChanges;
+        this.visitorsThatMadeChanges = visitorsThatMadeChanges;
     }
 
     /**
@@ -77,7 +77,7 @@ public class Change {
                 (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + fixed.getId());
 
         return new InMemoryDiffEntry(sourcePath, relativeTo,
-                original == null ? "" : original.print(), fixed.print(), rulesThatMadeChanges).getDiff();
+                original == null ? "" : original.print(), fixed.print(), visitorsThatMadeChanges).getDiff();
     }
 
     public Class<? extends Tree> getTreeType() {

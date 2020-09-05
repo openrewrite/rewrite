@@ -22,6 +22,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.MethodMatcher;
@@ -30,12 +31,14 @@ import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -1138,9 +1141,24 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
+        @JsonIgnore
+        public Path getSourceSet() {
+            int packageLevelsUp = getPackageDecl() == null ? 0 :
+                    (int) getPackageDecl().printTrimmed().chars().filter(c -> c == '.').count();
+            return Paths.get(sourcePath).resolve(IntStream.range(0, packageLevelsUp + 1)
+                .mapToObj(n -> "../")
+                .collect(joining(""))).normalize();
+        }
+
+        public JavaParser buildParser() {
+            return JavaParser.fromJavaVersion()
+                    .styles(styles)
+                    .build();
+        }
+
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
             String sourcePath = sourceSet
-                    .resolve(packageName.replace(".", System.getProperty("separator") == null ? "/" : System.getProperty("separator")))
+                    .resolve(packageName.replace(".", "/"))
                     .resolve(className + ".java")
                     .toString();
 

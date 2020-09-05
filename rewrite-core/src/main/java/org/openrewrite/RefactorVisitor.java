@@ -54,4 +54,10 @@ public interface RefactorVisitor<T extends Tree> extends SourceVisitor<T> {
      */
     default void next() {
     }
+
+    /**
+     * All sources have been visited once, prepare to enter the next cycle of the visitor pipeline
+     */
+    default void nextCycle() {
+    }
 }
