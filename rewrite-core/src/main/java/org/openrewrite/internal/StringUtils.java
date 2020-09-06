@@ -16,11 +16,11 @@
 package org.openrewrite.internal;
 
 import io.micrometer.core.lang.Nullable;
-import org.apache.commons.io.Charsets;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.SortedMap;
@@ -162,7 +162,7 @@ public class StringUtils {
                 bos.write(buffer, 0, n);
             }
 
-            return new String(bos.toByteArray(), Charsets.UTF_8);
+            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }
