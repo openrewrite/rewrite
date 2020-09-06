@@ -20,36 +20,20 @@ import org.apache.maven.model.Model;
 import org.apache.maven.model.building.*;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
-import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
-import org.eclipse.aether.*;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.CollectRequest;
 import org.eclipse.aether.collection.CollectResult;
 import org.eclipse.aether.collection.DependencyCollectionException;
-import org.eclipse.aether.connector.basic.BasicRepositoryConnectorFactory;
 import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.graph.Exclusion;
-import org.eclipse.aether.impl.DefaultServiceLocator;
-import org.eclipse.aether.repository.LocalRepository;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.repository.RepositoryPolicy;
-import org.eclipse.aether.resolution.ArtifactDescriptorPolicy;
-import org.eclipse.aether.resolution.VersionRangeRequest;
-import org.eclipse.aether.resolution.VersionRangeResolutionException;
-import org.eclipse.aether.resolution.VersionRangeResult;
-import org.eclipse.aether.spi.connector.RepositoryConnectorFactory;
-import org.eclipse.aether.spi.connector.transport.TransporterFactory;
-import org.eclipse.aether.transport.file.FileTransporterFactory;
-import org.eclipse.aether.transport.http.HttpTransporterFactory;
-import org.eclipse.aether.util.graph.selector.AndDependencySelector;
-import org.eclipse.aether.util.graph.selector.OptionalDependencySelector;
-import org.eclipse.aether.util.graph.selector.ScopeDependencySelector;
-import org.eclipse.aether.util.repository.SimpleArtifactDescriptorPolicy;
-import org.eclipse.aether.version.Version;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.CachingWorkspaceReader;
+import org.openrewrite.maven.internal.MavenRepositorySystemUtils;
 import org.openrewrite.maven.internal.ParentModelResolver;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.MavenModel;
@@ -64,6 +48,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
 import static java.util.Collections.emptyList;
@@ -78,20 +63,17 @@ class MavenModuleLoader {
     private final CachingWorkspaceReader workspaceReader;
 
     private final boolean resolveDependencies;
-    private boolean resolveNonProjectParents;
     private final File localRepository;
     private final List<RemoteRepository> remoteRepositories;
 
     public MavenModuleLoader(boolean resolveDependencies,
-                             boolean resolveNonProjectParents,
                              File localRepository,
                              @Nullable File workspaceDir,
                              List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
-        this.resolveNonProjectParents = resolveNonProjectParents;
         this.localRepository = localRepository;
         this.remoteRepositories = remoteRepositories;
-        this.workspaceReader = new CachingWorkspaceReader(workspaceDir);
+        this.workspaceReader = CachingWorkspaceReader.forWorkspaceDir(workspaceDir);
     }
 
     public List<MavenModel> load(Iterable<Parser.Input> inputs) {
@@ -115,21 +97,32 @@ class MavenModuleLoader {
         }
 
         return models.stream()
-                .map(m -> new MavenModel(m.getParent(), m.getModuleVersion(),
-                        m.getDependencyManagement(), m.getDependencies(),
-                        m.getTransitiveDependenciesByScope(), m.getProperties(),
+                .map(m -> new MavenModel(
+                        m.getParent(),
+                        m.getModuleVersion(),
+                        m.getDependencyManagement(),
+                        m.getDependencies(),
+                        m.getTransitiveDependenciesByScope(),
+                        m.getProperties(),
+                        Stream.concat(
+                                remoteRepositories.stream()
+                                        .map(repo -> new MavenModel.Repository(repo.getId(), repo.getUrl())),
+                                m.getRepositories().stream()
+                                        .map(repo -> new MavenModel.Repository(repo.getId(), repo.getUrl()))
+                        ).collect(toList()),
                         inheriting.getOrDefault(m.getModuleVersion(), emptyList())))
                 .collect(toList());
     }
 
     private MavenModel load(InputStreamModelSource modelSource) {
         try {
-            RepositorySystem repositorySystem = getRepositorySystem();
-            RepositorySystemSession repositorySystemSession = getRepositorySystemSession(repositorySystem);
+            RepositorySystem repositorySystem = MavenRepositorySystemUtils.getRepositorySystem();
+            RepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
+                    .getRepositorySystemSession(repositorySystem, localRepository, workspaceReader);
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
                     .setModelResolver(new ParentModelResolver(repositorySystem,
-                            repositorySystemSession, remoteRepositories, resolveNonProjectParents))
+                            repositorySystemSession, remoteRepositories))
                     .setModelSource(modelSource)
                     .setSystemProperties(System.getProperties());
 
@@ -204,46 +197,33 @@ class MavenModuleLoader {
                         model.getArtifactId(),
                         null,
                         model.getVersion(),
-                        newerVersions(repositorySystem, repositorySystemSession, model,
-                                model.getGroupId(), model.getArtifactId(), model.getVersion(),
-                                "", "pom")
+                        "pom"
                 ),
                 dependencyManagement,
                 dependencies,
                 transitiveDepenenciesByScope,
                 properties,
+                Stream.concat(
+                        remoteRepositories.stream()
+                                .map(repo -> new MavenModel.Repository(repo.getId(), repo.getUrl())),
+                        model.getRepositories().stream()
+                                .map(repo -> new MavenModel.Repository(repo.getId(), repo.getUrl()))
+                ).collect(toList()),
                 emptyList());
-    }
-
-    private List<String> newerVersions(RepositorySystem repositorySystem,
-                                       RepositorySystemSession repositorySystemSession,
-                                       Model model,
-                                       String groupId, String artifactId, String version,
-                                       String classifier, String extension) {
-        Artifact newerArtifacts = new DefaultArtifact(groupId, artifactId, classifier, extension,
-                "(" + version + ",)");
-        VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
-        newerArtifactsRequest.setArtifact(newerArtifacts);
-        newerArtifactsRequest.setRepositories(remoteRepositoriesFromModel(model));
-
-        try {
-            VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
-            List<String> versions = newerArtifactsResult.getVersions().stream()
-                    .map(Version::toString)
-                    .collect(toList());
-            workspaceReader.cacheVersions(newerArtifacts, versions);
-            return versions;
-        } catch (VersionRangeResolutionException e) {
-            return emptyList();
-        }
     }
 
     private List<RemoteRepository> remoteRepositoriesFromModel(Model model) {
         List<RemoteRepository> remotes = new ArrayList<>(remoteRepositories);
-        model.getRepositories().forEach(repo -> remotes.add(
-                new RemoteRepository.Builder(repo.getId(), "default",
-                        repo.getUrl().replace("http:", "https:")).build())
-        );
+        model.getRepositories().forEach(repo -> {
+            remotes.add(new RemoteRepository.Builder(repo.getId(), "default",
+                    repo.getUrl()).build());
+
+            if (repo.getUrl().contains("http://")) {
+                remotes.add(
+                        new RemoteRepository.Builder(repo.getId(), "default",
+                                repo.getUrl().replace("http:", "https:")).build());
+            }
+        });
         return remotes;
     }
 
@@ -259,7 +239,7 @@ class MavenModuleLoader {
                 dependency.getArtifactId(),
                 dependency.getClassifier(),
                 dependency.getVersion(),
-                emptyList());
+                "jar");
 
         return dependencyCache.computeIfAbsent(mvidFromDependency, mvid -> {
             String requestedVersion = dependency.getVersion();
@@ -284,9 +264,7 @@ class MavenModuleLoader {
                                     artifact.getArtifactId(),
                                     artifact.getClassifier(),
                                     artifact.getVersion(),
-                                    newerVersions(repositorySystem, repositorySystemSession, model,
-                                            artifact.getGroupId(), artifact.getArtifactId(), artifact.getVersion(),
-                                            artifact.getClassifier(), artifact.getExtension())
+                                    artifact.getExtension()
                             ),
                             requestedVersion,
                             dependency.getScope());
@@ -354,80 +332,9 @@ class MavenModuleLoader {
     public void collectTransitiveDependencies(DependencyNode node, Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope) {
         Artifact dep = node.getDependency().getArtifact();
         transitiveDepenenciesByScope.computeIfAbsent(node.getDependency().getScope(), scope -> new HashSet<>())
-                .add(new MavenModel.ModuleVersionId(dep.getGroupId(), dep.getArtifactId(), dep.getClassifier(), dep.getVersion(), emptyList()));
+                .add(new MavenModel.ModuleVersionId(dep.getGroupId(), dep.getArtifactId(),
+                        dep.getClassifier(), dep.getVersion(), "jar"));
         node.getChildren().forEach(child -> collectTransitiveDependencies(child, transitiveDepenenciesByScope));
-    }
-
-    private RepositorySystem getRepositorySystem() {
-        DefaultServiceLocator serviceLocator = MavenRepositorySystemUtils.newServiceLocator();
-        serviceLocator.addService(RepositoryConnectorFactory.class, BasicRepositoryConnectorFactory.class);
-        serviceLocator.addService(TransporterFactory.class, FileTransporterFactory.class);
-        serviceLocator.addService(TransporterFactory.class, HttpTransporterFactory.class);
-
-        return serviceLocator.getService(RepositorySystem.class);
-    }
-
-    private DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system) {
-        DefaultRepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
-                .newSession();
-
-        LocalRepository localRepository = new LocalRepository(this.localRepository.getPath());
-        repositorySystemSession.setLocalRepositoryManager(
-                system.newLocalRepositoryManager(repositorySystemSession, localRepository));
-
-        repositorySystemSession.setChecksumPolicy(RepositoryPolicy.CHECKSUM_POLICY_IGNORE);
-        repositorySystemSession.setCache(new DefaultRepositoryCache());
-        repositorySystemSession.setArtifactDescriptorPolicy(new SimpleArtifactDescriptorPolicy(ArtifactDescriptorPolicy.IGNORE_ERRORS));
-        repositorySystemSession.setWorkspaceReader(workspaceReader);
-        repositorySystemSession.setRepositoryListener(new ConsoleRepositoryEventListener());
-        repositorySystemSession.setDependencySelector(
-                new AndDependencySelector(
-                        new ScopeDependencySelector(emptyList(),
-                                Arrays.asList("provided", "test", "runtime")),
-                        new OptionalDependencySelector()
-                )
-        );
-
-        repositorySystemSession.setReadOnly();
-
-        return repositorySystemSession;
-    }
-
-    private static class ConsoleRepositoryEventListener
-            extends AbstractRepositoryListener {
-
-        @Override
-        public void artifactInstalled(RepositoryEvent event) {
-            logger.debug("artifact {} installed to file {}", event.getArtifact(), event.getFile());
-        }
-
-        @Override
-        public void artifactInstalling(RepositoryEvent event) {
-            logger.debug("installing artifact {} to file {}", event.getArtifact(), event.getFile());
-        }
-
-        @Override
-        public void artifactResolved(RepositoryEvent event) {
-            logger.debug("artifact {} resolved from repository {}", event.getArtifact(),
-                    event.getRepository());
-        }
-
-        @Override
-        public void artifactDownloading(RepositoryEvent event) {
-            logger.debug("downloading artifact {} from repository {}", event.getArtifact(),
-                    event.getRepository());
-        }
-
-        @Override
-        public void artifactDownloaded(RepositoryEvent event) {
-            logger.debug("downloaded artifact {} from repository {}", event.getArtifact(),
-                    event.getRepository());
-        }
-
-        @Override
-        public void artifactResolving(RepositoryEvent event) {
-            logger.debug("resolving artifact {}", event.getArtifact());
-        }
     }
 
     static class InputStreamModelSource implements ModelSource2 {

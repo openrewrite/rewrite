@@ -153,7 +153,7 @@ public class AddDependency extends MavenRefactorVisitor {
 
             Maven.Dependency toAdd = new Maven.Dependency(false,
                     new MavenModel.Dependency(
-                            new MavenModel.ModuleVersionId(groupId, artifactId, null, version, emptyList()),
+                            new MavenModel.ModuleVersionId(groupId, artifactId, null, version, "jar"),
                             version,
                             scope
                     ),

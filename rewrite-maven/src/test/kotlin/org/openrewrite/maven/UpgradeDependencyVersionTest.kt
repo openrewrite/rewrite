@@ -25,7 +25,9 @@ import java.nio.file.Path
 
 class UpgradeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
     override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
-    override val parser: Parser<Maven.Pom> = MavenParser.builder().build()
+    override val parser: Parser<Maven.Pom> = MavenParser.builder()
+            .resolveDependencies(false)
+            .build()
 
     @Test
     fun upgradeVersion() = assertRefactored(

@@ -80,6 +80,7 @@ class PomTest {
                 .build()
                 .parse(pomFile.toPath(), tempDir)
 
-        assertThat(pom.dependencies[0].model.moduleVersion.newerVersions).contains("29.0-jre")
+        assertThat(pom.dependencies[0].model.moduleVersion.getNewerVersions(pom,
+            MavenParser.DEFAULT_LOCAL_REPOSITORY, null)).contains("29.0-jre")
     }
 }

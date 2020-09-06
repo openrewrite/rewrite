@@ -29,44 +29,63 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 import static java.util.Collections.emptyList;
 
-public class CachingWorkspaceReader implements WorkspaceReader {
+public final class CachingWorkspaceReader implements WorkspaceReader {
+    private static final Map<File, CachingWorkspaceReader> READER_BY_CACHE_DIR = new ConcurrentHashMap<>();
+
     HTreeMap<Artifact, List<String>> versionsByArtifact;
 
-    public CachingWorkspaceReader(@Nullable File workspace) {
-        if(workspace != null) {
-            DB localRepositoryDiskDb = DBMaker
-                    .fileDB(workspace)
-                    .transactionEnable()
-                    .make();
+    public static CachingWorkspaceReader forWorkspaceDir(@Nullable File workspace) {
+        if (workspace != null) {
+            return READER_BY_CACHE_DIR.computeIfAbsent(workspace, w -> {
+                CachingWorkspaceReader reader = new CachingWorkspaceReader();
 
-            // big map populated with data expired from cache
-            versionsByArtifact = localRepositoryDiskDb
-                    .hashMap("workspace.disk")
-                    .keySerializer(ARTIFACT_SERIALIZER)
-                    .valueSerializer(LIST_SERIALIZER)
-                    .create();
+                DB localRepositoryDiskDb = DBMaker
+                        .fileDB(workspace)
+                        .transactionEnable()
+                        .make();
 
-            Metrics.gaugeMapSize("rewrite.maven.workspace.cache.size", Tags.of("layer", "disk"), versionsByArtifact);
-        }
-        else {
+                // big map populated with data expired from cache
+                reader.versionsByArtifact = localRepositoryDiskDb
+                        .hashMap("workspace.disk")
+                        .keySerializer(ARTIFACT_SERIALIZER)
+                        .valueSerializer(LIST_SERIALIZER)
+                        .create();
+
+                Metrics.gaugeMapSize("rewrite.maven.workspace.cache.size", Tags.of("layer", "disk"),
+                        reader.versionsByArtifact);
+
+                return reader;
+            });
+        } else {
+            CachingWorkspaceReader reader = new CachingWorkspaceReader();
+
             DB inMemoryDb = DBMaker
                     .heapDB()
                     .make();
 
             // fast in-memory collection with limited size
-            this.versionsByArtifact = inMemoryDb
+            reader.versionsByArtifact = inMemoryDb
                     .hashMap("workspace.inmem")
                     .keySerializer(ARTIFACT_SERIALIZER)
                     .valueSerializer(LIST_SERIALIZER)
                     .expireAfterCreate(10, TimeUnit.MINUTES)
                     .create();
 
-            Metrics.gaugeMapSize("rewrite.maven.workspace.cache.size", Tags.of("layer", "memory"), versionsByArtifact);
+            Metrics.gaugeMapSize("rewrite.maven.workspace.cache.size", Tags.of("layer", "memory"),
+                    reader.versionsByArtifact);
+
+            return reader;
         }
+    }
+
+    private CachingWorkspaceReader() {
+
     }
 
     @Override
@@ -111,7 +130,7 @@ public class CachingWorkspaceReader implements WorkspaceReader {
         }
     };
 
-    private static Serializer<List<String>> LIST_SERIALIZER = new Serializer<List<String>>() {
+    private static final Serializer<List<String>> LIST_SERIALIZER = new Serializer<List<String>>() {
         @Override
         public void serialize(@NotNull DataOutput2 out, @NotNull List<String> value) throws IOException {
             out.writeShort(value.size());

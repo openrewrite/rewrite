@@ -36,5 +36,5 @@ class MavenModelTest {
     }
 
     private fun mvid(group: String, artifact: String) = MavenModel.ModuleVersionId(
-            group, artifact, null, "1", emptyList())
+            group, artifact, null, "1", "jar")
 }

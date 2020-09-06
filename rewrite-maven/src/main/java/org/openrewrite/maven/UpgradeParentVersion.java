@@ -22,10 +22,12 @@ import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
+import java.io.File;
 import java.util.List;
 import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
+import static org.openrewrite.Validated.test;
 
 public class UpgradeParentVersion extends MavenRefactorVisitor {
     private String groupId;
@@ -34,6 +36,11 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
 
     @Nullable
     private String metadataPattern;
+
+    private File localRepository = MavenParser.DEFAULT_LOCAL_REPOSITORY;
+
+    @Nullable
+    private File workspaceDir;
 
     private VersionComparator versionComparator;
 
@@ -53,12 +60,28 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
         this.metadataPattern = metadataPattern;
     }
 
+    public void setLocalRepository(File localRepository) {
+        this.localRepository = localRepository;
+    }
+
+    public void setWorkspaceDir(@Nullable File workspaceDir) {
+        this.workspaceDir = workspaceDir;
+    }
+
+    public UpgradeParentVersion() {
+        setCursoringOn();
+    }
+
     @Override
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId))
                 .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion, metadataPattern));
+                .and(Semver.validate(toVersion, metadataPattern))
+                .and(test("localRepository", "must exist",
+                        localRepository, File::exists))
+                .and(test("workspaceDir", "must exist if set",
+                        workspaceDir, w -> w == null || w.exists()));
     }
 
     @Override
@@ -71,7 +94,11 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
     public Maven visitParent(Maven.Parent parent) {
         Maven.Parent p = refactor(parent, super::visitParent);
 
-        List<String> newerVersions = p.getModel().getModuleVersion().getNewerVersions();
+        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
+        assert pom != null;
+
+        List<String> newerVersions = p.getModel().getModuleVersion()
+                .getNewerVersions(pom, localRepository, workspaceDir);
 
         LatestRelease latestRelease = new LatestRelease(metadataPattern);
         Optional<String> newerVersion = newerVersions.stream()
