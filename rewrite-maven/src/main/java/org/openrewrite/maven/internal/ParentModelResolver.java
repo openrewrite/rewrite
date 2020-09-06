@@ -21,7 +21,6 @@ import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
 import org.apache.maven.model.building.ModelSource2;
 import org.apache.maven.model.resolution.ModelResolver;
-import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -47,23 +46,17 @@ public class ParentModelResolver implements ModelResolver {
     private final RepositorySystem repositorySystem;
     private final RepositorySystemSession repositorySystemSession;
     private final List<RemoteRepository> remoteRepositories;
-    private final boolean resolveNonProjectParents;
 
     public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession,
-                               List<RemoteRepository> remoteRepositories, boolean resolveNonProjectParents) {
+                               List<RemoteRepository> remoteRepositories) {
         this.repositorySystem = repositorySystem;
         this.repositorySystemSession = repositorySystemSession;
         this.remoteRepositories = remoteRepositories;
-        this.resolveNonProjectParents = resolveNonProjectParents;
     }
 
     @SuppressWarnings("deprecation")
     @Override
-    public ModelSource resolveModel(String groupId, String artifactId, String version) throws UnresolvableModelException {
-        if (!resolveNonProjectParents) {
-            return new UnresolvedModelSource(groupId, artifactId, version);
-        }
-
+    public ModelSource resolveModel(String groupId, String artifactId, String version) {
         logger.trace("resolving model for: {}:{}", groupId, artifactId);
         Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
 
@@ -83,7 +76,7 @@ public class ParentModelResolver implements ModelResolver {
 
     @SuppressWarnings("deprecation")
     @Override
-    public ModelSource resolveModel(Parent parent) throws UnresolvableModelException {
+    public ModelSource resolveModel(Parent parent) {
         return resolveModel(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
     }
 

@@ -15,14 +15,27 @@
  */
 package org.openrewrite.maven.tree;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.eclipse.aether.RepositorySystem;
+import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.artifact.Artifact;
+import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.repository.RemoteRepository;
+import org.eclipse.aether.resolution.VersionRangeRequest;
+import org.eclipse.aether.resolution.VersionRangeResolutionException;
+import org.eclipse.aether.resolution.VersionRangeResult;
+import org.eclipse.aether.version.Version;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.CachingWorkspaceReader;
+import org.openrewrite.maven.internal.MavenRepositorySystemUtils;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.io.File;
+import java.util.*;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 /**
  * A minified, serializable form of {@link org.apache.maven.model.Model}
@@ -56,6 +69,10 @@ public class MavenModel {
     @ToString.Exclude
     @With
     Map<String, String> properties;
+
+    @ToString.Exclude
+    @With
+    Collection<Repository> repositories;
 
     /**
      * Modules inheriting from the POM this model represents. To cut the
@@ -95,10 +112,47 @@ public class MavenModel {
         @With
         String version;
 
-        @ToString.Exclude
-        @EqualsAndHashCode.Exclude
         @With
-        List<String> newerVersions;
+        @Nullable
+        String extension;
+
+        @JsonIgnore
+        public List<String> getNewerVersions(Maven.Pom pom, File localRepository,
+                                             File workspaceDir) {
+            RepositorySystem repositorySystem = MavenRepositorySystemUtils.getRepositorySystem();
+            RepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
+                    .getRepositorySystemSession(repositorySystem, localRepository,
+                            CachingWorkspaceReader.forWorkspaceDir(workspaceDir));
+
+            Artifact newerArtifacts = new DefaultArtifact(groupId, artifactId, classifier, extension,
+                    "(" + version + ",)");
+            VersionRangeRequest newerArtifactsRequest = new VersionRangeRequest();
+            newerArtifactsRequest.setArtifact(newerArtifacts);
+
+            List<RemoteRepository> remotes = new ArrayList<>(pom.getModel().getRepositories().size());
+
+            for (Repository repo : pom.getModel().getRepositories()) {
+                remotes.add(new RemoteRepository.Builder(repo.getId(), "default",
+                        repo.getUrl()).build());
+
+                if(repo.getUrl().contains("http://")) {
+                    remotes.add(
+                            new RemoteRepository.Builder(repo.getId(), "default",
+                                    repo.getUrl().replace("http:", "https:")).build());
+                }
+            }
+
+            newerArtifactsRequest.setRepositories(remotes);
+
+            try {
+                VersionRangeResult newerArtifactsResult = repositorySystem.resolveVersionRange(repositorySystemSession, newerArtifactsRequest);
+                return newerArtifactsResult.getVersions().stream()
+                        .map(Version::toString)
+                        .collect(toList());
+            } catch (VersionRangeResolutionException e) {
+                return emptyList();
+            }
+        }
 
         @Override
         public int compareTo(ModuleVersionId v) {
@@ -141,6 +195,16 @@ public class MavenModel {
     public static class DependencyManagement {
         @With
         List<Dependency> dependencies;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class Repository {
+        @With
+        String id;
+
+        @With
+        String url;
     }
 
     public String valueOf(String value) {
