@@ -17,6 +17,7 @@ package org.openrewrite.config;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
+import org.jetbrains.annotations.NotNull;
 import org.openrewrite.AutoConfigure;
 import org.openrewrite.RefactorVisitor;
 import org.openrewrite.Style;
@@ -24,7 +25,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 
 import static java.util.Collections.emptyList;
@@ -34,20 +38,34 @@ import static java.util.stream.Collectors.toList;
 public class AutoConfigureRefactorVisitorLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(AutoConfigureRefactorVisitorLoader.class);
 
+    private final Iterable<Path> compileClasspath;
     private final String[] acceptVisitorPackages;
 
-    public AutoConfigureRefactorVisitorLoader(String... acceptVisitorPackages) {
+    public AutoConfigureRefactorVisitorLoader(Iterable<Path> compileClasspath, String... acceptVisitorPackages) {
+        this.compileClasspath = compileClasspath;
         this.acceptVisitorPackages = acceptVisitorPackages;
     }
 
     public Collection<? extends RefactorVisitor<?>> loadVisitors() {
-        try(ScanResult scanResult = new ClassGraph()
-                .acceptPackages(acceptVisitorPackages)
+        List<RefactorVisitor<?>> visitors = new ArrayList<>(loadVisitors(new ClassGraph()));
+
+        if(compileClasspath.iterator().hasNext()) {
+            visitors.addAll(loadVisitors(new ClassGraph().overrideClasspath(compileClasspath)));
+        }
+
+        return visitors;
+    }
+
+    @NotNull
+    private List<RefactorVisitor<?>> loadVisitors(ClassGraph classGraph) {
+        if(acceptVisitorPackages != null && acceptVisitorPackages.length > 0) {
+            classGraph = classGraph.acceptPackages(acceptVisitorPackages);
+        }
+
+        try(ScanResult scanResult = classGraph
                 .enableMemoryMapping()
-                .enableMethodInfo()
                 .enableAnnotationInfo()
                 .ignoreClassVisibility()
-                .ignoreMethodVisibility()
                 .scan()) {
             return scanResult.getClassesWithAnnotation(AutoConfigure.class.getName()).stream()
                     .map(classInfo -> {

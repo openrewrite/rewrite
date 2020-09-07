@@ -46,7 +46,7 @@ class EnvironmentTest {
     @Test
     fun scanAutoConfigurableRules() {
         val plan = Environment.builder()
-                .scanVisitors("org.openrewrite.text")
+                .scanClasspath(emptyList(), "org.openrewrite.text")
                 .loadRecipe(RecipeConfiguration().apply {
                     name = "org.openrewrite.HelloJon"
                     setInclude(setOf("org.openrewrite.text.*"))
