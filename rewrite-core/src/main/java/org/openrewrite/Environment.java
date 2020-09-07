@@ -105,10 +105,9 @@ public class Environment {
             this.properties = properties;
         }
 
-        public Builder scanClasspath(Iterable<Path> compileClasspath) {
-            ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(
-                    compileClasspath, properties);
-            load(classpathResourceLoader);
+        public Builder scanClasspath(Iterable<Path> compileClasspath, String... acceptVisitorPackages) {
+            load(new ClasspathResourceLoader(compileClasspath, properties));
+            visitors.addAll(new AutoConfigureRefactorVisitorLoader(compileClasspath, acceptVisitorPackages).loadVisitors());
             return this;
         }
 
@@ -125,11 +124,6 @@ public class Environment {
                     logger.warn("Unable to load ~/.rewrite/rewrite.yml", e);
                 }
             }
-            return this;
-        }
-
-        public Builder scanVisitors(String... acceptVisitorPackages) {
-            visitors.addAll(new AutoConfigureRefactorVisitorLoader(acceptVisitorPackages).loadVisitors());
             return this;
         }
 
@@ -161,8 +155,6 @@ public class Environment {
         }
 
         public Environment build() {
-            visitors.addAll(new AutoConfigureRefactorVisitorLoader("org.openrewrite").loadVisitors());
-
             return new Environment(
                     recipesConfigurations.values().stream()
                             .map(RecipeConfiguration::build)
