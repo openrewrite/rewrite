@@ -24,16 +24,22 @@ import org.openrewrite.Style;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.UncheckedIOException;
 import java.lang.reflect.Constructor;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.StreamSupport.stream;
 
 public class AutoConfigureRefactorVisitorLoader implements ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(AutoConfigureRefactorVisitorLoader.class);
@@ -49,8 +55,26 @@ public class AutoConfigureRefactorVisitorLoader implements ResourceLoader {
     public Collection<? extends RefactorVisitor<?>> loadVisitors() {
         List<RefactorVisitor<?>> visitors = new ArrayList<>(loadVisitors(new ClassGraph()));
 
-        if(compileClasspath.iterator().hasNext()) {
-            visitors.addAll(loadVisitors(new ClassGraph().overrideClasspath(compileClasspath)));
+        if (compileClasspath.iterator().hasNext()) {
+            URLClassLoader classpathLoader = new URLClassLoader(
+                    stream(compileClasspath.spliterator(), false)
+                            .map(cc -> {
+                                try {
+                                    return cc.toUri().toURL();
+                                } catch (MalformedURLException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            })
+                            .toArray(URL[]::new),
+                    getClass().getClassLoader()
+            );
+
+            visitors.addAll(loadVisitors(new ClassGraph()
+                    .ignoreParentClassLoaders()
+                    .overrideClassLoaders(
+                            classpathLoader
+                    )
+            ));
         }
 
         return visitors;
@@ -58,11 +82,11 @@ public class AutoConfigureRefactorVisitorLoader implements ResourceLoader {
 
     @NotNull
     private List<RefactorVisitor<?>> loadVisitors(ClassGraph classGraph) {
-        if(acceptVisitorPackages != null && acceptVisitorPackages.length > 0) {
+        if (acceptVisitorPackages != null && acceptVisitorPackages.length > 0) {
             classGraph = classGraph.acceptPackages(acceptVisitorPackages);
         }
 
-        try(ScanResult scanResult = classGraph
+        try (ScanResult scanResult = classGraph
                 .enableMemoryMapping()
                 .enableAnnotationInfo()
                 .ignoreClassVisibility()
