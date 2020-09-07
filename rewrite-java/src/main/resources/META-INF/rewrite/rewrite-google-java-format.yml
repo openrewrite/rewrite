@@ -14,10 +14,12 @@
 # limitations under the License.
 #
 ---
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.google-java-format
-styles:
-  org.openrewrite.java.ImportLayoutStyle:
+type: specs.openrewrite.org/v1beta/style
+name: org.openrewrite.java.GoogleJavaFormat
+configure:
+  org.openrewrite.java.style.ImportLayoutStyle:
+      classCountToUseStarImport: 999
+      nameCountToUseStarImport: 999
       layout:
         blocks:
           - import static all other imports

@@ -21,16 +21,12 @@ visitors:
       toText: Hello Jon!
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.hello-jon
+name: org.openrewrite.HelloJon
 include:
   - org.openrewrite.text.ChangeTextToJon
 ---
-type: specs.openrewrite.org/v1beta/recipe
-name: org.openrewrite.google-java-format
-styles:
-  org.openrewrite.java.ImportLayoutStyle:
-      layout:
-        blocks:
-          - import static all other imports
-          - <blank line>
-          - import all other imports
+type: specs.openrewrite.org/v1beta/style
+name: org.openrewrite.SampleStyle
+configure:
+  org.openrewrite.text.TextStyle:
+    charset: 'UTF-8'
