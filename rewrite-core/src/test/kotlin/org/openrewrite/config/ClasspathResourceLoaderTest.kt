@@ -31,7 +31,13 @@ class ClasspathResourceLoaderTest {
     fun loadRecipeFromClasspath() {
         val recipes = ClasspathResourceLoader(emptyList(), Properties()).loadRecipes()
         assertThat(recipes.map { it.name }).containsExactly(
-                "org.openrewrite.google-java-format",
-                "org.openrewrite.hello-jon")
+                "org.openrewrite.HelloJon")
+    }
+
+    @Test
+    fun loadStyleFromClasspath() {
+        val recipes = ClasspathResourceLoader(emptyList(), Properties()).loadStyles()
+        assertThat(recipes.map { it.key }).containsExactly(
+                "org.openrewrite.SampleStyle")
     }
 }
