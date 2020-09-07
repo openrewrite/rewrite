@@ -1094,6 +1094,7 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         String sourcePath;
 
         @With

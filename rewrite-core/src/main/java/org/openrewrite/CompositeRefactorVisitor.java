@@ -47,7 +47,7 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
     }
 
     @Override
-    public Collection<Tree> generate() {
+    public Collection<SourceFile> generate() {
         return delegates.stream()
                 .flatMap(d -> d.generate().stream())
                 .collect(toList());
