@@ -22,18 +22,18 @@ import org.openrewrite.text.ChangeText
 import org.openrewrite.text.PlainText
 
 class EnvironmentTest {
-    private val parent = RecipeConfiguration().apply {
-        name = "org.openrewrite.example"
-        setInclude(setOf("org.openrewrite.text.*"))
-        setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello World!"))
-    }
-
-    private val planBuilder = Environment.builder()
-            .loadRecipe(parent)
-            .loadVisitors(listOf(ChangeText()))
-
     @Test
     fun basicExample() {
+        val parent = RecipeConfiguration().apply {
+            name = "org.openrewrite.example"
+            setInclude(setOf("org.openrewrite.text.*"))
+            setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello World!"))
+        }
+
+        val planBuilder = Environment.builder()
+                .loadRecipe(parent)
+                .loadVisitors(listOf(ChangeText()))
+
         val visitors = planBuilder.build().visitors("org.openrewrite.example")
 
         val fixed: PlainText = Refactor()
@@ -43,4 +43,34 @@ class EnvironmentTest {
         assertThat(fixed.print()).isEqualTo("Hello World!")
     }
 
+    @Test
+    fun scanAutoConfigurableRules() {
+        val plan = Environment.builder()
+                .scanVisitors("org.openrewrite.text")
+                .loadRecipe(RecipeConfiguration().apply {
+                    name = "org.openrewrite.HelloJon"
+                    setInclude(setOf("org.openrewrite.text.*"))
+                    setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
+                })
+                .build()
+
+        val visitors = plan.visitors("org.openrewrite.HelloJon")
+
+        val fixed = Refactor()
+                .visit(visitors)
+                .fixed(PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList()))
+
+        assertThat(fixed!!.print()).isEqualTo("Hello Jon!")
+    }
+
+    @Test
+    fun scanRecipeAndDeclarativeRule() {
+        val plan = Environment.builder()
+                .scanClasspath(emptyList())
+                .build()
+
+        val visitors = plan.visitors("org.openrewrite.HelloJon")
+
+        assertThat(visitors).hasSize(1)
+    }
 }

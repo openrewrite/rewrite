@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.*;
 
-import static java.util.Collections.emptyList;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
@@ -100,19 +99,13 @@ public class Environment {
         private final Properties properties;
         private final Map<String, RecipeConfiguration> recipesConfigurations = new HashMap<>();
         private final Collection<RefactorVisitor<?>> visitors = new ArrayList<>();
-        private Iterable<Path> compileClasspath = emptyList();
         private final Map<String, Collection<Style>> stylesByName = new HashMap<>();
 
         public Builder(Properties properties) {
             this.properties = properties;
         }
 
-        public Builder compileClasspath(Iterable<Path> compileClasspath) {
-            this.compileClasspath = emptyList();
-            return this;
-        }
-
-        public Builder scanResources() {
+        public Builder scanClasspath(Iterable<Path> compileClasspath) {
             ClasspathResourceLoader classpathResourceLoader = new ClasspathResourceLoader(
                     compileClasspath, properties);
             load(classpathResourceLoader);
