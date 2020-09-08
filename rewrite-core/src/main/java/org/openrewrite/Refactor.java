@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toSet;
@@ -136,9 +137,17 @@ public class Refactor {
                 // let's do that now. On the next cycle, these visitors shouldn't generate these files again, but update
                 // them in place as necessary.
                 for (RefactorVisitor<? extends Tree> visitor : visitors) {
-                    visitorsThatMadeChangesThisCycle += visitor.generate().stream()
-                            .map(g -> accumulatedSources.add((SourceFile) g))
-                            .count();
+                    List<SourceFile> generatedSources = visitor.generate().stream().collect(Collectors.toList());
+                    if(generatedSources.size() > 0) {
+                        accumulatedSources.addAll(generatedSources);
+                        visitorsThatMadeChangesThisCycle += generatedSources.size();
+                        for(SourceFile generatedSource : generatedSources) {
+                            //TODO: Think about what should happen if multiple visitors try to generate the same target file
+                            Set<String> visitorSet = new HashSet<>();
+                            visitorSet.add(visitor.getName());
+                            changesByTree.put(generatedSource, new Change(null, generatedSource, visitorSet));
+                        }
+                    }
                 }
 
                 accumulatedSources.set(j, acc);

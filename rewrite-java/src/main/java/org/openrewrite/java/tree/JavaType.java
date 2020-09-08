@@ -46,6 +46,19 @@ public interface JavaType extends Serializable {
 
     TypeTree toTypeTree();
 
+    /**
+     * Return a JavaType for the specified string.
+     * The string is expected to be either a primitive type like "int" or a fully-qualified-class name like "java.lang.String"
+     */
+    static JavaType buildType(String typeName) {
+        JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(typeName);
+        if(primitive != null) {
+            return primitive;
+        } else {
+            return JavaType.Class.build(typeName);
+        }
+    }
+
     @Data
     class MultiCatch implements JavaType {
         private final List<JavaType> throwableTypes;

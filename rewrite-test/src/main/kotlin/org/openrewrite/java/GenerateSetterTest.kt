@@ -204,4 +204,28 @@ interface GenerateSetterTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun setterForPrimitive(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(GenerateSetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            before = """ 
+                package org.example;
+                 
+                class A {
+                    int foo;
+                }
+            """,
+            after = """
+                package org.example;
+                 
+                class A {
+                    int foo;
+                
+                    public void setFoo(int value) {
+                        foo = value;
+                    }
+                }
+            """
+    )
 }

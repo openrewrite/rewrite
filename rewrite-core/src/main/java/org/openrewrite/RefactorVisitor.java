@@ -45,7 +45,7 @@ public interface RefactorVisitor<T extends Tree> extends SourceVisitor<T> {
         return true;
     }
 
-    default Collection<T> generate() {
+    default Collection<SourceFile> generate() {
         return emptyList();
     }
 

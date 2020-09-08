@@ -17,11 +17,16 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface MethodMatcherTest {
+    fun typeRegex(signature: String) = MethodMatcher(signature).targetTypePattern.toRegex()
+    fun nameRegex(signature: String) = MethodMatcher(signature).methodNamePattern.toRegex()
+    fun argRegex(signature: String) = MethodMatcher(signature).argumentPattern.toRegex()
+
     @Test
     fun matchesSuperclassType(jp: JavaParser) {
         assertTrue(MethodMatcher("Object equals(Object)").matchesTargetType(JavaType.Class.build("java.lang.String")))
@@ -30,26 +35,17 @@ interface MethodMatcherTest {
 
     @Test
     fun matchesMethodTargetType(jp: JavaParser) {
-        val typeRegex = { signature: String -> MethodMatcher(signature).targetTypePattern.toRegex() }
-
         assertTrue(typeRegex("*..MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("MyClass foo()").matches("MyClass"))
         assertTrue(typeRegex("com.bar.MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("com.*.MyClass foo()").matches("com.bar.MyClass"))
     }
-
     @Test
     fun matchesMethodName(jp: JavaParser) {
-        val nameRegex = { signature: String -> MethodMatcher(signature).methodNamePattern.toRegex() }
-
         assertTrue(nameRegex("A foo()").matches("foo"))
         assertTrue(nameRegex("A *()").matches("foo"))
         assertTrue(nameRegex("A fo*()").matches("foo"))
         assertTrue(nameRegex("A *oo()").matches("foo"))
-    }
-
-    companion object {
-        private val argRegex = { signature: String -> MethodMatcher(signature).argumentPattern.toRegex() }
     }
 
     @Test
@@ -105,6 +101,14 @@ interface MethodMatcherTest {
     }
 
     @Test
+    @Disabled("Reproduces issue https://github.com/openrewrite/rewrite/issues/28")
+    fun matchesPrimitiveArgument(jp: JavaParser) {
+        assertTrue(argRegex("A foo(int)").matches("int"))
+        assertTrue(argRegex("A foo(int[])").matches("int[]"))
+        assertFalse(argRegex("A foo(int[])").matches("int"))
+    }
+
+    @Test
     fun matchesConstructorUsage(jp: JavaParser) {
         val cu = jp.parse("""
             package a;
@@ -120,5 +124,28 @@ interface MethodMatcherTest {
                 ((cu.classes.first().body.statements.first() as J.Block<*>)
                         .statements
                         .first() as J.VariableDecls).vars.first().initializer as J.NewClass))
+    }
+
+    @Test
+    fun matchesMethod(jp: JavaParser) {
+        val cu = jp.parse("""
+            package a;
+            
+            class A {
+                void setInt(int value) {}
+                int getInt() {}
+                void setInteger(Integer value) {}
+                Integer getInteger(){}
+            }
+        """.trimIndent()).first()
+        val classDecl = cu.classes.first()
+        val setIntMethod = classDecl.body.statements[0] as J.MethodDecl;
+        val getIntMethod = classDecl.body.statements[1] as J.MethodDecl;
+        val setIntegerMethod = classDecl.body.statements[2] as J.MethodDecl;
+        val getIntegerMethod = classDecl.body.statements[3] as J.MethodDecl;
+        assertTrue(MethodMatcher("a.A setInt(int)").matches(setIntMethod, classDecl))
+        assertTrue(MethodMatcher("a.A getInt()").matches(getIntMethod, classDecl))
+        assertTrue(MethodMatcher("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))
+        assertTrue(MethodMatcher("a.A getInteger()").matches(getIntegerMethod, classDecl))
     }
 }

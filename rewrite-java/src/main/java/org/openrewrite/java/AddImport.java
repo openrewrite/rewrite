@@ -85,6 +85,9 @@ public class AddImport extends JavaRefactorVisitor {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
+        if(JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
+            return cu;
+        }
         // note that using anyMatch here would return true for an empty list returned by FindType!
         @SuppressWarnings("SimplifyStreamApiCallChains") boolean hasReferences = new FindType(type).visit(cu).stream()
                 .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))

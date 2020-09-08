@@ -73,11 +73,18 @@ public class GenerateSetter extends JavaRefactorVisitor {
             if (field == null) {
                 return cd;
             }
-            assert field.getTypeAsClass() != null;
-            assert field.getTypeExpr() != null;
+
+            String fieldTypeString;
+            JavaType.Class classType = field.getTypeAsClass();
+            if(classType != null) {
+                fieldTypeString = classType.getFullyQualifiedName();
+            } else {
+                assert field.getTypeExpr() != null;
+                fieldTypeString = field.getTypeExpr().print();
+            }
 
             MethodMatcher setterMatcher = new MethodMatcher(
-                    type.getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + field.getTypeAsClass().getFullyQualifiedName() + ")");
+                    type.getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + fieldTypeString + ")");
 
             boolean setterAlreadyExists = cd.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
             if (setterAlreadyExists) {

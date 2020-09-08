@@ -150,4 +150,28 @@ interface GenerateGetterTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun getterForPrimitive(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            before = """ 
+                package org.example;
+                 
+                class A {
+                    int foo;
+                }
+            """,
+            after = """
+                package org.example;
+                 
+                class A {
+                    int foo;
+                
+                    public int getFoo() {
+                        return foo;
+                    }
+                }
+            """
+    )
 }

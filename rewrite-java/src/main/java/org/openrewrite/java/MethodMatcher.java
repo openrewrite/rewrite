@@ -68,8 +68,18 @@ public class MethodMatcher {
         }
 
         String signaturePattern = method.getParams().getParams().stream()
-                .map(v -> v instanceof J.VariableDecls ?
-                        ((J.VariableDecls) v).getTypeAsClass() : null)
+                .map(v -> {
+                    if(v instanceof J.VariableDecls) {
+                        J.VariableDecls vd = (J.VariableDecls)v;
+                        if(vd.getTypeAsClass() != null) {
+                            return vd.getTypeAsClass();
+                        } else {
+                            return vd.getTypeExpr() != null ? vd.getTypeExpr().getType() : null;
+                        }
+                    } else {
+                        return null;
+                    }
+                })
                 .filter(Objects::nonNull)
                 .map(this::typePattern)
                 .filter(Objects::nonNull)
