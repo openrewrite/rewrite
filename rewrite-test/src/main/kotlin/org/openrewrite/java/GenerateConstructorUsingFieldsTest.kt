@@ -23,7 +23,7 @@ interface GenerateConstructorUsingFieldsTest : RefactorVisitorTest {
     fun generateConstructorUsingFields(jp: JavaParser) = assertRefactored(
             jp,
             visitorsMapped = listOf { cu ->
-                GenerateConstructorUsingFields.Scoped(jp, cu.classes[0], cu.classes[0].fields)
+                GenerateConstructorUsingFields.Scoped(cu.classes[0], cu.classes[0].fields)
             },
             before = """
                 public class UsersController {
@@ -54,7 +54,7 @@ interface GenerateConstructorUsingFieldsTest : RefactorVisitorTest {
     fun emptyListOfFields(jp: JavaParser) = assertRefactored(
             jp,
             visitorsMapped = listOf { cu ->
-                GenerateConstructorUsingFields.Scoped(jp, cu.classes[0], emptyList())
+                GenerateConstructorUsingFields.Scoped(cu.classes[0], emptyList())
             },
             before = """
                 public class UsersController {

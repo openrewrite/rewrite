@@ -89,7 +89,9 @@ subprojects {
     }
 
     tasks.named<Test>("test") {
-        useJUnitPlatform()
+        useJUnitPlatform {
+            excludeTags("debug")
+        }
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
     }
 

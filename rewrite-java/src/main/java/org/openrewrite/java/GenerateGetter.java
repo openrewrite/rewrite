@@ -15,34 +15,27 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Formatting;
-import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
-import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.internal.StringUtils.*;
+import static org.openrewrite.internal.StringUtils.capitalize;
 
 /**
  * Generates a 'get' method for a field. For a field like:
- *
+ * <p>
  * String foo;
- *
+ * <p>
  * This will add the method:
- *
+ * <p>
  * public String getFoo() {
- *     return foo;
+ * return foo;
  * }
- *
+ * <p>
  * If the specified field does not exist no change will be made.
  * If a getter already exists no change will be made.
- *
  */
 public class GenerateGetter extends JavaRefactorVisitor {
     public static class Scoped extends JavaRefactorVisitor {
@@ -50,7 +43,6 @@ public class GenerateGetter extends JavaRefactorVisitor {
         private final String fieldName;
 
         public Scoped(JavaType.Class clazz, String fieldName) {
-            setCursoringOn();
             this.fieldName = fieldName;
             this.clazz = clazz;
         }
@@ -58,8 +50,9 @@ public class GenerateGetter extends JavaRefactorVisitor {
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
             J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
+
             JavaType.Class type = classDecl.getType();
-            if(type == null || !clazz.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+            if (type == null || !clazz.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
                 return cd;
             }
 
@@ -74,26 +67,21 @@ public class GenerateGetter extends JavaRefactorVisitor {
             assert field.getTypeExpr() != null;
             String simpleFieldName = field.getVars().get(0).getSimpleName();
             MethodMatcher getterMatcher = new MethodMatcher(type.getFullyQualifiedName() + " get" + capitalize(simpleFieldName) + "()");
+
             boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
             if (getterAlreadyExists) {
                 return cd;
             }
-            boolean isMissingTargetField = !cd.getFields().stream().filter(field::isScope).findAny().isPresent();
+
+            boolean isMissingTargetField = cd.getFields().stream().noneMatch(field::isScope);
             if (isMissingTargetField) {
                 return cd;
             }
 
-            J.CompilationUnit cu = getCursor().firstEnclosing(J.CompilationUnit.class);
-            assert cu != null;
-            JavaParser jp = JavaParser.fromJavaVersion()
-                    .styles(cu.getStyles())
-                    .build();
-
             J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
             String fieldName = fieldVar.getSimpleName();
 
-            J.MethodDecl getMethod = TreeBuilder.buildMethodDeclaration(jp,
-                    classDecl,
+            J.MethodDecl getMethod = treeBuilder.buildMethodDeclaration(classDecl,
                     "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
                             "    return " + fieldName + ";\n" +
                             "}\n",

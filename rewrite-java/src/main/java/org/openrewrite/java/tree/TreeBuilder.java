@@ -47,7 +47,10 @@ public class TreeBuilder {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    private TreeBuilder() {
+    private final J.CompilationUnit cu;
+
+    public TreeBuilder(J.CompilationUnit cu) {
+        this.cu = cu;
     }
 
     public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
@@ -99,13 +102,12 @@ public class TreeBuilder {
      * Build a class-scoped declaration. A "class-scoped declaration" is anything you can put inside a class declaration.
      * Examples of such statements include method declarations, field declarations, inner class declarations, and static initializers.
      *
-     * @param types specify any
+     * @param insertionScope The class this declaration is being inserted into.
+     * @param snippet        The declaration code to insert
+     * @param types          specify any
      */
-    public static J buildDeclaration(JavaParser parser,
-                                     J.ClassDecl insertionScope,
-                                     String snippet,
-                                     JavaType... types) {
-        parser.reset();
+    public J buildDeclaration(J.ClassDecl insertionScope, String snippet, JavaType... types) {
+        JavaParser javaParser = cu.buildParser();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
@@ -149,53 +151,47 @@ public class TreeBuilder {
             logger.debug(source);
         }
 
-        J.CompilationUnit cu = parser.parse(source).get(0);
+        J.CompilationUnit cu = javaParser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         return new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
     }
 
-    public static J.ClassDecl buildInnerClassDeclaration(
-            JavaParser parser,
-            J.ClassDecl insertionScope,
-            String classDeclarationSnippet,
-            JavaType... types
-    ) {
-        J.ClassDecl cd = (J.ClassDecl) buildDeclaration(parser, insertionScope, classDeclarationSnippet, types);
+    public J.ClassDecl buildInnerClassDeclaration(J.ClassDecl insertionScope,
+                                                  String classDeclarationSnippet,
+                                                  JavaType... types) {
+        J.ClassDecl cd = (J.ClassDecl) buildDeclaration(insertionScope, classDeclarationSnippet, types);
         JavaType.Class clazz = cd.getType();
-        assert insertionScope.getType() != null;
-        String fullyQualifiedType = insertionScope.getType().getFullyQualifiedName() + "." + cd.getSimpleName();
-        assert clazz != null;
-        JavaType.Class newClazz = JavaType.Class.build(fullyQualifiedType, clazz.getMembers(), clazz.getTypeParameters(), clazz.getInterfaces(), clazz.getConstructors(), clazz.getSupertype());
-        return cd.withType(newClazz);
+        if (insertionScope.getType() != null && clazz != null) {
+            JavaType.Class newClazz = JavaType.Class.build(insertionScope.getType().getFullyQualifiedName() +
+                    "." + cd.getSimpleName());
+            return cd.withType(newClazz);
+        }
+        return cd;
     }
 
-    public static J.VariableDecls buildFieldDeclaration(JavaParser parser,
-                                                        J.ClassDecl insertionScope,
-                                                        String fieldDeclarationSnippet,
-                                                        JavaType... types) {
-        return (J.VariableDecls) buildDeclaration(parser, insertionScope, fieldDeclarationSnippet, types);
+    public J.VariableDecls buildFieldDeclaration(J.ClassDecl insertionScope,
+                                                 String fieldDeclarationSnippet,
+                                                 JavaType... types) {
+        return (J.VariableDecls) buildDeclaration(insertionScope, fieldDeclarationSnippet, types);
     }
 
-    public static J.MethodDecl buildMethodDeclaration(JavaParser parser,
-                                                      J.ClassDecl insertionScope,
-                                                      String methodDeclarationSnippet,
-                                                      JavaType... types) {
-        return (J.MethodDecl) buildDeclaration(parser, insertionScope, methodDeclarationSnippet, types);
+    public J.MethodDecl buildMethodDeclaration(J.ClassDecl insertionScope,
+                                               String methodDeclarationSnippet,
+                                               JavaType... types) {
+        return (J.MethodDecl) buildDeclaration(insertionScope, methodDeclarationSnippet, types);
     }
 
     @SuppressWarnings("unchecked")
-    public static <T extends J> List<T> buildSnippet(JavaParser parser,
-                                                     J.CompilationUnit containing,
-                                                     Cursor insertionScope,
-                                                     String snippet,
-                                                     JavaType.Class... imports) {
-        parser.reset();
+    public <T extends J> List<T> buildSnippet(Cursor insertionScope,
+                                              String snippet,
+                                              JavaType.Class... imports) {
+        JavaParser javaParser = cu.buildParser();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
         String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
                 "class CodeSnippet {\n" +
-                new ListScopeVariables(insertionScope).visit(containing).stream()
+                new ListScopeVariables(insertionScope).visit(cu).stream()
                         .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
                 "  // the contents of this block are the snippet\n" +
                 "  {\n" +
@@ -209,7 +205,7 @@ public class TreeBuilder {
             logger.debug(source);
         }
 
-        J.CompilationUnit cu = parser.parse(source).get(0);
+        J.CompilationUnit cu = javaParser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
