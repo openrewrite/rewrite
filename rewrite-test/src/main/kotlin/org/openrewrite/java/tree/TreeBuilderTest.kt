@@ -40,8 +40,8 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder.buildSnippet<Statement>(
-                jp, a, methodBodyCursor,
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
                 "others.add(${paramName.printTrimmed()});")
 
         assertTrue(snippets[0] is J.MethodInvocation)
@@ -59,18 +59,19 @@ interface TreeBuilderTest {
             }
         """
                 .whenParsedBy(jp)
-                .whenVisitedByMapped { a ->
+                .whenVisitedByMapped { a: J.CompilationUnit ->
                     val method = a.classes[0].methods[0]
                     val methodBodyCursor = RetrieveCursor(method.body).visit(a)
                     val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
 
-                    val snippets = TreeBuilder.buildSnippet<Statement>(
-                            jp, a, methodBodyCursor, """
-                            others.add(${paramName});
-                            if(others.contains(${paramName})) {
-                                others.remove(${paramName});
-                            }
-                        """.trimIndent())
+                    val snippets = TreeBuilder(a).buildSnippet<Statement>(methodBodyCursor,
+                            """
+                                others.add(${paramName});
+                                if(others.contains(${paramName})) {
+                                    others.remove(${paramName});
+                                }
+                            """.trimIndent()
+                    )
 
                     object : JavaRefactorVisitor() {
                         override fun visitMethod(method: J.MethodDecl): J = method.withBody(method.body!!.withStatements(snippets))
@@ -108,7 +109,7 @@ interface TreeBuilderTest {
             }
         """.trimIndent())[0]
 
-        val methodDecl = TreeBuilder.buildMethodDeclaration(jp, a.classes[0],
+        val methodDecl = TreeBuilder(a).buildMethodDeclaration(a.classes[0],
                 """
                     B build() {
                         return new B();
@@ -155,14 +156,14 @@ interface TreeBuilderTest {
 
     @Test
     fun buildInnerClass(jp: JavaParser) {
-        val cd = jp.parse("""
+        val a = jp.parse("""
             import java.util.Arrays;
             import java.util.List;
             
             class A {
                 List<String> foo = Arrays.asList("Hello", "World");
             }
-        """).first().classes.first()
+        """).first()
 
         val innerClassSnippet = """
             class B {
@@ -170,7 +171,7 @@ interface TreeBuilderTest {
             }
         """.trimIndent()
 
-        val result = TreeBuilder.buildDeclaration(jp, cd, innerClassSnippet,
+        val result = TreeBuilder(a).buildDeclaration(a.classes.first(), innerClassSnippet,
                 JavaType.Class.build("java.util.List"))
         assertThat(result).isExactlyInstanceOf(J.ClassDecl::class.java)
         assertThat(result.printTrimmed()).isEqualTo(innerClassSnippet)

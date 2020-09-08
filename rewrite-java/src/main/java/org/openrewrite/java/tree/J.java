@@ -1150,8 +1150,9 @@ public interface J extends Serializable, Tree {
                 .collect(joining(""))).normalize();
         }
 
-        public JavaParser buildParser() {
+        public JavaParser buildParser(String... artifactNames) {
             return JavaParser.fromJavaVersion()
+                    .classpath(JavaParser.dependenciesFromClasspath(artifactNames))
                     .styles(styles)
                     .build();
         }
@@ -2177,7 +2178,7 @@ public interface J extends Serializable, Tree {
 
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     abstract class Modifier implements J {
-        static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
+        public static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
             return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
                     .toLowerCase().equals(modifier));
         }
@@ -2191,7 +2192,7 @@ public interface J extends Serializable, Tree {
          * @return A new list containing the new modifier, or the original list instance if the modifier
          * is already present in the list.
          */
-        static List<Modifier> withModifiers(List<Modifier> existing, String... modifierKeywords) {
+        public static List<Modifier> withModifiers(List<Modifier> existing, String... modifierKeywords) {
             boolean visibilityChanged = false;
             List<Modifier> modifiers = new ArrayList<>(existing);
 

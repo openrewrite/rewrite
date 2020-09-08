@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.AbstractSourceVisitor;
 import org.openrewrite.Incubating;
-import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.style.TabAndIndentStyle;
@@ -31,6 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.IntStream.range;
@@ -43,11 +43,11 @@ import static java.util.stream.IntStream.range;
  */
 @Incubating(since = "2.1.0")
 public class AutoFormat extends JavaRefactorVisitor {
-    private final J scope;
+    private final J[] scope;
 
     private Formatter.Result wholeSourceIndent;
 
-    public AutoFormat(J scope) {
+    public AutoFormat(J... scope) {
         this.scope = scope;
         setCursoringOn();
     }
@@ -94,7 +94,7 @@ public class AutoFormat extends JavaRefactorVisitor {
         J j = super.visitTree(tree);
 
         String prefix = tree.getPrefix();
-        if (prefix.contains("\n") && getCursor().isScopeInPath(scope)) {
+        if (prefix.contains("\n") && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
             int indentMultiple = (int) getCursor().getPathAsStream().filter(J.Block.class::isInstance).count();
             if(tree instanceof J.Block.End) {
                 indentMultiple--;
@@ -134,7 +134,7 @@ public class AutoFormat extends JavaRefactorVisitor {
 
         @Override
         public Void visitTree(Tree tree) {
-            if (getCursor().isScopeInPath(scope)) {
+            if (stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
                 return null;
             }
 

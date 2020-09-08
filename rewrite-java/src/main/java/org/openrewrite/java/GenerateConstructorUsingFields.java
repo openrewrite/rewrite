@@ -19,7 +19,6 @@ import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TreeBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,14 +32,11 @@ import static org.openrewrite.Tree.randomId;
 
 public class GenerateConstructorUsingFields {
     public static class Scoped extends JavaRefactorVisitor {
-        private final JavaParser javaParser;
         private final J.ClassDecl scope;
         private final List<J.VariableDecls> fields;
 
-        public Scoped(JavaParser javaParser,
-                                              J.ClassDecl scope,
-                                              List<J.VariableDecls> fields) {
-            this.javaParser = javaParser;
+        public Scoped(J.ClassDecl scope,
+                      List<J.VariableDecls> fields) {
             this.scope = scope;
             this.fields = fields;
             setCursoringOn();
@@ -126,9 +122,7 @@ public class GenerateConstructorUsingFields {
             public J visitMethod(J.MethodDecl method) {
                 if (scope.isScope(method)) {
                     return method.withBody(method.getBody().withStatements(
-                            TreeBuilder.buildSnippet(
-                                    javaParser,
-                                    enclosingCompilationUnit(),
+                            treeBuilder.buildSnippet(
                                     getCursor(),
                                     fields.stream().map(mv -> {
                                         String name = mv.getVars().get(0).getSimpleName();

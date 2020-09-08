@@ -22,6 +22,7 @@ import org.openrewrite.java.tree.*;
 
 public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements JavaSourceVisitor<J> {
     protected JavaFormatter formatter;
+    protected TreeBuilder treeBuilder;
 
     @Override
     public J visitStatement(Statement statement) {
@@ -140,6 +141,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
         formatter = new JavaFormatter(cu);
+        treeBuilder = new TreeBuilder(cu);
         J.CompilationUnit c = cu;
         c = c.withPackageDecl(refactor(c.getPackageDecl()));
         c = c.withImports(refactor(c.getImports()));

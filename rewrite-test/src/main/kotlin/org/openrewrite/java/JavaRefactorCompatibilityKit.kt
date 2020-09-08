@@ -62,6 +62,9 @@ abstract class JavaRefactorCompatibilityKit {
     inner class GenerateConstructorUsingFieldsTck : GenerateConstructorUsingFieldsTest
 
     @Nested
+    inner class GenerateNewBeanUsingPropertiesTck : GenerateNewBeanUsingPropertiesTest
+
+    @Nested
     inner class ImplementInterfaceTck : ImplementInterfaceTest
 
     @Nested
