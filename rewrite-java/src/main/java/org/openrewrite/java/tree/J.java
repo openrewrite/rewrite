@@ -2057,6 +2057,10 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            public boolean isEmpty() {
+                return params.stream().allMatch(p -> p instanceof Empty);
+            }
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

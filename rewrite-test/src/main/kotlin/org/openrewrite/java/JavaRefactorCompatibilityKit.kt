@@ -74,7 +74,10 @@ abstract class JavaRefactorCompatibilityKit {
     inner class MethodMatcherTck : MethodMatcherTest
 
     @Nested
-    inner class OrderImportTck : OrderImportTest
+    inner class OrderDeclarationsTck : OrderDeclarationsTest
+
+    @Nested
+    inner class OrderImportsTck : OrderImportsTest
 
     @Nested
     inner class RemoveImportTck : RemoveImportTest

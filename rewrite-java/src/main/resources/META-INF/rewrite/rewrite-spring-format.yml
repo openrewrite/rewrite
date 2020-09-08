@@ -31,3 +31,28 @@ configure:
         - import org.springframework.*
         - <blank line>
         - import static all other imports
+  org.openrewrite.java.style.DeclarationOrderStyle:
+    layout:
+      blankLineBeforeFirstStatement: true
+      privateMethodsAdjacentTo: AfterFirstUse # ... AfterLastUse, or End
+      accessorOrder: 'get,set,with'
+      blocks:
+        - public static fields
+        - <blank line>
+        - private static fields
+        - <blank line>
+        - final fields
+        - <blank line>
+        - all other fields
+        - <blank line>
+        - all other constructors
+        - <blank line>
+        - all other methods
+        - all accessors # orders them as get/set/with
+#        - all getters
+#        - all setters
+#        - all with
+        - equals
+        - hashCode
+        - toString
+        - all other classes

@@ -24,6 +24,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * The stylistic surroundings of a tree element
@@ -66,12 +67,60 @@ public class Formatting implements Serializable {
         }
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Formatting that = (Formatting) o;
+        return Objects.equals(prefix, that.prefix) &&
+                Objects.equals(suffix, that.suffix);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(prefix, suffix);
+    }
+
     public Formatting withPrefix(String prefix) {
         return format(prefix, suffix);
     }
 
     public Formatting withSuffix(String suffix) {
         return format(prefix, suffix);
+    }
+
+    public Formatting withMinimumBlankLines(int min) {
+        int blankLinesLessThanMin = (int) ((min + 1) - prefix.chars().filter(c -> c == '\n').count());
+        StringBuilder newBlankLines = new StringBuilder();
+        for (int i = 0; i < blankLinesLessThanMin; i++) {
+            newBlankLines.append('\n');
+        }
+        return withPrefix(newBlankLines + prefix);
+    }
+
+    public Formatting withMaximumBlankLines(int max) {
+        int blankLines = (int) (prefix.chars().filter(c -> c == '\n').count() - 1);
+
+        if(blankLines <= max) {
+            return this;
+        }
+
+        StringBuilder newPrefix = new StringBuilder();
+
+        char[] chars = prefix.toCharArray();
+        int newLinesSeen = 0;
+
+        for (char c : chars) {
+            if(c == '\n') {
+                newLinesSeen++;
+            }
+
+            if (newLinesSeen == 0 || newLinesSeen > max) {
+                newPrefix.append(c);
+            }
+        }
+
+        return withPrefix(newPrefix.toString());
     }
 
     @JsonIgnore

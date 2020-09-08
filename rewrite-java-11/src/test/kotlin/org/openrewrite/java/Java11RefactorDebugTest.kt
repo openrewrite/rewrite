@@ -88,7 +88,11 @@ class Java11MethodMatcherTest: Java11Test(), MethodMatcherTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11OrderImportTest: Java11Test(), OrderImportTest
+class Java11OrderDeclarationsTest: Java11Test(), OrderDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11OrderImportsTest: Java11Test(), OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

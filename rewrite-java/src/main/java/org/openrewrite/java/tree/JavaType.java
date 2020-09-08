@@ -156,7 +156,7 @@ public interface JavaType extends Serializable {
                       List<Var> members,
                       List<JavaType> typeParameters,
                       List<JavaType> interfaces,
-                      List<Method> constructors,
+                      @Nullable List<Method> constructors,
                       @Nullable Class supertype) {
             this.fullyQualifiedName = fullyQualifiedName;
             this.members = members;
