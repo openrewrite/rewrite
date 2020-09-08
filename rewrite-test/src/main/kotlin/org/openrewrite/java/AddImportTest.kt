@@ -227,4 +227,13 @@ interface AddImportTest: RefactorVisitorTest {
             ),
             before = "class A {}"
     )
+
+    @Test
+    fun dontAddImportForPrimitive(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(AddImport().apply {
+                setType("int")
+            }),
+            before = "class A {}"
+    )
 }

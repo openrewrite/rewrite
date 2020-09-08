@@ -37,23 +37,23 @@ public final class AddField {
     public static class Scoped extends JavaRefactorVisitor {
         private final J.ClassDecl scope;
         private final List<J.Modifier> modifiers;
-        private final String clazz;
+        private final String type;
         private final String name;
 
         @Nullable
         private final String init;
 
-        public Scoped(J.ClassDecl scope, List<J.Modifier> modifiers, String clazz, String name, @Nullable String init) {
+        public Scoped(J.ClassDecl scope, List<J.Modifier> modifiers, String type, String name, @Nullable String init) {
             this.scope = scope;
             this.modifiers = modifiers;
-            this.clazz = clazz;
+            this.type = type;
             this.name = name;
             this.init = init;
         }
 
         @Override
         public Iterable<Tag> getTags() {
-            return Tags.of("field.class", clazz, "field.name", name);
+            return Tags.of("field.class", type, "field.name", name);
         }
 
         @Override
@@ -65,21 +65,27 @@ public final class AddField {
                     .map(J.VariableDecls.class::cast)
                     .noneMatch(mv -> mv.getVars().stream().anyMatch(var -> var.getSimpleName().equals(name)))) {
                 J.Block<J> body = c.getBody();
-                JavaType.FullyQualified classType = JavaType.Class.build(clazz);
-
-                maybeAddImport(classType);
+                JavaType javaType = JavaType.buildType(type);
+                String fieldTypeString;
+                if(javaType instanceof JavaType.FullyQualified) {
+                    JavaType.FullyQualified classType = (JavaType.FullyQualified) javaType;
+                    maybeAddImport(classType);
+                    fieldTypeString = classType.getClassName();
+                } else {
+                    fieldTypeString = javaType.toTypeTree().print();
+                }
 
                 J.VariableDecls newField = new J.VariableDecls(randomId(),
                         emptyList(),
                         modifiers,
-                        J.Ident.build(randomId(), classType.getClassName(), classType, modifiers.isEmpty() ? EMPTY : format(" ")),
+                        J.Ident.build(randomId(), fieldTypeString, javaType, modifiers.isEmpty() ? EMPTY : format(" ")),
                         null,
                         emptyList(),
                         singletonList(new J.VariableDecls.NamedVar(randomId(),
                                 J.Ident.build(randomId(), name, null, format("", init == null ? "" : " ")),
                                 emptyList(),
                                 init == null ? null : new J.UnparsedSource(randomId(), init, format(" ")),
-                                classType,
+                                javaType,
                                 format(" ")
                         )),
                         formatter.format(body)
