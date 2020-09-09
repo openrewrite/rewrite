@@ -7,4 +7,4 @@
 
 The Rewrite project is a mass refactoring ecosystem for Java and other source code, designed to eliminate technical debt across an engineering organization. It consists of a platform of prepackaged refactoring recipes for common framework migration and stylistic consistency tasks in Java, ready for you to apply in your build via Maven or Gradle plugins.
 
-Read the full documentation at [docs.openrewrite.org/](https://docs.openrewrite.org/)
+Read the full documentation at [docs.openrewrite.org](https://docs.openrewrite.org/)
