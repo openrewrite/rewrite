@@ -97,20 +97,16 @@ public class DeclarationOrderStyle implements JavaStyle {
 
     public static class Layout {
         public static Layout DEFAULT = Layout.builder()
-                .fields("public", "static")
-                .blankLine()
-                .fields("private", "static")
-                .blankLine()
-                .fields("final")
-                .blankLine()
-                .allOtherFields()
-                .blankLine()
-                .allOtherConstructors()
-                .allOtherMethods()
-                .allAccessors()
-                .equals()
-                .hashCoding()
-                .toStringing()
+                .fields("public", "static").blankLine()
+                .fields("private", "static").blankLine()
+                .fields("final").blankLine()
+                .allOtherFields().blankLine()
+                .allOtherConstructors().blankLine()
+                .allOtherMethods().blankLine()
+                .allAccessors().blankLine()
+                .equals().blankLine()
+                .hashCoding().blankLine()
+                .toStringing().blankLine()
                 .allOtherClasses()
                 .build();
 
@@ -194,9 +190,16 @@ public class DeclarationOrderStyle implements JavaStyle {
                                     return declaration.withFormatting(declaration.getFormatting()
                                             .withMinimumBlankLines(blankLines.getAndSet(0)));
                                 }
+
+                                if (declaration instanceof J.MethodDecl) {
+                                    return declaration.withFormatting(declaration.getFormatting()
+                                            .withMinimumBlankLines(1));
+                                }
+
                                 return declaration;
                             })
                             .collect(toList()));
+                    blankLines.set(0);
                 }
             }
             return orderedDeclarations;

@@ -80,6 +80,10 @@ class Java11ImplementInterfaceTest: Java11Test(), ImplementInterfaceTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11InsertDeclaration: Java11Test(), InsertDeclarationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11InsertMethodArgumentTest: Java11Test(), InsertMethodArgumentTest
 
 @DebugOnly
