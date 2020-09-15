@@ -26,8 +26,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.test;
 
@@ -121,7 +120,10 @@ public class DeclarationOrderStyle implements JavaStyle {
         Layout(List<Block<?>> blocks) {
             this.blocks = blocks;
 
-            this.blocksByPrecedence = new ArrayList<>(blocks);
+            this.blocksByPrecedence = new ArrayList<>();
+            blocks.stream().filter(b -> !(b instanceof Block.BlankLines))
+                    .forEach(blocksByPrecedence::add);
+
             blocksByPrecedence.sort(new Comparator<Block<?>>() {
                 @Override
                 public int compare(Block<?> b1, Block<?> b2) {
@@ -180,11 +182,13 @@ public class DeclarationOrderStyle implements JavaStyle {
 
             AtomicInteger blankLines = new AtomicInteger(0);
             for (Block<?> block : blocks) {
+                System.out.println(block);
                 if (block instanceof Block.BlankLines) {
                     blankLines.addAndGet(((Block.BlankLines) block).count);
                 } else {
                     AtomicBoolean first = new AtomicBoolean(true);
                     orderedDeclarations.addAll(block.orderedDeclarations().stream()
+                            .peek(declaration -> System.out.println("  " + declaration.toString()))
                             .map(declaration -> {
                                 if (first.getAndSet(false)) {
                                     return declaration.withFormatting(declaration.getFormatting()
@@ -301,7 +305,8 @@ public class DeclarationOrderStyle implements JavaStyle {
 
                 @Override
                 public String toString() {
-                    return String.join(" ", requiredModifiers) + " fields";
+                    return (requiredModifiers.isEmpty() ? "all other" : String.join(" ", requiredModifiers)) +
+                            " fields";
                 }
             }
 
@@ -328,7 +333,8 @@ public class DeclarationOrderStyle implements JavaStyle {
 
                 @Override
                 public String toString() {
-                    return String.join(" ", requiredModifiers) + " classes";
+                    return (requiredModifiers.isEmpty() ? "all other" : String.join(" ", requiredModifiers)) +
+                            " classes";
                 }
             }
 
@@ -360,7 +366,8 @@ public class DeclarationOrderStyle implements JavaStyle {
 
                 @Override
                 public String toString() {
-                    return String.join(" ", requiredModifiers) + " methods";
+                    return (requiredModifiers.isEmpty() ? "all other" : String.join(" ", requiredModifiers)) +
+                            " methods";
                 }
             }
 
@@ -388,7 +395,8 @@ public class DeclarationOrderStyle implements JavaStyle {
 
                 @Override
                 public String toString() {
-                    return String.join(" ", requiredModifiers) + " constructors";
+                    return (requiredModifiers.isEmpty() ? "all other" : String.join(" ", requiredModifiers)) +
+                            " constructors";
                 }
             }
 

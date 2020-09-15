@@ -27,10 +27,10 @@ public class VariableDeclsToString {
     private static final PrintJava VARIABLE_PRINTER = new PrintJava() {
         @Override
         public String visitMultiVariable(J.VariableDecls multiVariable) {
-            String modifiers = visitModifiers(multiVariable.getModifiers());
+            String modifiers = visitModifiers(multiVariable.getModifiers()).trim();
             String varargs = multiVariable.getVarargs() == null ? "" : "...";
 
-            return modifiers +
+            return (modifiers.isEmpty() ? "" : modifiers + " ") +
                     (multiVariable.getTypeExpr() == null ? "" : multiVariable.getTypeExpr().printTrimmed() + " ") +
                     multiVariable.getDimensionsBeforeName().stream()
                             .map(d -> "[]")

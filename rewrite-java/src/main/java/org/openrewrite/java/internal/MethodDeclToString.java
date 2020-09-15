@@ -25,16 +25,15 @@ public class MethodDeclToString {
     private static final PrintJava METHOD_PRINTER = new PrintJava() {
         @Override
         public String visitMethod(J.MethodDecl method) {
-            String modifiers = visitModifiers(method.getModifiers());
+            String modifiers = visitModifiers(method.getModifiers()).trim();
             String params = "(" + visit(method.getParams().getParams(), ",") + ")";
             String thrown = method.getThrows() == null ? "" :
                     "throws" + visit(method.getThrows().getExceptions(), ",");
 
-            return visit(method.getAnnotations()) +
-                    modifiers +
-                    visit(method.getTypeParameters()) +
-                    visit(method.getReturnTypeExpr()) +
-                    visit(method.getName()) +
+            return (modifiers.isEmpty() ? "" : modifiers + " ") +
+                    (method.getTypeParameters() == null ? "" : method.getTypeParameters() + " ") +
+                    (method.getReturnTypeExpr() == null ? "" : method.getReturnTypeExpr().printTrimmed() + " ") +
+                    method.getName().printTrimmed() +
                     params +
                     thrown;
         }

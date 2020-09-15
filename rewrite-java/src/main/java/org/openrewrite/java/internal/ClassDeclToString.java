@@ -25,7 +25,7 @@ public class ClassDeclToString {
     private static final PrintJava CLASS_DECL_PRINTER = new PrintJava() {
         @Override
         public String visitClassDecl(J.ClassDecl classDecl) {
-            String modifiers = visitModifiers(classDecl.getModifiers());
+            String modifiers = visitModifiers(classDecl.getModifiers()).trim();
 
             String kind = "";
             if (classDecl.getKind() instanceof J.ClassDecl.Kind.Class) {
@@ -38,7 +38,8 @@ public class ClassDeclToString {
                 kind = "@interface ";
             }
 
-            return modifiers + kind + classDecl.getName().printTrimmed() +
+            return (modifiers.isEmpty() ? "" : modifiers + " ") +
+                    kind + classDecl.getName().printTrimmed() +
                     (classDecl.getTypeParameters() == null ? "" : classDecl.getTypeParameters().printTrimmed() + " ") +
                     (classDecl.getExtends() == null ? "" : "extends" + visit(classDecl.getExtends().getFrom()) + " ") +
                     (classDecl.getImplements() == null ? "" : (classDecl.getKind() instanceof J.ClassDecl.Kind.Interface ? "extends " : "implements ") +
