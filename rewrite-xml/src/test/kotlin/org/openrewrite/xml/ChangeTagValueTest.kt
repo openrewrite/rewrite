@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
 
-class ChangeTagValueTest : XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
+class ChangeTagValueTest : RefactorVisitorTestForParser<Xml.Document> {
     override val parser: XmlParser = XmlParser()
 
     @Test

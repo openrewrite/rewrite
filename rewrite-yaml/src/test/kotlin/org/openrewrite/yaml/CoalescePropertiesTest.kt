@@ -20,7 +20,7 @@ import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.whenParsedBy
 import org.openrewrite.yaml.tree.Yaml
 
-class CoalescePropertiesTest : YamlParser(), RefactorVisitorTestForParser<Yaml.Documents> {
+class CoalescePropertiesTest : RefactorVisitorTestForParser<Yaml.Documents> {
     override val parser = YamlParser()
 
     @Test
