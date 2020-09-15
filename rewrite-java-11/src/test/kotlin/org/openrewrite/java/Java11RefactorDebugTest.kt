@@ -76,6 +76,14 @@ class Java11GenerateConstructorUsingFieldsTest: Java11Test(), GenerateConstructo
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11GenerateGetter: Java11Test(), GenerateGetterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11GenerateSetter: Java11Test(), GenerateSetterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ImplementInterfaceTest: Java11Test(), ImplementInterfaceTest
 
 @DebugOnly

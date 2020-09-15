@@ -18,8 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.java.style.DeclarationOrderStyle;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 public class InsertDeclaration {
     public static class Scoped extends JavaRefactorVisitor {
@@ -55,33 +54,29 @@ public class InsertDeclaration {
                 layout.reset();
                 declarations.forEach(layout::accept);
 
-                J firstBefore = null;
-                J firstAfter = null;
+                Set<J> before = new HashSet<>();
                 J formattedDeclaration = declaration;
 
                 List<J> orderedDeclarations = layout.orderedDeclarations();
-                for (int i = 0; i < orderedDeclarations.size(); i++) {
-                    if (orderedDeclarations.get(i).isScope(declaration)) {
-                        firstBefore = i > 0 ? orderedDeclarations.get(i - 1) : null;
-                        firstAfter = i < orderedDeclarations.size() - 1 ? orderedDeclarations.get(i + 1) : null;
-                        formattedDeclaration = orderedDeclarations.get(i);
+                for (J orderedDeclaration : orderedDeclarations) {
+                    if (orderedDeclaration.isScope(declaration)) {
+                        formattedDeclaration = orderedDeclaration;
                         break;
                     }
+                    before.add(orderedDeclaration);
                 }
 
                 List<J> declarationsWithInsert = new ArrayList<>();
-                if (firstBefore == null) {
+                if (before.isEmpty()) {
                     declarationsWithInsert.add(formattedDeclaration);
                 }
 
                 for (J statement : c.getBody().getStatements()) {
-                    if (statement.isScope(firstAfter)) {
-                        declarationsWithInsert.add(firstAfter);
-                    } else {
-                        declarationsWithInsert.add(statement);
-                        if (statement.isScope(firstBefore)) {
-                            declarationsWithInsert.add(formattedDeclaration);
-                        }
+                    int size = before.size();
+                    before.remove(statement);
+                    declarationsWithInsert.add(statement);
+                    if(size == 1) {
+                        declarationsWithInsert.add(formattedDeclaration);
                     }
                 }
 

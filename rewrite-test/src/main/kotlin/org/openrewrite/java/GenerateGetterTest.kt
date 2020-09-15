@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 @ExtendWith(JavaParserResolver::class)
@@ -25,7 +26,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
 
     @Test
     fun generatesBasicGetter(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
                  
@@ -52,7 +53,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
 
     @Test
     fun generatesInnerClassGetter(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A.B"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0].body.statements[0] as J.ClassDecl, "foo") },
             before = """ 
                 package org.example;
                  
@@ -79,7 +80,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
 
     @Test
     fun getterToInnerClass(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """
                 package org.example;
                 
@@ -98,19 +99,19 @@ interface GenerateGetterTest : RefactorVisitorTest {
                  
                 class A {
                     Inner foo;
-                    
-                    public static class Inner { }
                 
                     public Inner getFoo() {
                         return foo;
                     }
+                    
+                    public static class Inner { }
                 }
             """
     )
 
     @Test
     fun doesNotDuplicateExistingGetter(jp: JavaParser) = assertUnchanged(jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """
                 package org.example;
                  
@@ -126,7 +127,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
 
     @Test
     fun handlesGenerics(jp: JavaParser) = assertRefactored(jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
                 
@@ -154,7 +155,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
     @Test
     fun getterForPrimitive(jp: JavaParser) = assertRefactored(
             jp,
-            visitors = listOf(GenerateGetter.Scoped(JavaType.Class.build("org.example.A"), "foo")),
+            visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
                  

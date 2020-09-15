@@ -19,16 +19,11 @@ import org.openrewrite.Formatting;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
-import org.openrewrite.java.tree.TreeBuilder;
-import org.openrewrite.java.tree.TypeTree;
 import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.capitalize;
@@ -50,19 +45,19 @@ import static org.openrewrite.internal.StringUtils.capitalize;
  */
 public class GenerateSetter extends JavaRefactorVisitor {
     public static class Scoped extends JavaRefactorVisitor {
-        private final JavaType.Class clazz;
+        private final J.ClassDecl scope;
         private final String fieldName;
 
-        public Scoped(JavaType.Class clazz, String fieldName) {
+        public Scoped(J.ClassDecl scope, String fieldName) {
+            this.scope = scope;
             this.fieldName = fieldName;
-            this.clazz = clazz;
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
             J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
-            JavaType.Class type = classDecl.getType();
-            if(type == null || !clazz.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
+
+            if(!classDecl.isScope(scope)) {
                 return cd;
             }
 
@@ -74,84 +69,87 @@ public class GenerateSetter extends JavaRefactorVisitor {
                 return cd;
             }
 
-            String fieldTypeString;
-            JavaType.Class classType = field.getTypeAsClass();
-            if(classType != null) {
-                fieldTypeString = classType.getFullyQualifiedName();
-            } else {
-                assert field.getTypeExpr() != null;
-                fieldTypeString = field.getTypeExpr().print();
-            }
+            JavaType.Class type = TypeUtils.asClass(classDecl.getType());
+            if (type != null) {
+                String fieldTypeString;
+                JavaType.Class classType = field.getTypeAsClass();
+                if(classType != null) {
+                    fieldTypeString = classType.getFullyQualifiedName();
+                } else {
+                    assert field.getTypeExpr() != null;
+                    fieldTypeString = field.getTypeExpr().print();
+                }
 
-            MethodMatcher setterMatcher = new MethodMatcher(
-                    type.getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + fieldTypeString + ")");
+                MethodMatcher setterMatcher = new MethodMatcher(
+                        type.getFullyQualifiedName() + " set" + capitalize(fieldName) + "(" + fieldTypeString + ")");
 
-            boolean setterAlreadyExists = cd.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
-            if (setterAlreadyExists) {
-                return cd;
-            }
+                boolean setterAlreadyExists = cd.getMethods().stream().anyMatch(it -> setterMatcher.matches(it, classDecl));
+                if (setterAlreadyExists) {
+                    return cd;
+                }
 
-            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
-            JavaType fieldType = fieldVar.getType();
+                J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+                JavaType fieldType = fieldVar.getType();
 
-            // TreeBuilder.buildMethodDeclaration() doesn't currently type-attribute inner classes correctly
-            // Manually construct the AST to get the types juuuust right
-            J.Ident valueArgument = J.Ident.build(randomId(), "value", fieldType, Formatting.format(" "));
-            Expression assignmentExp;
-            if(fieldVar.getSimpleName().equals("value")) {
-                assignmentExp = new J.FieldAccess(randomId(),
-                        J.Ident.build(randomId(),
-                                "this",
-                                cd.getType(),
+                // TreeBuilder.buildMethodDeclaration() doesn't currently type-attribute inner classes correctly
+                // Manually construct the AST to get the types juuuust right
+                J.Ident valueArgument = J.Ident.build(randomId(), "value", fieldType, Formatting.format(" "));
+                Expression assignmentExp;
+                if (fieldVar.getSimpleName().equals("value")) {
+                    assignmentExp = new J.FieldAccess(randomId(),
+                            J.Ident.build(randomId(),
+                                    "this",
+                                    cd.getType(),
+                                    Formatting.EMPTY),
+                            fieldVar.getName(),
+                            fieldType,
+                            Formatting.format("", " "));
+                } else {
+                    assignmentExp = fieldVar.getName().withFormatting(Formatting.format("", " "));
+                }
+                J.MethodDecl setMethod = new J.MethodDecl(randomId(),
+                        Collections.emptyList(),
+                        Collections.singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY)),
+                        null,
+                        JavaType.Primitive.Void.toTypeTree().withFormatting(Formatting.format(" ")),
+                        J.Ident.build(randomId(), "set" + capitalize(fieldName), null, Formatting.format(" ")),
+                        new J.MethodDecl.Parameters(randomId(),
+                                Collections.singletonList(new J.VariableDecls(randomId(),
+                                        Collections.emptyList(),
+                                        Collections.emptyList(),
+                                        field.getTypeExpr(),
+                                        null,
+                                        Collections.emptyList(),
+                                        Collections.singletonList(new J.VariableDecls.NamedVar(randomId(),
+                                                valueArgument,
+                                                Collections.emptyList(),
+                                                null,
+                                                fieldType,
+                                                Formatting.EMPTY)),
+                                        Formatting.EMPTY)),
                                 Formatting.EMPTY),
-                        fieldVar.getName(),
-                        fieldType,
-                        Formatting.format("", " "));
-            } else {
-                assignmentExp = fieldVar.getName().withFormatting(Formatting.format("", " "));
-            }
-            J.MethodDecl setMethod = new J.MethodDecl(randomId(),
-                    Collections.emptyList(),
-                    Collections.singletonList( new J.Modifier.Public(randomId(), Formatting.EMPTY)),
-                    null,
-                    JavaType.Primitive.Void.toTypeTree().withFormatting(Formatting.format(" ")),
-                    J.Ident.build(randomId(), "set" + capitalize(fieldName), null, Formatting.format(" ")),
-                    new J.MethodDecl.Parameters(randomId(),
-                            Collections.singletonList(new J.VariableDecls(randomId(),
-                                    Collections.emptyList(),
-                                    Collections.emptyList(),
-                                    field.getTypeExpr(),
-                                    null,
-                                    Collections.emptyList(),
-                                    Collections.singletonList(new J.VariableDecls.NamedVar(randomId(),
-                                            valueArgument,
-                                            Collections.emptyList(),
-                                            null,
-                                            fieldType,
-                                            Formatting.EMPTY)),
-                                    Formatting.EMPTY)),
-                            Formatting.EMPTY),
-                    null,
-                    new J.Block<>(randomId(),
-                            null,
-                            Collections.singletonList(new J.Assign(
-                                    randomId(),
-                                    assignmentExp,
-                                    valueArgument,
-                                    null,
-                                    Formatting.format("\n    ")
-                            )),
-                            Formatting.format(" "),
-                            new J.Block.End(randomId(), Formatting.format("\n"))),
-                    null,
-                    Formatting.format("\n\n")
-            );
-            andThen(new AutoFormat(setMethod));
+                        null,
+                        new J.Block<>(randomId(),
+                                null,
+                                Collections.singletonList(new J.Assign(
+                                        randomId(),
+                                        assignmentExp,
+                                        valueArgument,
+                                        null,
+                                        Formatting.format("\n    ")
+                                )),
+                                Formatting.format(" "),
+                                new J.Block.End(randomId(), Formatting.format("\n"))),
+                        null,
+                        Formatting.format("\n\n")
+                );
+                andThen(new AutoFormat(setMethod));
 
-            J.Block<J> body = cd.getBody();
-            List<J> statements = new ArrayList<>(body.getStatements());
-            statements.add(setMethod);
-            cd = cd.withBody(body.withStatements(statements));
+                J.Block<J> body = cd.getBody();
+                List<J> statements = new ArrayList<>(body.getStatements());
+                statements.add(setMethod);
+                cd = cd.withBody(body.withStatements(statements));
+            }
 
             return cd;
         }

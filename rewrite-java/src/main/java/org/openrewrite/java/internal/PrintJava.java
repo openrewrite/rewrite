@@ -38,11 +38,11 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
         return r1 + r2;
     }
 
-    private String visit(Collection<? extends Tree> nodes, String suffixBetween) {
+    String visit(Collection<? extends Tree> nodes, String suffixBetween) {
         return visit(nodes, suffixBetween, "");
     }
 
-    private String visit(Collection<? extends Tree> nodes, String suffixBetween, String suffixEnd) {
+    String visit(Collection<? extends Tree> nodes, String suffixBetween, String suffixEnd) {
         String acc = "";
         Tree[] array = nodes.toArray(new Tree[0]);
         for (int i = 0; i < array.length; i++) {
@@ -52,7 +52,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
         return acc;
     }
 
-    private String visitStatements(Collection<? extends Tree> statements) {
+    String visitStatements(Collection<? extends Tree> statements) {
         return statements.stream()
                 .map(this::fmtStatement)
                 .reduce("", this::reduce);
@@ -68,7 +68,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
         return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
     }
 
-    private String visitModifiers(Iterable<Modifier> modifiers) {
+    String visitModifiers(Iterable<Modifier> modifiers) {
         return stream(modifiers.spliterator(), false)
                 .map(mod -> {
                     String keyword = "";
@@ -102,7 +102,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
                 .reduce("", this::reduce);
     }
 
-    private String visitDims(Collection<VariableDecls.Dimension> dims) {
+    String visitDims(Collection<VariableDecls.Dimension> dims) {
         return dims.stream().map(d -> fmt(d, "[" + visit(d.getWhitespace()) + "]"))
                 .reduce("", this::reduce);
     }
