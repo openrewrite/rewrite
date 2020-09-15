@@ -16,48 +16,54 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.yaml.tree.Yaml
 
-class ChangePropertyKeyTest : YamlParser() {
+class ChangePropertyKeyTest : RefactorVisitorTestForParser<Yaml.Documents> {
+    override val parser = YamlParser()
+
     private val changeProp = ChangePropertyKey().apply {
         setProperty("management.metrics.binders.files.enabled")
         setToProperty("management.metrics.enable.process.files")
     }
 
     @Test
-    fun singleEntry() {
-        "management.metrics.binders.files.enabled: true"
-                .whenParsedBy(this)
-                .whenVisitedBy(changeProp)
-                .isRefactoredTo("management.metrics.enable.process.files: true")
-    }
+    fun singleEntry() = assertRefactored(
+            visitors = listOf(changeProp),
+            before = "management.metrics.binders.files.enabled: true",
+            after = "management.metrics.enable.process.files: true"
+    )
 
     @Test
-    fun nestedEntry() {
-        """
-            management.metrics:
-                binders:
-                    jvm.enabled: true
-                    files.enabled: true
-        """
-                .whenParsedBy(this)
-                .whenVisitedBy(changeProp)
-                .isRefactoredTo("""
-                    management.metrics:
-                        binders.jvm.enabled: true
-                        enable.process.files: true
-                """)
-    }
+    fun nestedEntry() = assertRefactored(
+            visitors = listOf(changeProp),
+            before = """
+                unrelated.property: true
+                management.metrics:
+                    binders:
+                        jvm.enabled: true
+                        files.enabled: true
+            """,
+            after = """
+                unrelated.property: true
+                management.metrics:
+                    binders.jvm.enabled: true
+                    enable.process.files: true
+            """
+    )
 
     @Test
-    fun nestedEntryEmptyPartialPathRemoved() {
-        """
-            management.metrics:
-                binders:
-                    files.enabled: true
-        """
-                .whenParsedBy(this)
-                .whenVisitedBy(changeProp)
-                .isRefactoredTo("management.metrics.enable.process.files: true")
-    }
+    fun nestedEntryEmptyPartialPathRemoved() = assertRefactored(
+            visitors = listOf(changeProp),
+            before = """
+                unrelated.property: true
+                management.metrics:
+                    binders:
+                        files.enabled: true
+            """,
+            after = """
+                unrelated.property: true
+                management.metrics.enable.process.files: true
+            """
+    )
 }

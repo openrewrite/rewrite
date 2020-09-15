@@ -15,31 +15,30 @@
  */
 package org.openrewrite.xml
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.xml.tree.Xml
 
-class XmlParserTest: XmlParser() {
-    @Test
-    fun parseXmlDocument() {
-        val xSource = """
-            <?xml
-                version="1.0" encoding="UTF-8"?>
-            <?xml-stylesheet href="mystyle.css" type="text/css"?>
-            <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN"
-                "http://www.springframework.org/dtd/spring-beans-2.0.dtd">
-            <beans >
-                <bean id="myBean"/>
-            </beans>
-        """.trimIndent()
-
-        val x = parse(xSource)[0]
-
-        assertEquals(xSource, x.printTrimmed())
-    }
+class XmlParserTest: XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
+    override val parser: XmlParser = XmlParser()
 
     @Test
-    fun parsePomDocument() {
-        val xSource = """
+    fun parseXmlDocument() = assertUnchanged(
+            before = """
+                <?xml
+                    version="1.0" encoding="UTF-8"?>
+                <?xml-stylesheet href="mystyle.css" type="text/css"?>
+                <!DOCTYPE beans PUBLIC "-//SPRING//DTD BEAN 2.0//EN"
+                    "http://www.springframework.org/dtd/spring-beans-2.0.dtd">
+                <beans >
+                    <bean id="myBean"/>
+                </beans>
+            """
+    )
+
+    @Test
+    fun parsePomDocument() = assertUnchanged(
+            before = """
             <?xml version="1.0" encoding="UTF-8"?>
             <!-- comment -->
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -54,10 +53,6 @@ class XmlParserTest: XmlParser() {
               <packaging>bundle</packaging>
               <name>Guava: Google Core Libraries for Java</name>
             </project>
-        """.trimIndent()
-
-        val x = parse(xSource)[0]
-
-        assertEquals(xSource, x.printTrimmed())
-    }
+        """
+    )
 }

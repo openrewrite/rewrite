@@ -16,49 +16,51 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
 
-class AddToTagTest : XmlParser() {
-    @Test
-    fun addElement() {
-        """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <beans >
-                <bean id="myBean"/>
-            </beans>
-        """
-                .whenParsedBy(this)
-                .whenVisitedByMapped { x -> AddToTag.Scoped(x.root, """<bean id="myBean2"/>""") }
-                .isRefactoredTo("""
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <beans >
-                        <bean id="myBean"/>
-                        <bean id="myBean2"/>
-                    </beans>
-                """)
-    }
+class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
+    override val parser: XmlParser = XmlParser()
 
     @Test
-    fun addElementToSlashClosedTag() {
-        """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <beans >
-                <bean id="myBean"/>
-            </beans>
-        """
-                .whenParsedBy(this)
-                .whenVisitedByMapped { x ->
-                    AddToTag.Scoped(x.root.content[0] as Xml.Tag,
-                            """<property name="myprop" ref="collaborator"/>""")
-                }
-                .isRefactoredTo("""
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <beans >
-                        <bean id="myBean">
-                            <property name="myprop" ref="collaborator"/>
-                        </bean>
-                    </beans>
-                """)
-    }
+    fun addElement() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                AddToTag.Scoped(x.root, """<bean id="myBean2"/>""")
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <bean id="myBean"/>
+                </beans>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <bean id="myBean"/>
+                    <bean id="myBean2"/>
+                </beans>
+            """
+    )
+
+    @Test
+    fun addElementToSlashClosedTag() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                AddToTag.Scoped(x.root.content[0] as Xml.Tag,
+                        """<property name="myprop" ref="collaborator"/>""")
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <bean id="myBean"/>
+                </beans>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <bean id="myBean">
+                        <property name="myprop" ref="collaborator"/>
+                    </bean>
+                </beans>
+            """
+    )
 }

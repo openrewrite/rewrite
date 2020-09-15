@@ -17,12 +17,12 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.whenParsedBy
-import java.io.File
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.maven.tree.Maven
 import java.nio.file.Path
 
-class ChangeDependencyScopeTest {
-    private val parser = MavenParser.builder()
+class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
+    override val parser = MavenParser.builder()
             .resolveDependencies(false)
             .build()
 
@@ -33,9 +33,9 @@ class ChangeDependencyScopeTest {
     }
 
     @Test
-    fun noScopeToScope(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+    fun noScopeToScope() = assertRefactored(
+            visitors = listOf(guavaToTest),
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -51,80 +51,8 @@ class ChangeDependencyScopeTest {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaToTest)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>28.2-jre</version>
-                          <scope>test</scope>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
-
-    @Test
-    fun scopeToScope(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                      <scope>compile</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaToTest)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>28.2-jre</version>
-                          <scope>test</scope>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
-
-    @Test
-    fun scopeToNoScope(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+            """,
+            after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -141,27 +69,89 @@ class ChangeDependencyScopeTest {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaToTest.apply { setToScope(null) })
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>28.2-jre</version>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
+            """
+    )
+
+    @Test
+    fun scopeToScope(@TempDir tempDir: Path) = assertRefactored(
+            visitors = listOf(guavaToTest),
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>28.2-jre</version>
+                      <scope>compile</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>28.2-jre</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
+    fun scopeToNoScope(@TempDir tempDir: Path) = assertRefactored(
+            visitors = listOf(
+                    guavaToTest.apply { setToScope(null) }
+            ),
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>28.2-jre</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>28.2-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 }

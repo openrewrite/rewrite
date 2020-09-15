@@ -17,43 +17,27 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.maven.tree.Maven
 import java.io.File
 import java.nio.file.Path
 
-class ChangeParentVersionTest {
-    private val parser = MavenParser.builder()
+class ChangeParentVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
+    override val parser = MavenParser.builder()
             .resolveDependencies(false)
             .build()
 
     @Test
-    fun fixedVersion(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>1.5.12.RELEASE</version>
-                    <relativePath/> <!-- lookup parent from repository -->
-                  </parent>
-                </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(ChangeParentVersion().apply {
+    fun fixedVersion(@TempDir tempDir: Path) = assertRefactored(
+            visitors = listOf(
+                ChangeParentVersion().apply {
                     setGroupId("org.springframework.boot")
                     setArtifactId("spring-boot-starter-parent")
                     setToVersion("2.3.1.RELEASE")
-                })
-                .isRefactoredTo("""
+                }
+            ),
+            before = File(tempDir.toFile(), "pom.xml").apply {
+                writeText("""
                     <project>
                       <modelVersion>4.0.0</modelVersion>
                       
@@ -64,10 +48,27 @@ class ChangeParentVersionTest {
                       <parent>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>2.3.1.RELEASE</version>
+                        <version>1.5.12.RELEASE</version>
                         <relativePath/> <!-- lookup parent from repository -->
                       </parent>
                     </project>
-                """)
-    }
+                """.trimIndent().trim())
+            },
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.3.1.RELEASE</version>
+                    <relativePath/> <!-- lookup parent from repository -->
+                  </parent>
+                </project>
+            """
+    )
 }

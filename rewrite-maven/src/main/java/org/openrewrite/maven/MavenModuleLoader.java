@@ -350,7 +350,9 @@ class MavenModuleLoader {
 
         @Override
         public ModelSource2 getRelatedSource(String relPath) {
-            return allModelSources.get(path.getParent().resolve(relPath).normalize());
+            return path.getParent() == null ?
+                    null :
+                    allModelSources.get(path.getParent().resolve(relPath).normalize());
         }
 
         @Override
