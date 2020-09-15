@@ -15,15 +15,15 @@
  */
 package org.openrewrite.maven
 
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.maven.tree.Maven
 import java.io.File
 import java.nio.file.Path
 
-class ChangeDependencyVersionTest {
-    private val parser = MavenParser.builder()
+class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
+    override val parser = MavenParser.builder()
             .resolveDependencies(false)
             .build()
 
@@ -34,9 +34,9 @@ class ChangeDependencyVersionTest {
     }
 
     @Test
-    fun fixedVersion(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+    fun fixedVersion() = assertRefactored(
+            visitors = listOf(guavaTo29),
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -53,35 +53,33 @@ class ChangeDependencyVersionTest {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaTo29)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>29.0-jre</version>
-                          <scope>test</scope>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 
     @Test
-    fun propertyVersion(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+
+
+    fun propertyVersion() = assertRefactored(
+            visitors = listOf(guavaTo29),
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                    
@@ -102,67 +100,40 @@ class ChangeDependencyVersionTest {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaTo29)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                       
-                      <properties>
-                        <guava.version>29.0-jre</guava.version>
-                      </properties>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>com.google.guava</groupId>
-                          <artifactId>guava</artifactId>
-                          <version>${"$"}{guava.version}</version>
-                          <scope>test</scope>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                   
+                  <properties>
+                    <guava.version>29.0-jre</guava.version>
+                  </properties>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>${"$"}{guava.version}</version>
+                      <scope>test</scope>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 
     @Test
     fun inDependencyManagementSection(@TempDir tempDir: Path) {
         val myModuleProject = File(tempDir.toFile(), "my-module")
         myModuleProject.mkdirs()
 
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>28.2-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whichDependsOn(
-                        File(myModuleProject, "pom.xml").apply {
-                            writeText("""
+        assertRefactored(
+            dependencies = listOf(
+                    File(myModuleProject, "pom.xml").apply {
+                        writeText("""
                                 <project>
                                   <modelVersion>4.0.0</modelVersion>
                                  
@@ -182,38 +153,11 @@ class ChangeDependencyVersionTest {
                                   </dependencies>
                                 </project>
                             """.trimIndent())
-                        }.toPath()
-                )
-                .whenVisitedBy(guavaTo29)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                     
-                      <packaging>pom</packaging>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencyManagement>
-                        <dependencies>
-                          <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>29.0-jre</version>
-                          </dependency>
-                        </dependencies>
-                      </dependencyManagement>
-                    </project>
-                """)
-    }
-
-    @Test
-    fun inParentProperty(@TempDir tempDir: Path) {
-        val myModuleProject = File(tempDir.toFile(), "my-module")
-        myModuleProject.mkdirs()
-
-        assertTrue(File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+                    }
+            ),
+            visitors = listOf(guavaTo29),
+            before = File(tempDir.toFile(), "pom.xml").apply {
+                writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                  
@@ -222,65 +166,110 @@ class ChangeDependencyVersionTest {
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                   
-                  <properties>
-                    <guava.version>28.2-jre</guava.version>
-                  </properties>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>28.2-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
                 </project>
             """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whichDependsOn(File(myModuleProject, "pom.xml").apply {
-                    writeText("""
-                        <project>
-                          <modelVersion>4.0.0</modelVersion>
-                         
-                          <parent>
-                            <groupId>com.mycompany.app</groupId>
-                            <artifactId>my-app</artifactId>
-                            <version>1</version>
-                          </parent>
-                        
-                          <artifactId>my-module</artifactId>
-                        
-                          <dependencies>
-                            <dependency>
-                              <groupId>com.google.guava</groupId>
-                              <artifactId>guava</artifactId>
-                              <version>${"$"}{guava.version}</version>
-                            </dependency>
-                          </dependencies>
-                        </project>
-                    """.trimIndent())
-                        }.toPath()
-                )
-                .whenVisitedBy(guavaTo29)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                     
-                      <packaging>pom</packaging>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <properties>
-                        <guava.version>29.0-jre</guava.version>
-                      </properties>
-                    </project>
-                """)
-                .fixed()
-                .any { pom ->
-                    pom.dependencies.firstOrNull()?.model?.moduleVersion?.version ==
-                            "29.0-jre"
-                }
+            },
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                 
+                  <packaging>pom</packaging>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+            """
         )
     }
 
     @Test
-    fun propertyInDependencyManagementSection(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+    fun inParentProperty(@TempDir tempDir: Path) {
+        val myModuleProject = File(tempDir.toFile(), "my-module")
+        myModuleProject.mkdirs()
+
+        assertRefactored(
+                dependencies = listOf(
+                    File(myModuleProject, "pom.xml").apply {
+                        writeText("""
+                            <project>
+                              <modelVersion>4.0.0</modelVersion>
+                             
+                              <parent>
+                                <groupId>com.mycompany.app</groupId>
+                                <artifactId>my-app</artifactId>
+                                <version>1</version>
+                              </parent>
+                            
+                              <artifactId>my-module</artifactId>
+                            
+                              <dependencies>
+                                <dependency>
+                                  <groupId>com.google.guava</groupId>
+                                  <artifactId>guava</artifactId>
+                                  <version>${"$"}{guava.version}</version>
+                                </dependency>
+                              </dependencies>
+                            </project>
+                        """.trimIndent())
+                    }
+                ),
+                visitors = listOf(guavaTo29),
+                before = File(tempDir.toFile(), "pom.xml").apply {
+                    writeText("""
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                         
+                          <packaging>pom</packaging>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-app</artifactId>
+                          <version>1</version>
+                          
+                          <properties>
+                            <guava.version>28.2-jre</guava.version>
+                          </properties>
+                        </project>
+                    """.trimIndent().trim())
+                },
+                after = """
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                         
+                          <packaging>pom</packaging>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-app</artifactId>
+                          <version>1</version>
+                          
+                          <properties>
+                            <guava.version>29.0-jre</guava.version>
+                          </properties>
+                        </project>
+            """
+        )
+    }
+
+    @Test
+    fun propertyInDependencyManagementSection() = assertRefactored(
+            visitors = listOf(guavaTo29),
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                  
@@ -303,34 +292,30 @@ class ChangeDependencyVersionTest {
                     </dependencies>
                   </dependencyManagement>
                 </project>
-            """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(guavaTo29)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                     
-                      <packaging>pom</packaging>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                    
-                      <properties>
-                        <guava.version>29.0-jre</guava.version>
-                      </properties>
-                      
-                      <dependencyManagement>
-                        <dependencies>
-                          <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>${"$"}{guava.version}</version>
-                          </dependency>
-                        </dependencies>
-                      </dependencyManagement>
-                    </project>
-                """)
-    }
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                 
+                  <packaging>pom</packaging>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                
+                  <properties>
+                    <guava.version>29.0-jre</guava.version>
+                  </properties>
+                  
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>${"$"}{guava.version}</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+            """
+    )
 }

@@ -16,47 +16,51 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
 
-class ChangeTagValueTest : XmlParser() {
-    @Test
-    fun changeTagValue() {
-        """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <dependency>
-                <version/>
-            </dependency>
-        """
-                .whenParsedBy(this)
-                .whenVisitedByMapped { x -> ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "2.0") }
-                .isRefactoredTo("""
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <dependency>
-                        <version>2.0</version>
-                    </dependency>
-                """)
-    }
+class ChangeTagValueTest : XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
+    override val parser: XmlParser = XmlParser()
 
     @Test
-    fun preserveOriginalFormatting() {
-        """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <dependency>
-                <version>
-                    2.0
-                </version>
-            </dependency>
-        """
-                .whenParsedBy(this)
-                .whenVisitedByMapped { x -> ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "3.0") }
-                .isRefactoredTo("""
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <dependency>
-                        <version>
-                            3.0
-                        </version>
-                    </dependency>
-                """)
-    }
+    fun changeTagValue() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "2.0")
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependency>
+                    <version/>
+                </dependency>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependency>
+                    <version>2.0</version>
+                </dependency>
+            """
+    )
+
+    @Test
+    fun preserveOriginalFormatting() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                ChangeTagValue.Scoped(x.root.content[0] as Xml.Tag, "3.0")
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependency>
+                    <version>
+                        2.0
+                    </version>
+                </dependency>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependency>
+                    <version>
+                        3.0
+                    </version>
+                </dependency>
+            """
+    )
 }

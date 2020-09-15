@@ -17,12 +17,13 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.maven.tree.Maven
 import java.io.File
 import java.nio.file.Path
 
-class AddDependencyTest {
-    private val parser = MavenParser.builder()
+class AddDependencyTest : RefactorVisitorTestForParser<Maven.Pom> {
+    override val parser = MavenParser.builder()
             .resolveDependencies(false)
             .build()
 
@@ -33,9 +34,10 @@ class AddDependencyTest {
     }
 
     @Test
-    fun addToExistingDependencies(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+    fun addToExistingDependencies(@TempDir tempDir: Path) = assertRefactored(
+            visitors = listOf(addDependency),
+            before = File(tempDir.toFile(), "pom.xml").apply {
+                writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -52,38 +54,36 @@ class AddDependencyTest {
                   </dependencies>
                 </project>
             """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(addDependency)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-actuator</artifactId>
-                          <version>1.5.22.RELEASE</version>
-                        </dependency>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-web</artifactId>
-                          <version>1.5.22.RELEASE</version>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
+            },
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-actuator</artifactId>
+                      <version>1.5.22.RELEASE</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                      <version>1.5.22.RELEASE</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 
     @Test
-    fun addWhenNoDependencies(@TempDir tempDir: Path) {
-        File(tempDir.toFile(), "pom.xml").apply {
-            writeText("""
+    fun addWhenNoDependencies(@TempDir tempDir: Path) = assertRefactored(
+            visitors = listOf(addDependency),
+            before = File(tempDir.toFile(), "pom.xml").apply {
+                writeText("""
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
@@ -91,24 +91,21 @@ class AddDependencyTest {
                   <version>1</version>
                 </project>
             """.trimIndent().trim())
-        }
-                .toPath()
-                .whenParsedBy(parser)
-                .whenVisitedBy(addDependency)
-                .isRefactoredTo("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      <dependencies>
-                        <dependency>
-                          <groupId>org.springframework.boot</groupId>
-                          <artifactId>spring-boot-starter-web</artifactId>
-                          <version>1.5.22.RELEASE</version>
-                        </dependency>
-                      </dependencies>
-                    </project>
-                """)
-    }
+            },
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-web</artifactId>
+                      <version>1.5.22.RELEASE</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 }

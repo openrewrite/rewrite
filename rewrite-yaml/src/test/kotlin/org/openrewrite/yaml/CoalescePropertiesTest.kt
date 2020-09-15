@@ -16,31 +16,33 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.whenParsedBy
+import org.openrewrite.yaml.tree.Yaml
 
-class CoalescePropertiesTest : YamlParser() {
+class CoalescePropertiesTest : YamlParser(), RefactorVisitorTestForParser<Yaml.Documents> {
+    override val parser = YamlParser()
 
     @Test
-    fun fold() {
-        """
-            management:
-                metrics:
-                    enable.process.files: true
-                endpoint:
-                    health:
-                        show-components: always
-                        show-details: always
-        """
-                .whenParsedBy(this)
-                .whenVisitedBy(CoalesceProperties())
-                .isRefactoredTo("""
-                    management:
-                        metrics.enable.process.files: true
-                        endpoint.health:
+    fun fold() = assertRefactored(
+            visitors = listOf(CoalesceProperties()),
+            before = """
+                management:
+                    metrics:
+                        enable.process.files: true
+                    endpoint:
+                        health:
                             show-components: always
                             show-details: always
-                """)
-    }
+            """,
+            after = """
+                management:
+                    metrics.enable.process.files: true
+                    endpoint.health:
+                        show-components: always
+                        show-details: always
+            """
+    )
 
 //    @Test
 //    fun group() {
