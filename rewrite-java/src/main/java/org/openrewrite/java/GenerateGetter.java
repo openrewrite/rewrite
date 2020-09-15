@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,62 +40,59 @@ import static org.openrewrite.internal.StringUtils.capitalize;
  */
 public class GenerateGetter extends JavaRefactorVisitor {
     public static class Scoped extends JavaRefactorVisitor {
-        private final JavaType.Class clazz;
+        private final J.ClassDecl scope;
         private final String fieldName;
 
-        public Scoped(JavaType.Class clazz, String fieldName) {
+        public Scoped(J.ClassDecl scope, String fieldName) {
+            this.scope = scope;
             this.fieldName = fieldName;
-            this.clazz = clazz;
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
+            if (classDecl.isScope(scope)) {
+                J.VariableDecls field = classDecl.getFields().stream()
+                        .filter(it -> it.getVars().get(0).getSimpleName().equals(fieldName))
+                        .findAny()
+                        .orElse(null);
+                if (field == null) {
+                    return classDecl;
+                }
 
-            JavaType.Class type = classDecl.getType();
-            if (type == null || !clazz.getFullyQualifiedName().equals(type.getFullyQualifiedName())) {
-                return cd;
+                assert field.getTypeExpr() != null;
+                String simpleFieldName = field.getVars().get(0).getSimpleName();
+
+                JavaType.Class classType = TypeUtils.asClass(classDecl.getType());
+                if (classType != null) {
+                    MethodMatcher getterMatcher = new MethodMatcher(classType.getFullyQualifiedName() +
+                            " get" + capitalize(simpleFieldName) + "()");
+
+                    boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
+                    if (getterAlreadyExists) {
+                        return classDecl;
+                    }
+
+                    boolean isMissingTargetField = classDecl.getFields().stream().noneMatch(field::isScope);
+                    if (isMissingTargetField) {
+                        return classDecl;
+                    }
+
+                    J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
+                    String fieldName = fieldVar.getSimpleName();
+
+                    J.MethodDecl getMethod = treeBuilder.buildMethodDeclaration(
+                            classDecl,
+                            "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
+                                    "    return " + fieldName + ";\n" +
+                                    "}\n",
+                            field.getTypeAsClass()
+                    );
+
+                    andThen(new InsertDeclaration.Scoped(classDecl, getMethod));
+                }
             }
 
-            J.VariableDecls field = cd.getFields().stream()
-                    .filter(it -> it.getVars().get(0).getSimpleName().equals(fieldName))
-                    .findAny()
-                    .orElse(null);
-            if (field == null) {
-                return cd;
-            }
-
-            assert field.getTypeExpr() != null;
-            String simpleFieldName = field.getVars().get(0).getSimpleName();
-            MethodMatcher getterMatcher = new MethodMatcher(type.getFullyQualifiedName() + " get" + capitalize(simpleFieldName) + "()");
-
-            boolean getterAlreadyExists = classDecl.getMethods().stream().anyMatch(it -> getterMatcher.matches(it, classDecl));
-            if (getterAlreadyExists) {
-                return cd;
-            }
-
-            boolean isMissingTargetField = cd.getFields().stream().noneMatch(field::isScope);
-            if (isMissingTargetField) {
-                return cd;
-            }
-
-            J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
-            String fieldName = fieldVar.getSimpleName();
-
-            J.MethodDecl getMethod = treeBuilder.buildMethodDeclaration(classDecl,
-                    "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
-                            "    return " + fieldName + ";\n" +
-                            "}\n",
-                    field.getTypeAsClass());
-
-            andThen(new AutoFormat(getMethod));
-
-            J.Block<J> body = cd.getBody();
-            List<J> statements = new ArrayList<>(body.getStatements());
-            statements.add(getMethod);
-            cd = cd.withBody(body.withStatements(statements));
-
-            return cd;
+            return super.visitClassDecl(classDecl);
         }
     }
 }

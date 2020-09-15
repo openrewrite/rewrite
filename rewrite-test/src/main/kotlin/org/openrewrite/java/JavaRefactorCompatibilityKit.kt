@@ -47,7 +47,7 @@ abstract class JavaRefactorCompatibilityKit {
     inner class ChangeMethodTargetToStaticTck : ChangeMethodTargetToStaticTest
 
     @Nested
-    inner class ChangeMethodTargetToVariableTck: ChangeMethodTargetToVariableTest
+    inner class ChangeMethodTargetToVariableTck : ChangeMethodTargetToVariableTest
 
     @Nested
     inner class ChangeTypeTck : ChangeTypeTest
@@ -68,13 +68,19 @@ abstract class JavaRefactorCompatibilityKit {
     inner class ImplementInterfaceTck : ImplementInterfaceTest
 
     @Nested
+    inner class InsertDeclaration : InsertDeclarationTest
+
+    @Nested
     inner class InsertMethodArgumentTck : InsertMethodArgumentTest
 
     @Nested
     inner class MethodMatcherTck : MethodMatcherTest
 
     @Nested
-    inner class OrderImportTck : OrderImportTest
+    inner class OrderDeclarationsTck : OrderDeclarationsTest
+
+    @Nested
+    inner class OrderImportsTck : OrderImportsTest
 
     @Nested
     inner class RemoveImportTck : RemoveImportTest

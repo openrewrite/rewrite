@@ -15,10 +15,9 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.format
-import org.openrewrite.java.JavaParser
 
 class FormattingTest {
 
@@ -27,6 +26,20 @@ class FormattingTest {
         val f1 = format("")
         val f2 = format("")
 
-        assertTrue(f1 === f2)
+        assertThat(f1).isSameAs(f2)
+    }
+
+    @Test
+    fun minimumBlankLines() {
+        assertThat(format("\n").withMinimumBlankLines(1).prefix).isEqualTo("\n\n")
+        assertThat(format("\n\n").withMinimumBlankLines(1).prefix).isEqualTo("\n\n")
+        assertThat(format("\n\n\n").withMinimumBlankLines(1).prefix).isEqualTo("\n\n\n")
+    }
+
+    @Test
+    fun maximumBlankLines() {
+        assertThat(format("  \n").withMaximumBlankLines(1).prefix).isEqualTo("  \n")
+        assertThat(format("  \n\n").withMaximumBlankLines(1).prefix).isEqualTo("  \n\n")
+        assertThat(format("  \n\n\n").withMaximumBlankLines(1).prefix).isEqualTo("  \n\n")
     }
 }

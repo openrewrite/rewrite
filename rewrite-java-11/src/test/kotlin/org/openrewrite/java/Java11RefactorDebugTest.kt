@@ -76,7 +76,19 @@ class Java11GenerateConstructorUsingFieldsTest: Java11Test(), GenerateConstructo
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11GenerateGetter: Java11Test(), GenerateGetterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11GenerateSetter: Java11Test(), GenerateSetterTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ImplementInterfaceTest: Java11Test(), ImplementInterfaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11InsertDeclaration: Java11Test(), InsertDeclarationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -88,7 +100,11 @@ class Java11MethodMatcherTest: Java11Test(), MethodMatcherTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11OrderImportTest: Java11Test(), OrderImportTest
+class Java11OrderDeclarationsTest: Java11Test(), OrderDeclarationsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11OrderImportsTest: Java11Test(), OrderImportsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

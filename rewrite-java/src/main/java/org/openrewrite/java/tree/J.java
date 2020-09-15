@@ -26,7 +26,10 @@ import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.internal.ClassDeclToString;
+import org.openrewrite.java.internal.MethodDeclToString;
 import org.openrewrite.java.internal.PrintJava;
+import org.openrewrite.java.internal.VariableDeclsToString;
 import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
@@ -1085,6 +1088,11 @@ public interface J extends Serializable, Tree {
         public boolean isAnnotation() {
             return kind instanceof Kind.Annotation;
         }
+
+        @Override
+        public String toString() {
+            return "ClassDecl{" + ClassDeclToString.toString(this) + "}";
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2057,6 +2065,10 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            public boolean isEmpty() {
+                return params.stream().allMatch(p -> p instanceof Empty);
+            }
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2094,6 +2106,11 @@ public interface J extends Serializable, Tree {
 
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
+        }
+
+        @Override
+        public String toString() {
+            return "MethodDecl{" + MethodDeclToString.toString(this) + "}";
         }
     }
 
@@ -3414,6 +3431,11 @@ public interface J extends Serializable, Tree {
 
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
+        }
+
+        @Override
+        public String toString() {
+            return "VariableDecls{" + VariableDeclsToString.toString(this) + "}";
         }
     }
 

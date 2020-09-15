@@ -18,7 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 
-interface OrderImportTest : RefactorVisitorTest {
+interface OrderImportsTest : RefactorVisitorTest {
     @Test
     fun orderImports(jp: JavaParser) = assertRefactored(
             jp,

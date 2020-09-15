@@ -281,7 +281,6 @@ public class OrderImports extends JavaRefactorVisitor {
                 private final boolean statik;
                 private Collection<ImportPackage> packageImports = emptyList();
 
-
                 public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
                     super(statik, "*", true,
                             classCountToUseStarImport, nameCountToUseStarImport);
