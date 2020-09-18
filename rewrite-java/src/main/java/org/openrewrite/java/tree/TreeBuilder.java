@@ -262,6 +262,6 @@ public class TreeBuilder {
             typeName = ((JavaType.Primitive) type).getKeyword();
         }
 
-        return typeName + " " + variable.getSimpleName();
+        return "static " + typeName + " " + variable.getSimpleName();
     }
 }
