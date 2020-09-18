@@ -93,6 +93,29 @@ interface TreeBuilderTest {
     }
 
     @Test
+    fun buildStaticInit(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.ArrayList;
+            import java.util.Collection;
+            
+            public class A {
+                static Collection<String> list;
+            }
+        """.trimIndent())[0]
+
+        @Suppress("UNCHECKED_CAST") val init = TreeBuilder(a)
+                .buildDeclaration(a.classes[0],
+                        """
+                            static {
+                                list = new ArrayList<>();
+                            }
+                        """.trimIndent(), JavaType.Class.build("java.util.ArrayList")) as J.Block<J>
+
+        assertThat((init.statements[0] as J.Assign).type)
+                .isEqualTo(JavaType.Class.build("java.util.Collection"))
+    }
+
+    @Test
     fun buildMethodDeclaration(jp: JavaParser) {
         val b = """
             package b;
