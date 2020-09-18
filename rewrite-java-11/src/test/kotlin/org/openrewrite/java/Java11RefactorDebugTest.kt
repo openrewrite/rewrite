@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
+import org.openrewrite.java.utilities.SpansMultipleLinesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -117,6 +118,10 @@ class Java11RenameVariableTest: Java11Test(), RenameVariableTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class JavaReorderMethodArgumentsTest: Java11Test(), ReorderMethodArgumentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SpansMultipleLinesTest: Java11Test(), SpansMultipleLinesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
