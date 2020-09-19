@@ -17,8 +17,8 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.tree.TreeBuilderTest
 import org.openrewrite.java.utilities.SpansMultipleLinesTest
+import org.openrewrite.java.tree.TreeBuilderTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

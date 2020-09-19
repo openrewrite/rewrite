@@ -24,7 +24,7 @@ import java.util.Spliterators;
 
 import static java.util.stream.StreamSupport.stream;
 
-class SpansMultipleLines extends AbstractJavaSourceVisitor<Boolean> {
+public class SpansMultipleLines extends AbstractJavaSourceVisitor<Boolean> {
     private final J scope;
 
     @Nullable
