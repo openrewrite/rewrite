@@ -52,7 +52,7 @@ public interface JavaType extends Serializable {
      */
     static JavaType buildType(String typeName) {
         JavaType.Primitive primitive = JavaType.Primitive.fromKeyword(typeName);
-        if(primitive != null) {
+        if (primitive != null) {
             return primitive;
         } else {
             return JavaType.Class.build(typeName);
@@ -132,6 +132,11 @@ public interface JavaType extends Serializable {
             return type instanceof ShallowClass &&
                     fullyQualifiedName.equals(((ShallowClass) type).fullyQualifiedName);
         }
+
+        @Override
+        public String toString() {
+            return "ShallowClass{" +  + '}';
+        }
     }
 
     @Getter
@@ -206,12 +211,28 @@ public interface JavaType extends Serializable {
 
             synchronized (flyweights) {
                 Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
-                return (!relaxedClassTypeMatching ? variants.stream().filter(v -> v.deepEquals(test)) : variants.stream())
-                        .findAny()
-                        .orElseGet(() -> {
-                            variants.add(test);
-                            return test;
-                        });
+
+                if (relaxedClassTypeMatching) {
+                    return variants.stream()
+                            .findFirst()
+                            .orElseGet(() -> {
+                                variants.add(test);
+                                return test;
+                            });
+                } else {
+                    return variants.stream().filter(v -> v.deepEquals(test))
+                            .findFirst()
+                            .orElseGet(() -> {
+                                if (test.supertype == null) {
+                                    return variants.stream().findFirst().orElseGet(() -> {
+                                        variants.add(test);
+                                        return test;
+                                    });
+                                }
+                                variants.add(test);
+                                return test;
+                            });
+                }
             }
         }
 
@@ -278,6 +299,11 @@ public interface JavaType extends Serializable {
                     TypeUtils.deepEquals(supertype, c.supertype) &&
                     TypeUtils.deepEquals(typeParameters, c.typeParameters);
         }
+
+        @Override
+        public String toString() {
+            return "Class{" + fullyQualifiedName + '}';
+        }
     }
 
     @EqualsAndHashCode(callSuper = false)
@@ -288,6 +314,11 @@ public interface JavaType extends Serializable {
         @Override
         public boolean deepEquals(JavaType type) {
             return this.equals(type);
+        }
+
+        @Override
+        public String toString() {
+            return "Cyclic{" + fullyQualifiedName + '}';
         }
     }
 
