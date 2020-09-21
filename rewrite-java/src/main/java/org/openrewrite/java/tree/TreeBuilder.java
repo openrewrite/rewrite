@@ -26,6 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -119,8 +120,9 @@ public class TreeBuilder {
         }
 
         JavaType.Class[] imports = stream(types)
+                .filter(Objects::nonNull)
                 .filter(it -> it instanceof JavaType.Class)
-                .map(it -> (JavaType.Class) it)
+                .map(JavaType.Class.class::cast)
                 .toArray(JavaType.Class[]::new);
 
         String source = stream(imports)
@@ -169,12 +171,17 @@ public class TreeBuilder {
     @SuppressWarnings("unchecked")
     public <T extends J> List<T> buildSnippet(Cursor insertionScope,
                                               String snippet,
-                                              JavaType.Class... imports) {
+                                              JavaType... imports) {
         JavaParser javaParser = cu.buildParser();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
-        String source = stream(imports).map(i -> "import " + i.getFullyQualifiedName() + ";").collect(joining("\n", "", "\n\n")) +
+        String source = stream(imports)
+                .filter(Objects::nonNull)
+                .filter(it -> it instanceof JavaType.FullyQualified)
+                .map(JavaType.FullyQualified.class::cast)
+                .map(i -> "import " + i.getFullyQualifiedName() + ";")
+                .collect(joining("\n", "", "\n\n")) +
                 "class CodeSnippet {\n" +
                 new ListScopeVariables(insertionScope).visit(cu).stream()
                         .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
