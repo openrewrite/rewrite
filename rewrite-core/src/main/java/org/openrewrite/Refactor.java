@@ -130,6 +130,7 @@ public class Refactor {
                                 .tag("exception", t.getClass().getSimpleName())
                                 .register(meterRegistry)
                                 .increment();
+                        rethrowIfRunningUnderJunit(t);
                     }
                 }
 
@@ -202,5 +203,25 @@ public class Refactor {
     public Refactor setMeterRegistry(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
         return this;
+    }
+
+    private static Boolean runningUnderJunit = null;
+
+    /**
+     * In production we don't want the refactor pipeline to ever be interrupted by exceptions.
+     * But for tests its often convenient to eagerly fail as soon as possible
+     */
+    private static void rethrowIfRunningUnderJunit(Throwable t) {
+        if(runningUnderJunit == null) {
+            runningUnderJunit = Arrays.stream(t.getStackTrace())
+                    .anyMatch(frame -> frame.getClassName().startsWith("org.junit."));
+        }
+        if(runningUnderJunit) {
+            if(t instanceof RuntimeException) {
+                throw (RuntimeException) t;
+            } else {
+                throw new RuntimeException(t);
+            }
+        }
     }
 }
