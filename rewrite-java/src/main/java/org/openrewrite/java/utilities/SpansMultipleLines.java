@@ -30,7 +30,7 @@ public class SpansMultipleLines extends AbstractJavaSourceVisitor<Boolean> {
     @Nullable
     private final J skip;
 
-    SpansMultipleLines(J scope, @Nullable J skip) {
+    public SpansMultipleLines(J scope, @Nullable J skip) {
         this.scope = scope;
         this.skip = skip;
         setCursoringOn();
