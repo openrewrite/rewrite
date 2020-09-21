@@ -18,6 +18,7 @@ package org.openrewrite.java.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
 import org.openrewrite.java.*
@@ -93,6 +94,7 @@ interface TreeBuilderTest {
     }
 
     @Test
+    @Disabled("https://github.com/openrewrite/rewrite/issues/38")
     fun buildStaticInit(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.ArrayList;
