@@ -59,13 +59,12 @@ public class ChangeClassVisibility {
                     modifiers.add(actualModifier);
                 }
 
-                modifiers = modifiers.stream()
-                        .filter(mod -> !((visibility.equals("public") && (mod instanceof J.Modifier.Protected || mod instanceof J.Modifier.Private)) ||
-                                (visibility.equals("private") && (mod instanceof J.Modifier.Protected || mod instanceof J.Modifier.Public)) ||
-                                (visibility.equals("protected") && (mod instanceof J.Modifier.Private || mod instanceof J.Modifier.Public))
-                        ))
-                        .distinct()
-                        .collect(toList());
+                modifiers = Stream.concat(
+                    Stream.of(actualModifier),
+                    modifiers.stream()
+                        .filter(mod -> !(mod instanceof J.Modifier.Protected || mod instanceof J.Modifier.Private || mod instanceof J.Modifier.Public))
+                )
+                    .collect(toList())
 
                 c = c.withModifiers(modifiers);
 
