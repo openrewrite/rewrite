@@ -39,6 +39,14 @@ import static java.util.stream.Collectors.toSet;
 public class Refactor {
     private static final Logger logger = LoggerFactory.getLogger(Refactor.class);
     private MeterRegistry meterRegistry = Metrics.globalRegistry;
+    private final boolean eagerlyThrow;
+    public Refactor() {
+        this(false);
+    }
+    public Refactor(boolean eagerlyThrow) {
+        this.eagerlyThrow = eagerlyThrow;
+    }
+
 
     @Getter
     private final Collection<RefactorVisitor<? extends Tree>> visitors = new ArrayList<>();
@@ -130,6 +138,9 @@ public class Refactor {
                                 .tag("exception", t.getClass().getSimpleName())
                                 .register(meterRegistry)
                                 .increment();
+                        if(eagerlyThrow) {
+                            throw t;
+                        }
                     }
                 }
 
