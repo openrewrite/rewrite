@@ -40,13 +40,14 @@ public class Refactor {
     private static final Logger logger = LoggerFactory.getLogger(Refactor.class);
     private MeterRegistry meterRegistry = Metrics.globalRegistry;
     private final boolean eagerlyThrow;
+
     public Refactor() {
         this(false);
     }
+
     public Refactor(boolean eagerlyThrow) {
         this.eagerlyThrow = eagerlyThrow;
     }
-
 
     @Getter
     private final Collection<RefactorVisitor<? extends Tree>> visitors = new ArrayList<>();
