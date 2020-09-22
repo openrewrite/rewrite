@@ -39,6 +39,14 @@ import static java.util.stream.Collectors.toSet;
 public class Refactor {
     private static final Logger logger = LoggerFactory.getLogger(Refactor.class);
     private MeterRegistry meterRegistry = Metrics.globalRegistry;
+    private final boolean eagerlyThrow;
+    public Refactor() {
+        this(false);
+    }
+    public Refactor(boolean eagerlyThrow) {
+        this.eagerlyThrow = eagerlyThrow;
+    }
+
 
     @Getter
     private final Collection<RefactorVisitor<? extends Tree>> visitors = new ArrayList<>();
@@ -130,7 +138,9 @@ public class Refactor {
                                 .tag("exception", t.getClass().getSimpleName())
                                 .register(meterRegistry)
                                 .increment();
-                        rethrowIfRunningUnderJunit(t);
+                        if(eagerlyThrow) {
+                            throw t;
+                        }
                     }
                 }
 
@@ -203,25 +213,5 @@ public class Refactor {
     public Refactor setMeterRegistry(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
         return this;
-    }
-
-    private static Boolean runningUnderJunit = null;
-
-    /**
-     * In production we don't want the refactor pipeline to ever be interrupted by exceptions.
-     * But for tests its often convenient to eagerly fail as soon as possible
-     */
-    private static void rethrowIfRunningUnderJunit(Throwable t) {
-        if(runningUnderJunit == null) {
-            runningUnderJunit = Arrays.stream(t.getStackTrace())
-                    .anyMatch(frame -> frame.getClassName().startsWith("org.junit."));
-        }
-        if(runningUnderJunit) {
-            if(t instanceof RuntimeException) {
-                throw (RuntimeException) t;
-            } else {
-                throw new RuntimeException(t);
-            }
-        }
     }
 }
