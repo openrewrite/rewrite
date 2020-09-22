@@ -42,6 +42,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -2201,6 +2202,29 @@ public interface J extends Serializable, Tree {
                     .toLowerCase().equals(modifier));
         }
 
+        public static List<Modifier> withVisibility(List<Modifier> existing, String visibility) {
+            List<J.Modifier> modifiers = new ArrayList<>(existing);
+            J.Modifier actualModifier = null;
+
+            if(!visibility.equals("package")) {
+                J.Modifier desiredModifier = J.Modifier.buildModifier(visibility, Formatting.EMPTY);
+                actualModifier = existing.stream()
+                        .filter(modifier -> modifier.getClass().equals(desiredModifier.getClass()))
+                        .findAny()
+                        .orElse(desiredModifier);
+            }
+
+            modifiers = Stream.concat(
+                    Stream.of(actualModifier),
+                    modifiers.stream()
+                            .filter(mod -> !(mod instanceof J.Modifier.Protected || mod instanceof J.Modifier.Private || mod instanceof J.Modifier.Public))
+            )
+                    .filter(Objects::nonNull)
+                    .collect(toList());
+
+            return modifiers;
+        }
+
         /**
          * Adds a new modifier(s) to a modifier list in a canonical way, e.g. add final after static and visibility modifiers,
          * static before final and after visibility modifiers.
@@ -2760,7 +2784,7 @@ public interface J extends Serializable, Tree {
         @Override
         public Primitive withType(JavaType type) {
             if (!(type instanceof JavaType.Primitive)) {
-                throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitve");
+                throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitive");
             }
             return new Primitive(id, (JavaType.Primitive) type, formatting);
         }
