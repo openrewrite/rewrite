@@ -63,6 +63,10 @@ public class MavenModel {
     @With
     List<Dependency> dependencies;
 
+    @ToString.Exclude
+    @With
+    List<License> licenses;
+
     @With
     Map<String, Set<ModuleVersionId>> transitiveDependenciesByScope;
 
@@ -94,6 +98,13 @@ public class MavenModel {
 
         @With
         String scope;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class License {
+        @With
+        String name;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

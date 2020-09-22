@@ -102,6 +102,7 @@ class MavenModuleLoader {
                         m.getModuleVersion(),
                         m.getDependencyManagement(),
                         m.getDependencies(),
+                        m.getLicenses(),
                         m.getTransitiveDependenciesByScope(),
                         m.getProperties(),
                         Stream.concat(
@@ -201,6 +202,9 @@ class MavenModuleLoader {
                 ),
                 dependencyManagement,
                 dependencies,
+                model.getLicenses().stream()
+                        .map(l -> new MavenModel.License(l.getName()))
+                        .collect(toList()),
                 transitiveDepenenciesByScope,
                 properties,
                 Stream.concat(

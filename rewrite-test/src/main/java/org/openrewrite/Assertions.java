@@ -134,7 +134,7 @@ public class Assertions {
     }
 
     public static class RefactoringAssert<S extends SourceFile> {
-        private final Refactor refactor = new Refactor();
+        private final Refactor refactor = new Refactor(true);
 
         private final S primarySource;
         private final List<S> sources;

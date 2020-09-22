@@ -24,13 +24,13 @@ import java.util.Spliterators;
 
 import static java.util.stream.StreamSupport.stream;
 
-class SpansMultipleLines extends AbstractJavaSourceVisitor<Boolean> {
+public class SpansMultipleLines extends AbstractJavaSourceVisitor<Boolean> {
     private final J scope;
 
     @Nullable
     private final J skip;
 
-    SpansMultipleLines(J scope, @Nullable J skip) {
+    public SpansMultipleLines(J scope, @Nullable J skip) {
         this.scope = scope;
         this.skip = skip;
         setCursoringOn();
