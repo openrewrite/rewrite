@@ -106,4 +106,7 @@ abstract class JavaRefactorCompatibilityKit {
 
     @Nested
     inner class GenerateSetterTck : GenerateSetterTest
+
+    @Nested
+    inner class ChangeClassVisibilityTck: ChangeClassVisibilityTest
 }

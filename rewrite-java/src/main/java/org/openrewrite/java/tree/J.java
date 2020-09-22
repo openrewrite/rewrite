@@ -2294,7 +2294,7 @@ public interface J extends Serializable, Tree {
             return visibilityChanged || modifiers.size() > existing.size() ? modifiers : existing;
         }
 
-        private static J.Modifier buildModifier(String modifier, Formatting formatting) {
+        public static J.Modifier buildModifier(String modifier, Formatting formatting) {
             Modifier access;
             switch (modifier) {
                 case "public":

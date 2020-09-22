@@ -135,3 +135,7 @@ class Java11UseStaticImportTest: Java11Test(), UseStaticImportTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TreeBuilderTest: Java11Test(), TreeBuilderTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ChangeClassVisibilityTest: Java11Test(), ChangeClassVisibilityTest
