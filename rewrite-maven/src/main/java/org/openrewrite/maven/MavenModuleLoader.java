@@ -21,11 +21,8 @@ import org.apache.maven.model.building.*;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
-import org.apache.maven.project.ProjectBuildingRequest;
-import org.apache.maven.project.ProjectModelResolver;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.RequestTrace;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.CollectRequest;
@@ -126,14 +123,11 @@ class MavenModuleLoader {
             RepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
                     .getRepositorySystemSession(repositorySystem, localRepository, workspaceReader);
 
-            ModelResolver resolver = new ProjectModelResolver(
+            ModelResolver resolver = new ParentModelResolver(
                     repositorySystemSession,
-                    new RequestTrace(null),
                     repositorySystem,
                     new DefaultRemoteRepositoryManager(),
-                    remoteRepositories,
-                    ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT,
-                    null
+                    remoteRepositories
             );
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()

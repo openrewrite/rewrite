@@ -71,7 +71,7 @@ class MavenParserTest {
                             <dependency>
                                 <groupId>org.springframework.cloud</groupId>
                                 <artifactId>spring-cloud-dependencies</artifactId>
-                                <version>Greenwich.RC2</version>
+                                <version>Greenwich.SR6</version>
                                 <type>pom</type>
                                 <scope>import</scope>
                             </dependency>

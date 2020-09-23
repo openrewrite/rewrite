@@ -15,65 +15,75 @@
  */
 package org.openrewrite.maven.internal;
 
+import io.micrometer.core.ipc.http.HttpUrlConnectionSender;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Parent;
 import org.apache.maven.model.Repository;
-import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
 import org.apache.maven.model.building.ModelSource2;
+import org.apache.maven.model.resolution.InvalidRepositoryException;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.project.ProjectModelResolver;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
-import org.eclipse.aether.artifact.Artifact;
-import org.eclipse.aether.artifact.DefaultArtifact;
+import org.eclipse.aether.RequestTrace;
+import org.eclipse.aether.impl.RemoteRepositoryManager;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.resolution.ArtifactRequest;
-import org.eclipse.aether.resolution.ArtifactResolutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
+import java.net.URLConnection;
 import java.util.List;
 
-/**
- * Because {@link org.apache.maven.repository.internal.DefaultModelResolver} is package private.
- */
-@SuppressWarnings("JavadocReference")
-public class ParentModelResolver implements ModelResolver {
+public class ParentModelResolver extends ProjectModelResolver {
     private static final Logger logger = LoggerFactory.getLogger(ParentModelResolver.class);
 
-    private final RepositorySystem repositorySystem;
-    private final RepositorySystemSession repositorySystemSession;
-    private final List<RemoteRepository> remoteRepositories;
+    public ParentModelResolver(RepositorySystemSession session,
+                               RepositorySystem resolver,
+                               RemoteRepositoryManager remoteRepositoryManager,
+                               List<RemoteRepository> repositories) {
+        super(session, new RequestTrace(null), resolver, remoteRepositoryManager, repositories,
+                ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT, null);
+    }
 
-    public ParentModelResolver(RepositorySystem repositorySystem, RepositorySystemSession repositorySystemSession,
-                               List<RemoteRepository> remoteRepositories) {
-        this.repositorySystem = repositorySystem;
-        this.repositorySystemSession = repositorySystemSession;
-        this.remoteRepositories = remoteRepositories;
+    @Override
+    public void addRepository(Repository repository, boolean replace) throws InvalidRepositoryException {
+        try {
+            if(repository.getUrl().contains("http:")) {
+                URLConnection connection = URI.create(repository.getUrl()).toURL().openConnection();
+                if (connection instanceof HttpURLConnection) {
+                    HttpURLConnection httpConnection = (HttpURLConnection) connection;
+                    httpConnection.setRequestMethod("HEAD");
+                    if (httpConnection.getResponseCode() == 403) {
+                        repository.setUrl(repository.getUrl().replace("http:", "https:"));
+                    }
+                }
+            }
+            super.addRepository(repository, replace);
+        } catch (IOException e) {
+            logger.warn("Unable to add repository with URL: " + repository.getUrl(), e);
+        }
     }
 
     @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(String groupId, String artifactId, String version) {
         logger.trace("resolving model for: {}:{}", groupId, artifactId);
-        Artifact pomArtifact = new DefaultArtifact(groupId, artifactId, "", "pom", version);
 
         try {
-            ArtifactRequest artifactRequest = new ArtifactRequest();
-            artifactRequest.setArtifact(pomArtifact);
-            artifactRequest.setRepositories(remoteRepositories);
-
-            pomArtifact = repositorySystem.resolveArtifact(repositorySystemSession, artifactRequest).getArtifact();
-        } catch (ArtifactResolutionException e) {
+            return super.resolveModel(groupId, artifactId, version);
+        } catch (UnresolvableModelException e) {
             logger.error("unable to resolve model", e);
             return new UnresolvedModelSource(groupId, artifactId, version);
         }
-
-        return new FileModelSource(pomArtifact.getFile());
     }
 
     @SuppressWarnings("deprecation")
@@ -82,17 +92,19 @@ public class ParentModelResolver implements ModelResolver {
         return resolveModel(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
     }
 
+    @SuppressWarnings("deprecation")
     @Override
     public ModelSource resolveModel(Dependency dependency) {
-        throw new UnsupportedOperationException("implement me");
-    }
+        logger.trace("resolving model for: {}:{}", dependency.getGroupId(), dependency.getArtifactId());
 
-    @Override
-    public void addRepository(Repository repository) {
-    }
-
-    @Override
-    public void addRepository(Repository repository, boolean replace) {
+        try {
+            return super.resolveModel(dependency);
+        } catch (UnresolvableModelException e) {
+            logger.error("unable to resolve model", e);
+            return new UnresolvedModelSource(dependency.getGroupId(),
+                    dependency.getArtifactId(),
+                    dependency.getVersion());
+        }
     }
 
     @Override
