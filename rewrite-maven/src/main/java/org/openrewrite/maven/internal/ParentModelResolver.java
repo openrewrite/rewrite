@@ -15,12 +15,14 @@
  */
 package org.openrewrite.maven.internal;
 
+import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Parent;
 import org.apache.maven.model.Repository;
 import org.apache.maven.model.building.FileModelSource;
 import org.apache.maven.model.building.ModelSource;
 import org.apache.maven.model.building.ModelSource2;
 import org.apache.maven.model.resolution.ModelResolver;
+import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -78,6 +80,11 @@ public class ParentModelResolver implements ModelResolver {
     @Override
     public ModelSource resolveModel(Parent parent) {
         return resolveModel(parent.getGroupId(), parent.getArtifactId(), parent.getVersion());
+    }
+
+    @Override
+    public ModelSource resolveModel(Dependency dependency) {
+        throw new UnsupportedOperationException("implement me");
     }
 
     @Override

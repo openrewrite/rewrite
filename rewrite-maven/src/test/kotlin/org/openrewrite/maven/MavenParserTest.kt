@@ -25,6 +25,79 @@ import java.io.File
 import java.nio.file.Path
 
 class MavenParserTest {
+    @Test
+    fun milestoneParent() {
+        val pom = MavenParser.builder().build()
+            .parse("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                 
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>2.4.0-M3</version>
+                  </parent>
+
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <repositories>
+                    <repository>
+                        <id>spring-milestones</id>
+                        <name>Spring Milestones</name>
+                        <url>http://repo.spring.io/milestone</url>
+                    </repository>
+                  </repositories>
+                </project>
+            """.trimIndent())[0]
+
+        assertThat(pom!!.model!!.parent!!.licenses).isNotNull()
+    }
+
+    @Test
+    fun milestoneDependencyManagement() {
+        val pom = MavenParser.builder().build()
+                .parse("""
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencyManagement>
+                        <dependencies>
+                            <dependency>
+                                <groupId>org.springframework.cloud</groupId>
+                                <artifactId>spring-cloud-dependencies</artifactId>
+                                <version>Greenwich.RC2</version>
+                                <type>pom</type>
+                                <scope>import</scope>
+                            </dependency>
+                        </dependencies>
+                    </dependencyManagement>
+                  
+                  <dependencies>
+                      <dependency>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-commons</artifactId>
+                      </dependency>
+                  </dependencies>
+                  
+                  <repositories>
+                    <repository>
+                        <id>spring-milestones</id>
+                        <name>Spring Milestones</name>
+                        <url>http://repo.spring.io/milestone</url>
+                    </repository>
+                  </repositories>
+                </project>
+            """.trimIndent())[0]
+
+        assertThat(pom!!.model!!.dependencies[0].moduleVersion.version).isNotBlank()
+    }
+
     /**
      * https://maven.apache.org/guides/introduction/introduction-to-the-pom.html#minimal-pom
      */

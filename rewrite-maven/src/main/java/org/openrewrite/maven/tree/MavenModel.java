@@ -64,6 +64,7 @@ public class MavenModel {
     List<Dependency> dependencies;
 
     @ToString.Exclude
+    @Nullable
     @With
     List<License> licenses;
 

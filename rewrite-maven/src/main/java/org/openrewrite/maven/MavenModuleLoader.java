@@ -18,10 +18,14 @@ package org.openrewrite.maven;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.building.*;
+import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.project.ProjectModelResolver;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
+import org.eclipse.aether.RequestTrace;
 import org.eclipse.aether.artifact.Artifact;
 import org.eclipse.aether.artifact.DefaultArtifact;
 import org.eclipse.aether.collection.CollectRequest;
@@ -29,6 +33,7 @@ import org.eclipse.aether.collection.CollectResult;
 import org.eclipse.aether.collection.DependencyCollectionException;
 import org.eclipse.aether.graph.DependencyNode;
 import org.eclipse.aether.graph.Exclusion;
+import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
@@ -121,9 +126,18 @@ class MavenModuleLoader {
             RepositorySystemSession repositorySystemSession = MavenRepositorySystemUtils
                     .getRepositorySystemSession(repositorySystem, localRepository, workspaceReader);
 
+            ModelResolver resolver = new ProjectModelResolver(
+                    repositorySystemSession,
+                    new RequestTrace(null),
+                    repositorySystem,
+                    new DefaultRemoteRepositoryManager(),
+                    remoteRepositories,
+                    ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT,
+                    null
+            );
+
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
-                    .setModelResolver(new ParentModelResolver(repositorySystem,
-                            repositorySystemSession, remoteRepositories))
+                    .setModelResolver(resolver)
                     .setModelSource(modelSource)
                     .setSystemProperties(System.getProperties());
 

@@ -14,6 +14,7 @@ dependencies {
     implementation("org.eclipse.aether:aether-transport-file:latest.release")
     implementation("org.eclipse.aether:aether-transport-http:latest.release")
     implementation("org.apache.maven:maven-aether-provider:latest.release")
+    implementation("org.apache.maven:maven-core:latest.release")
 
     testImplementation(project(":rewrite-test"))
 }
