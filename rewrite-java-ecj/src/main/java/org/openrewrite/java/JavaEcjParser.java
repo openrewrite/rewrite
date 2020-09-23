@@ -5,22 +5,22 @@ import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.io.IoBuilder;
-import org.apache.logging.log4j.spi.LoggerContextFactory;
 import org.eclipse.core.runtime.IPath;
 import org.eclipse.jdt.core.compiler.CategorizedProblem;
-import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.Compiler;
 import org.eclipse.jdt.internal.compiler.IErrorHandlingPolicy;
+import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
+import org.eclipse.jdt.internal.compiler.batch.ClasspathJar;
 import org.eclipse.jdt.internal.compiler.batch.FileSystem;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
 import org.eclipse.jdt.internal.compiler.impl.CompilerOptions;
 import org.eclipse.jdt.internal.compiler.problem.DefaultProblemFactory;
+import org.eclipse.jdt.internal.compiler.util.Util;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
-import java.lang.reflect.Method;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
@@ -72,13 +72,6 @@ public class JavaEcjParser implements JavaParser {
     @Override
     public List<J.CompilationUnit> parseInputs(Iterable<Input> sources, Path relativeTo) {
         try {
-            FileSystem nameEnvironment = new FileSystem(
-                    classpath == null ?
-                            new String[0] :
-                            classpath.stream().map(Path::toString).toArray(String[]::new),
-                    new String[0],
-                    StandardCharsets.UTF_8.name());
-
             CompilerOptions compilerOptions = new CompilerOptions();
             compilerOptions.generateClassFiles = false;
             compilerOptions.generateGenericSignatureForLambdaExpressions = true;
@@ -89,32 +82,57 @@ public class JavaEcjParser implements JavaParser {
             // See Compiler line 907: "No need of analysis or generation of code if statements are not required"
 //            compilerOptions.ignoreMethodBodies
 
+//            compilerOptions.verbose = true;
+
             List<J.CompilationUnit> cus = new ArrayList<>();
 
+            List<FileSystem.Classpath> classpath = new ArrayList<>();
+
+            // NOTE: will do nothing in natively compiled image
+            Util.collectVMBootclasspath(classpath, Util.getJavaHome());
+
+            if (this.classpath != null) {
+                this.classpath.forEach(cp -> new ClasspathJar(cp.toFile(), true,
+                        null, null));
+            }
+
+            FileSystem nameEnvironment = new FileSystem(
+                    classpath.toArray(new FileSystem.Classpath[0]),
+                    new String[0],
+                    true) {
+            };
+
+            @SuppressWarnings("deprecation")
             Compiler compiler = new Compiler(
                     nameEnvironment,
                     PERMISSIVE_ERROR_HANDLING,
                     compilerOptions,
                     result -> {
-                        // TODO call visitor to map to J.CompilationUnit and add to list
-                        for (CategorizedProblem problem : result.getAllProblems()) {
-                            logger.warn(problem.getMessage());
+                        if(result.getAllProblems() != null) {
+                            for (CategorizedProblem problem : result.getAllProblems()) {
+                                logger.warn(problem.getMessage());
+                            }
                         }
-
-                        // J.CompilationUnit mapped = ...
-                        // cus.add(mapped);
                     },
                     new DefaultProblemFactory(),
                     IoBuilder.forLogger(logger).setLevel(Level.WARN).buildPrintWriter()
-            );
+            ) {
+                @Override
+                public void process(CompilationUnitDeclaration unit, int i) {
+                    super.process(unit, i);
+
+                    JavaEcjParserVisitor visitor = new JavaEcjParserVisitor();
+                    cus.add(visitor.visit(unit));
+                }
+            };
 
             compiler.compile(stream(sources.spliterator(), false)
-                .map(source -> new org.eclipse.jdt.internal.compiler.batch.CompilationUnit(
-                        StringUtils.readFully(source.getSource()).toCharArray(),
-                        source.getPath().toString(),
-                        StandardCharsets.UTF_8.name()
-                ))
-                .toArray(ICompilationUnit[]::new));
+                    .map(source -> new org.eclipse.jdt.internal.compiler.batch.CompilationUnit(
+                            StringUtils.readFully(source.getSource()).toCharArray(),
+                            source.getPath().toString(),
+                            StandardCharsets.UTF_8.name()
+                    ))
+                    .toArray(ICompilationUnit[]::new));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
