@@ -16,15 +16,68 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.condition.DisabledIf
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
+import org.openrewrite.Parser
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Path
+import java.nio.file.Paths
 
 class MavenParserTest {
+
+    @Test
+    fun repositoryDefinedInSettings() {
+        val settingsXml = """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>http://repo.spring.io/milestone</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
+        """.trimIndent()
+
+        val pom = MavenParser.builder()
+                .userSettingsXml(Parser.Input(Paths.get("settings.xml"),
+                        { ByteArrayInputStream(settingsXml.toByteArray()) },
+                        true))
+                .build()
+                .parse("""
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                     
+                      <parent>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-parent</artifactId>
+                        <version>2.4.0-M3</version>
+                      </parent>
+    
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                    </project>
+                """.trimIndent())
+                .first()
+
+        assertThat(pom!!.model!!.parent!!.licenses).isNotNull
+    }
+
     @Test
     fun milestoneParent() {
         val pom = MavenParser.builder().build()
@@ -50,9 +103,10 @@ class MavenParserTest {
                     </repository>
                   </repositories>
                 </project>
-            """.trimIndent())[0]
+            """.trimIndent())
+                .first()
 
-        assertThat(pom!!.model!!.parent!!.licenses).isNotNull()
+        assertThat(pom!!.model!!.parent!!.licenses).isNotNull
     }
 
     @Test
