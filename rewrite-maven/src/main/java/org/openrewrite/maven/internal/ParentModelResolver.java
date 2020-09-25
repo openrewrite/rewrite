@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import io.micrometer.core.ipc.http.HttpUrlConnectionSender;
 import org.apache.maven.model.Dependency;
 import org.apache.maven.model.Parent;
 import org.apache.maven.model.Repository;
@@ -26,11 +25,13 @@ import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectModelResolver;
+import org.apache.maven.settings.Server;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.RequestTrace;
 import org.eclipse.aether.impl.RemoteRepositoryManager;
 import org.eclipse.aether.repository.RemoteRepository;
+import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,20 +39,57 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URLConnection;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class ParentModelResolver extends ProjectModelResolver {
     private static final Logger logger = LoggerFactory.getLogger(ParentModelResolver.class);
+    @Nullable private Map<String, Server> servers;
 
     public ParentModelResolver(RepositorySystemSession session,
                                RepositorySystem resolver,
                                RemoteRepositoryManager remoteRepositoryManager,
-                               List<RemoteRepository> repositories) {
-        super(session, new RequestTrace(null), resolver, remoteRepositoryManager, repositories,
-                ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT, null);
+                               List<RemoteRepository> repositories,
+                               @Nullable Map<String, Server> servers) {
+        super(session,
+                new RequestTrace(null),
+                resolver,
+                remoteRepositoryManager,
+                repositories.stream()
+                        .map(ParentModelResolver::httpsFallback)
+                        .collect(Collectors.toList()),
+                ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT,
+                null);
+        this.servers = servers;
+    }
+
+    /**
+     * Most repositories, at least the big public ones, in the maven ecosystem now require HTTPS.
+     * If a remote repository with an HTTP protocol comes in, check to see if the repository accepts HTTP connections
+     * and switch to HTTPS if it does not
+     */
+    private static RemoteRepository httpsFallback(RemoteRepository repository) {
+        RemoteRepository result = repository;
+        try {
+            if(repository.getProtocol().equals("http")) {
+                URLConnection connection = URI.create(repository.getUrl()).toURL().openConnection();
+                if(connection instanceof HttpURLConnection) {
+                    HttpURLConnection httpConnection = (HttpURLConnection) connection;
+                    httpConnection.setRequestMethod("HEAD");
+                    if(httpConnection.getResponseCode() == 403) {
+                      result = new RemoteRepository.Builder(repository)
+                              .setUrl(repository.getUrl().replace("http:", "https:"))
+                              .build();
+                    }
+                }
+            }
+        } catch (IOException e) {
+            logger.warn("Unable to add repository with URL: " + repository.getUrl(), e);
+        }
+        return result;
     }
 
     @Override

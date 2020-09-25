@@ -15,13 +15,9 @@
  */
 package org.openrewrite.maven;
 
-import org.apache.maven.building.Source;
-import org.apache.maven.settings.Server;
-import org.apache.maven.settings.Settings;
+import org.apache.maven.settings.*;
 import org.apache.maven.settings.building.*;
 import org.eclipse.aether.repository.Authentication;
-import org.eclipse.aether.repository.AuthenticationContext;
-import org.eclipse.aether.repository.AuthenticationDigest;
 import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.openrewrite.Parser;
@@ -33,7 +29,6 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.File;
-import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
@@ -50,17 +45,24 @@ public class MavenParser implements Parser<Maven.Pom> {
     @Nullable
     private final File workspaceDir;
     private final List<RemoteRepository> remoteRepositories;
+    /**
+     * Map of a server's id/name to the Server object containing the credentials that should be used to access it
+     */
+    @Nullable
+    private Map<String, Server> servers;
 
     private MavenParser(
             boolean resolveDependencies,
             File localRepository,
             @Nullable File workspaceDir,
-            List<RemoteRepository> remoteRepositories
+            List<RemoteRepository> remoteRepositories,
+            @Nullable Map<String, Server> servers
     ) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
         this.workspaceDir = workspaceDir;
         this.remoteRepositories = remoteRepositories;
+        this.servers = servers;
     }
 
     public static Builder builder() {
@@ -72,7 +74,7 @@ public class MavenParser implements Parser<Maven.Pom> {
         Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
 
         List<MavenModel> modules = new MavenModuleLoader(resolveDependencies,
-                localRepository, workspaceDir, remoteRepositories).load(pomSourceFiles);
+                localRepository, workspaceDir, remoteRepositories, servers).load(pomSourceFiles);
 
         List<Maven.Pom> poms = new ArrayList<>();
         Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
@@ -90,7 +92,7 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     public static class Builder {
         private boolean resolveDependencies = true;
-        private File localRepository = DEFAULT_LOCAL_REPOSITORY;
+        private File localRepository;
         private List<RemoteRepository> remoteRepositories = new ArrayList<>();
         private Input userSettingsXmlOverride;
         private Input globaLSettingsXmlOverride;
@@ -115,14 +117,19 @@ public class MavenParser implements Parser<Maven.Pom> {
 
         /**
          * Provide the global settings.xml from the maven installation.
-         * If this isn't provided, then no global settings.xml is used as we cannot know for sure where the appropriate
-         * maven installation may be located
+         * If this isn't provided, then the maven.conf System Property will be looked at to try and find the global
+         * settings.xml. This environment variable is unlikely to be set by anything other than Maven itself.
+         * So hopefully if this is being run by a non-maven client there isn't anything important in there.
          */
         public Builder globalSettingsXml(Input settingsXmlOverride) {
             this.globaLSettingsXmlOverride = settingsXmlOverride;
             return this;
         }
 
+        /**
+         * Sets the local maven repository to use.
+         * If not overridden here or in the settings.xml, defaults to user home/.m2/repository
+         */
         public Builder localRepository(File localRepository) {
             this.localRepository = localRepository;
             return this;
@@ -147,8 +154,7 @@ public class MavenParser implements Parser<Maven.Pom> {
             this.remoteRepositories.add(remoteRepository);
             return this;
         }
-
-        public MavenParser build() {
+        private Settings getEffectiveSettings() {
             SettingsBuilder settingsBuilder =  new DefaultSettingsBuilderFactory().newInstance();
             SettingsBuildingRequest settingsRequest = new DefaultSettingsBuildingRequest();
             if(userSettingsXmlOverride == null) {
@@ -171,18 +177,26 @@ public class MavenParser implements Parser<Maven.Pom> {
                 settingsRequest.setGlobalSettingsSource(source);
             }
 
-            Settings effectiveSettings;
             try {
-                effectiveSettings = settingsBuilder.build(settingsRequest).getEffectiveSettings();
+                return settingsBuilder.build(settingsRequest).getEffectiveSettings();
             } catch (SettingsBuildingException e) {
                 throw new RuntimeException(e);
+            }
+        }
+
+        public MavenParser build() {
+            Settings effectiveSettings = getEffectiveSettings();
+            if(localRepository == null) {
+                if(effectiveSettings.getLocalRepository() == null) {
+                    localRepository = DEFAULT_LOCAL_REPOSITORY;
+                } else {
+                    localRepository = new File(effectiveSettings.getLocalRepository());
+                }
             }
 
             Map<String, Server> idToServer = effectiveSettings.getServers().stream()
                     .collect(Collectors.toMap(Server::getId, Function.identity()));
-            Set<String> activeProfiles = new HashSet<>(effectiveSettings.getActiveProfiles());
-            List<RemoteRepository> settingsDefinedRepositories = effectiveSettings.getProfiles().stream()
-                    .filter(profile -> activeProfiles.contains(profile.getId()))
+            List<RemoteRepository> settingsDefinedRepositories = getActiveProfiles(effectiveSettings).stream()
                     .flatMap(profile -> profile.getRepositories().stream())
                     .map(mvnRepository -> {
                         RemoteRepository.Builder builder = new RemoteRepository.Builder(
@@ -205,7 +219,32 @@ public class MavenParser implements Parser<Maven.Pom> {
                     .collect(Collectors.toList());
             remoteRepositories.addAll(settingsDefinedRepositories);
 
-            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);
+            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories, idToServer);
+        }
+
+        /**
+         * A Maven profile can be activated based on a number of different criteria:
+         * https://maven.apache.org/guides/introduction/introduction-to-profiles.html
+         *
+         * This imperfectly emulates OR-ing a subset of these criteria together.
+         */
+        private static List<Profile> getActiveProfiles(Settings settings) {
+            Set<String> explicitlyActivatedProfiles = new HashSet<>(settings.getActiveProfiles());
+
+            return settings.getProfiles()
+                    .stream()
+                    .filter(profile -> explicitlyActivatedProfiles.contains(profile.getId()) ||
+                            isActive(profile.getActivation())
+                    )
+                    .collect(Collectors.toList());
+        }
+
+        private static boolean isActive(Activation activation) {
+            if(activation.isActiveByDefault()) {
+                return true;
+            }
+            // TODO other types of criteria. File, JVM, property, etc.
+            return false;
         }
     }
 }

@@ -21,6 +21,7 @@ import org.apache.maven.model.building.*;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
+import org.apache.maven.settings.Server;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -63,6 +64,8 @@ class MavenModuleLoader {
     private final Map<MavenModel.ModuleVersionId, MavenModel.Dependency> dependencyCache = new HashMap<>();
 
     private final CachingWorkspaceReader workspaceReader;
+    @Nullable
+    private Map<String, Server> servers;
 
     private final boolean resolveDependencies;
     private final File localRepository;
@@ -71,11 +74,13 @@ class MavenModuleLoader {
     public MavenModuleLoader(boolean resolveDependencies,
                              File localRepository,
                              @Nullable File workspaceDir,
-                             List<RemoteRepository> remoteRepositories) {
+                             List<RemoteRepository> remoteRepositories,
+                             @Nullable Map<String, Server> servers) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
         this.remoteRepositories = remoteRepositories;
         this.workspaceReader = CachingWorkspaceReader.forWorkspaceDir(workspaceDir);
+        this.servers = servers;
     }
 
     public List<MavenModel> load(Iterable<Parser.Input> inputs) {
@@ -127,7 +132,8 @@ class MavenModuleLoader {
                     repositorySystemSession,
                     repositorySystem,
                     new DefaultRemoteRepositoryManager(),
-                    remoteRepositories
+                    remoteRepositories,
+                    servers
             );
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()
