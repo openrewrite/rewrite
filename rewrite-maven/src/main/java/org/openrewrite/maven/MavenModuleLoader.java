@@ -21,6 +21,7 @@ import org.apache.maven.model.building.*;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
+import org.apache.maven.settings.Server;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
