@@ -45,7 +45,7 @@ class MavenParserTest {
                             <repository>
                                 <id>spring-milestones</id>
                                 <name>Spring Milestones</name>
-                                <url>http://repo.spring.io/milestone</url>
+                                <url>https://repo.spring.io/milestone</url>
                             </repository>
                         </repositories>
                     </profile>
@@ -61,13 +61,13 @@ class MavenParserTest {
                 .parse("""
                     <project>
                       <modelVersion>4.0.0</modelVersion>
-                     
+                    
                       <parent>
                         <groupId>org.springframework.boot</groupId>
                         <artifactId>spring-boot-starter-parent</artifactId>
                         <version>2.4.0-M3</version>
                       </parent>
-    
+                    
                       <groupId>com.mycompany.app</groupId>
                       <artifactId>my-app</artifactId>
                       <version>1</version>

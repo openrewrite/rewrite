@@ -45,24 +45,17 @@ public class MavenParser implements Parser<Maven.Pom> {
     @Nullable
     private final File workspaceDir;
     private final List<RemoteRepository> remoteRepositories;
-    /**
-     * Map of a server's id/name to the Server object containing the credentials that should be used to access it
-     */
-    @Nullable
-    private Map<String, Server> servers;
 
     private MavenParser(
             boolean resolveDependencies,
             File localRepository,
             @Nullable File workspaceDir,
-            List<RemoteRepository> remoteRepositories,
-            @Nullable Map<String, Server> servers
+            List<RemoteRepository> remoteRepositories
     ) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
         this.workspaceDir = workspaceDir;
         this.remoteRepositories = remoteRepositories;
-        this.servers = servers;
     }
 
     public static Builder builder() {
@@ -74,7 +67,7 @@ public class MavenParser implements Parser<Maven.Pom> {
         Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
 
         List<MavenModel> modules = new MavenModuleLoader(resolveDependencies,
-                localRepository, workspaceDir, remoteRepositories, servers).load(pomSourceFiles);
+                localRepository, workspaceDir, remoteRepositories).load(pomSourceFiles);
 
         List<Maven.Pom> poms = new ArrayList<>();
         Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
@@ -146,7 +139,7 @@ public class MavenParser implements Parser<Maven.Pom> {
         }
 
         public Builder remoteRepositories(List<RemoteRepository> remoteRepositories) {
-            this.remoteRepositories = remoteRepositories;
+            this.remoteRepositories = new ArrayList<>(remoteRepositories);
             return this;
         }
 
@@ -154,6 +147,8 @@ public class MavenParser implements Parser<Maven.Pom> {
             this.remoteRepositories.add(remoteRepository);
             return this;
         }
+
+        @SuppressWarnings("deprecation") // StringSettingsSource is deprecated, but the API that uses it doesn't accept its "replacement"
         private Settings getEffectiveSettings() {
             SettingsBuilder settingsBuilder =  new DefaultSettingsBuilderFactory().newInstance();
             SettingsBuildingRequest settingsRequest = new DefaultSettingsBuildingRequest();
@@ -219,7 +214,7 @@ public class MavenParser implements Parser<Maven.Pom> {
                     .collect(Collectors.toList());
             remoteRepositories.addAll(settingsDefinedRepositories);
 
-            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories, idToServer);
+            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);
         }
 
         /**

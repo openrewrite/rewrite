@@ -64,8 +64,6 @@ class MavenModuleLoader {
     private final Map<MavenModel.ModuleVersionId, MavenModel.Dependency> dependencyCache = new HashMap<>();
 
     private final CachingWorkspaceReader workspaceReader;
-    @Nullable
-    private Map<String, Server> servers;
 
     private final boolean resolveDependencies;
     private final File localRepository;
@@ -74,13 +72,11 @@ class MavenModuleLoader {
     public MavenModuleLoader(boolean resolveDependencies,
                              File localRepository,
                              @Nullable File workspaceDir,
-                             List<RemoteRepository> remoteRepositories,
-                             @Nullable Map<String, Server> servers) {
+                             List<RemoteRepository> remoteRepositories) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
         this.remoteRepositories = remoteRepositories;
         this.workspaceReader = CachingWorkspaceReader.forWorkspaceDir(workspaceDir);
-        this.servers = servers;
     }
 
     public List<MavenModel> load(Iterable<Parser.Input> inputs) {
@@ -132,8 +128,7 @@ class MavenModuleLoader {
                     repositorySystemSession,
                     repositorySystem,
                     new DefaultRemoteRepositoryManager(),
-                    remoteRepositories,
-                    servers
+                    remoteRepositories
             );
 
             DefaultModelBuildingRequest modelBuildingRequest = new DefaultModelBuildingRequest()

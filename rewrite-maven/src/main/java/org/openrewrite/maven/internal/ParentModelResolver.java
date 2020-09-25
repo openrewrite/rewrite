@@ -25,13 +25,11 @@ import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.resolution.UnresolvableModelException;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.project.ProjectModelResolver;
-import org.apache.maven.settings.Server;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.RequestTrace;
 import org.eclipse.aether.impl.RemoteRepositoryManager;
 import org.eclipse.aether.repository.RemoteRepository;
-import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,13 +45,11 @@ import java.util.stream.Collectors;
 
 public class ParentModelResolver extends ProjectModelResolver {
     private static final Logger logger = LoggerFactory.getLogger(ParentModelResolver.class);
-    @Nullable private Map<String, Server> servers;
 
     public ParentModelResolver(RepositorySystemSession session,
                                RepositorySystem resolver,
                                RemoteRepositoryManager remoteRepositoryManager,
-                               List<RemoteRepository> repositories,
-                               @Nullable Map<String, Server> servers) {
+                               List<RemoteRepository> repositories) {
         super(session,
                 new RequestTrace(null),
                 resolver,
@@ -63,7 +59,6 @@ public class ParentModelResolver extends ProjectModelResolver {
                         .collect(Collectors.toList()),
                 ProjectBuildingRequest.RepositoryMerging.POM_DOMINANT,
                 null);
-        this.servers = servers;
     }
 
     /**
