@@ -16,6 +16,7 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
@@ -26,6 +27,88 @@ import java.nio.file.Path
 import java.nio.file.Paths
 
 class MavenParserTest {
+
+    /**
+     * This tests resolving dependencies from a password-protected repository with credentials provided by settings.xml.
+     * We don't have a password-protected repository up and running all the time, so a suitably configured repository must be manually prepared.
+     * In the future this may be automated, but for now these steps can be used to prepare such an environment:
+     *
+     * 1. Install docker
+     * 2. docker pull docker.bintray.io/jfrog/artifactory-oss:latest
+     * 3. docker run -d -p 8081:8081 -p 8082:8082 docker.bintray.io/jfrog/artifactory-oss:latest
+     * 4. Browse to http://localhost:8081/ and go through setup. The initial username/password is admin/password
+     * 5. When prompted, change the password for admin to E0Sl0n85N0DK
+     * 6. Create a virtual repository that mirrors jcenter and requires authentication
+     * 7. Remove the @Disabled annotation from this test and run it
+     */
+    @Disabled("This test requires that a properly configured repository be running locally, and that process is not automated")
+    @Test
+    fun repositoryAccessedWithCredentialsFromSettings() {
+        val settingsXml = """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <servers>
+                    <server>
+                        <id>jcenter-auth</id>
+                        <username>admin</username>
+                        <password>E0Sl0n85N0DK</password>
+                    </server>
+                </servers>
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>jcenter-auth</id>
+                                <name>JCenter Authenticated</name>
+                                <url>http://localhost:8082/artifactory/jcenter-authenticated/</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
+        """.trimIndent()
+
+        val pom = MavenParser.builder()
+                .noMavenCentral()
+                .userSettingsXml(Parser.Input(Paths.get("settings.xml"),
+                        { ByteArrayInputStream(settingsXml.toByteArray()) },
+                        true))
+                .build()
+                .parse("""
+                    <project>
+                        <modelVersion>4.0.0</modelVersion>
+                    
+                        <groupId>com.mycompany.app</groupId>
+                        <artifactId>my-app</artifactId>
+                        <version>1</version>
+                    
+                        <dependencies>
+                          <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-api</artifactId>
+                            <version>5.7.0</version>
+                            <scope>test</scope>
+                          </dependency>
+                          <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter-engine</artifactId>
+                            <version>5.7.0</version>
+                            <scope>test</scope>
+                          </dependency>
+                        </dependencies>
+                    </project>
+                """.trimIndent())
+                .first()
+        // If transitive dependencies were found then dependency resolution successfully used the credentials from settings.xml
+        assertThat(pom.model.transitiveDependenciesByScope["test"]!!.size).isGreaterThan(0)
+    }
 
     @Test
     fun repositoryDefinedInSettings() {

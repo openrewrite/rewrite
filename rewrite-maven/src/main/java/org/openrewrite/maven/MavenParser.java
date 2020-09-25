@@ -85,6 +85,7 @@ public class MavenParser implements Parser<Maven.Pom> {
 
     public static class Builder {
         private boolean resolveDependencies = true;
+        private boolean useMavenCentral = true;
         private File localRepository;
         private List<RemoteRepository> remoteRepositories = new ArrayList<>();
         private Input userSettingsXmlOverride;
@@ -93,10 +94,12 @@ public class MavenParser implements Parser<Maven.Pom> {
         @Nullable
         private File workspaceDir;
 
-        public Builder() {
-            remoteRepositories.add(new RemoteRepository.Builder("central", "default",
-                    "https://repo1.maven.org/maven2/").build()
-            );
+        /**
+         * Remove Maven Central from the list of remote repositories.
+         */
+        public Builder noMavenCentral() {
+            useMavenCentral = false;
+            return this;
         }
 
         /**
@@ -212,6 +215,11 @@ public class MavenParser implements Parser<Maven.Pom> {
                         return builder.build();
                     })
                     .collect(Collectors.toList());
+            if(useMavenCentral) {
+                remoteRepositories.add(new RemoteRepository.Builder("central", "default",
+                        "https://repo1.maven.org/maven2/").build()
+                );
+            }
             remoteRepositories.addAll(settingsDefinedRepositories);
 
             return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);

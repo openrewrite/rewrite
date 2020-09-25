@@ -40,7 +40,6 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URLConnection;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ParentModelResolver extends ProjectModelResolver {
