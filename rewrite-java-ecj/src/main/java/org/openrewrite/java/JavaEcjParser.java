@@ -11,6 +11,7 @@ import org.eclipse.jdt.internal.compiler.Compiler;
 import org.eclipse.jdt.internal.compiler.IErrorHandlingPolicy;
 import org.eclipse.jdt.internal.compiler.ast.CompilationUnitDeclaration;
 import org.eclipse.jdt.internal.compiler.batch.ClasspathJar;
+import org.eclipse.jdt.internal.compiler.batch.CompilationUnit;
 import org.eclipse.jdt.internal.compiler.batch.FileSystem;
 import org.eclipse.jdt.internal.compiler.classfmt.ClassFileConstants;
 import org.eclipse.jdt.internal.compiler.env.ICompilationUnit;
@@ -24,10 +25,8 @@ import org.openrewrite.java.tree.J;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.stream.StreamSupport.stream;
 
@@ -102,6 +101,14 @@ public class JavaEcjParser implements JavaParser {
                     true) {
             };
 
+            Stack<CompilationUnit> compilationUnitStack = stream(sources.spliterator(), false)
+                    .map(source -> new CompilationUnit(
+                            StringUtils.readFully(source.getSource()).toCharArray(),
+                            source.getPath().toString(),
+                            StandardCharsets.UTF_8.name()
+                    ))
+                    .collect(Collectors.toCollection(Stack::new));
+
             @SuppressWarnings("deprecation")
             Compiler compiler = new Compiler(
                     nameEnvironment,
@@ -121,24 +128,20 @@ public class JavaEcjParser implements JavaParser {
                 public void process(CompilationUnitDeclaration unit, int i) {
                     super.process(unit, i);
 
-                    JavaEcjParserVisitor visitor = new JavaEcjParserVisitor();
+                    JavaEcjParserVisitor visitor = new JavaEcjParserVisitor(compilationUnitStack.pop());
                     cus.add(visitor.visit(unit));
                 }
             };
 
-            compiler.compile(stream(sources.spliterator(), false)
-                    .map(source -> new org.eclipse.jdt.internal.compiler.batch.CompilationUnit(
-                            StringUtils.readFully(source.getSource()).toCharArray(),
-                            source.getPath().toString(),
-                            StandardCharsets.UTF_8.name()
-                    ))
-                    .toArray(ICompilationUnit[]::new));
+            compiler.compile(compilationUnitStack.toArray(new ICompilationUnit[0]));
         } catch (Exception e) {
             throw new IllegalStateException(e);
         }
 
         return null;
     }
+
+
 
     @Override
     public JavaParser reset() {

@@ -9,7 +9,11 @@ class JavaEcjFileParsingTest {
     @Test
     fun parseJavaSourceFromFile(@TempDir tempDir: Path) {
         val source = File(tempDir.toFile(), "A.java")
-        source.writeText("public class A {}")
+        source.writeText("""
+            import java.io.Serializable;
+            public class A implements Serializable {
+            }
+        """.trimIndent())
 
         JavaEcjParser.builder().build().parse(listOf(source.toPath()), tempDir)
     }
