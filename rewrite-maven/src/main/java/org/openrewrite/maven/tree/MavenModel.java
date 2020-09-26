@@ -110,6 +110,7 @@ public class MavenModel {
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
+    @EqualsAndHashCode
     public static class ModuleVersionId implements Comparable<ModuleVersionId> {
         @With
         String groupId;

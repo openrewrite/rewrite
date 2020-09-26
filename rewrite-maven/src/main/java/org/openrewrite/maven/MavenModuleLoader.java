@@ -21,7 +21,6 @@ import org.apache.maven.model.building.*;
 import org.apache.maven.model.resolution.ModelResolver;
 import org.apache.maven.model.superpom.DefaultSuperPomProvider;
 import org.apache.maven.model.superpom.SuperPomProvider;
-import org.apache.maven.settings.Server;
 import org.eclipse.aether.RepositorySystem;
 import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.artifact.Artifact;
@@ -69,13 +68,21 @@ class MavenModuleLoader {
     private final File localRepository;
     private final List<RemoteRepository> remoteRepositories;
 
-    public MavenModuleLoader(boolean resolveDependencies,
-                             File localRepository,
-                             @Nullable File workspaceDir,
-                             List<RemoteRepository> remoteRepositories) {
+    public MavenModuleLoader(
+            boolean resolveDependencies,
+            File localRepository,
+            @Nullable File workspaceDir,
+            List<RemoteRepository> remoteRepositories
+    ) {
         this.resolveDependencies = resolveDependencies;
         this.localRepository = localRepository;
-        this.remoteRepositories = remoteRepositories;
+
+        // The type might be called "RemoteRepository" but file:// urls are perfectly acceptable
+        List<RemoteRepository> allRepositories = new ArrayList<>(remoteRepositories.size() + 1);
+        allRepositories.add(new RemoteRepository.Builder("local", "default", localRepository.toURI().toString()).build());
+        allRepositories.addAll(remoteRepositories);
+
+        this.remoteRepositories = allRepositories;
         this.workspaceReader = CachingWorkspaceReader.forWorkspaceDir(workspaceDir);
     }
 
@@ -174,11 +181,11 @@ class MavenModuleLoader {
 
         Model rawModel = result.getRawModel(model.getGroupId() + ":" + model.getArtifactId() + ":" + model.getVersion());
 
-        Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope = new HashMap<>();
+        Map<String, Set<MavenModel.ModuleVersionId>> transitiveDependenciesByScope = new HashMap<>();
 
         List<MavenModel.Dependency> dependencies = model.getDependencies().stream()
                 .map(dependency -> resolveDependency(repositorySystem, repositorySystemSession, dependency,
-                        model, rawModel, transitiveDepenenciesByScope))
+                        model, rawModel, transitiveDependenciesByScope))
                 .collect(toList());
 
         MavenModel.DependencyManagement dependencyManagement = model.getDependencyManagement() == null ?
@@ -193,7 +200,7 @@ class MavenModuleLoader {
                                 dependency,
                                 model,
                                 rawModel,
-                                transitiveDepenenciesByScope)
+                                transitiveDependenciesByScope)
                         )
                         .collect(toList())
                 );
@@ -214,7 +221,7 @@ class MavenModuleLoader {
                 model.getLicenses().stream()
                         .map(l -> new MavenModel.License(l.getName()))
                         .collect(toList()),
-                transitiveDepenenciesByScope,
+                transitiveDependenciesByScope,
                 properties,
                 Stream.concat(
                         remoteRepositories.stream()
@@ -240,11 +247,14 @@ class MavenModuleLoader {
         return remotes;
     }
 
-    private MavenModel.Dependency resolveDependency(RepositorySystem repositorySystem,
-                                                    RepositorySystemSession repositorySystemSession,
-                                                    Dependency dependency, Model model, Model rawModel,
-                                                    Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope) {
-
+    private MavenModel.Dependency resolveDependency(
+            RepositorySystem repositorySystem,
+            RepositorySystemSession repositorySystemSession,
+            Dependency dependency,
+            Model model,
+            Model rawModel,
+            Map<String, Set<MavenModel.ModuleVersionId>> transitiveDepenenciesByScope
+    ) {
         // This may not be the EFFECTIVE mvid, e.g. a version here could be a property reference. So two distinct
         // "dependency" instances could ultimately refer to the same MavenModel.Dependency, and that's ok.
         MavenModel.ModuleVersionId mvidFromDependency = new MavenModel.ModuleVersionId(
