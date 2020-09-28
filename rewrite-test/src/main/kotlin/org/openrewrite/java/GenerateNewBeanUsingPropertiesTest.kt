@@ -23,6 +23,21 @@ interface GenerateNewBeanUsingPropertiesTest: RefactorVisitorTest {
     @Test
     fun generateNewBeanWithProperties(jp: JavaParser) = assertRefactored(
             jp,
+            dependencies = listOf("""
+                package bean;
+                public class Address {
+                    private String street;
+                    private String zip;
+                    
+                    public void setStreet(String street) {
+                        this.street = street;
+                    }
+                    
+                    public void setZip(String zip) {
+                        this.zip = zip;
+                    }
+                }
+            """),
             visitorsMapped = listOf { a ->
                 val method = a.classes[0].methods[0]
                 val body = method.body!!
@@ -43,21 +58,6 @@ interface GenerateNewBeanUsingPropertiesTest: RefactorVisitorTest {
                     }
                 }
             """,
-            dependencies = listOf("""
-                package bean;
-                public class Address {
-                    private String street;
-                    private String zip;
-                    
-                    public void setStreet(String street) {
-                        this.street = street;
-                    }
-                    
-                    public void setZip(String zip) {
-                        this.zip = zip;
-                    }
-                }
-            """),
             after = """
                 public class A {
                     public void printAddress(String street, String zip) {
