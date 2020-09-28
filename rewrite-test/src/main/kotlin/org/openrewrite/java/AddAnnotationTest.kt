@@ -31,6 +31,10 @@ interface AddAnnotationTest : RefactorVisitorTest {
     @Test
     fun addAnnotationToClass(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf(
+                    { a -> AddAnnotation.Scoped(a.classes[0], "lombok.RequiredArgsConstructor") },
+                    { a -> AddAnnotation.Scoped(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor") }
+            ),
             before = """
                 package a;
                 
@@ -39,10 +43,6 @@ interface AddAnnotationTest : RefactorVisitorTest {
                     }
                 }
             """,
-            visitorsMapped = listOf(
-                    { a -> AddAnnotation.Scoped(a.classes[0], "lombok.RequiredArgsConstructor") },
-                    { a -> AddAnnotation.Scoped(a.classes[0].body.statements[0], "lombok.RequiredArgsConstructor") }
-            ),
             after = """
                 package a;
                 
@@ -60,6 +60,10 @@ interface AddAnnotationTest : RefactorVisitorTest {
     @Test
     fun addAnnotationToField(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf(
+                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[0], "b.MyAnnotation") },
+                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[1], "b.MyAnnotation") }
+            ),
             before = """
                 package a;
                 
@@ -68,10 +72,6 @@ interface AddAnnotationTest : RefactorVisitorTest {
                     NameService nameService;
                 }
             """,
-            visitorsMapped = listOf(
-                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[0], "b.MyAnnotation") },
-                    { a -> AddAnnotation.Scoped((a as J.CompilationUnit).classes[0].fields[1], "b.MyAnnotation") }
-            ),
             after = """
                 package a;
                 
@@ -90,6 +90,10 @@ interface AddAnnotationTest : RefactorVisitorTest {
     @Test
     fun addAnnotationToMethod(jp: JavaParser) = assertRefactored(
             jp,
+            dependencies = listOf(annot),
+            visitorsMappedToMany = listOf { a: J.CompilationUnit ->
+                a.classes[0].methods.map { m -> AddAnnotation.Scoped(m, "b.MyAnnotation") }
+            },
             before = """
                 package a;
                 
@@ -108,10 +112,6 @@ interface AddAnnotationTest : RefactorVisitorTest {
                     }
                 }
             """,
-            dependencies = listOf(annot),
-            visitorsMappedToMany = listOf { a: J.CompilationUnit ->
-                a.classes[0].methods.map { m -> AddAnnotation.Scoped(m, "b.MyAnnotation") }
-            },
             after = """
                 package a;
                 
@@ -141,6 +141,11 @@ interface AddAnnotationTest : RefactorVisitorTest {
     @Test
     fun addAnnotationToMethodParameters(jp: JavaParser) = assertRefactored(
             jp,
+            dependencies = listOf(annot),
+            visitorsMapped = listOf { a ->
+                AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0],
+                        "b.MyAnnotation")
+            },
             before = """
                 package a;
                 
@@ -149,11 +154,6 @@ interface AddAnnotationTest : RefactorVisitorTest {
                     }
                 }
             """,
-            dependencies = listOf(annot),
-            visitorsMapped = listOf { a ->
-                AddAnnotation.Scoped(a.classes[0].methods[0].params.params[0],
-                        "b.MyAnnotation")
-            },
             after = """
                 package a;
                 
