@@ -29,7 +29,6 @@ import java.util.List;
 
 import static java.util.Arrays.asList;
 import static org.openrewrite.Formatting.*;
-import static org.openrewrite.Tree.randomId;
 
 public final class AddAnnotation {
     private AddAnnotation() {
@@ -50,7 +49,7 @@ public final class AddAnnotation {
                         c.getTypeParameters().getFormatting()) :
                 format(firstPrefix(c.getModifiers()));
 
-        fixedAnnotations.add(buildAnnotation(annotationFormatting, annotationType, arguments));
+        fixedAnnotations.add(J.Annotation.buildAnnotation(annotationFormatting, annotationType, arguments));
 
         if (c.getAnnotations().isEmpty()) {
             String prefix = formatter.findIndent(0, c).getPrefix();
@@ -82,7 +81,7 @@ public final class AddAnnotation {
             JavaFormatter formatter
     ) {
         List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
-        fixedAnnotations.add(buildAnnotation(EMPTY, annotationType, arguments));
+        fixedAnnotations.add(J.Annotation.buildAnnotation(EMPTY, annotationType, arguments));
 
         if (m.getAnnotations().isEmpty()) {
             String prefix = formatter.findIndent(0, m).getPrefix();
@@ -99,13 +98,6 @@ public final class AddAnnotation {
         }
         m = m.withAnnotations(fixedAnnotations);
         return m;
-    }
-
-    public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
-        return new J.Annotation(randomId(),
-                J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
-                formatting);
     }
 
     public static class Scoped extends JavaRefactorVisitor {
@@ -199,7 +191,7 @@ public final class AddAnnotation {
         }
 
         private J.Annotation buildAnnotation(Formatting formatting) {
-            return AddAnnotation.buildAnnotation(formatting, annotationType, arguments);
+            return J.Annotation.buildAnnotation(formatting, annotationType, arguments);
         }
     }
 }

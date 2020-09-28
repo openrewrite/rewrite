@@ -137,6 +137,13 @@ public interface J extends Serializable, Tree {
             return v.visitAnnotation(this);
         }
 
+        public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
+            return new J.Annotation(randomId(),
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
+                    formatting);
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
