@@ -12,6 +12,8 @@ class JavaEcjFileParsingTest {
         source.writeText("""
             import java.io.Serializable;
             public class A implements Serializable {
+                class B {
+                }
             }
         """.trimIndent())
 
