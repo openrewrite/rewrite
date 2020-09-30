@@ -2571,7 +2571,7 @@ public interface J extends Serializable, Tree {
 
         @Nullable
         @With
-        J.Ident encl;
+        Expression encl;
 
         New nooh;
 
