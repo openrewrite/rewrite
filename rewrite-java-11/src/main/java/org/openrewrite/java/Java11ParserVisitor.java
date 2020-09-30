@@ -901,7 +901,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitNewClass(NewClassTree node, Formatting fmt) {
-        J.Ident encl = node.getEnclosingExpression() == null ? null : convert(node.getEnclosingExpression());
+        Expression encl = node.getEnclosingExpression() == null ? null : convert(node.getEnclosingExpression());
 
         if(encl != null) {
             encl = encl.withSuffix(sourceBefore("."));
