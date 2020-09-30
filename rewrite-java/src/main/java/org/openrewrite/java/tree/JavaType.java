@@ -470,7 +470,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(JavaType type) {
-            return type instanceof Array && elemType.deepEquals(((Array) type).elemType);
+            return type instanceof Array && elemType != null && elemType.deepEquals(((Array) type).elemType);
         }
 
         @Override
