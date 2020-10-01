@@ -29,7 +29,7 @@ import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 public class ImplementInterface {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
         private final String interfaze;
         private final JavaType.Class interfaceType;
@@ -46,8 +46,8 @@ public class ImplementInterface {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = super.visitClassDecl(classDecl);
             if (scope.isScope(classDecl) && (classDecl.getImplements() == null ||
                     classDecl.getImplements().getFrom().stream().noneMatch(f -> interfaceType.equals(f.getType())))) {
                 maybeAddImport(interfaze);

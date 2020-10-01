@@ -29,7 +29,7 @@ import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
+public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private String targetType;
 
@@ -48,14 +48,14 @@ public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
             andThen(new Scoped(method, targetType));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final String targetType;
 
@@ -70,7 +70,7 @@ public class ChangeMethodTargetToStatic extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method)) {
                 JavaType.FullyQualified classType = JavaType.Class.build(targetType);
                 J.MethodInvocation m = method.withSelect(

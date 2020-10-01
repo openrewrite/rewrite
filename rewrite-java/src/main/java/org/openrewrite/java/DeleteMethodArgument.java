@@ -27,7 +27,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class DeleteMethodArgument extends JavaRefactorVisitor {
+public class DeleteMethodArgument extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private Integer index;
 
@@ -51,14 +51,14 @@ public class DeleteMethodArgument extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
             andThen(new Scoped(method, index));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final int index;
 
@@ -73,7 +73,7 @@ public class DeleteMethodArgument extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             List<Expression> originalArgs = method.getArgs().getArgs();
             if (scope.isScope(method) && originalArgs.stream()
                     .filter(a -> !(a instanceof J.Empty))

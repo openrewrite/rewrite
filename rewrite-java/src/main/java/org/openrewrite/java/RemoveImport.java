@@ -32,7 +32,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class RemoveImport extends JavaRefactorVisitor {
+public class RemoveImport extends JavaIsoRefactorVisitor {
     @EqualsAndHashCode.Include
     private String type;
 
@@ -70,7 +70,7 @@ public class RemoveImport extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         namedImport = null;
         starImport = null;
         staticStarImport = null;
@@ -79,12 +79,12 @@ public class RemoveImport extends JavaRefactorVisitor {
         referencedFields.clear();
         staticNamedImports.clear();
 
-        J.CompilationUnit c = refactor(cu, super::visitCompilationUnit);
+        J.CompilationUnit c = super.visitCompilationUnit(cu);
         return staticImportDeletions(classImportDeletions(c));
     }
 
     @Override
-    public J visitImport(J.Import impoort) {
+    public J.Import visitImport(J.Import impoort) {
         if (impoort.isStatic()) {
             if (impoort.getQualid().getTarget().printTrimmed().equals(type)) {
                 if ("*".equals(impoort.getQualid().getSimpleName())) {
@@ -105,7 +105,7 @@ public class RemoveImport extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitTypeName(NameTree name) {
+    public NameTree visitTypeName(NameTree name) {
         JavaType.Class asClass = TypeUtils.asClass(name.getType());
         if (asClass != null && asClass.getPackageName().equals(classType.getPackageName()) &&
                 getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
@@ -115,7 +115,7 @@ public class RemoveImport extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident) {
+    public J.Ident visitIdentifier(J.Ident ident) {
         if (getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
             referencedFields.add(ident.getSimpleName());
         }
@@ -123,7 +123,7 @@ public class RemoveImport extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if (methodMatcher.matches(method) && method.getType() != null &&
                 method.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
             referencedMethods.add(method.getName());

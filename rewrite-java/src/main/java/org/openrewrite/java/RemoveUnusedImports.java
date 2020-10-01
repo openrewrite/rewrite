@@ -28,7 +28,7 @@ import static java.util.stream.Collectors.toSet;
 /**
  * Assumes imports are ordered. Only meant to be used by {@link OrderImports}.
  */
-class RemoveUnusedImports extends JavaRefactorVisitor {
+class RemoveUnusedImports extends JavaIsoRefactorVisitor {
     private final int classCountToUseStarImport;
     private final int nameCountToUseStarImport;
 
@@ -38,7 +38,7 @@ class RemoveUnusedImports extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
         Map<String, Set<String>> methodsByTypeName = new MethodsByType().visit(cu);
 

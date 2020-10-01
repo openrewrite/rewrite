@@ -29,7 +29,7 @@ import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class InsertMethodArgument extends JavaRefactorVisitor {
+public class InsertMethodArgument extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private Integer index;
     private String source;
@@ -59,14 +59,14 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
             andThen(new Scoped(method, index, source));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final int index;
         private final String source;
@@ -83,7 +83,7 @@ public class InsertMethodArgument extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method)) {
                 List<Expression> modifiedArgs = method.getArgs().getArgs().stream()
                         .filter(a -> !(a instanceof J.Empty))

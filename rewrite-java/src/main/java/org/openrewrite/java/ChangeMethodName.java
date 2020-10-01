@@ -17,23 +17,14 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
-import org.openrewrite.Tree;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TreeBuilder;
-import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class ChangeMethodName extends JavaRefactorVisitor {
+public class ChangeMethodName extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private String name;
 
@@ -56,8 +47,8 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method) {
-        J.MethodDecl m = refactor(method, super::visitMethod);
+    public J.MethodDecl visitMethod(J.MethodDecl method) {
+        J.MethodDecl m = super.visitMethod(method);
 
         J.ClassDecl classDecl = getCursor().firstEnclosing(J.ClassDecl.class);
         assert classDecl != null;
@@ -70,7 +61,7 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if (methodMatcher.matches(method)) {
             andThen(new Scoped(method, name));
         }
@@ -78,8 +69,8 @@ public class ChangeMethodName extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident) {
-        J.Ident i = refactor(ident, super::visitIdentifier);
+    public J.Ident visitIdentifier(J.Ident ident) {
+        J.Ident i = super.visitIdentifier(ident);
         return i;
     }
 
@@ -91,8 +82,8 @@ public class ChangeMethodName extends JavaRefactorVisitor {
      *  import static com.abc.B.static2;
      */
     @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess) {
-        J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
+    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess) {
+        J.FieldAccess f = super.visitFieldAccess(fieldAccess);
         if (f.isFullyQualifiedClassReference(methodMatcher)) {
             Expression target = f.getTarget();
             if(target instanceof J.FieldAccess) {
@@ -104,7 +95,7 @@ public class ChangeMethodName extends JavaRefactorVisitor {
         return f;
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final String name;
 
@@ -119,7 +110,7 @@ public class ChangeMethodName extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             return scope.isScope(method) && !method.getSimpleName().equals(name) ?
                     method.withName(method.getName().withName(name)) :
                     super.visitMethodInvocation(method);

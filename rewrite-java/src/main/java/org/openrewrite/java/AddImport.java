@@ -84,7 +84,7 @@ public class AddImport extends JavaRefactorVisitor {
     private static Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         if(JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }

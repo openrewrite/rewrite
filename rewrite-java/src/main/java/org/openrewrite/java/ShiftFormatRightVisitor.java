@@ -29,7 +29,7 @@ import static java.util.stream.IntStream.range;
 import static org.openrewrite.Formatting.formatLastSuffix;
 import static org.openrewrite.Formatting.lastSuffix;
 
-public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
+public class ShiftFormatRightVisitor extends JavaIsoRefactorVisitor {
     private final Tree scope;
     private final String shift;
 
@@ -42,8 +42,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method) {
-        J.MethodDecl m = refactor(method, super::visitMethod);
+    public J.MethodDecl visitMethod(J.MethodDecl method) {
+        J.MethodDecl m = super.visitMethod(method);
         if (getCursor().isScopeInPath(scope)) {
             m = m.withPrefix(m.getPrefix() + shift);
         }
@@ -51,8 +51,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitElse(J.If.Else elze) {
-        J.If.Else e = refactor(elze, super::visitElse);
+    public J.If.Else visitElse(J.If.Else elze) {
+        J.If.Else e = super.visitElse(elze);
         if (getCursor().isScopeInPath(scope) && isOnOwnLine(elze)) {
             e = e.withPrefix(e.getPrefix() + shift);
         }
@@ -60,8 +60,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitStatement(Statement statement) {
-        Statement s = refactor(statement, super::visitStatement);
+    public Statement visitStatement(Statement statement) {
+        Statement s = super.visitStatement(statement);
         if (getCursor().isScopeInPath(scope) && isOnOwnLine(statement)) {
             s = s.withPrefix(s.getPrefix() + shift);
         }
@@ -69,8 +69,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitBlock(J.Block<J> block) {
-        J.Block<J> b = refactor(block, super::visitBlock);
+    public J.Block<J> visitBlock(J.Block<J> block) {
+        J.Block<J> b = super.visitBlock(block);
         if (getCursor().isScopeInPath(scope)) {
             J.Block.End end = b.getEnd();
             b = b.withEnd(end.withFormatting(end.getFormatting().withPrefix(
@@ -80,8 +80,8 @@ public class ShiftFormatRightVisitor extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitNewArray(J.NewArray newArray) {
-        J.NewArray n = refactor(newArray, super::visitNewArray);
+    public J.NewArray visitNewArray(J.NewArray newArray) {
+        J.NewArray n = super.visitNewArray(newArray);
         if (n.getInitializer() != null) {
             String suffix = lastSuffix(n.getInitializer().getElements());
             if (suffix.contains("\n")) {
