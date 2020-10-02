@@ -16,42 +16,124 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.AutoFormat
 import org.openrewrite.java.JavaParser
-import org.openrewrite.whenParsedBy
 
-interface AutoFormatTest {
+interface AutoFormatTest : RefactorVisitorTest {
     @Test
-    fun methodDeclaration(jp: JavaParser) {
-        """
-            import java.util.*;
-            
-            public class A {
-                List<String> l = new ArrayList<>();
+    fun methodDeclaration(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import java.util.*;
                 
-            @Deprecated
-            public void method() {
-              if(true) {
-                l.add("value");
-              }
-            }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> AutoFormat(a.classes[0].methods[0]) }
-                .isRefactoredTo("""
-                    import java.util.*;
+                public class A {
+                    List<String> l = new ArrayList<>();
                     
-                    public class A {
-                        List<String> l = new ArrayList<>();
-                        
-                        @Deprecated
-                        public void method() {
-                            if(true) {
-                                l.add("value");
-                            }
+                @Deprecated
+                public void method() {
+                  if(true) {
+                    l.add("value");
+                  }
+                }
+                }
+            """,
+            after = """
+                import java.util.*;
+                
+                public class A {
+                    List<String> l = new ArrayList<>();
+                    
+                    @Deprecated
+                    public void method() {
+                        if(true) {
+                            l.add("value");
                         }
                     }
-                """)
-    }
+                }
+            """
+    )
+
+    @Test
+    fun putEachClassAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                    "public interface Tester {}",
+                    "public interface OtherTest {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                import lombok.Data;
+                import org.junit.jupiter.api.Tag;
+                import java.lang.annotation.Documented;
+                
+                @Documented@Tag(Tester.class)   @Data
+                public class B {
+                    
+                }
+            """,
+            after = """
+                import lombok.Data;
+                import org.junit.jupiter.api.Tag;
+                import java.lang.annotation.Documented;
+                
+                @Documented
+                @Tag(Tester.class)
+                @Data
+                public class B {
+                    
+                }
+            """
+    )
+
+    @Test
+    fun putClassAnnotationAndModifierOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                import java.lang.annotation.Documented;
+                
+                @Documented private class B {
+                    
+                }
+            """,
+            after = """
+                import java.lang.annotation.Documented;
+                
+                @Documented
+                private class B {
+                    
+                }
+            """
+    )
+
+    @Test
+    fun putClassAnnotationAndKindOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                import java.lang.annotation.Documented;
+                
+                @Documented class B {
+                    
+                }
+            """,
+            after = """
+                import java.lang.annotation.Documented;
+                
+                @Documented
+                class B {
+                    
+                }
+            """
+    )
 }

@@ -1056,44 +1056,18 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
-        public static J.ClassDecl addAnnotation(
-                J.ClassDecl c,
-                boolean isTopLevelClass,
+        public J.ClassDecl addAnnotation(
                 JavaType.Class annotationType,
-                List<Expression> arguments,
-                JavaFormatter formatter
+                List<Expression> arguments
         ) {
-            List<J.Annotation> fixedAnnotations = new ArrayList<>(c.getAnnotations());
-
-            Formatting annotationFormatting = c.getModifiers().isEmpty() ?
-                    (c.getTypeParameters() == null ?
-                            c.getKind().getFormatting() :
-                            c.getTypeParameters().getFormatting()) :
-                    format(firstPrefix(c.getModifiers()));
-
+            List<J.Annotation> fixedAnnotations = new ArrayList<>(getAnnotations());
+            Formatting annotationFormatting = getModifiers().isEmpty() ?
+                    (getTypeParameters() == null ?
+                            getKind().getFormatting() :
+                            getTypeParameters().getFormatting()) :
+                    format(firstPrefix(getModifiers()));
             fixedAnnotations.add(J.Annotation.buildAnnotation(annotationFormatting, annotationType, arguments));
-
-            if (c.getAnnotations().isEmpty()) {
-                String prefix = formatter.findIndent(0, c).getPrefix();
-
-                // special case, where a top-level class is often un-indented completely
-                String cdPrefix = c.getPrefix();
-                if (isTopLevelClass &&
-                        cdPrefix.substring(Math.max(cdPrefix.lastIndexOf('\n'), 0)).chars().noneMatch(p -> p == ' ' || p == '\t')) {
-                    prefix = "\n";
-                }
-
-                if (!c.getModifiers().isEmpty()) {
-                    c = c.withModifiers(formatFirstPrefix(c.getModifiers(), prefix));
-                } else if (c.getTypeParameters() != null) {
-                    c = c.withTypeParameters(c.getTypeParameters().withPrefix(prefix));
-                } else {
-                    c = c.withKind(c.getKind().withPrefix(prefix));
-                }
-            }
-            c = c.withAnnotations(fixedAnnotations);
-
-            return c;
+            return (J.ClassDecl) new AutoFormat().visit(withAnnotations(fixedAnnotations));
         }
 
         public List<Annotation> findAnnotations(String signature) {

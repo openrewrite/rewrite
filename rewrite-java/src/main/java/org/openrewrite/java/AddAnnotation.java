@@ -59,8 +59,7 @@ public final class AddAnnotation {
                 maybeAddImport(annotationType.getFullyQualifiedName());
 
                 if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    boolean isTopLevelClass = getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit;
-                    c = c.addAnnotation(c, isTopLevelClass, annotationType, arguments, formatter);
+                    c = c.addAnnotation(annotationType, arguments);
                 }
             }
 

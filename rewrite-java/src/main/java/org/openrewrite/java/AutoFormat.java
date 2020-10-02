@@ -23,9 +23,7 @@ import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.refactor.Formatter;
 
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -78,6 +76,38 @@ public class AutoFormat extends JavaRefactorVisitor {
         );
 
         return super.visitCompilationUnit(cu);
+    }
+
+    @Override
+    public J visitClassDecl(J.ClassDecl classDecl) {
+        J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
+
+        // check annotations formatting
+        List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
+        if(!annotations.isEmpty()) {
+
+            // ensure all annotations (except the first?) have a \n in their prefixes
+            for(int i = 1; i < annotations.size(); i++) {
+                if(!annotations.get(i).getPrefix().contains("\n")) {
+                    annotations.set(i, annotations.get(i).withPrefix("\n"));
+                }
+            }
+
+            cd = cd.withAnnotations(annotations);
+
+            // ensure first statement following annotations has \n in prefix
+            List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
+            if(!modifiers.isEmpty()) {
+                if(!modifiers.get(0).getPrefix().contains("\n")) {
+                    modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                    cd = cd.withModifiers(modifiers);
+                }
+            } else if(!cd.getKind().getPrefix().contains("\n")) {
+                cd = cd.withKind(cd.getKind().withPrefix("\n"));
+            }
+        }
+
+        return cd;
     }
 
     @Override
