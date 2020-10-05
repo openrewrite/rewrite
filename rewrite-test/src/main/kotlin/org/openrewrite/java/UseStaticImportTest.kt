@@ -63,4 +63,41 @@ interface UseStaticImportTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun junit5Assertions(jp: JavaParser) = assertRefactored(
+            parser = JavaParser.fromJavaVersion()
+                    .classpath(JavaParser.dependenciesFromClasspath("junit-jupiter-api"))
+                    .build(),
+            visitors = listOf(UseStaticImport().apply {
+                setMethod("org.junit.jupiter.api.Assertions assert*(..)")
+            }),
+            before = """
+                package org.openrewrite;
+
+                import org.junit.jupiter.api.Test;
+                import org.junit.jupiter.api.Assertions;
+
+                class Sample {
+                    @Test
+                    void sample() {
+                        Assertions.assertEquals(42, 21*2);
+                    }
+                }
+            """.trimIndent(),
+            after = """
+                package org.openrewrite;
+
+                import org.junit.jupiter.api.Test;
+                
+                import static org.junit.jupiter.api.Assertions.assertEquals;
+
+                class Sample {
+                    @Test
+                    void sample() {
+                        assertEquals(42, 21*2);
+                    }
+                }
+            """.trimIndent()
+    )
 }

@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
+import org.openrewrite.java.search.FindTypeTest
 import org.openrewrite.java.utilities.SpansMultipleLinesTest
 import org.openrewrite.java.tree.TreeBuilderTest
 
@@ -135,3 +136,7 @@ class Java11UseStaticImportTest: Java11Test(), UseStaticImportTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TreeBuilderTest: Java11Test(), TreeBuilderTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindTypeTest: Java11Test(), FindTypeTest
