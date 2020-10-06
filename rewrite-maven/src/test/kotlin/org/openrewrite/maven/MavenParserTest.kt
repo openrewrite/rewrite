@@ -16,15 +16,24 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import org.openrewrite.Parser
+import org.openrewrite.Tree
+import org.openrewrite.maven.tree.Maven
+import org.openrewrite.maven.tree.MavenModel
+import org.openrewrite.maven.tree.MavenModel.ModuleVersionId
+import org.openrewrite.xml.XmlParser
+import org.openrewrite.xml.tree.Xml
+import org.openrewrite.xml.tree.Xml.Tag.Closing
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.util.*
 
 class MavenParserTest {
 
@@ -390,5 +399,91 @@ class MavenParserTest {
                 """)[0]
 
         assertThat(pom.model.dependencies[0].moduleVersion.version).doesNotContain("[")
+    }
+
+    @Test
+    fun canAddDependencyManagementBlock(@TempDir tempDir: Path) {
+        var pom = MavenParser.builder()
+                .remoteRepositories(emptyList())
+                .localRepository(tempDir.toFile())
+                .build()
+                .parse("""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                        <modelVersion>4.0.0</modelVersion>
+        
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>dependency-management-example</artifactId>
+                        <version>0.1-SNAPSHOT</version>
+                        <name>dependency-management-example</name>
+        
+                    </project>
+                """.trimIndent()).first()
+        val fmt = pom.formatting
+        val dependencyManagement = Maven.DependencyManagement(
+                MavenModel.DependencyManagement(ArrayList()),
+                Xml.Tag(
+                        Tree.randomId(),
+                        "dependencyManagement",
+                        emptyList(),
+                        emptyList(),
+                        Closing(Tree.randomId(), "dependencyManagement", "", fmt),
+                        "",
+                        pom.formatting
+                )
+        )
+        pom = pom.withDependencyManagement(dependencyManagement)
+        Assertions.assertNotNull(pom.dependencyManagement)
+    }
+
+    @Test
+    fun canAddDependenciesBlock(@TempDir tempDir: Path) {
+        var pom = MavenParser.builder()
+                .remoteRepositories(emptyList())
+                .localRepository(tempDir.toFile())
+                .build()
+                .parse("""
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                        <modelVersion>4.0.0</modelVersion>
+        
+                        <groupId>org.openrewrite.maven</groupId>
+                        <artifactId>dependency-management-example</artifactId>
+                        <version>0.1-SNAPSHOT</version>
+                        <name>dependency-management-example</name>
+                        <dependencyManagement></dependencyManagement>
+                    </project>
+                """.trimIndent()).first()
+        val groupId = "org.junit.jupiter"
+        val artifactId = "junit-jupiter-api"
+        val version = "5.6.2"
+        val scope = "test"
+        val dependencyTag = XmlParser().parseTag("""
+                <dependency>
+                    <groupId>$groupId</groupId>
+                    <artifactId>$artifactId</artifactId>
+                    <version>$version</version>
+                    <scope>$scope</scope>
+                </dependency>
+                """.trimIndent())
+        val toAdd = Maven.Dependency(false,
+                MavenModel.Dependency(
+                        ModuleVersionId(groupId, artifactId, null, version, "jar"),
+                        version,
+                        scope
+                ),
+                dependencyTag
+        )
+
+        var dependencyManagement = pom.dependencyManagement!!.withDependencies(listOf(toAdd))
+        Assertions.assertEquals(1, dependencyManagement.dependencies.size)
+        pom = pom.withDependencyManagement(dependencyManagement)
+        dependencyManagement = pom.dependencyManagement!!
+        Assertions.assertEquals(1, dependencyManagement.dependencies.size)
+        val dep = dependencyManagement.dependencies.first()
+        Assertions.assertEquals(groupId, dep.groupId)
+        Assertions.assertEquals(artifactId, dep.artifactId)
+        Assertions.assertEquals(version, dep.version)
+        Assertions.assertEquals(scope, dep.scope)
     }
 }
