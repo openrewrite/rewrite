@@ -86,7 +86,8 @@ public class AutoFormat extends JavaRefactorVisitor {
         List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
         if(!annotations.isEmpty()) {
 
-            // ensure all annotations (except the first?) have a \n in their prefixes
+            // Ensure all annotations have a \n in their prefixes
+            // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
             for(int i = 1; i < annotations.size(); i++) {
                 if(!annotations.get(i).getPrefix().contains("\n")) {
                     annotations.set(i, annotations.get(i).withPrefix("\n"));
@@ -108,6 +109,45 @@ public class AutoFormat extends JavaRefactorVisitor {
         }
 
         return cd;
+    }
+
+    @Override
+    public J visitMethod(J.MethodDecl m) {
+
+        // check annotations formatting
+        List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
+        if(!annotations.isEmpty()) {
+
+            // ensure all annotations (except the first?) have a \n in their prefixes
+            for(int i = 1; i < annotations.size(); i++) {
+                if(!annotations.get(i).getPrefix().contains("\n")) {
+                    annotations.set(i, annotations.get(i).withPrefix("\n"));
+                }
+            }
+
+            m = m.withAnnotations(annotations);
+
+            List<J.Modifier> modifiers = new ArrayList<>(m.getModifiers());
+
+            // ensure first modifier following annotations has \n in prefix
+            if(!modifiers.isEmpty()) {
+                if(!modifiers.get(0).getPrefix().contains("\n")) {
+                    modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                    m = m.withModifiers(modifiers);
+                }
+            }
+            // returnTypeExpr
+            else if(m.getReturnTypeExpr() != null && !m.getReturnTypeExpr().getPrefix().contains("\n")) {
+                m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
+            }
+            // name
+            else if(!m.getName().getPrefix().contains("\n")) {
+                m = m.withName((J.Ident)visitTree(m.getName().withPrefix("\n")));
+            }
+
+        }
+
+        return refactor(m, super::visitMethod);
     }
 
     @Override

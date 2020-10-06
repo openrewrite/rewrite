@@ -61,8 +61,7 @@ interface AutoFormatTest : RefactorVisitorTest {
     fun putEachClassAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
             jp,
             dependencies = listOf(
-                    "public interface Tester {}",
-                    "public interface OtherTest {}"
+                "public interface Tester {}"
             ),
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0])
@@ -133,6 +132,144 @@ interface AutoFormatTest : RefactorVisitorTest {
                 @Documented
                 class B {
                     
+                }
+            """
+    )
+
+    @Test
+    fun putEachMethodAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                "public interface Tester {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Override@Tag(Tester.class)     @Data
+                    public String toString() {
+                    }
+                }
+            """,
+            after = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Override
+                    @Tag(Tester.class)
+                    @Data
+                    public String toString() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndVisibilityModifierSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                    "public interface Tester {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Override@Tag(Tester.class)     @Data public String toString() {
+                    }
+                    
+                    @Tag(Tester.class)
+                    @Data static String stringify() {
+                    }
+                }
+            """,
+            after = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Override
+                    @Tag(Tester.class)
+                    @Data
+                    public String toString() {
+                    }
+                    
+                    @Tag(Tester.class)
+                    @Data
+                    static String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndReturnTypeOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                    "public interface Tester {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Tag(Tester.class)
+                    @Data String stringify() {
+                    }
+                }
+            """,
+            after = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Tag(Tester.class)
+                    @Data
+                    String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndNameOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                    "public interface Tester {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Tag(Tester.class)
+                    @Data K() {
+                    }
+                }
+            """,
+            after = """
+                import org.junit.jupiter.api.Tag;
+                import lombok.Data;
+
+                public class K {
+                    @Tag(Tester.class)
+                    @Data
+                    K() {
+                    }
                 }
             """
     )
