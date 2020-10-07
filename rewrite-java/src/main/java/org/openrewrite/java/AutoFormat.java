@@ -142,7 +142,7 @@ public class AutoFormat extends JavaRefactorVisitor {
             }
             // name
             else if(!m.getName().getPrefix().contains("\n")) {
-                m = m.withName((J.Ident)visitTree(m.getName().withPrefix("\n")));
+                m = m.withName(m.getName().withPrefix("\n"));
             }
 
         }

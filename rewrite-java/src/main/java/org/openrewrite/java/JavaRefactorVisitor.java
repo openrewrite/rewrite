@@ -274,6 +274,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         m = m.withModifiers(refactor(m.getModifiers()));
         m = m.withTypeParameters(refactor(m.getTypeParameters()));
         m = m.withReturnTypeExpr(refactor(m.getReturnTypeExpr()));
+        m = m.withName(refactor(m.getName()));
         m = m.withParams(refactor(m.getParams()));
         m = m.withParams(m.getParams().withParams(refactor(m.getParams().getParams())));
         m = m.withThrows(refactor(m.getThrows()));
