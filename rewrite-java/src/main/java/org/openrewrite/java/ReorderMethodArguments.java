@@ -26,7 +26,7 @@ import java.util.List;
 
 import static org.openrewrite.Validated.required;
 
-public class ReorderMethodArguments extends JavaRefactorVisitor {
+public class ReorderMethodArguments extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private String[] order;
     private String[] originalOrder = new String[0];
@@ -55,14 +55,14 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
             andThen(new Scoped(method, order, originalOrder));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final String[] order;
         private final String[] originalOrder;
@@ -80,7 +80,7 @@ public class ReorderMethodArguments extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method) && method.getType() != null) {
                 List<String> paramNames = originalOrder.length == 0 ? method.getType().getParamNames() :
                         Arrays.asList(originalOrder);

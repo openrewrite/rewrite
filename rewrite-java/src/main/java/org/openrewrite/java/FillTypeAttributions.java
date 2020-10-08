@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.NameTree;
 
 import static java.util.Arrays.stream;
 
-public class FillTypeAttributions extends JavaRefactorVisitor {
+public class FillTypeAttributions extends JavaIsoRefactorVisitor {
     private final JavaType.Class[] types;
 
     public FillTypeAttributions(JavaType.Class[] types) {

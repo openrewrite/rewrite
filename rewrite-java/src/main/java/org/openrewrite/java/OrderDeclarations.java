@@ -21,12 +21,12 @@ import org.openrewrite.java.tree.J;
 
 import java.util.List;
 
-public class OrderDeclarations extends JavaRefactorVisitor {
+public class OrderDeclarations extends JavaIsoRefactorVisitor {
     @Nullable
     private DeclarationOrderStyle.Layout layout;
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
+    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
         andThen(new Scoped(classDecl, layout));
         return classDecl; // don't recurse intentionally
     }
@@ -40,7 +40,7 @@ public class OrderDeclarations extends JavaRefactorVisitor {
         return false;
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
 
         @Nullable
@@ -57,7 +57,7 @@ public class OrderDeclarations extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu) {
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
             if (layout == null) {
                 // infer from compilation unit or default
                 this.layout = cu.getStyle(DeclarationOrderStyle.class)
@@ -68,8 +68,8 @@ public class OrderDeclarations extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = super.visitClassDecl(classDecl);
 
             if (getCursor().isScopeInPath(scope)) {
                 assert layout != null;

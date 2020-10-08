@@ -20,6 +20,12 @@ import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+/**
+ * This is the class you want to extend from if your visitor might ever want to swap the AST element being visited
+ * for a different type of AST element. For example visiting a method declaration and returning a field.
+ * Most visitors do not need this flexibility and can extend JavaIsomorphicRefactorVisitor whose type signatures
+ * insist that when visiting an AST element the returned element must be of the same type.
+ */
 public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements JavaSourceVisitor<J> {
     protected JavaFormatter formatter;
     protected TreeBuilder treeBuilder;

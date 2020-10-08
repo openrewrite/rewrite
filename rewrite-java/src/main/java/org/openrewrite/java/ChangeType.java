@@ -35,7 +35,7 @@ import static org.openrewrite.Validated.required;
  * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
  * is defined on the super class.
  */
-public class ChangeType extends JavaRefactorVisitor {
+public class ChangeType extends JavaIsoRefactorVisitor {
     private String type;
     private JavaType.Class targetType;
 
@@ -63,16 +63,16 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         maybeAddImport(targetType);
         maybeRemoveImport(type);
         return super.visitCompilationUnit(cu);
     }
 
     @Override
-    public J visitTypeName(NameTree name) {
+    public NameTree visitTypeName(NameTree name) {
         JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
-        NameTree n = refactor(name, super::visitTypeName);
+        NameTree n = super.visitTypeName(name);
         if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(type)) {
             n = n.withType(targetType);
         }
@@ -80,20 +80,20 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitAnnotation(J.Annotation annotation) {
-        J.Annotation a = refactor(annotation, super::visitAnnotation);
+    public J.Annotation visitAnnotation(J.Annotation annotation) {
+        J.Annotation a = super.visitAnnotation(annotation);
         return a.withAnnotationType(transformName(a.getAnnotationType()));
     }
 
     @Override
-    public J visitArrayType(J.ArrayType arrayType) {
-        J.ArrayType a = refactor(arrayType, super::visitArrayType);
+    public J.ArrayType visitArrayType(J.ArrayType arrayType) {
+        J.ArrayType a = super.visitArrayType(arrayType);
         return a.withElementType(transformName(a.getElementType()));
     }
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
-        J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+        J.ClassDecl c = super.visitClassDecl(classDecl);
 
         if (c.getExtends() != null) {
             c = c.withExtends(c.getExtends().withFrom(transformName(c.getExtends().getFrom())));
@@ -107,8 +107,8 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess) {
-        J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
+    public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess) {
+        J.FieldAccess f = super.visitFieldAccess(fieldAccess);
         if (f.isFullyQualifiedClassReference(type)) {
             return TreeBuilder.buildName(targetType.getFullyQualifiedName(), f.getFormatting(), f.getId());
         }
@@ -116,10 +116,10 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident) {
+    public J.Ident visitIdentifier(J.Ident ident) {
         // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
         // Then transform it, otherwise leave it alone
-        J.Ident i = refactor(ident, super::visitIdentifier);
+        J.Ident i = super.visitIdentifier(ident);
         JavaType.Class originalType = JavaType.Class.build(type);
 
         if (TypeUtils.isOfClassType(i.getType(), type) && i.getSimpleName().equals(originalType.getClassName())) {
@@ -131,16 +131,16 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method) {
-        J.MethodDecl m = refactor(method, super::visitMethod);
+    public J.MethodDecl visitMethod(J.MethodDecl method) {
+        J.MethodDecl m = super.visitMethod(method);
         m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
         return m.withThrows(m.getThrows() == null ? null :
                 m.getThrows().withExceptions(transformNames(m.getThrows().getExceptions())));
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
-        J.MethodInvocation m = refactor(method, super::visitMethodInvocation);
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
+        J.MethodInvocation m = super.visitMethodInvocation(method);
 
         if (method.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
             m = m.withSelect(transformName(m.getSelect()));
@@ -157,24 +157,24 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMultiCatch(J.MultiCatch multiCatch) {
-        J.MultiCatch m = refactor(multiCatch, super::visitMultiCatch);
+    public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch) {
+        J.MultiCatch m = super.visitMultiCatch(multiCatch);
         return m.withAlternatives(transformNames(m.getAlternatives()));
     }
 
     @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable) {
+    public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
         if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
             return super.visitMultiVariable(multiVariable);
         }
 
-        J.VariableDecls m = refactor(multiVariable, super::visitMultiVariable);
+        J.VariableDecls m = super.visitMultiVariable(multiVariable);
         return m.withTypeExpr(transformName(m.getTypeExpr()));
     }
 
     @Override
-    public J visitVariable(J.VariableDecls.NamedVar variable) {
-        J.VariableDecls.NamedVar v = refactor(variable, super::visitVariable);
+    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable) {
+        J.VariableDecls.NamedVar v = super.visitVariable(variable);
 
         JavaType.Class varType = TypeUtils.asClass(variable.getType());
         if (varType != null && varType.getFullyQualifiedName().equals(type)) {
@@ -185,34 +185,34 @@ public class ChangeType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitNewArray(J.NewArray newArray) {
-        J.NewArray n = refactor(newArray, super::visitNewArray);
+    public J.NewArray visitNewArray(J.NewArray newArray) {
+        J.NewArray n = super.visitNewArray(newArray);
         return n.withTypeExpr(transformName(n.getTypeExpr()));
     }
 
     @Override
-    public J visitNewClass(J.NewClass newClass) {
-        J.NewClass n = refactor(newClass, super::visitNewClass);
+    public J.NewClass visitNewClass(J.NewClass newClass) {
+        J.NewClass n = super.visitNewClass(newClass);
         return n.withClazz(transformName(n.getClazz()));
     }
 
     @Override
-    public J visitTypeCast(J.TypeCast typeCast) {
-        J.TypeCast t = refactor(typeCast, super::visitTypeCast);
+    public J.TypeCast visitTypeCast(J.TypeCast typeCast) {
+        J.TypeCast t = super.visitTypeCast(typeCast);
         return t.withClazz(t.getClazz().withTree(transformName(t.getClazz().getTree())));
     }
 
     @Override
-    public J visitTypeParameter(J.TypeParameter typeParam) {
-        J.TypeParameter t = refactor(typeParam, super::visitTypeParameter);
+    public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam) {
+        J.TypeParameter t = super.visitTypeParameter(typeParam);
         t = t.withBounds(t.getBounds() == null ? null :
                 t.getBounds().withTypes(transformNames(t.getBounds().getTypes())));
         return t.withName(transformName(t.getName()));
     }
 
     @Override
-    public J visitWildcard(J.Wildcard wildcard) {
-        J.Wildcard w = refactor(wildcard, super::visitWildcard);
+    public J.Wildcard visitWildcard(J.Wildcard wildcard) {
+        J.Wildcard w = super.visitWildcard(wildcard);
         return w.withBoundedType(transformName(w.getBoundedType()));
     }
 

@@ -19,9 +19,6 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static org.openrewrite.internal.StringUtils.capitalize;
 
 /**
@@ -38,8 +35,8 @@ import static org.openrewrite.internal.StringUtils.capitalize;
  * If the specified field does not exist no change will be made.
  * If a getter already exists no change will be made.
  */
-public class GenerateGetter extends JavaRefactorVisitor {
-    public static class Scoped extends JavaRefactorVisitor {
+public class GenerateGetter {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
         private final String fieldName;
 
@@ -49,7 +46,7 @@ public class GenerateGetter extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
             if (classDecl.isScope(scope)) {
                 J.VariableDecls field = classDecl.getFields().stream()
                         .filter(it -> it.getVars().get(0).getSimpleName().equals(fieldName))

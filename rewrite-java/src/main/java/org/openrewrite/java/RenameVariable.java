@@ -20,7 +20,7 @@ import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.J;
 
-public class RenameVariable extends JavaRefactorVisitor {
+public class RenameVariable extends JavaIsoRefactorVisitor {
     private final J.VariableDecls.NamedVar scope;
     private final String toName;
 
@@ -39,7 +39,7 @@ public class RenameVariable extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         scopeCursor = new RetrieveCursor(scope).visit(cu);
         scopeVariableName = ((J.VariableDecls.NamedVar) scopeCursor.getTree()).getSimpleName();
 
@@ -47,7 +47,7 @@ public class RenameVariable extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident) {
+    public J.Ident visitIdentifier(J.Ident ident) {
         if (ident.getSimpleName().equals(scopeVariableName) &&
                 isInSameNameScope(scopeCursor, getCursor()) &&
                 !(getCursor().getParentOrThrow().getTree() instanceof J.FieldAccess)) {

@@ -25,7 +25,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.required;
 
-public class ChangeFieldType extends JavaRefactorVisitor {
+public class ChangeFieldType extends JavaIsoRefactorVisitor {
     private JavaType.Class type;
     private String targetType;
 
@@ -49,14 +49,14 @@ public class ChangeFieldType extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable) {
+    public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
         if (multiVariable.getTypeAsClass().equals(type)) {
             andThen(new Scoped(multiVariable, targetType));
         }
         return super.visitMultiVariable(multiVariable);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.VariableDecls scope;
         private final String targetType;
 
@@ -71,9 +71,9 @@ public class ChangeFieldType extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMultiVariable(J.VariableDecls multiVariable) {
+        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
             JavaType.Class originalType = multiVariable.getTypeAsClass();
-            J.VariableDecls mv = refactor(multiVariable, super::visitMultiVariable);
+            J.VariableDecls mv = super.visitMultiVariable(multiVariable);
             if (scope.isScope(multiVariable) && originalType != null && !originalType.getFullyQualifiedName().equals(targetType)) {
                 JavaType.Class type = JavaType.Class.build(targetType);
 

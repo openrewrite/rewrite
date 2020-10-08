@@ -18,7 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
-public class UseStaticImport extends JavaRefactorVisitor {
+public class UseStaticImport extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
 
     public void setMethod(String method) {
@@ -26,14 +26,14 @@ public class UseStaticImport extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if (methodMatcher.matches(method) && method.getSelect() != null) {
             andThen(new Scoped(method));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
 
         public Scoped(J.MethodInvocation scope) {
@@ -41,7 +41,7 @@ public class UseStaticImport extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method) && method.getSelect() != null) {
                 if (method.getType() != null) {
                     JavaType.FullyQualified receiverType = method.getType().getDeclaringType();
@@ -50,6 +50,7 @@ public class UseStaticImport extends JavaRefactorVisitor {
                     AddImport addStatic = new AddImport();
                     addStatic.setType(receiverType.getFullyQualifiedName());
                     addStatic.setStaticMethod(method.getSimpleName());
+                    addStatic.setOnlyIfReferenced(false);
                     if (!andThen().contains(addStatic)) {
                         andThen(addStatic);
                     }

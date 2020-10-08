@@ -22,8 +22,6 @@ import org.openrewrite.Formatting;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
-import org.openrewrite.java.search.HasType;
-import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
@@ -37,7 +35,7 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class AddImport extends JavaRefactorVisitor {
+public class AddImport extends JavaIsoRefactorVisitor {
     @EqualsAndHashCode.Include
     private String type;
 
@@ -84,7 +82,7 @@ public class AddImport extends JavaRefactorVisitor {
     private static Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         if(JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }

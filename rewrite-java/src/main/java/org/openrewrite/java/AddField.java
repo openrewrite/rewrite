@@ -34,7 +34,7 @@ public final class AddField {
     private AddField() {
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
         private final List<J.Modifier> modifiers;
         private final String type;
@@ -57,8 +57,8 @@ public final class AddField {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = super.visitClassDecl(classDecl);
 
             if (scope.isScope(classDecl) && classDecl.getBody().getStatements().stream()
                     .filter(s -> s instanceof J.VariableDecls)

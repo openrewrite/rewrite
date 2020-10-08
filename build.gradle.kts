@@ -5,7 +5,6 @@ import nebula.plugin.info.InfoBrokerPlugin
 import nebula.plugin.contacts.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jfrog.gradle.plugin.artifactory.dsl.*
-import org.w3c.dom.Element
 
 buildscript {
     repositories {
@@ -43,15 +42,6 @@ subprojects {
     apply(plugin = "io.spring.publishing")
     apply(plugin = "org.gradle.test-retry")
 
-    tasks.named<JavaCompile>("compileJava") {
-        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
-        targetCompatibility = JavaVersion.VERSION_1_8.toString()
-
-        options.isFork = true
-        options.forkOptions.executable = "javac"
-        options.compilerArgs.addAll(listOf("--release", "8"))
-    }
-
     repositories {
         mavenCentral()
     }
@@ -71,6 +61,28 @@ subprojects {
 
         "testRuntimeOnly"("ch.qos.logback:logback-classic:1.0.13")
     }
+
+    // This eagerly realizes KotlinCompile tasks, which is undesirable from the perspective of minimizing
+    // time spent during Gradle's configuration phase.
+    // But if we don't proactively make sure the destination dir exists, sometimes JavaCompile can fail with:
+    // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
+    tasks.withType(KotlinCompile::class.java) {
+        kotlinOptions {
+            jvmTarget = "1.8"
+        }
+
+        destinationDir.mkdirs()
+    }
+
+    tasks.named<JavaCompile>("compileJava") {
+        sourceCompatibility = JavaVersion.VERSION_1_8.toString()
+        targetCompatibility = JavaVersion.VERSION_1_8.toString()
+
+        options.isFork = true
+        options.forkOptions.executable = "javac"
+        options.compilerArgs.addAll(listOf("--release", "8"))
+    }
+
 
     configure<ContactsExtension> {
         val j = Contact("jkschneider@gmail.com")
@@ -95,17 +107,6 @@ subprojects {
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
     }
 
-    tasks.withType(KotlinCompile::class.java).configureEach {
-        kotlinOptions {
-            jvmTarget = "1.8"
-        }
-
-        // otherwise fails with:
-        // '..rewrite-core\build\classes\java\main' specified for property 'compileKotlinOutputClasses' does not exist.
-        doFirst {
-            destinationDir.mkdirs()
-        }
-    }
 
     configurations.all {
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")

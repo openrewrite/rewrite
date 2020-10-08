@@ -34,7 +34,7 @@ public final class AddAnnotation {
     private AddAnnotation() {
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final Tree scope;
         private final JavaType.Class annotationType;
         private final List<Expression> arguments;
@@ -52,8 +52,8 @@ public final class AddAnnotation {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = super.visitClassDecl(classDecl);
 
             if (scope.isScope(classDecl)) {
                 maybeAddImport(annotationType.getFullyQualifiedName());
@@ -67,8 +67,8 @@ public final class AddAnnotation {
         }
 
         @Override
-        public J visitMultiVariable(J.VariableDecls multiVariable) {
-            J.VariableDecls v = refactor(multiVariable, super::visitMultiVariable);
+        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
+            J.VariableDecls v = super.visitMultiVariable(multiVariable);
 
             if (scope.isScope(multiVariable)) {
                 Tree parent = getCursor().getParentOrThrow().getTree();
@@ -109,8 +109,8 @@ public final class AddAnnotation {
         }
 
         @Override
-        public J visitMethod(J.MethodDecl method) {
-            J.MethodDecl m = refactor(method, super::visitMethod);
+        public J.MethodDecl visitMethod(J.MethodDecl method) {
+            J.MethodDecl m = super.visitMethod(method);
 
             if (scope.isScope(method)) {
                 maybeAddImport(annotationType.getFullyQualifiedName());

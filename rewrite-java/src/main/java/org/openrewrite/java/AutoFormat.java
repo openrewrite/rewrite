@@ -40,7 +40,7 @@ import static java.util.stream.IntStream.range;
  * TODO when complete, this should replace {@link ShiftFormatRightVisitor}.
  */
 @Incubating(since = "2.1.0")
-public class AutoFormat extends JavaRefactorVisitor {
+public class AutoFormat extends JavaIsoRefactorVisitor {
     private final J[] scope;
 
     public AutoFormat(J... scope) {

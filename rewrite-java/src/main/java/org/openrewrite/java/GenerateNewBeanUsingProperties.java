@@ -24,7 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class GenerateNewBeanUsingProperties {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         /**
          * The block to insert the new bean into.
          */
@@ -67,8 +67,8 @@ public class GenerateNewBeanUsingProperties {
         }
 
         @Override
-        public J visitBlock(J.Block<J> block) {
-            J.Block<J> b = refactor(block, super::visitBlock);
+        public J.Block visitBlock(J.Block<J> block) {
+            J.Block<J> b = super.visitBlock(block);
 
             if (b.isScope(scope)) {
                 List<J> statements = new ArrayList<>(b.getStatements());

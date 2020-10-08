@@ -21,7 +21,7 @@ import org.openrewrite.java.tree.J;
 import java.util.*;
 
 public class InsertDeclaration {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl enclosing;
         private final J declaration;
         private DeclarationOrderStyle.Layout layout;
@@ -32,7 +32,7 @@ public class InsertDeclaration {
         }
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu) {
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
             this.layout = cu.getStyle(DeclarationOrderStyle.class)
                     .map(DeclarationOrderStyle::getLayout)
                     .orElse(DeclarationOrderStyle.Layout.DEFAULT);
@@ -41,8 +41,8 @@ public class InsertDeclaration {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl c = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl c = super.visitClassDecl(classDecl);
 
             if (c.isScope(enclosing)) {
                 if (c.getBody().getStatements().stream().anyMatch(s -> s.isScope(declaration))) {

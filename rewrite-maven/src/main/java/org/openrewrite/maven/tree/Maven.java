@@ -30,6 +30,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
+import javax.swing.text.html.Option;
 import java.beans.ConstructorProperties;
 import java.io.Serializable;
 import java.util.*;
@@ -167,11 +168,23 @@ public interface Maven extends Serializable, Tree {
         }
 
         public Pom withDependencyManagement(DependencyManagement dependencyManagement) {
-            return document.getRoot().getChild("dependencyManagement")
-                    .map(dm -> new Pom(model.withDependencyManagement(dependencyManagement.getModel()),
-                            document.withRoot((Xml.Tag) new ChangeTagContent(dm, dependencyManagement.tag.getContent()).visit(document.getRoot())))
-                    )
-                    .orElse(this);
+            Optional<Xml.Tag> dm = document.getRoot().getChild("dependencyManagement");
+            if(dm.isPresent()) {
+                return new Pom(
+                        model.withDependencyManagement(dependencyManagement.getModel()),
+                        document.withRoot((Xml.Tag) new ChangeTagContent(dm.get(), dependencyManagement.tag.getContent()).visit(document.getRoot()))
+                );
+            } else if(dependencyManagement != null) {
+                Xml.Tag root = document.getRoot();
+                List<Content> tags = new ArrayList<>(root.getContent());
+                tags.add(dependencyManagement.getTag());
+                return new Pom(
+                        model.withDependencyManagement(dependencyManagement.getModel()),
+                        document.withRoot(root.withContent(tags)));
+
+            } else {
+                return this;
+            }
         }
 
         @JsonIgnore
@@ -560,6 +573,7 @@ public interface Maven extends Serializable, Tree {
 
     class DependencyManagement implements Maven {
         private final MavenModel.DependencyManagement model;
+
         private final Xml.Tag tag;
 
         @JsonIgnore
@@ -591,7 +605,26 @@ public interface Maven extends Serializable, Tree {
         }
 
         public DependencyManagement withDependencies(List<Dependency> dependencies) {
-            return memoizedDependencies.with(dependencies)
+            MemoizedTags<Dependency> existingDependencies = memoizedDependencies;
+            // If no <dependencies> tag already exists within <dependencyManagement> create it
+            if(existingDependencies.getParent() == null) {
+                Formatting fmt = getFormatting();
+                Xml.Tag dependenciesTag = new Xml.Tag(
+                        Tree.randomId(),
+                        "dependencies",
+                        Collections.emptyList(),
+                        Collections.emptyList(),
+                        new Xml.Tag.Closing(Tree.randomId(), "dependencies", "", fmt),
+                        "",
+                        fmt
+                );
+                existingDependencies = new MemoizedTags<>(
+                        existingDependencies.getRoot().withContent(Collections.singletonList(dependenciesTag)),
+                        existingDependencies.getPathToModel(),
+                        existingDependencies.getBuildModel(),
+                        existingDependencies.getModelToTag());
+            }
+            return existingDependencies.with(dependencies)
                     .map(root -> new DependencyManagement(
                             model.withDependencies(dependencies.stream().map(Dependency::getModel).collect(toList())),
                             root)
