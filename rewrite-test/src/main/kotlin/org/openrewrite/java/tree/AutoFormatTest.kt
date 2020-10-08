@@ -21,6 +21,14 @@ import org.openrewrite.java.AutoFormat
 import org.openrewrite.java.JavaParser
 
 interface AutoFormatTest : RefactorVisitorTest {
+    companion object {
+        var dependencies = listOf(
+                "package a;\npublic @interface A {}",
+                "package a;\npublic @interface B { String value(); }",
+                "package a;\npublic @interface C {}"
+        )
+    }
+
     @Test
     fun methodDeclaration(jp: JavaParser) = assertRefactored(
             jp,
@@ -60,31 +68,25 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putEachClassAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                "public interface Tester {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0])
             },
             before = """
-                import lombok.Data;
-                import org.junit.jupiter.api.Tag;
-                import java.lang.annotation.Documented;
+                package a;
                 
-                @Documented@Tag(Tester.class)   @Data
-                public class B {
+                @A@B("")   @C
+                public class D {
                     
                 }
             """,
             after = """
-                import lombok.Data;
-                import org.junit.jupiter.api.Tag;
-                import java.lang.annotation.Documented;
+                package a;
                 
-                @Documented
-                @Tag(Tester.class)
-                @Data
-                public class B {
+                @A
+                @B("")
+                @C
+                public class D {
                     
                 }
             """
@@ -93,21 +95,22 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putClassAnnotationAndModifierOnSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0])
             },
             before = """
-                import java.lang.annotation.Documented;
+                package a;
                 
-                @Documented private class B {
+                @A public class D {
                     
                 }
             """,
             after = """
-                import java.lang.annotation.Documented;
+                package a;
                 
-                @Documented
-                private class B {
+                @A
+                public class D {
                     
                 }
             """
@@ -116,21 +119,22 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putClassAnnotationAndKindOnSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0])
             },
             before = """
                 import java.lang.annotation.Documented;
                 
-                @Documented class B {
+                @A class D {
                     
                 }
             """,
             after = """
                 import java.lang.annotation.Documented;
                 
-                @Documented
-                class B {
+                @A
+                class D {
                     
                 }
             """
@@ -139,30 +143,26 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putEachMethodAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                "public interface Tester {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[0])
             },
             before = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Override@Tag(Tester.class)     @Data
+                public class D {
+                    @A@B("")     @C
                     public String toString() {
                     }
                 }
             """,
             after = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Override
-                    @Tag(Tester.class)
-                    @Data
+                public class D {
+                    @A
+                    @B("")
+                    @C
                     public String toString() {
                     }
                 }
@@ -172,18 +172,14 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putMethodAnnotationAndVisibilityModifierSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                    "package a;\npublic @interface A {}",
-                    "package a;\npublic @interface B { String value(); }",
-                    "package a;\npublic @interface C {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[0])
             },
             before = """
                 package a;
 
-                public class K {
+                public class D {
                     @A@B("foo")     @C public String toString() {
                     }
                     
@@ -195,7 +191,7 @@ interface AutoFormatTest : RefactorVisitorTest {
             after = """
                 package a;
 
-                public class K {
+                public class D {
                     @A
                     @B("foo")
                     @C
@@ -212,18 +208,14 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putMethodAnnotationAndVisibilityModifierSeparateLines2(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                    "package a;\npublic @interface A {}",
-                    "package a;\npublic @interface B { String value(); }",
-                    "package a;\npublic @interface C {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[1])
             },
             before = """
                 package a;
 
-                public class K {
+                public class D {
                     @A@B("foo")     @C public String toString() {
                     }
                     
@@ -235,7 +227,7 @@ interface AutoFormatTest : RefactorVisitorTest {
             after = """
                 package a;
 
-                public class K {
+                public class D {
                     @A@B("foo")     @C public String toString() {
                     }
                     
@@ -250,29 +242,25 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putMethodAnnotationAndReturnTypeOnSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                    "public interface Tester {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[0])
             },
             before = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Tag(Tester.class)
-                    @Data String stringify() {
+                public class D {
+                    @B("foo")
+                    @A String stringify() {
                     }
                 }
             """,
             after = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Tag(Tester.class)
-                    @Data
+                public class D {
+                    @B("foo")
+                    @A
                     String stringify() {
                     }
                 }
@@ -282,30 +270,26 @@ interface AutoFormatTest : RefactorVisitorTest {
     @Test
     fun putMethodAnnotationAndNameOnSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
-            dependencies = listOf(
-                    "public interface Tester {}"
-            ),
+            dependencies = dependencies,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[0])
             },
             before = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Tag(Tester.class)
-                    @Data K() {
+                public class D {
+                    @B(Tester.class)
+                    @A D() {
                     }
                 }
             """,
             after = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
-                public class K {
-                    @Tag(Tester.class)
-                    @Data
-                    K() {
+                public class D {
+                    @B(Tester.class)
+                    @A
+                    D() {
                     }
                 }
             """
