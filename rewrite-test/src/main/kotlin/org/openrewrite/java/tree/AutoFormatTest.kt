@@ -173,37 +173,74 @@ interface AutoFormatTest : RefactorVisitorTest {
     fun putMethodAnnotationAndVisibilityModifierSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
             dependencies = listOf(
-                    "public interface Tester {}"
+                    "package a;\npublic @interface A {}",
+                    "package a;\npublic @interface B { String value(); }",
+                    "package a;\npublic @interface C {}"
             ),
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0].methods[0])
             },
             before = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
                 public class K {
-                    @Override@Tag(Tester.class)     @Data public String toString() {
+                    @A@B("foo")     @C public String toString() {
                     }
                     
-                    @Tag(Tester.class)
-                    @Data static String stringify() {
+                    @B("bar")
+                    @C static String stringify() {
                     }
                 }
             """,
             after = """
-                import org.junit.jupiter.api.Tag;
-                import lombok.Data;
+                package a;
 
                 public class K {
-                    @Override
-                    @Tag(Tester.class)
-                    @Data
+                    @A
+                    @B("foo")
+                    @C
                     public String toString() {
                     }
                     
-                    @Tag(Tester.class)
-                    @Data
+                    @B("bar")
+                    @C static String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndVisibilityModifierSeparateLines2(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = listOf(
+                    "package a;\npublic @interface A {}",
+                    "package a;\npublic @interface B { String value(); }",
+                    "package a;\npublic @interface C {}"
+            ),
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[1])
+            },
+            before = """
+                package a;
+
+                public class K {
+                    @A@B("foo")     @C public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C static String stringify() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class K {
+                    @A@B("foo")     @C public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C
                     static String stringify() {
                     }
                 }

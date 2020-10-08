@@ -43,8 +43,6 @@ import static java.util.stream.IntStream.range;
 public class AutoFormat extends JavaRefactorVisitor {
     private final J[] scope;
 
-    private Formatter.Result wholeSourceIndent;
-
     public AutoFormat(J... scope) {
         this.scope = scope;
         setCursoringOn();
@@ -56,96 +54,78 @@ public class AutoFormat extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
-        FindIndentExceptScope findIndent = new FindIndentExceptScope(0);
-        findIndent.visit(cu);
-
-        TabAndIndentStyle tabAndIndentStyle = cu.getStyle(TabAndIndentStyle.class)
-                .orElse(new TabAndIndentStyle());
-
-        int mostCommonIndent = findIndent.getMostCommonIndent();
-
-        wholeSourceIndent = new Formatter.Result(
-                0,
-                mostCommonIndent == 0 ?
-                        tabAndIndentStyle.getIndentSize() :
-                        mostCommonIndent,
-                mostCommonIndent == 0 ?
-                        !tabAndIndentStyle.isUseTabCharacter() :
-                        findIndent.isIndentedWithSpaces()
-        );
-
-        return super.visitCompilationUnit(cu);
-    }
-
-    @Override
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
 
-        // check annotations formatting
-        List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
-        if(!annotations.isEmpty()) {
+        if(stream(scope).anyMatch(s -> s.isScope(classDecl))) {
+            // check annotations formatting
+            List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
+            if (!annotations.isEmpty()) {
 
-            // Ensure all annotations have a \n in their prefixes
-            // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
-            for(int i = 1; i < annotations.size(); i++) {
-                if(!annotations.get(i).getPrefix().contains("\n")) {
-                    annotations.set(i, annotations.get(i).withPrefix("\n"));
+                // Ensure all annotations have a \n in their prefixes
+                // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
+                for (int i = 1; i < annotations.size(); i++) {
+                    if (!annotations.get(i).getPrefix().contains("\n")) {
+                        annotations.set(i, annotations.get(i).withPrefix("\n"));
+                    }
                 }
-            }
 
-            cd = cd.withAnnotations(annotations);
+                cd = cd.withAnnotations(annotations);
 
-            // ensure first statement following annotations has \n in prefix
-            List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
-            if(!modifiers.isEmpty()) {
-                if(!modifiers.get(0).getPrefix().contains("\n")) {
-                    modifiers.set(0, modifiers.get(0).withPrefix("\n"));
-                    cd = cd.withModifiers(modifiers);
+                // ensure first statement following annotations has \n in prefix
+                List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
+                if (!modifiers.isEmpty()) {
+                    if (!modifiers.get(0).getPrefix().contains("\n")) {
+                        modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                        cd = cd.withModifiers(modifiers);
+                    }
+                } else if (!cd.getKind().getPrefix().contains("\n")) {
+                    cd = cd.withKind(cd.getKind().withPrefix("\n"));
                 }
-            } else if(!cd.getKind().getPrefix().contains("\n")) {
-                cd = cd.withKind(cd.getKind().withPrefix("\n"));
             }
         }
-
         return cd;
     }
 
     @Override
     public J visitMethod(J.MethodDecl m) {
+        final J.MethodDecl finalM = m;
+        if(stream(scope).anyMatch(s -> s.isScope(finalM))) {
+            // check annotations formatting
+            List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
+            if(!annotations.isEmpty()) {
 
-        // check annotations formatting
-        List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
-        if(!annotations.isEmpty()) {
-
-            // ensure all annotations (except the first?) have a \n in their prefixes
-            for(int i = 1; i < annotations.size(); i++) {
-                if(!annotations.get(i).getPrefix().contains("\n")) {
-                    annotations.set(i, annotations.get(i).withPrefix("\n"));
+                // ensure all annotations except the first have a \n in their prefixes
+                // The first annotation doesn't need a \n since the prefix of the MethodDecl itself should contain that \n
+                for(int i = 1; i < annotations.size(); i++) {
+                    if(!annotations.get(i).getPrefix().contains("\n")) {
+                        annotations.set(i, annotations.get(i).withPrefix("\n"));
+                    }
                 }
-            }
 
-            m = m.withAnnotations(annotations);
+                m = m.withAnnotations(annotations);
 
-            List<J.Modifier> modifiers = new ArrayList<>(m.getModifiers());
+                List<J.Modifier> modifiers = new ArrayList<>(m.getModifiers());
 
-            // ensure first modifier following annotations has \n in prefix
-            if(!modifiers.isEmpty()) {
-                if(!modifiers.get(0).getPrefix().contains("\n")) {
-                    modifiers.set(0, modifiers.get(0).withPrefix("\n"));
-                    m = m.withModifiers(modifiers);
+                // ensure first modifier following annotations has \n in prefix
+                if(!modifiers.isEmpty()) {
+                    if(!modifiers.get(0).getPrefix().contains("\n")) {
+                        modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                        m = m.withModifiers(modifiers);
+                    }
                 }
-            }
-            // returnTypeExpr
-            else if(m.getReturnTypeExpr() != null && !m.getReturnTypeExpr().getPrefix().contains("\n")) {
-                m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
-            }
-            // name
-            else if(!m.getName().getPrefix().contains("\n")) {
-                m = m.withName(m.getName().withPrefix("\n"));
-            }
+                // returnTypeExpr
+                else if(m.getReturnTypeExpr() != null && !m.getReturnTypeExpr().getPrefix().contains("\n")) {
+                    m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
+                }
+                // name
+                else if(!m.getName().getPrefix().contains("\n")) {
+                    m = m.withName(m.getName().withPrefix("\n"));
+                }
 
+            }
         }
+
 
         return refactor(m, super::visitMethod);
     }
@@ -169,7 +149,7 @@ public class AutoFormat extends JavaRefactorVisitor {
             if(tree instanceof J.Block.End) {
                 indentMultiple--;
             }
-
+            Formatter.Result wholeSourceIndent = formatter.wholeSourceIndent();
             String shiftedPrefix = "|" + prefix.substring(0, prefix.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
                     .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
                     .collect(Collectors.joining(""));
