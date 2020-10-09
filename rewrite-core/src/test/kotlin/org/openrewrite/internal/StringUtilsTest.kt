@@ -17,6 +17,7 @@ package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.internal.StringUtils.*
 
 class StringUtilsTest {
     @Test
@@ -104,5 +105,38 @@ class StringUtilsTest {
         val input = "class{\n   A field;\n}"
 
         assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
+    }
+
+
+    @Test
+    fun splitComments() {
+        assertThat(splitCStyleComments("")).isEqualTo(listOf(""))
+        assertThat(splitCStyleComments(" ")).isEqualTo(listOf(" "))
+        assertThat(splitCStyleComments("///**/")).isEqualTo(listOf("///**/"))
+        assertThat(splitCStyleComments("/*\n//aoeu\n*/")).isEqualTo(listOf("/*\n//aoeu\n*/"))
+        var comments =
+                """
+                    
+                // aoeu 
+                /***/    // wasd
+            """.trimIndent()
+        var expected = listOf("    \n// aoeu ", "\n/***/", "    // wasd")
+        var splitComments = splitCStyleComments(comments);
+        assertThat(splitComments).isEqualTo(expected)
+    }
+
+    @Test
+    fun desiredNewlines() {
+        assertThat(ensureNewlineCountBeforeComment("", 1)).isEqualTo("\n")
+        assertThat(ensureNewlineCountBeforeComment(" ", 1)).isEqualTo("\n ")
+        assertThat(ensureNewlineCountBeforeComment("\n", 0)).isEqualTo("")
+        assertThat(ensureNewlineCountBeforeComment("//", 2)).isEqualTo("\n\n//")
+        assertThat(ensureNewlineCountBeforeComment("//\n", 2)).isEqualTo("\n\n//\n")
+        assertThat(ensureNewlineCountBeforeComment("\n\n\n//", 2)).isEqualTo("\n\n//")
+        assertThat(ensureNewlineCountBeforeComment("\n\n\n//\n", 2)).isEqualTo("\n\n//\n")
+        assertThat(ensureNewlineCountBeforeComment("/**\n*/", 2)).isEqualTo("\n\n/**\n*/")
+        assertThat(ensureNewlineCountBeforeComment("/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
+        assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/", 2)).isEqualTo("\n\n/**\n*/")
+        assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
     }
 }

@@ -21,7 +21,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -176,4 +178,107 @@ public class StringUtils {
     public static String uncapitalize(String value) {
         return Character.toLowerCase(value.charAt(0)) + value.substring(1);
     }
+
+
+    /**
+     * Given a prefix comprised of segments that are exclusively whitespace, single line comments, or multi-line comments,
+     * return a list of each segment.
+     *
+     * Operates on C-style comments:
+     *  // single line
+     *  /* multi-line
+     *
+     * If the provided input contains anything except whitespace and c-style comments this will probably explode
+     */
+    public static List<String> splitCStyleComments(String text) {
+        List<String> result = new ArrayList<>();
+        if(text == null || text.equals("")) {
+            result.add("");
+            return result;
+        }
+        int segmentStartIndex = 0;
+        boolean inSingleLineComment = false;
+        boolean inMultiLineComment = false;
+        for(int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            char previous = (i > 0) ? text.charAt(i - 1) : '\0';
+            if(i == text.length() - 1) {
+                result.add(text.substring(segmentStartIndex, i + 1));
+                break;
+            }
+
+            if(inSingleLineComment && current == '\n') {
+                result.add(text.substring(segmentStartIndex, i));
+                segmentStartIndex = i;
+                inSingleLineComment = false;
+            } else if(inMultiLineComment && previous == '*' && current == '/') {
+                result.add(text.substring(segmentStartIndex, i + 1));
+                segmentStartIndex = i + 1;
+                inMultiLineComment = false;
+            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '/') {
+                inSingleLineComment = true;
+            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '*') {
+                inMultiLineComment = true;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Return a copy of the supplied text that contains exactly the desired number of newline characters.
+     * If the text has more than the requested number of newlines, newlines after the desired count is reached are removed.
+     * If the text has fewer than the requested number of newlines, additional newlines are prepended to the text.
+     */
+    public static String ensureNewlineCount(String text, int desiredNewlineCount) {
+        int newlinesSoFar = 0;
+        StringBuilder result = new StringBuilder();
+        for(int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if(current == '\n') {
+                newlinesSoFar++;
+                if(newlinesSoFar > desiredNewlineCount) {
+                    continue;
+                }
+            }
+            result.append(current);
+        }
+        while(newlinesSoFar < desiredNewlineCount) {
+            result.insert(0, '\n');
+            newlinesSoFar++;
+        }
+
+        return result.toString();
+    }
+
+    /**
+     * Return a copy of the supplied text that contains exactly the desired number of newlines appear before characters
+     * that indicate the beginning of a C-style comment, "//" and "/*".
+     *
+     * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
+     */
+    public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
+        int newlinesSoFar = 0;
+        StringBuilder result = new StringBuilder();
+        boolean foundComment = false;
+        for(int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            char previous = (i > 0) ? text.charAt(i - 1) : '\0';
+            if(current == '\n' && !foundComment) {
+                newlinesSoFar++;
+                if(newlinesSoFar > desiredNewlineCount) {
+                    continue;
+                }
+            } else if((previous == '/' && current == '/') || (previous == '/' && current == '*')) {
+                foundComment = true;
+            }
+            result.append(current);
+        }
+        while(newlinesSoFar < desiredNewlineCount) {
+            result.insert(0, '\n');
+            newlinesSoFar++;
+        }
+
+        return result.toString();
+    }
+
 }

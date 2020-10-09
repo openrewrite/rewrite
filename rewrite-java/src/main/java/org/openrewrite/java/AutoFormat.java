@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.AbstractSourceVisitor;
+import org.openrewrite.Formatting;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
@@ -23,15 +24,18 @@ import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.refactor.Formatter;
 
+import java.text.Normalizer;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.function.Function.identity;
 import static java.util.stream.Collectors.counting;
 import static java.util.stream.IntStream.range;
+import static org.openrewrite.internal.StringUtils.splitCStyleComments;
 
 /**
  * A general purpose means of formatting arbitrarily complex blocks of code relative based on their
@@ -57,7 +61,7 @@ public class AutoFormat extends JavaRefactorVisitor {
     public J visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
 
-        if(stream(scope).anyMatch(s -> s.isScope(classDecl))) {
+        if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
             // check annotations formatting
             List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
             if (!annotations.isEmpty()) {
@@ -89,9 +93,20 @@ public class AutoFormat extends JavaRefactorVisitor {
 
     @Override
     public J visitMethod(J.MethodDecl m) {
-        final J.MethodDecl finalM = m;
-        if(stream(scope).anyMatch(s -> s.isScope(finalM))) {
-            // check annotations formatting
+        if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+            // Format comments
+            Formatting originalFormatting = m.getFormatting();
+            List<String> splitPrefix = splitCStyleComments(originalFormatting.getPrefix());
+
+            // Ensure that there is exactly one blank line separating a methodDecl from whatever proceeds it
+            String newPrefix = Stream.concat(
+                    Stream.of(splitPrefix.get(0))
+                            .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 2)),
+                    splitPrefix.stream().skip(1)
+            ).collect(Collectors.joining());
+
+            m = m.withFormatting(originalFormatting.withPrefix(newPrefix));
+            // Annotations should each appear on their own line
             List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
             if(!annotations.isEmpty()) {
 
@@ -126,7 +141,6 @@ public class AutoFormat extends JavaRefactorVisitor {
             }
         }
 
-
         return refactor(m, super::visitMethod);
     }
 
@@ -160,89 +174,5 @@ public class AutoFormat extends JavaRefactorVisitor {
         }
 
         return j;
-    }
-
-    private class FindIndentExceptScope extends AbstractSourceVisitor<Void> {
-        private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
-        private final int enclosingIndent;
-
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
-
-        public FindIndentExceptScope(int enclosingIndent) {
-            this.enclosingIndent = enclosingIndent;
-            setCursoringOn();
-        }
-
-        @Override
-        public Void defaultTo(Tree t) {
-            return null;
-        }
-
-        private final Pattern SINGLE_LINE_COMMENT = Pattern.compile("//[^\\n]+");
-        private final Pattern MULTI_LINE_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
-
-        @Override
-        public Void visitTree(Tree tree) {
-            if (stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                return null;
-            }
-
-            String prefix = tree.getPrefix();
-
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            if (prefix.chars()
-                    .filter(c -> {
-                        takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                        return takeWhile.get();
-                    })
-                    .count() > 0) {
-                int indent = 0;
-                char[] chars = MULTI_LINE_COMMENT.matcher(SINGLE_LINE_COMMENT.matcher(prefix)
-                        .replaceAll("")).replaceAll("").toCharArray();
-                for (char c : chars) {
-                    if (c == '\n' || c == '\r') {
-                        indent = 0;
-                        continue;
-                    }
-                    if (Character.isWhitespace(c)) {
-                        indent++;
-                    }
-                }
-
-                indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
-
-                AtomicBoolean dropWhile = new AtomicBoolean(false);
-                takeWhile.set(true);
-                Map<Boolean, Long> indentTypeCounts = prefix.chars()
-                        .filter(c -> {
-                            dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
-                            return dropWhile.get();
-                        })
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                            return takeWhile.get();
-                        })
-                        .mapToObj(c -> c == ' ')
-                        .collect(Collectors.groupingBy(identity(), counting()));
-
-                if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                    linesWithSpaceIndents++;
-                } else {
-                    linesWithTabIndents++;
-                }
-            }
-
-            return super.visitTree(tree);
-        }
-
-        public boolean isIndentedWithSpaces() {
-            return linesWithSpaceIndents >= linesWithTabIndents;
-        }
-
-        public int getMostCommonIndent() {
-            indentFrequencies.remove(0);
-            return StringUtils.mostCommonIndent(indentFrequencies);
-        }
     }
 }

@@ -294,4 +294,38 @@ interface AutoFormatTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun exactlyOneLineBetweenMethods(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    D() {
+                    } void foo() {}
+                    
+                    
+                    void bar() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                    D() {
+                    }
+                    
+                    void foo() {}
+                    
+                    void bar() {
+                    }
+                }
+            """
+    )
+
 }
