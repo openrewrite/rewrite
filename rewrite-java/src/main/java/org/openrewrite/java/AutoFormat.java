@@ -54,7 +54,7 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
     }
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl) {
+    public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
         J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
 
         if(stream(scope).anyMatch(s -> s.isScope(classDecl))) {
@@ -88,7 +88,7 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl m) {
+    public J.MethodDecl visitMethod(J.MethodDecl m) {
         final J.MethodDecl finalM = m;
         if(stream(scope).anyMatch(s -> s.isScope(finalM))) {
             // check annotations formatting
