@@ -5,3 +5,4 @@ gradle.properties
 out/
 rewrite-java/src/main/gen/
 .idea/
+rewrite.iml
