@@ -48,10 +48,8 @@ interface AddAnnotationTest : RefactorVisitorTest {
                 
                 import lombok.RequiredArgsConstructor;
                 
-                @RequiredArgsConstructor
-                public class UsersController {
-                    @RequiredArgsConstructor
-                    class Inner {
+                @RequiredArgsConstructor public class UsersController {
+                    @RequiredArgsConstructor class Inner {
                     }
                 }
             """

@@ -1035,14 +1035,14 @@ public interface J extends Serializable, Tree {
         }
 
         /**
-         * Find fields defined on this class, but do not include inherited fields up the type hierarchy
+         * Find fields is defined on this class, but does not include inherited fields up the type hierarchy
          */
         public List<VariableDecls> findFields(String clazz) {
             return new FindFields(clazz).visit(this);
         }
 
         /**
-         * Find fields defined up the type hierarchy, but do not include fields defined directly on this class
+         * Find fields is defined up the type hierarchy, but does not include fields defined directly on this class
          */
         public List<JavaType.Var> findInheritedFields(String clazz) {
             return new FindInheritedFields(clazz).visit(this);
@@ -1056,6 +1056,9 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
+        /*
+        *  Add annotation does not handle formatting. If proper formatting is desired use AutoFormat.
+        */
         public J.ClassDecl addAnnotation(
                 JavaType.Class annotationType,
                 List<Expression> arguments
@@ -1066,8 +1069,12 @@ public interface J extends Serializable, Tree {
                             getKind().getFormatting() :
                             getTypeParameters().getFormatting()) :
                     format(firstPrefix(getModifiers()));
+            if(annotationFormatting.getSuffix().isEmpty()) {
+                annotationFormatting = annotationFormatting.withSuffix(" ");
+            }
+
             fixedAnnotations.add(J.Annotation.buildAnnotation(annotationFormatting, annotationType, arguments));
-            return (J.ClassDecl) new AutoFormat().visit(withAnnotations(fixedAnnotations));
+            return withAnnotations(fixedAnnotations);
         }
 
         public List<Annotation> findAnnotations(String signature) {
