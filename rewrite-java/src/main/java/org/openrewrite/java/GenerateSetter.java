@@ -43,8 +43,8 @@ import static org.openrewrite.internal.StringUtils.capitalize;
  * If a getter already exists no change will be made.
  *
  */
-public class GenerateSetter extends JavaRefactorVisitor {
-    public static class Scoped extends JavaRefactorVisitor {
+public class GenerateSetter {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
         private final String fieldName;
 
@@ -54,8 +54,8 @@ public class GenerateSetter extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl cd = refactor(classDecl, super::visitClassDecl);
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl cd = super.visitClassDecl(classDecl);
 
             if(!classDecl.isScope(scope)) {
                 return cd;

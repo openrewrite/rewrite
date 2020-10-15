@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.J;
 import java.util.function.Function;
 
 public class ChangeLiteral {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final Expression scope;
         private final Function<Object, Object> transform;
 
@@ -38,7 +38,7 @@ public class ChangeLiteral {
         }
 
         @Override
-        public J visitLiteral(J.Literal literal) {
+        public J.Literal visitLiteral(J.Literal literal) {
             if (getCursor().isScopeInPath(scope)) {
                 Object transformed = transform.apply(literal.getValue());
 

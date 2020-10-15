@@ -28,7 +28,7 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
+public class ChangeMethodTargetToVariable extends JavaIsoRefactorVisitor {
     private MethodMatcher methodMatcher;
     private String variable;
     private JavaType.Class variableType;
@@ -53,14 +53,14 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         if(methodMatcher.matches(method)) {
             andThen(new Scoped(method, variable, variableType));
         }
         return super.visitMethodInvocation(method);
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.MethodInvocation scope;
         private final String variable;
 
@@ -83,7 +83,7 @@ public class ChangeMethodTargetToVariable extends JavaRefactorVisitor {
         }
 
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
             if (scope.isScope(method)) {
                 Expression select = method.getSelect();
 

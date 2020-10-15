@@ -28,7 +28,7 @@ public final class ChangeFieldName {
     private ChangeFieldName() {
     }
 
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final JavaType.Class classType;
         private final String hasName;
         private final String toName;
@@ -47,8 +47,8 @@ public final class ChangeFieldName {
         }
 
         @Override
-        public J visitVariable(J.VariableDecls.NamedVar variable) {
-            J.VariableDecls.NamedVar v = refactor(variable, super::visitVariable);
+        public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable) {
+            J.VariableDecls.NamedVar v = super.visitVariable(variable);
             if (variable.isField(getCursor()) && matchesClass(enclosingClass().getType()) &&
                     variable.getSimpleName().equals(hasName)) {
                 v = v.withName(v.getName().withName(toName));
@@ -57,8 +57,8 @@ public final class ChangeFieldName {
         }
 
         @Override
-        public J visitFieldAccess(J.FieldAccess fieldAccess) {
-            J.FieldAccess f = refactor(fieldAccess, super::visitFieldAccess);
+        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess) {
+            J.FieldAccess f = super.visitFieldAccess(fieldAccess);
             if (matchesClass(fieldAccess.getTarget().getType()) &&
                     fieldAccess.getSimpleName().equals(hasName)) {
                 f = f.withName(f.getName().withName(toName));
@@ -67,8 +67,8 @@ public final class ChangeFieldName {
         }
 
         @Override
-        public J visitIdentifier(J.Ident ident) {
-            J.Ident i = refactor(ident, super::visitIdentifier);
+        public J.Ident visitIdentifier(J.Ident ident) {
+            J.Ident i = super.visitIdentifier(ident);
             if (ident.getSimpleName().equals(hasName) && isFieldReference(ident)) {
                 i = i.withName(toName);
             }

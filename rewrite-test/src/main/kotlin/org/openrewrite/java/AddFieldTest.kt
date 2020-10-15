@@ -30,13 +30,13 @@ interface AddFieldTest : RefactorVisitorTest {
     @Test
     fun addFieldDefaultIndent(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf { a ->
+                AddField.Scoped(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()")
+            },
             before = """
                 class A {
                 }
             """,
-            visitorsMapped = listOf { a ->
-                AddField.Scoped(a.classes[0], private, "java.util.List", "list", "new ArrayList<>()")
-            },
             after = """
                 import java.util.List;
                 
@@ -49,6 +49,9 @@ interface AddFieldTest : RefactorVisitorTest {
     @Test
     fun addFieldMatchSpaces(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf { a ->
+                AddField.Scoped(a.classes[0], private, "java.util.List", "list", null)
+            },
             before = """
                 import java.util.List;
                 
@@ -56,9 +59,6 @@ interface AddFieldTest : RefactorVisitorTest {
                   List l;
                 }
             """,
-            visitorsMapped = listOf { a ->
-                AddField.Scoped(a.classes[0], private, "java.util.List", "list", null)
-            },
             after = """
                 import java.util.List;
                 
@@ -72,6 +72,9 @@ interface AddFieldTest : RefactorVisitorTest {
     @Test
     fun addFieldMatchTabs(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf { a ->
+                AddField.Scoped(a.classes[0], private, "java.util.List", "list", null)
+            },
             before = """
                 import java.util.List;
                 
@@ -79,9 +82,6 @@ interface AddFieldTest : RefactorVisitorTest {
                            List l;
                 }
             """,
-            visitorsMapped = listOf { a ->
-                AddField.Scoped(a.classes[0], private, "java.util.List", "list", null)
-            },
             after = """
             import java.util.List;
             
@@ -95,19 +95,19 @@ interface AddFieldTest : RefactorVisitorTest {
     @Test
     fun addPrimitiveField(jp: JavaParser) = assertRefactored(
             jp,
+            visitorsMapped = listOf { a->
+                AddField.Scoped(a.classes[0], private, "int", "count", "5");
+            },
             before = """
                 class A {
                 
                 }
-            """.trimIndent(),
-            visitorsMapped = listOf { a->
-                AddField.Scoped(a.classes[0], private, "int", "count", "5");
-            },
+            """,
             after = """
                 class A {
                     private int count = 5;
                 
                 }
-            """.trimIndent()
+            """
     )
 }

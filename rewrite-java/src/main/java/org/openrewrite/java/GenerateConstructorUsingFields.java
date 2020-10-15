@@ -31,7 +31,7 @@ import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
 public class GenerateConstructorUsingFields {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final J.ClassDecl scope;
         private final List<J.VariableDecls> fields;
 
@@ -43,7 +43,7 @@ public class GenerateConstructorUsingFields {
         }
 
         @Override
-        public J visitClassDecl(J.ClassDecl classDecl) {
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
             if (scope.isScope(classDecl) && !hasRequiredArgsConstructor(classDecl)) {
                 List<J> statements = new ArrayList<>(classDecl.getBody().getStatements());
 
@@ -109,7 +109,7 @@ public class GenerateConstructorUsingFields {
                     .orElse(false));
         }
 
-        private class AddAssignmentsToConstructor extends JavaRefactorVisitor {
+        private class AddAssignmentsToConstructor extends JavaIsoRefactorVisitor {
             private final J.MethodDecl scope;
 
             private AddAssignmentsToConstructor(J.MethodDecl scope) {
@@ -119,7 +119,7 @@ public class GenerateConstructorUsingFields {
 
             @SuppressWarnings("ConstantConditions")
             @Override
-            public J visitMethod(J.MethodDecl method) {
+            public J.MethodDecl visitMethod(J.MethodDecl method) {
                 if (scope.isScope(method)) {
                     return method.withBody(method.getBody().withStatements(
                             treeBuilder.buildSnippet(

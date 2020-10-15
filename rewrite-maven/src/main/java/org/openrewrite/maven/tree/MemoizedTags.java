@@ -35,6 +35,7 @@ import static java.util.stream.Collectors.toList;
  */
 class MemoizedTags<M> {
     private final Xml.Tag root;
+
     private final String pathToModel;
     private final Function<Xml.Tag, M> buildModel;
     private final Function<M, Xml.Tag> modelToTag;
@@ -52,11 +53,14 @@ class MemoizedTags<M> {
         this.parent = new FindTag(pathToModel.substring(0, pathToModel.lastIndexOf('/')))
                 .visit(root);
     }
-
-    public List<M> getModels() {
-        return memoizeIfNecessary();
+    protected MemoizedTags(Xml.Tag root, String pathToModel, Function<Xml.Tag, M> buildModel,
+                           Function<M, Xml.Tag> modelToTag, Xml.Tag parent) {
+        this.root = root;
+        this.pathToModel = pathToModel;
+        this.buildModel = buildModel;
+        this.modelToTag = modelToTag;
+        this.parent = parent;
     }
-
     public Optional<Xml.Tag> with(List<M> maybeMutated) {
         if (root == null) {
             throw new IllegalStateException("Expecting parent tag to already exist");
@@ -88,5 +92,33 @@ class MemoizedTags<M> {
         }
 
         return memoized;
+    }
+
+    public String getPathToModel() {
+        return pathToModel;
+    }
+
+    public Function<Xml.Tag, M> getBuildModel() {
+        return buildModel;
+    }
+
+    public Function<M, Xml.Tag> getModelToTag() {
+        return modelToTag;
+    }
+
+    public List<M> getMemoized() {
+        return memoized;
+    }
+
+    public List<M> getModels() {
+        return memoizeIfNecessary();
+    }
+
+    public Xml.Tag getParent() {
+        return parent;
+    }
+
+    public Xml.Tag getRoot() {
+        return root;
     }
 }

@@ -33,7 +33,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.valid;
 
-public class OrderImports extends JavaRefactorVisitor {
+public class OrderImports extends JavaIsoRefactorVisitor {
     // VisibleForTesting
     final static Comparator<J.Import> IMPORT_SORTING = (i1, i2) -> {
         String[] import1 = i1.getQualid().printTrimmed().split("\\.");
@@ -90,7 +90,7 @@ public class OrderImports extends JavaRefactorVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         List<J.Import> orderedImports = new ArrayList<>();
 
         if (importLayout == null) {

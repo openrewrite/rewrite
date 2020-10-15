@@ -30,7 +30,7 @@ import static org.openrewrite.Tree.randomId;
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
  */
 public class DeleteStatement {
-    public static class Scoped extends JavaRefactorVisitor {
+    public static class Scoped extends JavaIsoRefactorVisitor {
         private final Statement statement;
 
         public Scoped(Statement statement) {
@@ -38,8 +38,8 @@ public class DeleteStatement {
         }
 
         @Override
-        public J visitIf(J.If iff) {
-            J.If i = refactor(iff, super::visitIf);
+        public J.If visitIf(J.If iff) {
+            J.If i = super.visitIf(iff);
 
             if (statement.isScope(i.getThenPart())) {
                 i = i.withThenPart(emptyBlock());
@@ -51,32 +51,32 @@ public class DeleteStatement {
         }
 
         @Override
-        public J visitForLoop(J.ForLoop forLoop) {
+        public J.ForLoop visitForLoop(J.ForLoop forLoop) {
             return statement.isScope(forLoop.getBody()) ? forLoop.withBody(emptyBlock()) :
                     super.visitForLoop(forLoop);
         }
 
         @Override
-        public J visitForEachLoop(J.ForEachLoop forEachLoop) {
+        public J.ForEachLoop visitForEachLoop(J.ForEachLoop forEachLoop) {
             return statement.isScope(forEachLoop.getBody()) ? forEachLoop.withBody(emptyBlock()) :
                     super.visitForEachLoop(forEachLoop);
         }
 
         @Override
-        public J visitWhileLoop(J.WhileLoop whileLoop) {
+        public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop) {
             return statement.isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
                     super.visitWhileLoop(whileLoop);
         }
 
         @Override
-        public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop) {
+        public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop) {
             return statement.isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
                     super.visitDoWhileLoop(doWhileLoop);
         }
 
         @Override
-        public J visitBlock(J.Block<J> block) {
-            J.Block<J> b = refactor(block, super::visitBlock);
+        public J.Block visitBlock(J.Block<J> block) {
+            J.Block<J> b = super.visitBlock(block);
 
             if (block.getStatements().stream().anyMatch(statement::isScope)) {
                 b = b.withStatements(b.getStatements().stream()

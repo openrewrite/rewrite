@@ -160,6 +160,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @A
                     @B("")
                     @C
@@ -192,6 +193,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @A
                     @B("foo")
                     @C
@@ -259,6 +261,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @B("foo")
                     @A
                     String stringify() {
@@ -287,6 +290,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @B(Tester.class)
                     @A
                     D() {
@@ -315,11 +319,12 @@ interface AutoFormatTest : RefactorVisitorTest {
             """,
             after = """
                 package a;
-
+                
                 public class D {
+                
                     D() {
                     }
-                    
+                
                     void foo() {}
                     
                     void bar() {

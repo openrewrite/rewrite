@@ -32,4 +32,14 @@ public class PrintMaven extends AbstractMavenSourceVisitor<String> {
     public String visitPom(Maven.Pom pom) {
         return printXml.visitDocument(pom.getDocument());
     }
+
+    @Override
+    public String visitDependencyManagement(Maven.DependencyManagement dependencyManagement) {
+        return printXml.visitTag(dependencyManagement.getTag());
+    }
+
+    @Override
+    public String visitDependency(Maven.Dependency dependency) {
+        return printXml.visitTag(dependency.getTag());
+    }
 }
