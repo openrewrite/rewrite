@@ -21,9 +21,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -37,7 +37,7 @@ public interface Parser<S extends SourceFile> {
     default List<S> parse(Iterable<Path> sourceFiles, @Nullable Path relativeTo) {
         return parseInputs(StreamSupport
                         .stream(sourceFiles.spliterator(), false)
-                        .map(sourceFile -> new Input(sourceFile, () -> {
+                        .map(sourceFile -> new Input(sourceFile.toUri(), () -> {
                                     try {
                                         return Files.newInputStream(sourceFile);
                                     } catch (IOException e) {
@@ -46,7 +46,7 @@ public interface Parser<S extends SourceFile> {
                                 })
                         )
                         .collect(toList()),
-                relativeTo
+                relativeTo == null ? null : relativeTo.toUri()
         );
     }
 
@@ -64,7 +64,7 @@ public interface Parser<S extends SourceFile> {
         return parseInputs(
                 Arrays.stream(sources).map(source ->
                         new Input(
-                                Paths.get(Long.toString(System.nanoTime())),
+                                URI.create(Long.toString(System.nanoTime())),
                                 () -> new ByteArrayInputStream(source.getBytes()),
                                 true
                         )
@@ -76,15 +76,15 @@ public interface Parser<S extends SourceFile> {
     /**
      * @param sources    A collection of inputs. At the conclusion of parsing all sources' {@link Input#source}
      *                   are closed.
-     * @param relativeTo A common relative path for all {@link Input#path}.
+     * @param relativeTo A common relative path for all {@link Input#uri}.
      * @return A list of {@link SourceFile}.
      */
-    List<S> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo);
+    List<S> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo);
 
-    boolean accept(Path path);
+    boolean accept(URI path);
 
     default boolean accept(Input input) {
-        return input.isSynthetic() || accept(input.getPath());
+        return input.isSynthetic() || accept(input.getUri());
     }
 
     default List<Input> acceptedInputs(Iterable<Input> input) {
@@ -98,7 +98,7 @@ public interface Parser<S extends SourceFile> {
     }
 
     /**
-     * A source input. {@link Input#path} may be a synthetic path and not
+     * A source input. {@link Input#uri} may be a synthetic path and not
      * represent a resolvable path on disk, as is the case when parsing sources
      * from BigQuery (we have a relative path from the original Github repository
      * and the sources, but don't have these sources on disk).
@@ -109,25 +109,25 @@ public interface Parser<S extends SourceFile> {
      */
     class Input {
         private final boolean synthetic;
-        private final Path path;
+        private final URI uri;
         private final Supplier<InputStream> source;
 
-        public Input(Path path, Supplier<InputStream> source) {
-            this(path, source, false);
+        public Input(URI uri, Supplier<InputStream> source) {
+            this(uri, source, false);
         }
 
-        public Input(Path path, Supplier<InputStream> source, boolean synthetic) {
-            this.path = path;
+        public Input(URI uri, Supplier<InputStream> source, boolean synthetic) {
+            this.uri = uri;
             this.source = source;
             this.synthetic = synthetic;
         }
 
-        public Path getPath() {
-            return path;
+        public URI getUri() {
+            return uri;
         }
 
-        public Path getRelativePath(@Nullable Path relativeTo) {
-            return relativeTo == null ? path : relativeTo.relativize(path);
+        public URI getRelativePath(@Nullable URI relativeTo) {
+            return relativeTo == null ? uri : relativeTo.relativize(uri);
         }
 
         public InputStream getSource() {
@@ -143,12 +143,12 @@ public interface Parser<S extends SourceFile> {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             Input input = (Input) o;
-            return Objects.equals(path, input.path);
+            return Objects.equals(uri, input.uri);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(path);
+            return Objects.hash(uri);
         }
     }
 }

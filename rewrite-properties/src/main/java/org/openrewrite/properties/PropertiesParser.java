@@ -24,7 +24,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -38,7 +38,7 @@ import static org.openrewrite.Tree.randomId;
 public class PropertiesParser implements Parser<Properties.File> {
 
     @Override
-    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+    public List<Properties.File> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
@@ -49,7 +49,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                 }).collect(toList());
     }
 
-    private Properties.File parseFromInput(Path sourceFile, InputStream source) {
+    private Properties.File parseFromInput(URI sourceFile, InputStream source) {
         List<Properties.Content> contents = new ArrayList<>();
 
         StringBuilder prefix = new StringBuilder();
@@ -100,7 +100,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             throw new UncheckedIOException(e);
         }
 
-        return new Properties.File(randomId(), sourceFile.toFile().getPath(),
+        return new Properties.File(randomId(), sourceFile.toString(),
                 emptyList(), contents, Formatting.format("", suffix));
     }
 
@@ -209,7 +209,7 @@ public class PropertiesParser implements Parser<Properties.File> {
     }
 
     @Override
-    public boolean accept(Path path) {
-        return path.getFileName().toString().endsWith(".properties");
+    public boolean accept(URI path) {
+        return path.toString().endsWith(".properties");
     }
 }

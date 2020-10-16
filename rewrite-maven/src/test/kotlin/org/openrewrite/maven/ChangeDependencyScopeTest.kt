@@ -16,10 +16,8 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
-import java.nio.file.Path
 
 class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
     override val parser = MavenParser.builder()
@@ -73,7 +71,7 @@ class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
     )
 
     @Test
-    fun scopeToScope(@TempDir tempDir: Path) = assertRefactored(
+    fun scopeToScope() = assertRefactored(
             visitors = listOf(guavaToTest),
             before = """
                 <project>
@@ -114,7 +112,7 @@ class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
     )
 
     @Test
-    fun scopeToNoScope(@TempDir tempDir: Path) = assertRefactored(
+    fun scopeToNoScope() = assertRefactored(
             visitors = listOf(
                     guavaToTest.apply { setToScope(null) }
             ),

@@ -31,11 +31,11 @@ parser grammar XMLParser;
 
 options { tokenVocab=XMLLexer; }
 
-document                :   prolog? element;
+document                :   prolog element;
 
-prolog                  :   xmldecl misc*;
+prolog                  :   xmldecl? misc*;
 
-xmldecl                 :   SPECIAL_OPEN XML_DECL attribute * SPECIAL_CLOSE ;
+xmldecl                 :   SPECIAL_OPEN_XML attribute * SPECIAL_CLOSE ;
 
 misc                    :   COMMENT | doctypedecl | processinginstruction ;
 

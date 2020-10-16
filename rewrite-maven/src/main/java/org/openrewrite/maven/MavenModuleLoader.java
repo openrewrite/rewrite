@@ -395,7 +395,7 @@ class MavenModuleLoader {
 
         public static Collection<InputStreamModelSource> fromInputs(Iterable<Parser.Input> inputs) {
             Map<Path, InputStreamModelSource> modelSources = StreamSupport.stream(inputs.spliterator(), false)
-                    .map(input -> new InputStreamModelSource(input.getPath(), input::getSource))
+                    .map(input -> new InputStreamModelSource(input.getUri(), input::getSource))
                     .collect(Collectors.toMap(
                             modelSource -> modelSource.path,
                             Function.identity(),

@@ -26,7 +26,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +37,13 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
-    private final Path path;
+    private final URI uri;
     private final String source;
 
     private int cursor = 0;
 
-    public XmlParserVisitor(Path path, String source) {
-        this.path = path;
+    public XmlParserVisitor(URI uri, String source) {
+        this.uri = uri;
         this.source = source;
     }
 
@@ -51,7 +51,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
-                path.toString(),
+                uri.toString(),
                 emptyList(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
@@ -103,9 +103,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             });
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
-        } else {
-            return super.visitContent(ctx);
+        } else if (ctx.reference() != null && ctx.reference().EntityRef() != null) {
+            cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
+            return new Xml.CharData(randomId(),
+                    false,
+                    ctx.reference().EntityRef().getText(),
+                    Formatting.EMPTY);
         }
+
+        return super.visitContent(ctx);
     }
 
     private Map.Entry<Formatting, String> charDataFormat(String text) {
@@ -142,7 +148,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.ProcessingInstruction visitXmldecl(XMLParser.XmldeclContext ctx) {
         return convert(ctx, (c, format) -> {
-                    cursor = ctx.XML_DECL().getSymbol().getStopIndex() + 1;
+                    cursor = ctx.SPECIAL_OPEN_XML().getSymbol().getStopIndex() + 1;
                     List<Xml.Attribute> attributes = ctx.attribute().stream()
                             .map(this::visitAttribute)
                             .collect(toList());
@@ -277,7 +283,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
         Formatting format = format(ctx);
         T t = conversion.apply(ctx, format);
-        cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+        if (ctx.getStop() != null) {
+            cursor = ctx.getStop().getStopIndex() + (Character.isWhitespace(source.charAt(ctx.getStop().getStopIndex())) ? 0 : 1);
+        }
+
         return t;
     }
 

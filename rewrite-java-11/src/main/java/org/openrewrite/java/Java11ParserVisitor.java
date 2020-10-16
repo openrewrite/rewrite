@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
-import java.nio.file.Path;
+import java.net.URI;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,7 +45,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static java.lang.Math.max;
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
@@ -56,7 +57,7 @@ import static org.openrewrite.Tree.randomId;
 public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
-    private final Path path;
+    private final URI uri;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
@@ -64,8 +65,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles) {
-        this.path = path;
+    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles) {
+        this.uri = uri;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
@@ -403,7 +404,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
-        logger.debug("Building AST for: " + path);
+        logger.debug("Building AST for: " + uri);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         var prefix = source.substring(0, cu.getStartPosition());
@@ -421,7 +422,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         return new J.CompilationUnit(randomId(),
-                path.toString(),
+                uri.toString(),
                 emptyList(),
                 packageDecl,
                 convertAll(node.getImports(), semiDelim, semiDelim),
@@ -826,7 +827,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                             .findFirst()
                             .map(cd -> cd.getSimpleName().toString())
                             .orElseThrow() :
-                    ((Symbol.ClassSymbol) ((JCMethodDecl) node).sym.owner).name.toString();
+                    ((JCMethodDecl) node).sym.owner.name.toString();
             name = J.Ident.build(randomId(), owner, null, format(sourceBefore(owner)));
         } else {
             name = J.Ident.build(randomId(), node.getName().toString(), null, format(sourceBefore(node.getName().toString())));

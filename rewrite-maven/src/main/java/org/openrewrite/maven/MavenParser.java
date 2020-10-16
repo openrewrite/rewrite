@@ -29,6 +29,7 @@ import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Function;
@@ -63,7 +64,7 @@ public class MavenParser implements Parser<Maven.Pom> {
     }
 
     @Override
-    public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
+    public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
         Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
 
         List<MavenModel> modules = new MavenModuleLoader(resolveDependencies,
@@ -79,8 +80,8 @@ public class MavenParser implements Parser<Maven.Pom> {
     }
 
     @Override
-    public boolean accept(Path path) {
-        return path.getFileName().toString().equals("pom.xml");
+    public boolean accept(URI path) {
+        return path.toString().equals("pom.xml");
     }
 
     public static class Builder {

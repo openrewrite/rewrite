@@ -87,6 +87,7 @@ public interface Xml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Nullable
         @With
         ProcessingInstruction xmlDecl;
 
@@ -157,7 +158,7 @@ public interface Xml extends Serializable, Tree {
         @With
         List<Attribute> attributes;
 
-        List<Content> content;
+        List<? extends Content> content;
 
         @JsonIgnore
         public Optional<Tag> getChild(String name) {
@@ -238,7 +239,7 @@ public interface Xml extends Serializable, Tree {
             return parent.getChild(name);
         }
 
-        public Tag withContent(List<Content> content) {
+        public Tag withContent(List<? extends Content> content) {
             if (this.content == content) {
                 return this;
             }

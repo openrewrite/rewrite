@@ -30,7 +30,7 @@ class UpgradeParentVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
             .build()
 
     @Test
-    fun upgradeVersion(@TempDir tempDir: Path) = assertRefactored(
+    fun upgradeVersion() = assertRefactored(
             visitors = listOf(UpgradeParentVersion().apply {
                 setGroupId("org.springframework.boot")
                 setArtifactId("spring-boot-starter-parent")

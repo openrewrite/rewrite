@@ -3,7 +3,7 @@ parser grammar RefactorMethodSignatureParser;
 options { tokenVocab=AspectJLexer; }
 	
 import JavaParser;
-	
+
 methodPattern
 	:	targetTypePattern SPACE simpleNamePattern formalParametersPattern
 	;

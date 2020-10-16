@@ -3,7 +3,8 @@ build/
 gradle.properties
 .java-version
 out/
-rewrite-java/src/main/gen/
+*/src/main/gen/
+*/src/main/antlr/
 .idea/
 bin/
 .project

@@ -5,6 +5,7 @@ import nebula.plugin.info.InfoBrokerPlugin
 import nebula.plugin.contacts.*
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import org.jfrog.gradle.plugin.artifactory.dsl.*
+import com.github.jk1.license.LicenseReportExtension
 
 buildscript {
     repositories {
@@ -27,6 +28,7 @@ plugins {
     id("io.spring.release") version "0.20.1"
     id("org.jetbrains.kotlin.jvm") version "1.4.0" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
+    id("com.github.jk1.dependency-license-report") version "1.16" apply false
 }
 
 allprojects {
@@ -41,6 +43,7 @@ subprojects {
     apply(plugin = "nebula.maven-resolved-dependencies")
     apply(plugin = "io.spring.publishing")
     apply(plugin = "org.gradle.test-retry")
+    apply(plugin = "com.github.jk1.dependency-license-report")
 
     repositories {
         mavenCentral()
@@ -83,7 +86,6 @@ subprojects {
         options.compilerArgs.addAll(listOf("--release", "8"))
     }
 
-
     configure<ContactsExtension> {
         val j = Contact("jkschneider@gmail.com")
         j.moniker("Jonathan Schneider")
@@ -107,7 +109,6 @@ subprojects {
         jvmArgs = listOf("-XX:+UnlockDiagnosticVMOptions", "-XX:+ShowHiddenFrames")
     }
 
-
     configurations.all {
         resolutionStrategy.cacheDynamicVersionsFor(0, "seconds")
     }
@@ -115,6 +116,10 @@ subprojects {
     configure<JavaPluginExtension> {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    configure<LicenseReportExtension> {
+        renderers = arrayOf(com.github.jk1.license.render.CsvReportRenderer())
     }
 
     configure<PublishingExtension> {

@@ -43,9 +43,10 @@ CharRef       :   '&#' DIGIT+ ';'
 
 SEA_WS        :   (' '|'\t'|'\r'? '\n')+  -> skip;
 
-OPEN          :   '<'                     -> pushMode(INSIDE) ;
-SPECIAL_OPEN  :   '<?'                    -> pushMode(INSIDE) ;
-ELEMENT_OPEN  :   '<!'                    -> pushMode(INSIDE) ;
+SPECIAL_OPEN_XML : '<?xml'                -> pushMode(INSIDE) ;
+OPEN             :   '<'                     -> pushMode(INSIDE) ;
+SPECIAL_OPEN     :   '<?'                    -> pushMode(INSIDE) ;
+ELEMENT_OPEN     :   '<!'                    -> pushMode(INSIDE) ;
 
 TEXT          :   ~[<&]+ ;        // match any 16 bit char other than < and &
 
@@ -59,7 +60,6 @@ SLASH       :   '/' ;
 SUBSET_OPEN :   '[' ;
 SUBSET_CLOSE:   ']' ;
 EQUALS      :   '=' ;
-XML_DECL    :   'xml';
 DOCTYPE     :   'DOCTYPE';
 STRING      :   '"' ~[<"]* '"'
             |   '\'' ~[<']* '\''
@@ -83,7 +83,7 @@ NameChar    :   NameStartChar
 
 fragment
 NameStartChar
-            :   [:a-zA-Z]
+            :   [:a-zA-Z_]
             |   '\u2070'..'\u218F'
             |   '\u2C00'..'\u2FEF'
             |   '\u3001'..'\uD7FF'

@@ -23,7 +23,6 @@ import javax.lang.model.element.NestingKind;
 import javax.tools.JavaFileObject;
 import java.io.*;
 import java.net.URI;
-import java.nio.file.Path;
 import java.util.Objects;
 
 /**
@@ -31,22 +30,22 @@ import java.util.Objects;
  * other than a file on disk.
  */
 public class Java11ParserInputFileObject implements JavaFileObject {
-    private final Path path;
+    private final URI uri;
     private final Parser.Input input;
 
     public Java11ParserInputFileObject(Parser.Input input) {
         this.input = input;
-        this.path = input.getPath();
+        this.uri = input.getUri();
     }
 
     @Override
     public URI toUri() {
-        return input.getPath().toUri();
+        return input.getUri();
     }
 
     @Override
     public String getName() {
-        return input.getPath().getFileName().toString();
+        return input.getUri().toString();
     }
 
     @Override
@@ -109,11 +108,11 @@ public class Java11ParserInputFileObject implements JavaFileObject {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Java11ParserInputFileObject that = (Java11ParserInputFileObject) o;
-        return path.equals(that.path);
+        return uri.equals(that.uri);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(path);
+        return Objects.hash(uri);
     }
 }
