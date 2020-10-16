@@ -9,7 +9,7 @@ The Rewrite project is a mass refactoring ecosystem for Java and other source co
 
 Read the full documentation at [docs.openrewrite.org](https://docs.openrewrite.org/).
 
-Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-h7bqtyxx-nBjZPdqc9fXBugZKnEOlog)!
+Feel free to join us on [Slack](https://join.slack.com/t/rewriteoss/shared_invite/zt-i2ouq1qd-KdkTZKr5jmNtooqfc4ITAQ)!
 
 ## Building & Developing Openrewrite
 
