@@ -333,4 +333,29 @@ interface AutoFormatTest : RefactorVisitorTest {
             """
     )
 
+    @Test
+    fun putsCommentAboveMethod(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                
+                    /***/ void foo() {}
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    /***/
+                    void foo() {}
+                }
+            """
+    )
+
 }
