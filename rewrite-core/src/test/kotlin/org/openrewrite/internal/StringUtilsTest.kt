@@ -138,5 +138,8 @@ class StringUtilsTest {
         assertThat(ensureNewlineCountBeforeComment("/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
         assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/", 2)).isEqualTo("\n\n/**\n*/")
         assertThat(ensureNewlineCountBeforeComment("\n\n\n/**\n*/\n", 2)).isEqualTo("\n\n/**\n*/\n")
+        assertThat(ensureNewlineCountBeforeComment("\n    //", 1)).isEqualTo("\n    //")
+        assertThat(ensureNewlineCountBeforeComment("\n    \n    //", 1)).isEqualTo("\n    //")
+        assertThat(ensureNewlineCountBeforeComment("\n\n\n    /***/", 2)).isEqualTo("\n\n    /***/")
     }
 }

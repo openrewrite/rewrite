@@ -334,7 +334,32 @@ interface AutoFormatTest : RefactorVisitorTest {
     )
 
     @Test
-    fun putsCommentAboveMethod(jp:JavaParser) = assertRefactored(
+    fun indentClassComments(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+                    // Single-line comment
+                    /**
+                * multi-line comment
+                            */
+                public class D { }
+            """,
+            after = """
+                package a;
+
+                // Single-line comment
+                /**
+                 * multi-line comment
+                 */
+                public class D { }
+            """
+    )
+
+    @Test
+    fun indentMethodComments(jp:JavaParser) = assertRefactored(
             jp,
             visitorsMapped = listOf { a ->
                 AutoFormat(a.classes[0])
@@ -344,7 +369,15 @@ interface AutoFormatTest : RefactorVisitorTest {
 
                 public class D {
                 
-                    /***/ void foo() {}
+                
+                
+                    /**
+                 * multi-line comment
+                        */
+                     
+                        // single-line comment
+                    
+                    @A void foo() { }
                 }
             """,
             after = """
@@ -352,10 +385,13 @@ interface AutoFormatTest : RefactorVisitorTest {
 
                 public class D {
                 
-                    /***/
-                    void foo() {}
+                    /**
+                     * multi-line comment
+                     */
+                    // single-line comment
+                    @A
+                    void foo() { }
                 }
             """
     )
-
 }

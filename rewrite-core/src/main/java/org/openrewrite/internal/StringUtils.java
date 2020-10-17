@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
@@ -225,60 +226,53 @@ public class StringUtils {
     }
 
     /**
-     * Return a copy of the supplied text that contains exactly the desired number of newline characters.
-     * If the text has more than the requested number of newlines, newlines after the desired count is reached are removed.
-     * If the text has fewer than the requested number of newlines, additional newlines are prepended to the text.
-     */
-    public static String ensureNewlineCount(String text, int desiredNewlineCount) {
-        int newlinesSoFar = 0;
-        StringBuilder result = new StringBuilder();
-        for(int i = 0; i < text.length(); i++) {
-            char current = text.charAt(i);
-            if(current == '\n') {
-                newlinesSoFar++;
-                if(newlinesSoFar > desiredNewlineCount) {
-                    continue;
-                }
-            }
-            result.append(current);
-        }
-        while(newlinesSoFar < desiredNewlineCount) {
-            result.insert(0, '\n');
-            newlinesSoFar++;
-        }
-
-        return result.toString();
-    }
-
-    /**
      * Return a copy of the supplied text that contains exactly the desired number of newlines appear before characters
      * that indicate the beginning of a C-style comment, "//" and "/*".
      *
      * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
      */
     public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
-        int newlinesSoFar = 0;
         StringBuilder result = new StringBuilder();
-        boolean foundComment = false;
-        for(int i = 0; i < text.length(); i++) {
+        int prefixEndsIndex = indexOfNonWhitespace(text);
+        String suffix;
+        if(prefixEndsIndex == -1) {
+            prefixEndsIndex = text.length();
+            suffix = "";
+        } else {
+            suffix = text.substring(prefixEndsIndex);
+        }
+        int newlinesSoFar = 0;
+        for(int i = prefixEndsIndex - 1; i >= 0 && newlinesSoFar < desiredNewlineCount; i--) {
             char current = text.charAt(i);
-            char previous = (i > 0) ? text.charAt(i - 1) : '\0';
-            if(current == '\n' && !foundComment) {
+            if(current == '\n') {
                 newlinesSoFar++;
-                if(newlinesSoFar > desiredNewlineCount) {
-                    continue;
-                }
-            } else if((previous == '/' && current == '/') || (previous == '/' && current == '*')) {
-                foundComment = true;
             }
             result.append(current);
         }
         while(newlinesSoFar < desiredNewlineCount) {
-            result.insert(0, '\n');
+            result.append('\n');
             newlinesSoFar++;
         }
-
+        // Since iterated back-to-front, reverse things back into the usual order
+        result.reverse();
+        result.append(suffix);
         return result.toString();
     }
 
+    public static int indexOfNonWhitespace(String text) {
+        return indexOf(text, (it) -> !(it == ' ' || it == '\t' || it == '\n' || it == '\r'));
+    }
+
+    /**
+     * Return the index of the first character for which the predicate returns "true".
+     * Or -1 if no character in the string matches the predicate.
+     */
+    public static int indexOf(String text, Predicate<Character> test) {
+        for(int i = 0; i < text.length(); i++) {
+            if(test.test(text.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
+    }
 }

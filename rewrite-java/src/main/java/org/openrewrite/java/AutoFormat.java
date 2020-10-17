@@ -15,25 +15,16 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.AbstractSourceVisitor;
-import org.openrewrite.Formatting;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.refactor.Formatter;
 
-import java.text.Normalizer;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
 import static java.util.stream.IntStream.range;
 import static org.openrewrite.internal.StringUtils.splitCStyleComments;
 
@@ -69,56 +60,92 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
             setCursoringOn();
         }
 
-        @Override
-        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
-            J.ClassDecl cd = super.visitClassDecl(classDecl);
-
-            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                // check annotations formatting
-                List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
-                if (!annotations.isEmpty()) {
-
-                    // Ensure all annotations have a \n in their prefixes
-                    // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
-                    for (int i = 1; i < annotations.size(); i++) {
-                        if (!annotations.get(i).getPrefix().contains("\n")) {
-                            annotations.set(i, annotations.get(i).withPrefix("\n"));
-                        }
-                    }
-
-                    cd = cd.withAnnotations(annotations);
-
-                    // ensure first statement following annotations has \n in prefix
-                    List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
-                    if (!modifiers.isEmpty()) {
-                        if (!modifiers.get(0).getPrefix().contains("\n")) {
-                            modifiers.set(0, modifiers.get(0).withPrefix("\n"));
-                            cd = cd.withModifiers(modifiers);
-                        }
-                    } else if (!cd.getKind().getPrefix().contains("\n")) {
-                        cd = cd.withKind(cd.getKind().withPrefix("\n"));
-                    }
+        /**
+         * Given a single line string with a whitespace prefix and a non-whitespace suffix, alter the whitespace prefix
+         * to have the appropriate indentation.
+         *
+         * Right now comments aren't AST elements so FixIndentation.visitTree() is blind to them.
+         * This special treatment of comment indentation will be able to go away once we start treating
+         * comments an their own, independent AST element.
+         */
+        public String indentLine(String prefix) {
+            if (!prefix.isEmpty() && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                int indentMultiple = (int) getCursor().getPathAsStream().filter(J.Block.class::isInstance).count();
+                Formatter.Result wholeSourceIndent = formatter.wholeSourceIndent();
+                int nonWhiteSpaceIndex = StringUtils.indexOfNonWhitespace(prefix);
+                boolean insideJavaDocComment = false;
+                if(nonWhiteSpaceIndex == -1) {
+                    nonWhiteSpaceIndex = prefix.length();
+                } else if(prefix.charAt(nonWhiteSpaceIndex) == '*')
+                {
+                    insideJavaDocComment = true;
                 }
+                String indentation = prefix.substring(0, nonWhiteSpaceIndex);
+                String comment = prefix.substring(nonWhiteSpaceIndex);
+                String newIndentation = indentation.substring(0, indentation.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
+                        .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
+                        .collect(Collectors.joining(""));
+                if(insideJavaDocComment) //noinspection DanglingJavadoc
+                {
+                    // By convention Javadoc-style comments are indented such that lines beginning with '*'
+                    // have an extra space so as to vertically align the '*' characters from different lines. e.g.:
+                    /**
+                     *
+                     */
+                    newIndentation += " ";
+                }
+                return newIndentation + comment;
             }
-            return cd;
+            return prefix;
+        }
+
+        /**
+         * Ensure that the element in question is indented the right amount
+         */
+        private <T extends J> T spaceHorizontally(T j) {
+            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                // Format comments
+                Formatting originalFormatting = j.getFormatting();
+
+                // Ensure that comments are indented correctly
+                String newPrefix = stream(originalFormatting.getPrefix().split("\\n"))
+                        .map(this::indentLine)
+                        .collect(Collectors.joining("\n"));
+                if(originalFormatting.getPrefix().endsWith("\n")) {
+                    // A trailing newline would have been eliminated by the split(), put it back
+                    newPrefix += '\n';
+                }
+                j = j.withFormatting(originalFormatting.withPrefix(newPrefix));
+            }
+            return j;
+        }
+
+        /**
+         * Ensure there's a single blank line between the previous declaration and the current j
+         * Ensure that any comments are on their own line
+         */
+        private <T extends J> T spaceVertically(T j) {
+            Formatting originalFormatting = j.getFormatting();
+            List<String> splitPrefix = splitCStyleComments(originalFormatting.getPrefix());
+
+            String newPrefix = Stream.concat(
+                    Stream.of(splitPrefix.get(0))
+                            .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 2)),
+                    splitPrefix.stream().skip(1)
+                            .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 1))
+            )
+                    .collect(Collectors.joining());
+            return j.withFormatting(originalFormatting.withPrefix(newPrefix));
         }
 
         @Override
         public J.MethodDecl visitMethod(J.MethodDecl methodDecl) {
             J.MethodDecl m = super.visitMethod(methodDecl);
+
             if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                // Format comments
-                Formatting originalFormatting = m.getFormatting();
-                List<String> splitPrefix = splitCStyleComments(originalFormatting.getPrefix());
+                m = spaceHorizontally(m);
+                m = spaceVertically(m);
 
-                // Ensure that there is exactly one blank line separating a methodDecl from whatever proceeds it
-                String newPrefix = Stream.concat(
-                        Stream.of(splitPrefix.get(0))
-                                .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 2)),
-                        splitPrefix.stream().skip(1)
-                ).collect(Collectors.joining());
-
-                m = m.withFormatting(originalFormatting.withPrefix(newPrefix));
                 // Annotations should each appear on their own line
                 List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
                 if(!annotations.isEmpty()) {
@@ -157,6 +184,42 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
             return m;
         }
 
+        @Override
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl cd = super.visitClassDecl(classDecl);
+
+            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                cd = spaceHorizontally(cd);
+                cd = spaceVertically(cd);
+
+                // check annotations formatting
+                List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
+                if (!annotations.isEmpty()) {
+
+                    // Ensure all annotations have a \n in their prefixes
+                    // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
+                    for (int i = 1; i < annotations.size(); i++) {
+                        if (!annotations.get(i).getPrefix().contains("\n")) {
+                            annotations.set(i, annotations.get(i).withPrefix("\n"));
+                        }
+                    }
+
+                    cd = cd.withAnnotations(annotations);
+
+                    // ensure first statement following annotations has \n in prefix
+                    List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
+                    if (!modifiers.isEmpty()) {
+                        if (!modifiers.get(0).getPrefix().contains("\n")) {
+                            modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                            cd = cd.withModifiers(modifiers);
+                        }
+                    } else if (!cd.getKind().getPrefix().contains("\n")) {
+                        cd = cd.withKind(cd.getKind().withPrefix("\n"));
+                    }
+                }
+            }
+            return cd;
+        }
     }
 
     private class FixIndentation extends JavaIsoRefactorVisitor {
