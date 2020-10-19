@@ -57,15 +57,15 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
     @Nullable
     private String scope;
 
+
+    @Setter
+    @Nullable
+    private String type;
+
     @Override
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId));
-    }
-
-    @Override
-    public boolean isIdempotent() {
-        return false;
     }
 
     @Override
@@ -104,7 +104,9 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
                 (version != null && d.getVersion() != null ? version.equals(d.getVersion()) :
                         version == null && d.getVersion() == null) &&
                 (scope != null &&  d.getScope() != null ? scope.equals(d.getScope()) :
-                        scope == null && d.getScope() == null);
+                        scope == null && d.getScope() == null) &&
+                (type != null &&  d.getScope() != null ? type.equals(d.getScope()) :
+                        type == null && d.getScope() == null);
     }
 
     private boolean dependencyWithGroupIdAndArtifactIdExists(Maven.Pom pom) {
@@ -247,6 +249,8 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
                                 indent.getPrefix(offset + 1) + "<version>" + version + "</version>") +
                         (scope == null ? "" :
                                 indent.getPrefix(offset + 1) + "<scope>" + scope + "</scope>") +
+                        (type == null ? "" :
+                                indent.getPrefix(offset + 1) + "<type>" + type + "</type>") +
                         indent.getPrefix(offset) + "</dependency>"
                     ).get(0).getRoot().withFormatting(format(indent.getPrefix(offset)));
     }

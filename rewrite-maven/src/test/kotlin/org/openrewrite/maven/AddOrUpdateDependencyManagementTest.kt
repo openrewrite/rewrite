@@ -305,6 +305,55 @@ class AddOrUpdateDependencyManagementTest {
         verify(visitors, before, after)
     }
 
+    @Test
+    fun shouldAddTypeIfGiven() {
+
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springramework.boot</groupId>
+                            <artifactId>spring-boot-dependencies</artifactId>
+                            <version>2.3.4.RELEASE</version>
+                            <scope>import</scope>
+                            <type>pom</type>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("org.springramework.boot")
+            setArtifactId("spring-boot-dependencies")
+            setVersion("2.3.4.RELEASE")
+            setType("pom")
+            setScope("import")
+        })
+
+        verify(visitors, before, after)
+    }
+
     private fun verify(visitors: List<AddOrUpdateDependencyManagement>, before: String, after: String) {
         val changes: List<Change> = ArrayList<Change>(Refactor()
                 .visit(visitors)
