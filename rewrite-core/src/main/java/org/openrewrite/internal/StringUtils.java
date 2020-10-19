@@ -15,7 +15,7 @@
  */
 package org.openrewrite.internal;
 
-import io.micrometer.core.lang.Nullable;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
