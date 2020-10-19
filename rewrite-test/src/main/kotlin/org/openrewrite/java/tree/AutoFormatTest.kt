@@ -15,43 +15,419 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.AutoFormat
 import org.openrewrite.java.JavaParser
-import org.openrewrite.whenParsedBy
 
-interface AutoFormatTest {
+interface AutoFormatTest : RefactorVisitorTest {
+    companion object {
+        var dependencies = listOf(
+                "package a;\npublic @interface A {}",
+                "package a;\npublic @interface B { String value(); }",
+                "package a;\npublic @interface C {}"
+        )
+    }
+
     @Test
-    fun methodDeclaration(jp: JavaParser) {
-        """
-            import java.util.*;
-            
-            public class A {
-                List<String> l = new ArrayList<>();
+    fun methodDeclaration(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                import java.util.*;
                 
-            @Deprecated
-            public void method() {
-              if(true) {
-                l.add("value");
-              }
-            }
-            }
-        """
-                .whenParsedBy(jp)
-                .whenVisitedByMapped { a -> AutoFormat(a.classes[0].methods[0]) }
-                .isRefactoredTo("""
-                    import java.util.*;
+                public class A {
+                    List<String> l = new ArrayList<>();
                     
-                    public class A {
-                        List<String> l = new ArrayList<>();
-                        
-                        @Deprecated
-                        public void method() {
-                            if(true) {
-                                l.add("value");
-                            }
+                @Deprecated
+                public void method() {
+                  if(true) {
+                    l.add("value");
+                  }
+                }
+                }
+            """,
+            after = """
+                import java.util.*;
+                
+                public class A {
+                    List<String> l = new ArrayList<>();
+                    
+                    @Deprecated
+                    public void method() {
+                        if(true) {
+                            l.add("value");
                         }
                     }
-                """)
-    }
+                }
+            """
+    )
+
+    @Test
+    fun putEachClassAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+                
+                @A@B("")   @C
+                public class D {
+                    
+                }
+            """,
+            after = """
+                package a;
+                
+                @A
+                @B("")
+                @C
+                public class D {
+                    
+                }
+            """
+    )
+
+    @Test
+    fun putClassAnnotationAndModifierOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+                
+                @A public class D {
+                    
+                }
+            """,
+            after = """
+                package a;
+                
+                @A
+                public class D {
+                    
+                }
+            """
+    )
+
+    @Test
+    fun putClassAnnotationAndKindOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                import java.lang.annotation.Documented;
+                
+                @A class D {
+                    
+                }
+            """,
+            after = """
+                import java.lang.annotation.Documented;
+                
+                @A
+                class D {
+                    
+                }
+            """
+    )
+
+    @Test
+    fun putEachMethodAnnotationOnNewLine(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    @A@B("")     @C
+                    public String toString() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    @A
+                    @B("")
+                    @C
+                    public String toString() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndVisibilityModifierSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    @A@B("foo")     @C public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C static String stringify() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    @A
+                    @B("foo")
+                    @C
+                    public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C static String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndVisibilityModifierSeparateLines2(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[1])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    @A@B("foo")     @C public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C static String stringify() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                    @A@B("foo")     @C public String toString() {
+                    }
+                    
+                    @B("bar")
+                    @C
+                    static String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndReturnTypeOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    @B("foo")
+                    @A String stringify() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    @B("foo")
+                    @A
+                    String stringify() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun putMethodAnnotationAndNameOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    @B(Tester.class)
+                    @A D() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    @B(Tester.class)
+                    @A
+                    D() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun exactlyOneLineBetweenMethods(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    D() {
+                    } void foo() {}
+                    
+                    
+                    void bar() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+                
+                public class D {
+                
+                    D() {
+                    }
+                
+                    void foo() {}
+                    
+                    void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun indentClassComments(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+                    // Single-line comment
+                    /**
+                * multi-line comment
+                            */
+                public class D { }
+            """,
+            after = """
+                package a;
+
+                // Single-line comment
+                /**
+                 * multi-line comment
+                 */
+                public class D { }
+            """
+    )
+
+    @Test
+    fun indentMethodComments(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                
+                
+                
+                    /**
+                 * multi-line comment
+                        */
+                     
+                        // single-line comment
+                    
+                    @A void foo() { }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    /**
+                     * multi-line comment
+                     */
+                    // single-line comment
+                    @A
+                    void foo() { }
+                }
+            """
+    )
+
+    @Test
+    @Disabled("Not implemented")
+    fun indentCommentsInsideMethodBody(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a -> AutoFormat(a)},
+            before = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                            /** comment */
+                // comment
+                        int one = 1;
+                        
+                /** comment */
+                            // comment
+                    }
+                }
+            """,
+            after = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                        /** comment */
+                        // comment
+                        int one = 1;
+                        
+                        /** comment */
+                        // comment
+                    }
+                }
+            """
+    )
 }

@@ -15,25 +15,19 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.AbstractSourceVisitor;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.style.TabAndIndentStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.refactor.Formatter;
 
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Pattern;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
-import static java.util.function.Function.identity;
-import static java.util.stream.Collectors.counting;
 import static java.util.stream.IntStream.range;
+import static org.openrewrite.internal.StringUtils.splitCStyleComments;
 
 /**
  * A general purpose means of formatting arbitrarily complex blocks of code relative based on their
@@ -45,11 +39,15 @@ import static java.util.stream.IntStream.range;
 public class AutoFormat extends JavaIsoRefactorVisitor {
     private final J[] scope;
 
-    private Formatter.Result wholeSourceIndent;
-
     public AutoFormat(J... scope) {
         this.scope = scope;
-        setCursoringOn();
+    }
+
+    @Override
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+        andThen(new FixNewlines());
+        andThen(new FixIndentation());
+        return super.visitCompilationUnit(cu);
     }
 
     @Override
@@ -57,142 +55,209 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
         return false;
     }
 
-    @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
-        FindIndentExceptScope findIndent = new FindIndentExceptScope(0);
-        findIndent.visit(cu);
+    private class FixNewlines extends JavaIsoRefactorVisitor {
 
-        TabAndIndentStyle tabAndIndentStyle = cu.getStyle(TabAndIndentStyle.class)
-                .orElse(new TabAndIndentStyle());
-
-        int mostCommonIndent = findIndent.getMostCommonIndent();
-
-        wholeSourceIndent = new Formatter.Result(
-                0,
-                mostCommonIndent == 0 ?
-                        tabAndIndentStyle.getIndentSize() :
-                        mostCommonIndent,
-                mostCommonIndent == 0 ?
-                        !tabAndIndentStyle.isUseTabCharacter() :
-                        findIndent.isIndentedWithSpaces()
-        );
-
-        return super.visitCompilationUnit(cu);
-    }
-
-    @Override
-    public J reduce(J r1, J r2) {
-        J j = super.reduce(r1, r2);
-        if (r2 != null && r2.getPrefix().startsWith("|")) {
-            j = j.withPrefix(r2.getPrefix().substring(1));
-        }
-        return j;
-    }
-
-    @Override
-    public J visitTree(Tree tree) {
-        J j = super.visitTree(tree);
-
-        String prefix = tree.getPrefix();
-        if (prefix.contains("\n") && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-            int indentMultiple = (int) getCursor().getPathAsStream().filter(J.Block.class::isInstance).count();
-            if(tree instanceof J.Block.End) {
-                indentMultiple--;
-            }
-
-            String shiftedPrefix = "|" + prefix.substring(0, prefix.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
-                    .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
-                    .collect(Collectors.joining(""));
-
-            if (!shiftedPrefix.equals(prefix)) {
-                j = j.withPrefix(shiftedPrefix);
-            }
+        FixNewlines() {
+            setCursoringOn();
         }
 
-        return j;
+        /**
+         * Given a single line string with a whitespace prefix and a non-whitespace suffix, alter the whitespace prefix
+         * to have the appropriate indentation.
+         *
+         * Right now comments aren't AST elements so FixIndentation.visitTree() is blind to them.
+         * This special treatment of comment indentation will be able to go away once we start treating
+         * comments an their own, independent AST element.
+         */
+        public String indentLine(String prefix) {
+            if (!prefix.isEmpty() && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                int indentMultiple = (int) getCursor().getPathAsStream().filter(J.Block.class::isInstance).count();
+                Formatter.Result wholeSourceIndent = formatter.wholeSourceIndent();
+                int nonWhiteSpaceIndex = StringUtils.indexOfNonWhitespace(prefix);
+                boolean insideJavaDocComment = false;
+                if(nonWhiteSpaceIndex == -1) {
+                    nonWhiteSpaceIndex = prefix.length();
+                } else if(prefix.charAt(nonWhiteSpaceIndex) == '*')
+                {
+                    insideJavaDocComment = true;
+                }
+                String indentation = prefix.substring(0, nonWhiteSpaceIndex);
+                String comment = prefix.substring(nonWhiteSpaceIndex);
+                String newIndentation = indentation.substring(0, indentation.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
+                        .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
+                        .collect(Collectors.joining(""));
+                if(insideJavaDocComment) //noinspection DanglingJavadoc
+                {
+                    // By convention Javadoc-style comments are indented such that lines beginning with '*'
+                    // have an extra space so as to vertically align the '*' characters from different lines. e.g.:
+                    /**
+                     *
+                     */
+                    newIndentation += " ";
+                }
+                return newIndentation + comment;
+            }
+            return prefix;
+        }
+
+        /**
+         * Ensure that the element in question is indented the right amount
+         */
+        private <T extends J> T spaceHorizontally(T j) {
+            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                Formatting originalFormatting = j.getFormatting();
+
+                // Ensure that comments are indented correctly
+                String newPrefix = stream(originalFormatting.getPrefix().split("\\n"))
+                        .map(this::indentLine)
+                        .collect(Collectors.joining("\n"));
+                if(originalFormatting.getPrefix().endsWith("\n")) {
+                    // split() will eliminate a trailing newline, put it back
+                    newPrefix += '\n';
+                }
+                j = j.withFormatting(originalFormatting.withPrefix(newPrefix));
+            }
+            return j;
+        }
+
+        /**
+         * Ensure there's a single blank line between the previous declaration and the current j
+         * Ensure that any comments are on their own line
+         */
+        private <T extends J> T spaceVertically(T j) {
+            Formatting originalFormatting = j.getFormatting();
+            List<String> splitPrefix = splitCStyleComments(originalFormatting.getPrefix());
+
+            String newPrefix = Stream.concat(
+                    Stream.of(splitPrefix.get(0))
+                            .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 2)),
+                    splitPrefix.stream().skip(1)
+                            .map(it -> StringUtils.ensureNewlineCountBeforeComment(it, 1))
+            )
+                    .collect(Collectors.joining());
+            return j.withFormatting(originalFormatting.withPrefix(newPrefix));
+        }
+
+        @Override
+        public J.MethodDecl visitMethod(J.MethodDecl methodDecl) {
+            J.MethodDecl m = super.visitMethod(methodDecl);
+
+            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                m = spaceHorizontally(m);
+                m = spaceVertically(m);
+
+                // Annotations should each appear on their own line
+                List<J.Annotation> annotations = new ArrayList<>(m.getAnnotations());
+                if(!annotations.isEmpty()) {
+
+                    // ensure all annotations except the first have a \n in their prefixes
+                    // The first annotation doesn't need a \n since the prefix of the MethodDecl itself should contain that \n
+                    for(int i = 1; i < annotations.size(); i++) {
+                        if(!annotations.get(i).getPrefix().contains("\n")) {
+                            annotations.set(i, annotations.get(i).withPrefix("\n"));
+                        }
+                    }
+
+                    m = m.withAnnotations(annotations);
+
+                    List<J.Modifier> modifiers = new ArrayList<>(m.getModifiers());
+
+                    // ensure first modifier following annotations has \n in prefix
+                    if(!modifiers.isEmpty()) {
+                        if(!modifiers.get(0).getPrefix().contains("\n")) {
+                            modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                            m = m.withModifiers(modifiers);
+                        }
+                    }
+                    // returnTypeExpr
+                    else if(m.getReturnTypeExpr() != null && !m.getReturnTypeExpr().getPrefix().contains("\n")) {
+                        m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
+                    }
+                    // name
+                    else if(!m.getName().getPrefix().contains("\n")) {
+                        m = m.withName(m.getName().withPrefix("\n"));
+                    }
+
+                }
+            }
+
+            return m;
+        }
+
+        @Override
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl) {
+            J.ClassDecl cd = super.visitClassDecl(classDecl);
+
+            if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                cd = spaceHorizontally(cd);
+                cd = spaceVertically(cd);
+
+                // check annotations formatting
+                List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
+                if (!annotations.isEmpty()) {
+
+                    // Ensure all annotations have a \n in their prefixes
+                    // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
+                    for (int i = 1; i < annotations.size(); i++) {
+                        if (!annotations.get(i).getPrefix().contains("\n")) {
+                            annotations.set(i, annotations.get(i).withPrefix("\n"));
+                        }
+                    }
+
+                    cd = cd.withAnnotations(annotations);
+
+                    // ensure first statement following annotations has \n in prefix
+                    List<J.Modifier> modifiers = new ArrayList<>(cd.getModifiers());
+                    if (!modifiers.isEmpty()) {
+                        if (!modifiers.get(0).getPrefix().contains("\n")) {
+                            modifiers.set(0, modifiers.get(0).withPrefix("\n"));
+                            cd = cd.withModifiers(modifiers);
+                        }
+                    } else if (!cd.getKind().getPrefix().contains("\n")) {
+                        cd = cd.withKind(cd.getKind().withPrefix("\n"));
+                    }
+                }
+            }
+            return cd;
+        }
     }
 
-    private class FindIndentExceptScope extends AbstractSourceVisitor<Void> {
-        private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
-        private final int enclosingIndent;
-
-        private int linesWithSpaceIndents = 0;
-        private int linesWithTabIndents = 0;
-
-        public FindIndentExceptScope(int enclosingIndent) {
-            this.enclosingIndent = enclosingIndent;
+    private class FixIndentation extends JavaIsoRefactorVisitor {
+        FixIndentation() {
             setCursoringOn();
         }
 
         @Override
-        public Void defaultTo(Tree t) {
-            return null;
+        public J reduce(J r1, J r2) {
+            J j = super.reduce(r1, r2);
+            if (r2 != null && r2.getPrefix().startsWith("|")) {
+                j = j.withPrefix(r2.getPrefix().substring(1));
+            }
+            return j;
         }
-
-        private final Pattern SINGLE_LINE_COMMENT = Pattern.compile("//[^\\n]+");
-        private final Pattern MULTI_LINE_COMMENT = Pattern.compile("/\\*.*?\\*/", Pattern.DOTALL);
 
         @Override
-        public Void visitTree(Tree tree) {
-            if (stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                return null;
-            }
+        public J visitTree(Tree tree) {
+            J j = super.visitTree(tree);
 
             String prefix = tree.getPrefix();
-
-            AtomicBoolean takeWhile = new AtomicBoolean(true);
-            if (prefix.chars()
-                    .filter(c -> {
-                        takeWhile.set(takeWhile.get() && (c == '\n' || c == '\r'));
-                        return takeWhile.get();
-                    })
-                    .count() > 0) {
-                int indent = 0;
-                char[] chars = MULTI_LINE_COMMENT.matcher(SINGLE_LINE_COMMENT.matcher(prefix)
-                        .replaceAll("")).replaceAll("").toCharArray();
-                for (char c : chars) {
-                    if (c == '\n' || c == '\r') {
-                        indent = 0;
-                        continue;
-                    }
-                    if (Character.isWhitespace(c)) {
-                        indent++;
-                    }
+            if (prefix.contains("\n") && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
+                int indentMultiple = (int) getCursor().getPathAsStream().filter(J.Block.class::isInstance).count();
+                if(tree instanceof J.Block.End) {
+                    indentMultiple--;
                 }
+                Formatter.Result wholeSourceIndent = formatter.wholeSourceIndent();
+                String shiftedPrefix = "|" + prefix.substring(0, prefix.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
+                        .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
+                        .collect(Collectors.joining(""));
 
-                indentFrequencies.merge(indent - enclosingIndent, 1L, Long::sum);
-
-                AtomicBoolean dropWhile = new AtomicBoolean(false);
-                takeWhile.set(true);
-                Map<Boolean, Long> indentTypeCounts = prefix.chars()
-                        .filter(c -> {
-                            dropWhile.set(dropWhile.get() || !(c == '\n' || c == '\r'));
-                            return dropWhile.get();
-                        })
-                        .filter(c -> {
-                            takeWhile.set(takeWhile.get() && Character.isWhitespace(c));
-                            return takeWhile.get();
-                        })
-                        .mapToObj(c -> c == ' ')
-                        .collect(Collectors.groupingBy(identity(), counting()));
-
-                if (indentTypeCounts.getOrDefault(true, 0L) >= indentTypeCounts.getOrDefault(false, 0L)) {
-                    linesWithSpaceIndents++;
-                } else {
-                    linesWithTabIndents++;
+                if (!shiftedPrefix.equals(prefix)) {
+                    j = j.withPrefix(shiftedPrefix);
                 }
             }
 
-            return super.visitTree(tree);
-        }
-
-        public boolean isIndentedWithSpaces() {
-            return linesWithSpaceIndents >= linesWithTabIndents;
-        }
-
-        public int getMostCommonIndent() {
-            indentFrequencies.remove(0);
-            return StringUtils.mostCommonIndent(indentFrequencies);
+            return j;
         }
     }
+
 }

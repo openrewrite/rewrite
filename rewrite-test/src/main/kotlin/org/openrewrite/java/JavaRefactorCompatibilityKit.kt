@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.tree.AutoFormatTest
 import org.openrewrite.java.utilities.SpansMultipleLinesTest
 
 @ExtendWith(JavaParserResolver::class)
@@ -106,4 +107,7 @@ abstract class JavaRefactorCompatibilityKit {
 
     @Nested
     inner class GenerateSetterTck : GenerateSetterTest
+
+    @Nested
+    inner class AutoFormatTck : AutoFormatTest
 }

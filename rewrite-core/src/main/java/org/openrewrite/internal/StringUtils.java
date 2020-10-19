@@ -15,17 +15,20 @@
  */
 package org.openrewrite.internal;
 
-import io.micrometer.core.lang.Nullable;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static java.util.function.Function.identity;
@@ -175,5 +178,101 @@ public class StringUtils {
 
     public static String uncapitalize(String value) {
         return Character.toLowerCase(value.charAt(0)) + value.substring(1);
+    }
+
+
+    /**
+     * Given a prefix comprised of segments that are exclusively whitespace, single line comments, or multi-line comments,
+     * return a list of each segment.
+     *
+     * Operates on C-style comments:
+     *  // single line
+     *  /* multi-line
+     *
+     * If the provided input contains anything except whitespace and c-style comments this will probably explode
+     */
+    public static List<String> splitCStyleComments(String text) {
+        List<String> result = new ArrayList<>();
+        if(text == null || text.equals("")) {
+            result.add("");
+            return result;
+        }
+        int segmentStartIndex = 0;
+        boolean inSingleLineComment = false;
+        boolean inMultiLineComment = false;
+        for(int i = 0; i < text.length(); i++) {
+            char current = text.charAt(i);
+            char previous = (i > 0) ? text.charAt(i - 1) : '\0';
+            if(i == text.length() - 1) {
+                result.add(text.substring(segmentStartIndex, i + 1));
+                break;
+            }
+
+            if(inSingleLineComment && current == '\n') {
+                result.add(text.substring(segmentStartIndex, i));
+                segmentStartIndex = i;
+                inSingleLineComment = false;
+            } else if(inMultiLineComment && previous == '*' && current == '/') {
+                result.add(text.substring(segmentStartIndex, i + 1));
+                segmentStartIndex = i + 1;
+                inMultiLineComment = false;
+            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '/') {
+                inSingleLineComment = true;
+            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '*') {
+                inMultiLineComment = true;
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Return a copy of the supplied text that contains exactly the desired number of newlines appear before characters
+     * that indicate the beginning of a C-style comment, "//" and "/*".
+     *
+     * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
+     */
+    public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
+        StringBuilder result = new StringBuilder();
+        int prefixEndsIndex = indexOfNonWhitespace(text);
+        String suffix;
+        if(prefixEndsIndex == -1) {
+            prefixEndsIndex = text.length();
+            suffix = "";
+        } else {
+            suffix = text.substring(prefixEndsIndex);
+        }
+        int newlinesSoFar = 0;
+        for(int i = prefixEndsIndex - 1; i >= 0 && newlinesSoFar < desiredNewlineCount; i--) {
+            char current = text.charAt(i);
+            if(current == '\n') {
+                newlinesSoFar++;
+            }
+            result.append(current);
+        }
+        while(newlinesSoFar < desiredNewlineCount) {
+            result.append('\n');
+            newlinesSoFar++;
+        }
+        // Since iterated back-to-front, reverse things back into the usual order
+        result.reverse();
+        result.append(suffix);
+        return result.toString();
+    }
+
+    public static int indexOfNonWhitespace(String text) {
+        return indexOf(text, (it) -> !(it == ' ' || it == '\t' || it == '\n' || it == '\r'));
+    }
+
+    /**
+     * Return the index of the first character for which the predicate returns "true".
+     * Or -1 if no character in the string matches the predicate.
+     */
+    public static int indexOf(String text, Predicate<Character> test) {
+        for(int i = 0; i < text.length(); i++) {
+            if(test.test(text.charAt(i))) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
