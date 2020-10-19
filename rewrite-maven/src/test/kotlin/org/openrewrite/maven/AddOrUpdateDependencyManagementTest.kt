@@ -354,6 +354,329 @@ class AddOrUpdateDependencyManagementTest {
         verify(visitors, before, after)
     }
 
+    @Test
+    fun shouldSortDependencies_usingSetOfSameGroupId() {
+
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("b")
+            setArtifactId("a")
+        })
+
+        verify(visitors, before, after)
+    }
+
+    @Test
+    fun shouldSortDependencies_usingSetOfSameGroupId_lastPosition() {
+
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("b")
+            setArtifactId("a")
+        })
+
+        verify(visitors, before, after)
+    }
+
+
+    @Test
+    fun shouldSortDependencies_usingSetOfSameGroupId_firstPosition() {
+
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("c")
+            setArtifactId("a")
+        })
+
+        verify(visitors, before, after)
+    }
+
+    @Test
+    fun shouldSortDependencies_usingSetOfSameGroupId_middlePosition() {
+
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>c</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("a")
+            setArtifactId("c")
+        })
+
+        verify(visitors, before, after)
+    }
+
+    @Test
+    fun shouldSortDependencies_usingSetOfSameGroupId_withNewGroupId() {
+        val before =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+        val after =
+                """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>dependency-management-example</artifactId>
+                <version>0.1-SNAPSHOT</version>
+                <name>dependency-management-example</name>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>a</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>c</groupId>
+                            <artifactId>b</artifactId>
+                        </dependency>
+                        <dependency>
+                            <groupId>b</groupId>
+                            <artifactId>a</artifactId>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>
+            </project>
+            """.trimIndent().trim()
+
+
+        val visitors = listOf(AddOrUpdateDependencyManagement().apply {
+            setGroupId("a")
+            setArtifactId("a")
+        })
+
+        verify(visitors, before, after)
+    }
+
     private fun verify(visitors: List<AddOrUpdateDependencyManagement>, before: String, after: String) {
         val changes: List<Change> = ArrayList<Change>(Refactor()
                 .visit(visitors)

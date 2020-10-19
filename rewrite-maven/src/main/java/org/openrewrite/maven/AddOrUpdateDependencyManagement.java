@@ -29,6 +29,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Validated.required;
@@ -199,30 +200,56 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
         public Maven visitPom(Maven.Pom pom) {
             Maven.Pom p = refactor(pom, super::visitPom);
             List<Maven.Dependency> dependencies = new ArrayList<>(pom.getDependencyManagement().getDependencies());
-
             Maven.Dependency toAdd = createMavenDependencyManagementDependency(formatter.wholeSourceIndent());
-
-            if (dependencies.isEmpty()) {
-                dependencies.add(toAdd);
-            } else {
-                // if everything were ideally sorted, which dependency would the addable dependency
-                // come after?
-                List<Maven.Dependency> sortedDependencies = new ArrayList<>(pom.getDependencyManagement().getDependencies());
-                sortedDependencies.add(toAdd);
-                dependencies.sort(Comparator.comparing(d -> d.getModel().getModuleVersion()));
-
-                int addAfterIndex = -1;
-                for (int i = 0; i < sortedDependencies.size(); i++) {
-                    Maven.Dependency d = sortedDependencies.get(i);
-                    if (toAdd == d) {
-                        addAfterIndex = i - 1;
-                        break;
-                    }
+            int indexToAdd = 0;
+            if ( ! dependencies.isEmpty() ) {
+                List<Maven.Dependency> dependenciesWithSameGroupid = getDependenciesWithSameGroupId(pom, toAdd);
+                if(dependenciesWithSameGroupid.isEmpty()) {
+                    indexToAdd = findIndexWithoutExistingGroupId(dependencies, toAdd);
+                } else {
+                    indexToAdd = findIndexWithExistingGroupId(dependencies, toAdd, dependenciesWithSameGroupid);
                 }
-                dependencies.add(addAfterIndex + 1, toAdd);
             }
+            dependencies.add(indexToAdd, toAdd);
             p = p.withDependencyManagement(p.getDependencyManagement().withDependencies(dependencies));
             return p;
+        }
+
+        private int findIndexWithoutExistingGroupId(List<Maven.Dependency> dependencies, Maven.Dependency toAdd) {
+            List<Maven.Dependency> sortedDependencies = new ArrayList<>(dependencies);
+            sortedDependencies.add(toAdd);
+            sortedDependencies.sort(Comparator
+                    .comparing(Maven.Dependency::getGroupId)
+                    .thenComparing(Maven.Dependency::getArtifactId));
+            int indexInSortedList = sortedDependencies.indexOf(toAdd);
+            if(indexInSortedList > 0) {
+                Maven.Dependency predecessor = sortedDependencies.get(indexInSortedList -1);
+                return dependencies.indexOf(predecessor) + 1;
+            }
+            return 0;
+        }
+
+        private int findIndexWithExistingGroupId(List<Maven.Dependency> dependencies, Maven.Dependency toAdd, List<Maven.Dependency> dependenciesWithSameGroupid) {
+            int indexInSortedList;
+            dependenciesWithSameGroupid.add(toAdd);
+            dependenciesWithSameGroupid.sort(Comparator
+                    .comparing(Maven.Dependency::getGroupId)
+                    .thenComparing(Maven.Dependency::getArtifactId));
+            indexInSortedList = dependenciesWithSameGroupid.indexOf(toAdd);
+
+            if(indexInSortedList > 0) {
+                Maven.Dependency predecessor = dependenciesWithSameGroupid.get(indexInSortedList - 1);
+                indexInSortedList = dependencies.indexOf(predecessor) +1;
+            } else {
+                Maven.Dependency successor = dependenciesWithSameGroupid.get(indexInSortedList + 1);
+                indexInSortedList = dependencies.indexOf(successor);
+            }
+            return indexInSortedList;
+        }
+
+        @NotNull
+        private List<Maven.Dependency> getDependenciesWithSameGroupId(Maven.Pom pom, Maven.Dependency toAdd) {
+            return pom.getDependencyManagement().getDependencies().stream().filter(d -> d.getGroupId().equals(toAdd.getGroupId())).collect(Collectors.toList());
         }
     }
 
