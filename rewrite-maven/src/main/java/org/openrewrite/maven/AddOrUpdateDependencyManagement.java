@@ -27,6 +27,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -57,7 +58,6 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
     @Setter
     @Nullable
     private String scope;
-
 
     @Setter
     @Nullable
@@ -152,18 +152,21 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
         }
 
         private boolean hasDependenciesTag(Maven.Pom p) {
-            return  p.getDependencyManagement().getDependencies() != null &&
+            return  p.getDependencyManagement() != null && p.getDependencyManagement().getDependencies() != null &&
                     ! p.getDependencyManagement().getDependencies().isEmpty();
         }
 
         private Maven.Pom addDependenciesTag(Maven.Pom p) {
-            Maven.DependencyManagement currentDepMan = p.getDependencyManagement();
-            Xml.Tag tag = currentDepMan.getTag();
+            Maven.DependencyManagement dm = p.getDependencyManagement();
+            if(dm == null) {
+                return p;
+            }
+            Xml.Tag tag = dm.getTag();
             List<Content> contents = new ArrayList<>(tag.getContent());
             Xml.Tag dependenciesTag = createDependenciesTag(formatter.wholeSourceIndent());
             contents.add(dependenciesTag);
-            currentDepMan = new Maven.DependencyManagement(currentDepMan.getModel(), tag.withContent(contents));
-            p = p.withDependencyManagement(currentDepMan);
+            dm = new Maven.DependencyManagement(dm.getModel(), tag.withContent(contents));
+            p = p.withDependencyManagement(dm);
             return p;
         }
 
@@ -179,18 +182,26 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
         @Override
         public Maven visitPom(Maven.Pom pom) {
             Maven.Pom p = refactor(pom, super::visitPom);
-            List<Maven.Dependency> dependencies = new ArrayList<>(pom.getDependencyManagement().getDependencies());
+            Maven.DependencyManagement dm = pom.getDependencyManagement();
+            if(dm == null) {
+                return p;
+            }
+            List<Maven.Dependency> dependencies = new ArrayList<>(dm.getDependencies());
             Maven.Dependency dependency = findDependencyWithGroupIdAndArtifactId(dependencies);
+            if(dependency == null) {
+                return p;
+            }
             final Maven.Dependency updatedDependency = createMavenDependencyManagementDependency(formatter.wholeSourceIndent());
             dependencies.set(dependencies.indexOf(dependency), updatedDependency);
-            p = p.withDependencyManagement(p.getDependencyManagement().withDependencies(dependencies));
+            p = p.withDependencyManagement(dm.withDependencies(dependencies));
             return p;
         }
 
-        private Maven.Dependency findDependencyWithGroupIdAndArtifactId(List<Maven.Dependency> dependencies) {
+        private @Nullable Maven.Dependency findDependencyWithGroupIdAndArtifactId(List<Maven.Dependency> dependencies) {
             return dependencies.stream()
                     .filter(d -> groupId.equals(d.getGroupId()) && artifactId.equals(d.getArtifactId()))
-                    .findFirst().get();
+                    .findFirst()
+                    .orElse(null);
         }
 
     }
@@ -199,7 +210,11 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
         @Override
         public Maven visitPom(Maven.Pom pom) {
             Maven.Pom p = refactor(pom, super::visitPom);
-            List<Maven.Dependency> dependencies = new ArrayList<>(pom.getDependencyManagement().getDependencies());
+            Maven.DependencyManagement dm = pom.getDependencyManagement();
+            if(dm == null) {
+                return p;
+            }
+            List<Maven.Dependency> dependencies = new ArrayList<>(dm.getDependencies());
             Maven.Dependency toAdd = createMavenDependencyManagementDependency(formatter.wholeSourceIndent());
             int indexToAdd = 0;
             if ( ! dependencies.isEmpty() ) {
@@ -211,7 +226,7 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
                 }
             }
             dependencies.add(indexToAdd, toAdd);
-            p = p.withDependencyManagement(p.getDependencyManagement().withDependencies(dependencies));
+            p = p.withDependencyManagement(dm.withDependencies(dependencies));
             return p;
         }
 
@@ -249,7 +264,11 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
 
         @NotNull
         private List<Maven.Dependency> getDependenciesWithSameGroupId(Maven.Pom pom, Maven.Dependency toAdd) {
-            return pom.getDependencyManagement().getDependencies().stream().filter(d -> d.getGroupId().equals(toAdd.getGroupId())).collect(Collectors.toList());
+            if(pom.getDependencyManagement() == null) {
+                return Collections.emptyList();
+            }
+            return pom.getDependencyManagement().getDependencies().stream()
+                    .filter(d -> d.getGroupId() != null && d.getGroupId().equals(toAdd.getGroupId())).collect(Collectors.toList());
         }
     }
 
@@ -281,11 +300,4 @@ public class AddOrUpdateDependencyManagement extends MavenRefactorVisitor {
                         indent.getPrefix(offset) + "</dependency>"
                     ).get(0).getRoot().withFormatting(format(indent.getPrefix(offset)));
     }
-
-
-
-
-
-
-
 }
