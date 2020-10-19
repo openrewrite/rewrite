@@ -99,13 +99,14 @@ public class Refactor {
         for (int i = 0; i < maxCycles; i++) {
             int visitorsThatMadeChangesThisCycle = 0;
             for (int j = 0; j < accumulatedSources.size(); j++) {
-                SourceFile prev = accumulatedSources.get(j);
-                if (prev == null) {
+                SourceFile originalSource = accumulatedSources.get(j);
+                if (originalSource == null) {
+
                     // source was deleted in a previous iteration
                     continue;
                 }
 
-                SourceFile acc = prev;
+                SourceFile acc = originalSource;
 
                 for (RefactorVisitor<? extends Tree> visitor : visitors) {
                     try {
@@ -119,11 +120,12 @@ public class Refactor {
                         acc = (SourceFile) transformPipeline(acc, visitor);
 
                         if (before != acc) {
+
                             // we should only report on the top-level visitors, not any andThen() visitors that
                             // are applied as part of the top-level visitor's pipeline
                             changesByTree.compute(acc, (acc2, prevChange) -> prevChange == null ?
-                                    new Change(prev, acc2, Collections.singleton(visitor.getName())) :
-                                    new Change(prev, acc2, Stream
+                                    new Change(originalSource, acc2, Collections.singleton(visitor.getName())) :
+                                    new Change(originalSource, acc2, Stream
                                             .concat(prevChange.getVisitorsThatMadeChanges().stream(), Stream.of(visitor.getName()))
                                             .collect(toSet()))
                             );
@@ -135,7 +137,7 @@ public class Refactor {
                                 .baseUnit("errors")
                                 .description("Visitors that threw exceptions")
                                 .tag("visitor", visitor.getName())
-                                .tag("tree.type", prev.getClass().getName())
+                                .tag("tree.type", originalSource.getClass().getName())
                                 .tag("exception", t.getClass().getSimpleName())
                                 .register(meterRegistry)
                                 .increment();
