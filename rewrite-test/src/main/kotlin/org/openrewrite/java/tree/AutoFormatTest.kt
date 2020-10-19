@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.AutoFormat
@@ -391,6 +392,41 @@ interface AutoFormatTest : RefactorVisitorTest {
                     // single-line comment
                     @A
                     void foo() { }
+                }
+            """
+    )
+
+    @Test
+    @Disabled("Not implemented")
+    fun indentCommentsInsideMethodBody(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a -> AutoFormat(a)},
+            before = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                            /** comment */
+                // comment
+                        int one = 1;
+                        
+                /** comment */
+                            // comment
+                    }
+                }
+            """,
+            after = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                        /** comment */
+                        // comment
+                        int one = 1;
+                        
+                        /** comment */
+                        // comment
+                    }
                 }
             """
     )

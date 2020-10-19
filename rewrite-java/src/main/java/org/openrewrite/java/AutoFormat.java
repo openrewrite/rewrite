@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.refactor.Formatter;
 
 import java.util.*;
@@ -104,7 +105,6 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
          */
         private <T extends J> T spaceHorizontally(T j) {
             if(stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                // Format comments
                 Formatting originalFormatting = j.getFormatting();
 
                 // Ensure that comments are indented correctly
@@ -112,7 +112,7 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
                         .map(this::indentLine)
                         .collect(Collectors.joining("\n"));
                 if(originalFormatting.getPrefix().endsWith("\n")) {
-                    // A trailing newline would have been eliminated by the split(), put it back
+                    // split() will eliminate a trailing newline, put it back
                     newPrefix += '\n';
                 }
                 j = j.withFormatting(originalFormatting.withPrefix(newPrefix));
