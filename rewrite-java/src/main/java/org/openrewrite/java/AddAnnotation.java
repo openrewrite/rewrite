@@ -29,6 +29,7 @@ import java.util.List;
 
 import static java.util.Arrays.asList;
 import static org.openrewrite.Formatting.*;
+import static org.openrewrite.Tree.randomId;
 
 public final class AddAnnotation {
     private AddAnnotation() {
@@ -59,7 +60,35 @@ public final class AddAnnotation {
                 maybeAddImport(annotationType.getFullyQualifiedName());
 
                 if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    c = c.addAnnotation(annotationType, arguments);
+                    List<J.Annotation> fixedAnnotations = new ArrayList<>(c.getAnnotations());
+
+                    Formatting annotationFormatting = classDecl.getModifiers().isEmpty() ?
+                            (classDecl.getTypeParameters() == null ?
+                                    classDecl.getKind().getFormatting() :
+                                    classDecl.getTypeParameters().getFormatting()) :
+                            format(firstPrefix(classDecl.getModifiers()));
+
+                    fixedAnnotations.add(buildAnnotation(annotationFormatting));
+
+                    c = c.withAnnotations(fixedAnnotations);
+                    if (classDecl.getAnnotations().isEmpty()) {
+                        String prefix = formatter.findIndent(0, c).getPrefix();
+
+                        // special case, where a top-level class is often un-indented completely
+                        String cdPrefix = c.getPrefix();
+                        if (getCursor().getParentOrThrow().getTree() instanceof J.CompilationUnit &&
+                                cdPrefix.substring(Math.max(cdPrefix.lastIndexOf('\n'), 0)).chars().noneMatch(p -> p == ' ' || p == '\t')) {
+                            prefix = "\n";
+                        }
+
+                        if (!c.getModifiers().isEmpty()) {
+                            c = c.withModifiers(formatFirstPrefix(c.getModifiers(), prefix));
+                        } else if (c.getTypeParameters() != null) {
+                            c = c.withTypeParameters(c.getTypeParameters().withPrefix(prefix));
+                        } else {
+                            c = c.withKind(c.getKind().withPrefix(prefix));
+                        }
+                    }
                 }
             }
 
@@ -116,7 +145,24 @@ public final class AddAnnotation {
                 maybeAddImport(annotationType.getFullyQualifiedName());
 
                 if (m.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    m = m.addAnnotation(m, annotationType, arguments, formatter);
+                    List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
+
+                    fixedAnnotations.add(buildAnnotation(EMPTY));
+
+                    m = m.withAnnotations(fixedAnnotations);
+                    if (method.getAnnotations().isEmpty()) {
+                        String prefix = formatter.findIndent(0, method).getPrefix();
+
+                        if (!m.getModifiers().isEmpty()) {
+                            m = m.withModifiers(formatFirstPrefix(m.getModifiers(), prefix));
+                        } else if (m.getTypeParameters() != null) {
+                            m = m.withTypeParameters(m.getTypeParameters().withPrefix(prefix));
+                        } else if (m.getReturnTypeExpr() != null) {
+                            m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(prefix));
+                        } else {
+                            m = m.withName(m.getName().withPrefix(prefix));
+                        }
+                    }
                 }
             }
 
@@ -124,7 +170,10 @@ public final class AddAnnotation {
         }
 
         private J.Annotation buildAnnotation(Formatting formatting) {
-            return J.Annotation.buildAnnotation(formatting, annotationType, arguments);
+            return new J.Annotation(randomId(),
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
+                    formatting);
         }
     }
 }

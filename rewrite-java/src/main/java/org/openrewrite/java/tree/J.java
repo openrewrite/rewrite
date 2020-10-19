@@ -22,7 +22,10 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.ClassDeclToString;
 import org.openrewrite.java.internal.MethodDeclToString;
 import org.openrewrite.java.internal.PrintJava;
@@ -46,7 +49,8 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.*;
+import static org.openrewrite.Formatting.EMPTY;
+import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -131,13 +135,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitAnnotation(this);
-        }
-
-        public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
-            return new J.Annotation(randomId(),
-                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
-                    formatting);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1054,20 +1051,6 @@ public interface J extends Serializable, Tree {
 
         public Set<NameTree> findType(String clazz) {
             return new FindType(clazz).visit(this);
-        }
-
-        public J.ClassDecl addAnnotation(
-                JavaType.Class annotationType,
-                List<Expression> arguments
-        ) {
-            List<J.Annotation> fixedAnnotations = new ArrayList<>(getAnnotations());
-            Formatting annotationFormatting = getModifiers().isEmpty() ?
-                    (getTypeParameters() == null ?
-                            getKind().getFormatting() :
-                            getTypeParameters().getFormatting()) :
-                    format(firstPrefix(getModifiers()));
-            fixedAnnotations.add(J.Annotation.buildAnnotation(annotationFormatting, annotationType, arguments));
-            return (J.ClassDecl) new AutoFormat().visit(withAnnotations(fixedAnnotations));
         }
 
         public List<Annotation> findAnnotations(String signature) {
@@ -2062,32 +2045,6 @@ public interface J extends Serializable, Tree {
             return new HasType(clazz).visit(this);
         }
 
-        public J.MethodDecl addAnnotation(
-                J.MethodDecl m,
-                JavaType.Class annotationType,
-                List<Expression> arguments,
-                JavaFormatter formatter
-        ) {
-            List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
-            fixedAnnotations.add(J.Annotation.buildAnnotation(EMPTY, annotationType, arguments));
-
-            if (m.getAnnotations().isEmpty()) {
-                String prefix = formatter.findIndent(0, m).getPrefix();
-
-                if (!m.getModifiers().isEmpty()) {
-                    m = m.withModifiers(formatFirstPrefix(m.getModifiers(), prefix));
-                } else if (m.getTypeParameters() != null) {
-                    m = m.withTypeParameters(m.getTypeParameters().withPrefix(prefix));
-                } else if (m.getReturnTypeExpr() != null) {
-                    m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(prefix));
-                } else {
-                    m = m.withName(m.getName().withPrefix(prefix));
-                }
-            }
-            m = m.withAnnotations(fixedAnnotations);
-            return m;
-        }
-        
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
         }
