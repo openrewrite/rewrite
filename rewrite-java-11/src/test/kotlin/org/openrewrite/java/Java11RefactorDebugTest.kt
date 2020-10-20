@@ -28,6 +28,10 @@ class Java11AddAnnotationTest: Java11Test(), AddAnnotationTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveAnnotationTest: Java11Test(), RemoveAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11AddFieldTest: Java11Test(), AddFieldTest
 
 @DebugOnly
