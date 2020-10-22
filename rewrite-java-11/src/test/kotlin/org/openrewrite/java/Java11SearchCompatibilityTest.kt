@@ -46,3 +46,6 @@ class Java11SearchCompatibilityTest: JavaSearchCompatibilityKit() {
 //
 //@ExtendWith(JavaParserResolver::class)
 //class Java11HasTypeTest: Java11Test(), HasTypeTest
+//
+//@ExtendWith(JavaParserResolver::class)
+//class Java11SemanticallyEqualTest: Java11Test(), SemanticallyEqualTest
