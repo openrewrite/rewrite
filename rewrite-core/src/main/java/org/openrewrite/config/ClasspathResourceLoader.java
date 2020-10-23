@@ -20,23 +20,24 @@ import io.github.classgraph.ScanResult;
 import org.openrewrite.RefactorVisitor;
 import org.openrewrite.Style;
 
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
 
 public class ClasspathResourceLoader implements ResourceLoader {
-    private final Collection<YamlResourceLoader> yamlResourceLoaders;
+    private final Map<URI, YamlResourceLoader> resourceLoaderByOrigin;
 
     public ClasspathResourceLoader(Iterable<Path> compileClasspath, Properties properties) {
-        yamlResourceLoaders = new ArrayList<>();
+        resourceLoaderByOrigin = new HashMap<>();
 
         try (ScanResult scanResult = new ClassGraph()
                 .acceptPaths("META-INF/rewrite")
                 .enableMemoryMapping()
                 .scan()) {
             scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties)));
+                    resourceLoaderByOrigin.put(res.getURI(), new YamlResourceLoader(input, res.getURI(), properties)));
         }
 
         if (compileClasspath.iterator().hasNext()) {
@@ -46,25 +47,25 @@ public class ClasspathResourceLoader implements ResourceLoader {
                     .enableMemoryMapping()
                     .scan()) {
                 scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) ->
-                        yamlResourceLoaders.add(new YamlResourceLoader(input, res.getURI(), properties)));
+                    resourceLoaderByOrigin.put(res.getURI(), new YamlResourceLoader(input, res.getURI(), properties)));
             }
         }
     }
 
     @Override
     public Collection<RecipeConfiguration> loadRecipes() {
-        return yamlResourceLoaders.stream().flatMap(loader -> loader.loadRecipes().stream()).collect(toList());
+        return resourceLoaderByOrigin.values().stream().flatMap(loader -> loader.loadRecipes().stream()).collect(toList());
     }
 
     @Override
     public Collection<? extends RefactorVisitor<?>> loadVisitors() {
-        return yamlResourceLoaders.stream().flatMap(loader -> loader.loadVisitors().stream()).collect(toList());
+        return resourceLoaderByOrigin.values().stream().flatMap(loader -> loader.loadVisitors().stream()).collect(toList());
     }
 
     @Override
     public Map<String, Collection<Style>> loadStyles() {
         Map<String, Collection<Style>> styles = new HashMap<>();
-        yamlResourceLoaders.forEach(loader -> styles.putAll(loader.loadStyles()));
+        resourceLoaderByOrigin.values().forEach(loader -> styles.putAll(loader.loadStyles()));
         return styles;
     }
 }
