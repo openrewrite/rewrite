@@ -23,6 +23,11 @@ import org.openrewrite.java.tree.J;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
+/*
+* Semantically Equal recursively checks the equality of each element of two ASTs to determine if the two trees are semantically equal.
+* This is necessary because ASTs are so frequently recreated that merely comparing the IDs of two ASTs is ineffective.
+* SemanticallyEqual has only been implemented for annotations for now.
+*/
 @Incubating(since = "6.0.0")
 public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
     private final Tree tree;
