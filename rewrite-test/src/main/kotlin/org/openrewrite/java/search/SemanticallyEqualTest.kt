@@ -26,78 +26,64 @@ import org.openrewrite.java.tree.JavaType
 interface SemanticallyEqualTest {
 
     @Test
+    fun tagAnnotationEquality(jp: JavaParser) {
+        val cu = jp.parse(
+            """
+                @Tagg(FastTests.class)
+                @Tagg(FastTests.class)
+                @Tagg(SlowTests.class)
+                class A {}
+            """,
+            """
+                @interface Tagg {
+                    Class[] value();
+                }
+            """,
+            "public interface FastTests {}",
+            "public interface SlowTests {}"
+        )
+
+        val fastTest = cu[0].classes[0].annotations[0]
+        val fastTest2 = cu[0].classes[0].annotations[1]
+        val slowTest = cu[0].classes[0].annotations[2]
+
+        assertThat(SemanticallyEqual(fastTest).visit(fastTest2)).isTrue()
+        assertThat(SemanticallyEqual(fastTest).visit(slowTest)).isFalse()
+    }
+
+    @Test
     fun annotationEquality(jp: JavaParser) {
         val cu = jp.parse(
-                """
-                    @MyAnnotation(value = true, srcValue = "true")
-                    class A {}
-                """,
-                """
-                    @interface MyAnnotation { 
-                        boolean value();
-                        String srcValue(); 
-                    }
-                """
+            """
+                @MyAnnotation(value = true, srcValue = "true")
+                class A {}
+            """,
+            """
+                @interface MyAnnotation { 
+                    boolean value();
+                    String srcValue(); 
+                }
+            """
         )
 
         val annotation = cu[0].classes[0].annotations[0]
 
-        assertThat(SemanticallyEqual(annotation)
-            .visit(
-                J.Annotation(
-                    randomId(),
-                    J.Ident.build(
-                        randomId(),
-                        "MyAnnotation",
-                        JavaType.buildType("MyAnnotation"),
-                        Formatting.EMPTY
-                    ),
-                    J.Annotation.Arguments(
-                        randomId(),
-                        listOf(
-                            J.Assign(
-                                randomId(),
-                                J.Ident.build(
-                                    randomId(),
-                                    "value",
-                                    null,
-                                    Formatting.EMPTY
-                                ),
-                                J.Literal(
-                                    randomId(),
-                                    true,
-                                    "true",
-                                    JavaType.Primitive.Boolean,
-                                    Formatting.EMPTY
-                                ),
-                                JavaType.Primitive.Boolean,
-                                Formatting.EMPTY
-                            ),
-                            J.Assign(
-                                randomId(),
-                                J.Ident.build(
-                                    randomId(),
-                                    "srcValue",
-                                    null,
-                                    Formatting.EMPTY
-                                ),
-                                J.Literal(
-                                    randomId(),
-                                    "true",
-                                    "\"true\"",
-                                    JavaType.Primitive.String,
-                                    Formatting.EMPTY
-                                ),
-                                JavaType.buildType("java.lang.String"),
-                                Formatting.EMPTY
-                            )
-                        ),
-                        Formatting.EMPTY
-                    ),
-                    Formatting.EMPTY
-                )
-            )
-        ).isTrue()
+        jp.reset();
+
+        val otherAnnot = jp.parse(
+            """
+                @MyAnnotation(value = true, srcValue = "true")
+                class B {}
+            """,
+            """
+                @interface MyAnnotation { 
+                    boolean value();
+                    String srcValue(); 
+                }
+            """
+        )[0].classes[0].annotations[0]
+
+        assertThat(SemanticallyEqual(annotation).visit(otherAnnot)).isTrue()
     }
 
     @Test

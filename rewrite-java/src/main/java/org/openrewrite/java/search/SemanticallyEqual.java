@@ -44,18 +44,29 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
     public Boolean visitAnnotation(J.Annotation otherAnnotation) {
         if(tree instanceof J.Annotation) {
             J.Annotation annotation = (J.Annotation) tree;
-            AtomicInteger index = new AtomicInteger(0);
+            boolean areArgsEqual;
 
-            return new SemanticallyEqual(annotation.getAnnotationType()).visit(otherAnnotation.getAnnotationType()) &&
-                otherAnnotation.getArgs() != null ?
-                annotation.getArgs().getArgs().stream().allMatch(arg ->
-                    (otherAnnotation.getArgs().getArgs() != null &&
-                        otherAnnotation.getArgs().getArgs().size() > index.get()) ?
-                        new SemanticallyEqual(arg)
-                                .visit(otherAnnotation.getArgs().getArgs().get(index.getAndIncrement())) :
-                        false
-                ) :
-                annotation.getArgs() == null;
+            if(annotation.getArgs() != null && otherAnnotation.getArgs() != null) {
+                if(annotation.getArgs().getArgs() != null &&
+                    otherAnnotation.getArgs().getArgs() != null &&
+                    annotation.getArgs().getArgs().size() == otherAnnotation.getArgs().getArgs().size()) {
+
+                    AtomicInteger index = new AtomicInteger(0);
+                    areArgsEqual = annotation.getArgs().getArgs().stream()
+                        .allMatch(arg ->
+                                new SemanticallyEqual(arg)
+                                        .visit(otherAnnotation.getArgs().getArgs().get(index.getAndIncrement()))
+                        );
+                } else {
+                    return false;
+                }
+            } else if(annotation.getArgs() == null && otherAnnotation.getArgs() == null) {
+                areArgsEqual = true;
+            } else {
+                return false;
+            }
+
+            return areArgsEqual && new SemanticallyEqual(annotation.getAnnotationType()).visit(otherAnnotation.getAnnotationType());
         }
 
         return false;
@@ -65,13 +76,17 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
     public Boolean visitIdentifier(J.Ident otherIdent) {
         if(tree instanceof J.Ident) {
             J.Ident ident = (J.Ident) tree;
+            boolean isTypeEqual;
 
-            return ident.getSimpleName().equals(otherIdent.getSimpleName()) &&
-                (ident.getType() != null ?
-                    ident.getType().equals(otherIdent.getType()) :
-                    otherIdent.getType() == null);
+            if(ident.getType() != null && otherIdent.getType() != null) {
+                isTypeEqual = ident.getType().equals(otherIdent.getType());
+            } else if(ident.getType() == null && otherIdent.getType() == null) {
+                isTypeEqual = true;
+            } else {
+                return false;
+            }
+            return isTypeEqual && ident.getSimpleName().equals(otherIdent.getSimpleName());
         }
-
         return false;
     }
 
