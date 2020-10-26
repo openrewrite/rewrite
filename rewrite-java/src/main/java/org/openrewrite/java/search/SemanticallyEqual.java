@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Incubating(since = "6.0.0")
@@ -76,16 +77,8 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
     public Boolean visitIdentifier(J.Ident otherIdent) {
         if(tree instanceof J.Ident) {
             J.Ident ident = (J.Ident) tree;
-            boolean isTypeEqual;
-
-            if(ident.getType() != null && otherIdent.getType() != null) {
-                isTypeEqual = ident.getType().equals(otherIdent.getType());
-            } else if(ident.getType() == null && otherIdent.getType() == null) {
-                isTypeEqual = true;
-            } else {
-                return false;
-            }
-            return isTypeEqual && ident.getSimpleName().equals(otherIdent.getSimpleName());
+            return Objects.equals(ident.getType(), otherIdent.getType()) &&
+                    ident.getSimpleName().equals(otherIdent.getSimpleName());
         }
         return false;
     }
@@ -95,14 +88,14 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
         if(tree instanceof J.FieldAccess) {
             J.FieldAccess fieldAccess = (J.FieldAccess) tree;
 
-            // if the field access is a class literal
+            // Class literals are the only kind of FieldAccess which can appear within annotations
+            // Functionality to correctly determine semantic equality of other kinds of field access will come later
             if(fieldAccess.getSimpleName().equals("class")) {
                 if(!otherFieldAccess.getSimpleName().equals("class")) {
                     return false;
                 }
                 else {
-                    return fieldAccess.getTarget().getType() == null ||
-                            fieldAccess.getTarget().getType().equals(otherFieldAccess.getTarget().getType());
+                    return Objects.equals(fieldAccess.getTarget().getType(), otherFieldAccess.getTarget().getType());
                 }
             }
         }
@@ -115,9 +108,9 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
         if(tree instanceof J.Assign) {
             J.Assign assign = (J.Assign) tree;
 
-            return new SemanticallyEqual(assign.getVariable()).visit(otherAssign.getVariable()) &&
-                    new SemanticallyEqual(assign.getAssignment()).visit(otherAssign.getAssignment()) &&
-                    assign.getType().equals(otherAssign.getType());
+            return Objects.equals(assign.getType(), otherAssign.getType()) &&
+                    new SemanticallyEqual(assign.getVariable()).visit(otherAssign.getVariable()) &&
+                    new SemanticallyEqual(assign.getAssignment()).visit(otherAssign.getAssignment());
         }
         return false;
     }
@@ -126,15 +119,9 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
     public Boolean visitLiteral(J.Literal otherLiteral) {
         if(tree instanceof J.Literal) {
             J.Literal literal = (J.Literal) tree;
-
-            if(otherLiteral.getValue() == null) {
-                return literal.getValue() == null;
-            }
-
-            return otherLiteral.getValue().equals(((J.Literal) tree).getValue());
+            return Objects.equals(literal.getValue(), otherLiteral.getValue());
         }
 
         return false;
     }
-
 }

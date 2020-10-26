@@ -29,14 +29,20 @@ interface SemanticallyEqualTest {
     fun tagAnnotationEquality(jp: JavaParser) {
         val cu = jp.parse(
             """
-                @Tagg(FastTests.class)
-                @Tagg(FastTests.class)
-                @Tagg(SlowTests.class)
+                @Tag(FastTests.class)
+                @Tag(FastTests.class)
+                @Tag(SlowTests.class)
                 class A {}
             """,
             """
-                @interface Tagg {
-                    Class[] value();
+                @interface Tags {
+                    Tag[] value();
+                }
+            """,
+            """
+                @java.lang.annotation.Repeatable(Tags.class)
+                @interface Tag {
+                    Class value();
                 }
             """,
             "public interface FastTests {}",
