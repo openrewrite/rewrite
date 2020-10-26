@@ -8,6 +8,6 @@ dependencies {
 
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-
+    implementation("io.github.classgraph:classgraph:latest.release")
     implementation("org.assertj:assertj-core:latest.release")
 }

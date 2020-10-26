@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.AutoFormat
@@ -160,6 +161,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @A
                     @B("")
                     @C
@@ -192,6 +194,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @A
                     @B("foo")
                     @C
@@ -259,6 +262,7 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @B("foo")
                     @A
                     String stringify() {
@@ -287,9 +291,141 @@ interface AutoFormatTest : RefactorVisitorTest {
                 package a;
 
                 public class D {
+                
                     @B(Tester.class)
                     @A
                     D() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun exactlyOneLineBetweenMethods(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                    D() {
+                    } void foo() {}
+                    
+                    
+                    void bar() {
+                    }
+                }
+            """,
+            after = """
+                package a;
+                
+                public class D {
+                
+                    D() {
+                    }
+                
+                    void foo() {}
+                    
+                    void bar() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun indentClassComments(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+                    // Single-line comment
+                    /**
+                * multi-line comment
+                            */
+                public class D { }
+            """,
+            after = """
+                package a;
+
+                // Single-line comment
+                /**
+                 * multi-line comment
+                 */
+                public class D { }
+            """
+    )
+
+    @Test
+    fun indentMethodComments(jp:JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0])
+            },
+            before = """
+                package a;
+
+                public class D {
+                
+                
+                
+                    /**
+                 * multi-line comment
+                        */
+                     
+                        // single-line comment
+                    
+                    @A void foo() { }
+                }
+            """,
+            after = """
+                package a;
+
+                public class D {
+                
+                    /**
+                     * multi-line comment
+                     */
+                    // single-line comment
+                    @A
+                    void foo() { }
+                }
+            """
+    )
+
+    @Test
+    @Disabled("Not implemented")
+    fun indentCommentsInsideMethodBody(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a -> AutoFormat(a)},
+            before = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                            /** comment */
+                // comment
+                        int one = 1;
+                        
+                /** comment */
+                            // comment
+                    }
+                }
+            """,
+            after = """
+               package a;
+                
+                public class D {
+                    void foo() {
+                        /** comment */
+                        // comment
+                        int one = 1;
+                        
+                        /** comment */
+                        // comment
                     }
                 }
             """

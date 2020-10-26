@@ -15,10 +15,10 @@
  */
 package org.openrewrite
 
+import io.github.classgraph.ClassGraph
 import org.openrewrite.Assertions.whenParsedBy
-import org.openrewrite.config.ClasspathResourceLoader
 import java.nio.file.Path
-import java.util.*
+import java.nio.file.Paths
 
 fun <S : SourceFile> String.whenParsedBy(parser: Parser<S>): Assertions.StringSourceFileAssert<S> =
         whenParsedBy(parser, this)
@@ -27,28 +27,15 @@ fun <S : SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSource
         whenParsedBy(parser, this)
 
 /**
- * Retrieve an environment for the named recipe from the classpath.
+ * Retrieve the visitors associated with the specified recipes from the classpath.
+ * Intended to be used for testing, not guaranteed to replicate how build plugins or other rewrite consumers
+ * may construct environments.
  */
-fun loadRefactorPlan(recipeName: String): Environment {
-    val crl = ClasspathResourceLoader(emptyList(), Properties())
-    val recipeConfig = crl.loadRecipes().asSequence()
-            .find { it.name == recipeName } ?: throw RuntimeException("Couldn't load recipe named '$recipeName'. " +
-                    "Verify that there's a yml file defining a recipe with this name under src/test/resources/META-INF/rewrite")
-
-    val recipe = recipeConfig.build()
-    val visitors = crl.loadVisitors()
-            .filter { recipe.accept(it) == Recipe.FilterReply.ACCEPT }
-    if (visitors.isEmpty()) {
-        throw RuntimeException("Couldn't find any visitors for recipe named `$recipeName`. " +
-                "Verify that your recipe has an include pattern that accepts at least one visitor according to SourceVisitor<J>.accept()")
-    }
+fun loadVisitorsForTest(vararg recipeNames: String): Collection<RefactorVisitor<*>> {
+    val classpath = ClassGraph()
+            .classpathURIs.map { Paths.get(it) }
     return Environment.builder()
-            .loadRecipe(recipeConfig)
-            .loadVisitors(visitors)
+            .scanClasspath(classpath)
             .build()
+            .visitors(*recipeNames)
 }
-
-/**
- * Retrieve the visitors for the named recipe from the classpath
- */
-fun loadVisitors(recipeName: String): Collection<RefactorVisitor<*>> = loadRefactorPlan(recipeName).visitors(recipeName)
