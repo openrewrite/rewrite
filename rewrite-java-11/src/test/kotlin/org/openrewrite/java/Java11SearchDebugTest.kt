@@ -17,7 +17,39 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.search.SemanticallyEqualTest
+import org.openrewrite.java.search.*
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindAnnotationTest: Java11Test(), FindAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindFieldsTest: Java11Test(), FindFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindInheritedFieldsTest: Java11Test(), FindInheritedFieldsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindMethodsTest: Java11Test(), FindMethodsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindReferencesToVariableTest: Java11Test(), FindReferencesToVariableTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindTypeTest: Java11Test(), FindTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11HasImportTest: Java11Test(), HasImportTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11HasTypeTest: Java11Test(), HasTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
