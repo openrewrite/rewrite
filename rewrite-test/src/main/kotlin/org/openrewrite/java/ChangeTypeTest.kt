@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 
@@ -330,6 +331,58 @@ interface ChangeTypeTest : RefactorVisitorTest {
                 public class B {
                     public void test() {
                         stat();
+                    }
+                }
+            """
+    )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/62")
+    @Test
+    fun primitiveToClass(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(ChangeType().apply {
+                setType("int")
+                setTargetType("java.lang.Integer")
+            }),
+            before = """
+                class A {
+                    int foo = 5;
+                    int getFoo() {
+                        return foo;
+                    }
+                }
+            """,
+            after = """
+                class A {
+                    Integer foo = 5;
+                    Integer getFoo() {
+                        return foo;
+                    }
+                }
+            """
+    )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/62")
+    @Test
+    fun classToPrimitive(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(ChangeType().apply {
+                setType("java.lang.Integer")
+                setTargetType("int")
+            }),
+            before = """
+                class A {
+                    Integer foo = 5;
+                    Integer getFoo() {
+                        return foo;
+                    }
+                }
+            """,
+            after = """
+                class A {
+                    int foo = 5;
+                    int getFoo() {
+                        return foo;
                     }
                 }
             """
