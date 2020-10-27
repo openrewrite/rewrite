@@ -46,4 +46,7 @@ abstract class JavaSearchCompatibilityKit {
 
     @Nested
     inner class HasTypeTck: HasTypeTest
+
+    @Nested
+    inner class SemanticallyEqualTck: SemanticallyEqualTest
 }
