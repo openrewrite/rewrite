@@ -145,7 +145,3 @@ class Java11AutoFormatTest: Java11Test(), AutoFormatTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindTypeTest: Java11Test(), FindTypeTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11AutoFormatTest: Java11Test(), AutoFormatTest
