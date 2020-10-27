@@ -15,17 +15,20 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
 import org.openrewrite.Refactor
+import org.openrewrite.SourceFile
+import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
-import java.util.*
+import org.openrewrite.java.tree.JavaType
 
 class RefactorTest {
     class RefactorTestException : RuntimeException("")
     val cu = J.CompilationUnit(
-            UUID.randomUUID(),
+            randomId(),
             "",
             listOf(),
             null,
@@ -42,7 +45,7 @@ class RefactorTest {
 
     @Test
     fun throwsEagerly() {
-        Assertions.assertThrows(RefactorTestException::class.java) {
+        assertThrows(RefactorTestException::class.java) {
             Refactor(true)
                     .visit(throwingVisitor)
                     .fix(listOf(cu))
@@ -54,5 +57,114 @@ class RefactorTest {
         Refactor()
                 .visit(throwingVisitor)
                 .fix(listOf(cu))
+    }
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/60")
+    @Test
+    fun canDelete() {
+        val deletingVisitor = object : JavaIsoRefactorVisitor() {
+            override fun visitCompilationUnit(cu: J.CompilationUnit?): J.CompilationUnit? {
+                return null
+            }
+        }
+        val results = Refactor()
+                .visit(deletingVisitor)
+                .fix(listOf(cu))
+
+        assertEquals(1, results.size)
+        val result = results.first()
+        assertNotNull(result.original)
+        assertNull(result.fixed)
+    }
+
+    @Test
+    fun canGenerate() {
+        val cuToGenerate = J.CompilationUnit(
+                randomId(),
+                "",
+                listOf(),
+                null,
+                listOf(),
+                listOf(),
+                Formatting.EMPTY,
+                listOf()
+        )
+        val generatingVisitor = object : JavaIsoRefactorVisitor() {
+            var generationComplete = false;
+            override fun generate(): MutableCollection<SourceFile> {
+                return if (generationComplete) {
+                    mutableListOf()
+                } else {
+                    generationComplete = true
+                    mutableListOf(cuToGenerate)
+                }
+            }
+        }
+        val results = Refactor()
+                .visit(generatingVisitor)
+                .fix(listOf(cu))
+        assertEquals(1, results.size, "The only change returned should be the generated file")
+        val result = results.first()
+        assertNull(result.original, "The generated file should have no \"original\"")
+        assertNotNull(result.fixed)
+        val resultCu = (result.fixed as J.CompilationUnit)
+        assertEquals(cuToGenerate.id, resultCu.id)
+    }
+
+    @Test
+    fun multipleVisitorsHaveCumulativeEffects() {
+        val addClassDecl = object : JavaIsoRefactorVisitor() {
+            override fun visitCompilationUnit(compilationUnit : J.CompilationUnit?): J.CompilationUnit {
+                var cu = super.visitCompilationUnit(compilationUnit);
+                if(cu.classes.size == 0) {
+                    cu = cu.withClasses(listOf(J.ClassDecl(
+                            randomId(),
+                            emptyList(),
+                            emptyList(),
+                            J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY),
+                            J.Ident.buildClassName("Foo"),
+                            null,
+                            null,
+                            null,
+                            J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
+                            JavaType.Class.build("Foo"),
+                            Formatting.EMPTY
+                    )))
+                }
+                return cu
+            }
+        }
+        val addMethod = object : JavaIsoRefactorVisitor() {
+            override fun visitClassDecl(classDecl: J.ClassDecl?): J.ClassDecl {
+                var cd = super.visitClassDecl(classDecl)
+                if(cd.methods.size == 0) {
+                    cd = cd.withBody(cd.body.withStatements(listOf(
+                            J.MethodDecl(
+                                    randomId(),
+                                    emptyList(),
+                                    emptyList(),
+                                    null,
+                                    JavaType.Primitive.Void.toTypeTree(),
+                                    J.Ident.build(randomId(), "bar", null, Formatting.EMPTY),
+                                    J.MethodDecl.Parameters(randomId(), emptyList(), Formatting.EMPTY),
+                                    null,
+                                    J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
+                                    null,
+                                    Formatting.EMPTY
+                            )
+                    )))
+                }
+                return cd
+            }
+        }
+
+        val results = Refactor(true)
+                .visit(addClassDecl, addMethod)
+                .fix(listOf(cu))
+        assertEquals(1, results.size)
+        val result = results.first().fixed as J.CompilationUnit
+
+        assertEquals(1, result.classes.size, "addClassDecl should have added a class declaration")
+        assertEquals(1, result.classes.first().methods.size, "addMethod should have added a method declaration")
     }
 }
