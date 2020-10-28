@@ -430,4 +430,24 @@ interface AutoFormatTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/63")
+    @Test
+    fun separatesStatementsWithEmptyFormatting(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped =  listOf { a -> AutoFormat(a) },
+            before = """
+                public class D {public String foo() {String foo = "foo";foo = foo + foo;return foo;}}
+            """,
+            after = """
+                public class D {
+                
+                    public String foo() {
+                        String foo = "foo";
+                        foo = foo + foo;
+                        return foo;
+                    }
+                }
+            """
+    )
 }
