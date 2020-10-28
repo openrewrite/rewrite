@@ -19,15 +19,16 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.search.SemanticallyEqual;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Arrays.asList;
+import static java.util.UUID.randomUUID;
 import static org.openrewrite.Formatting.*;
 
 public final class AddAnnotation {
@@ -56,11 +57,40 @@ public final class AddAnnotation {
             J.ClassDecl c = super.visitClassDecl(classDecl);
 
             if (scope.isScope(classDecl)) {
-                maybeAddImport(annotationType.getFullyQualifiedName());
 
-                if (c.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    c = c.addAnnotation(annotationType, arguments);
+                Formatting formatting = !c.getAnnotations().isEmpty() ?
+                        c.getAnnotations().get(0).getFormatting() :
+                        !c.getModifiers().isEmpty() ?
+                                c.getModifiers().get(0).getFormatting() :
+                                c.getKind().getFormatting();
+
+                J.Annotation newAnnot = new J.Annotation(
+                        randomUUID(),
+                        J.Ident.build(
+                                randomUUID(),
+                                annotationType.getClassName(),
+                                JavaType.buildType(annotationType.getFullyQualifiedName()),
+                                Formatting.EMPTY
+                        ),
+                        !arguments.isEmpty() ?
+                            new J.Annotation.Arguments(
+                                randomUUID(),
+                                arguments,
+                                Formatting.EMPTY
+                            ) :
+                            null,
+                        formatting
+                );
+
+                List<J.Annotation> annots = new ArrayList<>(c.getAnnotations());
+
+                if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
+                    annots.add(0, newAnnot);
+                    c = c.withAnnotations(annots);
                 }
+
+                maybeAddImport(annotationType.getFullyQualifiedName());
+                andThen(new AutoFormat(c));
             }
 
             return c;
@@ -113,11 +143,42 @@ public final class AddAnnotation {
             J.MethodDecl m = super.visitMethod(method);
 
             if (scope.isScope(method)) {
-                maybeAddImport(annotationType.getFullyQualifiedName());
 
-                if (m.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    m = m.addAnnotation(m, annotationType, arguments, formatter);
+                Formatting formatting = !m.getAnnotations().isEmpty() ?
+                        m.getAnnotations().get(0).getFormatting() :
+                        !m.getModifiers().isEmpty() ?
+                                m.getModifiers().get(0).getFormatting() :
+                                m.getReturnTypeExpr() != null ?
+                                    m.getReturnTypeExpr().getFormatting() :
+                                    m.getName().getFormatting();
+
+                J.Annotation newAnnot = new J.Annotation(
+                        randomUUID(),
+                        J.Ident.build(
+                                randomUUID(),
+                                annotationType.getClassName(),
+                                JavaType.buildType(annotationType.getFullyQualifiedName()),
+                                Formatting.EMPTY
+                        ),
+                        !arguments.isEmpty() ?
+                                new J.Annotation.Arguments(
+                                        randomUUID(),
+                                        arguments,
+                                        Formatting.EMPTY
+                                ) :
+                                null,
+                        formatting
+                );
+
+                List<J.Annotation> annots = new ArrayList<>(m.getAnnotations());
+
+                if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
+                    annots.add(0, newAnnot);
+                    m = m.withAnnotations(annots);
                 }
+
+                maybeAddImport(annotationType.getFullyQualifiedName());
+                andThen(new AutoFormat(m));
             }
 
             return m;

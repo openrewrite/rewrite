@@ -45,11 +45,14 @@ interface AddAnnotationTest : RefactorVisitorTest {
             """,
             after = """
                 package a;
-                
+
                 import lombok.RequiredArgsConstructor;
                 
-                @RequiredArgsConstructor public class UsersController {
-                    @RequiredArgsConstructor class Inner {
+                @RequiredArgsConstructor
+                public class UsersController {
+                
+                    @RequiredArgsConstructor
+                    class Inner {
                     }
                 }
             """
