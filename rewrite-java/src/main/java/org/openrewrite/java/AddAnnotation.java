@@ -24,8 +24,6 @@ import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static java.util.Arrays.asList;
 import static java.util.UUID.randomUUID;
