@@ -36,6 +36,12 @@ interface CompilationUnitTest {
     }
 
     @Test
+    fun sourceSet(jp: JavaParser) {
+        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
+        assertThat(a.getSourceSet()).isEqualTo(Paths.get("sourceSet"))
+    }
+    
+    @Test
     fun imports(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;

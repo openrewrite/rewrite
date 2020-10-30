@@ -1155,7 +1155,8 @@ public interface J extends Serializable, Tree {
         public Path getSourceSet() {
             int packageLevelsUp = getPackageDecl() == null ? 0 :
                     (int) getPackageDecl().printTrimmed().chars().filter(c -> c == '.').count();
-            return Paths.get(sourcePath).resolve(IntStream.range(0, packageLevelsUp + 1)
+            // Jump over Java file name
+            return Paths.get(sourcePath).getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
                 .mapToObj(n -> "../")
                 .collect(joining(""))).normalize();
         }
