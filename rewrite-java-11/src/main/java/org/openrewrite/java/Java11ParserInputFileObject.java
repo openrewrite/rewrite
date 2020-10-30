@@ -30,11 +30,11 @@ import java.util.Objects;
  * So that {@link JavaParser} can ingest source files from {@link InputStream} sources
  * other than a file on disk.
  */
-public class ParserInputFileObject implements JavaFileObject {
+public class Java11ParserInputFileObject implements JavaFileObject {
     private final Path path;
     private final Parser.Input input;
 
-    public ParserInputFileObject(Parser.Input input) {
+    public Java11ParserInputFileObject(Parser.Input input) {
         this.input = input;
         this.path = input.getPath();
     }
@@ -108,7 +108,7 @@ public class ParserInputFileObject implements JavaFileObject {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ParserInputFileObject that = (ParserInputFileObject) o;
+        Java11ParserInputFileObject that = (Java11ParserInputFileObject) o;
         return path.equals(that.path);
     }
 
