@@ -5,3 +5,8 @@ gradle.properties
 out/
 rewrite-java/src/main/gen/
 .idea/
+bin/
+.project
+.classpath
+.settings/
+.DS_Store
