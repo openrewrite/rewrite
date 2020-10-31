@@ -76,21 +76,18 @@ interface AddAnnotationTest : RefactorVisitorTest {
             """,
             after = """
                 package a;
-                
+
                 import b.MyAnnotation;
                 
                 public class UsersController {
-                    @MyAnnotation
-                    private final UserService userService;
-                
-                    @MyAnnotation
-                    NameService nameService;
+                    @MyAnnotation private final UserService userService;
+                    @MyAnnotation NameService nameService;
                 }
             """
     )
 
+    @Disabled("https://github.com/openrewrite/rewrite/issues/64")
     @Test
-    @Disabled("Annotation added successfully, but formatting is incorrect")
     fun addAnnotationToMethod(jp: JavaParser) = assertRefactored(
             jp,
             dependencies = listOf(annot),

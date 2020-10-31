@@ -62,23 +62,7 @@ public final class AddAnnotation {
                                 c.getModifiers().get(0).getFormatting() :
                                 c.getKind().getFormatting();
 
-                J.Annotation newAnnot = new J.Annotation(
-                        randomUUID(),
-                        J.Ident.build(
-                                randomUUID(),
-                                annotationType.getClassName(),
-                                JavaType.buildType(annotationType.getFullyQualifiedName()),
-                                Formatting.EMPTY
-                        ),
-                        !arguments.isEmpty() ?
-                            new J.Annotation.Arguments(
-                                randomUUID(),
-                                arguments,
-                                Formatting.EMPTY
-                            ) :
-                            null,
-                        formatting
-                );
+                J.Annotation newAnnot = buildAnnotation(formatting);
 
                 List<J.Annotation> annots = new ArrayList<>(c.getAnnotations());
 
@@ -99,38 +83,32 @@ public final class AddAnnotation {
             J.VariableDecls v = super.visitMultiVariable(multiVariable);
 
             if (scope.isScope(multiVariable)) {
-                Tree parent = getCursor().getParentOrThrow().getTree();
-                boolean isMethodOrLambdaParameter = parent instanceof J.MethodDecl || parent instanceof J.Lambda;
+                Formatting formatting = !v.getAnnotations().isEmpty() ?
+                        v.getAnnotations().get(0).getFormatting() :
+                        !v.getModifiers().isEmpty() ?
+                                v.getModifiers().get(0).getFormatting() :
+                                Formatting.EMPTY;
+
+                J.Annotation newAnnot = buildAnnotation(formatting);
+
+                List<J.Annotation> annots = new ArrayList<>(v.getAnnotations());
+
+                if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
+                    annots.add(0, newAnnot);
+                    v = v.withAnnotations(annots);
+                }
+
+                List<J.Modifier> modifiers = v.getModifiers();
+
+                if(!modifiers.isEmpty() && modifiers.get(0).getPrefix().isEmpty()) {
+                    modifiers.set(0, modifiers.get(0).withPrefix(" "));
+                    v = v.withModifiers(modifiers);
+                } else if(v.getTypeExpr().getPrefix().isEmpty()) {
+                    v = v.withTypeExpr(v.getTypeExpr().withPrefix(" "));
+                }
 
                 maybeAddImport(annotationType.getFullyQualifiedName());
-
-                if (v.getAnnotations().stream().noneMatch(ann -> TypeUtils.isOfClassType(ann.getType(), annotationType.getFullyQualifiedName()))) {
-                    List<J.Annotation> fixedAnnotations = new ArrayList<>(v.getAnnotations());
-
-                    if (!isMethodOrLambdaParameter && multiVariable.getPrefix().chars().filter(c -> c == '\n').count() < 2) {
-                        List<?> statements = enclosingBlock().getStatements();
-                        for (int i = 1; i < statements.size(); i++) {
-                            if (statements.get(i) == multiVariable) {
-                                v = v.withPrefix("\n" + v.getPrefix());
-                                break;
-                            }
-                        }
-                    }
-
-                    fixedAnnotations.add(buildAnnotation(EMPTY));
-
-                    v = v.withAnnotations(fixedAnnotations);
-                    if (multiVariable.getAnnotations().isEmpty()) {
-                        String prefix = isMethodOrLambdaParameter ? " " : formatter.format(enclosingBlock()).getPrefix();
-
-                        if (!v.getModifiers().isEmpty()) {
-                            v = v.withModifiers(formatFirstPrefix(v.getModifiers(), prefix));
-                        } else {
-                            //noinspection ConstantConditions
-                            v = v.withTypeExpr(v.getTypeExpr().withPrefix(prefix));
-                        }
-                    }
-                }
+                andThen(new AutoFormat(v));
             }
 
             return v;
@@ -150,23 +128,7 @@ public final class AddAnnotation {
                                     m.getReturnTypeExpr().getFormatting() :
                                     m.getName().getFormatting();
 
-                J.Annotation newAnnot = new J.Annotation(
-                        randomUUID(),
-                        J.Ident.build(
-                                randomUUID(),
-                                annotationType.getClassName(),
-                                JavaType.buildType(annotationType.getFullyQualifiedName()),
-                                Formatting.EMPTY
-                        ),
-                        !arguments.isEmpty() ?
-                                new J.Annotation.Arguments(
-                                        randomUUID(),
-                                        arguments,
-                                        Formatting.EMPTY
-                                ) :
-                                null,
-                        formatting
-                );
+                J.Annotation newAnnot = buildAnnotation(formatting);
 
                 List<J.Annotation> annots = new ArrayList<>(m.getAnnotations());
 
