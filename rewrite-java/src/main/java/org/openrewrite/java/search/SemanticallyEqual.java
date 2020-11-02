@@ -102,7 +102,7 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
                     return false;
                 }
                 else {
-                    return Objects.equals(fieldAccess.getTarget().getType(), otherFieldAccess.getTarget().getType());
+                    return typeEquals(fieldAccess.getType(), otherFieldAccess.getType()) && typeEquals(fieldAccess.getTarget().getType(), otherFieldAccess.getTarget().getType());
                 }
             }
         }
