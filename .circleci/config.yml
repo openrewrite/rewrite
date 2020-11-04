@@ -100,16 +100,9 @@ workflows:
           filters:
             tags:
               only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
-      - staging-approval:
-          type: approval
-          requires:
-            - deploy
-          filters:
-            tags:
-              only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
       - maven-central-sync:
           requires:
-            - staging-approval
+            - deploy
           filters:
             tags:
               only: /^v\d+\.\d+\.\d+(-rc\.\d+)?$/
