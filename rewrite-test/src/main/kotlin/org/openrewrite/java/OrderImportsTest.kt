@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 
@@ -337,6 +338,31 @@ interface OrderImportsTest : RefactorVisitorTest {
                 import static java.util.stream.Collectors.*;
                 
                 class A {}
+            """
+    )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/68")
+    @Test
+    fun preservesStaticStarImportWhenRemovingUnused(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
+            dependencies = listOf("""
+                package com.foo;
+                
+                public class A {
+                    public static void foo() {}
+                }
+            """),
+            before = """
+                package org.bar;
+                
+                import static com.foo.A.*;
+                
+                class B {
+                    void bar() {
+                        foo();
+                    }
+                }
             """
     )
 }
