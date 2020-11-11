@@ -16,6 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
@@ -34,5 +35,25 @@ interface CommentTest {
 
         val a = jp.parse(aSrc)[0]
         assertEquals(aSrc, a.printTrimmed())
+    }
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/70")
+    @Test
+    fun singleLineComment(jp: JavaParser) {
+        val a = jp.parse(
+            """
+                @Category()
+                // Some comment
+                public class B {
+
+                }
+            """,
+            """
+                @interface Category {
+                }
+            """
+        )[0]
+
+        assert(a.classes[0].modifiers.isNotEmpty());
     }
 }
