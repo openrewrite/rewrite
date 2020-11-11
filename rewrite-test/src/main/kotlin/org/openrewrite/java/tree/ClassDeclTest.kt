@@ -15,12 +15,27 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
 
 interface ClassDeclTest {
-    
+
+    @Issue("#70")
+    @Test
+    fun singleLineCommentBeforeModifier(jp: JavaParser) {
+        val a = jp.parse("""
+            @Deprecated
+            // Some comment
+            public final class B {
+            }
+        """.trimIndent())[0]
+
+        assertThat(a.classes[0].kind.prefix).doesNotContain("public")
+    }
+
     @Test
     fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) {
         val a = jp.parse("""
