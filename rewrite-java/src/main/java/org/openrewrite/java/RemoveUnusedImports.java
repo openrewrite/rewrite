@@ -39,14 +39,14 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
-        Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
-        Map<String, Set<String>> methodsByTypeName = new MethodsByType().visit(cu);
-
         boolean changed = false;
-        final List<J.Import> importsWithoutUnused = new ArrayList<>();
+        // Whenever an import statement is found to be used it should be added to this list
+        // At the end this list will contain only imports which are actually used
+        final List<J.Import> importsWithUsage = new ArrayList<>();
 
         for (J.Import anImport : cu.getImports()) {
             if (anImport.isStatic()) {
+                Map<String, Set<String>> methodsByTypeName = new StaticMethodsByType().visit(cu);
                 Set<String> methods = methodsByTypeName.get(anImport.getTypeName());
                 if (methods == null) {
                     changed = true;
@@ -55,16 +55,17 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (methods.size() < nameCountToUseStarImport) {
                         methods.stream().sorted().forEach(method ->
-                                importsWithoutUnused.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
+                                importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
                         );
                         changed = true;
                     } else {
-                        importsWithoutUnused.add(anImport);
+                        importsWithUsage.add(anImport);
                     }
                 } else {
-                    importsWithoutUnused.add(anImport);
+                    importsWithUsage.add(anImport);
                 }
             } else {
+                Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
                 Set<JavaType.Class> types = typesByPackage.get(anImport.getPackageName());
                 if (types == null) {
                     changed = true;
@@ -73,20 +74,20 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (types.size() < classCountToUseStarImport) {
                         types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
-                            importsWithoutUnused.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
+                            importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
                                     .withName(typeClassName))))
                         );
                         changed = true;
                     } else {
-                        importsWithoutUnused.add(anImport);
+                        importsWithUsage.add(anImport);
                     }
                 } else {
-                    importsWithoutUnused.add(anImport);
+                    importsWithUsage.add(anImport);
                 }
             }
         }
 
-        return changed ? cu.withImports(importsWithoutUnused) : cu;
+        return changed ? cu.withImports(importsWithUsage) : cu;
     }
 
     static class TypesByPackage extends AbstractJavaSourceVisitor<Map<String, Set<JavaType.Class>>> {
@@ -130,7 +131,7 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
         }
     }
 
-    static class MethodsByType extends AbstractJavaSourceVisitor<Map<String, Set<String>>> {
+    static class StaticMethodsByType extends AbstractJavaSourceVisitor<Map<String, Set<String>>> {
         @Override
         public Map<String, Set<String>> reduce(Map<String, Set<String>> r1,
                                                Map<String, Set<String>> r2) {
@@ -150,20 +151,19 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
         @Override
         public Map<String, Set<String>> defaultTo(Tree t) {
-            return emptyMap();
+            return new HashMap<>();
         }
 
         @Override
         public Map<String, Set<String>> visitMethodInvocation(J.MethodInvocation method) {
+            Map<String, Set<String>> m = super.visitMethodInvocation(method);
             if (method.getSelect() == null) {
                 JavaType.Method type = method.getType();
                 if (type != null && type.hasFlags(Flag.Static)) {
-                    Map<String, Set<String>> typeByPackage = new HashMap<>();
-                    typeByPackage.put(type.getDeclaringType().getFullyQualifiedName(), singleton(type.getName()));
-                    return typeByPackage;
+                    m.put(type.getDeclaringType().getFullyQualifiedName(), singleton(type.getName()));
                 }
             }
-            return super.visitMethodInvocation(method);
+            return m;
         }
     }
 }

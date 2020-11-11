@@ -341,7 +341,6 @@ interface OrderImportsTest : RefactorVisitorTest {
             """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/68")
     @Test
     fun preservesStaticStarImportWhenRemovingUnused(jp: JavaParser) = assertUnchanged(
             jp,
@@ -351,6 +350,11 @@ interface OrderImportsTest : RefactorVisitorTest {
                 
                 public class A {
                     public static void foo() {}
+                    public static void bar() {}
+                    public static void baz() {}
+                    public static void foo2() {}
+                    public static void bar2() {}
+                    public static void baz2() {}
                 }
             """),
             before = """
@@ -361,8 +365,80 @@ interface OrderImportsTest : RefactorVisitorTest {
                 class B {
                     void bar() {
                         foo();
+                        bar();
+                        baz();
+                        foo2();
+                        bar2();
+                        baz2();
                     }
                 }
             """
     )
+
+
+    @Test
+    fun preservesStaticInheritanceImport(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
+            dependencies = listOf("""
+                package com.foo;
+                
+                public class A {
+                    public static void foo() {}
+                    public static void bar() {}
+                    public static void baz() {}
+                    public static void foo2() {}
+                    public static void bar2() {}
+                    public static void baz2() {}
+                }
+            """,
+            """
+               package com.foo;
+                
+                public class B extends A { }
+            """),
+            before = """
+                package org.bar;
+                
+                import static com.foo.B.*;
+                
+                class C {
+                    void bar() {
+                        foo();
+                        bar();
+                        baz();
+                        foo2();
+                        bar2();
+                        baz2();
+                    }
+                }
+            """
+    )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/68")
+    fun preservesStaticMethodArguments(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
+            dependencies = listOf("""
+                package com.foo;
+                
+                public class A {
+                    public static void foo(String bar) {}
+                    public static String stringify(Integer baz) { return baz.toString(); }
+                    public static Integer numberOne() { return 1; }
+                }
+            """),
+            before = """
+                package org.bar;
+                
+                import static com.foo.A.*;
+                
+                class B {
+                    void bar() {
+                        foo(stringify(numberOne()));
+                    }
+                }
+            """
+    )
+
 }
