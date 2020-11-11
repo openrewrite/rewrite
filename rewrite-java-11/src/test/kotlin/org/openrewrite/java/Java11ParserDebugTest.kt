@@ -17,8 +17,13 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
+import org.openrewrite.java.tree.ClassDeclTest
 import org.openrewrite.java.tree.JavaTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11JavaTypeTest: Java11Test(), JavaTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11ClassDeclTest: Java11Test(), ClassDeclTest

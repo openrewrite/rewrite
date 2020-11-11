@@ -334,7 +334,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         J.ClassDecl.Extends extendings = null;
-        if(node.getExtendsClause() != null) {
+        if (node.getExtendsClause() != null) {
             var extendsPrefix = sourceBefore("extends");
             extendings = new J.ClassDecl.Extends(
                     randomId(),
@@ -344,7 +344,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         J.ClassDecl.Implements implementings = null;
-        if(node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
+        if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
             var implementsPrefix = sourceBefore(kind instanceof J.ClassDecl.Kind.Interface ?
                     "extends" : "implements");
 
@@ -903,7 +903,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitNewClass(NewClassTree node, Formatting fmt) {
         Expression encl = node.getEnclosingExpression() == null ? null : convert(node.getEnclosingExpression());
 
-        if(encl != null) {
+        if (encl != null) {
             encl = encl.withSuffix(sourceBefore("."));
         }
         String whitespaceBeforeNew = sourceBefore("new");
@@ -913,7 +913,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         TypeTree clazz = endPos(node.getIdentifier()) >= 0 ? convertOrNull(node.getIdentifier()) : null;
 
         J.NewClass.Arguments args = null;
-        if(positionOfNext("(", '{') > -1) {
+        if (positionOfNext("(", '{') > -1) {
             var argPrefix = sourceBefore("(");
             args = new J.NewClass.Arguments(randomId(),
                     node.getArguments().isEmpty() ?
@@ -1452,7 +1452,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private JavaType type(@Nullable com.sun.tools.javac.code.Type type,
                           List<Symbol> stack, boolean shallow) {
         if (type instanceof com.sun.tools.javac.code.Type.ClassType) {
-            if(type instanceof Type.ErrorType) {
+            if (type instanceof Type.ErrorType) {
                 return null;
             }
 
@@ -1596,7 +1596,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                     if (stop != null && source.charAt(delimIndex) == stop)
                         return -1; // reached stop word before finding the delimiter
 
-                    if (source.substring(delimIndex, delimIndex + untilDelim.length()).equals(untilDelim)) {
+                    if (source.startsWith(untilDelim, delimIndex)) {
                         break; // found it!
                     }
                 }
@@ -1657,7 +1657,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private String skip(@Nullable String token) {
         if (token == null)
             return null;
-        if (source.substring(cursor, cursor + token.length()).equals(token))
+        if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;
     }
@@ -1719,16 +1719,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         var sortedModifiers = new ArrayList<Modifier>();
 
         var inComment = false;
+        var inMultilineComment = false;
         final var word = new AtomicReference<>("");
         for (int i = cursor; i < source.length(); i++) {
             var c = source.charAt(i);
-            if (c == '/' && source.length() > i + 1 && source.charAt(i + 1) == '*') {
-                inComment = true;
+            if (c == '/' && source.length() > i + 1) {
+                char next = source.charAt(i + 1);
+                if (next == '*') {
+                    inMultilineComment = true;
+                } else if (next == '/') {
+                    inComment = true;
+                }
             }
 
-            if (inComment && c == '/' && source.charAt(i - 1) == '*') {
+            if (inMultilineComment && c == '/' && source.charAt(i - 1) == '*') {
+                inMultilineComment = false;
+            } else if (inComment && c == '\n' || c == '\r') {
                 inComment = false;
-            } else if (!inComment) {
+            } else if (!inMultilineComment && !inComment) {
                 if (Character.isWhitespace(c)) {
                     if (!word.get().isEmpty()) {
                         Optional<Modifier> matching = modifiers.getFlags().stream()
