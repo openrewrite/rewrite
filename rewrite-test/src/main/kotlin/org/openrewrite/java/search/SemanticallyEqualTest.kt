@@ -312,4 +312,12 @@ interface SemanticallyEqualTest {
             )
         ).isFalse()
     }
+
+    @Test
+    fun typeEqualityDependsOnlyOnFqn(jp: JavaParser) {
+        val namea = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar"), Formatting.EMPTY);
+        val nameb = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar", listOf(), listOf(), listOf(JavaType.Class.build("org.foo.Baz")), listOf(), null), Formatting.EMPTY);
+
+        assertThat(SemanticallyEqual(namea).visit(nameb)).isTrue()
+    }
 }

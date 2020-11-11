@@ -19,6 +19,8 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.java.AbstractJavaSourceVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,7 +74,7 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
                 return false;
             }
 
-            return areArgsEqual && new SemanticallyEqual(annotation.getAnnotationType()).visit(otherAnnotation.getAnnotationType());
+            return areArgsEqual && new SemanticallyEqual(annotation.getAnnotationType()).visitTypeName(otherAnnotation.getAnnotationType());
         }
 
         return false;
@@ -100,7 +102,7 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
                     return false;
                 }
                 else {
-                    return Objects.equals(fieldAccess.getTarget().getType(), otherFieldAccess.getTarget().getType());
+                    return typeEquals(fieldAccess.getType(), otherFieldAccess.getType()) && typeEquals(fieldAccess.getTarget().getType(), otherFieldAccess.getTarget().getType());
                 }
             }
         }
@@ -128,5 +130,34 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
         }
 
         return false;
+    }
+
+    @Override
+    public Boolean visitTypeName(NameTree name) {
+        if(this.tree instanceof J.Ident) {
+            if(!(name instanceof J.Ident)) {
+                return false;
+            }
+            return identEquals((J.Ident) this.tree, (J.Ident) name);
+        }
+        return super.visitTypeName(name);
+    }
+
+    private static boolean identEquals(J.Ident thisIdent, J.Ident otherIdent) {
+        return Objects.equals(thisIdent.getSimpleName(), otherIdent.getSimpleName()) && typeEquals(thisIdent.getType(), otherIdent.getType());
+    }
+
+    private static boolean typeEquals(JavaType thisType, JavaType otherType) {
+        if(thisType == null) {
+            return otherType == null;
+        }
+        if(thisType instanceof JavaType.FullyQualified) {
+            if (!(otherType instanceof JavaType.FullyQualified)) {
+                return false;
+            }
+            return ((JavaType.FullyQualified) thisType).getFullyQualifiedName().equals(((JavaType.FullyQualified) otherType).getFullyQualifiedName());
+        }
+
+        return thisType.deepEquals(otherType);
     }
 }

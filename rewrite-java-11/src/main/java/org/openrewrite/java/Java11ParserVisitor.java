@@ -1488,7 +1488,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 }
             }
         } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {
-            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(((com.sun.tools.javac.code.Type.TypeVar) type).bound, stack)));
+            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(((com.sun.tools.javac.code.Type.TypeVar) type).getUpperBound(), stack)));
         } else if (type instanceof com.sun.tools.javac.code.Type.JCPrimitiveType) {
             return primitive(type.getTag());
         } else if (type instanceof com.sun.tools.javac.code.Type.ArrayType) {

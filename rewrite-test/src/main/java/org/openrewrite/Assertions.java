@@ -190,7 +190,12 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> isUnchanged() {
-            assertThat(refactor.fix(sources)).isEmpty();
+            List<String> results = refactor.fix(sources).stream()
+                    .map(Change::getFixed)
+                    .map(SourceFile::printTrimmed)
+                    .collect(toList());
+
+            assertThat(results).isEmpty();
             return this;
         }
 
