@@ -39,6 +39,8 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+        Map<String, Set<String>> methodsByTypeName = new StaticMethodsByType().visit(cu);
+        Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
         boolean changed = false;
         // Whenever an import statement is found to be used it should be added to this list
         // At the end this list will contain only imports which are actually used
@@ -46,7 +48,6 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
         for (J.Import anImport : cu.getImports()) {
             if (anImport.isStatic()) {
-                Map<String, Set<String>> methodsByTypeName = new StaticMethodsByType().visit(cu);
                 Set<String> methods = methodsByTypeName.get(anImport.getTypeName());
                 if (methods == null) {
                     changed = true;
@@ -65,7 +66,6 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     importsWithUsage.add(anImport);
                 }
             } else {
-                Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
                 Set<JavaType.Class> types = typesByPackage.get(anImport.getPackageName());
                 if (types == null) {
                     changed = true;
@@ -160,7 +160,9 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
             if (method.getSelect() == null) {
                 JavaType.Method type = method.getType();
                 if (type != null && type.hasFlags(Flag.Static)) {
-                    m.put(type.getDeclaringType().getFullyQualifiedName(), singleton(type.getName()));
+                    Map<String, Set<String>> m2 = new HashMap<>();
+                    m2.put(type.getDeclaringType().getFullyQualifiedName(), singleton(type.getName()));
+                    m = reduce(m, m2);
                 }
             }
             return m;

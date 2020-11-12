@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 
 interface OrderImportsTest : RefactorVisitorTest {
     @Test
@@ -381,7 +381,7 @@ interface OrderImportsTest : RefactorVisitorTest {
             jp,
             visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
             dependencies = listOf("""
-                package com.foo;
+                package com.baz;
                 
                 public class A {
                     public static void foo() {}
@@ -393,7 +393,9 @@ interface OrderImportsTest : RefactorVisitorTest {
                 }
             """,
             """
-               package com.foo;
+                package com.foo;
+                
+                import com.baz.A; 
                 
                 public class B extends A { }
             """),
@@ -415,7 +417,7 @@ interface OrderImportsTest : RefactorVisitorTest {
             """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/68")
+    @Test
     fun preservesStaticMethodArguments(jp: JavaParser) = assertUnchanged(
             jp,
             visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
@@ -426,6 +428,9 @@ interface OrderImportsTest : RefactorVisitorTest {
                     public static void foo(String bar) {}
                     public static String stringify(Integer baz) { return baz.toString(); }
                     public static Integer numberOne() { return 1; }
+                    public static Integer plusOne(Integer n) { return n + 1; }
+                    public static Integer timesTwo(Integer n) { return n * 2; }
+                    public static Integer numberTwo() { return 2; }
                 }
             """),
             before = """
@@ -436,6 +441,7 @@ interface OrderImportsTest : RefactorVisitorTest {
                 class B {
                     void bar() {
                         foo(stringify(numberOne()));
+                        timesTwo(plusOne(numberTwo()));
                     }
                 }
             """
