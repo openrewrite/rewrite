@@ -67,7 +67,7 @@ public final class AddAnnotation {
                 List<J.Annotation> annots = new ArrayList<>(c.getAnnotations());
 
                 if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
-                    annots.add(0, newAnnot);
+                    annots.add(newAnnot);
                     c = c.withAnnotations(annots);
                 }
 
@@ -94,7 +94,7 @@ public final class AddAnnotation {
                 List<J.Annotation> annots = new ArrayList<>(v.getAnnotations());
 
                 if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
-                    annots.add(0, newAnnot);
+                    annots.add(newAnnot);
                     v = v.withAnnotations(annots);
                 }
 
@@ -133,7 +133,7 @@ public final class AddAnnotation {
                 List<J.Annotation> annots = new ArrayList<>(m.getAnnotations());
 
                 if (annots.stream().noneMatch(ann -> new SemanticallyEqual(newAnnot).visit(ann))) {
-                    annots.add(0, newAnnot);
+                    annots.add(newAnnot);
                     m = m.withAnnotations(annots);
                 }
 
