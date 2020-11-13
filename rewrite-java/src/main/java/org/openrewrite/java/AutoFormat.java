@@ -196,6 +196,10 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
                 List<J.Annotation> annotations = new ArrayList<>(cd.getAnnotations());
                 if (!annotations.isEmpty()) {
 
+                    if(annotations.get(0).getFormatting().getPrefix().contains("\n")) {
+                        annotations.set(0, annotations.get(0).withPrefix(""));
+                    }
+
                     // Ensure all annotations have a \n in their prefixes
                     // The first annotation is skipped because the whitespace prior to it is stored in the formatting for ClassDecl
                     for (int i = 1; i < annotations.size(); i++) {

@@ -155,19 +155,19 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> whenVisitedByMapped(Function<S, RefactorVisitor<? super S>> visitorFunction) {
-            assertThat(sources).isNotEmpty();
+            assertThat(sources).withFailMessage("Expected sources to be provided, but none were.").isNotEmpty();
             return whenVisitedBy(visitorFunction.apply(sources.iterator().next()));
         }
 
         public RefactoringAssert<S> whenVisitedByMany(Function<S, Iterable<RefactorVisitor<? super S>>> visitorFunction) {
-            assertThat(sources).isNotEmpty();
+            assertThat(sources).withFailMessage("Expected sources to be provided, but none were.").isNotEmpty();
             visitorFunction.apply(sources.iterator().next()).forEach(refactor::visit);
             return this;
         }
 
         private SourceFile doRefactor() {
             Collection<Change> fixes = refactor.fix(sources);
-            assertThat(fixes).isNotEmpty();
+            assertThat(fixes).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotEmpty();
 
             return fixes.stream().filter(f -> primarySource.equals(f.getOriginal())).findAny()
                     .map(Change::getFixed)
@@ -176,14 +176,15 @@ public class Assertions {
 
         public RefactoringAssert<S> isRefactoredTo(String expected) {
             SourceFile fixed = doRefactor();
-            assertThat(fixed).isNotNull();
+            assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
 
             return this;
         }
+
         public RefactoringAssert<S> isRefactoredTo(Supplier<String> expected) {
             SourceFile fixed = doRefactor();
-            assertThat(fixed).isNotNull();
+            assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected.get()));
 
             return this;

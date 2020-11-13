@@ -35,4 +35,23 @@ interface CommentTest {
         val a = jp.parse(aSrc)[0]
         assertEquals(aSrc, a.printTrimmed())
     }
+
+    @Test
+    fun singleLineComment(jp: JavaParser) {
+        val a = jp.parse(
+            """
+                @Category()
+                // Some comment
+                public class B {
+
+                }
+            """,
+            """
+                @interface Category {
+                }
+            """
+        )[0]
+
+        assert(a.classes[0].modifiers.isNotEmpty());
+    }
 }

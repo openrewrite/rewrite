@@ -22,10 +22,7 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.JavaSourceVisitor;
-import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.MethodMatcher;
+import org.openrewrite.java.*;
 import org.openrewrite.java.internal.ClassDeclToString;
 import org.openrewrite.java.internal.MethodDeclToString;
 import org.openrewrite.java.internal.PrintJava;
@@ -49,8 +46,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.EMPTY;
-import static org.openrewrite.Formatting.format;
+import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -135,6 +131,13 @@ public interface J extends Serializable, Tree {
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitAnnotation(this);
+        }
+
+        public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
+            return new J.Annotation(randomId(),
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
+                    formatting);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1032,14 +1035,14 @@ public interface J extends Serializable, Tree {
         }
 
         /**
-         * Find fields defined on this class, but do not include inherited fields up the type hierarchy
+         * Find fields is defined on this class, but does not include inherited fields up the type hierarchy
          */
         public List<VariableDecls> findFields(String clazz) {
             return new FindFields(clazz).visit(this);
         }
 
         /**
-         * Find fields defined up the type hierarchy, but do not include fields defined directly on this class
+         * Find fields is defined up the type hierarchy, but does not include fields defined directly on this class
          */
         public List<JavaType.Var> findInheritedFields(String clazz) {
             return new FindInheritedFields(clazz).visit(this);
@@ -2045,7 +2048,7 @@ public interface J extends Serializable, Tree {
         public boolean hasType(String clazz) {
             return new HasType(clazz).visit(this);
         }
-
+        
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
         }
