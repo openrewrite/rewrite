@@ -1056,27 +1056,6 @@ public interface J extends Serializable, Tree {
             return new FindType(clazz).visit(this);
         }
 
-        /*
-        *  Add annotation does not handle formatting. If proper formatting is desired use AutoFormat.
-        */
-        public J.ClassDecl addAnnotation(
-                JavaType.Class annotationType,
-                List<Expression> arguments
-        ) {
-            List<J.Annotation> fixedAnnotations = new ArrayList<>(getAnnotations());
-            Formatting annotationFormatting = getModifiers().isEmpty() ?
-                    (getTypeParameters() == null ?
-                            getKind().getFormatting() :
-                            getTypeParameters().getFormatting()) :
-                    format(firstPrefix(getModifiers()));
-            if(annotationFormatting.getSuffix().isEmpty()) {
-                annotationFormatting = annotationFormatting.withSuffix(" ");
-            }
-
-            fixedAnnotations.add(J.Annotation.buildAnnotation(annotationFormatting, annotationType, arguments));
-            return withAnnotations(fixedAnnotations);
-        }
-
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
         }
@@ -2068,32 +2047,6 @@ public interface J extends Serializable, Tree {
 
         public boolean hasType(String clazz) {
             return new HasType(clazz).visit(this);
-        }
-
-        public J.MethodDecl addAnnotation(
-                J.MethodDecl m,
-                JavaType.Class annotationType,
-                List<Expression> arguments,
-                JavaFormatter formatter
-        ) {
-            List<J.Annotation> fixedAnnotations = new ArrayList<>(m.getAnnotations());
-            fixedAnnotations.add(J.Annotation.buildAnnotation(EMPTY, annotationType, arguments));
-
-            if (m.getAnnotations().isEmpty()) {
-                String prefix = formatter.findIndent(0, m).getPrefix();
-
-                if (!m.getModifiers().isEmpty()) {
-                    m = m.withModifiers(formatFirstPrefix(m.getModifiers(), prefix));
-                } else if (m.getTypeParameters() != null) {
-                    m = m.withTypeParameters(m.getTypeParameters().withPrefix(prefix));
-                } else if (m.getReturnTypeExpr() != null) {
-                    m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix(prefix));
-                } else {
-                    m = m.withName(m.getName().withPrefix(prefix));
-                }
-            }
-            m = m.withAnnotations(fixedAnnotations);
-            return m;
         }
         
         public List<Annotation> findAnnotations(String signature) {

@@ -56,13 +56,18 @@ public final class AddAnnotation {
 
             if (scope.isScope(classDecl)) {
 
-                Formatting formatting = !c.getAnnotations().isEmpty() ?
-                        c.getAnnotations().get(0).getFormatting() :
-                        !c.getModifiers().isEmpty() ?
-                                c.getModifiers().get(0).getFormatting() :
-                                c.getKind().getFormatting();
+                String prefix;
+                if(c.getAnnotations().isEmpty()) {
+                    if(c.getModifiers().isEmpty()) {
+                        prefix = c.getKind().getPrefix();
+                    } else {
+                        prefix = firstPrefix(c.getModifiers());
+                    }
+                } else {
+                    prefix = firstPrefix(c.getAnnotations());
+                }
 
-                J.Annotation newAnnot = buildAnnotation(formatting);
+                J.Annotation newAnnot = buildAnnotation(Formatting.format(prefix));
 
                 List<J.Annotation> annots = new ArrayList<>(c.getAnnotations());
 
@@ -120,15 +125,18 @@ public final class AddAnnotation {
 
             if (scope.isScope(method)) {
 
-                Formatting formatting = !m.getAnnotations().isEmpty() ?
-                        m.getAnnotations().get(0).getFormatting() :
-                        !m.getModifiers().isEmpty() ?
-                                m.getModifiers().get(0).getFormatting() :
-                                m.getReturnTypeExpr() != null ?
-                                    m.getReturnTypeExpr().getFormatting() :
-                                    m.getName().getFormatting();
+                String prefix;
+                if(m.getAnnotations().isEmpty()) {
+                    if(m.getModifiers().isEmpty()) {
+                        prefix = (m.getReturnTypeExpr() == null ? m.getName() : m.getReturnTypeExpr()).getPrefix();
+                    } else {
+                        prefix = firstPrefix(m.getModifiers());
+                    }
+                } else {
+                    prefix = firstPrefix(m.getAnnotations());
+                }
 
-                J.Annotation newAnnot = buildAnnotation(formatting);
+                J.Annotation newAnnot = buildAnnotation(Formatting.format(prefix));
 
                 List<J.Annotation> annots = new ArrayList<>(m.getAnnotations());
 
