@@ -15,9 +15,9 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
-import org.openrewrite.java.tree.J
 
 interface OrderImportsTest : RefactorVisitorTest {
     @Test
@@ -447,4 +447,42 @@ interface OrderImportsTest : RefactorVisitorTest {
             """
     )
 
+    @Disabled("https://github.com/openrewrite/rewrite/issues/72")
+    @Test
+    fun moreStaticImportFun(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf( OrderImports() ),
+            dependencies = listOf(
+                """
+                    package com.foo;
+                    
+                    public class A {
+                        public static int one() { return 1;}
+                        public static int plusOne(int n) { return n + 1; }
+                    }
+                """,
+                """
+                    package com.foo;
+                    
+                    public class B {
+                        public static int two() { return 2; }
+                        public static int multiply(int n, int n2) { return n * n2; }
+                    }
+                """
+            ),
+            before = """
+                package org.bar;
+                
+                import static com.foo.A.one;
+                import static com.foo.A.plusOne;
+                import static com.foo.B.two;
+                import static com.foo.B.multiply;
+                
+                public class C {
+                    void c() {
+                        multiply(plusOne(one()), two());
+                    }
+                }
+            """
+    )
 }
