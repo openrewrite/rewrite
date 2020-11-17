@@ -142,7 +142,7 @@ public class ChangeType extends JavaIsoRefactorVisitor {
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
         J.MethodInvocation m = super.visitMethodInvocation(method);
 
-        if (method.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
+        if (m.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
             m = m.withSelect(transformName(m.getSelect()));
         }
 
@@ -150,6 +150,12 @@ public class ChangeType extends JavaIsoRefactorVisitor {
             JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getType());
             if (selectType != null && selectType.getFullyQualifiedName().equals(type)) {
                 m = m.withSelect(m.getSelect().withType(targetType));
+            }
+        }
+
+        if (m.getType() != null) {
+            if(m.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
+                m = m.withDeclaringType(targetType);
             }
         }
 

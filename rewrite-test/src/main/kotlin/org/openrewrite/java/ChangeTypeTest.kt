@@ -15,9 +15,12 @@
  */
 package org.openrewrite.java
 
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Refactor
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.tree.J
 
 interface ChangeTypeTest : RefactorVisitorTest {
     companion object {
@@ -171,6 +174,28 @@ interface ChangeTypeTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun staticMethodInvocationTypeUpdated(jp: JavaParser) {
+        val b = Refactor()
+                .visit(changeType)
+                .fix(jp.parse("""
+                    package b;
+                    
+                    import static a.A1.stat;
+                    
+                    class B {
+                        void foo() {
+                            stat();
+                        }
+                    }
+                """, a1))
+                .first { (it.fixed as J.CompilationUnit).classes.first().name.simpleName == "B" }
+                .fixed as J.CompilationUnit
+
+        val statCall = (b.classes.first().body.statements!!.first() as J.MethodDecl).body!!.statements.first() as J.MethodInvocation
+        Assertions.assertEquals("a.A2", statCall.type!!.declaringType.fullyQualifiedName)
+    }
 
     @Test
     fun multiCatch(jp: JavaParser) = assertRefactored(
