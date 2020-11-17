@@ -34,6 +34,13 @@ import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
+/**
+ * A Java refactoring visitor that can be used to add either an import or static import to a given compilation unit.
+ *
+ * The {@link AddImport#type} must be supplied and represents a fully qualified class name.
+ * The {@link AddImport#staticMethod} is an optional method within the imported type. The staticMethod can be set to "*"
+ * to represent a static wildcard import.
+ */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaIsoRefactorVisitor {
     @EqualsAndHashCode.Include
@@ -79,20 +86,15 @@ public class AddImport extends JavaIsoRefactorVisitor {
      *     [ \t\r]*    match 0 or more whitespace characters, omitting \n
      *     .*          match anything that's left, including multi-line comments, whitespace, etc., thanks to Pattern.DOTALL
      */
-    private static Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
+    private static final Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
         if(JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }
-        // note that using anyMatch here would return true for an empty list returned by FindType!
-        @SuppressWarnings("SimplifyStreamApiCallChains") boolean hasReferences = new FindType(type).visit(cu).stream()
-                .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))
-                .findAny()
-                .isPresent();
 
-        if (onlyIfReferenced && !hasReferences) {
+        if (onlyIfReferenced && ! hasReference(cu)) {
             return cu;
         }
 
@@ -143,5 +145,35 @@ public class AddImport extends JavaIsoRefactorVisitor {
         andThen(orderImports);
 
         return cu;
+    }
+
+    /**
+     * Returns true if there is at least one matching references for this associated import.
+     * An import is considered a match if:
+     *  It is non-static and has a field reference
+     *  It is static, the static method is a wildcard, and there is at least on method invocation on the given import type.
+     *  It is static, the static method is explicitly defined, and there is at least on method invocation matching the type and method.
+     *
+     * @param compilationUnit The compilation passed to the visitCompilationUnit
+     * @return true if the import is referenced by the class either explicitly or through a method reference.
+     */
+
+    //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
+    @SuppressWarnings("SimplifyStreamApiCallChains")
+    private boolean hasReference(J.CompilationUnit compilationUnit) {
+
+        if (staticMethod == null) {
+            //Non-static imports, we just look for field accesses.
+            return new FindType(type).visit(compilationUnit).stream()
+                    .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))
+                    .findAny()
+                    .isPresent();
+        }
+
+        //For static imports, we are either looking for a specific method or a wildcard.
+        return compilationUnit.findMethodCalls(type + " *(..)").stream()
+                .filter(invocation -> staticMethod.equals("*") || invocation.getName().getSimpleName().equals(staticMethod))
+                .findAny()
+                .isPresent();
     }
 }
