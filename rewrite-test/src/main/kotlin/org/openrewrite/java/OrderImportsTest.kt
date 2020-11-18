@@ -15,11 +15,31 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 
 interface OrderImportsTest : RefactorVisitorTest {
+    companion object {
+        val a = """
+            package com.foo;
+            
+            public class A {
+                public static int one() { return 1;}
+                public static int plusOne(int n) { return n + 1; }
+                public static int three() { return 3; }
+            }
+        """.trimIndent()
+
+        val b = """
+            package com.foo;
+            
+            public class B {
+                public static int two() { return 2; }
+                public static int multiply(int n, int n2) { return n * n2; }
+                public static int four() { return 4; }
+            }    
+        """.trimIndent()
+    }
     @Test
     fun orderImports(jp: JavaParser) = assertRefactored(
             jp,
@@ -447,40 +467,98 @@ interface OrderImportsTest : RefactorVisitorTest {
             """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/72")
     @Test
-    fun moreStaticImportFun(jp: JavaParser) = assertUnchanged(
+    fun preservesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertUnchanged(
             jp,
-            visitors = listOf( OrderImports() ),
-            dependencies = listOf(
-                """
-                    package com.foo;
-                    
-                    public class A {
-                        public static int one() { return 1;}
-                        public static int plusOne(int n) { return n + 1; }
-                    }
-                """,
-                """
-                    package com.foo;
-                    
-                    public class B {
-                        public static int two() { return 2; }
-                        public static int multiply(int n, int n2) { return n * n2; }
-                    }
-                """
-            ),
+            visitors = listOf( OrderImports().apply { setRemoveUnused(true) } ),
+            dependencies = listOf(a, b),
             before = """
                 package org.bar;
                 
                 import static com.foo.A.one;
                 import static com.foo.A.plusOne;
-                import static com.foo.B.two;
                 import static com.foo.B.multiply;
+                import static com.foo.B.two;
                 
                 public class C {
                     void c() {
                         multiply(plusOne(one()), two());
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun collapsesDifferentStaticImportsFromSamePackage(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf( OrderImports().apply { setRemoveUnused(true); } ),
+            dependencies = listOf(a, b),
+            before = """
+                package org.bar;
+                
+                import static com.foo.A.one;
+                import static com.foo.A.plusOne;
+                import static com.foo.A.three;
+                import static com.foo.B.multiply;
+                import static com.foo.B.two;
+                import static com.foo.B.four;
+                
+                public class C {
+                    void c() {
+                        multiply(plusOne(one()), two());
+                        three();
+                        four();
+                    }
+                }
+            """,
+            after = """
+                package org.bar;
+                
+                import static com.foo.A.*;
+                import static com.foo.B.*;
+                
+                public class C {
+                    void c() {
+                        multiply(plusOne(one()), two());
+                        three();
+                        four();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun removesRedundantImports(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf( OrderImports().apply { setRemoveUnused(false); } ),
+            dependencies = listOf(a, b),
+            before = """
+                package org.bar;
+                
+                import com.foo.B;
+                import com.foo.B;
+                
+                import static com.foo.A.one;
+                import static com.foo.A.one;
+                
+                public class C {
+                    void c() {
+                        one();
+                        B.two();
+                    }
+                }
+            """,
+            after = """
+                package org.bar;
+                
+                import com.foo.B;
+                
+                import static com.foo.A.one;
+                
+                public class C {
+                    void c() {
+                        one();
+                        B.two();
                     }
                 }
             """

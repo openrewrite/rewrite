@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Formatting;
+import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
@@ -25,10 +26,19 @@ import org.openrewrite.java.tree.J;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.valid;
@@ -99,9 +109,41 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                     .orElse(intellij());
         }
 
+        List<Layout.Block> blocks = importLayout.blocks;
+        blocks.forEach(Layout.Block::reset);
+        assert (blocks.stream().filter( it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).statik).findAny().isPresent())
+                : "There must be at least one block that accepts all static imports, but no such block was found in the specified layout";
+        assert (blocks.stream().filter( it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).statik).findAny().isPresent())
+                : "There must be at least one block that accepts all non-static imports, but no such block was found in the specified layout";
+
+        // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
+        Map<Boolean, List<Layout.Block>> blockGroups = blocks.stream()
+                .collect(Collectors.partitioningBy(block -> block instanceof Layout.Block.AllOthers));
+        List<Layout.Block> blocksNoCatchalls = blockGroups.get(false);
+        List<Layout.Block> blocksOnlyCatchalls = blockGroups.get(true);
+
+        // Allocate imports to blocks, preferring to put imports into non-catchall blocks
+        for(J.Import anImport: cu.getImports()) {
+            boolean accepted = false;
+            for(Layout.Block block : blocksNoCatchalls) {
+                if(block.accept(anImport)) {
+                    accepted = true;
+                    break;
+                }
+            }
+            if(!accepted) {
+                for(Layout.Block block : blocksOnlyCatchalls) {
+                    if(block.accept(anImport)) {
+                        accepted = true;
+                        break;
+                    }
+                }
+            }
+            assert accepted : "Every import must be accepted by at least one block, but this import was not: " + anImport.printTrimmed();
+        }
+
         int importIndex = 0;
         String extraLineSpace = "";
-        List<Layout.Block> blocks = importLayout.blocks;
         for (Layout.Block block : blocks) {
             if (block instanceof Layout.Block.BlankLines) {
                 extraLineSpace = "";
@@ -110,8 +152,6 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                     extraLineSpace += "\n";
                 }
             } else {
-                block.reset();
-                cu.getImports().forEach(block::accept);
                 for (J.Import orderedImport : block.orderedImports()) {
                     String prefix = importIndex == 0 ? cu.getImports().get(0).getPrefix() :
                             extraLineSpace + "\n";
@@ -230,51 +270,51 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                     imports.clear();
                 }
 
-                private static final J.Import SPACER = new J.Import(randomId(),
-                        new J.FieldAccess(randomId(),
-                                J.Ident.build(randomId(), "_SPACER", null, Formatting.EMPTY),
-                                J.Ident.build(randomId(), "_SPACER", null, Formatting.EMPTY),
-                                null,
-                                Formatting.EMPTY),
-                        false,
-                        Formatting.EMPTY);
-
                 @Override
                 public List<J.Import> orderedImports() {
-                    imports.sort(IMPORT_SORTING);
+                    Map<String, List<J.Import>> groupedImports = imports
+                            .stream()
+                            .sorted(IMPORT_SORTING)
+                            .collect(groupingBy(
+                                    anImport -> {
+                                        if (anImport.isStatic()) {
+                                            return anImport.getTypeName();
+                                        } else {
+                                            return anImport.getPackageName();
+                                        }
+                                    },
+                                    LinkedHashMap::new, // Use an ordered map to preserve sorting
+                                    Collectors.toList()
+                            ));
 
-                    // simplifies the logic of dealing with folding the last group of imports
-                    imports.add(SPACER);
-
-                    boolean foundStar = false;
-                    int consecutiveSamePackages = 0;
-                    for (int i = 0; i < imports.size(); i++) {
-                        consecutiveSamePackages++;
-                        if (i >= 1 && !imports.get(i - 1).getPackageName().equals(imports.get(i).getPackageName())) {
-                            int threshold = statik ? nameCountToUseStarImport : classCountToUseStarImport;
-                            if (consecutiveSamePackages >= threshold || (consecutiveSamePackages > 1 && foundStar)) {
-                                int j = i - 1;
-                                for (; j > i - consecutiveSamePackages + 1; j--) {
-                                    imports.remove(j);
-                                }
-                                J.Import toStar = imports.get(j);
-                                if (!toStar.getQualid().getSimpleName().equals("*")) {
-                                    imports.set(j, toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
+                    List<J.Import> orderedStarredImports = groupedImports.values().stream()
+                            .flatMap(importGroup -> {
+                                J.Import toStar = importGroup.get(0);
+                                boolean statik = toStar.isStatic();
+                                int threshold = statik ? nameCountToUseStarImport : classCountToUseStarImport;
+                                boolean starImportExists = importGroup.stream().anyMatch(it -> it.getQualid().getSimpleName().equals("*"));
+                                if(importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
+                                    return Stream.of(toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
                                             .getName().withName("*"))));
+                                } else {
+                                    return importGroup.stream()
+                                            .filter(Block.distinctBy(Tree::printTrimmed));
                                 }
-                                i = j + 1;
-                            }
-                            consecutiveSamePackages = 1;
-                            foundStar = false;
-                        }
-                        if ("*".equals(imports.get(i).getQualid().getSimpleName())) {
-                            foundStar = true;
-                        }
-                    }
+                            }).collect(toList());
 
-                    imports.remove(SPACER);
-                    return imports;
+                    return orderedStarredImports;
                 }
+            }
+            // Returns a predicate suitable for use with stream().filter() that will result in a set filtered to
+            // contain only items that are distinct as evaluated by keyFunc
+            static <T> Predicate<T> distinctBy(Function<? super T, ?> keyFunc) {
+                Set<Object> seen = new HashSet<>();
+                return t -> {
+                    Object it = keyFunc.apply(t);
+                    boolean alreadySeen = seen.contains(it);
+                    seen.add(it);
+                    return !alreadySeen;
+                };
             }
 
             class AllOthers extends ImportPackage {
@@ -298,9 +338,9 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                 @Override
                 public boolean accept(J.Import anImport) {
                     if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
-                        return super.accept(anImport);
+                        super.accept(anImport);
                     }
-                    return false;
+                    return anImport.isStatic() == statik;
                 }
             }
         }

@@ -43,6 +43,7 @@ import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -1698,6 +1699,13 @@ public interface J extends Serializable, Tree {
             return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
         }
 
+        /**
+         * Retrieve just the package from the import.
+         * e.g.:
+         * import org.foo.A;            -> "org.foo"
+         * import static org.foo.A.bar; -> "org.foo"
+         * import org.foo.*;            -> "org.foo"
+         */
         @JsonIgnore
         public String getPackageName() {
             JavaType.Class importType = TypeUtils.asClass(qualid.getType());
@@ -2048,7 +2056,7 @@ public interface J extends Serializable, Tree {
         public boolean hasType(String clazz) {
             return new HasType(clazz).visit(this);
         }
-        
+
         public List<Annotation> findAnnotations(String signature) {
             return new FindAnnotations(signature).visit(this);
         }
@@ -2153,6 +2161,14 @@ public interface J extends Serializable, Tree {
                 return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, formatting);
             }
             return this;
+        }
+
+        public MethodInvocation withDeclaringType(JavaType.FullyQualified type) {
+            if(this.type == null) {
+                return this;
+            } else {
+                return withType(this.type.withDeclaringType(type));
+            }
         }
 
         @Override
