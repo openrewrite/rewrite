@@ -35,7 +35,7 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
 /**
- * A Java refactoring visitor that can be used to add either an import or static import to a given compilation unit.
+ * A Java refactoring visitor that can be used to add an import (or static import) to a given compilation unit.
  * This visitor can also be configured to only add the import if the imported class/method are referenced within the
  * compilation unit.
  * <P><P>
