@@ -17,7 +17,12 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
-import org.openrewrite.whenParsedBy
+import org.openrewrite.java.tree.Flag
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JavaType
+import java.util.*
+import java.util.stream.Collectors
+import java.util.stream.Stream
 
 interface AddImportTest: RefactorVisitorTest {
     @Test
@@ -47,6 +52,31 @@ interface AddImportTest: RefactorVisitorTest {
             before = "class A {}",
             after = """
                 import java.util.List;
+                
+                class A {}
+            """
+    )
+    @Test
+    fun doNotAddImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(
+                    AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(true) }
+            ),
+            before = """
+                package a;
+                
+                class A {}
+            """
+    )
+
+    @Test
+    fun doNotAddWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(
+                    AddImport().apply { setType("java.util.*"); setOnlyIfReferenced(true) }
+            ),
+            before = """
+                package a;
                 
                 class A {}
             """
@@ -217,23 +247,136 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     @Test
-    fun dontAddImportWhenClassHasNoPackage(jp: JavaParser) = assertUnchanged(
+    fun dontAddStaticWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
             jp,
             visitors = listOf(
-                AddImport().apply {
-                    setType("C")
-                    setOnlyIfReferenced(false)
-                }
+                    AddImport().apply {
+                        setType("java.util.Collections")
+                        setStaticMethod("*")
+                        setOnlyIfReferenced(true)
+                    }
             ),
-            before = "class A {}"
+            before = """
+                package a;
+                
+                class A {}
+            """
     )
 
     @Test
-    fun dontAddImportForPrimitive(jp: JavaParser) = assertUnchanged(
+    fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertRefactored(
             jp,
-            visitors = listOf(AddImport().apply {
-                setType("int")
-            }),
-            before = "class A {}"
+            visitors = listOf(
+                    FixEmptyListMethodType(),
+                    AddImport().apply {
+                        setType("java.util.Collections")
+                        setStaticMethod("emptyList")
+                        setOnlyIfReferenced(true)
+                    }
+            ),
+            before = """
+                package a;
+                
+                import java.util.List;
+                
+                class A {
+                    public A() {
+                        List<String> list = emptyList();
+                    }
+                }
+            """,
+            after = """
+                package a;
+                
+                import java.util.List;
+                
+                import static java.util.Collections.emptyList;
+                
+                class A {
+                    public A() {
+                        List<String> list = emptyList();
+                    }
+                }
+            """
     )
+
+    @Test
+    fun doNotAddNamedStaticImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(
+                    AddImport().apply {
+                        setType("java.util.Collections")
+                        setStaticMethod("emptyList")
+                        setOnlyIfReferenced(true)
+                    }
+            ),
+            before = """
+                package a;
+                
+                class A {}
+            """
+    )
+
+    @Test
+    fun addStaticWildcardImportWhenReferenced(jp: JavaParser) = assertRefactored(
+            jp,
+            visitors = listOf(
+                    FixEmptyListMethodType(),
+                    AddImport().apply {
+                        setType("java.util.Collections")
+                        setStaticMethod("*")
+                        setOnlyIfReferenced(true)
+                    }
+            ),
+            before = """
+                package a;
+                
+                import java.util.List;
+                
+                class A {
+                    public A() {
+                        List<String> list = emptyList();
+                    }
+                }
+            """,
+            after = """
+                package a;
+                
+                import java.util.List;
+                
+                import static java.util.Collections.*;
+                
+                class A {
+                    public A() {
+                        List<String> list = emptyList();
+                    }
+                }
+            """
+    )
+
+    /**
+     * This visitor is used to set the method type of a statically referenced call to java.util.Collections.emptyList().
+     * This allows us to leave an unqualified "emptyList()" method invocation in our "before" snippets and to insure
+     * the static import is correctly added afterwards.
+     */
+    private class FixEmptyListMethodType : JavaIsoRefactorVisitor() {
+        override fun visitMethodInvocation(method: J.MethodInvocation?): J.MethodInvocation {
+
+            val original: J.MethodInvocation = super.visitMethodInvocation(method)
+
+            if (original.name.simpleName == "emptyList") {
+                val signature = JavaType.Method.Signature(JavaType.Class.build("java.util.List"), emptyList())
+                val emptyListMethod: JavaType.Method = JavaType.Method.build(
+                        JavaType.Class.build("java.util.Collections"),
+                        "emptyList",
+                        signature,
+                        signature,
+                        Collections.emptyList(),
+                        Stream.of(Flag.Public, Flag.Static).collect(Collectors.toSet()))
+                return original.withType(emptyListMethod)
+            }
+            return original
+        }
+    }
+
 }

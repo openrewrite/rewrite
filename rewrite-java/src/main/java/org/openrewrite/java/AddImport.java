@@ -36,10 +36,16 @@ import static org.openrewrite.Validated.required;
 
 /**
  * A Java refactoring visitor that can be used to add either an import or static import to a given compilation unit.
- *
+ * This visitor can also be configured to only add the import if the imported class/method are referenced within the
+ * compilation unit.
+ * <P><P>
  * The {@link AddImport#type} must be supplied and represents a fully qualified class name.
+ * <P><P>
  * The {@link AddImport#staticMethod} is an optional method within the imported type. The staticMethod can be set to "*"
  * to represent a static wildcard import.
+ * <P><P>
+ * The {@link AddImport#onlyIfReferenced} is a flag (defaulted to true) to indicate if the import should only be added
+ * if there is a reference to the imported class/method.
  */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 public class AddImport extends JavaIsoRefactorVisitor {
@@ -172,7 +178,10 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
         //For static imports, we are either looking for a specific method or a wildcard.
         return compilationUnit.findMethodCalls(type + " *(..)").stream()
-                .filter(invocation -> staticMethod.equals("*") || invocation.getName().getSimpleName().equals(staticMethod))
+                .filter(
+                    invocation -> invocation.getSelect() == null &&
+                            (staticMethod.equals("*") || invocation.getName().getSimpleName().equals(staticMethod))
+                )
                 .findAny()
                 .isPresent();
     }
