@@ -201,6 +201,27 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     @Test
+    fun dontAddImportWhenClassHasNoPackage(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(
+                    AddImport().apply {
+                        setType("C")
+                        setOnlyIfReferenced(false)
+                    }
+            ),
+            before = "class A {}"
+    )
+
+    @Test
+    fun dontAddImportForPrimitive(jp: JavaParser) = assertUnchanged(
+            jp,
+            visitors = listOf(AddImport().apply {
+                setType("int")
+            }),
+            before = "class A {}"
+    )
+
+    @Test
     fun addNamedImportIfStarStaticImportExists(jp: JavaParser) = assertRefactored(
             jp,
             visitors = listOf(
