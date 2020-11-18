@@ -377,7 +377,7 @@ interface AddImportTest: RefactorVisitorTest {
 
     /**
      * This visitor is used to set the method type of a statically referenced call to java.util.Collections.emptyList().
-     * This allows us to leave an unqualified "emptyList()" method invocation in our "before" snippets and to insure
+     * This allows us to leave an unqualified "emptyList()" method invocation in our "before" snippets and to ensure
      * the static import is correctly added afterwards.
      */
     private class FixEmptyListMethodType : JavaIsoRefactorVisitor() {
