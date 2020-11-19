@@ -67,7 +67,7 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
          *
          * Right now comments aren't AST elements so FixIndentation.visitTree() is blind to them.
          * This special treatment of comment indentation will be able to go away once we start treating
-         * comments an their own, independent AST element.
+         * comments as their own, independent AST element.
          */
         public String indentLine(String prefix) {
             if (!prefix.isEmpty() && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
@@ -75,17 +75,22 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
                 Formatter.Result wholeSourceIndent = formatter.wholeSourceIndent();
                 int nonWhiteSpaceIndex = StringUtils.indexOfNonWhitespace(prefix);
                 boolean insideJavaDocComment = false;
+
                 if(nonWhiteSpaceIndex == -1) {
                     nonWhiteSpaceIndex = prefix.length();
-                } else if(prefix.charAt(nonWhiteSpaceIndex) == '*')
-                {
+                } else if(prefix.charAt(nonWhiteSpaceIndex) == '*') {
                     insideJavaDocComment = true;
                 }
+
                 String indentation = prefix.substring(0, nonWhiteSpaceIndex);
                 String comment = prefix.substring(nonWhiteSpaceIndex);
-                String newIndentation = indentation.substring(0, indentation.lastIndexOf('\n') + 1) + range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
-                        .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
-                        .collect(Collectors.joining(""));
+
+                // +1 because for String.substring(start, end) start is inclusive, but end is exclusive
+                String newIndentation = indentation.substring(0, indentation.lastIndexOf('\n') + 1) +
+                        range(0, indentMultiple * wholeSourceIndent.getIndentToUse())
+                            .mapToObj(n -> wholeSourceIndent.isIndentedWithSpaces() ? " " : "\t")
+                            .collect(Collectors.joining(""));
+
                 if(insideJavaDocComment) //noinspection DanglingJavadoc
                 {
                     // By convention Javadoc-style comments are indented such that lines beginning with '*'
@@ -169,9 +174,17 @@ public class AutoFormat extends JavaIsoRefactorVisitor {
                             m = m.withModifiers(modifiers);
                         }
                     }
+                    // typeParameters
+                    else if(m.getTypeParameters() != null) {
+                        if(!m.getTypeParameters().getPrefix().contains("\n")) {
+                            m = m.withTypeParameters(m.getTypeParameters().withPrefix("\n"));
+                        }
+                    }
                     // returnTypeExpr
-                    else if(m.getReturnTypeExpr() != null && !m.getReturnTypeExpr().getPrefix().contains("\n")) {
-                        m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
+                    else if(m.getReturnTypeExpr() != null) {
+                        if(!m.getReturnTypeExpr().getPrefix().contains("\n")) {
+                            m = m.withReturnTypeExpr(m.getReturnTypeExpr().withPrefix("\n"));
+                        }
                     }
                     // name
                     else if(!m.getName().getPrefix().contains("\n")) {

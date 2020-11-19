@@ -127,10 +127,15 @@ public final class AddAnnotation {
 
                 String prefix;
                 if(m.getAnnotations().isEmpty()) {
-                    if(m.getModifiers().isEmpty()) {
-                        prefix = (m.getReturnTypeExpr() == null ? m.getName() : m.getReturnTypeExpr()).getPrefix();
-                    } else {
-                        prefix = firstPrefix(m.getModifiers());
+                    if(m.getTypeParameters() == null) {
+                        if(m.getModifiers().isEmpty()) {
+                            prefix = (m.getReturnTypeExpr() == null ? m.getName() : m.getReturnTypeExpr()).getPrefix();
+                        } else {
+                            prefix = firstPrefix(m.getModifiers());
+                        }
+                    }
+                    else {
+                        prefix = m.getTypeParameters().getPrefix();
                     }
                 } else {
                     prefix = firstPrefix(m.getAnnotations());

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.java.tree.J
@@ -86,7 +85,6 @@ interface AddAnnotationTest : RefactorVisitorTest {
             """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/64")
     @Test
     fun addAnnotationToMethod(jp: JavaParser) = assertRefactored(
             jp,
@@ -118,6 +116,7 @@ interface AddAnnotationTest : RefactorVisitorTest {
                 import b.MyAnnotation;
                 
                 public class UsersController {
+                
                     @MyAnnotation
                     UsersController() {
                     }
