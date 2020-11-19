@@ -2,12 +2,10 @@ package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.tree.Xml;
 
 import java.net.URL;
 import java.util.Collection;
@@ -32,7 +30,10 @@ public class Pom {
 
     Collection<Dependency> dependencies;
     DependencyManagement dependencyManagement;
+
+    @With
     Collection<License> licenses;
+
     Collection<Repository> repositories;
     Map<String, String> properties;
 

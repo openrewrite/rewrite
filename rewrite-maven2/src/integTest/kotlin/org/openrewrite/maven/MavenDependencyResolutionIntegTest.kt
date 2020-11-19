@@ -1,7 +1,6 @@
 package org.openrewrite.maven
 
 import ch.qos.logback.classic.Level
-import io.micrometer.core.instrument.Metrics
 import io.micrometer.core.instrument.config.MeterFilter
 import org.apache.maven.model.Model
 import org.apache.maven.model.Repository
@@ -20,6 +19,7 @@ import org.eclipse.aether.repository.RemoteRepository
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.maven.cache.MapdbCache
 import org.openrewrite.maven.tree.Maven
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -42,7 +42,7 @@ class MavenDependencyResolutionIntegTest {
                     Level.INFO
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
-            Metrics.addRegistry(meterRegistry)
+//            Metrics.addRegistry(meterRegistry)
         }
     }
 
@@ -289,8 +289,8 @@ class MavenDependencyResolutionIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
+                .cache(MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null))
                 .resolveOptional(false)
-                .workspace(File(System.getProperty("user.home") + "/.m2/rewrite"))
                 .build()
                 .parse(pom)
                 .first()

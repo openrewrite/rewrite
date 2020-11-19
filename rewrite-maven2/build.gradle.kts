@@ -21,7 +21,8 @@ dependencies {
 
     implementation("org.slf4j:slf4j-api:1.7.+")
 
-    implementation("org.mapdb:mapdb:latest.release")
+    compileOnly("org.mapdb:mapdb:latest.release")
+
     implementation("io.micrometer:micrometer-core:latest.release")
 
     implementation("com.squareup.okhttp3:okhttp:latest.release")
@@ -42,6 +43,8 @@ dependencies {
     testImplementation("ch.qos.logback:logback-classic:1.0.13")
 
     testImplementation(project(":rewrite-test"))
+
+    testRuntimeOnly("org.mapdb:mapdb:latest.release")
 }
 
 tasks.register<JavaExec>("generateAntlrSources") {
