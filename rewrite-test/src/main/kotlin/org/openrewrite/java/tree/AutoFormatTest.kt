@@ -243,6 +243,30 @@ interface AutoFormatTest : RefactorVisitorTest {
     )
 
     @Test
+    fun putMethodAnnotationAndTypeParametersOnSeparateLines(jp: JavaParser) = assertRefactored(
+            jp,
+            dependencies = dependencies,
+            visitorsMapped = listOf { a ->
+                AutoFormat(a.classes[0].methods[0])
+            },
+            before = """
+                public class D {
+                
+                    @A <T> T onInit() {
+                    }
+                }
+            """,
+            after = """
+                public class D {
+                
+                    @A
+                    <T> T onInit() {
+                    }
+                }
+            """
+    )
+
+    @Test
     fun putMethodAnnotationAndReturnTypeOnSeparateLines(jp: JavaParser) = assertRefactored(
             jp,
             dependencies = dependencies,
