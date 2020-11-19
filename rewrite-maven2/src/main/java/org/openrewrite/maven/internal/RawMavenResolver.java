@@ -243,7 +243,7 @@ public class RawMavenResolver {
                     );
                 })
                 .filter(Objects::nonNull)
-                .filter(dep -> task.getExclusions().stream().noneMatch(e -> dep.getGroupId().matches(e.getGroupId()) ||
+                .filter(dep -> task.getExclusions().stream().noneMatch(e -> dep.getGroupId().matches(e.getGroupId()) &&
                         dep.getArtifactId().matches(e.getArtifactId())))
                 .map(dep -> {
                     assert dep.getVersion() != null;

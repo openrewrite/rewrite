@@ -39,7 +39,7 @@ class MavenDependencyResolutionIntegTest {
         @BeforeAll
         fun beforeAll() {
             (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as ch.qos.logback.classic.Logger).level =
-                    Level.INFO
+                    Level.DEBUG
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
 //            Metrics.addRegistry(meterRegistry)
