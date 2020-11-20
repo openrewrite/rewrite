@@ -16,6 +16,7 @@ import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
+import static java.util.stream.StreamSupport.stream;
 
 public class MavenParser implements Parser<Maven> {
     private final MavenCache mavenCache;
@@ -28,7 +29,7 @@ public class MavenParser implements Parser<Maven> {
 
     @Override
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
-        Collection<RawMaven> projectPoms = StreamSupport.stream(sources.spliterator(), false)
+        Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
                 .map(source -> RawMaven.parse(source, relativeTo))
                 .collect(toList());
 

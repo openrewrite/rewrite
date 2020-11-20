@@ -5,6 +5,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.maven.internal.RawPom
+import java.net.URI
 
 class PomTest {
     @Test
@@ -74,9 +75,9 @@ class PomTest {
 
         val model = mapper.readValue(pom, RawPom::class.java)
 
-        assertThat(model.dependencies[0]?.groupId).isEqualTo("org.junit.jupiter")
-        assertThat(model.dependencyManagement.dependencies[0].groupId).isEqualTo("org.springframework.cloud")
-        assertThat(model.licenses[0].name).isEqualTo("Apache License, Version 2.0")
-        assertThat(model.repositories[0].url).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
+        assertThat(model.getActiveDependencies(URI.create("pom.xml"))[0].groupId).isEqualTo("org.junit.jupiter")
+        assertThat(model.dependencyManagement?.dependencies?.first()?.groupId).isEqualTo("org.springframework.cloud")
+        assertThat(model.licenses?.first()?.name).isEqualTo("Apache License, Version 2.0")
+        assertThat(model.repositories?.first()?.url).isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
     }
 }

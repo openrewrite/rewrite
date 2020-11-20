@@ -7,11 +7,13 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -35,18 +37,13 @@ public class RawMaven {
         // disable namespace handling, as some POMs contain undefined namespaces like Xlint in
         // https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
         XMLInputFactory input = new WstxInputFactory();
-        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, Boolean.FALSE);
-        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, Boolean.FALSE);
+        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
+        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
         xmlMapper = new XmlMapper(new XmlFactory(input, new WstxOutputFactory()))
+                .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+                .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
     }
-
-    private static final XmlParser xmlParser = new XmlParser() {
-        @Override
-        public boolean accept(URI path) {
-            return super.accept(path) || path.toString().endsWith(".pom");
-        }
-    };
 
     Xml.Document document;
 
@@ -79,7 +76,7 @@ public class RawMaven {
     }
 
     public static RawMaven parse(Parser.Input source, @Nullable URI relativeTo) {
-        Xml.Document document = xmlParser.parseInputs(singletonList(source), relativeTo)
+        Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo)
                 .iterator().next();
 
         try {
@@ -98,4 +95,11 @@ public class RawMaven {
     public List<RawPom.Dependency> getActiveDependencies() {
         return pom.getActiveDependencies(getURI());
     }
+
+    private static class MavenXmlParser extends XmlParser {
+        @Override
+        public boolean accept(URI path) {
+            return super.accept(path) || path.toString().endsWith(".pom");
+        }
+    };
 }

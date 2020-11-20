@@ -84,10 +84,11 @@ public class RawMavenResolver {
         RawMaven rawMaven = task.getRawMaven();
         RawPom pom = rawMaven.getPom();
 
-        List<RawPom.Repository> repositories = new ArrayList<>(task.getRepositories());
+        List<RawPom.Repository> repositories = new ArrayList<>();
         if (pom.getRepositories() != null) {
             repositories.addAll(pom.getRepositories());
         }
+        repositories.addAll(task.getRepositories());
 
         PartialMaven partialMaven = new PartialMaven(rawMaven);
         processProperties(task, partialMaven);
@@ -152,7 +153,7 @@ public class RawMavenResolver {
         RawMaven rawMaven = task.getRawMaven();
 
         // Parent dependencies wind up being part of the subtree rooted at "task", so affect conflict resolution further down tree.
-        if(partialMaven.getParent() != null) {
+        if (partialMaven.getParent() != null) {
             for (Pom.Dependency dependency : partialMaven.getParent().getModel().getDependencies()) {
                 RequestedVersion requestedVersion = selectVersion(rawMaven.getURI(), dependency.getScope(), dependency.getGroupId(),
                         dependency.getArtifactId(), dependency.getVersion());
@@ -356,107 +357,109 @@ public class RawMavenResolver {
 
         //noinspection OptionalAssignedToNull
         if (result == null) {
-            result = Optional.ofNullable(partialResults.get(task))
-                    .map(partial -> {
-                        List<Pom.Dependency> dependencies = partial.getDependencyTasks().stream()
-                                .map(depTask -> {
-                                    boolean optional = depTask.isOptional() ||
-                                            assemblyStack.stream().anyMatch(ResolutionTask::isOptional);
+            PartialMaven partial = partialResults.get(task);
+            if (partial != null) {
+                List<Pom.Dependency> dependencies = partial.getDependencyTasks().stream()
+                        .map(depTask -> {
+                            boolean optional = depTask.isOptional() ||
+                                    assemblyStack.stream().anyMatch(ResolutionTask::isOptional);
 
-                                    if (logger.isDebugEnabled() && !forParent) {
-                                        String indent = CharBuffer.allocate(assemblyStack.size()).toString().replace('\0', ' ');
-                                        RawPom depPom = depTask.getRawMaven().getPom();
-                                        logger.debug(
-                                                "{}{}:{}:{}{} {}",
-                                                indent,
-                                                depPom.getGroupId(),
-                                                depPom.getArtifactId(),
-                                                depPom.getVersion(),
-                                                optional ? " (optional) " : "",
-                                                depTask.getRawMaven().getURI()
-                                        );
-                                    }
-
-                                    Maven resolved = assembleResults(depTask, nextAssemblyStack);
-                                    if (resolved == null) {
-                                        return null;
-                                    }
-
-                                    return new Pom.Dependency(
-                                            depTask.getScope(),
-                                            depTask.getClassifier(),
-                                            optional,
-                                            resolved,
-                                            depTask.getExclusions()
-                                    );
-                                })
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toCollection(ArrayList::new));
-
-                        for (Maven ancestor = partial.getParent(); ancestor != null; ancestor = ancestor.getModel().getParent()) {
-                            for (Pom.Dependency ancestorDep : ancestor.getModel().getDependencies()) {
-                                // the ancestor's dependency might be overridden by another version by conflict resolution
-                                Scope scope = ancestorDep.getScope();
-                                String groupId = ancestorDep.getGroupId();
-                                String artifactId = ancestorDep.getArtifactId();
-
-                                String conflictResolvedVersion = selectVersion(rawMaven.getURI(), scope, groupId, artifactId, ancestorDep.getVersion())
-                                        .resolve(downloader, task.getRepositories());
-
-                                if (!conflictResolvedVersion.equals(ancestorDep.getVersion())) {
-                                    RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
-                                            ancestorDep.getClassifier(), null, null, task.getRepositories());
-
-                                    Maven conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw, ancestorDep.getExclusions(),
-                                            ancestorDep.isOptional(), ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
-
-                                    // for debugging
-                                    //noinspection RedundantIfStatement
-                                    if (conflictResolved == null) {
-                                        //noinspection ConstantConditions
-                                        assert conflictResolved != null;
-                                    }
-
-                                    dependencies.add(new Pom.Dependency(
-                                            scope,
-                                            ancestorDep.getClassifier(),
-                                            ancestorDep.isOptional(),
-                                            conflictResolved,
-                                            ancestorDep.getExclusions()
-                                    ));
-                                } else {
-                                    dependencies.add(ancestorDep);
-                                }
+                            if (logger.isDebugEnabled() && !forParent) {
+                                String indent = CharBuffer.allocate(assemblyStack.size()).toString().replace('\0', ' ');
+                                RawPom depPom = depTask.getRawMaven().getPom();
+                                logger.debug(
+                                        "{}{}:{}:{}{} {}",
+                                        indent,
+                                        depPom.getGroupId(),
+                                        depPom.getArtifactId(),
+                                        depPom.getVersion(),
+                                        optional ? " (optional) " : "",
+                                        depTask.getRawMaven().getURI()
+                                );
                             }
-                        }
 
-                        String groupId = rawPom.getGroupId();
-                        if (groupId == null) {
-                            groupId = partial.getParent().getModel().getGroupId();
-                        }
+                            Maven resolved = assembleResults(depTask, nextAssemblyStack);
+                            if (resolved == null) {
+                                return null;
+                            }
 
-                        String version = rawPom.getVersion();
-                        if (version == null) {
-                            version = partial.getParent().getModel().getVersion();
-                        }
+                            return new Pom.Dependency(
+                                    depTask.getScope(),
+                                    depTask.getClassifier(),
+                                    optional,
+                                    resolved,
+                                    depTask.getExclusions()
+                            );
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toCollection(ArrayList::new));
 
-                        return new Maven(
-                                rawMaven.getDocument(),
-                                Pom.build(
-                                        groupId,
-                                        rawPom.getArtifactId(),
-                                        version,
-                                        "jar",
-                                        null,
-                                        partial.getParent(),
-                                        dependencies,
-                                        partial.getDependencyManagement(),
-                                        partial.getLicenses(),
-                                        partial.getRepositories(),
-                                        partial.getProperties()
-                                )
-                        );
-                    });
+                for (Maven ancestor = partial.getParent(); ancestor != null; ancestor = ancestor.getModel().getParent()) {
+                    for (Pom.Dependency ancestorDep : ancestor.getModel().getDependencies()) {
+                        // the ancestor's dependency might be overridden by another version by conflict resolution
+                        Scope scope = ancestorDep.getScope();
+                        String groupId = ancestorDep.getGroupId();
+                        String artifactId = ancestorDep.getArtifactId();
+
+                        String conflictResolvedVersion = selectVersion(rawMaven.getURI(), scope, groupId, artifactId, ancestorDep.getVersion())
+                                .resolve(downloader, task.getRepositories());
+
+                        if (!conflictResolvedVersion.equals(ancestorDep.getVersion())) {
+                            RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
+                                    ancestorDep.getClassifier(), null, null, task.getRepositories());
+
+                            Maven conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw, ancestorDep.getExclusions(),
+                                    ancestorDep.isOptional(), ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
+
+                            // for debugging
+                            //noinspection RedundantIfStatement
+                            if (conflictResolved == null) {
+                                //noinspection ConstantConditions
+                                assert conflictResolved != null;
+                            }
+
+                            dependencies.add(new Pom.Dependency(
+                                    scope,
+                                    ancestorDep.getClassifier(),
+                                    ancestorDep.isOptional(),
+                                    conflictResolved,
+                                    ancestorDep.getExclusions()
+                            ));
+                        } else {
+                            dependencies.add(ancestorDep);
+                        }
+                    }
+                }
+
+                String groupId = rawPom.getGroupId();
+                if (groupId == null) {
+                    groupId = partial.getParent().getModel().getGroupId();
+                }
+
+                String version = rawPom.getVersion();
+                if (version == null) {
+                    version = partial.getParent().getModel().getVersion();
+                }
+
+                result = Optional.of(new Maven(
+                        rawMaven.getDocument(),
+                        Pom.build(
+                                groupId,
+                                rawPom.getArtifactId(),
+                                version,
+                                "jar",
+                                null,
+                                partial.getParent(),
+                                dependencies,
+                                partial.getDependencyManagement(),
+                                partial.getLicenses(),
+                                partial.getRepositories(),
+                                partial.getProperties()
+                        )
+                ));
+            } else {
+                result = Optional.empty();
+            }
 
             resolved.put(taskKey, result);
         }

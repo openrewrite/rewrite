@@ -170,4 +170,11 @@ public class MapdbCache implements MavenCache {
                 .map(pom -> new CacheResult<>(CacheResult.State.Cached, pom))
                 .orElse(UNAVAILABLE_REPOSITORY);
     }
+
+    @Override
+    public void close() {
+        pomCache.close();
+        mavenMetadataCache.close();
+        normalizedRepositoryUrls.close();
+    }
 }

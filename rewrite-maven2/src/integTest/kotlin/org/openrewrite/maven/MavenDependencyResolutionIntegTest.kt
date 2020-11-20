@@ -16,6 +16,7 @@ import org.eclipse.aether.graph.DependencyNode
 import org.eclipse.aether.graph.Exclusion
 import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -31,10 +32,11 @@ import java.util.function.Consumer
  * Compare rewrite-maven with Maven Aether.
  */
 class MavenDependencyResolutionIntegTest {
+    @Suppress("unused")
     companion object {
         private val meterRegistry = MetricsDestinations.prometheus()
+        private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
 
-        @Suppress("unused")
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
@@ -43,6 +45,12 @@ class MavenDependencyResolutionIntegTest {
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
 //            Metrics.addRegistry(meterRegistry)
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun afterAll() {
+            mavenCache.close()
         }
     }
 
@@ -184,6 +192,12 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
+    fun jacksonCoreAsl(@TempDir tempDir: Path) {
+        // empty dependencies block with a comment
+        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.codehaus.jackson:jackson-core-asl:1.9.13"))
+    }
+
+    @Test
     fun springCloudSecurityOauth2(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework.cloud:spring-cloud-starter-oauth2:2.2.4.RELEASE"))
     }
@@ -289,11 +303,12 @@ class MavenDependencyResolutionIntegTest {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
         val pomAst: Maven = MavenParser.builder()
-                .cache(MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null))
+                .cache(mavenCache)
                 .resolveOptional(false)
                 .build()
-                .parse(pom)
+                .parse(listOf(pomFile.toPath()), null)
                 .first()
+
         val rewrite = printTreeRecursive(pomAst, ignoreScopes)
 
 //        println(rewrite)

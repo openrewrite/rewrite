@@ -1,25 +1,28 @@
 package org.openrewrite.maven.internal;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Maven;
 
 import java.net.URI;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
 /**
  * A value object deserialized directly from POM XML
  */
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@Data
+@RequiredArgsConstructor
 public class RawPom {
+    @Getter
     @Nullable
     Parent parent;
 
@@ -28,6 +31,7 @@ public class RawPom {
     @Nullable
     String groupId;
 
+    @Getter
     @EqualsAndHashCode.Include
     @ToString.Include
     String artifactId;
@@ -37,26 +41,29 @@ public class RawPom {
     @Nullable
     String version;
 
+    @Getter
     @Nullable
     String packaging;
 
     @Nullable
-    List<Dependency> dependencies;
+    Dependencies dependencies;
 
+    @Getter
     @Nullable
     DependencyManagement dependencyManagement;
 
+    @Getter
     @Nullable
     Map<String, String> properties;
 
     @Nullable
-    List<Repository> repositories;
+    Repositories repositories;
 
     @Nullable
-    List<License> licenses;
+    Licenses licenses;
 
     @Nullable
-    List<Profile> profiles;
+    Profiles profiles;
 
     @JsonIgnore
     public Map<String, String> getActiveProperties(URI containingPomUri) {
@@ -67,7 +74,7 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            for (RawPom.Profile profile : profiles) {
+            for (RawPom.Profile profile : getProfiles()) {
                 if (profile.isActive(containingPomUri) && profile.getProperties() != null) {
                     activeProperties.putAll(profile.getProperties());
                 }
@@ -82,11 +89,11 @@ public class RawPom {
         List<Dependency> activeDependencies = new ArrayList<>();
 
         if (dependencies != null) {
-            activeDependencies.addAll(dependencies);
+            activeDependencies.addAll(dependencies.getDependencies());
         }
 
         if (profiles != null) {
-            profiles.stream().filter(p -> p.isActive(containingPomUri)).forEach(profile -> {
+            getProfiles().stream().filter(p -> p.isActive(containingPomUri)).forEach(profile -> {
                 if (profile.dependencies != null) {
                     activeDependencies.addAll(profile.dependencies);
                 }
@@ -94,6 +101,18 @@ public class RawPom {
         }
 
         return activeDependencies;
+    }
+
+    public List<Repository> getRepositories() {
+        return repositories == null ? emptyList() : repositories.getRepositories();
+    }
+
+    public List<License> getLicenses() {
+        return licenses == null ? emptyList() : licenses.getLicenses();
+    }
+
+    public List<Profile> getProfiles() {
+        return profiles == null ? emptyList() : profiles.getProfiles();
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -121,10 +140,49 @@ public class RawPom {
         Set<GroupArtifact> exclusions;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
     public static class DependencyManagement {
-        List<Dependency> dependencies;
+        @JacksonXmlProperty(localName = "dependency")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Dependency> dependencies = emptyList();
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    public static class Dependencies {
+        @JacksonXmlProperty(localName = "dependency")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Dependency> dependencies = emptyList();
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    public static class Repositories {
+        @JacksonXmlProperty(localName = "repository")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Repository> repositories = emptyList();
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    public static class Licenses {
+        @JacksonXmlProperty(localName = "license")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<License> licenses = emptyList();
+    }
+
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
+    public static class Profiles {
+        @JacksonXmlProperty(localName = "profile")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        List<Profile> profiles = emptyList();
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
