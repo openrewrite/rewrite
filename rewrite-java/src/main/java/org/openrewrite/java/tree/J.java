@@ -1148,9 +1148,8 @@ public interface J extends Serializable, Tree {
         }
 
         /**
-        * This method will find any method invocations that match the signature exoression within the compilation unit. The
-        * signature is expressed using the AspectJ pointcut syntax.
-        * See {@link org.openrewrite.java.search.FindMethods} for details on how do define the syntax.
+        * This finds method invocations matching the specified pointcut expression within the compilation unit. 
+        * See {@link org.openrewrite.java.search.FindMethods} for pointcut expression examples.
         *
         * @param signature A pointcut expression that scopes the method invocation search. 
         */
