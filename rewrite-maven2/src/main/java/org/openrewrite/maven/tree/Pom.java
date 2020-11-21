@@ -1,11 +1,9 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.tree.Xml;
 
 import java.net.URL;
 import java.util.Collection;
@@ -20,8 +18,6 @@ import static java.util.Optional.ofNullable;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class Pom {
-    private static final Map<ModuleVersionId, Pom> flyweights = HashObjObjMaps.newMutableMap();
-
     @Getter(AccessLevel.NONE)
     ModuleVersionId moduleVersionId;
 
@@ -66,8 +62,7 @@ public class Pom {
                             @JsonProperty("repositories") Collection<Repository> repositories,
                             @JsonProperty("properties") Map<String, String> properties) {
         ModuleVersionId mvid = new ModuleVersionId(groupId, artifactId, version, type, classifier);
-        return flyweights.computeIfAbsent(mvid, m ->
-                new Pom(m, parent, dependencies, dependencyManagement, licenses, repositories, properties));
+        return new Pom(mvid, parent, dependencies, dependencyManagement, licenses, repositories, properties);
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

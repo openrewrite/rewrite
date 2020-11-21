@@ -85,9 +85,8 @@ public class RawMavenResolver {
         RawPom pom = rawMaven.getPom();
 
         List<RawPom.Repository> repositories = new ArrayList<>();
-        if (pom.getRepositories() != null) {
-            repositories.addAll(pom.getRepositories());
-        }
+        pom.getRepositories();
+        repositories.addAll(pom.getRepositories());
         repositories.addAll(task.getRepositories());
 
         PartialMaven partialMaven = new PartialMaven(rawMaven);

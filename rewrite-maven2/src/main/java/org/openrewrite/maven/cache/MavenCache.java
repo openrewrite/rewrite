@@ -27,4 +27,8 @@ public interface MavenCache extends AutoCloseable {
      */
     CacheResult<RawPom.Repository> computeRepository(RawPom.Repository repository,
                                                      Callable<RawPom.Repository> orElseGet) throws Exception;
+
+    @Override
+    default void close() {
+    }
 }
