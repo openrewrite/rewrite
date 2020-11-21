@@ -25,7 +25,7 @@ public enum Scope {
 
         switch(scope) {
             case None:
-                return scope;
+                return this;
             case Compile:
                 switch(this) {
                     case Compile:
