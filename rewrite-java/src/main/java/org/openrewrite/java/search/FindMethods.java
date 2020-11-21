@@ -25,6 +25,24 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 
+/**
+ * A Java search visitor that will return a list of matching method invocations within the abstract syntax tree.
+ * This visitor is configured with a single parameter that represents a method signature using the AspectJ pointcut
+ * syntax. The signature syntax allows for wildcard matches against the receiver, the method name, and the method
+ * arguments.
+ * <P><P>
+ * <PRE>
+ *     EXAMPLES:
+ *
+ *      * *(..)                                 - All method invocations
+ *      java.util.* *(..)                       - All method invocations to classes belonging to java.util (including sub-packages)
+ *      java.util.Collections *(..)             - All method invocations on java.util.Collections class
+ *      java.util.Collections unmodifiable*(..) - All method invocations starting with "unmodifiable" on java.util.Collections
+ *      java.util.Collections min(..)           - All method invocations for all overloads of "min"
+ *      java.util.Collections emptyList()       - All method invocations on java.util.Collections.emptyList()
+ *      my.org.MyClass *(boolean, ..)           - All method invocations where the first arg is a boolean in my.org.MyClass
+ * </PRE>
+ */
 public class FindMethods extends AbstractJavaSourceVisitor<List<J.MethodInvocation>> {
     private final MethodMatcher matcher;
 

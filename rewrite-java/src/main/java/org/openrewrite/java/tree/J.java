@@ -1147,6 +1147,13 @@ public interface J extends Serializable, Tree {
             return new HasType(clazz).visit(this);
         }
 
+        /**
+        * This method will find any method invocations that match the signature exoression within the compilation unit. The
+        * signature is expressed using the AspectJ pointcut syntax.
+        * See {@link org.openrewrite.java.search.FindMethods} for details on how do define the syntax.
+        *
+        * @param signature A pointcut expression that scopes the method invocation search. 
+        */
         public List<MethodInvocation> findMethodCalls(String signature) {
             return new FindMethods(signature).visit(this);
         }
