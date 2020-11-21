@@ -141,12 +141,13 @@ public class RawPom {
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
     @Setter
     public static class DependencyManagement {
-        @JacksonXmlProperty(localName = "dependency")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<Dependency> dependencies = emptyList();
+        Dependencies dependencies;
+
+        public List<Dependency> getDependencies() {
+            return dependencies == null ? emptyList() : dependencies.getDependencies();
+        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)

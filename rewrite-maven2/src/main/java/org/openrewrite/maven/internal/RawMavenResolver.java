@@ -3,12 +3,7 @@ package org.openrewrite.maven.internal;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.DependencyDescriptor;
-import org.openrewrite.maven.tree.DependencyManagementDependency;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.maven.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -58,18 +53,24 @@ public class RawMavenResolver {
         this.resolveOptional = resolveOptional;
     }
 
+    @Nullable
+    public Maven resolve(RawMaven rawMaven) {
+        return resolve(rawMaven, SUPER_POM_REPOSITORY);
+    }
+
     /**
      * Resolution is performed breadth-first because the default conflict resolution algorithm
      * for Maven prefers nearer versions. By proceeding breadth-first we can avoid even attempting
      * to resolve subtrees that have no chance of being selected by conflict resolution in the end.
      *
-     * @param rawMaven The shell of the POM to resolve.
+     * @param rawMaven     The shell of the POM to resolve.
+     * @param repositories The set of repositories to resolve with.
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Maven resolve(RawMaven rawMaven) {
+    public Maven resolve(RawMaven rawMaven, List<RawPom.Repository> repositories) {
         ResolutionTask rootTask = new ResolutionTask(Scope.Compile, rawMaven, emptySet(),
-                false, null, SUPER_POM_REPOSITORY);
+                false, null, repositories);
 
         workQueue.add(rootTask);
 
@@ -82,20 +83,14 @@ public class RawMavenResolver {
 
     private void processTask(ResolutionTask task) {
         RawMaven rawMaven = task.getRawMaven();
-        RawPom pom = rawMaven.getPom();
-
-        List<RawPom.Repository> repositories = new ArrayList<>();
-        pom.getRepositories();
-        repositories.addAll(pom.getRepositories());
-        repositories.addAll(task.getRepositories());
 
         PartialMaven partialMaven = new PartialMaven(rawMaven);
         processProperties(task, partialMaven);
-        processParent(task, partialMaven);
-        processDependencyManagement(task, partialMaven, task.getRepositories());
-        processLicenses(task, partialMaven);
         processRepositories(task, partialMaven);
-        processDependencies(task, partialMaven, repositories);
+        processParent(task, partialMaven);
+        processDependencyManagement(task, partialMaven);
+        processLicenses(task, partialMaven);
+        processDependencies(task, partialMaven);
 
         partialResults.put(task, partialMaven);
     }
@@ -104,7 +99,7 @@ public class RawMavenResolver {
         partialMaven.setProperties(task.getRawMaven().getActiveProperties());
     }
 
-    private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven, List<RawPom.Repository> repositories) {
+    private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven) {
         RawPom pom = task.getRawMaven().getPom();
         List<DependencyManagementDependency> managedDependencies = new ArrayList<>();
 
@@ -128,9 +123,10 @@ public class RawMavenResolver {
                 // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
                 if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
-                            repositories);
+                            partialMaven.getRepositories());
                     if (rawMaven != null) {
-                        Maven maven = new RawMavenResolver(downloader, true, resolveOptional).resolve(rawMaven);
+                        Maven maven = new RawMavenResolver(downloader, true, resolveOptional)
+                                .resolve(rawMaven, partialMaven.getRepositories());
 
                         if (maven != null) {
                             managedDependencies.add(new DependencyManagementDependency.Imported(maven));
@@ -148,7 +144,7 @@ public class RawMavenResolver {
         partialMaven.setDependencyManagement(new Pom.DependencyManagement(managedDependencies));
     }
 
-    private void processDependencies(ResolutionTask task, PartialMaven partialMaven, List<RawPom.Repository> repositories) {
+    private void processDependencies(ResolutionTask task, PartialMaven partialMaven) {
         RawMaven rawMaven = task.getRawMaven();
 
         // Parent dependencies wind up being part of the subtree rooted at "task", so affect conflict resolution further down tree.
@@ -223,7 +219,7 @@ public class RawMavenResolver {
                     RequestedVersion requestedVersion = selectVersion(rawMaven.getURI(), effectiveScope, groupId, artifactId, version);
                     versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
 
-                    version = requestedVersion.resolve(downloader, repositories);
+                    version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
                     // for debugging
                     //noinspection RedundantIfStatement
@@ -250,7 +246,7 @@ public class RawMavenResolver {
 
                     RawMaven download = downloader.download(dep.getGroupId(), dep.getArtifactId(),
                             dep.getVersion(), dep.getClassifier(), null, rawMaven,
-                            task.getRepositories());
+                            partialMaven.getRepositories());
 
                     if (download == null) {
                         logger.warn("Unable to download {}:{}:{}. Including POM is at {}",
@@ -272,7 +268,7 @@ public class RawMavenResolver {
                                             .collect(Collectors.toSet()),
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
-                            repositories
+                            partialMaven.getRepositories()
                     );
 
                     if (!partialResults.containsKey(resolutionTask)) {
@@ -295,14 +291,15 @@ public class RawMavenResolver {
             RawPom.Parent rawParent = pom.getParent();
             RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
                     rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
-                    SUPER_POM_REPOSITORY);
+                    partialMaven.getRepositories());
             if (rawParentModel != null) {
                 PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
                 Optional<Maven> maybeParent = resolved.get(parentKey);
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, true, resolveOptional).resolve(rawParentModel);
+                    parent = new RawMavenResolver(downloader, true, resolveOptional)
+                            .resolve(rawParentModel, partialMaven.getRepositories());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -314,29 +311,17 @@ public class RawMavenResolver {
     }
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
-        List<RawPom.Repository> repositories = task.getRawMaven().getPom().getRepositories();
-        if (repositories != null) {
-            List<Pom.Repository> parsed = new ArrayList<>();
-            for (RawPom.Repository repo : repositories) {
-                try {
-                    parsed.add(new Pom.Repository(URI.create(repo.getUrl()).toURL(),
-                            repo.getReleases() == null || repo.getReleases().isEnabled(),
-                            repo.getSnapshots() == null || repo.getSnapshots().isEnabled()));
-                } catch (MalformedURLException e) {
-                    logger.debug("Malformed repository URL '{}'", repo.getUrl());
-                }
-            }
-            partialMaven.setRepositories(parsed);
-        }
+        List<RawPom.Repository> repositories = new ArrayList<>();
+        repositories.addAll(task.getRawMaven().getPom().getRepositories());
+        repositories.addAll(task.getRepositories());
+        partialMaven.setRepositories(repositories);
     }
 
     private void processLicenses(ResolutionTask task, PartialMaven partialMaven) {
         List<RawPom.License> licenses = task.getRawMaven().getPom().getLicenses();
-        if (licenses != null) {
-            partialMaven.setLicenses(licenses.stream()
-                    .map(license -> Pom.License.fromName(license.getName()))
-                    .collect(toList()));
-        }
+        partialMaven.setLicenses(licenses.stream()
+                .map(license -> Pom.License.fromName(license.getName()))
+                .collect(toList()));
     }
 
     @Nullable
@@ -440,6 +425,17 @@ public class RawMavenResolver {
                     version = partial.getParent().getModel().getVersion();
                 }
 
+                List<Pom.Repository> repositories = new ArrayList<>();
+                for (RawPom.Repository repo : partial.getRepositories()) {
+                    try {
+                        repositories.add(new Pom.Repository(URI.create(repo.getUrl()).toURL(),
+                                repo.getReleases() == null || repo.getReleases().isEnabled(),
+                                repo.getSnapshots() == null || repo.getSnapshots().isEnabled()));
+                    } catch (MalformedURLException e) {
+                        logger.debug("Malformed repository URL '{}'", repo.getUrl());
+                    }
+                }
+
                 result = Optional.of(new Maven(
                         rawMaven.getDocument(),
                         Pom.build(
@@ -452,7 +448,7 @@ public class RawMavenResolver {
                                 dependencies,
                                 partial.getDependencyManagement(),
                                 partial.getLicenses(),
-                                partial.getRepositories(),
+                                repositories,
                                 partial.getProperties()
                         )
                 ));
@@ -515,7 +511,7 @@ public class RawMavenResolver {
         Pom.DependencyManagement dependencyManagement;
         Collection<ResolutionTask> dependencyTasks = emptyList();
         Collection<Pom.License> licenses = emptyList();
-        Collection<Pom.Repository> repositories = emptyList();
+        List<RawPom.Repository> repositories = emptyList();
         Map<String, String> properties = emptyMap();
 
         @Nullable
