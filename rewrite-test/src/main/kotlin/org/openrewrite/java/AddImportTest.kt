@@ -376,9 +376,8 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     /**
-     * This visitor is used to set the clear the receiver of a a method invocation to java.util.Collections.emptyList().
-     * This allows us to test that the static import is correctly added when a method has no receiver but has a method
-     * type that matches the static import defined in the AddImport.
+     * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
+     * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
     private class FixEmptyListMethodType : JavaIsoRefactorVisitor() {
         override fun visitMethodInvocation(method: J.MethodInvocation?): J.MethodInvocation {
