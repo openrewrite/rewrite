@@ -3,6 +3,7 @@ package org.openrewrite.maven.tree;
 import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.Metadata;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URL;
@@ -12,14 +13,23 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static java.util.Optional.ofNullable;
-
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
-public class Pom {
-    @Getter(AccessLevel.NONE)
-    ModuleVersionId moduleVersionId;
+public class Pom implements Metadata {
+    @Nullable
+    String groupId;
+
+    String artifactId;
+
+    @Nullable
+    String version;
+
+    @Nullable
+    String type;
+
+    @Nullable
+    String classifier;
 
     @Nullable
     Pom parent;
@@ -33,48 +43,28 @@ public class Pom {
     Collection<Repository> repositories;
     Map<String, String> properties;
 
-    private Pom(ModuleVersionId moduleVersionId,
-                @Nullable Pom parent,
-                Collection<Dependency> dependencies,
-                DependencyManagement dependencyManagement,
-                Collection<License> licenses,
-                Collection<Repository> repositories,
-                Map<String, String> properties) {
-        this.moduleVersionId = moduleVersionId;
+    public Pom(@Nullable @JsonProperty("groupId") String groupId,
+               @JsonProperty("artifactId") String artifactId,
+               @Nullable @JsonProperty("version") String version,
+               @Nullable @JsonProperty("type") String type,
+               @Nullable @JsonProperty("classifier") String classifier,
+               @Nullable @JsonProperty("parent") Pom parent,
+               @JsonProperty("dependencies") Collection<Dependency> dependencies,
+               @JsonProperty("dependencyManagement") DependencyManagement dependencyManagement,
+               @JsonProperty("licenses") Collection<License> licenses,
+               @JsonProperty("repositories") Collection<Repository> repositories,
+               @JsonProperty("properties") Map<String, String> properties) {
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.type = type;
+        this.classifier = classifier;
         this.parent = parent;
         this.dependencies = dependencies;
         this.dependencyManagement = dependencyManagement;
         this.licenses = licenses;
         this.repositories = repositories;
         this.properties = properties;
-    }
-
-    @JsonCreator
-    public static Pom build(@JsonProperty("groupId") String groupId,
-                            @JsonProperty("artifactId") String artifactId,
-                            @JsonProperty("version") String version,
-                            @JsonProperty("type") String type,
-                            @Nullable @JsonProperty("classifier") String classifier,
-                            @Nullable @JsonProperty("parent") Pom parent,
-                            @JsonProperty("dependencies") Collection<Dependency> dependencies,
-                            @JsonProperty("dependencyManagement") DependencyManagement dependencyManagement,
-                            @JsonProperty("licenses") Collection<License> licenses,
-                            @JsonProperty("repositories") Collection<Repository> repositories,
-                            @JsonProperty("properties") Map<String, String> properties) {
-        ModuleVersionId mvid = new ModuleVersionId(groupId, artifactId, version, type, classifier);
-        return new Pom(mvid, parent, dependencies, dependencyManagement, licenses, repositories, properties);
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    private static class ModuleVersionId {
-        String groupId;
-        String artifactId;
-        String version;
-        String type;
-
-        @Nullable
-        String classifier;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -91,19 +81,25 @@ public class Pom {
     @Nullable
     public String getProperty(String property) {
         String key = property.replace("${", "").replace("}", "");
-        return ofNullable(properties.get(key))
-                .orElseGet(() -> parent == null ? null : parent.getProperty(property));
+        String value = properties.get(key);
+        if (value == null) {
+            return parent == null ? null : parent.getProperty(key);
+        }
+        return value;
     }
 
     public String getGroupId() {
-        return ofNullable(moduleVersionId.getGroupId())
-                .orElseGet(() -> ofNullable(parent)
-                        .map(Pom::getGroupId)
-                        .orElseThrow(() -> new IllegalStateException("groupId must be defined")));
+        if (groupId == null) {
+            if (parent == null) {
+                throw new IllegalStateException("groupId must be defined");
+            }
+            return parent.getGroupId();
+        }
+        return groupId;
     }
 
     public DependencyManagement getEffectiveDependencyManagement() {
-        if(parent == null) {
+        if (parent == null) {
             return dependencyManagement;
         }
         return new DependencyManagement(Stream.concat(dependencyManagement.getDependencies().stream(),
@@ -114,35 +110,41 @@ public class Pom {
     @Nullable
     public String getManagedVersion(String groupId, String artifactId) {
         DependencyManagement effectiveDependencyManagement = getEffectiveDependencyManagement();
-        return effectiveDependencyManagement.getDependencies().stream()
-                .flatMap(dep -> dep.getDependencies().stream())
-                .filter(dep -> groupId.equals(dep.getGroupId()) && artifactId.equals(dep.getArtifactId()))
-                .findAny()
-                .map(DependencyDescriptor::getVersion)
-                .orElse(null);
+        for (DependencyManagementDependency dep : effectiveDependencyManagement.getDependencies()) {
+            for (DependencyDescriptor dependencyDescriptor : dep.getDependencies()) {
+                if (groupId.equals(dependencyDescriptor.getGroupId()) && artifactId.equals(dependencyDescriptor.getArtifactId())) {
+                    return dependencyDescriptor.getVersion();
+                }
+            }
+        }
+        return null;
     }
 
     /**
      * Cannot be inherited from a parent POM.
      */
     public String getArtifactId() {
-        return moduleVersionId.getArtifactId();
+        return artifactId;
     }
 
     public String getVersion() {
-        return ofNullable(moduleVersionId.getVersion())
-                .orElseGet(() -> ofNullable(parent)
-                        .map(Pom::getVersion)
-                        .orElseThrow(() -> new IllegalStateException("version must be defined")));
+        if (version == null) {
+            if (parent == null) {
+                throw new IllegalStateException("version must be defined");
+            }
+            return parent.getVersion();
+        }
+        return version;
     }
 
+    @Nullable
     public String getType() {
-        return moduleVersionId.getType();
+        return type;
     }
 
     @Nullable
     public String getClassifier() {
-        return moduleVersionId.getClassifier();
+        return classifier;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

@@ -7,19 +7,18 @@ import org.openrewrite.maven.cache.NoopCache;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.internal.RawPomDownloader;
-import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.tree.Xml;
 
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.StreamSupport;
 
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.StreamSupport.stream;
 
-public class MavenParser implements Parser<Maven> {
+public class MavenParser implements Parser<Xml.Document> {
     private final MavenCache mavenCache;
     private final boolean resolveOptional;
 
@@ -29,7 +28,7 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
+    public List<Xml.Document> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
         Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
                 .map(source -> RawMaven.parse(source, relativeTo))
                 .collect(toList());

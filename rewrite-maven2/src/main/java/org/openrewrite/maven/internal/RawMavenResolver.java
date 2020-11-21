@@ -4,6 +4,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
+import org.openrewrite.xml.tree.Xml;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,10 +55,10 @@ public class RawMavenResolver {
     }
 
     @Nullable
-    public Maven resolve(RawMaven rawMaven) {
+    public Xml.Document resolve(RawMaven rawMaven) {
         Pom pom = resolve(rawMaven, Scope.None, SUPER_POM_REPOSITORY);
         assert pom != null;
-        return new Maven(rawMaven.getDocument(), pom);
+        return rawMaven.getDocument().withMetadata(singletonList(pom));
     }
 
     /**
@@ -442,11 +443,11 @@ public class RawMavenResolver {
                 }
 
                 result = Optional.of(
-                        Pom.build(
+                        new Pom(
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
-                                "jar",
+                                null,
                                 null,
                                 partial.getParent(),
                                 dependencies,

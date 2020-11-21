@@ -20,6 +20,7 @@ import org.openrewrite.java.style.DeclarationOrderStyle;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;
+import java.util.Optional;
 
 public class OrderDeclarations extends JavaIsoRefactorVisitor {
     @Nullable
@@ -60,7 +61,7 @@ public class OrderDeclarations extends JavaIsoRefactorVisitor {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
             if (layout == null) {
                 // infer from compilation unit or default
-                this.layout = cu.getStyle(DeclarationOrderStyle.class)
+                this.layout = Optional.ofNullable(cu.getStyle(DeclarationOrderStyle.class))
                         .map(style -> this.layout = style.getLayout())
                         .orElse(DeclarationOrderStyle.Layout.DEFAULT);
             }

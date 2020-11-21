@@ -33,7 +33,7 @@ public class InsertDeclaration {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
-            this.layout = cu.getStyle(DeclarationOrderStyle.class)
+            this.layout = Optional.ofNullable(cu.getStyle(DeclarationOrderStyle.class))
                     .map(DeclarationOrderStyle::getLayout)
                     .orElse(DeclarationOrderStyle.Layout.DEFAULT);
 

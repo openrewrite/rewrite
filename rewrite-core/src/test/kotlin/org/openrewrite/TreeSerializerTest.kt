@@ -35,6 +35,6 @@ class TreeSerializerTest {
         val serialized = serializer.write(listOf(plainText1, plainText2))
 
         val deserialized = serializer.readList(serialized)
-        assertThat(deserialized[0].getStyle(TextStyle::class.java).map { it.charset }.orElse(null)).isEqualTo("UTF-8")
+        assertThat(deserialized[0].getStyle(TextStyle::class.java)!!.charset).isEqualTo("UTF-8")
     }
 }

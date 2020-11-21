@@ -4,10 +4,8 @@ import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenMetadata;
 import org.openrewrite.maven.internal.RawPom;
 
-import java.io.Closeable;
 import java.net.URL;
 import java.util.concurrent.Callable;
-import java.util.function.Supplier;
 
 public interface MavenCache extends AutoCloseable {
     CacheResult<RawMavenMetadata> computeMavenMetadata(URL repo,

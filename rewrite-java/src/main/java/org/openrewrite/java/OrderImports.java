@@ -16,21 +16,13 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
@@ -40,7 +32,6 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.valid;
 
 public class OrderImports extends JavaIsoRefactorVisitor {
@@ -104,16 +95,16 @@ public class OrderImports extends JavaIsoRefactorVisitor {
         List<J.Import> orderedImports = new ArrayList<>();
 
         if (importLayout == null) {
-            importLayout = cu.getStyle(ImportLayoutStyle.class)
+            importLayout = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .map(ImportLayoutStyle::orderImportLayout)
                     .orElse(intellij());
         }
 
         List<Layout.Block> blocks = importLayout.blocks;
         blocks.forEach(Layout.Block::reset);
-        assert (blocks.stream().filter( it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).statik).findAny().isPresent())
+        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).statik))
                 : "There must be at least one block that accepts all static imports, but no such block was found in the specified layout";
-        assert (blocks.stream().filter( it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).statik).findAny().isPresent())
+        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).statik))
                 : "There must be at least one block that accepts all non-static imports, but no such block was found in the specified layout";
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
@@ -287,11 +278,11 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                                     Collectors.toList()
                             ));
 
-                    List<J.Import> orderedStarredImports = groupedImports.values().stream()
+                    return groupedImports.values().stream()
                             .flatMap(importGroup -> {
                                 J.Import toStar = importGroup.get(0);
-                                boolean statik = toStar.isStatic();
-                                int threshold = statik ? nameCountToUseStarImport : classCountToUseStarImport;
+                                boolean statik1 = toStar.isStatic();
+                                int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
                                 boolean starImportExists = importGroup.stream().anyMatch(it -> it.getQualid().getSimpleName().equals("*"));
                                 if(importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                     return Stream.of(toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
@@ -301,8 +292,6 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                                             .filter(Block.distinctBy(Tree::printTrimmed));
                                 }
                             }).collect(toList());
-
-                    return orderedStarredImports;
                 }
             }
             // Returns a predicate suitable for use with stream().filter() that will result in a set filtered to

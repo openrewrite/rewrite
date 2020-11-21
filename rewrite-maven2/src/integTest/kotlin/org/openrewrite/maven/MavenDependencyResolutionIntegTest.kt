@@ -21,8 +21,8 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.maven.cache.MapdbCache
-import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
+import org.openrewrite.xml.tree.Xml
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -304,14 +304,14 @@ class MavenDependencyResolutionIntegTest {
     private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
-        val pomAst: Maven = MavenParser.builder()
+        val pomAst: Xml.Document = MavenParser.builder()
                 .cache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null)
                 .first()
 
-        val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)
+        val rewrite = printTreeRecursive(pomAst.getMetadata(Pom::class.java)!!, ignoreScopes)
 
 //        println(rewrite)
 

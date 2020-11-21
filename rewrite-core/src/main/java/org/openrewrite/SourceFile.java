@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -33,8 +34,16 @@ public interface SourceFile extends Tree {
      */
     Collection<Metadata> getMetadata();
 
-    default <M extends Metadata> Optional<M> getMetadata(Class<M> metadataType) {
-        return getStyles().stream().filter(metadataType::isInstance).map(metadataType::cast).findFirst();
+    @Nullable
+    default <M extends Metadata> M getMetadata(Class<M> metadataType) {
+        for (Metadata metadata : getMetadata()) {
+            if (metadataType.isInstance(metadata)) {
+                //noinspection unchecked
+                return (M) metadata;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -47,8 +56,16 @@ public interface SourceFile extends Tree {
         return emptyList();
     }
 
-    default <S extends Style> Optional<S> getStyle(Class<S> styleType) {
-        return getStyles().stream().filter(styleType::isInstance).map(styleType::cast).findFirst();
+    @Nullable
+    default <S extends Style> S getStyle(Class<S> styleType) {
+        for (Style style : getStyles()) {
+            if (styleType.isInstance(style)) {
+                //noinspection unchecked
+                return (S) style;
+            }
+        }
+
+        return null;
     }
 
     @JsonProperty("@c")

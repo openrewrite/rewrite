@@ -191,10 +191,16 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> isUnchanged() {
-            List<String> results = refactor.fix(sources).stream()
-                    .map(Change::getFixed)
-                    .map(SourceFile::printTrimmed)
-                    .collect(toList());
+            List<String> results = new ArrayList<>();
+            for (Change change : refactor.fix(sources)) {
+                if(change.getFixed() != null) {
+                    results.add(change.getFixed().printTrimmed());
+                }
+                else {
+                    assert change.getOriginal() != null;
+                    results.add(change.getOriginal().getSourcePath() + " has been DELETED");
+                }
+            }
 
             assertThat(results).isEmpty();
             return this;
