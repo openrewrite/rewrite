@@ -35,14 +35,12 @@ public class RequestedVersion {
      * @param requested     Any valid version text that can be written in a POM
      *                      including a fixed version, a range, LATEST, or RELEASE.
      */
-    public RequestedVersion(@Nullable URI uri, GroupArtifact groupArtifact, @Nullable RequestedVersion nearer, String requested) {
+    public RequestedVersion(GroupArtifact groupArtifact, @Nullable RequestedVersion nearer, String requested) {
         this.groupArtifact = groupArtifact;
         this.nearer = nearer;
 
         VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(
                 CharStreams.fromString(requested))));
-        parser.removeErrorListeners();
-        parser.addErrorListener(new LoggingErrorListener(uri));
 
         this.versionSpec = new VersionRangeParserBaseVisitor<VersionSpec>() {
             @Override

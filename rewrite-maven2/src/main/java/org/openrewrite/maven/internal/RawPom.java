@@ -8,7 +8,6 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
 
-import java.net.URI;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -66,7 +65,7 @@ public class RawPom {
     Profiles profiles;
 
     @JsonIgnore
-    public Map<String, String> getActiveProperties(URI containingPomUri) {
+    public Map<String, String> getActiveProperties() {
         Map<String, String> activeProperties = new HashMap<>();
 
         if (properties != null) {
@@ -75,7 +74,7 @@ public class RawPom {
 
         if (profiles != null) {
             for (RawPom.Profile profile : getProfiles()) {
-                if (profile.isActive(containingPomUri) && profile.getProperties() != null) {
+                if (profile.isActive() && profile.getProperties() != null) {
                     activeProperties.putAll(profile.getProperties());
                 }
             }
@@ -85,7 +84,7 @@ public class RawPom {
     }
 
     @JsonIgnore
-    public List<Dependency> getActiveDependencies(URI containingPomUri) {
+    public List<Dependency> getActiveDependencies() {
         List<Dependency> activeDependencies = new ArrayList<>();
 
         if (dependencies != null) {
@@ -93,7 +92,7 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            getProfiles().stream().filter(p -> p.isActive(containingPomUri)).forEach(profile -> {
+            getProfiles().stream().filter(Profile::isActive).forEach(profile -> {
                 if (profile.dependencies != null) {
                     activeDependencies.addAll(profile.dependencies);
                 }
@@ -253,8 +252,8 @@ public class RawPom {
         List<Dependency> dependencies;
 
         @JsonIgnore
-        public boolean isActive(URI containingPomUri) {
-            return activation != null && activation.isActive(containingPomUri);
+        public boolean isActive() {
+            return activation != null && activation.isActive();
         }
     }
 
@@ -268,17 +267,17 @@ public class RawPom {
         Map<String, String> property;
 
         @JsonIgnore
-        public boolean isActive(@Nullable URI containingPomUri) {
-            return isActiveByJdk(containingPomUri) || isActiveByProperty();
+        public boolean isActive() {
+            return isActiveByJdk() || isActiveByProperty();
         }
 
         @JsonIgnore
-        private boolean isActiveByJdk(@Nullable URI containingPomUri) {
+        private boolean isActiveByJdk() {
             if (jdk == null) {
                 return false;
             }
             String version = System.getProperty("java.version");
-            RequestedVersion requestedVersion = new RequestedVersion(containingPomUri, new GroupArtifact("", ""),
+            RequestedVersion requestedVersion = new RequestedVersion(new GroupArtifact("", ""),
                     null, jdk);
 
             if (requestedVersion.isDynamic() || requestedVersion.isRange()) {

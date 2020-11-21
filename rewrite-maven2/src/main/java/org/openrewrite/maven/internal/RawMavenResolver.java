@@ -31,7 +31,7 @@ public class RawMavenResolver {
     // The breadth-first queue of resolution tasks.
     private final Queue<ResolutionTask> workQueue = new LinkedList<>();
 
-    private final Map<PartialTreeKey, Optional<Maven>> resolved = new HashMap<>();
+    private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
 
     private final RawPomDownloader downloader;
@@ -55,7 +55,9 @@ public class RawMavenResolver {
 
     @Nullable
     public Maven resolve(RawMaven rawMaven) {
-        return resolve(rawMaven, Scope.None, SUPER_POM_REPOSITORY);
+        Pom pom = resolve(rawMaven, Scope.None, SUPER_POM_REPOSITORY);
+        assert pom != null;
+        return new Maven(rawMaven.getDocument(), pom);
     }
 
     /**
@@ -68,7 +70,7 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Maven resolve(RawMaven rawMaven, Scope scope, List<RawPom.Repository> repositories) {
+    public Pom resolve(RawMaven rawMaven, Scope scope, List<RawPom.Repository> repositories) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
                 false, null, repositories);
 
@@ -84,7 +86,7 @@ public class RawMavenResolver {
     private void processTask(ResolutionTask task) {
         RawMaven rawMaven = task.getRawMaven();
 
-        PartialMaven partialMaven = new PartialMaven(rawMaven);
+        PartialMaven partialMaven = new PartialMaven(rawMaven.getPom());
         processProperties(task, partialMaven);
         processRepositories(task, partialMaven);
         processParent(task, partialMaven);
@@ -125,7 +127,7 @@ public class RawMavenResolver {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
-                        Maven maven = new RawMavenResolver(downloader, true, resolveOptional)
+                        Pom maven = new RawMavenResolver(downloader, true, resolveOptional)
                                 .resolve(rawMaven, Scope.Compile, partialMaven.getRepositories());
 
                         if (maven != null) {
@@ -149,8 +151,8 @@ public class RawMavenResolver {
 
         // Parent dependencies wind up being part of the subtree rooted at "task", so affect conflict resolution further down tree.
         if (partialMaven.getParent() != null) {
-            for (Pom.Dependency dependency : partialMaven.getParent().getModel().getDependencies()) {
-                RequestedVersion requestedVersion = selectVersion(rawMaven.getURI(), dependency.getScope(), dependency.getGroupId(),
+            for (Pom.Dependency dependency : partialMaven.getParent().getDependencies()) {
+                RequestedVersion requestedVersion = selectVersion(dependency.getScope(), dependency.getGroupId(),
                         dependency.getArtifactId(), dependency.getVersion());
                 versionSelection.get(dependency.getScope()).put(new GroupArtifact(dependency.getGroupId(), dependency.getArtifactId()), requestedVersion);
             }
@@ -189,8 +191,10 @@ public class RawMavenResolver {
                                                 artifactId.equals(partialMaven.getArtifactId(managed.getArtifactId())))
                                         .findAny()
                                         .map(DependencyDescriptor::getVersion)
-                                        .orElseGet(() -> partialMaven.getParent() == null ? null : partialMaven.getParent().getModel()
-                                                .getManagedVersion(groupId, artifactId))
+                                        .orElseGet(() -> partialMaven.getParent() == null ?
+                                                null :
+                                                partialMaven.getParent().getManagedVersion(groupId, artifactId)
+                                        )
                                 );
                     } while (i++ < 2 || !Objects.equals(version, last));
 
@@ -216,7 +220,7 @@ public class RawMavenResolver {
                         return null;
                     }
 
-                    RequestedVersion requestedVersion = selectVersion(rawMaven.getURI(), effectiveScope, groupId, artifactId, version);
+                    RequestedVersion requestedVersion = selectVersion(effectiveScope, groupId, artifactId, version);
                     versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
 
                     version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
@@ -285,7 +289,7 @@ public class RawMavenResolver {
     private void processParent(ResolutionTask task, PartialMaven partialMaven) {
         RawMaven rawMaven = task.getRawMaven();
         RawPom pom = rawMaven.getPom();
-        Maven parent = null;
+        Pom parent = null;
         if (pom.getParent() != null) {
             // TODO would it help to limit lookups of parents here by pre-caching RawMaven by RawPom.Parent?
             RawPom.Parent rawParent = pom.getParent();
@@ -294,7 +298,7 @@ public class RawMavenResolver {
                     partialMaven.getRepositories());
             if (rawParentModel != null) {
                 PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
-                Optional<Maven> maybeParent = resolved.get(parentKey);
+                Optional<Pom> maybeParent = resolved.get(parentKey);
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
@@ -325,7 +329,7 @@ public class RawMavenResolver {
     }
 
     @Nullable
-    private Maven assembleResults(ResolutionTask task, Stack<ResolutionTask> assemblyStack) {
+    private Pom assembleResults(ResolutionTask task, Stack<ResolutionTask> assemblyStack) {
         if (assemblyStack.contains(task)) {
             return null; // cut cycles
         }
@@ -334,7 +338,7 @@ public class RawMavenResolver {
         RawPom rawPom = rawMaven.getPom();
         PartialTreeKey taskKey = new PartialTreeKey(rawPom.getGroupId(), rawPom.getArtifactId(), rawPom.getVersion());
 
-        Optional<Maven> result = resolved.get(taskKey);
+        Optional<Pom> result = resolved.get(taskKey);
 
         Stack<ResolutionTask> nextAssemblyStack = new Stack<>();
         nextAssemblyStack.addAll(assemblyStack);
@@ -363,7 +367,7 @@ public class RawMavenResolver {
                                 );
                             }
 
-                            Maven resolved = assembleResults(depTask, nextAssemblyStack);
+                            Pom resolved = assembleResults(depTask, nextAssemblyStack);
                             if (resolved == null) {
                                 return null;
                             }
@@ -379,21 +383,21 @@ public class RawMavenResolver {
                         .filter(Objects::nonNull)
                         .collect(Collectors.toCollection(ArrayList::new));
 
-                for (Maven ancestor = partial.getParent(); ancestor != null; ancestor = ancestor.getModel().getParent()) {
-                    for (Pom.Dependency ancestorDep : ancestor.getModel().getDependencies()) {
+                for (Pom ancestor = partial.getParent(); ancestor != null; ancestor = ancestor.getParent()) {
+                    for (Pom.Dependency ancestorDep : ancestor.getDependencies()) {
                         // the ancestor's dependency might be overridden by another version by conflict resolution
                         Scope scope = ancestorDep.getScope();
                         String groupId = ancestorDep.getGroupId();
                         String artifactId = ancestorDep.getArtifactId();
 
-                        String conflictResolvedVersion = selectVersion(rawMaven.getURI(), scope, groupId, artifactId, ancestorDep.getVersion())
+                        String conflictResolvedVersion = selectVersion(scope, groupId, artifactId, ancestorDep.getVersion())
                                 .resolve(downloader, task.getRepositories());
 
                         if (!conflictResolvedVersion.equals(ancestorDep.getVersion())) {
                             RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
                                     ancestorDep.getClassifier(), null, null, task.getRepositories());
 
-                            Maven conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw, ancestorDep.getExclusions(),
+                            Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw, ancestorDep.getExclusions(),
                                     ancestorDep.isOptional(), ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
 
                             // for debugging
@@ -418,12 +422,12 @@ public class RawMavenResolver {
 
                 String groupId = rawPom.getGroupId();
                 if (groupId == null) {
-                    groupId = partial.getParent().getModel().getGroupId();
+                    groupId = partial.getParent().getGroupId();
                 }
 
                 String version = rawPom.getVersion();
                 if (version == null) {
-                    version = partial.getParent().getModel().getVersion();
+                    version = partial.getParent().getVersion();
                 }
 
                 List<Pom.Repository> repositories = new ArrayList<>();
@@ -437,8 +441,7 @@ public class RawMavenResolver {
                     }
                 }
 
-                result = Optional.of(new Maven(
-                        rawMaven.getDocument(),
+                result = Optional.of(
                         Pom.build(
                                 groupId,
                                 rawPom.getArtifactId(),
@@ -452,7 +455,7 @@ public class RawMavenResolver {
                                 repositories,
                                 partial.getProperties()
                         )
-                ));
+                );
             } else {
                 result = Optional.empty();
             }
@@ -506,9 +509,9 @@ public class RawMavenResolver {
     @Setter
     static class PartialMaven {
         @EqualsAndHashCode.Include
-        final RawMaven rawMaven;
+        final RawPom rawPom;
 
-        Maven parent;
+        Pom parent;
         Pom.DependencyManagement dependencyManagement;
         Collection<ResolutionTask> dependencyTasks = emptyList();
         Collection<Pom.License> licenses = emptyList();
@@ -518,10 +521,10 @@ public class RawMavenResolver {
         @Nullable
         String getGroupId(String g) {
             if (g.equals("${project.groupId}") || g.equals("${pom.groupId}")) {
-                return ofNullable(rawMaven.getPom().getGroupId())
-                        .orElse(parent == null ? null : parent.getModel().getGroupId());
+                return ofNullable(rawPom.getGroupId())
+                        .orElse(parent == null ? null : parent.getGroupId());
             } else if (g.equals("${project.parent.groupId}")) {
-                return parent != null ? parent.getModel().getGroupId() : null;
+                return parent != null ? parent.getGroupId() : null;
             }
             return getValue(g);
         }
@@ -529,9 +532,9 @@ public class RawMavenResolver {
         @Nullable
         String getArtifactId(String a) {
             if (a.equals("${project.artifactId}") || a.equals("${pom.artifactId}")) {
-                return rawMaven.getPom().getArtifactId(); // cannot be inherited from parent
+                return rawPom.getArtifactId(); // cannot be inherited from parent
             } else if (a.equals("${project.parent.artifactId}")) {
-                return parent != null ? parent.getModel().getArtifactId() : null;
+                return parent != null ? parent.getArtifactId() : null;
             }
             return getValue(a);
         }
@@ -541,10 +544,10 @@ public class RawMavenResolver {
             if (v == null) {
                 return null;
             } else if (v.equals("${project.version}") || v.equals("${pom.version}")) {
-                return ofNullable(rawMaven.getPom().getVersion())
-                        .orElse(parent == null ? null : parent.getModel().getVersion());
+                return ofNullable(rawPom.getVersion())
+                        .orElse(parent == null ? null : parent.getVersion());
             } else if (v.equals("${project.parent.version}")) {
-                return parent != null ? parent.getModel().getVersion() : null;
+                return parent != null ? parent.getVersion() : null;
             }
             return getValue(v);
         }
@@ -558,7 +561,7 @@ public class RawMavenResolver {
             if (v.startsWith("${") && v.endsWith("}")) {
                 String key = v.replace("${", "").replace("}", "");
 
-                String value = rawMaven.getActiveProperties().get(key);
+                String value = rawPom.getActiveProperties().get(key);
                 if (value != null) {
                     return value;
                 }
@@ -573,8 +576,8 @@ public class RawMavenResolver {
                     }
                 }
 
-                for (Maven ancestor = parent; ancestor != null; ancestor = ancestor.getModel().getParent()) {
-                    value = ancestor.getModel().getProperty(key);
+                for (Pom ancestor = parent; ancestor != null; ancestor = ancestor.getParent()) {
+                    value = ancestor.getProperty(key);
                     if (value != null) {
                         return value;
                     }
@@ -600,11 +603,11 @@ public class RawMavenResolver {
      * @param version    The dependency's recommended version, if any.
      * @return The version selected by conflict resolution.
      */
-    private RequestedVersion selectVersion(URI containingPomUri, @Nullable Scope scope, String groupId, String artifactId, String version) {
+    private RequestedVersion selectVersion(@Nullable Scope scope, String groupId, String artifactId, String version) {
         GroupArtifact groupArtifact = new GroupArtifact(groupId, artifactId);
 
         if (scope == null) {
-            return new RequestedVersion(containingPomUri, groupArtifact, null, version);
+            return new RequestedVersion(groupArtifact, null, version);
         }
 
         RequestedVersion nearer = versionSelection.headMap(scope, true).values().stream()
@@ -614,6 +617,6 @@ public class RawMavenResolver {
                 .orElse(null);
 
         return versionSelection.get(scope)
-                .getOrDefault(groupArtifact, new RequestedVersion(containingPomUri, groupArtifact, nearer, version));
+                .getOrDefault(groupArtifact, new RequestedVersion(groupArtifact, nearer, version));
     }
 }

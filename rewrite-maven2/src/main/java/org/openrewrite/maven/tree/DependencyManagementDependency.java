@@ -52,12 +52,12 @@ public interface DependencyManagementDependency {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     class Imported implements DependencyManagementDependency {
-        Maven maven;
+        Pom maven;
 
         @JsonIgnore
         @Override
         public List<DependencyDescriptor> getDependencies() {
-            return maven.getModel().getEffectiveDependencyManagement().getDependencies().stream()
+            return maven.getEffectiveDependencyManagement().getDependencies().stream()
                     .flatMap(dep -> dep.getDependencies().stream())
                     .collect(Collectors.toList());
         }
@@ -66,7 +66,7 @@ public interface DependencyManagementDependency {
         @Override
         public Map<String, String> getProperties() {
             // FIXME should be active properties by profile as well? also parent properties?
-            return maven.getModel().getProperties();
+            return maven.getProperties();
         }
     }
 

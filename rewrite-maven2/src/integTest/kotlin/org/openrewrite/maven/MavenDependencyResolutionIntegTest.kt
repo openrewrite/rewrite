@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.maven.cache.MapdbCache
 import org.openrewrite.maven.tree.Maven
+import org.openrewrite.maven.tree.Pom
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -310,7 +311,7 @@ class MavenDependencyResolutionIntegTest {
                 .parse(listOf(pomFile.toPath()), null)
                 .first()
 
-        val rewrite = printTreeRecursive(pomAst, ignoreScopes)
+        val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)
 
 //        println(rewrite)
 
@@ -321,8 +322,8 @@ class MavenDependencyResolutionIntegTest {
         assertThat(rewrite).isEqualTo(aether)
     }
 
-    private fun printTreeRecursive(maven: Maven, ignoreScopes: Boolean): String {
-        return maven.model.dependencies
+    private fun printTreeRecursive(maven: Pom, ignoreScopes: Boolean): String {
+        return maven.dependencies
                 .filterNot { it.isOptional }
                 .sortedWith { d1, d2 ->
                     if (d1.groupId == d2.groupId)
@@ -331,7 +332,7 @@ class MavenDependencyResolutionIntegTest {
                         d1.groupId.compareTo(d2.groupId)
                 }
                 .joinToString("\n") { dep ->
-                    dependencyString(dep, ignoreScopes) + printTreeRecursive(dep.maven, ignoreScopes)
+                    dependencyString(dep, ignoreScopes) + printTreeRecursive(dep.model, ignoreScopes)
                             .let { if (it.isBlank()) "" else "\n${it.prependIndent(" ")}" }
                 }
     }

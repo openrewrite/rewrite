@@ -6,8 +6,8 @@ import org.junit.jupiter.api.Test
 class RawPomTest {
     @Test
     fun profileActivationByJdk() {
-        assertThat(RawPom.ProfileActivation("11", emptyMap()).isActive(null)).isTrue()
-        assertThat(RawPom.ProfileActivation("[,12)", emptyMap()).isActive(null)).isTrue()
-        assertThat(RawPom.ProfileActivation("[,11]", emptyMap()).isActive(null)).isFalse()
+        assertThat(RawPom.ProfileActivation("11", emptyMap()).isActive()).isTrue()
+        assertThat(RawPom.ProfileActivation("[,12)", emptyMap()).isActive()).isTrue()
+        assertThat(RawPom.ProfileActivation("[,11]", emptyMap()).isActive()).isFalse()
     }
 }

@@ -22,7 +22,7 @@ public class Pom {
     ModuleVersionId moduleVersionId;
 
     @Nullable
-    Maven parent;
+    Pom parent;
 
     Collection<Dependency> dependencies;
     DependencyManagement dependencyManagement;
@@ -34,7 +34,7 @@ public class Pom {
     Map<String, String> properties;
 
     private Pom(ModuleVersionId moduleVersionId,
-                @Nullable Maven parent,
+                @Nullable Pom parent,
                 Collection<Dependency> dependencies,
                 DependencyManagement dependencyManagement,
                 Collection<License> licenses,
@@ -55,7 +55,7 @@ public class Pom {
                             @JsonProperty("version") String version,
                             @JsonProperty("type") String type,
                             @Nullable @JsonProperty("classifier") String classifier,
-                            @Nullable @JsonProperty("parent") Maven parent,
+                            @Nullable @JsonProperty("parent") Pom parent,
                             @JsonProperty("dependencies") Collection<Dependency> dependencies,
                             @JsonProperty("dependencyManagement") DependencyManagement dependencyManagement,
                             @JsonProperty("licenses") Collection<License> licenses,
@@ -92,13 +92,13 @@ public class Pom {
     public String getProperty(String property) {
         String key = property.replace("${", "").replace("}", "");
         return ofNullable(properties.get(key))
-                .orElseGet(() -> parent == null ? null : parent.getModel().getProperty(property));
+                .orElseGet(() -> parent == null ? null : parent.getProperty(property));
     }
 
     public String getGroupId() {
         return ofNullable(moduleVersionId.getGroupId())
                 .orElseGet(() -> ofNullable(parent)
-                        .map(p -> p.getModel().getGroupId())
+                        .map(Pom::getGroupId)
                         .orElseThrow(() -> new IllegalStateException("groupId must be defined")));
     }
 
@@ -107,7 +107,7 @@ public class Pom {
             return dependencyManagement;
         }
         return new DependencyManagement(Stream.concat(dependencyManagement.getDependencies().stream(),
-                parent.getModel().getEffectiveDependencyManagement().getDependencies().stream()).collect(Collectors.toList())
+                parent.getEffectiveDependencyManagement().getDependencies().stream()).collect(Collectors.toList())
         );
     }
 
@@ -132,7 +132,7 @@ public class Pom {
     public String getVersion() {
         return ofNullable(moduleVersionId.getVersion())
                 .orElseGet(() -> ofNullable(parent)
-                        .map(p -> p.getModel().getVersion())
+                        .map(Pom::getVersion)
                         .orElseThrow(() -> new IllegalStateException("version must be defined")));
     }
 
@@ -198,23 +198,23 @@ public class Pom {
         String classifier;
 
         boolean optional;
-        Maven maven;
+        Pom model;
 
         Set<GroupArtifact> exclusions;
 
         @JsonIgnore
         public String getGroupId() {
-            return maven.getModel().getGroupId();
+            return model.getGroupId();
         }
 
         @JsonIgnore
         public String getArtifactId() {
-            return maven.getModel().getArtifactId();
+            return model.getArtifactId();
         }
 
         @JsonIgnore
         public String getVersion() {
-            return maven.getModel().getVersion();
+            return model.getVersion();
         }
     }
 

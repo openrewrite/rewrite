@@ -88,12 +88,12 @@ public class RawMaven {
 
     @JsonIgnore
     public Map<String, String> getActiveProperties() {
-        return pom.getActiveProperties(getURI());
+        return pom.getActiveProperties();
     }
 
     @JsonIgnore
     public List<RawPom.Dependency> getActiveDependencies() {
-        return pom.getActiveDependencies(getURI());
+        return pom.getActiveDependencies();
     }
 
     private static class MavenXmlParser extends XmlParser {
@@ -101,5 +101,5 @@ public class RawMaven {
         public boolean accept(URI path) {
             return super.accept(path) || path.toString().endsWith(".pom");
         }
-    };
+    }
 }

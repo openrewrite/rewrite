@@ -36,7 +36,7 @@ class MavenParserTest {
 
         val maven = parser.parse(pom)[0]
 
-        assertThat(maven.model.dependencies.first().maven.model.licenses.first()?.type)
+        assertThat(maven.model.dependencies.first().model.licenses.first()?.type)
                 .isEqualTo(Pom.LicenseType.Eclipse2)
     }
 

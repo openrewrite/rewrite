@@ -20,9 +20,14 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public interface MavenSourceVisitor<R> extends XmlSourceVisitor<R> {
-    R visitPom(Maven maven);
-//    R visitParent(Xml.Tag tag);
-    R visitDependency(Xml.Tag tag);
-//    R visitDependencyManagement(Xml.Tag tag);
+public interface MavenSourceVisitor<R> {
+    R visitMaven(Maven maven);
+
+    R visitMavenXml(Xml.Document document);
+
+    interface MavenXmlVisitor<S> extends XmlSourceVisitor<S> {
+        S visitDependency(Xml.Tag dependency);
+
+        S visitProperty(Xml.Tag property);
+    }
 }
