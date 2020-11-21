@@ -3,6 +3,7 @@ package org.openrewrite.maven.tree;
 import org.openrewrite.internal.lang.Nullable;
 
 public enum Scope {
+    None, // the root of a resolution tree
     Compile,
     Provided,
     Runtime,
@@ -23,6 +24,8 @@ public enum Scope {
         }
 
         switch(scope) {
+            case None:
+                return scope;
             case Compile:
                 switch(this) {
                     case Compile:

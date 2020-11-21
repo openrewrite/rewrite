@@ -55,7 +55,7 @@ public class RawMavenResolver {
 
     @Nullable
     public Maven resolve(RawMaven rawMaven) {
-        return resolve(rawMaven, SUPER_POM_REPOSITORY);
+        return resolve(rawMaven, Scope.None, SUPER_POM_REPOSITORY);
     }
 
     /**
@@ -68,8 +68,8 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Maven resolve(RawMaven rawMaven, List<RawPom.Repository> repositories) {
-        ResolutionTask rootTask = new ResolutionTask(Scope.Compile, rawMaven, emptySet(),
+    public Maven resolve(RawMaven rawMaven, Scope scope, List<RawPom.Repository> repositories) {
+        ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
                 false, null, repositories);
 
         workQueue.add(rootTask);
@@ -126,7 +126,7 @@ public class RawMavenResolver {
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
                         Maven maven = new RawMavenResolver(downloader, true, resolveOptional)
-                                .resolve(rawMaven, partialMaven.getRepositories());
+                                .resolve(rawMaven, Scope.Compile, partialMaven.getRepositories());
 
                         if (maven != null) {
                             managedDependencies.add(new DependencyManagementDependency.Imported(maven));
@@ -299,7 +299,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, true, resolveOptional)
-                            .resolve(rawParentModel, partialMaven.getRepositories());
+                            .resolve(rawParentModel, Scope.Compile, partialMaven.getRepositories());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -329,6 +329,7 @@ public class RawMavenResolver {
         if (assemblyStack.contains(task)) {
             return null; // cut cycles
         }
+
         RawMaven rawMaven = task.getRawMaven();
         RawPom rawPom = rawMaven.getPom();
         PartialTreeKey taskKey = new PartialTreeKey(rawPom.getGroupId(), rawPom.getArtifactId(), rawPom.getVersion());
