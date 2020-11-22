@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.cache.MapdbCache
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.xml.tree.Xml
@@ -38,8 +39,9 @@ class MavenDependencyResolutionIntegTest {
     companion object {
 //        private val meterRegistry = MetricsDestinations.prometheus()
         private val meterRegistry = Metrics.globalRegistry
-        private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
+//        private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
 //        private val mavenCache = NoopCache()
+        private val mavenCache = InMemoryCache()
 
         @JvmStatic
         @BeforeAll
