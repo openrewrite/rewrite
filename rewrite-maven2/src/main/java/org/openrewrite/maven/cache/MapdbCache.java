@@ -40,8 +40,8 @@ public class MapdbCache implements MavenCache {
             DB localRepositoryDiskDb = DBMaker
                     .fileDB(workspace)
                     .fileMmapEnableIfSupported()
-                    .fileLockWait()
-                    .checksumStoreEnable()
+                    .fileLockWait(10_000)
+                    .checksumHeaderBypass()
                     .closeOnJvmShutdown()
                     .make();
 
@@ -117,7 +117,9 @@ public class MapdbCache implements MavenCache {
         //noinspection OptionalAssignedToNull
         if (rawMavenMetadata == null) {
             try {
-                return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+                RawMavenMetadata metadata = orElseGet.call();
+                mavenMetadataCache.put(gar, Optional.ofNullable(metadata));
+                return new CacheResult<>(CacheResult.State.Updated, metadata);
             } catch (Exception e) {
                 mavenMetadataCache.put(gar, Optional.empty());
                 throw e;
@@ -139,7 +141,9 @@ public class MapdbCache implements MavenCache {
         //noinspection OptionalAssignedToNull
         if (rawMaven == null) {
             try {
-                return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+                RawMaven maven = orElseGet.call();
+                pomCache.put(cacheKey, Optional.ofNullable(maven));
+                return new CacheResult<>(CacheResult.State.Updated, maven);
             } catch (Exception e) {
                 pomCache.put(cacheKey, Optional.empty());
                 throw e;
@@ -159,7 +163,9 @@ public class MapdbCache implements MavenCache {
         //noinspection OptionalAssignedToNull
         if (normalizedRepository == null) {
             try {
-                return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
+                RawPom.Repository repo = orElseGet.call();
+                normalizedRepositoryUrls.put(repository, Optional.of(repo));
+                return new CacheResult<>(CacheResult.State.Updated, repo);
             } catch (Exception e) {
                 normalizedRepositoryUrls.put(repository, Optional.empty());
                 throw e;

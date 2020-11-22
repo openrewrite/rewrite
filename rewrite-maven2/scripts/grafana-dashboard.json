@@ -15,7 +15,6 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
   "links": [],
   "panels": [
     {
@@ -71,7 +70,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "rewrite_maven_workspace_cache_size",
+          "expr": "rewrite_maven_cache_size",
           "interval": "",
           "legendFormat": "{{content}} {{layer}}",
           "refId": "A"
@@ -97,6 +96,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:184",
           "format": "short",
           "label": "entries",
           "logBase": 1,
@@ -105,6 +105,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:185",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -170,7 +171,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "sum by (group_id) (rewrite_maven_download_seconds_count{outcome=\"success\"})",
+          "expr": "sum by (group_id) (rewrite_maven_download_seconds_count{outcome=\"downloaded\"})",
           "interval": "",
           "legendFormat": "{{group_id}}",
           "refId": "A"
@@ -196,6 +197,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:109",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -204,6 +206,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:110",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -265,7 +268,7 @@
       "steppedLine": true,
       "targets": [
         {
-          "expr": "sum(rewrite_maven_download_seconds_count{outcome=\"success\"})",
+          "expr": "sum( {outcome=\"downloaded\"})",
           "interval": "",
           "legendFormat": "success",
           "refId": "A"
@@ -277,7 +280,7 @@
           "refId": "B"
         },
         {
-          "expr": "sum(rewrite_maven_download_seconds_count{outcome=\"error\"})",
+          "expr": "sum(rewrite_maven_download_seconds_count{outcome=\"unavailable\"})",
           "interval": "",
           "legendFormat": "error",
           "refId": "C"
@@ -309,6 +312,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:330",
           "format": "none",
           "label": "operations",
           "logBase": 1,
@@ -317,6 +321,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:331",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -404,6 +409,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:405",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -412,6 +418,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:406",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -477,7 +484,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "rewrite_maven_download_seconds_count{outcome=\"error\"}",
+          "expr": "rewrite_maven_download_seconds_count{outcome=\"unavailable\"}",
           "interval": "",
           "legendFormat": "{{group_id}}",
           "refId": "A"
@@ -503,6 +510,7 @@
       },
       "yaxes": [
         {
+          "$$hashKey": "object:627",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -511,6 +519,7 @@
           "show": true
         },
         {
+          "$$hashKey": "object:628",
           "format": "short",
           "label": null,
           "logBase": 1,
@@ -533,12 +542,12 @@
     "list": []
   },
   "time": {
-    "from": "2020-11-10T23:37:30.323Z",
-    "to": "2020-11-10T23:38:42.349Z"
+    "from": "2020-11-22T05:14:32.911Z",
+    "to": "2020-11-22T05:16:04.691Z"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Rewrite Maven",
   "uid": "3caeZl2Mk",
-  "version": 6
+  "version": 1
 }

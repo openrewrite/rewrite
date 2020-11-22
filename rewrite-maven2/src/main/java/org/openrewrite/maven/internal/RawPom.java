@@ -1,6 +1,8 @@
 package org.openrewrite.maven.internal;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -19,7 +21,6 @@ import static java.util.Collections.singletonList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-@RequiredArgsConstructor
 public class RawPom {
     @Getter
     @Nullable
@@ -64,6 +65,31 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
+    @JsonCreator
+    public RawPom(@JsonProperty("parent") @Nullable Parent parent,
+                  @JsonProperty("groupId") @Nullable String groupId,
+                  @JsonProperty("artifactId") String artifactId,
+                  @JsonProperty("version") @Nullable String version,
+                  @JsonProperty("packaging") @Nullable String packaging,
+                  @JsonProperty("dependencies") @Nullable Dependencies dependencies,
+                  @JsonProperty("dependencyManagement") @Nullable DependencyManagement dependencyManagement,
+                  @JsonProperty("properties") @Nullable Map<String, String> properties,
+                  @JsonProperty("repositories") @Nullable Repositories repositories,
+                  @JsonProperty("licenses") @Nullable Licenses licenses,
+                  @JsonProperty("profiles") @Nullable Profiles profiles) {
+        this.parent = parent;
+        this.groupId = groupId;
+        this.artifactId = artifactId;
+        this.version = version;
+        this.packaging = packaging;
+        this.dependencies = dependencies;
+        this.dependencyManagement = dependencyManagement;
+        this.properties = properties;
+        this.repositories = repositories;
+        this.licenses = licenses;
+        this.profiles = profiles;
+    }
+
     @JsonIgnore
     public Map<String, String> getActiveProperties() {
         Map<String, String> activeProperties = new HashMap<>();
@@ -92,24 +118,29 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            getProfiles().stream().filter(Profile::isActive).forEach(profile -> {
-                if (profile.dependencies != null) {
-                    activeDependencies.addAll(profile.dependencies);
+            for (Profile profile : getProfiles()) {
+                if (profile.isActive()) {
+                    if (profile.dependencies != null) {
+                        activeDependencies.addAll(profile.dependencies);
+                    }
                 }
-            });
+            }
         }
 
         return activeDependencies;
     }
 
+    @JsonIgnore
     public List<Repository> getRepositories() {
         return repositories == null ? emptyList() : repositories.getRepositories();
     }
 
+    @JsonIgnore
     public List<License> getLicenses() {
         return licenses == null ? emptyList() : licenses.getLicenses();
     }
 
+    @JsonIgnore
     public List<Profile> getProfiles() {
         return profiles == null ? emptyList() : profiles.getProfiles();
     }
@@ -139,14 +170,11 @@ public class RawPom {
         Set<GroupArtifact> exclusions;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
     public static class DependencyManagement {
+        @Nullable
         Dependencies dependencies;
-
-        public List<Dependency> getDependencies() {
-            return dependencies == null ? emptyList() : dependencies.getDependencies();
-        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -209,14 +237,20 @@ public class RawPom {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode
     @Getter
     public static class ArtifactPolicy {
         boolean enabled;
 
-        public ArtifactPolicy(@Nullable Boolean enabled) {
+        @JsonCreator
+        public ArtifactPolicy(@JsonProperty("enabled") @Nullable Boolean enabled) {
             this.enabled = enabled == null || enabled;
         }
 
+        /**
+         * Used by Jackson in the event there is an empty tag in the POM.
+         */
+        @SuppressWarnings("unused")
         public ArtifactPolicy() {
             this(true);
         }
@@ -276,6 +310,7 @@ public class RawPom {
             if (jdk == null) {
                 return false;
             }
+
             String version = System.getProperty("java.version");
             RequestedVersion requestedVersion = new RequestedVersion(new GroupArtifact("", ""),
                     null, jdk);
@@ -290,8 +325,17 @@ public class RawPom {
 
         @JsonIgnore
         private boolean isActiveByProperty() {
-            return property != null && !property.isEmpty() &&
-                    property.entrySet().stream().allMatch(prop -> prop.getValue().equals(System.getenv(prop.getKey())));
+            if (property == null || property.isEmpty()) {
+                return false;
+            }
+
+            for (Map.Entry<String, String> prop : property.entrySet()) {
+                if (!prop.getValue().equals(System.getenv(prop.getKey()))) {
+                    return false;
+                }
+            }
+
+            return true;
         }
     }
 

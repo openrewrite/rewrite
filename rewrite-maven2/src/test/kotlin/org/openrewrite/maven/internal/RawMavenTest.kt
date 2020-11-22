@@ -30,7 +30,7 @@ class RawMavenTest {
             """.trimIndent().byteInputStream()
         }, null)
 
-        assertThat(maven.pom.dependencyManagement?.dependencies).isEmpty()
+        assertThat(maven.pom.dependencyManagement?.dependencies?.dependencies).isEmpty()
         assertThat(maven.pom.repositories).isEmpty()
         assertThat(maven.pom.licenses).isEmpty()
         assertThat(maven.pom.profiles).isEmpty()

@@ -1,6 +1,7 @@
 package org.openrewrite.maven
 
 import ch.qos.logback.classic.Level
+import io.micrometer.core.instrument.Metrics
 import io.micrometer.core.instrument.config.MeterFilter
 import org.apache.maven.model.Model
 import org.apache.maven.model.Repository
@@ -35,7 +36,8 @@ import java.util.function.Consumer
 class MavenDependencyResolutionIntegTest {
     @Suppress("unused")
     companion object {
-        private val meterRegistry = MetricsDestinations.prometheus()
+//        private val meterRegistry = MetricsDestinations.prometheus()
+        private val meterRegistry = Metrics.globalRegistry
         private val mavenCache = MapdbCache(File(System.getProperty("user.home") + "/.m2/rewrite"), null)
 //        private val mavenCache = NoopCache()
 
@@ -43,10 +45,9 @@ class MavenDependencyResolutionIntegTest {
         @BeforeAll
         fun beforeAll() {
             (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as ch.qos.logback.classic.Logger).level =
-                    Level.DEBUG
+                    Level.INFO
 
             meterRegistry.config().meterFilter(MeterFilter.ignoreTags("artifact.id"))
-//            Metrics.addRegistry(meterRegistry)
         }
 
         @JvmStatic

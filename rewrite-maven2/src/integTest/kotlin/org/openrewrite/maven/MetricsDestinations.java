@@ -1,6 +1,7 @@
 package org.openrewrite.maven;
 
 import com.sun.net.httpserver.HttpServer;
+import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
@@ -48,10 +49,11 @@ public class MetricsDestinations {
             throw new RuntimeException(e);
         }
 
-        new JvmHeapPressureMetrics().bindTo(prometheusRegistry);
-        new ProcessorMetrics().bindTo(prometheusRegistry);
-        new JvmGcMetrics().bindTo(prometheusRegistry);
+//        new JvmHeapPressureMetrics().bindTo(prometheusRegistry);
+//        new ProcessorMetrics().bindTo(prometheusRegistry);
+//        new JvmGcMetrics().bindTo(prometheusRegistry);
 
+        Metrics.addRegistry(prometheusRegistry);
         return prometheusRegistry;
     }
 }

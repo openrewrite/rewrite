@@ -1,5 +1,6 @@
 package org.openrewrite.maven.internal;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
@@ -87,6 +88,10 @@ public class RawMavenResolver {
     private void processTask(ResolutionTask task) {
         RawMaven rawMaven = task.getRawMaven();
 
+        if(partialResults.containsKey(task)) {
+            return; // already processed
+        }
+
         PartialMaven partialMaven = new PartialMaven(rawMaven.getPom());
         processProperties(task, partialMaven);
         processRepositories(task, partialMaven);
@@ -107,8 +112,8 @@ public class RawMavenResolver {
         List<DependencyManagementDependency> managedDependencies = new ArrayList<>();
 
         RawPom.DependencyManagement dependencyManagement = pom.getDependencyManagement();
-        if (dependencyManagement != null) {
-            for (RawPom.Dependency d : dependencyManagement.getDependencies()) {
+        if (dependencyManagement != null && dependencyManagement.getDependencies() != null) {
+            for (RawPom.Dependency d : dependencyManagement.getDependencies().getDependencies()) {
                 assert d.getVersion() != null;
 
                 String groupId = partialMaven.getGroupId(d.getGroupId());
@@ -478,6 +483,7 @@ public class RawMavenResolver {
         RawMaven rawMaven;
 
         @EqualsAndHashCode.Include
+        @Nullable
         Set<GroupArtifact> exclusions;
 
         @EqualsAndHashCode.Include
@@ -489,6 +495,7 @@ public class RawMavenResolver {
 
         List<RawPom.Repository> repositories;
 
+        @JsonIgnore
         public Set<GroupArtifact> getExclusions() {
             return exclusions == null ? emptySet() : exclusions;
         }
