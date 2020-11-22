@@ -16,7 +16,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
-import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toList;
 
 public class RawMavenResolver {
@@ -88,7 +87,7 @@ public class RawMavenResolver {
     private void processTask(ResolutionTask task) {
         RawMaven rawMaven = task.getRawMaven();
 
-        if(partialResults.containsKey(task)) {
+        if (partialResults.containsKey(task)) {
             return; // already processed
         }
 
@@ -189,24 +188,38 @@ public class RawMavenResolver {
                     int i = 0;
                     do {
                         last = version;
-                        version = ofNullable(last)
-                                .map(partialMaven::getVersion)
-                                .orElseGet(() -> partialMaven.getDependencyManagement().getDependencies().stream()
-                                        .flatMap(managed -> managed.getDependencies().stream())
-                                        .filter(managed -> groupId.equals(partialMaven.getGroupId(managed.getGroupId())) &&
-                                                artifactId.equals(partialMaven.getArtifactId(managed.getArtifactId())))
-                                        .findAny()
-                                        .map(DependencyDescriptor::getVersion)
-                                        .orElseGet(() -> partialMaven.getParent() == null ?
-                                                null :
-                                                partialMaven.getParent().getManagedVersion(groupId, artifactId)
-                                        )
-                                );
+                        String result = null;
+                        if (last != null) {
+                            String partialMavenVersion = partialMaven.getVersion(last);
+                            if (partialMavenVersion != null) {
+                                result = partialMavenVersion;
+                            }
+                        }
+                        if (result == null) {
+                            OUTER:
+                            for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
+                                for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
+                                    if (groupId.equals(partialMaven.getGroupId(dependencyDescriptor.getGroupId())) &&
+                                            artifactId.equals(partialMaven.getArtifactId(dependencyDescriptor.getArtifactId()))) {
+                                        result = dependencyDescriptor.getVersion();
+                                        break OUTER;
+                                    }
+                                }
+                            }
+
+                            if (result == null && partialMaven.getParent() != null) {
+                                result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
+                            }
+                        }
+                        version = result;
                     } while (i++ < 2 || !Objects.equals(version, last));
 
                     // dependencyManagement takes precedence over the version specified on the dependency
                     if (version == null) {
-                        version = ofNullable(dep.getVersion()).map(partialMaven::getVersion).orElse(null);
+                        String depVersion = dep.getVersion();
+                        if (depVersion != null) {
+                            version = partialMaven.getVersion(depVersion);
+                        }
                     }
 
                     // for debugging...
@@ -249,8 +262,15 @@ public class RawMavenResolver {
                     );
                 })
                 .filter(Objects::nonNull)
-                .filter(dep -> task.getExclusions().stream().noneMatch(e -> dep.getGroupId().matches(e.getGroupId()) &&
-                        dep.getArtifactId().matches(e.getArtifactId())))
+                .filter(dep -> {
+                    for (GroupArtifact e : task.getExclusions()) {
+                        if (dep.getGroupId().matches(e.getGroupId()) &&
+                                dep.getArtifactId().matches(e.getArtifactId())) {
+                            return false;
+                        }
+                    }
+                    return true;
+                })
                 .map(dep -> {
                     assert dep.getVersion() != null;
 
@@ -329,9 +349,12 @@ public class RawMavenResolver {
 
     private void processLicenses(ResolutionTask task, PartialMaven partialMaven) {
         List<RawPom.License> licenses = task.getRawMaven().getPom().getLicenses();
-        partialMaven.setLicenses(licenses.stream()
-                .map(license -> Pom.License.fromName(license.getName()))
-                .collect(toList()));
+        List<Pom.License> list = new ArrayList<>();
+        for (RawPom.License license : licenses) {
+            Pom.License fromName = Pom.License.fromName(license.getName());
+            list.add(fromName);
+        }
+        partialMaven.setLicenses(list);
     }
 
     @Nullable
@@ -529,8 +552,11 @@ public class RawMavenResolver {
         @Nullable
         String getGroupId(String g) {
             if (g.equals("${project.groupId}") || g.equals("${pom.groupId}")) {
-                return ofNullable(rawPom.getGroupId())
-                        .orElse(parent == null ? null : parent.getGroupId());
+                String groupId = rawPom.getGroupId();
+                if (groupId != null) {
+                    return groupId;
+                }
+                return parent == null ? null : parent.getGroupId();
             } else if (g.equals("${project.parent.groupId}")) {
                 return parent != null ? parent.getGroupId() : null;
             }
@@ -552,8 +578,11 @@ public class RawMavenResolver {
             if (v == null) {
                 return null;
             } else if (v.equals("${project.version}") || v.equals("${pom.version}")) {
-                return ofNullable(rawPom.getVersion())
-                        .orElse(parent == null ? null : parent.getVersion());
+                String version = rawPom.getVersion();
+                if (version != null) {
+                    return version;
+                }
+                return parent == null ? null : parent.getVersion();
             } else if (v.equals("${project.parent.version}")) {
                 return parent != null ? parent.getVersion() : null;
             }
@@ -618,11 +647,14 @@ public class RawMavenResolver {
             return new RequestedVersion(groupArtifact, null, version);
         }
 
-        RequestedVersion nearer = versionSelection.headMap(scope, true).values().stream()
-                .map(nearerInScope -> nearerInScope.get(groupArtifact))
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+        RequestedVersion nearer = null;
+        for (Map<GroupArtifact, RequestedVersion> nearerInScope : versionSelection.headMap(scope, true).values()) {
+            RequestedVersion requestedVersion = nearerInScope.get(groupArtifact);
+            if (requestedVersion != null) {
+                nearer = requestedVersion;
+                break;
+            }
+        }
 
         return versionSelection.get(scope)
                 .getOrDefault(groupArtifact, new RequestedVersion(groupArtifact, nearer, version));
