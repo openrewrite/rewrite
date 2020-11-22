@@ -228,4 +228,24 @@ interface GenerateSetterTest : RefactorVisitorTest {
                 }
             """
     )
+
+    @Test
+    fun setterWithVisibility(jp: JavaParser) = assertRefactored(
+            jp,
+            visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
+            before = """
+                public class A {
+                    private String foo;
+                }
+            """,
+            after = """
+                public class A {
+                    private String foo;
+
+                    public void setFoo(String value) {
+                        foo = value;
+                    }
+                }
+            """
+    )
 }

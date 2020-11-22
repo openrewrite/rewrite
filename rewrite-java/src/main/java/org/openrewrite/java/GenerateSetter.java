@@ -16,10 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -107,6 +104,10 @@ public class GenerateSetter {
                 } else {
                     assignmentExp = fieldVar.getName().withFormatting(Formatting.format("", " "));
                 }
+                TypeTree fieldTypeExpr = field.getTypeExpr();
+                if (fieldTypeExpr != null) {
+                    fieldTypeExpr = fieldTypeExpr.withFormatting(Formatting.EMPTY);
+                }
                 J.MethodDecl setMethod = new J.MethodDecl(randomId(),
                         Collections.emptyList(),
                         Collections.singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY)),
@@ -117,7 +118,7 @@ public class GenerateSetter {
                                 Collections.singletonList(new J.VariableDecls(randomId(),
                                         Collections.emptyList(),
                                         Collections.emptyList(),
-                                        field.getTypeExpr(),
+                                        fieldTypeExpr,
                                         null,
                                         Collections.emptyList(),
                                         Collections.singletonList(new J.VariableDecls.NamedVar(randomId(),
