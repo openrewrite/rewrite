@@ -23,7 +23,7 @@ import org.openrewrite.maven.tree.Maven
 
 class UpgradeParentVersionTest : RefactorVisitorTestForParser<Maven> {
     override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
-    override val parser: Parser<Maven> = MavenParser.builder().build()
+    override val parser: Parser<Maven> = MavenParser.builder().resolveOptional(false).build()
 
     @Test
     fun upgradeVersion() = assertRefactored(

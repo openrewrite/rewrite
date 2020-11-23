@@ -23,7 +23,7 @@ import java.io.File
 import java.nio.file.Path
 
 class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
-    override val parser: MavenParser = MavenParser.builder().build()
+    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
     private val addDependency = AddDependency().apply {
         setGroupId("org.springframework.boot")

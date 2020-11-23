@@ -23,7 +23,7 @@ import java.io.File
 import java.nio.file.Path
 
 class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
-    override val parser: MavenParser = MavenParser.builder().build()
+    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
     private val guavaTo29 = ChangeDependencyVersion().apply {
         setGroupId("com.google.guava")

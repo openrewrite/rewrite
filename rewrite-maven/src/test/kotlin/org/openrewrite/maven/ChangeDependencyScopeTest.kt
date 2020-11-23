@@ -20,7 +20,7 @@ import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
 
 class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven> {
-    override val parser: MavenParser = MavenParser.builder().build()
+    override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
     private val guavaToTest = ChangeDependencyScope().apply {
         setGroupId("com.google.guava")
