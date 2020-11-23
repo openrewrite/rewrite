@@ -453,7 +453,10 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     }
 
     /**
-     * This method will add an import to the compilation unit.
+     * This method will add an import to the compilation unit regardless if a references to the type exists within
+     * the compilation unit. This method adds an additional visitor via the andThen() method which means the addition
+     * of the import is deferred and does not complete immediately. This method is idempotent and calling this method
+     * multiple times with the same type will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
      */
@@ -468,9 +471,11 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
 
     /**
      * This method will add an import to the compilation unit if there is a reference to the type in the compilation
-     * unit.
+     * unit. This method adds an additional visitor via the andThen() method which means the addition of the import is
+     * deferred and does not complete immediately. This method is idempotent and calling this method
+     * multiple times with the same type will only add an import once.
      *
-     * @param clazz The class that will be imported into the compliation unit.
+     * @param clazz The class that will be imported into the compilation unit.
      */
     public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
         if (clazz != null) {
@@ -480,7 +485,9 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
 
     /**
      * This method will add an import to the compilation unit if there is a reference to the type in the compilation
-     * unit.
+     * unit. This method adds an additional visitor via the andThen() method which means the addition of the import is
+     * deferred and does not complete immediately. This method is idempotent and calling this method
+     * multiple times with the same type will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
      */
@@ -494,7 +501,9 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
 
     /**
      * This method will add a static method import to the compilation unit if there is a reference to the method
-     * in the compilation unit.
+     * in the compilation unit. This method adds an additional visitor via the andThen() method which means the
+     * addition of the import is deferred and does not complete immediately. This method is idempotent and calling this
+     * method multiple times with the same type/method combination will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
      * @param staticMethod The static method to be imported. A wildcard "*" may also be used to statically import all methods.
