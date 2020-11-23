@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.NoopCache;
@@ -128,7 +127,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     private void maybeChangeDependencyVersion(Pom model) {
         for (Pom.Dependency dependency : model.getDependencies()) {
             if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                maybeNewerVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
                     ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
                     changeDependencyVersion.setGroupId(groupId);
                     changeDependencyVersion.setArtifactId(dependency.getArtifactId());
@@ -140,7 +139,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
 
         for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
             if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                maybeNewerVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
                     ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
                     changeDependencyVersion.setGroupId(groupId);
                     changeDependencyVersion.setArtifactId(dependency.getArtifactId());
@@ -151,8 +150,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
         }
     }
 
-    @NotNull
-    private Optional<String> maybeNewerVersion(String groupId, String artifactId, String currentVersion) {
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
         if (availableVersions == null) {
             MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
                     .downloadMetadata(groupId, artifactId, emptyList());

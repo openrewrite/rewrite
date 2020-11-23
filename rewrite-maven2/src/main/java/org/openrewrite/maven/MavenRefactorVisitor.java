@@ -14,7 +14,7 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
     private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
-    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent/version");
+    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
 
     protected Pom model;
     protected Collection<Pom> modules;
