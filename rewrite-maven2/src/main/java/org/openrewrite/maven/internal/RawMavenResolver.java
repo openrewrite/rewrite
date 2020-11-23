@@ -3,6 +3,7 @@ package org.openrewrite.maven.internal;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
@@ -19,6 +20,7 @@ import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
 
 public class RawMavenResolver {
+    private static final PropertyPlaceholderHelper placeholderHelper = new PropertyPlaceholderHelper("${", "}", null);
     private static final Logger logger = LoggerFactory.getLogger(RawMavenResolver.class);
 
     // This is used to keep track of what versions have been seen further up the tree so we don't unnecessarily
@@ -323,7 +325,21 @@ public class RawMavenResolver {
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
         List<RawPom.Repository> repositories = new ArrayList<>();
-        repositories.addAll(task.getRawMaven().getPom().getRepositories());
+        for (RawPom.Repository repository : task.getRawMaven().getPom().getRepositories()) {
+            String url = repository.getUrl().trim();
+            if(repository.getUrl().contains("${")) {
+                url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
+            }
+
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                URI.create(url);
+                repositories.add(new RawPom.Repository(url, repository.getReleases(), repository.getSnapshots()));
+            } catch(Throwable t) {
+                logger.warn("Unable to make a URI out of repositoriy url {}", url);
+            }
+        }
+
         repositories.addAll(task.getRepositories());
         partialMaven.setRepositories(repositories);
     }
@@ -412,21 +428,25 @@ public class RawMavenResolver {
                                     ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
                                     ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
 
-                            // for debugging
-                            //noinspection RedundantIfStatement
                             if (conflictResolved == null) {
-                                //noinspection ConstantConditions
-                                assert conflictResolved != null;
+                                logger.warn(
+                                        "Unable to conflict resolve {}:{}:{} {}",
+                                        ancestorDep.getGroupId(),
+                                        ancestorDep.getArtifactId(),
+                                        ancestorDep.getVersion(),
+                                        conflictResolvedRaw == null ? "unknown URI" : conflictResolvedRaw.getURI()
+                                );
+                                dependencies.add(ancestorDep);
+                            } else {
+                                dependencies.add(new Pom.Dependency(
+                                        scope,
+                                        ancestorDep.getClassifier(),
+                                        ancestorDep.isOptional(),
+                                        conflictResolved,
+                                        ancestorDep.getRequestedVersion(),
+                                        ancestorDep.getExclusions()
+                                ));
                             }
-
-                            dependencies.add(new Pom.Dependency(
-                                    scope,
-                                    ancestorDep.getClassifier(),
-                                    ancestorDep.isOptional(),
-                                    conflictResolved,
-                                    ancestorDep.getRequestedVersion(),
-                                    ancestorDep.getExclusions()
-                            ));
                         } else {
                             dependencies.add(ancestorDep);
                         }

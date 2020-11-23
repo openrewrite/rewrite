@@ -95,7 +95,7 @@ public class InMemoryCache implements MavenCache {
         if (normalizedRepository == null) {
             try {
                 RawPom.Repository repo = orElseGet.call();
-                normalizedRepositoryUrls.put(repository, Optional.of(repo));
+                normalizedRepositoryUrls.put(repository, Optional.ofNullable(repo));
                 return new CacheResult<>(CacheResult.State.Updated, repo);
             } catch (Exception e) {
                 normalizedRepositoryUrls.put(repository, Optional.empty());
