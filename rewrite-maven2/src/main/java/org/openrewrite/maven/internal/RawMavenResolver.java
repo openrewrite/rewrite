@@ -21,10 +21,6 @@ import static java.util.stream.Collectors.toList;
 public class RawMavenResolver {
     private static final Logger logger = LoggerFactory.getLogger(RawMavenResolver.class);
 
-    // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final List<RawPom.Repository> SUPER_POM_REPOSITORY = singletonList(new RawPom.Repository("https://repo.maven.apache.org/maven2",
-            new RawPom.ArtifactPolicy(true), new RawPom.ArtifactPolicy(false)));
-
     // This is used to keep track of what versions have been seen further up the tree so we don't unnecessarily
     // resolve subtrees that have no chance of being selected by conflict resolution.
     private final NavigableMap<Scope, Map<GroupArtifact, RequestedVersion>> versionSelection;
@@ -35,7 +31,7 @@ public class RawMavenResolver {
     private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
 
-    private final RawPomDownloader downloader;
+    private final MavenDownloader downloader;
 
     /**
      * Is this resolver being used for resolving parents or import BOMs? Just a flag for logging purposes alone...
@@ -44,7 +40,7 @@ public class RawMavenResolver {
 
     private final boolean resolveOptional;
 
-    public RawMavenResolver(RawPomDownloader downloader, boolean forParent, boolean resolveOptional) {
+    public RawMavenResolver(MavenDownloader downloader, boolean forParent, boolean resolveOptional) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -56,7 +52,7 @@ public class RawMavenResolver {
 
     @Nullable
     public Xml.Document resolve(RawMaven rawMaven) {
-        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), SUPER_POM_REPOSITORY);
+        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), emptyList());
         assert pom != null;
         return rawMaven.getDocument().withMetadata(singletonList(pom));
     }
@@ -136,12 +132,13 @@ public class RawMavenResolver {
                                 .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                         if (maven != null) {
-                            managedDependencies.add(new DependencyManagementDependency.Imported(maven));
+                            managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
+                                    version, d.getVersion(), maven));
                         }
                     }
                 } else {
                     managedDependencies.add(new DependencyManagementDependency.Defined(
-                            groupId, artifactId, version,
+                            groupId, artifactId, version, d.getVersion(),
                             d.getScope() == null ? null : Scope.fromName(d.getScope()),
                             d.getClassifier(), d.getExclusions()));
                 }
@@ -252,10 +249,10 @@ public class RawMavenResolver {
 
                     version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
-                    // for debugging
-                    //noinspection RedundantIfStatement
                     if (version.contains("${")) {
-                        assert !version.contains("${");
+                        logger.warn("Unable to download {}:{}:{}. Including POM is at {}",
+                                groupId, artifactId, version, rawMaven.getURI());
+                        return null;
                     }
 
                     RawMaven download = downloader.download(groupId, artifactId,

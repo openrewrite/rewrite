@@ -23,8 +23,6 @@ import org.openrewrite.xml.tree.Xml;
 import static org.openrewrite.Validated.required;
 
 public class ChangePropertyValue extends MavenRefactorVisitor {
-    private static final XPathMatcher propertyMatcher = new XPathMatcher("/project/properties/*");
-
     private String key;
     private String toValue;
 
@@ -48,7 +46,7 @@ public class ChangePropertyValue extends MavenRefactorVisitor {
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
-        if (propertyMatcher.matches(getCursor()) && key.equals(tag.getName()) &&
+        if (isPropertyTag() && key.equals(tag.getName()) &&
                 !toValue.equals(tag.getValue().orElse(null))) {
             andThen(new ChangeTagValue.Scoped(tag, toValue));
         }

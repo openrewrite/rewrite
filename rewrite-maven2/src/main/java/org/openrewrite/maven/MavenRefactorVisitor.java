@@ -1,7 +1,9 @@
 package org.openrewrite.maven;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
@@ -9,6 +11,11 @@ import java.util.Collection;
 
 public class MavenRefactorVisitor extends XmlRefactorVisitor
         implements MavenSourceVisitor<Xml> {
+    private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent/version");
+
     protected Pom model;
     protected Collection<Pom> modules;
 
@@ -26,5 +33,37 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
             return new Maven(refactored);
         }
         return refactored;
+    }
+
+    protected boolean isPropertyTag() {
+        return PROPERTY_MATCHER.matches(getCursor());
+    }
+
+    protected boolean isDependencyTag() {
+        return DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
+    protected boolean isDependencyTag(String groupId, @Nullable String artifactId) {
+        return isDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
+    }
+
+    protected boolean isManagedDependencyTag() {
+        return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
+    protected boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
+        return isManagedDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
+    }
+
+    protected boolean isParentTag() {
+        return PARENT_MATCHER.matches(getCursor());
+    }
+
+    private boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
+        Xml.Tag tag = getCursor().getTree();
+        return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
+                tag.getChildValue("artifactId")
+                        .map(a -> a.equals(artifactId))
+                        .orElse(artifactId == null);
     }
 }

@@ -114,6 +114,11 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
+    fun springWebMvc(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("org.springframework:spring-webmvc:4.3.6.RELEASE"))
+    }
+
+    @Test
     fun importDependencies(@TempDir tempDir: Path) {
         val pom = """
             <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

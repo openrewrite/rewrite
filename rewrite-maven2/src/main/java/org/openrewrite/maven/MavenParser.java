@@ -6,7 +6,7 @@ import org.openrewrite.maven.cache.InMemoryCache;
 import org.openrewrite.maven.cache.MavenCache;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
-import org.openrewrite.maven.internal.RawPomDownloader;
+import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Modules;
 import org.openrewrite.maven.tree.Pom;
@@ -36,7 +36,7 @@ public class MavenParser implements Parser<Maven> {
                 .map(source -> RawMaven.parse(source, relativeTo))
                 .collect(toList());
 
-        RawPomDownloader downloader = new RawPomDownloader(mavenCache,
+        MavenDownloader downloader = new MavenDownloader(mavenCache,
                 projectPoms.stream().collect(toMap(RawMaven::getURI, Function.identity())));
 
         List<Maven> parsed = projectPoms.stream()

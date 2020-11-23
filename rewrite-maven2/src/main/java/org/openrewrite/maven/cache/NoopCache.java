@@ -1,7 +1,7 @@
 package org.openrewrite.maven.cache;
 
 import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.internal.RawMavenMetadata;
+import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.RawPom;
 
 import java.net.URL;
@@ -9,7 +9,7 @@ import java.util.concurrent.Callable;
 
 public class NoopCache implements MavenCache {
     @Override
-    public CacheResult<RawMavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<RawMavenMetadata> orElseGet) throws Exception {
+    public CacheResult<MavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
         return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
     }
 

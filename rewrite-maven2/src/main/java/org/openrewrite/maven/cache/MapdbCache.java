@@ -23,15 +23,15 @@ public class MapdbCache implements MavenCache {
     private static final Serializer<Optional<RawMaven>> MAVEN_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMaven.class);
     private static final Serializer<RawPom.Repository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(RawPom.Repository.class);
     private static final Serializer<Optional<RawPom.Repository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawPom.Repository.class);
-    private static final Serializer<Optional<RawMavenMetadata>> MAVEN_METADATA_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMavenMetadata.class);
+    private static final Serializer<Optional<MavenMetadata>> MAVEN_METADATA_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenMetadata.class);
     private static final Serializer<GroupArtifactRepository> GROUP_ARTIFACT_SERIALIZER = new JacksonMapdbSerializer<>(GroupArtifactRepository.class);
 
     private final HTreeMap<String, Optional<RawMaven>> pomCache;
-    private final HTreeMap<GroupArtifactRepository, Optional<RawMavenMetadata>> mavenMetadataCache;
+    private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
     private final HTreeMap<RawPom.Repository, Optional<RawPom.Repository>> normalizedRepositoryUrls;
 
     CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawMavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<RawPom.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public MapdbCache(@Nullable File workspace,
@@ -103,21 +103,21 @@ public class MapdbCache implements MavenCache {
     }
 
     private void fillUnresolvablePoms() {
-        new BufferedReader(new InputStreamReader(RawPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
+        new BufferedReader(new InputStreamReader(MavenDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
                 .filter(line -> !line.isEmpty())
                 .forEach(gav -> pomCache.put(gav, Optional.empty()));
     }
 
     @Override
-    public CacheResult<RawMavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<RawMavenMetadata> orElseGet) throws Exception {
+    public CacheResult<MavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
         GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
-        Optional<RawMavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
+        Optional<MavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
 
         //noinspection OptionalAssignedToNull
         if (rawMavenMetadata == null) {
             try {
-                RawMavenMetadata metadata = orElseGet.call();
+                MavenMetadata metadata = orElseGet.call();
                 mavenMetadataCache.put(gar, Optional.ofNullable(metadata));
                 return new CacheResult<>(CacheResult.State.Updated, metadata);
             } catch (Exception e) {

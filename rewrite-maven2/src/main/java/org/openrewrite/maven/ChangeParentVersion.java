@@ -23,8 +23,6 @@ import org.openrewrite.xml.tree.Xml;
 import static org.openrewrite.Validated.required;
 
 public class ChangeParentVersion extends MavenRefactorVisitor {
-    private static final XPathMatcher parentMatcher = new XPathMatcher("/project/parent/version");
-
     private String groupId;
     private String artifactId;
     private String toVersion;
@@ -54,7 +52,7 @@ public class ChangeParentVersion extends MavenRefactorVisitor {
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
-        if (parentMatcher.matches(getCursor())) {
+        if (isParentTag()) {
             Xml.Tag parent = getCursor().getParentOrThrow().getTree();
             if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
                     artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&

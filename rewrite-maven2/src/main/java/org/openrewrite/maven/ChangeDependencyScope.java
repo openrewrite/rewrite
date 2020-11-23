@@ -28,8 +28,6 @@ import java.util.Optional;
 import static org.openrewrite.Validated.required;
 
 public class ChangeDependencyScope extends MavenRefactorVisitor {
-    private static final XPathMatcher dependencyMatcher = new XPathMatcher("/project/dependencies/dependency");
-
     private String groupId;
     private String artifactId;
 
@@ -63,7 +61,7 @@ public class ChangeDependencyScope extends MavenRefactorVisitor {
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
-        if (dependencyMatcher.matches(getCursor())) {
+        if (isDependencyTag()) {
             if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
                     artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
                 Optional<Xml.Tag> scope = tag.getChild("scope");

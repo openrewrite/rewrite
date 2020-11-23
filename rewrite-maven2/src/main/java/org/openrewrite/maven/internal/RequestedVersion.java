@@ -196,10 +196,10 @@ public class RequestedVersion {
         }
     }
 
-    public String resolve(RawPomDownloader downloader, List<RawPom.Repository> repositories) {
+    public String resolve(MavenDownloader downloader, List<RawPom.Repository> repositories) {
         String selectedVersion;
         if (isRange() || isDynamic()) {
-            RawMavenMetadata metadata = downloader.downloadMetadata(groupArtifact.getGroupId(),
+            MavenMetadata metadata = downloader.downloadMetadata(groupArtifact.getGroupId(),
                     groupArtifact.getArtifactId(), repositories);
             selectedVersion = selectFrom(metadata.getVersioning().getVersions());
         } else {

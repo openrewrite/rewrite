@@ -28,6 +28,7 @@ public interface DependencyManagementDependency {
         String groupId;
         String artifactId;
         String version;
+        String requestedVersion;
 
         @Nullable
         Scope scope;
@@ -52,6 +53,10 @@ public interface DependencyManagementDependency {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     class Imported implements DependencyManagementDependency {
+        String groupId;
+        String artifactId;
+        String version;
+        String requestedVersion;
         Pom maven;
 
         @JsonIgnore
@@ -80,4 +85,12 @@ public interface DependencyManagementDependency {
      * dependencyManagement dependencies.
      */
     Map<String, String> getProperties();
+
+    String getGroupId();
+
+    String getArtifactId();
+
+    String getVersion();
+
+    String getRequestedVersion();
 }

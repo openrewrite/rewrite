@@ -6,11 +6,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
-import org.apache.commons.text.StringEscapeUtils;
-import org.openrewrite.Parser;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.tree.Xml;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -18,11 +14,10 @@ import java.net.URI;
 import java.util.Collection;
 
 import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
-public class RawMavenMetadata {
+public class MavenMetadata {
     private static final ObjectMapper xmlMapper = new XmlMapper()
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
@@ -33,7 +28,7 @@ public class RawMavenMetadata {
         }
     };
 
-    public static final RawMavenMetadata EMPTY = new RawMavenMetadata(new RawMavenMetadata.Versioning(emptyList()));
+    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList()));
 
     Versioning versioning;
 
@@ -43,9 +38,9 @@ public class RawMavenMetadata {
         Collection<String> versions;
     }
 
-    public static RawMavenMetadata parse(byte[] document) {
+    public static MavenMetadata parse(byte[] document) {
         try {
-            return xmlMapper.readValue(document, RawMavenMetadata.class);
+            return xmlMapper.readValue(document, MavenMetadata.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -3,9 +3,9 @@ package org.openrewrite.maven.cache;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.maven.internal.RawMaven;
-import org.openrewrite.maven.internal.RawMavenMetadata;
+import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.RawPom;
-import org.openrewrite.maven.internal.RawPomDownloader;
+import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.tree.GroupArtifact;
 
 import java.io.BufferedReader;
@@ -19,11 +19,11 @@ import java.util.concurrent.Callable;
 
 public class InMemoryCache implements MavenCache {
     private final Map<String, Optional<RawMaven>> pomCache = new HashMap<>();
-    private final Map<GroupArtifactRepository, Optional<RawMavenMetadata>> mavenMetadataCache = new HashMap<>();
+    private final Map<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache = new HashMap<>();
     private final Map<RawPom.Repository, Optional<RawPom.Repository>> normalizedRepositoryUrls = new HashMap<>();
 
     CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawMavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<RawPom.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public InMemoryCache() {
@@ -34,21 +34,21 @@ public class InMemoryCache implements MavenCache {
     }
 
     private void fillUnresolvablePoms() {
-        new BufferedReader(new InputStreamReader(RawPomDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
+        new BufferedReader(new InputStreamReader(MavenDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
                 .filter(line -> !line.isEmpty())
                 .forEach(gav -> pomCache.put(gav, Optional.empty()));
     }
 
     @Override
-    public CacheResult<RawMavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<RawMavenMetadata> orElseGet) throws Exception {
+    public CacheResult<MavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
         GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
-        Optional<RawMavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
+        Optional<MavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
 
         //noinspection OptionalAssignedToNull
         if (rawMavenMetadata == null) {
             try {
-                RawMavenMetadata metadata = orElseGet.call();
+                MavenMetadata metadata = orElseGet.call();
                 mavenMetadataCache.put(gar, Optional.ofNullable(metadata));
                 return new CacheResult<>(CacheResult.State.Updated, metadata);
             } catch (Exception e) {

@@ -23,31 +23,33 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 
-public class RawPomDownloader {
+public class MavenDownloader {
     private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
 
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
             .build();
 
+    // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
+    private static final RawPom.Repository SUPER_POM_REPOSITORY = new RawPom.Repository("https://repo.maven.apache.org/maven2",
+            new RawPom.ArtifactPolicy(true), new RawPom.ArtifactPolicy(false));
+
     private final MavenCache mavenCache;
     private final Map<URI, RawMaven> projectPoms;
 
-    public RawPomDownloader(MavenCache mavenCache) {
+    public MavenDownloader(MavenCache mavenCache) {
         this(mavenCache, emptyMap());
     }
 
-    public RawPomDownloader(MavenCache mavenCache, Map<URI, RawMaven> projectPoms) {
+    public MavenDownloader(MavenCache mavenCache, Map<URI, RawMaven> projectPoms) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
     }
 
-    public RawMavenMetadata downloadMetadata(String groupId, String artifactId, List<RawPom.Repository> repositories) {
+    public MavenMetadata downloadMetadata(String groupId, String artifactId, List<RawPom.Repository> repositories) {
         Timer.Sample sample = Timer.start();
 
-        return repositories.stream()
-                .distinct()
-                .map(this::normalizeRepository)
+        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
                 .filter(Objects::nonNull)
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
@@ -56,7 +58,7 @@ public class RawPomDownloader {
                             .tag("type", "metadata");
 
                     try {
-                        CacheResult<RawMavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId, () -> {
+                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId, () -> {
                             logger.debug("Resolving {}:{} metadata from {}", groupId, artifactId, repo.getUrl());
 
                             String uri = repo.getUrl() + "/" +
@@ -70,7 +72,7 @@ public class RawPomDownloader {
                                     @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                             .bytes();
 
-                                    return RawMavenMetadata.parse(responseBody);
+                                    return MavenMetadata.parse(responseBody);
                                 }
                             }
 
@@ -86,17 +88,17 @@ public class RawPomDownloader {
                     }
                 })
                 .filter(Objects::nonNull)
-                .reduce(RawMavenMetadata.EMPTY, (m1, m2) -> {
-                    if (m1 == RawMavenMetadata.EMPTY) {
-                        if (m2 == RawMavenMetadata.EMPTY) {
+                .reduce(MavenMetadata.EMPTY, (m1, m2) -> {
+                    if (m1 == MavenMetadata.EMPTY) {
+                        if (m2 == MavenMetadata.EMPTY) {
                             return m1;
                         } else {
                             return m2;
                         }
-                    } else if (m2 == RawMavenMetadata.EMPTY) {
+                    } else if (m2 == MavenMetadata.EMPTY) {
                         return m1;
                     } else {
-                        return new RawMavenMetadata(new RawMavenMetadata.Versioning(
+                        return new MavenMetadata(new MavenMetadata.Versioning(
                                 Stream.concat(m1.getVersioning().getVersions().stream(),
                                         m2.getVersioning().getVersions().stream()).collect(toList())
                         ));
@@ -150,9 +152,7 @@ public class RawPomDownloader {
             }
         }
 
-        return repositories.stream()
-                .distinct()
-                .map(this::normalizeRepository)
+        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
                 .filter(Objects::nonNull)
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
