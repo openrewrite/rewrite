@@ -44,9 +44,9 @@ interface AutoFormatTest : RefactorVisitorTest {
                     
                 @Deprecated
                 public void method() {
-                  if(true) {
-                    l.add("value");
-                  }
+                    if(true) {
+                      l.add("value");
+                    }
                 }
                 }
             """,

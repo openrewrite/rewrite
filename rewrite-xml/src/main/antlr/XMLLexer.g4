@@ -43,10 +43,10 @@ CharRef       :   '&#' DIGIT+ ';'
 
 SEA_WS        :   (' '|'\t'|'\r'? '\n')+  -> skip;
 
-SPECIAL_OPEN_XML : '<?xml'                -> pushMode(INSIDE) ;
-OPEN             :   '<'                     -> pushMode(INSIDE) ;
-SPECIAL_OPEN     :   '<?'                    -> pushMode(INSIDE) ;
-ELEMENT_OPEN     :   '<!'                    -> pushMode(INSIDE) ;
+SPECIAL_OPEN_XML : ('<?xml-stylesheet'|'<?xml')    -> pushMode(INSIDE) ;
+OPEN             :   '<'                           -> pushMode(INSIDE) ;
+SPECIAL_OPEN     :   '<?'                          -> pushMode(INSIDE) ;
+ELEMENT_OPEN     :   '<!'                          -> pushMode(INSIDE) ;
 
 TEXT          :   ~[<&]+ ;        // match any 16 bit char other than < and &
 

@@ -18,7 +18,6 @@ package org.openrewrite.xml.internal;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AbstractXmlSourceVisitor;
-import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 public class PrintXml extends AbstractXmlSourceVisitor<String> {
@@ -39,7 +38,7 @@ public class PrintXml extends AbstractXmlSourceVisitor<String> {
 
     @Override
     public String visitProlog(Xml.Prolog prolog) {
-        return fmt(prolog, visit(prolog.getXmlDecl()) + visit(prolog.getMisc()));
+        return fmt(prolog, visit(prolog.getXmlDecls()) + visit(prolog.getMisc()));
     }
 
     @Override

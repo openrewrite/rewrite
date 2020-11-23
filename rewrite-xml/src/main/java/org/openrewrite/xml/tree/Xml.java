@@ -90,7 +90,7 @@ public interface Xml extends Serializable, Tree {
 
         @Nullable
         @With
-        ProcessingInstruction xmlDecl;
+        List<ProcessingInstruction> xmlDecls;
 
         @With
         List<Misc> misc;

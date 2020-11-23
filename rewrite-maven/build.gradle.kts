@@ -42,6 +42,7 @@ dependencies {
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 
     testImplementation("ch.qos.logback:logback-classic:1.0.13")
+    testImplementation("org.mapdb:mapdb:latest.release")
 
     testImplementation(project(":rewrite-test"))
 

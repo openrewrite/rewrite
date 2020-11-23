@@ -35,7 +35,7 @@ public class XmlRefactorVisitor extends AbstractRefactorVisitor<Xml>
     @Override
     public Xml visitProlog(Xml.Prolog prolog) {
         Xml.Prolog p = prolog;
-        p = p.withXmlDecl(refactor(p.getXmlDecl()));
+        p = p.withXmlDecls(refactor(p.getXmlDecls()));
         return p.withMisc(refactor(p.getMisc()));
     }
 

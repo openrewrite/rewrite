@@ -64,7 +64,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Prolog visitProlog(XMLParser.PrologContext ctx) {
         return convert(ctx, (c, format) -> new Xml.Prolog(
                 randomId(),
-                visitXmldecl(ctx.xmldecl()),
+                ctx.xmldecl().stream().map(this::visitXmldecl).collect(toList()),
                 ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
                 format)
         );

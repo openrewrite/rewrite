@@ -78,7 +78,7 @@ public abstract class AbstractXmlSourceVisitor<R> extends AbstractSourceVisitor<
         return reduce(
                 defaultTo(prolog),
                 reduce(
-                        visit(prolog.getXmlDecl()),
+                        visit(prolog.getXmlDecls()),
                         visit(prolog.getMisc())
                 )
         );

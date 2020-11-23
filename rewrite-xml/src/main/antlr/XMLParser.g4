@@ -33,7 +33,7 @@ options { tokenVocab=XMLLexer; }
 
 document                :   prolog element;
 
-prolog                  :   xmldecl? misc*;
+prolog                  :   xmldecl* misc*;
 
 xmldecl                 :   SPECIAL_OPEN_XML attribute * SPECIAL_CLOSE ;
 

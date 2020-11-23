@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import java.net.URI
 import java.nio.file.Paths
 
 interface CompilationUnitTest {
@@ -37,8 +38,9 @@ interface CompilationUnitTest {
 
     @Test
     fun sourceSet(jp: JavaParser) {
-        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
-        assertThat(a.getSourceSet()).isEqualTo(Paths.get("sourceSet"))
+        val path = Paths.get("sourceSet")
+        val a = J.CompilationUnit.buildEmptyClass(path, "my.org", "MyClass")
+        assertThat(a.sourceSet).isEqualTo(Paths.get(path.toUri()))
     }
     
     @Test

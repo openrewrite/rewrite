@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -44,6 +45,7 @@ public interface SourceFile extends Tree {
      * @param <S>      The type of {@link SourceFile}.
      * @return A new {@link SourceFile} with updated metadata.
      */
+    @JsonIgnore
     @SuppressWarnings("unchecked")
     default <S extends SourceFile> S setMetadata(Metadata metadata) {
         List<Metadata> updatedMetadata = new ArrayList<>(getMetadata().size());
