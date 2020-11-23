@@ -28,6 +28,7 @@ import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.internal.PrintProperties;
 
 import java.io.Serializable;
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -57,7 +58,7 @@ public interface Properties extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String sourcePath;
+        URI sourcePath;
 
         @With
         Collection<Metadata> metadata;

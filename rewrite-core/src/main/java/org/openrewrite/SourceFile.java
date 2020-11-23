@@ -18,13 +18,13 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.net.URI;
 import java.util.Collection;
-import java.util.Optional;
 
 import static java.util.Collections.emptyList;
 
 public interface SourceFile extends Tree {
-    String getSourcePath();
+    URI getSourcePath();
 
     /**
      * {@link SourceVisitor} may respond to metadata to determine whether to act on

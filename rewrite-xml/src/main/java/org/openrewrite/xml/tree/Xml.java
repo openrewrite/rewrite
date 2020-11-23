@@ -27,6 +27,7 @@ import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
+import java.net.URI;
 import java.util.*;
 
 import static java.util.stream.Collectors.toList;
@@ -60,7 +61,7 @@ public interface Xml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String sourcePath;
+        URI sourcePath;
 
         @With
         Collection<Metadata> metadata;

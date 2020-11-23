@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -80,8 +79,6 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
                     } else if (!toVersion.equals(version)) {
                         andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
                     }
-                } else {
-                    andThen(new AddToTag.Scoped(tag, "<version>" + toVersion + "</version>"));
                 }
             }
         }

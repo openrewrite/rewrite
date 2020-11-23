@@ -51,7 +51,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
-                uri.toString(),
+                uri,
                 emptyList(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),

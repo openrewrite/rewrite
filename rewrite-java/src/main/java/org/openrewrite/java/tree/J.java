@@ -30,6 +30,7 @@ import org.openrewrite.java.internal.VariableDeclsToString;
 import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
+import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -1108,7 +1109,7 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        String sourcePath;
+        URI sourcePath;
 
         @With
         Collection<Metadata> metadata;
@@ -1179,10 +1180,10 @@ public interface J extends Serializable, Tree {
         }
 
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
-            String sourcePath = sourceSet
+            URI sourcePath = sourceSet
                     .resolve(packageName.replace(".", "/"))
                     .resolve(className + ".java")
-                    .toString();
+                    .toUri();
 
             return new J.CompilationUnit(randomId(),
                     sourcePath,

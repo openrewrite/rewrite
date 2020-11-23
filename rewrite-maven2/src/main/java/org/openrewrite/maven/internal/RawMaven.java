@@ -57,7 +57,7 @@ public class RawMaven {
 
     @JsonIgnore
     public URI getURI() {
-        return URI.create(document.getSourcePath());
+        return document.getSourcePath();
     }
 
     @Override

@@ -136,7 +136,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), sourceFile.toString(), emptyList(),
+            return new Yaml.Documents(randomId(), sourceFile, emptyList(),
                     documents, Formatting.EMPTY);
         } catch (IOException e) {
             throw new UncheckedIOException(e);

@@ -127,9 +127,9 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
         myModuleProject.mkdirs()
 
         assertRefactored(
-            dependencies = listOf(
-                    File(myModuleProject, "pom.xml").apply {
-                        writeText("""
+                dependencies = listOf(
+                        File(myModuleProject, "pom.xml").apply {
+                            writeText("""
                                 <project>
                                   <modelVersion>4.0.0</modelVersion>
                                  
@@ -148,52 +148,52 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
                                     </dependency>
                                   </dependencies>
                                 </project>
-                            """.trimIndent())
-                    }
-            ),
-            visitors = listOf(guavaTo29),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>28.2-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """.trimIndent().trim())
-            },
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """
+                            """.trimIndent().trim())
+                        }
+                ),
+                visitors = listOf(guavaTo29),
+                before = File(tempDir.toFile(), "pom.xml").apply {
+                    writeText("""
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                         
+                          <packaging>pom</packaging>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-app</artifactId>
+                          <version>1</version>
+                          
+                          <dependencyManagement>
+                            <dependencies>
+                              <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>28.2-jre</version>
+                              </dependency>
+                            </dependencies>
+                          </dependencyManagement>
+                        </project>
+                    """.trimIndent().trim())
+                },
+                after = """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                     
+                      <packaging>pom</packaging>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                """
         )
     }
 
@@ -204,29 +204,29 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
 
         assertRefactored(
                 dependencies = listOf(
-                    File(myModuleProject, "pom.xml").apply {
-                        writeText("""
-                            <project>
-                              <modelVersion>4.0.0</modelVersion>
-                             
-                              <parent>
-                                <groupId>com.mycompany.app</groupId>
-                                <artifactId>my-app</artifactId>
-                                <version>1</version>
-                              </parent>
-                            
-                              <artifactId>my-module</artifactId>
-                            
-                              <dependencies>
-                                <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>${"$"}{guava.version}</version>
-                                </dependency>
-                              </dependencies>
-                            </project>
-                        """.trimIndent())
-                    }
+                        File(myModuleProject, "pom.xml").apply {
+                            writeText("""
+                                <project>
+                                  <modelVersion>4.0.0</modelVersion>
+                                 
+                                  <parent>
+                                    <groupId>com.mycompany.app</groupId>
+                                    <artifactId>my-app</artifactId>
+                                    <version>1</version>
+                                  </parent>
+                                
+                                  <artifactId>my-module</artifactId>
+                                
+                                  <dependencies>
+                                    <dependency>
+                                      <groupId>com.google.guava</groupId>
+                                      <artifactId>guava</artifactId>
+                                      <version>${"$"}{guava.version}</version>
+                                    </dependency>
+                                  </dependencies>
+                                </project>
+                            """.trimIndent().trim())
+                        }
                 ),
                 visitors = listOf(guavaTo29),
                 before = File(tempDir.toFile(), "pom.xml").apply {

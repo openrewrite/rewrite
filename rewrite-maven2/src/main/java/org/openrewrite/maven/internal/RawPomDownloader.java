@@ -130,14 +130,23 @@ public class RawPomDownloader {
 
         Timer.Sample sample = Timer.start();
 
-        if (!StringUtils.isBlank(relativePath) && (containingPom == null || !containingPom.getURI().getScheme().contains("http"))) {
-            return Optional.ofNullable(containingPom)
-                    .map(pom -> projectPoms.get(pom.getURI()
-                            .relativize(URI.create(relativePath))
-                            .resolve("pom.xml")
-                            .normalize()
-                    ))
-                    .orElse(null);
+        if (containingPom == null || !containingPom.getURI().getScheme().contains("http")) {
+            if (!StringUtils.isBlank(relativePath)) {
+                return Optional.ofNullable(containingPom)
+                        .map(pom -> projectPoms.get(pom.getURI()
+                                .relativize(URI.create(relativePath))
+                                .resolve("pom.xml")
+                                .normalize()
+                        ))
+                        .orElse(null);
+            }
+
+            for (RawMaven projectPom : projectPoms.values()) {
+                if(groupId.equals(projectPom.getPom().getGroupId()) &&
+                        artifactId.equals(projectPom.getPom().getArtifactId())) {
+                    return projectPom;
+                }
+            }
         }
 
         return repositories.stream()

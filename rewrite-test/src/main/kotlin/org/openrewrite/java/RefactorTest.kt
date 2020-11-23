@@ -24,12 +24,14 @@ import org.openrewrite.SourceFile
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
+import java.net.URI
 
 class RefactorTest {
     class RefactorTestException : RuntimeException("")
+
     val cu = J.CompilationUnit(
             randomId(),
-            "",
+            URI.create("A.java"),
             listOf(),
             null,
             listOf(),
@@ -37,7 +39,8 @@ class RefactorTest {
             Formatting.EMPTY,
             listOf()
     )
-    val throwingVisitor = object : JavaRefactorVisitor() {
+
+    private val throwingVisitor = object : JavaRefactorVisitor() {
         override fun visitCompilationUnit(cu: J.CompilationUnit?): J {
             throw RefactorTestException()
         }
@@ -81,7 +84,7 @@ class RefactorTest {
     fun canGenerate() {
         val cuToGenerate = J.CompilationUnit(
                 randomId(),
-                "",
+                URI.create("A.java"),
                 listOf(),
                 null,
                 listOf(),

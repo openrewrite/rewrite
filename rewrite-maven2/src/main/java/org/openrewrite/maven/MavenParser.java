@@ -37,11 +37,13 @@ public class MavenParser implements Parser<Maven> {
         RawPomDownloader downloader = new RawPomDownloader(mavenCache,
             projectPoms.stream().collect(toMap(RawMaven::getURI, Function.identity())));
 
-        return projectPoms.stream()
+        List<Maven> parsed = projectPoms.stream()
                 .map(raw -> new RawMavenResolver(downloader, false, resolveOptional).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(Maven::new)
                 .collect(toList());
+
+        return parsed;
     }
 
     @Override
