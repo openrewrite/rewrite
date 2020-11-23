@@ -66,10 +66,19 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
                     tag.getChildValue("artifactId")
                             .map(a -> a.equals(artifactId))
                             .orElse(artifactId == null)) {
-                Optional<Xml.Tag> version = tag.getChild("version");
-                if (version.isPresent()) {
-                    if (!toVersion.equals(version.get().getValue().orElse(null))) {
-                        andThen(new ChangeTagValue.Scoped(version.get(), toVersion));
+                Optional<Xml.Tag> versionTag = tag.getChild("version");
+                if (versionTag.isPresent()) {
+                    String version = versionTag.get().getValue().orElse(null);
+                    if (version == null) {
+                        // TODO change in dependency management...
+                    } else if (version.contains("${") &&
+                            !toVersion.equals(model.getProperty(version))) {
+                        ChangePropertyValue changePropertyValue = new ChangePropertyValue();
+                        changePropertyValue.setKey(version);
+                        changePropertyValue.setToValue(toVersion);
+                        andThen(changePropertyValue);
+                    } else if (!toVersion.equals(version)) {
+                        andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
                     }
                 } else {
                     andThen(new AddToTag.Scoped(tag, "<version>" + toVersion + "</version>"));

@@ -33,7 +33,7 @@ public class ChangePropertyValue extends MavenRefactorVisitor {
     }
 
     public void setKey(String key) {
-        this.key = key;
+        this.key = key.replace("${", "").replace("}", "");
     }
 
     public void setToValue(String toValue) {

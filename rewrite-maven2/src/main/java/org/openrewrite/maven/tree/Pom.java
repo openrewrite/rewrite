@@ -1,6 +1,9 @@
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Metadata;
@@ -79,7 +82,11 @@ public class Pom implements Metadata {
     }
 
     @Nullable
-    public String getProperty(String property) {
+    public String getProperty(@Nullable String property) {
+        if (property == null) {
+            return null;
+        }
+
         String key = property.replace("${", "").replace("}", "");
         String value = properties.get(key);
         if (value == null) {
