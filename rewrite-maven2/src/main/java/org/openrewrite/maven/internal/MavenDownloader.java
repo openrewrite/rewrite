@@ -203,7 +203,7 @@ public class MavenDownloader {
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
                         return result.getData();
                     } catch (Exception e) {
-                        logger.error("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
+                        logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
                         sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
                                 .register(Metrics.globalRegistry));
                         return null;

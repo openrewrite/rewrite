@@ -185,8 +185,9 @@ public class RawPom {
         Set<GroupArtifact> exclusions;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @FieldDefaults(level = AccessLevel.PRIVATE)
+    @Getter
+    @Setter
     public static class DependencyManagement {
         @Nullable
         Dependencies dependencies;

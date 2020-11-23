@@ -359,7 +359,7 @@ class MavenDependencyResolutionIntegTest {
                 }
     }
 
-    private fun dependencyString(dep: org.openrewrite.maven.tree.Pom.Dependency, ignoreScopes: Boolean): String =
+    private fun dependencyString(dep: Pom.Dependency, ignoreScopes: Boolean): String =
             dep.run { "$groupId:$artifactId:$version${if (classifier != null) ":${classifier}" else ""}" } +
                     (if (ignoreScopes) "" else "[${dep.scope.toString().toLowerCase()}]") +
                     dep.run { " https://repo1.maven.org/maven2/${groupId.replace(".", "/")}/$artifactId/$version/$artifactId-$version.pom" }
@@ -435,7 +435,7 @@ class MavenDependencyResolutionIntegTest {
                             " https://repo1.maven.org/maven2/${artifact.run { "${groupId.replace(".", "/")}/$artifactId/$version/$artifactId-$version.pom" }}"
                 } ?: ""
 
-        private fun remoteRepositoriesFromModel(model: Model): List<RemoteRepository>? {
+        private fun remoteRepositoriesFromModel(model: Model): List<RemoteRepository> {
             val remotes: MutableList<RemoteRepository> = mutableListOf()
             model.repositories.forEach(Consumer { repo: Repository ->
                 remotes.add(RemoteRepository.Builder(repo.id, "default",

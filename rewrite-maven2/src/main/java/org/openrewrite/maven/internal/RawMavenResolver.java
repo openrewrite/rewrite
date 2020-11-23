@@ -267,7 +267,7 @@ public class RawMavenResolver {
                     version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
 
                     if (version.contains("${")) {
-                        logger.warn("Unable to download {}:{}:{}. Including POM is at {}",
+                        logger.debug("Unable to download {}:{}:{}. Including POM is at {}",
                                 groupId, artifactId, version, rawMaven.getURI());
                         return null;
                     }
@@ -277,7 +277,7 @@ public class RawMavenResolver {
                             partialMaven.getRepositories());
 
                     if (download == null) {
-                        logger.warn("Unable to download {}:{}:{}. Including POM is at {}",
+                        logger.debug("Unable to download {}:{}:{}. Including POM is at {}",
                                 groupId, artifactId, version, rawMaven.getURI());
                         return null;
                     }
@@ -351,7 +351,7 @@ public class RawMavenResolver {
                 URI.create(url);
                 repositories.add(new RawPom.Repository(url, repository.getReleases(), repository.getSnapshots()));
             } catch(Throwable t) {
-                logger.warn("Unable to make a URI out of repositoriy url {}", url);
+                logger.debug("Unable to make a URI out of repositoriy url {}", url);
             }
         }
 
@@ -444,7 +444,7 @@ public class RawMavenResolver {
                                     ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
 
                             if (conflictResolved == null) {
-                                logger.warn(
+                                logger.debug(
                                         "Unable to conflict resolve {}:{}:{} {}",
                                         ancestorDep.getGroupId(),
                                         ancestorDep.getArtifactId(),
