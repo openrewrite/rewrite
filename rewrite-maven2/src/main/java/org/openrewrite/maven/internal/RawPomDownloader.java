@@ -130,7 +130,8 @@ public class RawPomDownloader {
 
         Timer.Sample sample = Timer.start();
 
-        if (containingPom == null || !containingPom.getURI().getScheme().contains("http")) {
+        if (containingPom == null || Optional.ofNullable(containingPom.getURI().getScheme())
+                .map(s -> !s.contains("http")).orElse(true)) {
             if (!StringUtils.isBlank(relativePath)) {
                 return Optional.ofNullable(containingPom)
                         .map(pom -> projectPoms.get(pom.getURI()
@@ -142,7 +143,7 @@ public class RawPomDownloader {
             }
 
             for (RawMaven projectPom : projectPoms.values()) {
-                if(groupId.equals(projectPom.getPom().getGroupId()) &&
+                if (groupId.equals(projectPom.getPom().getGroupId()) &&
                         artifactId.equals(projectPom.getPom().getArtifactId())) {
                     return projectPom;
                 }

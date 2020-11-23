@@ -5,13 +5,17 @@ import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Collection;
+
 public class MavenRefactorVisitor extends XmlRefactorVisitor
         implements MavenSourceVisitor<Xml> {
     protected Pom model;
+    protected Collection<Pom> modules;
 
     @Override
     public Maven visitMaven(Maven maven) {
         this.model = maven.getModel();
+        this.modules = maven.getModules();
         return (Maven) visitDocument(maven);
     }
 

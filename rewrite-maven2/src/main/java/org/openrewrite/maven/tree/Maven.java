@@ -1,6 +1,8 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openrewrite.Formatting;
+import org.openrewrite.Metadata;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.xml.XmlSourceVisitor;
@@ -50,5 +52,25 @@ public class Maven extends Xml.Document {
             return super.accept(v);
         }
         return v.defaultTo(null);
+    }
+
+    @Override
+    public Maven withRoot(Tag root) {
+        return new Maven(super.withRoot(root));
+    }
+
+    @Override
+    public Maven withMetadata(Collection<Metadata> metadata) {
+        return new Maven(super.withMetadata(metadata));
+    }
+
+    @Override
+    public Maven withFormatting(Formatting formatting) {
+        return new Maven(super.withFormatting(formatting));
+    }
+
+    @Override
+    public Maven withProlog(Prolog prolog) {
+        return new Maven(super.withProlog(prolog));
     }
 }

@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -27,6 +28,8 @@ import static org.openrewrite.Validated.required;
 
 public class ChangeDependencyVersion extends MavenRefactorVisitor {
     private static final XPathMatcher dependencyMatcher = new XPathMatcher("/project/dependencies/dependency");
+    private static final XPathMatcher managedDependencyMatcher = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    private static final XPathMatcher propertyMatcher = new XPathMatcher("/project/properties/*");
 
     private String groupId;
 
@@ -60,7 +63,7 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
 
     @Override
     public Xml visitTag(Xml.Tag tag) {
-        if (dependencyMatcher.matches(getCursor())) {
+        if (dependencyMatcher.matches(getCursor()) || managedDependencyMatcher.matches(getCursor())) {
             if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
                     tag.getChildValue("artifactId")
                             .map(a -> a.equals(artifactId))
@@ -68,18 +71,31 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
                 Optional<Xml.Tag> versionTag = tag.getChild("version");
                 if (versionTag.isPresent()) {
                     String version = versionTag.get().getValue().orElse(null);
-                    if (version == null) {
-                        // TODO change in dependency management...
-                    } else if (version.contains("${") &&
-                            !toVersion.equals(model.getProperty(version))) {
-                        ChangePropertyValue changePropertyValue = new ChangePropertyValue();
-                        changePropertyValue.setKey(version);
-                        changePropertyValue.setToValue(toVersion);
-                        andThen(changePropertyValue);
-                    } else if (!toVersion.equals(version)) {
-                        andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
+                    if (version != null) {
+                        if (version.trim().startsWith("${") &&
+                                !toVersion.equals(model.getProperty(version.trim()))) {
+                            ChangePropertyValue changePropertyValue = new ChangePropertyValue();
+                            changePropertyValue.setKey(version);
+                            changePropertyValue.setToValue(toVersion);
+                            andThen(changePropertyValue);
+                        } else if (!toVersion.equals(version)) {
+                            andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
+                        }
                     }
                 }
+            }
+        } else if (!modules.isEmpty() && propertyMatcher.matches(getCursor())) {
+            String propertyKeyRef = "${" + tag.getName() + "}";
+
+            OUTER:
+            for (Pom module : modules) {
+                for (Pom.Dependency dependency : module.getDependencies()) {
+                    if(propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                        andThen(new ChangeTagValue.Scoped(tag, toVersion));
+                        break OUTER;
+                    }
+                }
+
             }
         }
 
