@@ -2,8 +2,8 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.InMemoryCache;
 import org.openrewrite.maven.cache.MavenCache;
-import org.openrewrite.maven.cache.NoopCache;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
 import org.openrewrite.maven.internal.RawPomDownloader;
@@ -55,7 +55,7 @@ public class MavenParser implements Parser<Maven> {
 
     public static class Builder {
         private boolean resolveOptional = true;
-        private MavenCache mavenCache = new NoopCache();
+        private MavenCache mavenCache = new InMemoryCache();
 
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;

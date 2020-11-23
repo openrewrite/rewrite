@@ -202,6 +202,9 @@ public class Pom implements Metadata {
         boolean optional;
         Pom model;
 
+        @Nullable
+        String requestedVersion;
+
         Set<GroupArtifact> exclusions;
 
         @JsonIgnore

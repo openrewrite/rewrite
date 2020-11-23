@@ -56,7 +56,7 @@ public class RawMavenResolver {
 
     @Nullable
     public Xml.Document resolve(RawMaven rawMaven) {
-        Pom pom = resolve(rawMaven, Scope.None, SUPER_POM_REPOSITORY);
+        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), SUPER_POM_REPOSITORY);
         assert pom != null;
         return rawMaven.getDocument().withMetadata(singletonList(pom));
     }
@@ -71,9 +71,9 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Pom resolve(RawMaven rawMaven, Scope scope, List<RawPom.Repository> repositories) {
+    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawPom.Repository> repositories) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, repositories);
+                false, null, requestedVersion, repositories);
 
         workQueue.add(rootTask);
 
@@ -133,7 +133,7 @@ public class RawMavenResolver {
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
                         Pom maven = new RawMavenResolver(downloader, true, resolveOptional)
-                                .resolve(rawMaven, Scope.Compile, partialMaven.getRepositories());
+                                .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                         if (maven != null) {
                             managedDependencies.add(new DependencyManagementDependency.Imported(maven));
@@ -179,6 +179,14 @@ public class RawMavenResolver {
                         assert groupId != null;
                         //noinspection ConstantConditions
                         assert artifactId != null;
+                    }
+
+                    // excluded
+                    for (GroupArtifact e : task.getExclusions()) {
+                        if (dep.getGroupId().matches(e.getGroupId()) &&
+                                dep.getArtifactId().matches(e.getArtifactId())) {
+                            return null;
+                        }
                     }
 
                     String version = null;
@@ -250,43 +258,18 @@ public class RawMavenResolver {
                         assert !version.contains("${");
                     }
 
-                    return new RawPom.Dependency(
-                            groupId,
-                            artifactId,
-                            version,
-                            requestedScope.toString().toLowerCase(),
-                            dep.getType(),
-                            dep.getClassifier(),
-                            dep.getOptional() != null && dep.getOptional(),
-                            dep.getExclusions()
-                    );
-                })
-                .filter(Objects::nonNull)
-                .filter(dep -> {
-                    for (GroupArtifact e : task.getExclusions()) {
-                        if (dep.getGroupId().matches(e.getGroupId()) &&
-                                dep.getArtifactId().matches(e.getArtifactId())) {
-                            return false;
-                        }
-                    }
-                    return true;
-                })
-                .map(dep -> {
-                    assert dep.getVersion() != null;
-
-                    RawMaven download = downloader.download(dep.getGroupId(), dep.getArtifactId(),
-                            dep.getVersion(), dep.getClassifier(), null, rawMaven,
+                    RawMaven download = downloader.download(groupId, artifactId,
+                            version, dep.getClassifier(), null, rawMaven,
                             partialMaven.getRepositories());
 
                     if (download == null) {
                         logger.warn("Unable to download {}:{}:{}. Including POM is at {}",
-                                dep.getGroupId(), dep.getArtifactId(), dep.getVersion(),
-                                rawMaven.getURI());
+                                groupId, artifactId, version, rawMaven.getURI());
                         return null;
                     }
 
                     ResolutionTask resolutionTask = new ResolutionTask(
-                            Scope.fromName(dep.getScope()),
+                            requestedScope,
                             download,
                             dep.getExclusions() == null ?
                                     emptySet() :
@@ -298,6 +281,7 @@ public class RawMavenResolver {
                                             .collect(Collectors.toSet()),
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
+                            dep.getVersion(),
                             partialMaven.getRepositories()
                     );
 
@@ -329,7 +313,7 @@ public class RawMavenResolver {
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
                     parent = new RawMavenResolver(downloader, true, resolveOptional)
-                            .resolve(rawParentModel, Scope.Compile, partialMaven.getRepositories());
+                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -406,6 +390,7 @@ public class RawMavenResolver {
                                     depTask.getClassifier(),
                                     optional,
                                     resolved,
+                                    depTask.getRequestedVersion(),
                                     depTask.getExclusions()
                             );
                         })
@@ -426,8 +411,9 @@ public class RawMavenResolver {
                             RawMaven conflictResolvedRaw = downloader.download(groupId, artifactId, conflictResolvedVersion,
                                     ancestorDep.getClassifier(), null, null, task.getRepositories());
 
-                            Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw, ancestorDep.getExclusions(),
-                                    ancestorDep.isOptional(), ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
+                            Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
+                                    ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
+                                    ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
 
                             // for debugging
                             //noinspection RedundantIfStatement
@@ -441,6 +427,7 @@ public class RawMavenResolver {
                                     ancestorDep.getClassifier(),
                                     ancestorDep.isOptional(),
                                     conflictResolved,
+                                    ancestorDep.getRequestedVersion(),
                                     ancestorDep.getExclusions()
                             ));
                         } else {
@@ -515,6 +502,10 @@ public class RawMavenResolver {
         @EqualsAndHashCode.Include
         @Nullable
         String classifier;
+
+        @EqualsAndHashCode.Include
+        @Nullable
+        String requestedVersion;
 
         List<RawPom.Repository> repositories;
 

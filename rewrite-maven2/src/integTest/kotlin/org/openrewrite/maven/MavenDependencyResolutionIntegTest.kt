@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.maven.cache.InMemoryCache
-import org.openrewrite.maven.cache.MapdbCache
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.xml.tree.Xml
 import org.slf4j.Logger
