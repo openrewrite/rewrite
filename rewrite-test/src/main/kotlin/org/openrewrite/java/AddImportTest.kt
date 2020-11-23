@@ -302,7 +302,7 @@ interface AddImportTest: RefactorVisitorTest {
                 
                 class A {
                     public A() {
-                        List<String> list = emptyList();
+                        List<String> list = java.util.Collections.emptyList();
                     }
                 }
             """,
@@ -356,7 +356,7 @@ interface AddImportTest: RefactorVisitorTest {
                 
                 class A {
                     public A() {
-                        List<String> list = emptyList();
+                        List<String> list = java.util.Collections.emptyList();
                     }
                 }
             """,
@@ -376,9 +376,8 @@ interface AddImportTest: RefactorVisitorTest {
     )
 
     /**
-     * This visitor is used to set the method type of a statically referenced call to java.util.Collections.emptyList().
-     * This allows us to leave an unqualified "emptyList()" method invocation in our "before" snippets and to ensure
-     * the static import is correctly added afterwards.
+     * This visitor removes the "java.util.Collections" receiver from method invocations of "java.util.Collections.emptyList()".
+     * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
     private class FixEmptyListMethodType : JavaIsoRefactorVisitor() {
         override fun visitMethodInvocation(method: J.MethodInvocation?): J.MethodInvocation {
@@ -386,15 +385,7 @@ interface AddImportTest: RefactorVisitorTest {
             val original: J.MethodInvocation = super.visitMethodInvocation(method)
 
             if (original.name.simpleName == "emptyList") {
-                val signature = JavaType.Method.Signature(JavaType.Class.build("java.util.List"), emptyList())
-                val emptyListMethod: JavaType.Method = JavaType.Method.build(
-                        JavaType.Class.build("java.util.Collections"),
-                        "emptyList",
-                        signature,
-                        signature,
-                        Collections.emptyList(),
-                        Stream.of(Flag.Public, Flag.Static).collect(Collectors.toSet()))
-                return original.withType(emptyListMethod)
+                return original.withSelect(null)
             }
             return original
         }

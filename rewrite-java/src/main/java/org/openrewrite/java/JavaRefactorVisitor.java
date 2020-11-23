@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.Cursor;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -451,12 +452,13 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         return w.withBoundedType(refactor(w.getBoundedType()));
     }
 
-    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
-        if (clazz != null) {
-            maybeAddImport(clazz.getFullyQualifiedName());
-        }
-    }
-
+    /**
+     * This method will add an import to the compilation unit regardless if a reference to the type exists. It adds an
+     * additional visitor which means the "add import" is deferred and does not complete immediately. This operation is
+     * idempotent and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     */
     public void addImport(String fullyQualifiedName) {
         AddImport op = new AddImport();
         op.setType(fullyQualifiedName);
@@ -466,9 +468,64 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         }
     }
 
+    /**
+     * This method will add an import to the compilation unit regardless if a reference to the type/method exists. It
+     * adds an additional visitor which means the "add import" is deferred and does not complete immediately.
+     * This operation is idempotent and calling this method multiple times with the same arguments will only add an
+     * import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     * @param staticMethod The static method to be imported. A wildcard "*" may also be used to statically import all methods.
+     */
+    public void addImport(String fullyQualifiedName, String staticMethod) {
+        AddImport op = new AddImport();
+        op.setType(fullyQualifiedName);
+        op.setOnlyIfReferenced(false);
+        if (!andThen().contains(op)) {
+            andThen(op);
+        }
+    }
+
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param clazz The class that will be imported into the compilation unit.
+     */
+    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+        if (clazz != null) {
+            maybeAddImport(clazz.getFullyQualifiedName());
+        }
+    }
+
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     */
     public void maybeAddImport(String fullyQualifiedName) {
         AddImport op = new AddImport();
         op.setType(fullyQualifiedName);
+        if (!andThen().contains(op)) {
+            andThen(op);
+        }
+    }
+
+    /**
+     * This method will add a static import to the compilation unit if there is a reference to the type/method. It adds
+     * an additional visitor which means the "add import" is deferred and does not complete immediately. This operation
+     * is idempotent and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     * @param staticMethod The static method to be imported. A wildcard "*" may also be used to statically import all methods.
+     */
+    public void maybeAddImport(@NonNull String fullyQualifiedName, @NonNull String staticMethod) {
+        AddImport op = new AddImport();
+        op.setType(fullyQualifiedName);
+        op.setStaticMethod(staticMethod);
         if (!andThen().contains(op)) {
             andThen(op);
         }
