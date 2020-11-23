@@ -1148,11 +1148,11 @@ public interface J extends Serializable, Tree {
         }
 
         /**
-        * This finds method invocations matching the specified pointcut expression within the compilation unit. 
-        * See {@link org.openrewrite.java.search.FindMethods} for pointcut expression examples.
-        *
-        * @param signature A pointcut expression that scopes the method invocation search. 
-        */
+         * This finds method invocations matching the specified pointcut expression within the compilation unit. 
+         * See {@link org.openrewrite.java.search.FindMethods} for pointcut expression examples.
+         *
+         * @param signature A pointcut expression that scopes the method invocation search. 
+         */
         public List<MethodInvocation> findMethodCalls(String signature) {
             return new FindMethods(signature).visit(this);
         }
