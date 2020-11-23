@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.refactor.Formatter;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
@@ -45,7 +46,8 @@ public class AddToTag  {
             Xml.Tag t = refactor(tag, super::visitTag);
             if (scope.isScope(tag)) {
                 List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
-                content.add(tagToAdd.withPrefix(formatter.findIndent(enclosingTag().getFormatting().getIndent(), tag).getPrefix()));
+                Formatter.Result indent = formatter.findIndent(enclosingTag().getFormatting().getIndent(), tag);
+                content.add(tagToAdd.withPrefix(indent.getPrefix()));
                 t = t.withContent(content);
             }
             return t;

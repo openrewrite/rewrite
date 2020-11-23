@@ -17,6 +17,7 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.refactor.Formatter;
+import org.openrewrite.yaml.search.FindIndentYaml;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlRefactorVisitor extends AbstractRefactorVisitor<Yaml>
@@ -26,7 +27,7 @@ public class YamlRefactorVisitor extends AbstractRefactorVisitor<Yaml>
 
     @Override
     public Yaml visitDocuments(Yaml.Documents documents) {
-        formatter = new Formatter(documents);
+        formatter = new Formatter(documents, FindIndentYaml::new);
         return documents.withDocuments(refactor(documents.getDocuments()));
     }
 

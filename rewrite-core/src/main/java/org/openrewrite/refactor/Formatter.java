@@ -19,15 +19,19 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import org.openrewrite.Tree;
 
+import java.util.function.Function;
+
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.IntStream.range;
 
 public class Formatter {
     private final Tree root;
+    private final Function<Integer, FindIndent> findIndentBuilder;
     private Result wholeSourceIndent;
 
-    public Formatter(Tree root) {
+    public Formatter(Tree root, Function<Integer, FindIndent> findIndentBuilder) {
         this.root = root;
+        this.findIndentBuilder = findIndentBuilder;
     }
 
     @RequiredArgsConstructor
@@ -50,7 +54,7 @@ public class Formatter {
 
     public Result wholeSourceIndent() {
         if (wholeSourceIndent == null) {
-            FindIndent wholeSourceIndentVisitor = new FindIndent(0);
+            FindIndent wholeSourceIndentVisitor = findIndentBuilder.apply(0);
             wholeSourceIndentVisitor.visit(root);
             wholeSourceIndent = new Result(0, wholeSourceIndentVisitor.getMostCommonIndent() > 0 ?
                     wholeSourceIndentVisitor.getMostCommonIndent() : 4 /* default to 4 spaces */,
@@ -60,7 +64,7 @@ public class Formatter {
     }
 
     public Result findIndent(int enclosingIndent, Tree... trees) {
-        FindIndent findIndentVisitor = new FindIndent(enclosingIndent);
+        FindIndent findIndentVisitor = findIndentBuilder.apply(enclosingIndent);
         for (Tree tree : trees) {
             findIndentVisitor.visit(tree);
         }
@@ -73,5 +77,4 @@ public class Formatter {
 
         return new Result(enclosingIndent, indentToUse, indentedWithSpaces);
     }
-
 }

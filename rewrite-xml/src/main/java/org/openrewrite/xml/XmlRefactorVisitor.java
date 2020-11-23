@@ -17,6 +17,7 @@ package org.openrewrite.xml;
 
 import org.openrewrite.AbstractRefactorVisitor;
 import org.openrewrite.refactor.Formatter;
+import org.openrewrite.xml.search.FindIndentXml;
 import org.openrewrite.xml.tree.Xml;
 
 public class XmlRefactorVisitor extends AbstractRefactorVisitor<Xml>
@@ -25,7 +26,7 @@ public class XmlRefactorVisitor extends AbstractRefactorVisitor<Xml>
 
     @Override
     public Xml visitDocument(Xml.Document document) {
-        formatter = new Formatter(document);
+        formatter = new Formatter(document, FindIndentXml::new);
         Xml.Document d = document;
         d = d.withProlog(refactor(d.getProlog()));
         return d.withRoot(refactor(d.getRoot()));

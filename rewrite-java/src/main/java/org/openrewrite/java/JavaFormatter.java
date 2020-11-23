@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
+import org.openrewrite.java.search.FindIndentJava;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.refactor.Formatter;
 
@@ -25,7 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 public class JavaFormatter extends Formatter {
     public JavaFormatter(J.CompilationUnit cu) {
-        super(cu);
+        super(cu, FindIndentJava::new);
     }
 
     public Formatting format(Tree relativeToEnclosing) {

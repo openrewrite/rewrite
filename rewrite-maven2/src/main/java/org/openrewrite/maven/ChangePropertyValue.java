@@ -41,17 +41,17 @@ public class ChangePropertyValue extends MavenRefactorVisitor {
     }
 
     @Override
+    public Validated validate() {
+        return required("key", key)
+                .and(required("toValue", toValue));
+    }
+
+    @Override
     public Xml visitTag(Xml.Tag tag) {
         if (propertyMatcher.matches(getCursor()) && key.equals(tag.getName()) &&
                 !toValue.equals(tag.getValue().orElse(null))) {
             andThen(new ChangeTagValue.Scoped(tag, toValue));
         }
         return super.visitTag(tag);
-    }
-
-    @Override
-    public Validated validate() {
-        return required("key", key)
-                .and(required("toValue", toValue));
     }
 }
