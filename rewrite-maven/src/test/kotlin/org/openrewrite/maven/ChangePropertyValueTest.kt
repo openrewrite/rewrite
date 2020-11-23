@@ -16,41 +16,33 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
-import org.openrewrite.whenParsedBy
-import java.io.File
-import java.nio.file.Path
 
-class ChangePropertyValueTest : RefactorVisitorTestForParser<Maven.Pom> {
-    override val parser = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+class ChangePropertyValueTest : RefactorVisitorTestForParser<Maven> {
+    override val parser: MavenParser = MavenParser.builder().build()
 
     @Test
-    fun property(@TempDir tempDir: Path) = assertRefactored(
+    fun property() = assertRefactored(
             visitors = listOf(
-                ChangePropertyValue().apply {
-                    setKey("guava.version")
-                    setToValue("29.0-jre")
-                }
+                    ChangePropertyValue().apply {
+                        setKey("guava.version")
+                        setToValue("29.0-jre")
+                    }
             ),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                       
-                      <properties>
-                        <guava.version>28.2-jre</guava.version>
-                      </properties>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                    </project>
-                """.trimIndent().trim())
-            },
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                   
+                  <properties>
+                    <guava.version>28.2-jre</guava.version>
+                  </properties>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                </project>
+            """,
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -64,6 +56,5 @@ class ChangePropertyValueTest : RefactorVisitorTestForParser<Maven.Pom> {
                   <version>1</version>
                 </project>
             """
-
     )
 }

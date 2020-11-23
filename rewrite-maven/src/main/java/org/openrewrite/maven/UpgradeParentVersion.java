@@ -17,30 +17,32 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.NoopCache;
+import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
+import org.openrewrite.xml.tree.Xml;
 
-import java.io.File;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.required;
-import static org.openrewrite.Validated.test;
 
 public class UpgradeParentVersion extends MavenRefactorVisitor {
+    @Nullable
+    private Collection<String> availableVersions;
+
     private String groupId;
     private String artifactId;
     private String toVersion;
 
     @Nullable
     private String metadataPattern;
-
-    private File localRepository = MavenParser.DEFAULT_LOCAL_REPOSITORY;
-
-    @Nullable
-    private File workspaceDir;
 
     private VersionComparator versionComparator;
 
@@ -60,14 +62,6 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
         this.metadataPattern = metadataPattern;
     }
 
-    public void setLocalRepository(File localRepository) {
-        this.localRepository = localRepository;
-    }
-
-    public void setWorkspaceDir(@Nullable File workspaceDir) {
-        this.workspaceDir = workspaceDir;
-    }
-
     public UpgradeParentVersion() {
         setCursoringOn();
     }
@@ -77,43 +71,47 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId))
                 .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion, metadataPattern))
-                .and(test("localRepository", "must exist",
-                        localRepository, File::exists))
-                .and(test("workspaceDir", "must exist if set",
-                        workspaceDir, w -> w == null || w.exists()));
+                .and(Semver.validate(toVersion, metadataPattern));
     }
 
     @Override
-    public Maven visitPom(Maven.Pom pom) {
+    public Maven visitMaven(Maven maven) {
         versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
-        return super.visitPom(pom);
+        return super.visitMaven(maven);
     }
 
     @Override
-    public Maven visitParent(Maven.Parent parent) {
-        Maven.Parent p = refactor(parent, super::visitParent);
-
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-        assert pom != null;
-
-        List<String> newerVersions = p.getModel().getModuleVersion()
-                .getNewerVersions(pom, localRepository, workspaceDir);
-
-        LatestRelease latestRelease = new LatestRelease(metadataPattern);
-        Optional<String> newerVersion = newerVersions.stream()
-                .filter(v -> versionComparator.isValid(v))
-                .filter(v -> latestRelease.compare(parent.getModel().getModuleVersion().getVersion(), v) < 0)
-                .max(versionComparator);
-
-        if (newerVersion.isPresent()) {
-            ChangeParentVersion changeParentVersion = new ChangeParentVersion();
-            changeParentVersion.setGroupId(groupId);
-            changeParentVersion.setArtifactId(artifactId);
-            changeParentVersion.setToVersion(newerVersion.get());
-            andThen(changeParentVersion);
+    public Xml visitTag(Xml.Tag tag) {
+        if (isParentTag()) {
+            if (groupId.equals(tag.getChildValue("groupId").orElse(null)) &&
+                    artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
+                tag.getChildValue("version")
+                        .flatMap(parentVersion -> findNewerDependencyVersion(groupId, artifactId, parentVersion))
+                        .ifPresent(newer -> {
+                            ChangeParentVersion changeParentVersion = new ChangeParentVersion();
+                            changeParentVersion.setGroupId(groupId);
+                            changeParentVersion.setArtifactId(artifactId);
+                            changeParentVersion.setToVersion(newer);
+                            andThen(changeParentVersion);
+                        });
+            }
         }
 
-        return p;
+        return super.visitTag(tag);
+    }
+
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        if (availableVersions == null) {
+            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
+                    .downloadMetadata(groupId, artifactId, emptyList());
+            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .collect(Collectors.toList());
+        }
+
+        LatestRelease latestRelease = new LatestRelease(metadataPattern);
+        return availableVersions.stream()
+                .filter(v -> latestRelease.compare(currentVersion, v) < 0)
+                .max(versionComparator);
     }
 }

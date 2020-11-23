@@ -22,10 +22,8 @@ import org.openrewrite.maven.tree.Maven
 import java.io.File
 import java.nio.file.Path
 
-class AddDependencyTest : RefactorVisitorTestForParser<Maven.Pom> {
-    override val parser = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
+    override val parser: MavenParser = MavenParser.builder().build()
 
     private val addDependency = AddDependency().apply {
         setGroupId("org.springframework.boot")

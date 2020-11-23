@@ -15,20 +15,25 @@
  */
 package org.openrewrite.maven;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.NoopCache;
+import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenMetadata;
+import org.openrewrite.maven.tree.DependencyManagementDependency;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 
-import java.io.File;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.required;
 import static org.openrewrite.Validated.test;
 
@@ -38,6 +43,9 @@ import static org.openrewrite.Validated.test;
  * more precise control over version updates to patch or minor releases.
  */
 public class UpgradeDependencyVersion extends MavenRefactorVisitor {
+    @Nullable
+    private Collection<String> availableVersions;
+
     private String groupId;
 
     @Nullable
@@ -50,11 +58,6 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
 
     @Nullable
     private String metadataPattern;
-
-    private File localRepository = MavenParser.DEFAULT_LOCAL_REPOSITORY;
-
-    @Nullable
-    private File workspaceDir;
 
     private VersionComparator versionComparator;
 
@@ -85,14 +88,6 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
         this.metadataPattern = metadataPattern;
     }
 
-    public void setLocalRepository(File localRepository) {
-        this.localRepository = localRepository;
-    }
-
-    public void setWorkspaceDir(@Nullable File workspaceDir) {
-        this.workspaceDir = workspaceDir;
-    }
-
     @Override
     public Validated validate() {
         return required("groupId", groupId)
@@ -108,11 +103,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
                                 return false;
                             }
                         }))
-                .and(Semver.validate(toVersion, metadataPattern))
-                .and(test("localRepository", "must exist",
-                        localRepository, File::exists))
-                .and(test("workspaceDir", "must exist if set",
-                        workspaceDir, w -> w == null || w.exists()));
+                .and(Semver.validate(toVersion, metadataPattern));
     }
 
     @Override
@@ -121,52 +112,55 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitPom(Maven.Pom pom) {
+    public Maven visitMaven(Maven maven) {
         versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
-        return super.visitPom(pom);
+
+        maybeChangeDependencyVersion(maven.getModel());
+
+        for (Pom module : maven.getModules()) {
+            maybeChangeDependencyVersion(module);
+        }
+
+        return super.visitMaven(maven);
     }
 
-    @Override
-    public Maven visitDependency(Maven.Dependency dependency) {
-        Maven.Dependency d = refactor(dependency, super::visitDependency);
-
-        if (groupId.equals(d.getGroupId()) && (artifactId == null || artifactId.equals(d.getArtifactId())) &&
-                !Maven.getPropertyKey(d.getVersion()).isPresent()) {
-            Optional<String> newerVersion = maybeNewerVersion(d.getModel(),
-                    d.getModel().getModuleVersion().getVersion());
-
-            if (newerVersion.isPresent()) {
-                ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                changeDependencyVersion.setGroupId(groupId);
-                changeDependencyVersion.setArtifactId(artifactId);
-                changeDependencyVersion.setToVersion(newerVersion.get());
-                andThen(changeDependencyVersion);
+    private void maybeChangeDependencyVersion(Pom model) {
+        for (Pom.Dependency dependency : model.getDependencies()) {
+            if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                    ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
+                    changeDependencyVersion.setGroupId(groupId);
+                    changeDependencyVersion.setArtifactId(dependency.getArtifactId());
+                    changeDependencyVersion.setToVersion(newer);
+                    andThen(changeDependencyVersion);
+                });
             }
         }
 
-        return d;
+        for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
+            if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                    ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
+                    changeDependencyVersion.setGroupId(groupId);
+                    changeDependencyVersion.setArtifactId(dependency.getArtifactId());
+                    changeDependencyVersion.setToVersion(newer);
+                    andThen(changeDependencyVersion);
+                });
+            }
+        }
     }
 
-    @Override
-    public Maven visitProperty(Maven.Property property) {
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-
-        property.findDependencies(pom, groupId, artifactId)
-                .findAny()
-                .flatMap(dependency -> maybeNewerVersion(dependency, property.getValue()))
-                .ifPresent(newerVersion -> andThen(new ChangePropertyValue.Scoped(property, newerVersion)));
-
-        return super.visitProperty(property);
-    }
-
-    @NotNull
-    private Optional<String> maybeNewerVersion(MavenModel.Dependency d, String currentVersion) {
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-        assert pom != null;
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        if (availableVersions == null) {
+            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
+                    .downloadMetadata(groupId, artifactId, emptyList());
+            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .collect(Collectors.toList());
+        }
 
         LatestRelease latestRelease = new LatestRelease(metadataPattern);
-        return d.getModuleVersion().getNewerVersions(pom, localRepository, workspaceDir).stream()
-                .filter(v -> versionComparator.isValid(v))
+        return availableVersions.stream()
                 .filter(v -> latestRelease.compare(currentVersion, v) < 0)
                 .max(versionComparator);
     }

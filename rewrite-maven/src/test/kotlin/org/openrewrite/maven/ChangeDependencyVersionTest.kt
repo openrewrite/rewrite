@@ -22,10 +22,8 @@ import org.openrewrite.maven.tree.Maven
 import java.io.File
 import java.nio.file.Path
 
-class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
-    override val parser = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
+    override val parser: MavenParser = MavenParser.builder().build()
 
     private val guavaTo29 = ChangeDependencyVersion().apply {
         setGroupId("com.google.guava")
@@ -75,8 +73,6 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
     )
 
     @Test
-
-
     fun propertyVersion() = assertRefactored(
             visitors = listOf(guavaTo29),
             before = """
@@ -131,9 +127,9 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
         myModuleProject.mkdirs()
 
         assertRefactored(
-            dependencies = listOf(
-                    File(myModuleProject, "pom.xml").apply {
-                        writeText("""
+                dependencies = listOf(
+                        File(myModuleProject, "pom.xml").apply {
+                            writeText("""
                                 <project>
                                   <modelVersion>4.0.0</modelVersion>
                                  
@@ -152,52 +148,52 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
                                     </dependency>
                                   </dependencies>
                                 </project>
-                            """.trimIndent())
-                    }
-            ),
-            visitors = listOf(guavaTo29),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>28.2-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """.trimIndent().trim())
-            },
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                 
-                  <packaging>pom</packaging>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencyManagement>
-                    <dependencies>
-                      <dependency>
-                        <groupId>com.google.guava</groupId>
-                        <artifactId>guava</artifactId>
-                        <version>29.0-jre</version>
-                      </dependency>
-                    </dependencies>
-                  </dependencyManagement>
-                </project>
-            """
+                            """.trimIndent().trim())
+                        }
+                ),
+                visitors = listOf(guavaTo29),
+                before = File(tempDir.toFile(), "pom.xml").apply {
+                    writeText("""
+                        <project>
+                          <modelVersion>4.0.0</modelVersion>
+                         
+                          <packaging>pom</packaging>
+                          <groupId>com.mycompany.app</groupId>
+                          <artifactId>my-app</artifactId>
+                          <version>1</version>
+                          
+                          <dependencyManagement>
+                            <dependencies>
+                              <dependency>
+                                <groupId>com.google.guava</groupId>
+                                <artifactId>guava</artifactId>
+                                <version>28.2-jre</version>
+                              </dependency>
+                            </dependencies>
+                          </dependencyManagement>
+                        </project>
+                    """.trimIndent().trim())
+                },
+                after = """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                     
+                      <packaging>pom</packaging>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <dependencyManagement>
+                        <dependencies>
+                          <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                          </dependency>
+                        </dependencies>
+                      </dependencyManagement>
+                    </project>
+                """
         )
     }
 
@@ -208,29 +204,29 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
 
         assertRefactored(
                 dependencies = listOf(
-                    File(myModuleProject, "pom.xml").apply {
-                        writeText("""
-                            <project>
-                              <modelVersion>4.0.0</modelVersion>
-                             
-                              <parent>
-                                <groupId>com.mycompany.app</groupId>
-                                <artifactId>my-app</artifactId>
-                                <version>1</version>
-                              </parent>
-                            
-                              <artifactId>my-module</artifactId>
-                            
-                              <dependencies>
-                                <dependency>
-                                  <groupId>com.google.guava</groupId>
-                                  <artifactId>guava</artifactId>
-                                  <version>${"$"}{guava.version}</version>
-                                </dependency>
-                              </dependencies>
-                            </project>
-                        """.trimIndent())
-                    }
+                        File(myModuleProject, "pom.xml").apply {
+                            writeText("""
+                                <project>
+                                  <modelVersion>4.0.0</modelVersion>
+                                 
+                                  <parent>
+                                    <groupId>com.mycompany.app</groupId>
+                                    <artifactId>my-app</artifactId>
+                                    <version>1</version>
+                                  </parent>
+                                
+                                  <artifactId>my-module</artifactId>
+                                
+                                  <dependencies>
+                                    <dependency>
+                                      <groupId>com.google.guava</groupId>
+                                      <artifactId>guava</artifactId>
+                                      <version>${"$"}{guava.version}</version>
+                                    </dependency>
+                                  </dependencies>
+                                </project>
+                            """.trimIndent().trim())
+                        }
                 ),
                 visitors = listOf(guavaTo29),
                 before = File(tempDir.toFile(), "pom.xml").apply {

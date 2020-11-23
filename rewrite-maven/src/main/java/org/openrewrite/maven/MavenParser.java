@@ -15,240 +15,97 @@
  */
 package org.openrewrite.maven;
 
-import org.apache.maven.settings.*;
-import org.apache.maven.settings.building.*;
-import org.eclipse.aether.repository.Authentication;
-import org.eclipse.aether.repository.RemoteRepository;
-import org.eclipse.aether.util.repository.AuthenticationBuilder;
 import org.openrewrite.Parser;
-import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.InMemoryCache;
+import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.internal.RawMaven;
+import org.openrewrite.maven.internal.RawMavenResolver;
+import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
-import org.openrewrite.xml.XmlParser;
-import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.maven.tree.Modules;
+import org.openrewrite.maven.tree.Pom;
 
-import java.io.File;
 import java.net.URI;
-import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
-public class MavenParser implements Parser<Maven.Pom> {
-    public static final File DEFAULT_LOCAL_REPOSITORY =
-            new File(System.getProperty("user.home") + "/.m2/rewrite");
+import static java.util.stream.Collectors.*;
+import static java.util.stream.StreamSupport.stream;
 
-    private final XmlParser xmlParser = new XmlParser();
-    private final boolean resolveDependencies;
-    private final File localRepository;
+public class MavenParser implements Parser<Maven> {
+    private final MavenCache mavenCache;
+    private final boolean resolveOptional;
 
-    @Nullable
-    private final File workspaceDir;
-    private final List<RemoteRepository> remoteRepositories;
+    private MavenParser(MavenCache mavenCache, boolean resolveOptional) {
+        this.mavenCache = mavenCache;
+        this.resolveOptional = resolveOptional;
+    }
 
-    private MavenParser(
-            boolean resolveDependencies,
-            File localRepository,
-            @Nullable File workspaceDir,
-            List<RemoteRepository> remoteRepositories
-    ) {
-        this.resolveDependencies = resolveDependencies;
-        this.localRepository = localRepository;
-        this.workspaceDir = workspaceDir;
-        this.remoteRepositories = remoteRepositories;
+    @Override
+    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
+        Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
+                .map(source -> RawMaven.parse(source, relativeTo))
+                .collect(toList());
+
+        MavenDownloader downloader = new MavenDownloader(mavenCache,
+                projectPoms.stream().collect(toMap(RawMaven::getURI, Function.identity())));
+
+        List<Maven> parsed = projectPoms.stream()
+                .map(raw -> new RawMavenResolver(downloader, false, resolveOptional).resolve(raw))
+                .filter(Objects::nonNull)
+                .map(Maven::new)
+                .collect(toCollection(ArrayList::new));
+
+        for (int i = 0; i < parsed.size(); i++) {
+            Maven maven = parsed.get(i);
+            List<Pom> modules = new ArrayList<>(0);
+            for (Maven possibleModule : parsed) {
+                Pom parent = possibleModule.getModel().getParent();
+                if (parent != null &&
+                        parent.getGroupId().equals(maven.getModel().getGroupId()) &&
+                        parent.getArtifactId().equals(maven.getModel().getArtifactId()) &&
+                        parent.getVersion().equals(maven.getModel().getVersion())) {
+                    modules.add(possibleModule.getModel());
+                }
+            }
+
+            if (!modules.isEmpty()) {
+                parsed.set(i, maven.setMetadata(new Modules(modules)));
+            }
+        }
+
+        return parsed;
+    }
+
+    @Override
+    public boolean accept(URI path) {
+        return path.toString().equals("pom.xml") || path.toString().endsWith(".pom");
     }
 
     public static Builder builder() {
         return new Builder();
     }
 
-    @Override
-    public List<Maven.Pom> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
-        Iterable<Input> pomSourceFiles = acceptedInputs(sourceFiles);
-
-        List<MavenModel> modules = new MavenModuleLoader(resolveDependencies,
-                localRepository, workspaceDir, remoteRepositories).load(pomSourceFiles);
-
-        List<Maven.Pom> poms = new ArrayList<>();
-        Iterator<Xml.Document> xmlDocuments = xmlParser.parseInputs(pomSourceFiles, relativeTo).iterator();
-        for (MavenModel module : modules) {
-            poms.add(new Maven.Pom(module, xmlDocuments.next()));
-        }
-
-        return poms;
-    }
-
-    @Override
-    public boolean accept(URI path) {
-        return path.toString().equals("pom.xml");
-    }
-
     public static class Builder {
-        private boolean resolveDependencies = true;
-        private boolean useMavenCentral = true;
-        private File localRepository;
-        private List<RemoteRepository> remoteRepositories = new ArrayList<>();
-        private Input userSettingsXmlOverride;
-        private Input globaLSettingsXmlOverride;
+        private boolean resolveOptional = true;
+        private MavenCache mavenCache = new InMemoryCache();
 
-        @Nullable
-        private File workspaceDir;
-
-        /**
-         * Remove Maven Central from the list of remote repositories.
-         */
-        public Builder noMavenCentral() {
-            useMavenCentral = false;
+        public Builder resolveOptional(@Nullable Boolean optional) {
+            this.resolveOptional = optional == null || optional;
             return this;
         }
 
-        /**
-         * Override the location or contents of the settings.xml file.
-         * If this isn't overridden then ${user.home}/.m2/settings.xml will be used, if such a file exists
-         */
-        public Builder userSettingsXml(Input settingsXmlOverride) {
-            this.userSettingsXmlOverride = settingsXmlOverride;
+        public Builder cache(MavenCache cache) {
+            this.mavenCache = cache;
             return this;
-        }
-
-        /**
-         * Provide the global settings.xml from the maven installation.
-         * If this isn't provided, then the maven.conf System Property will be looked at to try and find the global
-         * settings.xml. This environment variable is unlikely to be set by anything other than Maven itself.
-         * So hopefully if this is being run by a non-maven client there isn't anything important in there.
-         */
-        public Builder globalSettingsXml(Input settingsXmlOverride) {
-            this.globaLSettingsXmlOverride = settingsXmlOverride;
-            return this;
-        }
-
-        /**
-         * Sets the local maven repository to use.
-         * If not overridden here or in the settings.xml, defaults to user home/.m2/repository
-         */
-        public Builder localRepository(File localRepository) {
-            this.localRepository = localRepository;
-            return this;
-        }
-
-        public Builder workspaceDir(File workspaceDir) {
-            this.workspaceDir = workspaceDir;
-            return this;
-        }
-
-        public Builder resolveDependencies(boolean resolveDependencies) {
-            this.resolveDependencies = resolveDependencies;
-            return this;
-        }
-
-        public Builder remoteRepositories(List<RemoteRepository> remoteRepositories) {
-            this.remoteRepositories = new ArrayList<>(remoteRepositories);
-            return this;
-        }
-
-        public Builder addRemoteRepository(RemoteRepository remoteRepository) {
-            this.remoteRepositories.add(remoteRepository);
-            return this;
-        }
-
-        @SuppressWarnings("deprecation") // StringSettingsSource is deprecated, but the API that uses it doesn't accept its "replacement"
-        private Settings getEffectiveSettings() {
-            SettingsBuilder settingsBuilder =  new DefaultSettingsBuilderFactory().newInstance();
-            SettingsBuildingRequest settingsRequest = new DefaultSettingsBuildingRequest();
-            if(userSettingsXmlOverride == null) {
-                File settingsXml = new File(System.getProperty("user.home"), ".m2/settings.xml");
-                if(settingsXml.exists()) {
-                    settingsRequest.setUserSettingsFile(settingsXml);
-                }
-            } else {
-                StringSettingsSource source = new StringSettingsSource(StringUtils.readFully(userSettingsXmlOverride.getSource()));
-                settingsRequest.setUserSettingsSource(source);
-            }
-            if(globaLSettingsXmlOverride == null) {
-                // maven.conf is unlikely to be set in any non-maven process, but might as well mimic Maven's lookup behavior
-                File globalSettingsXml = new File(System.getProperty("maven.conf"),"settings.xml" );
-                if(globalSettingsXml.exists()) {
-                    settingsRequest.setGlobalSettingsFile(globalSettingsXml);
-                }
-            } else {
-                StringSettingsSource source = new StringSettingsSource(StringUtils.readFully(globaLSettingsXmlOverride.getSource()));
-                settingsRequest.setGlobalSettingsSource(source);
-            }
-
-            try {
-                return settingsBuilder.build(settingsRequest).getEffectiveSettings();
-            } catch (SettingsBuildingException e) {
-                throw new RuntimeException(e);
-            }
         }
 
         public MavenParser build() {
-            Settings effectiveSettings = getEffectiveSettings();
-            if(localRepository == null) {
-                if(effectiveSettings.getLocalRepository() == null) {
-                    localRepository = DEFAULT_LOCAL_REPOSITORY;
-                } else {
-                    localRepository = new File(effectiveSettings.getLocalRepository());
-                }
-            }
-
-            Map<String, Server> idToServer = effectiveSettings.getServers().stream()
-                    .collect(Collectors.toMap(Server::getId, Function.identity()));
-            List<RemoteRepository> settingsDefinedRepositories = getActiveProfiles(effectiveSettings).stream()
-                    .flatMap(profile -> profile.getRepositories().stream())
-                    .map(mvnRepository -> {
-                        RemoteRepository.Builder builder = new RemoteRepository.Builder(
-                                mvnRepository.getId(),
-                                "default",
-                                mvnRepository.getUrl());
-
-                        Server credentials = idToServer.get(mvnRepository.getId());
-                        if(credentials != null) {
-                            Authentication authentication = new AuthenticationBuilder()
-                                    .addPassword(credentials.getPassword())
-                                    .addUsername(credentials.getUsername())
-                                    .addPrivateKey(credentials.getPrivateKey(), credentials.getPassphrase())
-                                    .build();
-                            builder.setAuthentication(authentication);
-                        }
-
-                        return builder.build();
-                    })
-                    .collect(Collectors.toList());
-            if(useMavenCentral) {
-                remoteRepositories.add(new RemoteRepository.Builder("central", "default",
-                        "https://repo1.maven.org/maven2/").build()
-                );
-            }
-            remoteRepositories.addAll(settingsDefinedRepositories);
-
-            return new MavenParser(resolveDependencies, localRepository, workspaceDir, remoteRepositories);
-        }
-
-        /**
-         * A Maven profile can be activated based on a number of different criteria:
-         * https://maven.apache.org/guides/introduction/introduction-to-profiles.html
-         *
-         * This imperfectly emulates OR-ing a subset of these criteria together.
-         */
-        private static List<Profile> getActiveProfiles(Settings settings) {
-            Set<String> explicitlyActivatedProfiles = new HashSet<>(settings.getActiveProfiles());
-
-            return settings.getProfiles()
-                    .stream()
-                    .filter(profile -> explicitlyActivatedProfiles.contains(profile.getId()) ||
-                            isActive(profile.getActivation())
-                    )
-                    .collect(Collectors.toList());
-        }
-
-        private static boolean isActive(Activation activation) {
-            if(activation.isActiveByDefault()) {
-                return true;
-            }
-            // TODO other types of criteria. File, JVM, property, etc.
-            return false;
+            return new MavenParser(mavenCache, resolveOptional);
         }
     }
 }

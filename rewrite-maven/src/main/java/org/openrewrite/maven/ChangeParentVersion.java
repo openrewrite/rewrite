@@ -16,14 +16,22 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
-import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.XPathMatcher;
+import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
 
 public class ChangeParentVersion extends MavenRefactorVisitor {
+    private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
+
     private String groupId;
     private String artifactId;
     private String toVersion;
+
+    public ChangeParentVersion() {
+        setCursoringOn();
+    }
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
@@ -45,12 +53,15 @@ public class ChangeParentVersion extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitParent(Maven.Parent parent) {
-        Maven.Parent p = refactor(parent, super::visitParent);
-        if (groupId.equals(p.getGroupId()) && artifactId.equals(p.getArtifactId()) &&
-                !toVersion.equals(p.getVersion())) {
-            p = p.withVersion(toVersion);
+    public Xml visitTag(Xml.Tag tag) {
+        if (PARENT_VERSION_MATCHER.matches(getCursor())) {
+            Xml.Tag parent = getCursor().getParentOrThrow().getTree();
+            if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
+                    artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
+                    !toVersion.equals(tag.getValue().orElse(null))) {
+                andThen(new ChangeTagValue.Scoped(tag, toVersion));
+            }
         }
-        return p;
+        return super.visitTag(tag);
     }
 }

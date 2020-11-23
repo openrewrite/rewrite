@@ -16,19 +16,14 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
-import java.io.File
-import java.nio.file.Path
 
-class ChangeParentVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
-    override val parser = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+class ChangeParentVersionTest : RefactorVisitorTestForParser<Maven> {
+    override val parser: MavenParser = MavenParser.builder().build()
 
     @Test
-    fun fixedVersion(@TempDir tempDir: Path) = assertRefactored(
+    fun fixedVersion() = assertRefactored(
             visitors = listOf(
                 ChangeParentVersion().apply {
                     setGroupId("org.springframework.boot")
@@ -36,24 +31,22 @@ class ChangeParentVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
                     setToVersion("2.3.1.RELEASE")
                 }
             ),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
-                    <project>
-                      <modelVersion>4.0.0</modelVersion>
-                      
-                      <groupId>com.mycompany.app</groupId>
-                      <artifactId>my-app</artifactId>
-                      <version>1</version>
-                      
-                      <parent>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-parent</artifactId>
-                        <version>1.5.12.RELEASE</version>
-                        <relativePath/> <!-- lookup parent from repository -->
-                      </parent>
-                    </project>
-                """.trimIndent().trim())
-            },
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <parent>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-starter-parent</artifactId>
+                    <version>1.5.12.RELEASE</version>
+                    <relativePath/> <!-- lookup parent from repository -->
+                  </parent>
+                </project>
+            """,
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>

@@ -16,18 +16,14 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Parser
 import org.openrewrite.RefactorVisitor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
-import java.nio.file.Path
 
-class UpgradeParentVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
+class UpgradeParentVersionTest : RefactorVisitorTestForParser<Maven> {
     override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
-    override val parser: Parser<Maven.Pom> = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+    override val parser: Parser<Maven> = MavenParser.builder().build()
 
     @Test
     fun upgradeVersion() = assertRefactored(

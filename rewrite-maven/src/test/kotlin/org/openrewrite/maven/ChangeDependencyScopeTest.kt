@@ -19,10 +19,8 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
 
-class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
-    override val parser = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven> {
+    override val parser: MavenParser = MavenParser.builder().build()
 
     private val guavaToTest = ChangeDependencyScope().apply {
         setGroupId("com.google.guava")
@@ -36,11 +34,11 @@ class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
             before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-                  
+                
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                  
+                
                   <dependencies>
                     <dependency>
                       <groupId>com.google.guava</groupId>
@@ -53,11 +51,11 @@ class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven.Pom> {
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
-                  
+                
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
-                  
+                
                   <dependencies>
                     <dependency>
                       <groupId>com.google.guava</groupId>

@@ -23,11 +23,9 @@ import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
 import java.nio.file.Path
 
-class UpgradeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
+class UpgradeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
     override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
-    override val parser: Parser<Maven.Pom> = MavenParser.builder()
-            .resolveDependencies(false)
-            .build()
+    override val parser: Parser<Maven> = MavenParser.builder().build()
 
     @Test
     fun upgradeVersion() = assertRefactored(
@@ -48,7 +46,6 @@ class UpgradeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot</artifactId>
                       <version>1.5.1.RELEASE</version>
-                      <scope>test</scope>
                     </dependency>
                   </dependencies>
                 </project>
@@ -66,7 +63,6 @@ class UpgradeDependencyVersionTest : RefactorVisitorTestForParser<Maven.Pom> {
                           <groupId>org.springframework.boot</groupId>
                           <artifactId>spring-boot</artifactId>
                           <version>1.5.22.RELEASE</version>
-                          <scope>test</scope>
                         </dependency>
                       </dependencies>
                     </project>

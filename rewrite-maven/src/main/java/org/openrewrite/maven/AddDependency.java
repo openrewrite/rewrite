@@ -20,8 +20,8 @@ import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
 import org.openrewrite.refactor.Formatter;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
@@ -81,29 +81,26 @@ public class AddDependency extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitPom(Maven.Pom pom) {
-        if (pom.getModel().getDependencies().stream()
-                .map(MavenModel.Dependency::getModuleVersion)
-                .anyMatch(mvid -> mvid.getGroupId().equals(groupId) &&
-                        mvid.getArtifactId().equals(artifactId))) {
-            return pom;
+    public Maven visitMaven(Maven maven) {
+        if (maven.getModel().getDependencies().stream()
+                .anyMatch(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId))) {
+            return maven;
         }
 
         andThen(new AddDependenciesTagIfNotPresent());
         andThen(new InsertDependencyInOrder());
 
-        return pom;
+        return maven;
     }
 
     private static class AddDependenciesTagIfNotPresent extends MavenRefactorVisitor {
         @Override
-        public Maven visitPom(Maven.Pom pom) {
-            Maven.Pom p = refactor(pom, super::visitPom);
+        public Maven visitMaven(Maven maven) {
+            Maven m = super.visitMaven(maven);
 
-            Xml.Tag root = p.getDocument().getRoot();
+            Xml.Tag root = maven.getRoot();
             if (!root.getChild("dependencies").isPresent()) {
-                MavenTagInsertionComparator insertionComparator = new MavenTagInsertionComparator(
-                        root.getChildren());
+                MavenTagInsertionComparator insertionComparator = new MavenTagInsertionComparator(root.getChildren());
                 List<Xml.Tag> content = new ArrayList<>(root.getChildren());
 
                 Formatting fmt = format(formatter.findIndent(0, root.getChildren().toArray(new Tree[0])).getPrefix());
@@ -121,67 +118,109 @@ public class AddDependency extends MavenRefactorVisitor {
 
                 content.sort(insertionComparator);
 
-                //noinspection unchecked
-                return p.withDocument(p.getDocument().withRoot(
-                        root.withContent((List) content)
-                ));
+                return maven.withRoot(maven.getRoot().withContent(content));
             }
-            return p;
+
+            return m;
         }
     }
 
     private class InsertDependencyInOrder extends MavenRefactorVisitor {
+        private final XPathMatcher dependenciesMatcher = new XPathMatcher("/project/dependencies");
+
+        public InsertDependencyInOrder() {
+            setCursoringOn();
+        }
+
         @Override
-        public Maven visitPom(Maven.Pom pom) {
-            Maven.Pom p = refactor(pom, super::visitPom);
-            List<Maven.Dependency> dependencies = new ArrayList<>(pom.getDependencies());
+        public Xml visitTag(Xml.Tag tag) {
+            if (dependenciesMatcher.matches(getCursor())) {
+                Formatter.Result indent = formatter.findIndent(0, tag);
 
-            Formatter.Result indent = formatter.findIndent(0, pom.getDocument().getRoot()
-                    .getChild("dependencies").get());
+                // TODO if the dependency is manageable, make it managed
+                Xml.Tag dependencyTag = new XmlParser().parse(
+                        "<dependency>" +
+                                indent.getPrefix(2) + "<groupId>" + groupId + "</groupId>" +
+                                indent.getPrefix(2) + "<artifactId>" + artifactId + "</artifactId>" +
+                                (version == null ? "" :
+                                        indent.getPrefix(2) + "<version>" + version + "</version>") +
+                                (scope == null ? "" :
+                                        indent.getPrefix(2) + "<scope>" + scope + "</scope>") +
+                                indent.getPrefix(1) + "</dependency>"
+                ).get(0).getRoot().withFormatting(format(indent.getPrefix(1)));
 
-            // TODO if the dependency is manageable, make it managed
-            Xml.Tag dependencyTag = new XmlParser().parse(
-                    "<dependency>" +
-                            indent.getPrefix(2) + "<groupId>" + groupId + "</groupId>" +
-                            indent.getPrefix(2) + "<artifactId>" + artifactId + "</artifactId>" +
-                            (version == null ? "" :
-                                    indent.getPrefix(2) + "<version>" + version + "</version>") +
-                            (scope == null ? "" :
-                                    indent.getPrefix(2) + "<scope>" + scope + "</scope>") +
-                            indent.getPrefix(1) + "</dependency>"
-            ).get(0).getRoot().withFormatting(format(indent.getPrefix(1)));
+                List<Xml.Tag> ideallySortedDependencies = new ArrayList<>(tag.getChildren());
+                if (tag.getChildren().isEmpty()) {
+                    ideallySortedDependencies.add(dependencyTag);
+                } else {
+                    // if everything were ideally sorted, which dependency would the addable dependency
+                    // come after?
+                    List<Xml.Tag> sortedDependencies = new ArrayList<>(tag.getChildren());
+                    sortedDependencies.add(dependencyTag);
 
-            Maven.Dependency toAdd = new Maven.Dependency(false,
-                    new MavenModel.Dependency(
-                            new MavenModel.ModuleVersionId(groupId, artifactId, null, version, "jar"),
-                            version,
-                            scope
-                    ),
-                    dependencyTag
-            );
+                    ideallySortedDependencies.sort(dependencyComparator);
 
-            if (dependencies.isEmpty()) {
-                dependencies.add(toAdd);
-            } else {
-                // if everything were ideally sorted, which dependency would the addable dependency
-                // come after?
-                List<Maven.Dependency> sortedDependencies = new ArrayList<>(pom.getDependencies());
-                sortedDependencies.add(toAdd);
-                dependencies.sort(Comparator.comparing(d -> d.getModel().getModuleVersion()));
-
-                int addAfterIndex = -1;
-                for (int i = 0; i < sortedDependencies.size(); i++) {
-                    Maven.Dependency d = sortedDependencies.get(i);
-                    if (toAdd == d) {
-                        addAfterIndex = i - 1;
-                        break;
+                    int addAfterIndex = -1;
+                    for (int i = 0; i < sortedDependencies.size(); i++) {
+                        Xml.Tag d = sortedDependencies.get(i);
+                        if (dependencyTag == d) {
+                            addAfterIndex = i - 1;
+                            break;
+                        }
                     }
-                }
 
-                dependencies.add(addAfterIndex + 1, toAdd);
+                    ideallySortedDependencies.add(addAfterIndex + 1, dependencyTag);
+                }
+                return tag.withContent(ideallySortedDependencies);
             }
 
-            return p.withDependencies(dependencies);
+            return super.visitTag(tag);
+        }
+
+        Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
+            String groupId1 = d1.getChildValue("groupId").orElse("");
+            String groupId2 = d2.getChildValue("groupId").orElse("");
+            if (!groupId1.equals(groupId2)) {
+                return comparePartByPart(groupId1, groupId2);
+            }
+
+            String artifactId1 = d1.getChildValue("artifactId").orElse("");
+            String artifactId2 = d2.getChildValue("artifactId").orElse("");
+            if (!artifactId1.equals(artifactId2)) {
+                return comparePartByPart(artifactId1, artifactId2);
+            }
+
+            String classifier1 = d1.getChildValue("classifier").orElse(null);
+            String classifier2 = d2.getChildValue("classifier").orElse(null);
+
+            if (classifier1 == null && classifier2 != null) {
+                return -1;
+            } else if (classifier1 != null) {
+                if (classifier2 == null) {
+                    return 1;
+                }
+                if (!classifier1.equals(classifier2)) {
+                    return classifier1.compareTo(classifier2);
+                }
+            }
+
+            // in every case imagined so far, group and artifact comparison are enough,
+            // so this is just for completeness
+            return d1.getChildValue("version").orElse("")
+                    .compareTo(d2.getChildValue("version").orElse(""));
+        };
+
+        private int comparePartByPart(String d1, String d2) {
+            String[] d1Parts = d1.split("[.-]");
+            String[] d2Parts = d2.split("[.-]");
+
+            for (int i = 0; i < Math.min(d1Parts.length, d2Parts.length); i++) {
+                if (!d1Parts[i].equals(d2Parts[i])) {
+                    return d1Parts[i].compareTo(d2Parts[i]);
+                }
+            }
+
+            return d1Parts.length - d2Parts.length;
         }
     }
 }

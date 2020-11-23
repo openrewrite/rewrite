@@ -15,54 +15,70 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.AbstractRefactorVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.refactor.Formatter;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public class MavenRefactorVisitor extends AbstractRefactorVisitor<Maven> implements MavenSourceVisitor<Maven> {
-    protected Formatter formatter;
+import java.util.Collection;
 
-    XmlRefactorVisitor xmlRefactorVisitor = new XmlRefactorVisitor() {
-    };
+public class MavenRefactorVisitor extends XmlRefactorVisitor
+        implements MavenSourceVisitor<Xml> {
+    private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
+    private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
+    private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
+    private static final XPathMatcher PARENT_MATCHER = new XPathMatcher("/project/parent");
+
+    protected Pom model;
+    protected Collection<Pom> modules;
 
     @Override
-    public Maven visitPom(Maven.Pom pom) {
-        formatter = new Formatter(pom.getDocument());
-        Maven.Pom p = pom;
-        p = p.withParent(refactor(p.getParent()));
-        p = p.withDependencyManagement(refactor(p.getDependencyManagement()));
-        p = p.withDependencies(refactor(p.getDependencies()));
-        p = p.withProperties(refactor(p.getProperties()));
-        return p;
+    public Maven visitMaven(Maven maven) {
+        this.model = maven.getModel();
+        this.modules = maven.getModules();
+        return (Maven) visitDocument(maven);
     }
 
     @Override
-    public Maven visitDependencyManagement(Maven.DependencyManagement dependencyManagement) {
-        return dependencyManagement.withDependencies(refactor(dependencyManagement.getDependencies()));
-    }
-
-    @Override
-    public Maven visitDependency(Maven.Dependency dependency) {
-        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(dependency.getTag());
-        if(t != dependency.getTag()) {
-            return new Maven.Dependency(dependency.isManaged(), dependency.getModel(), t);
+    public final Xml visitDocument(Xml.Document document) {
+        Xml.Document refactored = refactor(document, super::visitDocument);
+        if (refactored != document) {
+            return new Maven(refactored);
         }
-        return dependency;
+        return refactored;
     }
 
-    @Override
-    public Maven visitProperty(Maven.Property property) {
-        Xml.Tag t = (Xml.Tag) xmlRefactorVisitor.visitTag(property.getTag());
-        if(t != property.getTag()) {
-            return new Maven.Property(t);
-        }
-        return property;
+    protected boolean isPropertyTag() {
+        return PROPERTY_MATCHER.matches(getCursor());
     }
 
-    @Override
-    public Maven visitParent(Maven.Parent parent) {
-        return parent;
+    protected boolean isDependencyTag() {
+        return DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
+    protected boolean isDependencyTag(String groupId, @Nullable String artifactId) {
+        return isDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
+    }
+
+    protected boolean isManagedDependencyTag() {
+        return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
+    }
+
+    protected boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
+        return isManagedDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
+    }
+
+    protected boolean isParentTag() {
+        return PARENT_MATCHER.matches(getCursor());
+    }
+
+    private boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
+        Xml.Tag tag = getCursor().getTree();
+        return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
+                tag.getChildValue("artifactId")
+                        .map(a -> a.equals(artifactId))
+                        .orElse(artifactId == null);
     }
 }

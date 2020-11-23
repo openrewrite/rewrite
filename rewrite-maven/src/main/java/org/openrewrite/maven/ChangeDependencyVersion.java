@@ -17,8 +17,9 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.maven.tree.MavenModel;
+import org.openrewrite.maven.tree.Pom;
+import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
@@ -56,62 +57,38 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitProperty(Maven.Property property) {
-        Maven.Property p = refactor(property, super::visitProperty);
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-
-        if (!property.getValue().equals(toVersion) &&
-                property.findDependencies(pom, groupId, artifactId)
-                        .anyMatch(d -> d.getRequestedVersion().equals("${" + property.getKey() + "}"))) {
-            p = p.withValue(toVersion);
-        }
-
-        return p;
-    }
-
-    @Override
-    public Maven visitDependency(Maven.Dependency dependency) {
-        Maven.Dependency d = refactor(dependency, super::visitDependency);
-
-        Maven.Pom pom = getCursor().firstEnclosing(Maven.Pom.class);
-        assert pom != null;
-
-        MavenModel.ModuleVersionId mvid = d.getModel().getModuleVersion();
-        if (mvid.getGroupId().equals(groupId) && (artifactId == null || mvid.getArtifactId().equals(artifactId))) {
-            if (!mvid.getVersion().equals(toVersion)) {
-                d = d.withModel(d.getModel().withModuleVersion(
-                        d.getModel().getModuleVersion().withVersion(toVersion)));
-
-                Optional<Maven.Property> property = pom.getPropertyFromValue(
-                        dependency.getVersion());
-                if (property.isPresent()) {
-                    andThen(new ChangePropertyValue.Scoped(property.get(), toVersion));
-                } else {
-                    d = d.withModel(d.getModel().withRequestedVersion(toVersion));
-                    andThen(new Scoped(d, toVersion));
+    public Xml visitTag(Xml.Tag tag) {
+        if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
+            Optional<Xml.Tag> versionTag = tag.getChild("version");
+            if (versionTag.isPresent()) {
+                String version = versionTag.get().getValue().orElse(null);
+                if (version != null) {
+                    if (version.trim().startsWith("${") &&
+                            !toVersion.equals(model.getProperty(version.trim()))) {
+                        ChangePropertyValue changePropertyValue = new ChangePropertyValue();
+                        changePropertyValue.setKey(version);
+                        changePropertyValue.setToValue(toVersion);
+                        andThen(changePropertyValue);
+                    } else if (!toVersion.equals(version)) {
+                        andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
+                    }
                 }
             }
-        }
+        } else if (!modules.isEmpty() && isPropertyTag()) {
+            String propertyKeyRef = "${" + tag.getName() + "}";
 
-        return d;
-    }
+            OUTER:
+            for (Pom module : modules) {
+                for (Pom.Dependency dependency : module.getDependencies()) {
+                    if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                        andThen(new ChangeTagValue.Scoped(tag, toVersion));
+                        break OUTER;
+                    }
+                }
 
-    public static class Scoped extends MavenRefactorVisitor {
-        private final Maven.Dependency scope;
-        private final String toVersion;
-
-        public Scoped(Maven.Dependency scope, String toVersion) {
-            this.scope = scope;
-            this.toVersion = toVersion;
-        }
-
-        @Override
-        public Maven visitDependency(Maven.Dependency dependency) {
-            Maven.Dependency d = refactor(dependency, super::visitDependency);
-            if (scope.isScope(dependency)) {
-                d = d.withVersion(toVersion);
             }
-            return d;
         }
+
+        return super.visitTag(tag);
     }
 }
