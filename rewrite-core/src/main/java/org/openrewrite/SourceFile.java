@@ -19,7 +19,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 
@@ -33,6 +35,34 @@ public interface SourceFile extends Tree {
      * @return A metadata map containing any additional context about this source file.
      */
     Collection<Metadata> getMetadata();
+
+    /**
+     * Overrides metadata of the same type if it exists, otherwise adds
+     * a new metadata element to the collection.
+     *
+     * @param metadata The metadata to set
+     * @param <S>      The type of {@link SourceFile}.
+     * @return A new {@link SourceFile} with updated metadata.
+     */
+    @SuppressWarnings("unchecked")
+    default <S extends SourceFile> S setMetadata(Metadata metadata) {
+        List<Metadata> updatedMetadata = new ArrayList<>(getMetadata().size());
+        boolean updated = false;
+        for (Metadata metadatum : getMetadata()) {
+            if (metadatum.getClass().equals(metadata.getClass())) {
+                updatedMetadata.add(metadata);
+                updated = true;
+            } else {
+                updatedMetadata.add(metadatum);
+            }
+        }
+        if (!updated) {
+            updatedMetadata.add(metadata);
+        }
+        return (S) withMetadata(updatedMetadata);
+    }
+
+    SourceFile withMetadata(Collection<Metadata> metadata);
 
     @Nullable
     default <M extends Metadata> M getMetadata(Class<M> metadataType) {

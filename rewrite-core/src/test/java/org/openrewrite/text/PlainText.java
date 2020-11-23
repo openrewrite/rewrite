@@ -52,12 +52,14 @@ public class PlainText implements SourceFile, Tree {
         return null;
     }
 
-    public void setMetadata(Collection<Metadata> ignore) {
-    }
-
     @Override
     public Collection<Metadata> getMetadata() {
         return emptyList();
+    }
+
+    @Override
+    public PlainText withMetadata(Collection<Metadata> metadata) {
+        return this;
     }
 
     @Override
