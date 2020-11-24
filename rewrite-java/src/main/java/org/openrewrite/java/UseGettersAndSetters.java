@@ -21,11 +21,7 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
             J.VariableDecls variableDecl = getCursor().firstEnclosing(J.VariableDecls.class);
             if (variableDecl != null && J.Modifier.hasModifier(variableDecl.getModifiers(), "public")) {
                 String fieldName = variable.getSimpleName();
-                ChangeFieldVisibility changeFieldVisibility = new ChangeFieldVisibility();
-                changeFieldVisibility.setClassType(classType);
-                changeFieldVisibility.setFieldName(fieldName);
-                changeFieldVisibility.setVisibility("private");
-                andThen(changeFieldVisibility);
+                andThen(new Scoped(variableDecl));
                 andThen(new GenerateGetter.Scoped(enclosingClass(), fieldName));
                 andThen(new GenerateSetter.Scoped(enclosingClass(), fieldName));
             }
@@ -34,6 +30,23 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
         // TODO change all sites where field was used to use getter or setter
 
         return super.visitVariable(variable);
+    }
+
+    public static class Scoped extends JavaIsoRefactorVisitor {
+
+        private final J.VariableDecls scope;
+
+        public Scoped(J.VariableDecls scope) {
+            this.scope = scope;
+        }
+
+        @Override
+        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
+            if (scope.isScope(multiVariable)) {
+                return multiVariable.withModifiers(J.Modifier.withModifiers(multiVariable.getModifiers(), "private"));
+            }
+            return super.visitMultiVariable(multiVariable);
+        }
     }
 
 }

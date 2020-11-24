@@ -144,7 +144,3 @@ class Java11AutoFormatTest: Java11Test(), AutoFormatTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UseGettersAndSettersTest: Java11Test(), UseGettersAndSettersTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11ChangeFieldVisibilityTest: Java11Test(), ChangeFieldVisibilityTest
