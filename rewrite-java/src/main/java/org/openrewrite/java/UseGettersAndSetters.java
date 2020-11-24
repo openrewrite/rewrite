@@ -35,9 +35,6 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
                 andThen(new ScopedUpdateReferences(fieldName, classType));
             }
         }
-
-        // TODO change all sites where field was used to use getter or setter
-
         return super.visitVariable(variable);
     }
 
