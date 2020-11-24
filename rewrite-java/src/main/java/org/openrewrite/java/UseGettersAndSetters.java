@@ -1,7 +1,15 @@
 package org.openrewrite.java;
 
+import org.openrewrite.Formatting;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
+
+import java.util.List;
+
+import static org.openrewrite.internal.StringUtils.capitalize;
 
 public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
 
@@ -21,9 +29,10 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
             J.VariableDecls variableDecl = getCursor().firstEnclosing(J.VariableDecls.class);
             if (variableDecl != null && J.Modifier.hasModifier(variableDecl.getModifiers(), "public")) {
                 String fieldName = variable.getSimpleName();
-                andThen(new Scoped(variableDecl));
+                andThen(new ScopedPrivateField(variableDecl));
                 andThen(new GenerateGetter.Scoped(enclosingClass(), fieldName));
                 andThen(new GenerateSetter.Scoped(enclosingClass(), fieldName));
+                andThen(new ScopedUpdateReferences(fieldName, classType));
             }
         }
 
@@ -32,11 +41,11 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
         return super.visitVariable(variable);
     }
 
-    public static class Scoped extends JavaIsoRefactorVisitor {
+    public static class ScopedPrivateField extends JavaIsoRefactorVisitor {
 
         private final J.VariableDecls scope;
 
-        public Scoped(J.VariableDecls scope) {
+        public ScopedPrivateField(J.VariableDecls scope) {
             this.scope = scope;
         }
 
@@ -46,6 +55,88 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
                 return multiVariable.withModifiers(J.Modifier.withModifiers(multiVariable.getModifiers(), "private"));
             }
             return super.visitMultiVariable(multiVariable);
+        }
+    }
+
+    public static class ScopedUpdateReferences extends JavaRefactorVisitor {
+
+        private final String fieldName;
+        private final JavaType.Class classType;
+
+        public ScopedUpdateReferences(String fieldName, JavaType.Class classType) {
+            this.fieldName = fieldName;
+            this.classType = classType;
+            setCursoringOn();
+        }
+
+        @Override
+        public J visitFieldAccess(J.FieldAccess fieldAccess) {
+            if (matchesClass(fieldAccess.getTarget().getType()) && fieldAccess.getName().getSimpleName().equals(fieldName)) {
+                Tree t = getCursor().getParentOrThrow().getTree();
+                if (t instanceof J.Assign) {
+                    J.Assign assign = (J.Assign) t;
+                    andThen(new ScopedAssign(assign, fieldName));
+                } else if (t instanceof J.VariableDecls.NamedVar) {
+                    J.VariableDecls.NamedVar namedVar = (J.VariableDecls.NamedVar) t;
+                    andThen(new ScopedNamedVariable(namedVar, fieldName));
+                }
+            }
+            return super.visitFieldAccess(fieldAccess);
+        }
+
+
+        private boolean matchesClass(@Nullable JavaType test) {
+            JavaType.Class testClassType = TypeUtils.asClass(test);
+            return testClassType != null && testClassType.getFullyQualifiedName().equals(classType.getFullyQualifiedName());
+        }
+
+        public static class ScopedAssign extends JavaRefactorVisitor {
+
+            private final J.Assign scope;
+            private final String fieldName;
+
+            public ScopedAssign(J.Assign scope, String fieldName) {
+                this.scope = scope;
+                this.fieldName = fieldName;
+                setCursoringOn();
+            }
+
+            @Override
+            public J visitAssign(J.Assign assign) {
+                if (scope.isScope(assign)) {
+                    J.FieldAccess fieldAccess = (J.FieldAccess) assign.getVariable();
+                    List<J> elements = treeBuilder.buildSnippet(getCursor().getParentOrThrow(),
+                            fieldAccess.getTarget().printTrimmed() + ".set" + capitalize(fieldName) + "(" + assign.getAssignment().printTrimmed() + ")");
+                    return elements.get(0);
+                }
+                return super.visitAssign(assign);
+            }
+        }
+
+        public static class ScopedNamedVariable extends JavaRefactorVisitor {
+
+            private final J.VariableDecls.NamedVar scope;
+            private final String fieldName;
+
+            public ScopedNamedVariable(J.VariableDecls.NamedVar scope, String fieldName) {
+                this.scope = scope;
+                this.fieldName = fieldName;
+                setCursoringOn();
+            }
+
+            @Override
+            public J visitVariable(J.VariableDecls.NamedVar variable) {
+                if (scope.isScope(variable)) {
+                    J.FieldAccess fieldAccess = (J.FieldAccess) variable.getInitializer();
+                    if (fieldAccess == null) {
+                        throw new IllegalStateException("variable initializer must not be null");
+                    }
+                    List<J> elements = treeBuilder.buildSnippet(getCursor().getParentOrThrow(),
+                            variable.getSimpleName() + " = " + fieldAccess.getTarget().printTrimmed() + ".get" + capitalize(fieldName) + "()");
+                    return elements.get(0).withFormatting(Formatting.format(" ", ""));
+                }
+                return super.visitVariable(variable);
+            }
         }
     }
 

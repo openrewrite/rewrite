@@ -14,6 +14,14 @@ interface UseGettersAndSettersTest : RefactorVisitorTest {
                     public class A {
                         public String foo;
                     }
+                    
+                    public class B {
+                        public void useFoo() {
+                            A a = new A();
+                            a.foo = "bar";
+                            String x = a.foo;
+                        }
+                    }
                 """
             ,
             after =
@@ -27,6 +35,14 @@ interface UseGettersAndSettersTest : RefactorVisitorTest {
 
                         public void setFoo(String value) {
                             foo = value;
+                        }
+                    }
+                    
+                    public class B {
+                        public void useFoo() {
+                            A a = new A();
+                            a.setFoo("bar");
+                            String x = a.getFoo();
                         }
                     }
                 """
