@@ -31,7 +31,7 @@ class RefactorTest {
 
     val cu = J.CompilationUnit(
             randomId(),
-            URI.create("A.java"),
+            "A.java",
             listOf(),
             null,
             listOf(),
@@ -84,7 +84,7 @@ class RefactorTest {
     fun canGenerate() {
         val cuToGenerate = J.CompilationUnit(
                 randomId(),
-                URI.create("A.java"),
+                "A.java",
                 listOf(),
                 null,
                 listOf(),

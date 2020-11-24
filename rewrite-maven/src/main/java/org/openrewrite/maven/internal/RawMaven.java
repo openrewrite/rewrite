@@ -67,17 +67,17 @@ public class RawMaven {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         RawMaven rawMaven = (RawMaven) o;
-        return getURI().equals(rawMaven.getURI());
+        return getSourcePath().equals(rawMaven.getSourcePath());
     }
 
     @JsonIgnore
-    public URI getURI() {
+    public String getSourcePath() {
         return document.getSourcePath();
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getURI());
+        return Objects.hash(getSourcePath());
     }
 
     @Override

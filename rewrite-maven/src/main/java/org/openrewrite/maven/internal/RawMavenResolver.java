@@ -248,7 +248,7 @@ public class RawMavenResolver {
                     if (version == null) {
                         logger.error("Failed to determine version for {}:{}. Initial value was {}. Including POM is at {}",
                                 groupId, artifactId, dep.getVersion(),
-                                rawMaven.getURI());
+                                rawMaven.getSourcePath());
 
                         //noinspection ConstantConditions
                         assert version != null;
@@ -268,7 +268,7 @@ public class RawMavenResolver {
 
                     if (version.contains("${")) {
                         logger.debug("Unable to download {}:{}:{}. Including POM is at {}",
-                                groupId, artifactId, version, rawMaven.getURI());
+                                groupId, artifactId, version, rawMaven.getSourcePath());
                         return null;
                     }
 
@@ -278,7 +278,7 @@ public class RawMavenResolver {
 
                     if (download == null) {
                         logger.debug("Unable to download {}:{}:{}. Including POM is at {}",
-                                groupId, artifactId, version, rawMaven.getURI());
+                                groupId, artifactId, version, rawMaven.getSourcePath());
                         return null;
                     }
 
@@ -404,7 +404,7 @@ public class RawMavenResolver {
                                         depPom.getArtifactId(),
                                         depPom.getVersion(),
                                         optional ? " (optional) " : "",
-                                        depTask.getRawMaven().getURI()
+                                        depTask.getRawMaven().getSourcePath()
                                 );
                             }
 
@@ -449,7 +449,7 @@ public class RawMavenResolver {
                                         ancestorDep.getGroupId(),
                                         ancestorDep.getArtifactId(),
                                         ancestorDep.getVersion(),
-                                        conflictResolvedRaw == null ? "unknown URI" : conflictResolvedRaw.getURI()
+                                        conflictResolvedRaw == null ? "unknown URI" : conflictResolvedRaw.getSourcePath()
                                 );
                                 dependencies.add(ancestorDep);
                             } else {

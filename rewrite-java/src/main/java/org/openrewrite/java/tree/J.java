@@ -22,7 +22,10 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.java.JavaSourceVisitor;
+import org.openrewrite.java.JavaStyle;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.ClassDeclToString;
 import org.openrewrite.java.internal.MethodDeclToString;
 import org.openrewrite.java.internal.PrintJava;
@@ -30,7 +33,6 @@ import org.openrewrite.java.internal.VariableDeclsToString;
 import org.openrewrite.java.search.*;
 
 import java.io.Serializable;
-import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -44,11 +46,11 @@ import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.*;
+import static org.openrewrite.Formatting.EMPTY;
+import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -1109,7 +1111,7 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        URI sourcePath;
+        String sourcePath;
 
         @With
         Collection<Metadata> metadata;
@@ -1180,10 +1182,10 @@ public interface J extends Serializable, Tree {
         }
 
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
-            URI sourcePath = sourceSet
+            String sourcePath = sourceSet
                     .resolve(packageName.replace(".", "/"))
                     .resolve(className + ".java")
-                    .toUri();
+                    .toString();
 
             return new J.CompilationUnit(randomId(),
                     sourcePath,

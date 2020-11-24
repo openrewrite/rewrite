@@ -27,7 +27,10 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 
 public interface SourceFile extends Tree {
-    URI getSourcePath();
+    /**
+     * This can refer to an absolute or relative file path or a remote location like an HTTP(s) URL.
+     */
+    String getSourcePath();
 
     /**
      * {@link SourceVisitor} may respond to metadata to determine whether to act on

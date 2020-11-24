@@ -38,11 +38,10 @@ interface CompilationUnitTest {
 
     @Test
     fun sourceSet(jp: JavaParser) {
-        val path = Paths.get("sourceSet")
-        val a = J.CompilationUnit.buildEmptyClass(path, "my.org", "MyClass")
-        assertThat(a.sourceSet).isEqualTo(Paths.get(path.toUri()))
+        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
+        assertThat(a.sourceSet.toString()).isEqualTo("sourceSet")
     }
-    
+
     @Test
     fun imports(jp: JavaParser) {
         val a = jp.parse("""
@@ -63,7 +62,7 @@ interface CompilationUnitTest {
 
         assertEquals(2, a.classes.size)
     }
-    
+
     @Test
     fun format(jp: JavaParser) {
         val a = """
@@ -73,7 +72,7 @@ interface CompilationUnitTest {
             
             public class A { }
         """
-        
+
         assertEquals(a.trimIndent(), jp.parse(a)[0].printTrimmed())
     }
 }

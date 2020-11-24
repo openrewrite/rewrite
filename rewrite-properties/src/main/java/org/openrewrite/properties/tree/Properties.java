@@ -58,7 +58,7 @@ public interface Properties extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        URI sourcePath;
+        String sourcePath;
 
         @With
         Collection<Metadata> metadata;

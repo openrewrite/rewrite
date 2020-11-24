@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.net.URI;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
 
@@ -50,13 +51,13 @@ public class MavenDownloader {
             new RawPom.ArtifactPolicy(true), new RawPom.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
-    private final Map<URI, RawMaven> projectPoms;
+    private final Map<String, RawMaven> projectPoms;
 
     public MavenDownloader(MavenCache mavenCache) {
         this(mavenCache, emptyMap());
     }
 
-    public MavenDownloader(MavenCache mavenCache, Map<URI, RawMaven> projectPoms) {
+    public MavenDownloader(MavenCache mavenCache, Map<String, RawMaven> projectPoms) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
     }
@@ -147,14 +148,14 @@ public class MavenDownloader {
 
         Timer.Sample sample = Timer.start();
 
-        if (containingPom == null || Optional.ofNullable(containingPom.getURI().getScheme())
-                .map(s -> !s.contains("http")).orElse(true)) {
+        if (containingPom == null || !containingPom.getSourcePath().contains("http")) {
             if (!StringUtils.isBlank(relativePath)) {
                 return Optional.ofNullable(containingPom)
-                        .map(pom -> projectPoms.get(pom.getURI()
-                                .relativize(URI.create(relativePath))
+                        .map(pom -> projectPoms.get(Paths.get(pom.getSourcePath())
+                                .relativize(Paths.get(relativePath))
                                 .resolve("pom.xml")
                                 .normalize()
+                                .toString()
                         ))
                         .orElse(null);
             }

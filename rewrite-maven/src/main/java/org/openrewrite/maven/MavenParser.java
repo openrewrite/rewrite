@@ -52,7 +52,7 @@ public class MavenParser implements Parser<Maven> {
                 .collect(toList());
 
         MavenDownloader downloader = new MavenDownloader(mavenCache,
-                projectPoms.stream().collect(toMap(RawMaven::getURI, Function.identity())));
+                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())));
 
         List<Maven> parsed = projectPoms.stream()
                 .map(raw -> new RawMavenResolver(downloader, false, resolveOptional).resolve(raw))

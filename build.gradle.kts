@@ -96,7 +96,7 @@ subprojects {
     configure<LicenseExtension> {
         ext.set("year", Calendar.getInstance().get(Calendar.YEAR))
         skipExistingHeaders = true
-        excludePatterns.addAll(listOf("**/*.tokens", "**/*.config"))
+        excludePatterns.addAll(listOf("**/*.tokens", "**/*.config", "**/*.interp"))
         header = project.rootProject.file("gradle/licenseHeader.txt")
         mapping(mapOf("kt" to "SLASHSTAR_STYLE", "java" to "SLASHSTAR_STYLE"))
         strictCheck = true

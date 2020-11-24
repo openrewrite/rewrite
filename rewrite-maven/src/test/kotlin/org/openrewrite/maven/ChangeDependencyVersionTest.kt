@@ -246,19 +246,19 @@ class ChangeDependencyVersionTest : RefactorVisitorTestForParser<Maven> {
                     """.trimIndent().trim())
                 },
                 after = """
-                        <project>
-                          <modelVersion>4.0.0</modelVersion>
-                         
-                          <packaging>pom</packaging>
-                          <groupId>com.mycompany.app</groupId>
-                          <artifactId>my-app</artifactId>
-                          <version>1</version>
-                          
-                          <properties>
-                            <guava.version>29.0-jre</guava.version>
-                          </properties>
-                        </project>
-            """
+                    <project>
+                      <modelVersion>4.0.0</modelVersion>
+                     
+                      <packaging>pom</packaging>
+                      <groupId>com.mycompany.app</groupId>
+                      <artifactId>my-app</artifactId>
+                      <version>1</version>
+                      
+                      <properties>
+                        <guava.version>29.0-jre</guava.version>
+                      </properties>
+                    </project>
+                """
         )
     }
 

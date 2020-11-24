@@ -72,12 +72,14 @@ public class Change {
      */
     public String diff(@Nullable Path relativeTo) {
         // FIXME fix source path when deleting files
-        Path sourcePath = fixed instanceof SourceFile ?
-                Paths.get(((SourceFile) fixed).getSourcePath()) :
-                (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + fixed.getId());
+        Path sourcePath = fixed != null ?
+                Paths.get(fixed.getSourcePath().toString()) :
+                (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
 
         return new InMemoryDiffEntry(sourcePath, relativeTo,
-                original == null ? "" : original.print(), fixed.print(), visitorsThatMadeChanges).getDiff();
+                original == null ? "" : original.print(),
+                fixed == null ? "" : fixed.print(),
+                visitorsThatMadeChanges).getDiff();
     }
 
     public Class<? extends Tree> getTreeType() {
