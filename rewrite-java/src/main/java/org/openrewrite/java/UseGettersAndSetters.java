@@ -76,9 +76,10 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
                 if (t instanceof J.Assign) {
                     J.Assign assign = (J.Assign) t;
                     andThen(new ScopedAssign(assign, fieldName));
-                } else if (t instanceof J.VariableDecls.NamedVar) {
-                    J.VariableDecls.NamedVar namedVar = (J.VariableDecls.NamedVar) t;
-                    andThen(new ScopedNamedVariable(namedVar, fieldName));
+                } else {
+                    List<J> elements = treeBuilder.buildSnippet(getCursor().getParentOrThrow(),
+                fieldAccess.getTarget().printTrimmed() + ".get" + capitalize(fieldName) + "()");
+                    return elements.get(0).withFormatting(Formatting.format(" ", ""));
                 }
             }
             return super.visitFieldAccess(fieldAccess);
@@ -110,32 +111,6 @@ public class UseGettersAndSetters extends JavaIsoRefactorVisitor {
                     return elements.get(0);
                 }
                 return super.visitAssign(assign);
-            }
-        }
-
-        public static class ScopedNamedVariable extends JavaRefactorVisitor {
-
-            private final J.VariableDecls.NamedVar scope;
-            private final String fieldName;
-
-            public ScopedNamedVariable(J.VariableDecls.NamedVar scope, String fieldName) {
-                this.scope = scope;
-                this.fieldName = fieldName;
-                setCursoringOn();
-            }
-
-            @Override
-            public J visitVariable(J.VariableDecls.NamedVar variable) {
-                if (scope.isScope(variable)) {
-                    J.FieldAccess fieldAccess = (J.FieldAccess) variable.getInitializer();
-                    if (fieldAccess == null) {
-                        throw new IllegalStateException("variable initializer must not be null");
-                    }
-                    List<J> elements = treeBuilder.buildSnippet(getCursor().getParentOrThrow(),
-                            variable.getSimpleName() + " = " + fieldAccess.getTarget().printTrimmed() + ".get" + capitalize(fieldName) + "()");
-                    return elements.get(0).withFormatting(Formatting.format(" ", ""));
-                }
-                return super.visitVariable(variable);
             }
         }
     }

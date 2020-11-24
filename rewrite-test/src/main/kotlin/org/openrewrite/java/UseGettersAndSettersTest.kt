@@ -20,6 +20,8 @@ interface UseGettersAndSettersTest : RefactorVisitorTest {
                             A a = new A();
                             a.foo = "bar";
                             String x = a.foo;
+                            
+                            System.out.println("hi" + a.foo);
                         }
                     }
                 """
@@ -43,6 +45,8 @@ interface UseGettersAndSettersTest : RefactorVisitorTest {
                             A a = new A();
                             a.setFoo("bar");
                             String x = a.getFoo();
+                            
+                            System.out.println("hi" + a.getFoo());
                         }
                     }
                 """
