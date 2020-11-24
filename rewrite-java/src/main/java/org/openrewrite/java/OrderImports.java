@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.StreamUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
@@ -33,6 +34,7 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.groupingBy;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.valid;
+import static org.openrewrite.internal.StreamUtils.distinctBy;
 
 public class OrderImports extends JavaIsoRefactorVisitor {
     // VisibleForTesting
@@ -289,21 +291,10 @@ public class OrderImports extends JavaIsoRefactorVisitor {
                                             .getName().withName("*"))));
                                 } else {
                                     return importGroup.stream()
-                                            .filter(Block.distinctBy(Tree::printTrimmed));
+                                            .filter(distinctBy(Tree::printTrimmed));
                                 }
                             }).collect(toList());
                 }
-            }
-            // Returns a predicate suitable for use with stream().filter() that will result in a set filtered to
-            // contain only items that are distinct as evaluated by keyFunc
-            static <T> Predicate<T> distinctBy(Function<? super T, ?> keyFunc) {
-                Set<Object> seen = new HashSet<>();
-                return t -> {
-                    Object it = keyFunc.apply(t);
-                    boolean alreadySeen = seen.contains(it);
-                    seen.add(it);
-                    return !alreadySeen;
-                };
             }
 
             class AllOthers extends ImportPackage {
