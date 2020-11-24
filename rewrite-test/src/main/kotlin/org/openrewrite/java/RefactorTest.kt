@@ -15,16 +15,17 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
+import org.openrewrite.Formatting.format
 import org.openrewrite.Refactor
 import org.openrewrite.SourceFile
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
-import java.net.URI
 
 class RefactorTest {
     class RefactorTestException : RuntimeException("")
@@ -43,6 +44,30 @@ class RefactorTest {
     private val throwingVisitor = object : JavaRefactorVisitor() {
         override fun visitCompilationUnit(cu: J.CompilationUnit?): J {
             throw RefactorTestException()
+        }
+    }
+
+    private val addClassDecl = object : JavaIsoRefactorVisitor() {
+        override fun getName(): String = "AddClassDecl"
+
+        override fun visitCompilationUnit(compilationUnit : J.CompilationUnit?): J.CompilationUnit {
+            var cu = super.visitCompilationUnit(compilationUnit);
+            if(cu.classes.size == 0) {
+                cu = cu.withClasses(listOf(J.ClassDecl(
+                        randomId(),
+                        emptyList(),
+                        emptyList(),
+                        J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY),
+                        J.Ident.buildClassName("Foo").withPrefix(" "),
+                        null,
+                        null,
+                        null,
+                        J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
+                        JavaType.Class.build("Foo"),
+                        format("", "\n")
+                )))
+            }
+            return cu
         }
     }
 
@@ -116,27 +141,6 @@ class RefactorTest {
 
     @Test
     fun multipleVisitorsHaveCumulativeEffects() {
-        val addClassDecl = object : JavaIsoRefactorVisitor() {
-            override fun visitCompilationUnit(compilationUnit : J.CompilationUnit?): J.CompilationUnit {
-                var cu = super.visitCompilationUnit(compilationUnit);
-                if(cu.classes.size == 0) {
-                    cu = cu.withClasses(listOf(J.ClassDecl(
-                            randomId(),
-                            emptyList(),
-                            emptyList(),
-                            J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY),
-                            J.Ident.buildClassName("Foo"),
-                            null,
-                            null,
-                            null,
-                            J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
-                            JavaType.Class.build("Foo"),
-                            Formatting.EMPTY
-                    )))
-                }
-                return cu
-            }
-        }
         val addMethod = object : JavaIsoRefactorVisitor() {
             override fun visitClassDecl(classDecl: J.ClassDecl?): J.ClassDecl {
                 var cd = super.visitClassDecl(classDecl)
@@ -148,7 +152,7 @@ class RefactorTest {
                                     emptyList(),
                                     null,
                                     JavaType.Primitive.Void.toTypeTree(),
-                                    J.Ident.build(randomId(), "bar", null, Formatting.EMPTY),
+                                    J.Ident.build(randomId(), "bar", null, format(" ")),
                                     J.MethodDecl.Parameters(randomId(), emptyList(), Formatting.EMPTY),
                                     null,
                                     J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
@@ -165,9 +169,27 @@ class RefactorTest {
                 .visit(addClassDecl, addMethod)
                 .fix(listOf(cu))
         assertEquals(1, results.size)
-        val result = results.first().fixed as J.CompilationUnit
 
+        val result = results.first().fixed as J.CompilationUnit
         assertEquals(1, result.classes.size, "addClassDecl should have added a class declaration")
         assertEquals(1, result.classes.first().methods.size, "addMethod should have added a method declaration")
+    }
+
+    @Test
+    fun generateDiff() {
+        val results = Refactor(true)
+                .visit(addClassDecl)
+                .fix(listOf(cu))
+
+        assertEquals(1, results.size)
+        assertThat(results.first().diff()).isEqualTo("""
+                diff --git a/A.java b/A.java
+                index e69de29..aaaae2e 100644
+                --- a/A.java
+                +++ b/A.java
+                @@ -0,0 +1 @@ AddClassDecl
+                +class Foo{}
+            """.trimIndent() + "\n"
+        )
     }
 }
