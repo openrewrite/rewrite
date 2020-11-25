@@ -104,7 +104,7 @@ public class RawMavenResolver {
             return; // already processed
         }
 
-        PartialMaven partialMaven = new PartialMaven(rawMaven.getPom());
+        PartialMaven partialMaven = new PartialMaven(rawMaven.getDocument().getSourcePath(), rawMaven.getPom());
         processProperties(task, partialMaven);
         processRepositories(task, partialMaven);
         processParent(task, partialMaven);
@@ -342,7 +342,7 @@ public class RawMavenResolver {
         List<RawPom.Repository> repositories = new ArrayList<>();
         for (RawPom.Repository repository : task.getRawMaven().getPom().getRepositories()) {
             String url = repository.getUrl().trim();
-            if(repository.getUrl().contains("${")) {
+            if (repository.getUrl().contains("${")) {
                 url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
             }
 
@@ -350,7 +350,7 @@ public class RawMavenResolver {
                 //noinspection ResultOfMethodCallIgnored
                 URI.create(url);
                 repositories.add(new RawPom.Repository(url, repository.getReleases(), repository.getSnapshots()));
-            } catch(Throwable t) {
+            } catch (Throwable t) {
                 logger.debug("Unable to make a URI out of repositoriy url {}", url);
             }
         }
@@ -491,6 +491,7 @@ public class RawMavenResolver {
 
                 result = Optional.of(
                         new Pom(
+                                partial.getSourcePath(),
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
@@ -562,6 +563,9 @@ public class RawMavenResolver {
     @Getter
     @Setter
     static class PartialMaven {
+        @EqualsAndHashCode.Include
+        final String sourcePath;
+
         @EqualsAndHashCode.Include
         final RawPom rawPom;
 

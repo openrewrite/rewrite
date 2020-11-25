@@ -110,6 +110,12 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
+    fun missingAtEof(@TempDir tempDir: Path) {
+        assertDependencyResolutionEqualsAether(tempDir,
+            singleDependencyPom("com.fasterxml.jackson:jackson-base:2.12.0-rc2"))
+    }
+
+    @Test
     fun dearGoogleWhyDoesYourNameAppearWhenIHaveProblemsSoMuch(@TempDir tempDir: Path) {
         assertDependencyResolutionEqualsAether(tempDir,
                 singleDependencyPom("com.google.cloud:google-cloud-shared-config:0.9.2"))
@@ -301,26 +307,6 @@ class MavenDependencyResolutionIntegTest {
          */
 
         assertDependencyResolutionEqualsAether(tempDir, singleDependencyPom("net.openhft:lang:6.6.2"))
-    }
-
-    private fun singleDependencyPom(gav: String) = gav.split(":").let { (group, artifact, version) ->
-        """
-            <project>
-                <modelVersion>4.0.0</modelVersion>
-            
-                <groupId>com.mycompany.app</groupId>
-                <artifactId>my-app</artifactId>
-                <version>1</version>
-                
-                <dependencies>
-                  <dependency>
-                    <groupId>$group</groupId>
-                    <artifactId>$artifact</artifactId>
-                    <version>$version</version>
-                  </dependency>
-                </dependencies>
-            </project>
-        """.trimIndent()
     }
 
     private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {

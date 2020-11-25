@@ -22,12 +22,12 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Metadata;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.net.URI;
 import java.net.URL;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -35,6 +35,8 @@ import java.util.stream.Stream;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class Pom implements Metadata {
+    String sourcePath;
+
     @Nullable
     String groupId;
 
@@ -61,7 +63,8 @@ public class Pom implements Metadata {
     Collection<Repository> repositories;
     Map<String, String> properties;
 
-    public Pom(@Nullable @JsonProperty("groupId") String groupId,
+    public Pom(@Nullable @JsonProperty("sourcePath") String sourcePath,
+               @Nullable @JsonProperty("groupId") String groupId,
                @JsonProperty("artifactId") String artifactId,
                @Nullable @JsonProperty("version") String version,
                @Nullable @JsonProperty("type") String type,
@@ -72,6 +75,7 @@ public class Pom implements Metadata {
                @JsonProperty("licenses") Collection<License> licenses,
                @JsonProperty("repositories") Collection<Repository> repositories,
                @JsonProperty("properties") Map<String, String> properties) {
+        this.sourcePath = sourcePath;
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
@@ -85,15 +89,21 @@ public class Pom implements Metadata {
         this.properties = properties;
     }
 
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
-    @Data
-    public static class Repository {
-        @EqualsAndHashCode.Include
-        URL url;
+    public Set<Dependency> getDependencies(Scope scope) {
+        Set<Dependency> dependenciesForScope = new TreeSet<>(Comparator.comparing(Dependency::getCoordinates));
+        for (Dependency dependency : dependencies) {
+            addDependenciesFromScope(scope, dependency, dependenciesForScope);
+        }
+        return dependenciesForScope;
+    }
 
-        boolean releases;
-        boolean snapshots;
+    private void addDependenciesFromScope(Scope scope, Dependency dep, Set<Dependency> found) {
+        if (dep.getScope().transitiveOf(scope) == scope) {
+            found.add(dep);
+            for (Dependency child : dep.getModel().getDependencies()) {
+                addDependenciesFromScope(scope, child, found);
+            }
+        }
     }
 
     @Nullable
@@ -170,6 +180,17 @@ public class Pom implements Metadata {
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+    @Data
+    public static class Repository {
+        @EqualsAndHashCode.Include
+        URL url;
+
+        boolean releases;
+        boolean snapshots;
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class License {
         String name;
@@ -243,11 +264,42 @@ public class Pom implements Metadata {
         public String getVersion() {
             return model.getVersion();
         }
+
+        @JsonIgnore
+        public URI getArtifactUri() {
+            return URI.create(model.getSourcePath())
+                    .resolve(getArtifactId() + '-' + getVersion() +
+                            (StringUtils.isBlank(classifier) ? "" : '-' + classifier) +
+                            ".jar")
+                    .normalize();
+        }
+
+        @JsonIgnore
+        public String getCoordinates() {
+            return model.getGroupId() + ':' + model.getArtifactId() + ':' + model.getVersion() +
+                    (classifier == null ? "" : ':' + classifier);
+        }
+
+        @Override
+        public String toString() {
+            return "Dependency {" + getCoordinates() +
+                    (optional ? ", optional" : "") +
+                    (!getVersion().equals(requestedVersion) ? ", requested=" + requestedVersion : "") +
+                    ", from=" + model.getSourcePath() + '}';
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @Data
     public static class DependencyManagement {
         Collection<DependencyManagementDependency> dependencies;
+    }
+
+    @Override
+    public String toString() {
+        return "Pom{" +
+                groupId + ':' + artifactId + ':' + version +
+                ", from=" + sourcePath +
+                '}';
     }
 }

@@ -54,8 +54,19 @@ public class RequestedVersion {
         this.groupArtifact = groupArtifact;
         this.nearer = nearer;
 
+        // for things like the profile activation block of where the range is unclosed but maven still handles it, e.g.
+        // https://repo1.maven.org/maven2/com/fasterxml/jackson/core/jackson-databind/2.12.0-rc2/jackson-databind-2.12.0-rc2.pom
+        if (requested.contains("[") || requested.contains(")")) {
+            if (!(requested.contains("]") || requested.contains(")"))) {
+                requested = requested + "]";
+            }
+        }
+
         VersionRangeParser parser = new VersionRangeParser(new CommonTokenStream(new VersionRangeLexer(
                 CharStreams.fromString(requested))));
+
+        parser.removeErrorListeners();
+        parser.addErrorListener(new LoggingErrorListener(URI.create("dontknow")));
 
         this.versionSpec = new VersionRangeParserBaseVisitor<VersionSpec>() {
             @Override
