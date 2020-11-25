@@ -172,7 +172,8 @@ public class TreeBuilder {
     public <T extends J> List<T> buildSnippet(Cursor insertionScope,
                                               String snippet,
                                               JavaType... imports) {
-        JavaParser javaParser = cu.buildParser();
+        //This uses a parser that has the same classpath as the runtime.
+        JavaParser javaParser = cu.buildRuntimeParser();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off

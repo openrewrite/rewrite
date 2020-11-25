@@ -58,6 +58,18 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     /**
+     * Convenience utility for constructing a parser with all binary dependencies from the runtime classpath.
+     *
+     * @return A set of paths of all jars included on the runtime classpath.
+     */
+    static List<Path> allDependenciesFromClasspath() {
+
+        return Arrays.stream(System.getProperty("java.class.path").split("\\Q" + System.getProperty("path.separator") + "\\E"))
+                .map(cpEntry -> new File(cpEntry).toPath())
+                .collect(toList());
+    }
+
+    /**
      * Builds a Java parser with a language level equal to that of the JDK running this JVM process.
      */
     static JavaParser.Builder<? extends JavaParser, ?> fromJavaVersion() {
