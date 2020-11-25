@@ -1151,10 +1151,10 @@ public interface J extends Serializable, Tree {
         }
 
         /**
-         * This finds method invocations matching the specified pointcut expression within the compilation unit. 
+         * This finds method invocations matching the specified pointcut expression within the compilation unit.
          * See {@link org.openrewrite.java.search.FindMethods} for pointcut expression examples.
          *
-         * @param signature A pointcut expression that scopes the method invocation search. 
+         * @param signature A pointcut expression that scopes the method invocation search.
          */
         public List<MethodInvocation> findMethodCalls(String signature) {
             return new FindMethods(signature).visit(this);
@@ -1174,9 +1174,29 @@ public interface J extends Serializable, Tree {
                 .collect(joining(""))).normalize();
         }
 
+        /**
+         * Build a parser that matches the styles for this compilation unit with just the named artifacts on the
+         * classpath.
+         *
+         * @param artifactNames The artifact names are the artifact portion of group:artifact:version coordinates
+         * @return A JavaParser with an explcit set of dependencies derived from the runtime classpath
+         */
         public JavaParser buildParser(String... artifactNames) {
             return JavaParser.fromJavaVersion()
                     .classpath(JavaParser.dependenciesFromClasspath(artifactNames))
+                    .styles(styles)
+                    .build();
+        }
+
+        /**
+         * Build a parser that matches the styles for this compilation unit with all dependencies from the runtime
+         * classpath included.
+         *
+         * @return A JavaParser with a classpath matching the current runtime classpath
+         */
+        public JavaParser buildRuntimeParser() {
+            return JavaParser.fromJavaVersion()
+                    .classpath(JavaParser.allDependenciesFromClasspath())
                     .styles(styles)
                     .build();
         }
