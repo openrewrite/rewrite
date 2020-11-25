@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.tree.Yaml;
 import org.yaml.snakeyaml.events.Event;
@@ -82,7 +83,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 event.getEndMark().getIndex() - event.getStartMark().getIndex() > 0,
                                 emptyList(),
                                 null,
-                                fmt
+                                fmt,
+                                Markers.EMPTY
                         );
                         lastEnd = event.getEndMark().getIndex();
                         break;
@@ -111,7 +113,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                                 break;
                         }
 
-                        blockStack.peek().push(new Yaml.Scalar(randomId(), style, scalar.getValue(), fmt));
+                        blockStack.peek().push(new Yaml.Scalar(randomId(), style, scalar.getValue(), fmt, Markers.EMPTY));
                         lastEnd = event.getEndMark().getIndex();
                         break;
                     case SequenceEnd:
@@ -136,8 +138,8 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), sourceFile.toString(), emptyList(),
-                    documents, Formatting.EMPTY);
+            return new Yaml.Documents(randomId(), sourceFile.toString(),
+                    documents, Formatting.EMPTY, Markers.EMPTY);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -179,13 +181,13 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                         "",
                         keySuffix.substring(0, keySuffix.lastIndexOf(':'))
                 ));
-                entries.add(new Yaml.Mapping.Entry(randomId(), key, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1))));
+                entries.add(new Yaml.Mapping.Entry(randomId(), key, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1)), Markers.EMPTY));
                 key = null;
             }
         }
 
         public Yaml.Mapping build() {
-            return new Yaml.Mapping(randomId(), entries, formatting);
+            return new Yaml.Mapping(randomId(), entries, formatting, Markers.EMPTY);
         }
     }
 
@@ -203,11 +205,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             String entryPrefix = block.getPrefix();
             block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
             entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
-            entries.add(new Yaml.Sequence.Entry(randomId(), block, format(entryPrefix)));
+            entries.add(new Yaml.Sequence.Entry(randomId(), block, format(entryPrefix), Markers.EMPTY));
         }
 
         public Yaml.Sequence build() {
-            return new Yaml.Sequence(randomId(), entries, formatting);
+            return new Yaml.Sequence(randomId(), entries, formatting, Markers.EMPTY);
         }
     }
 }

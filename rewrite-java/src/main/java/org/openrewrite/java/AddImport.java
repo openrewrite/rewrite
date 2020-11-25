@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
@@ -30,7 +31,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
-import static org.openrewrite.Formatting.*;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
@@ -87,20 +87,20 @@ public class AddImport extends JavaIsoRefactorVisitor {
     /**
      * Regex intended to be used on the whitespace, possibly containing comments, between import statements and class definition.
      * It will match() when the text begins with two `\n` characters, while allowing for other whitespace such as spaces
-     *
-     *     Fragment    Purpose
-     *     [ \t\r]*    match 0 or more whitespace characters, omitting \n
-     *     .*          match anything that's left, including multi-line comments, whitespace, etc., thanks to Pattern.DOTALL
+     * <p>
+     * Fragment    Purpose
+     * [ \t\r]*    match 0 or more whitespace characters, omitting \n
+     * .*          match anything that's left, including multi-line comments, whitespace, etc., thanks to Pattern.DOTALL
      */
     private static final Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
-        if(JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
+        if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }
 
-        if (onlyIfReferenced && ! hasReference(cu)) {
+        if (onlyIfReferenced && !hasReference(cu)) {
             return cu;
         }
 
@@ -126,7 +126,8 @@ public class AddImport extends JavaIsoRefactorVisitor {
                 TreeBuilder.buildName(classType.getFullyQualifiedName() +
                         (statik == null ? "" : "." + statik), Formatting.format(" ")),
                 statik != null,
-                EMPTY);
+                Formatting.EMPTY,
+                Markers.EMPTY);
 
         List<J.Import> imports = new ArrayList<>(cu.getImports());
 
@@ -137,9 +138,9 @@ public class AddImport extends JavaIsoRefactorVisitor {
         }
 
         // Add just enough newlines to yield a blank line between imports and the first class declaration
-        if(cu.getClasses().iterator().hasNext()) {
-            while (!prefixedByTwoNewlines.matcher(firstPrefix(cu.getClasses())).matches()) {
-                cu = cu.withClasses(formatFirstPrefix(cu.getClasses(), "\n" + firstPrefix(cu.getClasses())));
+        if (cu.getClasses().iterator().hasNext()) {
+            while (!prefixedByTwoNewlines.matcher(Formatting.firstPrefix(cu.getClasses())).matches()) {
+                cu = cu.withClasses(Formatting.formatFirstPrefix(cu.getClasses(), "\n" + Formatting.firstPrefix(cu.getClasses())));
             }
         }
 
@@ -156,9 +157,9 @@ public class AddImport extends JavaIsoRefactorVisitor {
     /**
      * Returns true if there is at least one matching references for this associated import.
      * An import is considered a match if:
-     *  It is non-static and has a field reference
-     *  It is static, the static method is a wildcard, and there is at least on method invocation on the given import type.
-     *  It is static, the static method is explicitly defined, and there is at least on method invocation matching the type and method.
+     * It is non-static and has a field reference
+     * It is static, the static method is a wildcard, and there is at least on method invocation on the given import type.
+     * It is static, the static method is explicitly defined, and there is at least on method invocation matching the type and method.
      *
      * @param compilationUnit The compilation passed to the visitCompilationUnit
      * @return true if the import is referenced by the class either explicitly or through a method reference.
@@ -179,8 +180,8 @@ public class AddImport extends JavaIsoRefactorVisitor {
         //For static imports, we are either looking for a specific method or a wildcard.
         return compilationUnit.findMethodCalls(type + " *(..)").stream()
                 .filter(
-                    invocation -> invocation.getSelect() == null &&
-                            (statik.equals("*") || invocation.getName().getSimpleName().equals(statik))
+                        invocation -> invocation.getSelect() == null &&
+                                (statik.equals("*") || invocation.getName().getSimpleName().equals(statik))
                 )
                 .findAny()
                 .isPresent();

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -25,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.internal.StringUtils.capitalize;
 
@@ -93,26 +95,28 @@ public class GenerateSetter {
 
                 // TreeBuilder.buildMethodDeclaration() doesn't currently type-attribute inner classes correctly
                 // Manually construct the AST to get the types juuuust right
-                J.Ident valueArgument = J.Ident.build(randomId(), "value", fieldType, Formatting.format(" "));
+                J.Ident valueArgument = J.Ident.build(randomId(), "value", fieldType, format(" "), Markers.EMPTY);
                 Expression assignmentExp;
                 if (fieldVar.getSimpleName().equals("value")) {
                     assignmentExp = new J.FieldAccess(randomId(),
                             J.Ident.build(randomId(),
                                     "this",
                                     cd.getType(),
-                                    Formatting.EMPTY),
+                                    Formatting.EMPTY,
+                                    Markers.EMPTY),
                             fieldVar.getName(),
                             fieldType,
-                            Formatting.format("", " "));
+                            format("", " "),
+                            Markers.EMPTY);
                 } else {
-                    assignmentExp = fieldVar.getName().withFormatting(Formatting.format("", " "));
+                    assignmentExp = fieldVar.getName().withFormatting(format("", " "));
                 }
                 J.MethodDecl setMethod = new J.MethodDecl(randomId(),
                         Collections.emptyList(),
-                        Collections.singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY)),
+                        Collections.singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY, Markers.EMPTY)),
                         null,
-                        JavaType.Primitive.Void.toTypeTree().withFormatting(Formatting.format(" ")),
-                        J.Ident.build(randomId(), "set" + capitalize(fieldName), null, Formatting.format(" ")),
+                        JavaType.Primitive.Void.toTypeTree().withFormatting(format(" ")),
+                        J.Ident.build(randomId(), "set" + capitalize(fieldName), null, format(" "), Markers.EMPTY),
                         new J.MethodDecl.Parameters(randomId(),
                                 Collections.singletonList(new J.VariableDecls(randomId(),
                                         Collections.emptyList(),
@@ -125,9 +129,12 @@ public class GenerateSetter {
                                                 Collections.emptyList(),
                                                 null,
                                                 fieldType,
-                                                Formatting.EMPTY)),
-                                        Formatting.EMPTY)),
-                                Formatting.EMPTY),
+                                                Formatting.EMPTY,
+                                                Markers.EMPTY)),
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY)),
+                                Formatting.EMPTY,
+                                Markers.EMPTY),
                         null,
                         new J.Block<>(randomId(),
                                 null,
@@ -136,12 +143,15 @@ public class GenerateSetter {
                                         assignmentExp,
                                         valueArgument,
                                         null,
-                                        Formatting.format("\n    ")
+                                        format("\n    "),
+                                        Markers.EMPTY
                                 )),
-                                Formatting.format(" "),
-                                new J.Block.End(randomId(), Formatting.format("\n"))),
+                                format(" "),
+                                Markers.EMPTY,
+                                new J.Block.End(randomId(), format("\n"), Markers.EMPTY)),
                         null,
-                        Formatting.format("\n\n")
+                        format("\n\n"),
+                        Markers.EMPTY
                 );
                 andThen(new AutoFormat(setMethod));
 

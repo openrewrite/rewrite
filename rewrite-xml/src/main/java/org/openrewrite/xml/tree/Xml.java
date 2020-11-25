@@ -26,12 +26,16 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -68,9 +72,6 @@ public interface Xml extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Collection<Metadata> metadata;
-
-        @With
         Prolog prolog;
 
         @With
@@ -78,6 +79,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -101,6 +105,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -130,6 +137,9 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitProcessingInstruction(this);
@@ -156,7 +166,8 @@ public interface Xml extends Serializable, Tree {
             return new Tag(id, name, attributes, content,
                     closing == null ? null : closing.withName(name),
                     beforeTagDelimiterPrefix,
-                    formatting);
+                    formatting,
+                    markers);
         }
 
         public Tag withValue(String value) {
@@ -164,7 +175,7 @@ public interface Xml extends Serializable, Tree {
             if (content != null && content.get(0) instanceof CharData) {
                 charData = ((CharData) content.get(0)).withText(value);
             } else {
-                charData = new CharData(randomId(), false, value, Formatting.EMPTY);
+                charData = new CharData(randomId(), false, value, Formatting.EMPTY, Markers.EMPTY);
             }
             return withContent(Collections.singletonList(charData));
         }
@@ -266,7 +277,8 @@ public interface Xml extends Serializable, Tree {
 
             Tag tag = new Tag(id, name, attributes, content, closing,
                     beforeTagDelimiterPrefix,
-                    formatting);
+                    formatting,
+                    markers);
 
             if (closing == null) {
                 if (content != null && !content.isEmpty()) {
@@ -277,10 +289,11 @@ public interface Xml extends Serializable, Tree {
                     if (content.get(0) instanceof CharData) {
                         return tag.withClosing(new Closing(randomId(), name, "",
                                 content.get(0).getPrefix().contains("\n") ?
-                                        indentedClosingTagFormatting : Formatting.EMPTY));
+                                        indentedClosingTagFormatting : Formatting.EMPTY,
+                                Markers.EMPTY));
                     } else {
                         return tag.withClosing(new Closing(randomId(), name, "",
-                                indentedClosingTagFormatting));
+                                indentedClosingTagFormatting, Markers.EMPTY));
                     }
                 }
             }
@@ -300,6 +313,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -323,7 +339,10 @@ public interface Xml extends Serializable, Tree {
             String beforeTagDelimiterPrefix;
 
             @With
-            Formatting formatting;
+        Formatting formatting;
+
+        @With
+        Markers markers;
         }
     }
 
@@ -342,6 +361,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -366,7 +388,10 @@ public interface Xml extends Serializable, Tree {
             String value;
 
             @With
-            Formatting formatting;
+        Formatting formatting;
+
+        @With
+        Markers markers;
         }
 
         @JsonIgnore
@@ -396,6 +421,9 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitCharData(this);
@@ -414,6 +442,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
@@ -450,6 +481,9 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
@@ -461,7 +495,10 @@ public interface Xml extends Serializable, Tree {
             List<Element> elements;
 
             @With
-            Formatting formatting;
+        Formatting formatting;
+
+        @With
+        Markers markers;
         }
 
         @Override
@@ -489,6 +526,9 @@ public interface Xml extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {
             return v.visitElement(this);
@@ -507,6 +547,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptXml(XmlSourceVisitor<R> v) {

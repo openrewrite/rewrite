@@ -22,7 +22,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TreeBuilder;
 import org.openrewrite.java.tree.TypeUtils;
 
 public final class ChangeFieldName {

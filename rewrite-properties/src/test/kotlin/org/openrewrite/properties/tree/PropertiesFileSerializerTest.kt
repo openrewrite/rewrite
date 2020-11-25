@@ -17,8 +17,9 @@ package org.openrewrite.properties.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.Markers
 import org.openrewrite.TreeSerializer
-import org.openrewrite.git.GitMetadata
+import org.openrewrite.git.Git
 import org.openrewrite.properties.PropertiesParser
 
 class PropertiesFileSerializerTest {
@@ -26,7 +27,10 @@ class PropertiesFileSerializerTest {
     @Test
     fun roundTripSerialization() {
         val serializer = TreeSerializer<Properties.File>()
-        val a = PropertiesParser().parse("key=value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val a = PropertiesParser().parse("key=value")[0]
+                .withMarkers(Markers(listOf(Git().apply {
+                    headCommitId = "123"
+                })))
 
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
@@ -37,8 +41,14 @@ class PropertiesFileSerializerTest {
     @Test
     fun roundTripSerializationList() {
         val serializer = TreeSerializer<Properties.File>()
-        val p1 = PropertiesParser().parse("key=value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
-        val p2 = PropertiesParser().parse("key=value")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val p1 = PropertiesParser().parse("key=value")[0]
+                .withMarkers(Markers(listOf(Git().apply {
+                    headCommitId = "123"
+                })))
+        val p2 = PropertiesParser().parse("key=value")[0]
+                .withMarkers(Markers(listOf(Git().apply {
+                    headCommitId = "123"
+                })))
 
         val serialized = serializer.write(listOf(p1, p2))
         val deserialized = serializer.readList(serialized)

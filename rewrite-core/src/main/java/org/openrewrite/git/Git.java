@@ -16,10 +16,10 @@
 package org.openrewrite.git;
 
 import org.openrewrite.Incubating;
-import org.openrewrite.Metadata;
+import org.openrewrite.marker.Marker;
 
 @Incubating(since = "2.0.0")
-public class GitMetadata implements Metadata {
+public class Git implements Marker {
     private String headCommitId;
     private String headTreeId;
     private String branch;

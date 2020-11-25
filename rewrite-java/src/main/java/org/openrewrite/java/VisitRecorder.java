@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
-import org.openrewrite.internal.StringUtils;
 
 import java.util.List;
 import java.util.stream.Collectors;

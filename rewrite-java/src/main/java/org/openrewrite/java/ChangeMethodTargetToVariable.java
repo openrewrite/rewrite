@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -54,7 +55,7 @@ public class ChangeMethodTargetToVariable extends JavaIsoRefactorVisitor {
 
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
-        if(methodMatcher.matches(method)) {
+        if (methodMatcher.matches(method)) {
             andThen(new Scoped(method, variable, variableType));
         }
         return super.visitMethodInvocation(method);
@@ -97,7 +98,9 @@ public class ChangeMethodTargetToVariable extends JavaIsoRefactorVisitor {
                 andThen(new OrderImports());
 
                 return method
-                        .withSelect(J.Ident.build(randomId(), variable, type, select == null ? Formatting.EMPTY : select.getFormatting()))
+                        .withSelect(J.Ident.build(randomId(), variable, type,
+                                select == null ? Formatting.EMPTY : select.getFormatting(),
+                                Markers.EMPTY))
                         .withType(methodType);
             }
 

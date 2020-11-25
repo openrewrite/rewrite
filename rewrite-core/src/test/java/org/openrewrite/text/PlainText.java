@@ -18,11 +18,10 @@ package org.openrewrite.text;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.Collection;
 import java.util.UUID;
-
-import static java.util.Collections.emptyList;
 
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
@@ -52,13 +51,8 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public Collection<Metadata> getMetadata() {
-        return emptyList();
-    }
-
-    @Override
-    public PlainText withMetadata(Collection<Metadata> metadata) {
-        return this;
+    public Markers getMarkers() {
+        return Markers.EMPTY;
     }
 
     @Override

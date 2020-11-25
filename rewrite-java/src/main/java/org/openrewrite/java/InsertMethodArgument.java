@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
@@ -93,7 +94,8 @@ public class InsertMethodArgument extends JavaIsoRefactorVisitor {
                                 source,
                                 index == 0 ?
                                         modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
-                                        format(" ")
+                                        format(" "),
+                                Markers.EMPTY
                         )
                 );
 

@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -82,7 +83,7 @@ public class DeleteMethodArgument extends JavaIsoRefactorVisitor {
 
                 args.remove(index);
                 if (args.isEmpty()) {
-                    args = singletonList(new J.Empty(randomId(), Formatting.EMPTY));
+                    args = singletonList(new J.Empty(randomId(), Formatting.EMPTY, Markers.EMPTY));
                 }
 
                 return method.withArgs(method.getArgs().withArgs(args));

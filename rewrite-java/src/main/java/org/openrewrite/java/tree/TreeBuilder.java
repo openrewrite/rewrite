@@ -17,6 +17,7 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
@@ -28,7 +29,6 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -70,7 +70,7 @@ public class TreeBuilder {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = J.Ident.build(randomId(), part, null, Formatting.EMPTY);
+                expr = J.Ident.build(randomId(), part, null, Formatting.EMPTY, Markers.EMPTY);
             } else {
                 fullName += "." + part;
 
@@ -84,11 +84,12 @@ public class TreeBuilder {
                 expr = new J.FieldAccess(
                         i == parts.length - 1 ? id : randomId(),
                         expr,
-                        J.Ident.build(randomId(), part.trim(), null, identFmt),
+                        J.Ident.build(randomId(), part.trim(), null, identFmt, Markers.EMPTY),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.Class.build(fullName) :
                                 null,
-                        partFmt
+                        partFmt,
+                        Markers.EMPTY
                 );
             }
         }

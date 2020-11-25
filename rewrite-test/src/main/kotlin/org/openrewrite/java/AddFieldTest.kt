@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
+import org.openrewrite.marker.Markers
 import org.openrewrite.RefactorVisitorTest
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
@@ -24,7 +25,7 @@ import java.util.Collections.singletonList
 
 interface AddFieldTest : RefactorVisitorTest {
     companion object {
-        val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), EMPTY) as J.Modifier)
+        val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), EMPTY, Markers.EMPTY) as J.Modifier)
     }
 
     @Test
@@ -96,7 +97,7 @@ interface AddFieldTest : RefactorVisitorTest {
     fun addPrimitiveField(jp: JavaParser) = assertRefactored(
             jp,
             visitorsMapped = listOf { a->
-                AddField.Scoped(a.classes[0], private, "int", "count", "5");
+                AddField.Scoped(a.classes[0], private, "int", "count", "5")
             },
             before = """
                 class A {

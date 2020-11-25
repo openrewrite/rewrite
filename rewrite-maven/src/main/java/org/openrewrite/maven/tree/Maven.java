@@ -17,15 +17,13 @@ package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Formatting;
-import org.openrewrite.Metadata;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 import static java.util.Collections.emptyList;
 
@@ -37,18 +35,18 @@ public class Maven extends Xml.Document {
         super(
                 document.getId(),
                 document.getSourcePath(),
-                document.getMetadata(),
                 document.getProlog(),
                 document.getRoot(),
-                document.getFormatting()
+                document.getFormatting(),
+                document.getMarkers()
         );
 
-        model = getMetadata(Pom.class);
+        model = document.getMarkers().findFirst(Pom.class).orElse(null);
         assert model != null;
 
-        Modules modulesContainer = getMetadata(Modules.class);
-        modules = modulesContainer == null ? emptyList() :
-                modulesContainer.getModules();
+        modules = document.getMarkers().findFirst(Modules.class)
+                .map(Modules::getModules)
+                .orElse(emptyList());
     }
 
     @JsonIgnore
@@ -81,8 +79,8 @@ public class Maven extends Xml.Document {
     }
 
     @Override
-    public Maven withMetadata(Collection<Metadata> metadata) {
-        Document m = super.withMetadata(metadata);
+    public Maven withMarkers(Markers markers) {
+        Document m = super.withMarkers(markers);
         if (m instanceof Maven) {
             return (Maven) m;
         }
@@ -108,14 +106,6 @@ public class Maven extends Xml.Document {
     }
 
     public Maven withModel(Pom model) {
-        Pom existing = getMetadata(Pom.class);
-        List<Metadata> metadata = new ArrayList<>(getMetadata());
-        for (int i = 0; i < metadata.size(); i++) {
-            Metadata datum = metadata.get(i);
-            if (datum == existing) {
-                metadata.set(i, model);
-            }
-        }
-        return withMetadata(metadata);
+        return withMarkers(getMarkers().addOrUpdate(model));
     }
 }

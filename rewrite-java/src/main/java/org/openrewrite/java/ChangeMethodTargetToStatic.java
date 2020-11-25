@@ -17,6 +17,8 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
@@ -25,7 +27,6 @@ import org.openrewrite.java.tree.JavaType;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
@@ -75,7 +76,8 @@ public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
                 JavaType.FullyQualified classType = JavaType.Class.build(targetType);
                 J.MethodInvocation m = method.withSelect(
                         J.Ident.build(randomId(), classType.getClassName(), classType,
-                                method.getSelect() == null ? EMPTY : method.getSelect().getFormatting()));
+                                method.getSelect() == null ? Formatting.EMPTY : method.getSelect().getFormatting(),
+                                Markers.EMPTY));
 
                 maybeAddImport(targetType);
 

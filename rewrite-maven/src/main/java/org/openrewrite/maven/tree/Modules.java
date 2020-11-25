@@ -15,11 +15,11 @@
  */
 package org.openrewrite.maven.tree;
 
-import org.openrewrite.Metadata;
+import org.openrewrite.marker.Marker;
 
 import java.util.Collection;
 
-public class Modules implements Metadata {
+public class Modules implements Marker {
     private final Collection<Pom> modules;
 
     public Modules(Collection<Pom> modules) {

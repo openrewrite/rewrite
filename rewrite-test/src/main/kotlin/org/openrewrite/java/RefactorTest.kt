@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
 import org.openrewrite.Formatting.format
+import org.openrewrite.marker.Markers
 import org.openrewrite.Refactor
 import org.openrewrite.SourceFile
 import org.openrewrite.Tree.randomId
@@ -33,12 +34,12 @@ class RefactorTest {
     val cu = J.CompilationUnit(
             randomId(),
             "A.java",
-            listOf(),
             null,
             listOf(),
             listOf(),
             Formatting.EMPTY,
-            listOf()
+            Markers.EMPTY,
+            emptyList()
     )
 
     private val throwingVisitor = object : JavaRefactorVisitor() {
@@ -51,20 +52,21 @@ class RefactorTest {
         override fun getName(): String = "AddClassDecl"
 
         override fun visitCompilationUnit(compilationUnit : J.CompilationUnit?): J.CompilationUnit {
-            var cu = super.visitCompilationUnit(compilationUnit);
+            var cu = super.visitCompilationUnit(compilationUnit)
             if(cu.classes.size == 0) {
                 cu = cu.withClasses(listOf(J.ClassDecl(
                         randomId(),
                         emptyList(),
                         emptyList(),
-                        J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY),
+                        J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY, Markers.EMPTY),
                         J.Ident.buildClassName("Foo").withPrefix(" "),
                         null,
                         null,
                         null,
-                        J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
+                        J.Block(randomId(), null, emptyList(), Formatting.EMPTY, Markers.EMPTY, J.Block.End(randomId(), Formatting.EMPTY, Markers.EMPTY)),
                         JavaType.Class.build("Foo"),
-                        format("", "\n")
+                        format("", "\n"),
+                        Markers.EMPTY
                 )))
             }
             return cu
@@ -110,15 +112,15 @@ class RefactorTest {
         val cuToGenerate = J.CompilationUnit(
                 randomId(),
                 "A.java",
-                listOf(),
                 null,
                 listOf(),
                 listOf(),
                 Formatting.EMPTY,
+                Markers.EMPTY,
                 listOf()
         )
         val generatingVisitor = object : JavaIsoRefactorVisitor() {
-            var generationComplete = false;
+            var generationComplete = false
             override fun generate(): MutableCollection<SourceFile> {
                 return if (generationComplete) {
                     mutableListOf()
@@ -152,12 +154,13 @@ class RefactorTest {
                                     emptyList(),
                                     null,
                                     JavaType.Primitive.Void.toTypeTree(),
-                                    J.Ident.build(randomId(), "bar", null, format(" ")),
-                                    J.MethodDecl.Parameters(randomId(), emptyList(), Formatting.EMPTY),
+                                    J.Ident.build(randomId(), "bar", null, format(" "), Markers.EMPTY),
+                                    J.MethodDecl.Parameters(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
                                     null,
-                                    J.Block(randomId(), null, emptyList(), Formatting.EMPTY, J.Block.End(randomId(), Formatting.EMPTY)),
+                                    J.Block(randomId(), null, emptyList(), Formatting.EMPTY, Markers.EMPTY, J.Block.End(randomId(), Formatting.EMPTY, Markers.EMPTY)),
                                     null,
-                                    Formatting.EMPTY
+                                    Formatting.EMPTY,
+                                    Markers.EMPTY
                             )
                     )))
                 }

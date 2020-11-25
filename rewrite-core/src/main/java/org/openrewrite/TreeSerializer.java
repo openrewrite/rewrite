@@ -20,7 +20,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
@@ -41,13 +40,13 @@ public class TreeSerializer<S extends SourceFile> {
     private final ObjectMapper mapper;
 
     public TreeSerializer() {
-        SimpleModule metadataModule = new SimpleModule();
+        SimpleModule markerModule = new SimpleModule();
 
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
 
         this.mapper = new ObjectMapper(f)
-                .registerModule(metadataModule)
+                .registerModule(markerModule)
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
     }

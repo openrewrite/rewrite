@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
@@ -27,7 +28,8 @@ import java.util.Set;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.*;
-import static org.openrewrite.Formatting.*;
+import static org.openrewrite.Formatting.format;
+import static org.openrewrite.Formatting.formatFirstPrefix;
 import static org.openrewrite.Tree.randomId;
 
 public class GenerateConstructorUsingFields {
@@ -58,11 +60,12 @@ public class GenerateConstructorUsingFields {
                         .map(mv -> new J.VariableDecls(randomId(),
                                 emptyList(),
                                 emptyList(),
-                                mv.getTypeExpr() != null ? mv.getTypeExpr().withFormatting(EMPTY) : null,
+                                mv.getTypeExpr() != null ? mv.getTypeExpr().withFormatting(Formatting.EMPTY) : null,
                                 null,
                                 formatFirstPrefix(mv.getDimensionsBeforeName(), ""),
                                 formatFirstPrefix(mv.getVars(), " "),
-                                EMPTY))
+                                Formatting.EMPTY,
+                                Markers.EMPTY))
                         .collect(toList());
 
                 for (int i = 1; i < constructorParams.size(); i++) {
@@ -70,18 +73,23 @@ public class GenerateConstructorUsingFields {
                 }
 
                 Formatting constructorFormatting = formatter.format(classDecl.getBody());
-                J.MethodDecl constructor = new J.MethodDecl(randomId(), emptyList(),
-                        singletonList(new J.Modifier.Public(randomId(), EMPTY)),
+                J.MethodDecl constructor = new J.MethodDecl(
+                        randomId(),
+                        emptyList(),
+                        singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY, Markers.EMPTY)),
                         null,
                         null,
-                        J.Ident.build(randomId(), classDecl.getSimpleName(), classDecl.getType(), format(" ")),
-                        new J.MethodDecl.Parameters(randomId(), constructorParams, EMPTY),
+                        J.Ident.build(randomId(), classDecl.getSimpleName(), classDecl.getType(), format(" "), Markers.EMPTY),
+                        new J.MethodDecl.Parameters(randomId(), constructorParams, Formatting.EMPTY, Markers.EMPTY),
                         null,
                         new J.Block<>(randomId(), null, emptyList(), format(" "),
+                                Markers.EMPTY,
                                 new J.Block.End(randomId(), format(formatter.findIndent(classDecl.getBody().getIndent(),
-                                        classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()))),
+                                        classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()), Markers.EMPTY)),
                         null,
-                        constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()));
+                        constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()),
+                        Markers.EMPTY
+                );
 
                 if (!fields.isEmpty()) {
                     // add assignment statements to constructor

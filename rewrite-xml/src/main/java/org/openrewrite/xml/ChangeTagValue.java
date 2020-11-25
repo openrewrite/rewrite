@@ -18,6 +18,7 @@ package org.openrewrite.xml;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Xml;
 
 import static java.util.Collections.singletonList;
@@ -58,7 +59,7 @@ public class ChangeTagValue {
                     // if the previous content was also character data, preserve its formatting
                     formatting = existingValue.getFormatting();
                 }
-                t = t.withContent(singletonList(new Xml.CharData(randomId(), false, value, formatting)));
+                t = t.withContent(singletonList(new Xml.CharData(randomId(), false, value, formatting, Markers.EMPTY)));
             }
 
             return t;

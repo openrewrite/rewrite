@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -133,9 +134,10 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
                         Stream.of(
                                 new Yaml.Mapping.Entry(randomId(),
                                         new Yaml.Scalar(randomId(), Yaml.Scalar.Style.PLAIN, subproperty,
-                                                Formatting.EMPTY),
+                                                Formatting.EMPTY, Markers.EMPTY),
                                         value.copyPaste(),
-                                        newEntryFormatting
+                                        newEntryFormatting,
+                                        Markers.EMPTY
                                 )
                         )
                 ).collect(toList()));

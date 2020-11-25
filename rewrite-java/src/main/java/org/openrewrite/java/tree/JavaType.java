@@ -23,6 +23,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.With;
+import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
@@ -36,7 +38,6 @@ import static java.util.Collections.singleton;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -73,7 +74,8 @@ public interface JavaType extends Serializable {
         public TypeTree toTypeTree() {
             return new J.MultiCatch(randomId(), throwableTypes.stream()
                     .map(JavaType::toTypeTree)
-                    .collect(toList()), EMPTY);
+                    .collect(toList()), Formatting.EMPTY,
+                    Markers.EMPTY);
         }
     }
 
@@ -135,7 +137,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public String toString() {
-            return "ShallowClass{" +  + '}';
+            return "ShallowClass{" + +'}';
         }
     }
 
@@ -475,7 +477,12 @@ public interface JavaType extends Serializable {
 
         @Override
         public TypeTree toTypeTree() {
-            return new J.ArrayType(randomId(), elemType.toTypeTree(), emptyList(), EMPTY);
+            return new J.ArrayType(
+                    randomId(),
+                    elemType.toTypeTree(), emptyList(),
+                    Formatting.EMPTY,
+                    Markers.EMPTY
+            );
         }
     }
 
@@ -528,7 +535,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public TypeTree toTypeTree() {
-            return new J.Primitive(randomId(), this, EMPTY);
+            return new J.Primitive(randomId(), this, Formatting.EMPTY, Markers.EMPTY);
         }
 
         public J.Literal toLiteral(String value) {
@@ -570,7 +577,7 @@ public interface JavaType extends Serializable {
                     throw new IllegalArgumentException("Unable to build literals for void, none, and wildcards");
             }
 
-            return new J.Literal(randomId(), primitiveValue, value, this, EMPTY);
+            return new J.Literal(randomId(), primitiveValue, value, this, Formatting.EMPTY, Markers.EMPTY);
         }
     }
 }

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -50,7 +51,8 @@ public class ChangeFieldType extends JavaIsoRefactorVisitor {
 
     @Override
     public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable) {
-        if (multiVariable.getTypeAsClass().equals(type)) {
+        JavaType.Class typeAsClass = multiVariable.getTypeAsClass();
+        if (typeAsClass != null && typeAsClass.equals(type)) {
             andThen(new Scoped(multiVariable, targetType));
         }
         return super.visitMultiVariable(multiVariable);
@@ -80,15 +82,18 @@ public class ChangeFieldType extends JavaIsoRefactorVisitor {
                 maybeAddImport(targetType);
                 maybeRemoveImport(originalType);
 
-                mv = mv.withTypeExpr(mv.getTypeExpr() == null ? null : J.Ident.build(mv.getTypeExpr().getId(),
-                        type.getClassName(), type, mv.getTypeExpr().getFormatting()))
-                        .withVars(mv.getVars().stream().map(var -> {
-                            JavaType.Class varType = TypeUtils.asClass(var.getType());
-                            if (varType != null && !varType.equals(type)) {
-                                return var.withType(type).withName(var.getName().withType(type));
-                            }
-                            return var;
-                        }).collect(toList()));
+                mv = mv.withTypeExpr(mv.getTypeExpr() == null ?
+                        null :
+                        J.Ident.build(mv.getTypeExpr().getId(), type.getClassName(), type, mv.getTypeExpr().getFormatting(), Markers.EMPTY)
+                );
+
+                mv = mv.withVars(mv.getVars().stream().map(var -> {
+                    JavaType.Class varType = TypeUtils.asClass(var.getType());
+                    if (varType != null && !varType.equals(type)) {
+                        return var.withType(type).withName(var.getName().withType(type));
+                    }
+                    return var;
+                }).collect(toList()));
             }
             return mv;
         }
