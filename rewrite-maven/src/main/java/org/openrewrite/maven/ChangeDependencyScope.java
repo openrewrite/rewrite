@@ -65,15 +65,14 @@ public class ChangeDependencyScope extends MavenRefactorVisitor {
             if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
                     artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
                 Optional<Xml.Tag> scope = tag.getChild("scope");
-                if(scope.isPresent()) {
-                    if(toScope == null) {
+                if (scope.isPresent()) {
+                    if (toScope == null) {
                         andThen(new RemoveContent.Scoped(scope.get()));
-                    }
-                    else if(!toScope.equals(scope.get().getValue().orElse(null))) {
+                    } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
                         andThen(new ChangeTagValue.Scoped(scope.get(), toScope));
                     }
                 } else {
-                    andThen(new AddToTag.Scoped(tag, "<scope>" + toScope + "</scope>"));
+                    andThen(new AddToTag.Scoped(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
                 }
             }
         }

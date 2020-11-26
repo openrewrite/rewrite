@@ -26,6 +26,14 @@ public enum Scope {
     System;
 
     /**
+     * @param scope The scope to test
+     * @return If a dependency in this scope would be in the classpath of the tested scope.
+     */
+    public boolean isInClasspathOf(@Nullable Scope scope) {
+        return this.transitiveOf(scope) == scope;
+    }
+
+    /**
      * See the table at <a href="Dependency Scope">https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#dependency-scope</a>.
      * <code>this</code> represents the scope on the top row of the table.
      *
@@ -34,15 +42,15 @@ public enum Scope {
      */
     @Nullable
     public Scope transitiveOf(@Nullable Scope scope) {
-        if(scope == null) {
+        if (scope == null) {
             return this;
         }
 
-        switch(scope) {
+        switch (scope) {
             case None:
                 return this;
             case Compile:
-                switch(this) {
+                switch (this) {
                     case Compile:
                         return Compile;
                     case Runtime:
@@ -53,7 +61,7 @@ public enum Scope {
                         return null;
                 }
             case Provided:
-                switch(this) {
+                switch (this) {
                     case Compile:
                     case Runtime:
                         return Provided;
@@ -63,7 +71,7 @@ public enum Scope {
                         return null;
                 }
             case Runtime:
-                switch(this) {
+                switch (this) {
                     case Compile:
                     case Runtime:
                         return Runtime;
@@ -73,7 +81,7 @@ public enum Scope {
                         return null;
                 }
             case Test:
-                switch(this) {
+                switch (this) {
                     case Compile:
                     case Runtime:
                         return Test;
@@ -88,10 +96,10 @@ public enum Scope {
     }
 
     public static Scope fromName(@Nullable String scope) {
-        if(scope == null) {
+        if (scope == null) {
             return Compile;
         }
-        switch(scope) {
+        switch (scope) {
             case "compile":
                 return Compile;
             case "provided":

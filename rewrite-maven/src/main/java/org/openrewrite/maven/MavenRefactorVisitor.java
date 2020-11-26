@@ -23,6 +23,9 @@ import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
+import java.util.stream.Stream;
+
+import static java.util.stream.Collectors.toList;
 
 public class MavenRefactorVisitor extends XmlRefactorVisitor
         implements MavenSourceVisitor<Xml> {
@@ -50,27 +53,27 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
         return refactored;
     }
 
-    protected boolean isPropertyTag() {
+    public boolean isPropertyTag() {
         return PROPERTY_MATCHER.matches(getCursor());
     }
 
-    protected boolean isDependencyTag() {
+    public boolean isDependencyTag() {
         return DEPENDENCY_MATCHER.matches(getCursor());
     }
 
-    protected boolean isDependencyTag(String groupId, @Nullable String artifactId) {
+    public boolean isDependencyTag(String groupId, @Nullable String artifactId) {
         return isDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
     }
 
-    protected boolean isManagedDependencyTag() {
+    public boolean isManagedDependencyTag() {
         return MANAGED_DEPENDENCY_MATCHER.matches(getCursor());
     }
 
-    protected boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
+    public boolean isManagedDependencyTag(String groupId, @Nullable String artifactId) {
         return isManagedDependencyTag() && hasGroupAndArtifact(groupId, artifactId);
     }
 
-    protected boolean isParentTag() {
+    public boolean isParentTag() {
         return PARENT_MATCHER.matches(getCursor());
     }
 
@@ -82,11 +85,42 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
                         .orElse(artifactId == null);
     }
 
-    protected Pom.Dependency findDependency(Xml.Tag tag) {
+    public Pom.Dependency findDependency(Xml.Tag tag) {
         return model.getDependencies().stream()
                 .filter(d -> tag.getChildValue("groupId").orElse(model.getGroupId()).equals(d.getGroupId()) &&
                         tag.getChildValue("artifactId").orElse(model.getArtifactId()).equals(d.getArtifactId()))
                 .findAny()
                 .orElseThrow(() -> new IllegalStateException("Dependency tag has no corresponding model element"));
+    }
+
+    /**
+     * Finds dependencies in the model that match the provided group and artifact ids.
+     *
+     * @param groupId    The groupId to match
+     * @param artifactId The artifactId to match.
+     * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
+     */
+    public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+        return Stream.concat(
+                model.getDependencies().stream()
+                        .filter(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId)),
+                model.getDependencies().stream()
+                        .flatMap(d -> d.findDependencies(groupId, artifactId).stream())
+        ).collect(toList());
+    }
+
+    public void maybeAddDependency(String groupId, String artifactId, @Nullable String version,
+                                      @Nullable String classifier, @Nullable String scope) {
+        AddDependency op = new AddDependency();
+        op.setGroupId(groupId);
+        op.setArtifactId(artifactId);
+        op.setClassifier(classifier);
+        op.setScope(scope);
+        op.setVersion(version);
+        op.setSkipIfPresent(true);
+
+        if (!andThen().contains(op)) {
+            andThen(op);
+        }
     }
 }

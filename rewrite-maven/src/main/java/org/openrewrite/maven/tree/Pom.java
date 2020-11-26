@@ -98,7 +98,7 @@ public class Pom implements Metadata {
     }
 
     private void addDependenciesFromScope(Scope scope, Dependency dep, Set<Dependency> found) {
-        if (dep.getScope().transitiveOf(scope) == scope) {
+        if (dep.getScope().isInClasspathOf(scope)) {
             found.add(dep);
             for (Dependency child : dep.getModel().getDependencies()) {
                 addDependenciesFromScope(scope, child, found);
@@ -289,19 +289,21 @@ public class Pom implements Metadata {
         }
 
         /**
-         * Finds a transitive dependency of this dependency that matches the provided group and artifact ids.
+         * Finds transitive dependencies of this dependency that match the provided group and artifact ids.
          *
          * @param groupId    The groupId to match
          * @param artifactId The artifactId to match.
-         * @return A transitive dependency with any version matching the provided group and artifact id, if any.
+         * @return Transitive dependencies with any version matching the provided group and artifact id, if any.
          */
-        @Nullable
-        public Pom.Dependency findDependency(String groupId, String artifactId) {
-            return model.getDependencies().stream()
-                    .filter(d -> (d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId)) ||
-                            d.findDependency(groupId, artifactId) != null)
-                    .findAny()
-                    .orElse(null);
+        public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+            List<Pom.Dependency> matches = new ArrayList<>();
+            if (getGroupId().equals(groupId) && getArtifactId().equals(artifactId)) {
+                matches.add(this);
+            }
+            for (Dependency d : model.getDependencies()) {
+                matches.addAll(d.findDependencies(groupId, artifactId));
+            }
+            return matches;
         }
     }
 

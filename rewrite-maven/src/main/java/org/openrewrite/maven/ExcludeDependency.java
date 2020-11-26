@@ -51,7 +51,7 @@ public class ExcludeDependency extends MavenRefactorVisitor {
     public Xml visitTag(Xml.Tag tag) {
         if (isDependencyTag()) {
             Pom.Dependency dependency = findDependency(tag);
-            if (dependency.findDependency(groupId, artifactId) != null) {
+            if (!dependency.findDependencies(groupId, artifactId).isEmpty()) {
                 Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                 if (maybeExclusions.isPresent()) {
                     Xml.Tag exclusions = maybeExclusions.get();
@@ -60,14 +60,14 @@ public class ExcludeDependency extends MavenRefactorVisitor {
                     if (individualExclusions.stream().noneMatch(exclusion ->
                             groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
                                     artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
-                        andThen(new AddToTag.Scoped(exclusions, "<exclusion>\n" +
-                                "  <groupId>" + groupId + "</groupId>\n" +
-                                "  <artifactId>" + artifactId + "</artifactId>\n" +
-                                "</exclusion>"));
+                        andThen(new AddToTag.Scoped(exclusions, Xml.Tag.build("<exclusion>\n" +
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
+                                "</exclusion>")));
                     }
 
                 } else {
-                    andThen(new AddToTag.Scoped(tag, "<exclusions>\n</exclusions>"));
+                    andThen(new AddToTag.Scoped(tag, Xml.Tag.build("<exclusions/>")));
                 }
             }
         }

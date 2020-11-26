@@ -15,7 +15,10 @@
  */
 package org.openrewrite.xml.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -28,9 +31,9 @@ import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
-import java.net.URI;
 import java.util.*;
 
+import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -168,7 +171,7 @@ public interface Xml extends Serializable, Tree {
 
         @JsonIgnore
         public Optional<Tag> getChild(String name) {
-            return content.stream()
+            return content == null ? Optional.empty() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
@@ -177,7 +180,7 @@ public interface Xml extends Serializable, Tree {
 
         @JsonIgnore
         public List<Tag> getChildren(String name) {
-            return content.stream()
+            return content == null ? emptyList() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
                     .map(Tag.class::cast)
                     .filter(t -> t.getName().equals(name))
@@ -186,7 +189,7 @@ public interface Xml extends Serializable, Tree {
 
         @JsonIgnore
         public List<Tag> getChildren() {
-            return content.stream()
+            return content == null ? emptyList() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
                     .map(Tag.class::cast)
                     .collect(toList());
@@ -216,6 +219,9 @@ public interface Xml extends Serializable, Tree {
          */
         @JsonIgnore
         public Optional<String> getValue() {
+            if (content == null) {
+                return Optional.empty();
+            }
             if (content.size() != 1) {
                 return Optional.empty();
             }

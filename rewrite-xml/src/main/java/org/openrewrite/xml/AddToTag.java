@@ -85,7 +85,7 @@ public class AddToTag {
                 t = t.withContent(content);
 
                 if (!formatRequested) {
-                    andThen(new AutoFormat(tagToAdd));
+                    andThen(new AutoFormat(formattedTagToAdd));
                 }
             }
             return t;

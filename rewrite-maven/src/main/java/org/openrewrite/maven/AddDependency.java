@@ -15,23 +15,17 @@
  */
 package org.openrewrite.maven;
 
-import org.openrewrite.Formatting;
-import org.openrewrite.Tree;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.refactor.Formatter;
+import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
+import java.util.*;
 
-import static java.util.Collections.emptyList;
-import static org.openrewrite.Formatting.format;
-import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
 /**
@@ -42,7 +36,10 @@ import static org.openrewrite.Validated.required;
  * <p>
  * Places a new dependency as physically "near" to a group of similar dependencies as possible.
  */
+@EqualsAndHashCode(callSuper = false)
 public class AddDependency extends MavenRefactorVisitor {
+    private static final XPathMatcher DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencies");
+
     private String groupId;
     private String artifactId;
 
@@ -50,7 +47,12 @@ public class AddDependency extends MavenRefactorVisitor {
     private String version;
 
     @Nullable
+    private String classifier;
+
+    @Nullable
     private String scope;
+
+    private boolean skipIfPresent = true;
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
@@ -64,8 +66,16 @@ public class AddDependency extends MavenRefactorVisitor {
         this.version = version;
     }
 
+    public void setClassifier(@Nullable String classifier) {
+        this.classifier = classifier;
+    }
+
     public void setScope(@Nullable String scope) {
         this.scope = scope;
+    }
+
+    public void setSkipIfPresent(boolean skipIfPresent) {
+        this.skipIfPresent = skipIfPresent;
     }
 
     @Override
@@ -82,102 +92,98 @@ public class AddDependency extends MavenRefactorVisitor {
 
     @Override
     public Maven visitMaven(Maven maven) {
-        if (maven.getModel().getDependencies().stream()
-                .anyMatch(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId))) {
+        model = maven.getModel();
+
+        if (skipIfPresent && findDependencies(groupId, artifactId).stream()
+                .anyMatch(d -> (version == null || version.equals(d.getVersion())) &&
+                        (classifier == null || classifier.equals(d.getClassifier())) &&
+                        d.getScope().isInClasspathOf(Scope.fromName(scope))
+                )) {
             return maven;
         }
 
-        andThen(new AddDependenciesTagIfNotPresent());
+        Xml.Tag root = maven.getRoot();
+        if (!root.getChild("dependencies").isPresent()) {
+            MavenTagInsertionComparator insertionComparator = new MavenTagInsertionComparator(root.getChildren());
+            andThen(new AddToTag.Scoped(root, Xml.Tag.build("<dependencies/>"), insertionComparator));
+        }
+
         andThen(new InsertDependencyInOrder());
 
         return maven;
     }
 
-    private static class AddDependenciesTagIfNotPresent extends MavenRefactorVisitor {
-        @Override
-        public Maven visitMaven(Maven maven) {
-            Maven m = super.visitMaven(maven);
-
-            Xml.Tag root = maven.getRoot();
-            if (!root.getChild("dependencies").isPresent()) {
-                MavenTagInsertionComparator insertionComparator = new MavenTagInsertionComparator(root.getChildren());
-                List<Xml.Tag> content = new ArrayList<>(root.getChildren());
-
-                Formatting fmt = format(formatter.findIndent(0, root.getChildren().toArray(new Tree[0])).getPrefix());
-                content.add(
-                        new Xml.Tag(
-                                randomId(),
-                                "dependencies",
-                                emptyList(),
-                                emptyList(),
-                                new Xml.Tag.Closing(randomId(), "dependencies", "", fmt),
-                                "",
-                                fmt
-                        )
-                );
-
-                content.sort(insertionComparator);
-
-                return maven.withRoot(maven.getRoot().withContent(content));
-            }
-
-            return m;
-        }
-    }
-
     private class InsertDependencyInOrder extends MavenRefactorVisitor {
-        private final XPathMatcher dependenciesMatcher = new XPathMatcher("/project/dependencies");
-
         public InsertDependencyInOrder() {
             setCursoringOn();
         }
 
         @Override
         public Xml visitTag(Xml.Tag tag) {
-            if (dependenciesMatcher.matches(getCursor())) {
-                Formatter.Result indent = formatter.findIndent(0, tag);
-
-                // TODO if the dependency is manageable, make it managed
-                Xml.Tag dependencyTag = new XmlParser().parse(
-                        "<dependency>" +
-                                indent.getPrefix(2) + "<groupId>" + groupId + "</groupId>" +
-                                indent.getPrefix(2) + "<artifactId>" + artifactId + "</artifactId>" +
+            if (DEPENDENCIES_MATCHER.matches(getCursor())) {
+                Xml.Tag dependencyTag = Xml.Tag.build(
+                        "\n<dependency>\n" +
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
                                 (version == null ? "" :
-                                        indent.getPrefix(2) + "<version>" + version + "</version>") +
+                                        "<version>" + version + "</version>\n") +
+                                (classifier == null ? "" :
+                                        "<classifier>" + classifier + "</classifier>\n") +
                                 (scope == null ? "" :
-                                        indent.getPrefix(2) + "<scope>" + scope + "</scope>") +
-                                indent.getPrefix(1) + "</dependency>"
-                ).get(0).getRoot().withFormatting(format(indent.getPrefix(1)));
+                                        "<scope>" + scope + "</scope>\n") +
+                                "</dependency>"
+                );
 
-                List<Xml.Tag> ideallySortedDependencies = new ArrayList<>(tag.getChildren());
-                if (tag.getChildren().isEmpty()) {
-                    ideallySortedDependencies.add(dependencyTag);
-                } else {
-                    // if everything were ideally sorted, which dependency would the addable dependency
-                    // come after?
-                    List<Xml.Tag> sortedDependencies = new ArrayList<>(tag.getChildren());
-                    sortedDependencies.add(dependencyTag);
-
-                    ideallySortedDependencies.sort(dependencyComparator);
-
-                    int addAfterIndex = -1;
-                    for (int i = 0; i < sortedDependencies.size(); i++) {
-                        Xml.Tag d = sortedDependencies.get(i);
-                        if (dependencyTag == d) {
-                            addAfterIndex = i - 1;
-                            break;
-                        }
-                    }
-
-                    ideallySortedDependencies.add(addAfterIndex + 1, dependencyTag);
-                }
-                return tag.withContent(ideallySortedDependencies);
+                andThen(new AddToTag.Scoped(tag, dependencyTag,
+                        new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
             }
 
             return super.visitTag(tag);
         }
+    }
+
+    private static class InsertDependencyComparator implements Comparator<Xml.Tag> {
+        private final Map<Xml.Tag, Float> positions = new HashMap<>();
+
+        public InsertDependencyComparator(List<Xml.Tag> existingDependencies, Xml.Tag dependencyTag) {
+            for (int i = 0, existingDependenciesSize = existingDependencies.size(); i < existingDependenciesSize; i++) {
+                positions.put(existingDependencies.get(i), (float) i);
+            }
+
+
+            // if everything were ideally sorted, which dependency would the addable dependency
+            // come after?
+            List<Xml.Tag> ideallySortedDependencies = new ArrayList<>(existingDependencies);
+            ideallySortedDependencies.add(dependencyTag);
+            ideallySortedDependencies.sort(dependencyComparator);
+
+            Xml.Tag afterDependency = null;
+            for (int i = 0; i < ideallySortedDependencies.size(); i++) {
+                Xml.Tag d = ideallySortedDependencies.get(i);
+                if (dependencyTag == d) {
+                    if (i > 0) {
+                        afterDependency = ideallySortedDependencies.get(i - 1);
+                    }
+                    break;
+                }
+            }
+
+            positions.put(dependencyTag, afterDependency == null ? -0.5f :
+                    positions.get(afterDependency) + 0.5f);
+        }
+
+        @Override
+        public int compare(Xml.Tag o1, Xml.Tag o2) {
+            return positions.get(o1).compareTo(positions.get(o2));
+        }
 
         Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
+            Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
+            Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
+            if (!scope1.equals(scope2)) {
+                return scope1.compareTo(scope2);
+            }
+
             String groupId1 = d1.getChildValue("groupId").orElse("");
             String groupId2 = d2.getChildValue("groupId").orElse("");
             if (!groupId1.equals(groupId2)) {
