@@ -23,6 +23,7 @@ import org.openrewrite.xml.XmlRefactorVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -101,16 +102,25 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
      * @return dependencies (including transitive dependencies) with any version matching the provided group and artifact id, if any.
      */
     public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+        return findDependencies(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId));
+    }
+
+    /**
+     * Finds dependencies in the model that match the given predicate.
+     *
+     * @param matcher A dependency test
+     * @return dependencies (including transitive dependencies) with any version matching the given predicate.
+     */
+    public Collection<Pom.Dependency> findDependencies(Predicate<Pom.Dependency> matcher) {
         return Stream.concat(
+                model.getDependencies().stream().filter(matcher),
                 model.getDependencies().stream()
-                        .filter(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId)),
-                model.getDependencies().stream()
-                        .flatMap(d -> d.findDependencies(groupId, artifactId).stream())
+                        .flatMap(d -> d.findDependencies(matcher).stream())
         ).collect(toList());
     }
 
     public void maybeAddDependency(String groupId, String artifactId, @Nullable String version,
-                                      @Nullable String classifier, @Nullable String scope) {
+                                   @Nullable String classifier, @Nullable String scope) {
         AddDependency op = new AddDependency();
         op.setGroupId(groupId);
         op.setArtifactId(artifactId);

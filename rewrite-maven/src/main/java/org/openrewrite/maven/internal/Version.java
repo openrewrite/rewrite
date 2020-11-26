@@ -23,11 +23,11 @@ import java.util.*;
 /**
  * Modified from <code>org.eclipse.aether.util.version.GenericVersion</code>.
  */
-class Version implements Comparable<Version> {
+public class Version implements Comparable<Version> {
     private final String version;
     private final Version.Item[] items;
 
-    Version(String version) {
+    public Version(String version) {
         this.version = version;
         this.items = parse(version);
     }

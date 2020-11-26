@@ -28,6 +28,7 @@ import org.openrewrite.internal.lang.Nullable;
 import java.net.URI;
 import java.net.URL;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -318,12 +319,22 @@ public class Pom implements Metadata {
          * @return Transitive dependencies with any version matching the provided group and artifact id, if any.
          */
         public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+            return findDependencies(d -> d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId));
+        }
+
+        /**
+         * Finds transitive dependencies of this dependency that match the given predicate.
+         *
+         * @param matcher A dependency test.
+         * @return Transitive dependencies with any version matching the given predicate.
+         */
+        public Collection<Pom.Dependency> findDependencies(Predicate<Dependency> matcher) {
             List<Pom.Dependency> matches = new ArrayList<>();
-            if (getGroupId().equals(groupId) && getArtifactId().equals(artifactId)) {
+            if (matcher.test(this)) {
                 matches.add(this);
             }
             for (Dependency d : model.getDependencies()) {
-                matches.addAll(d.findDependencies(groupId, artifactId));
+                matches.addAll(d.findDependencies(matcher));
             }
             return matches;
         }

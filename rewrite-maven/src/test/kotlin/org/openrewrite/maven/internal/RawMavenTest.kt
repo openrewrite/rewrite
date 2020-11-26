@@ -50,4 +50,29 @@ class RawMavenTest {
         assertThat(maven.pom.licenses).isEmpty()
         assertThat(maven.pom.profiles).isEmpty()
     }
+
+    @Test
+    fun dependencyManagement() {
+        val maven = RawMaven.parse(Parser.Input(URI.create("pom.xml")) {
+            """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-databind</artifactId>
+                        <version>2.11.3</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+            """.trimIndent().byteInputStream()
+        }, null)
+
+        assertThat(maven.pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty()
+    }
 }

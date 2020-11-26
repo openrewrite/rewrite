@@ -16,12 +16,9 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
-import java.io.File
-import java.nio.file.Path
 
 class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
     companion object {
@@ -41,10 +38,9 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
     }
 
     @Test
-    fun addToExistingDependencies(@TempDir tempDir: Path) = assertRefactored(
+    fun addToExistingDependencies() = assertRefactored(
             visitors = listOf(addDependency),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -60,8 +56,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-            },
+            """,
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -115,7 +110,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
     )
 
     @Test
-    fun addTestDependenciesAfterCompile(@TempDir tempDir: Path) = assertRefactored(
+    fun addTestDependenciesAfterCompile() = assertRefactored(
             visitors = listOf(AddDependency().apply {
                 setGroupId("org.junit.jupiter")
                 setArtifactId("junit-jupiter-api")
@@ -123,8 +118,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                 setScope("test")
                 setSkipIfPresent(false)
             }),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   
@@ -140,8 +134,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """.trimIndent().trim())
-            },
+            """,
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -201,6 +194,113 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                       <groupId>org.springframework.boot</groupId>
                       <artifactId>spring-boot-starter-actuator</artifactId>
                       <version>1.5.22.RELEASE</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
+    fun useManagedDependency() = assertRefactored(
+            visitors = listOf(AddDependency().apply {
+                setGroupId("com.fasterxml.jackson.core")
+                setArtifactId("jackson-databind")
+                setVersion("2.12.0-rc2") // will defer instead to dependency management
+            }),
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-databind</artifactId>
+                        <version>2.11.3</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>com.fasterxml.jackson.core</groupId>
+                        <artifactId>jackson-databind</artifactId>
+                        <version>2.11.3</version>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
+    fun useRequestedVersionInUseByOtherMembersOfTheFamily() = assertRefactored(
+            visitors = listOf(AddDependency().apply {
+                setGroupId("com.fasterxml.jackson.core")
+                setArtifactId("jackson-databind")
+                setVersion("2.12.0-rc2") // will be overridden by family alignment
+                setFamilyPattern("com.fasterxml.jackson*")
+                setSkipIfPresent(false)
+            }),
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <properties>
+                    <jackson.version>2.11.3</jackson.version>
+                  </properties>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.module</groupId>
+                      <artifactId>jackson-module-afterburner</artifactId>
+                      <version>${'$'}{jackson.version}</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <properties>
+                    <jackson.version>2.11.3</jackson.version>
+                  </properties>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.core</groupId>
+                      <artifactId>jackson-databind</artifactId>
+                      <version>${'$'}{jackson.version}</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>com.fasterxml.jackson.module</groupId>
+                      <artifactId>jackson-module-afterburner</artifactId>
+                      <version>${'$'}{jackson.version}</version>
                     </dependency>
                   </dependencies>
                 </project>

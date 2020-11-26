@@ -18,13 +18,17 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static org.openrewrite.Validated.required;
 
@@ -43,6 +47,13 @@ public class AddDependency extends MavenRefactorVisitor {
     private String groupId;
     private String artifactId;
 
+    /**
+     * When other modules exist from the same dependency family, defined as those dependencies whose
+     * groupId matches {@link #familyPattern}, we ignore version and attempt to align the new dependency
+     * with the highest version already in use.
+     * <p>
+     * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
+     */
     @Nullable
     private String version;
 
@@ -53,6 +64,9 @@ public class AddDependency extends MavenRefactorVisitor {
     private String scope;
 
     private boolean skipIfPresent = true;
+
+    @Nullable
+    private Pattern familyPattern;
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
@@ -76,6 +90,16 @@ public class AddDependency extends MavenRefactorVisitor {
 
     public void setSkipIfPresent(boolean skipIfPresent) {
         this.skipIfPresent = skipIfPresent;
+    }
+
+    /**
+     * @param familyPattern A glob expression used to identify other dependencies in the same
+     *                      family as the dependency to be added.
+     */
+    public void setFamilyPattern(@Nullable String familyPattern) {
+        this.familyPattern = familyPattern == null ?
+                null :
+                Pattern.compile(familyPattern.replace("*", ".*"));
     }
 
     @Override
@@ -120,12 +144,23 @@ public class AddDependency extends MavenRefactorVisitor {
         @Override
         public Xml visitTag(Xml.Tag tag) {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
+                String versionToUse = version;
+
+                if (model.getManagedVersion(groupId, artifactId) != null) {
+                    versionToUse = null;
+                } else if (familyPattern != null) {
+                    versionToUse = findDependencies(d -> familyPattern.matcher(d.getGroupId()).matches()).stream()
+                            .max(Comparator.comparing(d -> new Version(d.getVersion())))
+                            .map(Pom.Dependency::getRequestedVersion)
+                            .orElse(versionToUse);
+                }
+
                 Xml.Tag dependencyTag = Xml.Tag.build(
                         "\n<dependency>\n" +
                                 "<groupId>" + groupId + "</groupId>\n" +
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
-                                (version == null ? "" :
-                                        "<version>" + version + "</version>\n") +
+                                (versionToUse == null ? "" :
+                                        "<version>" + versionToUse + "</version>\n") +
                                 (classifier == null ? "" :
                                         "<classifier>" + classifier + "</classifier>\n") +
                                 (scope == null ? "" :
