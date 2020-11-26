@@ -32,7 +32,7 @@ public class AddToTag  {
 
         public Scoped(Xml.Tag scope, String tagSource) {
             this.scope = scope;
-            this.tagToAdd = new XmlParser().parseTag(tagSource);
+            this.tagToAdd = new XmlParser().parseTag(tagSource.startsWith("\n") ? tagSource : "\n" + tagSource);
             setCursoringOn();
         }
 
@@ -46,9 +46,9 @@ public class AddToTag  {
             Xml.Tag t = refactor(tag, super::visitTag);
             if (scope.isScope(tag)) {
                 List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
-                Formatter.Result indent = formatter.findIndent(enclosingTag().getFormatting().getIndent(), tag);
-                content.add(tagToAdd.withPrefix(indent.getPrefix()));
+                content.add(tagToAdd);
                 t = t.withContent(content);
+                andThen(new AutoFormat(tagToAdd));
             }
             return t;
         }
