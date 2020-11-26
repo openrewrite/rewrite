@@ -52,7 +52,7 @@ class MavenParserTest {
         val maven = parser.parse(pom)[0]
 
         assertThat(maven.getMetadata(Pom::class.java)!!.dependencies.first().model.licenses.first()?.type)
-                .isEqualTo(Pom.LicenseType.Eclipse2)
+                .isEqualTo(Pom.LicenseType.Eclipse)
     }
 
     @Test

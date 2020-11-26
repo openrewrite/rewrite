@@ -201,15 +201,16 @@ public class Pom implements Metadata {
                 return new Pom.License("", Pom.LicenseType.Unknown);
             }
 
-            // FIXME add others
             switch (license) {
-                case "Eclipse Public License v2.0":
-                    return new Pom.License(license, Pom.LicenseType.Eclipse2);
                 case "Apache License, Version 2.0":
+                case "The Apache Software License, Version 2.0":
                     return new Pom.License(license, Pom.LicenseType.Apache2);
                 case "GNU Lesser General Public License":
+                case "GNU Library General Public License":
                     // example Lanterna
                     return new Pom.License(license, Pom.LicenseType.LGPL);
+                case "Public Domain":
+                    return new Pom.License(license, LicenseType.PublicDomain);
                 default:
                     if (license.contains("LGPL")) {
                         // example Checkstyle
@@ -218,6 +219,23 @@ public class Pom implements Metadata {
                         // example com.buschmais.jqassistant:jqassistant-maven-plugin
                         // example com.github.mtakaki:dropwizard-circuitbreaker
                         return new Pom.License(license, Pom.LicenseType.GPL);
+                    } else if (license.contains("CDDL")) {
+                        return new Pom.License(license, LicenseType.CDDL);
+                    } else if (license.contains("Creative Commons") || license.contains("CC0")) {
+                        return new Pom.License(license, LicenseType.CreativeCommons);
+                    } else if (license.contains("BSD")) {
+                        return new Pom.License(license, LicenseType.BSD);
+                    } else if (license.contains("MIT")) {
+                        return new Pom.License(license, LicenseType.MIT);
+                    } else if (license.contains("Eclipse") || license.contains("EPL")) {
+                        return new Pom.License(license, LicenseType.Eclipse);
+                    } else if (license.contains("Apache") || license.contains("ASF")) {
+                        return new Pom.License(license, LicenseType.Apache2);
+                    } else if (license.contains("Mozilla")) {
+                        return new Pom.License(license, LicenseType.Mozilla);
+                    } else if (license.toLowerCase().contains("GNU Lesser General Public License".toLowerCase()) ||
+                            license.contains("GNU Library General Public License")) {
+                        return new Pom.License(license, LicenseType.LGPL);
                     }
                     return new Pom.License(license, Pom.LicenseType.Unknown);
             }
@@ -226,11 +244,15 @@ public class Pom implements Metadata {
 
     public enum LicenseType {
         Apache2,
-        Eclipse2,
-        MIT,
+        BSD,
+        CDDL,
+        CreativeCommons,
+        Eclipse,
         GPL,
         LGPL,
-        Other,
+        MIT,
+        Mozilla,
+        PublicDomain,
         Unknown
     }
 
