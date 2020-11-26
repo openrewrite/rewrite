@@ -34,11 +34,11 @@ public class AutoFormat extends XmlRefactorVisitor {
 
     @Override
     public Xml reduce(Xml r1, Xml r2) {
-        Xml j = super.reduce(r1, r2);
+        Xml x = super.reduce(r1, r2);
         if (r2 != null && r2.getPrefix().startsWith("|")) {
-            j = j.withPrefix(r2.getPrefix().substring(1));
+            x = x.withPrefix(r2.getPrefix().substring(1));
         }
-        return j;
+        return x;
     }
 
     @Override

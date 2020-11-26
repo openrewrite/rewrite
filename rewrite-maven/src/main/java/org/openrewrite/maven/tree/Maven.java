@@ -71,21 +71,37 @@ public class Maven extends Xml.Document {
 
     @Override
     public Maven withRoot(Tag root) {
-        return new Maven(super.withRoot(root));
+        Document m = super.withRoot(root);
+        if(m instanceof Maven) {
+            return (Maven) m;
+        }
+        return new Maven(m);
     }
 
     @Override
     public Maven withMetadata(Collection<Metadata> metadata) {
-        return new Maven(super.withMetadata(metadata));
+        Document m = super.withMetadata(metadata);
+        if(m instanceof Maven) {
+            return (Maven) m;
+        }
+        return new Maven(m);
     }
 
     @Override
     public Maven withFormatting(Formatting formatting) {
-        return new Maven(super.withFormatting(formatting));
+        Document m = super.withFormatting(formatting);
+        if(m instanceof Maven) {
+            return (Maven) m;
+        }
+        return new Maven(m);
     }
 
     @Override
     public Maven withProlog(Prolog prolog) {
-        return new Maven(super.withProlog(prolog));
+        Document m = super.withProlog(prolog);
+        if(m instanceof Maven) {
+            return (Maven) m;
+        }
+        return new Maven(m);
     }
 }

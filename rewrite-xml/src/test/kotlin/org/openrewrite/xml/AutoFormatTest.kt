@@ -40,7 +40,8 @@ class AutoFormatTest : RefactorVisitorTestForParser<Xml.Document> {
                         <exclusion>
                   <groupId>org.junit.vintage</groupId>
                   <artifactId>junit-vintage-engine</artifactId>
-                </exclusion></exclusions>
+                </exclusion>
+                      </exclusions>
                     </dependency>
                   </dependencies>
                 </project>
@@ -56,7 +57,8 @@ class AutoFormatTest : RefactorVisitorTestForParser<Xml.Document> {
                         <exclusion>
                           <groupId>org.junit.vintage</groupId>
                           <artifactId>junit-vintage-engine</artifactId>
-                        </exclusion></exclusions>
+                        </exclusion>
+                      </exclusions>
                     </dependency>
                   </dependencies>
                 </project>

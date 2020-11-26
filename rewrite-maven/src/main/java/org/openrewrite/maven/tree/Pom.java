@@ -287,6 +287,22 @@ public class Pom implements Metadata {
                     (!getVersion().equals(requestedVersion) ? ", requested=" + requestedVersion : "") +
                     ", from=" + model.getSourcePath() + '}';
         }
+
+        /**
+         * Finds a transitive dependency of this dependency that matches the provided group and artifact ids.
+         *
+         * @param groupId    The groupId to match
+         * @param artifactId The artifactId to match.
+         * @return A transitive dependency with any version matching the provided group and artifact id, if any.
+         */
+        @Nullable
+        public Pom.Dependency findDependency(String groupId, String artifactId) {
+            return model.getDependencies().stream()
+                    .filter(d -> (d.getGroupId().equals(groupId) && d.getArtifactId().equals(artifactId)) ||
+                            d.findDependency(groupId, artifactId) != null)
+                    .findAny()
+                    .orElse(null);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

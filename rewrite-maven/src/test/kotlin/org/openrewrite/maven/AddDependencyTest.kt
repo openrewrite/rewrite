@@ -78,18 +78,16 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
     )
 
     @Test
-    fun addWhenNoDependencies(@TempDir tempDir: Path) = assertRefactored(
+    fun addWhenNoDependencies() = assertRefactored(
             visitors = listOf(addDependency),
-            before = File(tempDir.toFile(), "pom.xml").apply {
-                writeText("""
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <groupId>com.mycompany.app</groupId>
                   <artifactId>my-app</artifactId>
                   <version>1</version>
                 </project>
-            """.trimIndent().trim())
-            },
+            """,
             after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
