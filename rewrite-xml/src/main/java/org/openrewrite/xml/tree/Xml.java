@@ -159,14 +159,20 @@ public interface Xml extends Serializable, Tree {
                     formatting);
         }
 
-        public Xml.Tag withValue(String value) {
-            Xml.CharData charData = (Xml.CharData) content.get(0);
-            return withContent(Collections.singletonList(charData.withText(value)));
+        public Tag withValue(String value) {
+            CharData charData;
+            if (content != null && content.get(0) instanceof CharData) {
+                charData = ((CharData) content.get(0)).withText(value);
+            } else {
+                charData = new CharData(randomId(), false, value, Formatting.EMPTY);
+            }
+            return withContent(Collections.singletonList(charData));
         }
 
         @With
         List<Attribute> attributes;
 
+        @Nullable
         List<? extends Content> content;
 
         @JsonIgnore
@@ -205,11 +211,13 @@ public interface Xml extends Serializable, Tree {
         public Xml.Tag withChildValue(String childName, String text) {
             return getChild(childName)
                     .map(tag -> this.withContent(
-                            this.getContent().stream()
-                                    .map(content -> content == tag ?
-                                            ((Tag) content).withValue(text) :
-                                            content)
-                                    .collect(toList())
+                            content == null ?
+                                    null :
+                                    content.stream()
+                                            .map(content -> content == tag ?
+                                                    ((Tag) content).withValue(text) :
+                                                    content)
+                                            .collect(toList())
                     ))
                     .orElse(this);
         }

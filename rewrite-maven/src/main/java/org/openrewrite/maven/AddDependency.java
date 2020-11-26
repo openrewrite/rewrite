@@ -81,8 +81,7 @@ public class AddDependency extends MavenRefactorVisitor {
     @Override
     public Validated validate() {
         return required("groupId", groupId)
-                .and(required("artifactId", artifactId))
-                .and(required("version", version));
+                .and(required("artifactId", artifactId));
     }
 
     @Override

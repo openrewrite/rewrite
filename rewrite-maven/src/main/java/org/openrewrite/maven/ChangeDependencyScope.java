@@ -20,7 +20,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.ChangeTagValue;
 import org.openrewrite.xml.RemoveContent;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -67,7 +66,7 @@ public class ChangeDependencyScope extends MavenRefactorVisitor {
                 Optional<Xml.Tag> scope = tag.getChild("scope");
                 if (scope.isPresent()) {
                     if (toScope == null) {
-                        andThen(new RemoveContent.Scoped(scope.get()));
+                        andThen(new RemoveContent.Scoped(scope.get(), false));
                     } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
                         andThen(new ChangeTagValue.Scoped(scope.get(), toScope));
                     }

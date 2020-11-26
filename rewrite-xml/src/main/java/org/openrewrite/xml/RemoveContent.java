@@ -27,18 +27,32 @@ public class RemoveContent {
 
     public static class Scoped extends XmlRefactorVisitor {
         private final Content scope;
+        private final boolean removeEmptyAncestors;
 
-        public Scoped(Content tag) {
+        public Scoped(Content tag, boolean removeEmptyAncestors) {
             this.scope = tag;
+            this.removeEmptyAncestors = removeEmptyAncestors;
+            setCursoringOn();
         }
 
         @Override
         public Xml visitTag(Xml.Tag tag) {
-            for (Content content : tag.getContent()) {
-                if (scope.isScope(content)) {
-                    List<Content> contents = new ArrayList<>(tag.getContent());
-                    contents.remove(content);
-                    return tag.withContent(contents);
+            if (tag.getContent() != null) {
+                for (Content content : tag.getContent()) {
+                    if (scope.isScope(content)) {
+                        List<Content> contents = new ArrayList<>(tag.getContent());
+                        contents.remove(content);
+
+                        if (removeEmptyAncestors && contents.isEmpty()) {
+                            if (getCursor().getParentOrThrow().getTree() instanceof Xml.Document) {
+                                return tag.withContent(null).withClosing(null);
+                            } else {
+                                andThen(new RemoveContent.Scoped(tag, true));
+                            }
+                        } else {
+                            return tag.withContent(contents);
+                        }
+                    }
                 }
             }
 

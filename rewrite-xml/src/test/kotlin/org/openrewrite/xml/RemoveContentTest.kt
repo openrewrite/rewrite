@@ -17,6 +17,7 @@ package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.xml.search.FindTag
 import org.openrewrite.xml.tree.Xml
 
 class RemoveContentTest : RefactorVisitorTestForParser<Xml.Document> {
@@ -25,7 +26,7 @@ class RemoveContentTest : RefactorVisitorTestForParser<Xml.Document> {
     @Test
     fun removeContent() = assertRefactored(
             visitorsMapped = listOf { x ->
-                RemoveContent.Scoped(x.root.content[1] as Xml.Tag)
+                RemoveContent.Scoped(x.root.content[1] as Xml.Tag, false)
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -39,6 +40,47 @@ class RemoveContentTest : RefactorVisitorTestForParser<Xml.Document> {
                 <dependency>
                     <groupId>group</groupId>
                 </dependency>
+            """
+    )
+
+    @Test
+    fun removeAncestorsThatBecomeEmpty() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                RemoveContent.Scoped(FindTag("//groupId").visit(x), true)
+            },
+            before = """
+                <project>
+                    <name>my.company</name>
+                    <dependencyManagement>
+                        <dependencies>
+                            <groupId>group</groupId>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            after = """
+                <project>
+                    <name>my.company</name>
+                </project>
+            """
+    )
+
+    @Test
+    fun rootChangedToEmptyTagIfLastRemainingTag() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                RemoveContent.Scoped(FindTag("//groupId").visit(x), true)
+            },
+            before = """
+                <project>
+                    <dependencyManagement>
+                        <dependencies>
+                            <groupId>group</groupId>
+                        </dependencies>
+                    </dependencyManagement>
+                </project>
+            """,
+            after = """
+                <project/>
             """
     )
 }
