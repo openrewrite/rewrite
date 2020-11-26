@@ -15,14 +15,18 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.refactor.Formatter;
+import org.openrewrite.Tree;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
-public class AddToTag  {
+import static org.openrewrite.Formatting.format;
+
+public class AddToTag {
     private AddToTag() {
     }
 
@@ -30,9 +34,17 @@ public class AddToTag  {
         private final Xml.Tag scope;
         private final Xml.Tag tagToAdd;
 
-        public Scoped(Xml.Tag scope, String tagSource) {
+        @Nullable
+        private final Comparator<Xml.Tag> tagComparator;
+
+        public Scoped(Xml.Tag scope, Xml.Tag tagToAdd) {
+            this(scope, tagToAdd, null);
+        }
+
+        public Scoped(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Xml.Tag> tagComparator) {
             this.scope = scope;
-            this.tagToAdd = new XmlParser().parseTag(tagSource.startsWith("\n") ? tagSource : "\n" + tagSource);
+            this.tagToAdd = tagToAdd;
+            this.tagComparator = tagComparator;
             setCursoringOn();
         }
 
@@ -45,10 +57,36 @@ public class AddToTag  {
         public Xml visitTag(Xml.Tag tag) {
             Xml.Tag t = refactor(tag, super::visitTag);
             if (scope.isScope(tag)) {
-                List<Content> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getContent());
-                content.add(tagToAdd);
+                boolean formatRequested = false;
+                if (t.getClosing() == null) {
+                    t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), tag.getName(), "", format("\n")))
+                            .withBeforeTagDelimiterPrefix("");
+                    andThen(new AutoFormat(t));
+                    formatRequested = true;
+                }
+
+                //noinspection ConstantConditions
+                if (!t.getClosing().getPrefix().contains("\n")) {
+                    t = t.withClosing(t.getClosing().withPrefix("\n"));
+                }
+
+                Xml.Tag formattedTagToAdd = tagToAdd;
+                if (!formattedTagToAdd.getPrefix().contains("\n")) {
+                    formattedTagToAdd = formattedTagToAdd.withPrefix("\n");
+                }
+
+                List<Xml.Tag> content = t.getContent() == null ? new ArrayList<>() : new ArrayList<>(t.getChildren());
+                content.add(formattedTagToAdd);
+
+                if (tagComparator != null) {
+                    content.sort(tagComparator);
+                }
+
                 t = t.withContent(content);
-                andThen(new AutoFormat(tagToAdd));
+
+                if (!formatRequested) {
+                    andThen(new AutoFormat(tagToAdd));
+                }
             }
             return t;
         }

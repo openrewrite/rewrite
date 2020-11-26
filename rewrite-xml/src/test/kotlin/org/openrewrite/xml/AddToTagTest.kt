@@ -18,6 +18,7 @@ package org.openrewrite.xml
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
+import java.util.Comparator
 
 class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
     override val parser: XmlParser = XmlParser()
@@ -25,7 +26,7 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
     @Test
     fun addElement() = assertRefactored(
             visitorsMapped = listOf { x ->
-                AddToTag.Scoped(x.root, """<bean id="myBean2"/>""")
+                AddToTag.Scoped(x.root, Xml.Tag.build("""<bean id="myBean2"/>"""))
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -46,12 +47,12 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
     fun addElementToSlashClosedTag() = assertRefactored(
             visitorsMapped = listOf { x ->
                 AddToTag.Scoped(x.root.content[0] as Xml.Tag,
-                        """<property name="myprop" ref="collaborator"/>""")
+                        Xml.Tag.build("""<property name="myprop" ref="collaborator"/>"""))
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans >
-                    <bean id="myBean"/>
+                    <bean id="myBean" />
                 </beans>
             """,
             after = """
@@ -60,6 +61,44 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
                     <bean id="myBean">
                         <property name="myprop" ref="collaborator"/>
                     </bean>
+                </beans>
+            """
+    )
+
+    @Test
+    fun addElementToEmptyTagOnSameLine() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                AddToTag.Scoped(x.root, Xml.Tag.build("""<bean id="myBean"/>"""))
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans></beans>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans>
+                    <bean id="myBean"/>
+                </beans>
+            """
+    )
+
+    @Test
+    fun addElementInOrder() = assertRefactored(
+            visitorsMapped = listOf { x ->
+                AddToTag.Scoped(x.root, Xml.Tag.build("""<apple/>"""),
+                    Comparator.comparing(Xml.Tag::getName))
+            },
+            before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <banana/>
+                </beans>
+            """,
+            after = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <beans >
+                    <apple/>
+                    <banana/>
                 </beans>
             """
     )

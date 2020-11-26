@@ -23,6 +23,7 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
@@ -143,6 +144,10 @@ public interface Xml extends Serializable, Tree {
          * XML does not allow space between the '&lt;' and tag name.
          */
         String name;
+
+        public static Xml.Tag build(String tagSource) {
+            return new XmlParser().parse(tagSource).get(0).getRoot();
+        }
 
         public Tag withName(String name) {
             return new Tag(id, name, attributes, content,
