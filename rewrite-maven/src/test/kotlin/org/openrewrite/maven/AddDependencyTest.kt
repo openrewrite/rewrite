@@ -110,6 +110,36 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
     )
 
     @Test
+    fun addBySemver() = assertRefactored(
+            visitors = listOf(addDependency.apply {
+                setVersion("1.4.X")
+            }),
+            before = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                </project>
+            """,
+            after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot</artifactId>
+                      <version>1.4.7.RELEASE</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
     fun addTestDependenciesAfterCompile() = assertRefactored(
             visitors = listOf(AddDependency().apply {
                 setGroupId("org.junit.jupiter")

@@ -17,15 +17,33 @@ package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
 
+import java.util.regex.Pattern;
+
+import static org.openrewrite.Validated.test;
+
 public class Semver {
     private Semver() {
     }
 
     public static Validated validate(String toVersion, String metadataPattern) {
-        return LatestRelease.build(toVersion, metadataPattern)
+        return test(
+                "metadataPattern",
+                "must be a valid regular expression",
+                metadataPattern, metadata -> {
+                    try {
+                        if (metadata != null) {
+                            Pattern.compile(metadata);
+                        }
+                        return true;
+                    } catch (Throwable e) {
+                        return false;
+                    }
+                }
+        ).and(LatestRelease.build(toVersion, metadataPattern)
                 .or(HyphenRange.build(toVersion, metadataPattern))
                 .or(XRange.build(toVersion, metadataPattern))
                 .or(TildeRange.build(toVersion, metadataPattern))
-                .or(CaretRange.build(toVersion, metadataPattern));
+                .or(CaretRange.build(toVersion, metadataPattern))
+        );
     }
 }

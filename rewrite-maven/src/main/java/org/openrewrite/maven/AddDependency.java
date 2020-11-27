@@ -18,11 +18,17 @@ package org.openrewrite.maven;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.cache.NoopCache;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
+import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
+import org.openrewrite.semver.HyphenRange;
+import org.openrewrite.semver.Semver;
+import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
@@ -30,6 +36,7 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Comparator;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.required;
 
 /**
@@ -54,8 +61,24 @@ public class AddDependency extends MavenRefactorVisitor {
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
-    @Nullable
     private String version;
+
+    @Nullable
+    private String metadataPattern;
+
+    /**
+     * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
+     * We can pair a {@link HyphenRange} of "25-29" with a metadata pattern of "-jre" to select
+     * Guava 29.0-jre
+     *
+     * @param metadataPattern The metadata pattern extending semver selection.
+     */
+    public void setMetadataPattern(@Nullable String metadataPattern) {
+        this.metadataPattern = metadataPattern;
+    }
+
+    @Nullable
+    private VersionComparator versionComparator;
 
     @Nullable
     private String classifier;
@@ -105,7 +128,9 @@ public class AddDependency extends MavenRefactorVisitor {
     @Override
     public Validated validate() {
         return required("groupId", groupId)
-                .and(required("artifactId", artifactId));
+                .and(required("artifactId", artifactId))
+                .and(required("version", version)
+                        .or(Semver.validate(version, metadataPattern)));
     }
 
     @Override
@@ -116,6 +141,11 @@ public class AddDependency extends MavenRefactorVisitor {
     @Override
     public Maven visitMaven(Maven maven) {
         model = maven.getModel();
+
+        Validated versionValidation = Semver.validate(version, metadataPattern);
+        if (versionValidation.isValid()) {
+            versionComparator = versionValidation.getValue();
+        }
 
         if (skipIfPresent && findDependencies(groupId, artifactId).stream()
                 .anyMatch(d -> (version == null || version.equals(d.getVersion())) &&
@@ -144,15 +174,19 @@ public class AddDependency extends MavenRefactorVisitor {
         @Override
         public Xml visitTag(Xml.Tag tag) {
             if (DEPENDENCIES_MATCHER.matches(getCursor())) {
-                String versionToUse = version;
+                String versionToUse = null;
 
-                if (model.getManagedVersion(groupId, artifactId) != null) {
-                    versionToUse = null;
-                } else if (familyPattern != null) {
-                    versionToUse = findDependencies(d -> familyPattern.matcher(d.getGroupId()).matches()).stream()
-                            .max(Comparator.comparing(d -> new Version(d.getVersion())))
-                            .map(Pom.Dependency::getRequestedVersion)
-                            .orElse(versionToUse);
+                if (model.getManagedVersion(groupId, artifactId) == null) {
+                    if (familyPattern != null) {
+                        versionToUse = findDependencies(d -> familyPattern.matcher(d.getGroupId()).matches()).stream()
+                                .max(Comparator.comparing(d -> new Version(d.getVersion())))
+                                .map(Pom.Dependency::getRequestedVersion)
+                                .orElse(versionToUse);
+                    }
+
+                    if (versionToUse == null) {
+                        versionToUse = findVersionToUse(groupId, artifactId);
+                    }
                 }
 
                 Xml.Tag dependencyTag = Xml.Tag.build(
@@ -176,5 +210,19 @@ public class AddDependency extends MavenRefactorVisitor {
 
             return super.visitTag(tag);
         }
+    }
+
+    private String findVersionToUse(String groupId, String artifactId) {
+        if (versionComparator == null) {
+            return version;
+        }
+
+        MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
+                .downloadMetadata(groupId, artifactId, emptyList());
+
+        return mavenMetadata.getVersioning().getVersions().stream()
+                .filter(versionComparator::isValid)
+                .max(versionComparator)
+                .orElse(version);
     }
 }

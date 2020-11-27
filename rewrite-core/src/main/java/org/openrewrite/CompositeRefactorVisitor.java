@@ -27,7 +27,7 @@ import static java.util.stream.Collectors.toList;
 
 public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
     private final String name;
-    private final List<RefactorVisitor<? extends Tree>> delegates;
+    protected final List<RefactorVisitor<? extends Tree>> delegates;
 
     public CompositeRefactorVisitor(String name, List<RefactorVisitor<? extends Tree>> delegates) {
         this.name = name;

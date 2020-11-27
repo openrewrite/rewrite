@@ -30,12 +30,10 @@ import org.openrewrite.semver.VersionComparator;
 
 import java.util.Collection;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.required;
-import static org.openrewrite.Validated.test;
 
 /**
  * Upgrade the version a group or group and artifact using Node Semver
@@ -92,17 +90,6 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("toVersion", toVersion))
-                .and(test("metadataPattern", "must be a valid regular expression",
-                        metadataPattern, metadataPattern -> {
-                            try {
-                                if (metadataPattern != null) {
-                                    Pattern.compile(metadataPattern);
-                                }
-                                return true;
-                            } catch (Throwable e) {
-                                return false;
-                            }
-                        }))
                 .and(Semver.validate(toVersion, metadataPattern));
     }
 

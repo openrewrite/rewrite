@@ -302,7 +302,7 @@ public interface Validated extends Iterable<Validated> {
 
         @Override
         public <T> T getValue() {
-            throw new IllegalStateException("Cannot select a single value from two or more Validated");
+            return right.getValue();
         }
 
         @NonNull
