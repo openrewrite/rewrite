@@ -15,9 +15,6 @@
  */
 package org.openrewrite;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
-
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -26,12 +23,10 @@ import java.util.Objects;
 import static java.util.stream.Collectors.toList;
 
 public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
-    private final String name;
-    protected final List<RefactorVisitor<? extends Tree>> delegates;
+    private final List<RefactorVisitor<? extends Tree>> delegates = new ArrayList<>();
 
-    public CompositeRefactorVisitor(String name, List<RefactorVisitor<? extends Tree>> delegates) {
-        this.name = name;
-        this.delegates = delegates;
+    public void addVisitor(RefactorVisitor<? extends Tree> visitor) {
+        delegates.add(visitor);
     }
 
     @Override
@@ -51,15 +46,6 @@ public class CompositeRefactorVisitor implements RefactorVisitor<Tree> {
         return delegates.stream()
                 .flatMap(d -> d.generate().stream())
                 .collect(toList());
-    }
-
-    @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("name", name);
-    }
-
-    public String getName() {
-        return name;
     }
 
     public void extendsFrom(CompositeRefactorVisitor delegate) {

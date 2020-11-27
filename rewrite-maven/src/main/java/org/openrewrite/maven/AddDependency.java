@@ -27,6 +27,7 @@ import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
 import org.openrewrite.semver.HyphenRange;
+import org.openrewrite.semver.LatestRelease;
 import org.openrewrite.semver.Semver;
 import org.openrewrite.semver.VersionComparator;
 import org.openrewrite.xml.AddToTag;
@@ -65,6 +66,8 @@ public class AddDependency extends MavenRefactorVisitor {
 
     @Nullable
     private String metadataPattern;
+
+    private boolean releasesOnly = true;
 
     /**
      * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
@@ -113,6 +116,10 @@ public class AddDependency extends MavenRefactorVisitor {
 
     public void setSkipIfPresent(boolean skipIfPresent) {
         this.skipIfPresent = skipIfPresent;
+    }
+
+    public void setReleasesOnly(boolean releasesOnly) {
+        this.releasesOnly = releasesOnly;
     }
 
     /**
@@ -220,8 +227,10 @@ public class AddDependency extends MavenRefactorVisitor {
         MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
                 .downloadMetadata(groupId, artifactId, emptyList());
 
+        LatestRelease latest = new LatestRelease(metadataPattern);
         return mavenMetadata.getVersioning().getVersions().stream()
                 .filter(versionComparator::isValid)
+                .filter(v -> !releasesOnly || latest.isValid(v))
                 .max(versionComparator)
                 .orElse(version);
     }

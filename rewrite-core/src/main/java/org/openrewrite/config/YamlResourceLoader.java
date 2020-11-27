@@ -19,6 +19,8 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
 import kotlin.text.Charsets;
 import org.openrewrite.*;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -180,7 +182,7 @@ public class YamlResourceLoader implements ResourceLoader {
             }
         }
 
-        CompositeRefactorVisitor visitor = new CompositeRefactorVisitor(visitorMap.get("name").toString(), subVisitors);
+        ResourceLoadedVisitor visitor = new ResourceLoadedVisitor(visitorMap.get("name").toString(), subVisitors);
 
         if (visitorMap.containsKey("extends")) {
             visitorExtensions.put(visitor, visitorMap.get("extends").toString());
@@ -259,5 +261,24 @@ public class YamlResourceLoader implements ResourceLoader {
     @Override
     public Map<String, Collection<Style>> loadStyles() {
         return styles;
+    }
+
+    private static class ResourceLoadedVisitor extends CompositeRefactorVisitor {
+        private final String name;
+
+        public ResourceLoadedVisitor(String name, List<RefactorVisitor<? extends Tree>> delegates) {
+            this.name = name;
+            delegates.forEach(this::addVisitor);
+        }
+
+        @Override
+        public String getName() {
+            return name;
+        }
+
+        @Override
+        public Iterable<Tag> getTags() {
+            return Tags.of("name", name);
+        }
     }
 }

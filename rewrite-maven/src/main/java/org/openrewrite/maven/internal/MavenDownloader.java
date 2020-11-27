@@ -24,7 +24,6 @@ import okhttp3.Response;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenParser;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenCache;
 import org.slf4j.Logger;
@@ -40,7 +39,7 @@ import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 
 public class MavenDownloader {
-    private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
+    private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
 
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))

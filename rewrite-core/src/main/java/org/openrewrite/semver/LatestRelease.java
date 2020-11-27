@@ -34,7 +34,7 @@ public class LatestRelease implements VersionComparator {
     @Override
     public boolean isValid(String version) {
         Matcher matcher = VersionComparator.RELEASE_PATTERN.matcher(normalizeVersion(version));
-        if (!matcher.matches()) {
+        if (!matcher.matches() || PRE_RELEASE_ENDING.matcher(version).find()) {
             return false;
         }
         return metadataPattern == null ||
