@@ -68,12 +68,6 @@ public class ChangeMethodName extends JavaIsoRefactorVisitor {
         return super.visitMethodInvocation(method);
     }
 
-    @Override
-    public J.Ident visitIdentifier(J.Ident ident) {
-        J.Ident i = super.visitIdentifier(ident);
-        return i;
-    }
-
     /**
      * The only time field access should be relevant to changing method names is static imports.
      * This exists to turn
