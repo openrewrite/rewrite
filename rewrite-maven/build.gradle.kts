@@ -9,13 +9,13 @@ val integTestImplementation = configurations.getByName("integTestImplementation"
 dependencies {
     api(project(":rewrite-xml"))
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.11.3")
 
     implementation("org.antlr:antlr4:4.8-1")
 
-    implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
-    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.11.3")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:2.11.3")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:2.11.3")
 
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")

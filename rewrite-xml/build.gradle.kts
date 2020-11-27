@@ -16,8 +16,8 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.8-1")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
-    implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
+    api("com.fasterxml.jackson.core:jackson-annotations:2.11.3")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.11.3")
 
     testImplementation(project(":rewrite-test"))
 }
