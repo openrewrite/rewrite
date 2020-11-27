@@ -16,13 +16,32 @@
 package org.openrewrite.java.tree;
 
 public enum Flag {
-    Public,
-    Private,
-    Protected,
-    Static,
-    Final,
-    Synchronized,
-    Volatile,
-    Transient,
-    Abstract
+    Public("public"),
+    Private("private"),
+    Protected("protected"),
+    Static("static"),
+    Final("final"),
+    Synchronized("synchronized"),
+    Volatile("volatile"),
+    Transient("transient"),
+    Abstract("abstract");
+
+    private final String keyword;
+
+    Flag(String keyword) {
+        this.keyword = keyword;
+    }
+
+    public String getKeyword() {
+        return this.keyword;
+    }
+
+    public static Flag fromKeyword(String keyword) {
+        for (Flag flag : values()) {
+            if (flag.keyword.equals(keyword)) {
+                return flag;
+            }
+        }
+        return null;
+    }
 }

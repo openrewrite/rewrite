@@ -25,12 +25,9 @@ import org.openrewrite.java.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -172,33 +169,64 @@ public class TreeBuilder {
     public <T extends J> List<T> buildSnippet(Cursor insertionScope,
                                               String snippet,
                                               JavaType... imports) {
+
+        Set<JavaType> allImports = new HashSet<>(Arrays.asList(imports));
+
         //This uses a parser that has the same classpath as the runtime.
         JavaParser javaParser = cu.buildRuntimeParser();
 
-        // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
-        // @formatter:off
-        String source = stream(imports)
-                .filter(Objects::nonNull)
-                .filter(it -> it instanceof JavaType.FullyQualified)
-                .map(JavaType.FullyQualified.class::cast)
-                .map(i -> "import " + i.getFullyQualifiedName() + ";")
-                .collect(joining("\n", "", "\n\n")) +
-                "class CodeSnippet {\n" +
-                new ListScopeVariables(insertionScope).visit(cu).stream()
-                        .collect(joining(";\n  ", "  // variables visible in the insertion scope\n  ", ";\n")) + "\n" +
-                "  // the contents of this block are the snippet\n" +
-                "  {\n" +
-                StringUtils.trimIndent(snippet) + "\n" +
-                "  }\n" +
-                "}";
-        // @formatter:on
+        //Need to collect any method invocation within the insert scope. These either need to be stubbed out
+        //or statically imported into the synthetic class.
+        List<JavaType.Method> methodTypesInScope = new GetMethodTypesInScope(insertionScope).visit(cu);
 
-        if (logger.isDebugEnabled()) {
-            logger.debug("Building code snippet using synthetic class:");
-            logger.debug(source);
+        List<JavaType.Method> localMethods = new ArrayList<>();
+        for (JavaType.Method method: methodTypesInScope) {
+            if (cu.getClasses().stream().map(J.ClassDecl::getType)
+                    .filter(Objects::nonNull)
+                    .anyMatch(t -> t.equals(method.getDeclaringType()))) {
+                localMethods.add(method);
+            } else {
+                //Any method not belonging to the compilation unit should be statically imported.
+                allImports.add(method);
+            }
         }
 
-        J.CompilationUnit cu = javaParser.parse(source).get(0);
+        StringBuilder source = new StringBuilder(512);
+
+        for (JavaType importType : allImports) {
+            if (importType == null) {
+                continue;
+            }
+            if (importType instanceof JavaType.FullyQualified) {
+                source.append("import ");
+                source.append(((JavaType.FullyQualified) importType).getFullyQualifiedName());
+                source.append(";\n");
+            } else if (importType instanceof JavaType.Method) {
+                source.append("import static ");
+                JavaType.Method method = (JavaType.Method) importType;
+                source.append(method.getDeclaringType().getFullyQualifiedName());
+                source.append(".");
+                source.append(method.getName());
+                source.append(";\n");
+            }
+        }
+        source.append("\nclass CodeSnippet {\n\n  // local method in scope at insertion point\n\n");
+        source.append(localMethods.stream().map(TreeBuilder::stubMethod).collect(joining("\n")));
+
+        source.append("\n  // variables visible in the insertion scope\n\n");
+        source.append(String.join(";\n", new ListScopeVariables(insertionScope).visit(cu)));
+        source.append("\n  // the contents of this block are the snippet\n  {\n");
+        source.append(StringUtils.trimIndent(snippet));
+        source.append("\n  }\n}");
+
+
+        String sourceString = source.toString();
+        if (logger.isDebugEnabled()) {
+            logger.debug("Building code snippet using synthetic class:");
+            logger.debug(sourceString);
+        }
+
+        J.CompilationUnit cu = javaParser.parse(sourceString).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
@@ -211,6 +239,83 @@ public class TreeBuilder {
                     return (T) shiftRight.visit(stat);
                 })
                 .collect(toList());
+    }
+
+    /**
+     * This method generates a stubbed out method snippet based on the Java Method Type.
+     *
+     * @param method The method type for which a stub will be generated.
+     * @return A snippet representing as method declaration of code that can be included as source in a synthetically generated class.
+     */
+    private static String stubMethod(JavaType.Method method) {
+        StringBuilder methodStub = new StringBuilder(128);
+        methodStub.append("  ");
+        methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" ")));
+        methodStub.append(" ");
+
+        JavaType.FullyQualified returnTypeQualified = TypeUtils.asFullyQualified(method.getResolvedSignature().getReturnType());
+        String returnStatement = null;
+        if (returnTypeQualified != null) {
+            methodStub.append(returnTypeQualified.getFullyQualifiedName());
+            methodStub.append(" ");
+            returnStatement = "    return null;\n";
+        } else {
+
+            JavaType.Primitive primitiveReturn = TypeUtils.asPrimitive(method.getResolvedSignature().getReturnType());
+            if (primitiveReturn != null && primitiveReturn.getDefaultValue() != null) {
+                methodStub.append(primitiveReturn.getKeyword());
+                returnStatement = "    return " + primitiveReturn.getDefaultValue() + ";\n";
+            }
+        }
+
+        methodStub.append(method.getName());
+        methodStub.append("(");
+        int argIndex = 0;
+        for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
+            JavaType.Primitive primitive = TypeUtils.asPrimitive(parameter);
+            if (primitive != null) {
+                methodStub.append(primitive.getKeyword());
+            } else if (parameter instanceof JavaType.FullyQualified) {
+                methodStub.append(TypeUtils.asFullyQualified(parameter).getFullyQualifiedName());
+            } else {
+                methodStub.append("Object");
+            }
+            methodStub.append(" arg");
+            methodStub.append(argIndex);
+            argIndex++;
+        }
+        methodStub.append(") {\n");
+        if (returnStatement != null) {
+            methodStub.append(returnStatement);
+        }
+        methodStub.append("  }\n");
+        return methodStub.toString();
+    }
+
+
+    private static class GetMethodTypesInScope extends AbstractJavaSourceVisitor<List<JavaType.Method>> {
+        @Nullable
+        private final Cursor scope;
+
+        private GetMethodTypesInScope(@Nullable Cursor scope) {
+            this.scope = scope;
+            setCursoringOn();
+        }
+
+        @Override
+        public List<JavaType.Method> defaultTo(@Nullable Tree t) {
+            return emptyList();
+        }
+
+        @Override
+        public List<JavaType.Method> visitMethodInvocation(J.MethodInvocation method) {
+            List<JavaType.Method> methods = super.visitMethodInvocation(method);
+            if (isInSameNameScope(scope)) {
+                methods.add(method.getType());
+            }
+            return methods;
+
+        }
     }
 
     private static class ListScopeVariables extends AbstractJavaSourceVisitor<List<String>> {

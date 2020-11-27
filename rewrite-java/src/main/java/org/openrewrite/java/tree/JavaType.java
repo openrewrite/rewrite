@@ -480,72 +480,45 @@ public interface JavaType extends Serializable {
     }
 
     enum Primitive implements JavaType {
-        Boolean, Byte, Char, Double, Float, Int, Long, Short, Void, String, None, Wildcard, Null;
+        Boolean("boolean","false"),
+        Byte("byte","0"),
+        Char("char","'\u0000'"),
+        Double("double","0.0d"),
+        Float("float","0.0f"),
+        Int("int","0"),
+        Long("long","0L"),
+        Short("short","0"),
+        Void("void",null),
+        String("String",null),
+        None("",null),
+        Wildcard("*",null),
+        Null("null",null);
+
+        private final String keyword;
+        private final String defaultValue;
+
+        Primitive(String keyword, String defaultValue) {
+            this.keyword = keyword;
+            this.defaultValue = defaultValue;
+        }
 
         public static Primitive fromKeyword(String keyword) {
-            switch (keyword) {
-                case "boolean":
-                    return Boolean;
-                case "byte":
-                    return Byte;
-                case "char":
-                    return Char;
-                case "double":
-                    return Double;
-                case "float":
-                    return Float;
-                case "int":
-                    return Int;
-                case "long":
-                    return Long;
-                case "short":
-                    return Short;
-                case "void":
-                    return Void;
-                case "String":
-                    return String;
-                case "":
-                    return None;
-                case "*":
-                    return Wildcard;
-                case "null":
-                    return Null;
-                default:
-                    return null;
+            for (Primitive p : values()) {
+                if (p.keyword.equals(keyword)) {
+                    return p;
+                }
             }
+            return null;
         }
 
         @JsonIgnore
         public String getKeyword() {
-            switch (this) {
-                case Boolean:
-                    return "boolean";
-                case Byte:
-                    return "byte";
-                case Char:
-                    return "char";
-                case Double:
-                    return "double";
-                case Float:
-                    return "float";
-                case Int:
-                    return "int";
-                case Long:
-                    return "long";
-                case Short:
-                    return "short";
-                case Void:
-                    return "void";
-                case String:
-                    return "String";
-                case Wildcard:
-                    return "*";
-                case Null:
-                    return "null";
-                case None:
-                default:
-                    return "";
-            }
+            return this.keyword;
+        }
+
+        @JsonIgnore
+        public String getDefaultValue() {
+            return this.defaultValue;
         }
 
         @Override
