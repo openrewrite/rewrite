@@ -181,6 +181,9 @@ public class TreeBuilder {
 
         List<JavaType.Method> localMethods = new ArrayList<>();
         for (JavaType.Method method: methodTypesInScope) {
+            if (method.getDeclaringType() == null) {
+                continue;
+            }
             if (cu.getClasses().stream().map(J.ClassDecl::getType)
                     .filter(Objects::nonNull)
                     .anyMatch(t -> t.equals(method.getDeclaringType()))) {
@@ -317,7 +320,7 @@ public class TreeBuilder {
         @Override
         public List<JavaType.Method> visitMethodInvocation(J.MethodInvocation method) {
             List<JavaType.Method> methods = super.visitMethodInvocation(method);
-            if (isInSameNameScope(scope)) {
+            if (isInSameNameScope(scope) && method.getType() != null) {
                 methods.add(method.getType());
             }
             return methods;
