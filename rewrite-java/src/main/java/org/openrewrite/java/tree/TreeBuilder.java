@@ -165,6 +165,34 @@ public class TreeBuilder {
         return (J.MethodDecl) buildDeclaration(insertionScope, methodDeclarationSnippet, types);
     }
 
+    /**
+     * Manually constructing complex AST elements programmatically can be tedious and foreign to
+     * developers used to authoring code as text. This method provides a mechanism for authorizing a snippet
+     * of code as text, within the context of the insertion point, that will then be converted into an abstract
+     * syntax tree.
+     * <P><P>
+     * The method uses a parser that is constructed from the compilation unit associated with the insertionScope.
+     * Currently, the parser is seeded with the runtime classpath and, while this will work for a majority of cases, if
+     * types are referenced in the snippet but are not on the runtime classpath, no type attribution will be applied
+     * to any of the elements returned.
+     * <P><P>
+     * This method does attempts a "good faith effort" to include variables and method invocations from the original
+     * insertion scope. Those references should be valid within the code snippet if the original insertion scope has
+     * proper type attribution.
+     * <P><P>
+     * Any types introduced into the snippet that are NOT already present in the insertion scope MUST be explicitly
+     * enumerated using the "imports" parameter.
+     *<P></P>
+     * A syntactically correct snippet of code will result in a list of AST elements that represent the text, however,
+     * type attribution will only occur if the parser can fully resolve types used within the snippets AND available
+     * on the runtime classpath.
+     *
+     * @param insertionScope A point within an existing AST where this snippet will be inserted.
+     * @param snippet A valid code snippet within the context of the current insertion point.
+     * @param imports Any types introduced into the snippet that were not originally present within the compilation unit.
+     * @param <T> The expected type of element that is returned from the snippet.
+     * @return A list of AST elements constructed from the snippet.
+     */
     @SuppressWarnings("unchecked")
     public <T extends J> List<T> buildSnippet(Cursor insertionScope,
                                               String snippet,
