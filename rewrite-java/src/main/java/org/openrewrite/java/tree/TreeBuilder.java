@@ -210,15 +210,22 @@ public class TreeBuilder {
                 source.append(";\n");
             }
         }
-        source.append("\nclass CodeSnippet {\n\n  // local method in scope at insertion point\n\n");
-        source.append(localMethods.stream().map(TreeBuilder::stubMethod).collect(joining("\n")));
+        source.append("\nclass CodeSnippet {\n");
+        if (!localMethods.isEmpty()) {
+            source.append("\n// local methods in scope at insertion point\n");
+            source.append(localMethods.stream().map(TreeBuilder::stubMethod).collect(joining("\n", "\n", "\n")));
+        }
 
-        source.append("\n  // variables visible in the insertion scope\n\n");
-        source.append(String.join(";\n", new ListScopeVariables(insertionScope).visit(cu)));
-        source.append("\n  // the contents of this block are the snippet\n  {\n");
+        List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(cu);
+        if (!localScopeVariables.isEmpty()) {
+
+            source.append("\n// variables visible in the insertion scope\n");
+            source.append(new ListScopeVariables(insertionScope).visit(cu).stream()
+                    .collect(joining(";\n", "\n", ";\n")));
+        }
+        source.append("\n// begin snippet block\n{\n");
         source.append(StringUtils.trimIndent(snippet));
-        source.append("\n  }\n}");
-
+        source.append("\n}\n// end snippet block\n}");
 
         String sourceString = source.toString();
         if (logger.isDebugEnabled()) {
