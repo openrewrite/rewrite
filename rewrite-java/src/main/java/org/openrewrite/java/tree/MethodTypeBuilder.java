@@ -18,10 +18,12 @@ package org.openrewrite.java.tree;
 import com.koloboke.collect.set.hash.HashObjSet;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
+import org.openrewrite.Incubating;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Incubating(since="6.1.0")
 public class MethodTypeBuilder {
 
     JavaType.FullyQualified declaringType = null;
