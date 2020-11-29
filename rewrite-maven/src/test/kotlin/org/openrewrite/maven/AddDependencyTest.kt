@@ -235,7 +235,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
             visitors = listOf(AddDependency().apply {
                 setGroupId("com.fasterxml.jackson.core")
                 setArtifactId("jackson-databind")
-                setVersion("2.12.0-rc2") // will defer instead to dependency management
+                setVersion("2.12.0") // will defer instead to dependency management
             }),
             before = """
                 <project>
@@ -248,7 +248,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                       <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-databind</artifactId>
-                        <version>latest.release</version>
+                        <version>2.12.0</version>
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
@@ -265,7 +265,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                       <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-databind</artifactId>
-                        <version>latest.release</version>
+                        <version>2.12.0</version>
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
@@ -284,7 +284,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
             visitors = listOf(AddDependency().apply {
                 setGroupId("com.fasterxml.jackson.core")
                 setArtifactId("jackson-databind")
-                setVersion("2.12.0-rc2") // will be overridden by family alignment
+                setVersion("2.12.0") // will be overridden by family alignment
                 setFamilyPattern("com.fasterxml.jackson*")
                 setSkipIfPresent(false)
             }),
@@ -297,7 +297,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                   <version>1</version>
                   
                   <properties>
-                    <jackson.version>latest.release</jackson.version>
+                    <jackson.version>2.12.0</jackson.version>
                   </properties>
                   
                   <dependencies>
@@ -318,7 +318,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                   <version>1</version>
                   
                   <properties>
-                    <jackson.version>latest.release</jackson.version>
+                    <jackson.version>2.12.0</jackson.version>
                   </properties>
                   
                   <dependencies>
