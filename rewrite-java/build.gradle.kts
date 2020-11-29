@@ -22,8 +22,8 @@ dependencies {
     implementation("com.koloboke:koloboke-api-jdk8:latest.release")
     implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
 
-    api("com.fasterxml.jackson.core:jackson-annotations:2.11.3")
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.11.3")
+    api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
+    implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
 
     implementation("org.ow2.asm:asm:latest.release")
     implementation("org.ow2.asm:asm-util:latest.release")

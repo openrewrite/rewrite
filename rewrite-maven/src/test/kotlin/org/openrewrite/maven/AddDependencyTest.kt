@@ -248,7 +248,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                       <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-databind</artifactId>
-                        <version>2.11.3</version>
+                        <version>latest.release</version>
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
@@ -265,7 +265,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                       <dependency>
                         <groupId>com.fasterxml.jackson.core</groupId>
                         <artifactId>jackson-databind</artifactId>
-                        <version>2.11.3</version>
+                        <version>latest.release</version>
                       </dependency>
                     </dependencies>
                   </dependencyManagement>
@@ -297,7 +297,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                   <version>1</version>
                   
                   <properties>
-                    <jackson.version>2.11.3</jackson.version>
+                    <jackson.version>latest.release</jackson.version>
                   </properties>
                   
                   <dependencies>
@@ -318,7 +318,7 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                   <version>1</version>
                   
                   <properties>
-                    <jackson.version>2.11.3</jackson.version>
+                    <jackson.version>latest.release</jackson.version>
                   </properties>
                   
                   <dependencies>
