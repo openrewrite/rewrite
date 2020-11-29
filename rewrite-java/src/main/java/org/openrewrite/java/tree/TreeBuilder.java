@@ -176,16 +176,20 @@ public class TreeBuilder {
      * types are referenced in the snippet but are not on the runtime classpath, no type attribution will be applied
      * to any of the elements returned.
      * <P><P>
-     * This method does attempts a "good faith effort" to include variables and method invocations from the original
+     * On a best-effort basis, this method attempts to include variables and method invocations from the original
      * insertion scope. Those references should be valid within the code snippet if the original insertion scope has
      * proper type attribution.
      * <P><P>
      * Any types introduced into the snippet that are NOT already present in the insertion scope MUST be explicitly
      * enumerated using the "imports" parameter.
-     *<P></P>
+     *<P><P>
      * A syntactically correct snippet of code will result in a list of AST elements that represent the text, however,
      * type attribution will only occur if the parser can fully resolve types used within the snippets AND available
      * on the runtime classpath.
+     * <P><P>
+     * If type attribution fails for any reason, the resulting snippet may still serialize back to the correct
+     * Java source code. But any other visitors running as part of the same pipeline that would operate on the snippet
+     * will likely fail to do so if they depend on correct type attribution, as most visitors do.
      *
      * @param insertionScope A point within an existing AST where this snippet will be inserted.
      * @param snippet A valid code snippet within the context of the current insertion point.
@@ -244,14 +248,13 @@ public class TreeBuilder {
         source.append("\nclass CodeSnippet {\n");
         if (!localMethods.isEmpty()) {
             source.append("\n// local methods in scope at insertion point\n");
-            source.append(localMethods.stream().map(TreeBuilder::stubMethod).collect(joining("\n", "\n", "\n")));
+            source.append(localMethods.stream().map(TreeBuilder::stubMethodDecl).collect(joining("\n", "\n", "\n")));
         }
 
         List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(cu);
         if (!localScopeVariables.isEmpty()) {
-
             source.append("\n// variables visible in the insertion scope\n");
-            source.append(new ListScopeVariables(insertionScope).visit(cu).stream()
+            source.append(localScopeVariables.stream()
                     .collect(joining(";\n", "\n", ";\n")));
         }
         source.append("\n// begin snippet block\n{\n");
@@ -280,12 +283,13 @@ public class TreeBuilder {
     }
 
     /**
-     * This method generates a stubbed out method snippet based on the Java Method Type.
+     * This generates a String representation of a method declaration with an empty body based on the supplied JavaType.Method.
+     * These stubs can be used to ensure that type attribution succeeds for methods included in snippets built into AST elements.
      *
      * @param method The method type for which a stub will be generated.
      * @return A snippet representing as method declaration of code that can be included as source in a synthetically generated class.
      */
-    private static String stubMethod(JavaType.Method method) {
+    private static String stubMethodDecl(JavaType.Method method) {
         StringBuilder methodStub = new StringBuilder(128);
         methodStub.append("  ");
         methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" ")));
@@ -310,11 +314,10 @@ public class TreeBuilder {
         methodStub.append("(");
         int argIndex = 0;
         for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
-            JavaType.Primitive primitive = TypeUtils.asPrimitive(parameter);
-            if (primitive != null) {
-                methodStub.append(primitive.getKeyword());
+            if (parameter instanceof JavaType.Primitive) {
+                methodStub.append(((JavaType.Primitive) parameter).getKeyword());
             } else if (parameter instanceof JavaType.FullyQualified) {
-                methodStub.append(TypeUtils.asFullyQualified(parameter).getFullyQualifiedName());
+                methodStub.append(((JavaType.FullyQualified) parameter).getFullyQualifiedName());
             } else {
                 methodStub.append("Object");
             }
