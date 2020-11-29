@@ -1194,6 +1194,7 @@ public interface J extends Serializable, Tree {
          *
          * @return A JavaParser with a classpath matching the current runtime classpath
          */
+        @Incubating
         public JavaParser buildRuntimeParser() {
             return JavaParser.fromJavaVersion()
                     .classpath(JavaParser.allDependenciesFromClasspath())
