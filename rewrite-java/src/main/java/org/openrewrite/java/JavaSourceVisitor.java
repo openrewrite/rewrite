@@ -93,11 +93,13 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     /**
-     * @param lower The cursor of the lower scoped tree element to check.
+     * Returns true if the passed child cursor is within the same name scope as the current cursor.
+     *
+     * @param child The cursor of the child tree element to check.
      * @return Whether this cursor shares the same name scope as {@code scope}.
      */
-    default boolean isInSameNameScope(Cursor lower) {
-        return isInSameNameScope(getCursor(), lower);
+    default boolean isInSameNameScope(Cursor child) {
+        return isInSameNameScope(getCursor(), child);
     }
 
     default R visitExpression(Expression expr) {

@@ -96,7 +96,7 @@ interface TreeBuilderTest {
         """.trimIndent())[0]
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
         val snippets = TreeBuilder(a).buildSnippet<Statement>(
@@ -120,12 +120,11 @@ interface TreeBuilderTest {
 
             public class A {
                 int n = 0;
-                void foo(String m, List<String> others) {
-                    if(others == null) {
-                        others = asList(m);
-                    }
-                    others.add(m);
-                    incrementCounterByListSize(others);
+                List<String> bucket;
+                
+                void foo(String... m) {
+                    bucket.addAll(asList(m));
+                    incrementCounterByListSize(bucket);
                 }
                 void incrementCounterByListSize(List<String> list) {
                     n =+ list.size();
@@ -134,18 +133,18 @@ interface TreeBuilderTest {
         """.trimIndent())[0]
 
         val method = a.classes[0].methods[0]
-        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
         val snippets = TreeBuilder(a).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
-                    if(others == null) {
-                        others = asList(m);
+                    if(bucket == null) {
+                        bucket = asList(${paramName.printTrimmed()});
                     } else {
-                        others.add(${paramName.printTrimmed()});
+                        bucket.addAll(asList(${paramName.printTrimmed()}));
                     }
-                    incrementCounterByListSize(others);
+                    incrementCounterByListSize(bucket);
                  """)
 
         val ifStatement : J.If = snippets[0] as J.If
