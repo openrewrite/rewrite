@@ -15,14 +15,36 @@
  */
 package org.openrewrite.java.tree;
 
-import com.koloboke.collect.set.hash.HashObjSet;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.StringUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
+/**
+ * This builder provides a fluent API for constructing method types. This builder does not support separate generic
+ * and resolved methods signatures.
+ * <P><P>
+ * WARNING: This API is still in flux and may change.
+ * <P>
+ * <PRE>
+ *     EXAMPLE:
+ *
+ *     import static org.openrewrite.java.tree.MethodTypeBuilder.methodType;
+ *     .
+ *     .
+ *     .
+ *     JavaType.Method method = methodType()
+ *             .declaringClass("org.assertj.core.api.Assertions")
+ *             .flags(Flag.Public, Flag.Static)
+ *             .returnType("org.assertj.core.api.AbstractBooleanAssert")
+ *             .name("assertThat")
+ *             .parameter("boolean", "actual")
+ *             .build();
+ * </PRE>
+ */
 @Incubating(since="6.1.0")
 public class MethodTypeBuilder {
 
@@ -32,36 +54,92 @@ public class MethodTypeBuilder {
     String name;
     List<Parameter> parameters = new ArrayList<>();
 
+    /**
+     * See {@link MethodTypeBuilder} for usage.
+     *
+     * @return A new builder.
+     */
     public static MethodTypeBuilder methodType() {
         return new MethodTypeBuilder();
     }
 
+    /**
+     * The declaring class is a fully qualified name of the receiver for this method type.
+     *
+     * @param fullyQualifiedClassName The fully-qualified name of the class on which this method is defined.
+     * @return this
+     */
     public MethodTypeBuilder declaringClass(String fullyQualifiedClassName) {
         declaringType = JavaType.Class.build(fullyQualifiedClassName);
         return this;
     }
 
+    /**
+     * The method qualifiers such as "public", "static", etc.
+     *
+     * @param flags a list of qualifiers for the method.
+     * @return this
+     */
     public MethodTypeBuilder flags(Flag ... flags) {
         this.flags.addAll(Arrays.asList(flags));
         return this;
     }
 
+    /**
+     * The name of the method.
+     *
+     * @param name Method name
+     * @return this
+     */
     public MethodTypeBuilder name(String name) {
         this.name = name;
         return this;
     }
 
+    /**
+     * Set the return type for the method. The default, it no specified, is "void"
+     *
+     * @param type Return type
+     * @return this
+     */
     public MethodTypeBuilder returnType(String type) {
         this.returnType = JavaType.buildType(type);
         return this;
     }
 
+    /**
+     * Add a parameter to the method type. Parameters are added in the order in which this method is called.
+     *
+     * The parameter type is either expressed as a fully-qualified class name or can be one of the primitive
+     * {@link JavaType.Primitive} keywords.
+     *
+     * @param type String representation of the parameter type.
+     * @param name The name of the parameter.
+     *
+     * @return this
+     */
     public MethodTypeBuilder parameter(String type, String name) {
         this.parameters.add(new Parameter(JavaType.buildType(type), name));
         return this;
     }
 
+    /**
+     * Create a method type based on the values defined on this builder. This method will throw an exception if
+     * either the method name or declaring class are not defined. The return type will be defaulted to "void" if not
+     * specified.
+     *
+     * @return A new instance of JavaType.Method
+     */
     public JavaType.Method build() {
+        if (StringUtils.isBlank(name)) {
+            throw new IllegalArgumentException("The method name is required.");
+        }
+        if (declaringType == null) {
+            throw new IllegalArgumentException("The declaring type is required.");
+        }
+        if (returnType == null) {
+            returnType = JavaType.Primitive.Void;
+        }
         JavaType.Method.Signature signature = new JavaType.Method.Signature(
                 this.returnType,
                 parameters.stream().map(Parameter::getType).collect(Collectors.toList())
@@ -70,7 +148,7 @@ public class MethodTypeBuilder {
         return JavaType.Method.build(
                 declaringType,
                 name,
-                null,
+                signature,
                 signature,
                 parameters.stream().map(Parameter::getName).collect(Collectors.toList()),
                 flags);
@@ -78,9 +156,8 @@ public class MethodTypeBuilder {
 
     @Getter
     @AllArgsConstructor
-    private class Parameter {
+    private static class Parameter {
         JavaType type;
         String name;
     }
-
 }
