@@ -123,9 +123,8 @@ interface TreeBuilderTest {
                 void foo(String m, List<String> others) {
                     if(others == null) {
                         others = asList(m);
-                    } else {
-                        others.add(m);
                     }
+                    others.add(m);
                     incrementCounterByListSize(others);
                 }
                 void incrementCounterByListSize(List<String> list) {
@@ -143,12 +142,18 @@ interface TreeBuilderTest {
                 """
                     if(others == null) {
                         others = asList(m);
+                    } else {
+                        others.add(${paramName.printTrimmed()});
                     }
-                    others.add(${paramName.printTrimmed()});
                     incrementCounterByListSize(others);
                  """)
-        val methodInv1 : Expression = snippets[0] as Expression
-        assertNotNull(methodInv1.type, "The type information should be populated")
+
+        val ifStatement : J.If = snippets[0] as J.If
+        val thenPart : J.Block<*> = ifStatement.thenPart as J.Block<*>
+        val assign : J.Assign = thenPart.statements[0] as J.Assign
+        val methodInv1 : Expression = assign.assignment as Expression
+        assertNotNull(methodInv1.type, "The type information for the static method asList() should be populated")
+
         val methodInv2 : Expression = snippets[1] as Expression
         assertNotNull(methodInv2.type, "The type information should be populated")
     }
