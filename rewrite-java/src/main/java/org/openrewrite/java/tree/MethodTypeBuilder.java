@@ -30,11 +30,24 @@ import java.util.stream.Collectors;
  * <PRE>
  *     EXAMPLE:
  *
- *     import static org.openrewrite.java.tree.MethodTypeBuilder.methodType;
+ *     import static org.openrewrite.java.tree.MethodInvocationBuilder.newMethodInvocation;
+ *     import static org.openrewrite.java.tree.MethodTypeBuilder.newMethodType;
  *     .
  *     .
  *     .
- *     JavaType.Method method = methodType()
+ *     J.MethodInvocation invocation = newMethodInvocation()
+ *          .randomId()
+ *          .select(...)
+ *          .methodType(newMethodType()
+ *             .declaringClass("org.assertj.core.api.Assertions")
+ *             .flags(Flag.Public, Flag.Static)
+ *             .returnType("org.assertj.core.api.AbstractBooleanAssert")
+ *             .name("assertThat")
+ *             .parameter("boolean", "actual")
+ *             .build()
+ *           )
+ *           .bulid()
+ *
  *             .declaringClass("org.assertj.core.api.Assertions")
  *             .flags(Flag.Public, Flag.Static)
  *             .returnType("org.assertj.core.api.AbstractBooleanAssert")
@@ -52,7 +65,7 @@ public class MethodTypeBuilder {
     String name;
     List<Parameter> parameters = new ArrayList<>();
 
-    public static MethodTypeBuilder methodType() {
+    public static MethodTypeBuilder newMethodType() {
         return new MethodTypeBuilder();
     }
 
@@ -89,7 +102,15 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * Add a parameter to the method type. Parameters are added in the order in which this method is called.
+     * @param type The return type for the method. The default, it no specified, is "void"
+     */
+    public MethodTypeBuilder returnType(JavaType type) {
+        this.returnType = type;
+        return this;
+    }
+
+    /**
+     * Add a parameter to the method type. The parameters are added in the same order they are added to the builder.
      *
      * The parameter type is either expressed as a fully-qualified class name or can be one of the primitive
      * {@link JavaType.Primitive} keywords.
@@ -99,6 +120,17 @@ public class MethodTypeBuilder {
      */
     public MethodTypeBuilder parameter(String type, String name) {
         this.parameters.add(new Parameter(JavaType.buildType(type), name));
+        return this;
+    }
+
+    /**
+     * Add a parameter to the method type. The parameters are added in the same order they are added to the builder.
+     *
+     * @param type Parameter type
+     * @param name The name of the parameter.
+     */
+    public MethodTypeBuilder parameter(JavaType type, String name) {
+        this.parameters.add(new Parameter(type, name));
         return this;
     }
 

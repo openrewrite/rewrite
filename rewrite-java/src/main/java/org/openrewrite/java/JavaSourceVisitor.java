@@ -47,8 +47,9 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     /**
-     * This method determines if the element referenced by the child cursor has visibility to variables and declarations
-     * that are visible to the element referenced by the base cursor. (Is the child within the lexical scope of the base?)
+     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the base
+     * cursor. (i.e.: Are the variables and declarations visible in the base scope also visible to the child AST
+     * element?)
      *
      * The base lexical scope is first established by walking up the path of the base cursor to find it's first enclosing
      * element. The child path is traversed by walking up the child path elements until either the base scope has
@@ -94,8 +95,8 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     /**
-     * This method determines if the element referenced by the child cursor has visibility to variables and declarations
-     * that are visible to the element referenced by the current cursor. (Is the child within the lexical scope of the base?)
+     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the current
+     * cursor.
      *
      * See {@link JavaSourceVisitor#isInSameNameScope}
      *
