@@ -248,7 +248,6 @@ public class TreeBuilder {
                 .map(TreeBuilder::stubMethod)
                 .collect(joining("\n", "\n", "\n")));
         }
-        //insertionScope.firstEnclosing(J.MethodDecl.class);
         List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(cu);
         if (!localScopeVariables.isEmpty()) {
             //Stub out in-scope variables
@@ -282,7 +281,8 @@ public class TreeBuilder {
     }
 
     /**
-     * This method generates a stubbed out method snippet based on the Java Method Type.
+     * This generates a String representation of a method declaration with an empty body based on the supplied JavaType.Method.
+     * These stubs can be used to ensure that type attribution succeeds for methods included in snippets built into AST elements.
      *
      * @param method The method type for which a stub will be generated.
      * @return A snippet representing as method declaration of code that can be included as source in a synthetically generated class.

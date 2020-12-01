@@ -47,9 +47,10 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     /**
-     * Returns true if the child cursor is within the name scope of the base cursor.
+     * This method determines if the element referenced by the child cursor has visibility to variables and declarations
+     * that are visible to the element referenced by the base cursor. (Is the child within the lexical scope of the base?)
      *
-     * The base scope is first established by walking up the path of the base cursor to find it's first enclosing
+     * The base lexical scope is first established by walking up the path of the base cursor to find it's first enclosing
      * element. The child path is traversed by walking up the child path elements until either the base scope has
      * been found, a "terminating" element is encountered, or there are no more elements in the path.
      * <P><P>
@@ -60,9 +61,9 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
      * <li>An interface declaration</li>
      * <li>An annotation declaration</li>
      *
-     * @param base The point within the tree that is used to establish the "base scope".
-     * @param child A point within the tree that will be traversed (up the tree) looking for an intersection with the base scope.
-     * @return If the base scope is found within the context of the child path, this method will return true, otherwise false
+     * @param base A pointer within the AST that is used to establish the "base lexical scope".
+     * @param child A pointer within the AST that will be traversed (up the tree) looking for an intersection with the base lexical scope.
+     * @return true if the child is in within the lexical scope of the base
      */
     default boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
@@ -93,10 +94,13 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
     }
 
     /**
-     * Returns true if the passed child cursor is within the same name scope as the current cursor.
+     * This method determines if the element referenced by the child cursor has visibility to variables and declarations
+     * that are visible to the element referenced by the current cursor. (Is the child within the lexical scope of the base?)
      *
-     * @param child The cursor of the child tree element to check.
-     * @return Whether this cursor shares the same name scope as {@code scope}.
+     * See {@link JavaSourceVisitor#isInSameNameScope}
+     *
+     * @param child A pointer to an element within the abstract syntax tree
+     * @return true if the child is in within the lexical scope of the current cursor
      */
     default boolean isInSameNameScope(Cursor child) {
         return isInSameNameScope(getCursor(), child);

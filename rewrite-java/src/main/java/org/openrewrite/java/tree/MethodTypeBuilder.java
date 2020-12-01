@@ -26,8 +26,6 @@ import java.util.stream.Collectors;
 /**
  * This builder provides a fluent API for constructing method types. This builder does not support separate generic
  * and resolved methods signatures.
- * <P><P>
- * WARNING: This API is still in flux and may change.
  * <P>
  * <PRE>
  *     EXAMPLE:
@@ -54,20 +52,12 @@ public class MethodTypeBuilder {
     String name;
     List<Parameter> parameters = new ArrayList<>();
 
-    /**
-     * See {@link MethodTypeBuilder} for usage.
-     *
-     * @return A new builder.
-     */
     public static MethodTypeBuilder methodType() {
         return new MethodTypeBuilder();
     }
 
     /**
-     * The declaring class is a fully qualified name of the receiver for this method type.
-     *
      * @param fullyQualifiedClassName The fully-qualified name of the class on which this method is defined.
-     * @return this
      */
     public MethodTypeBuilder declaringClass(String fullyQualifiedClassName) {
         declaringType = JavaType.Class.build(fullyQualifiedClassName);
@@ -75,10 +65,7 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * The method qualifiers such as "public", "static", etc.
-     *
-     * @param flags a list of qualifiers for the method.
-     * @return this
+     * @param flags a list of qualifiers (public, static, etc) for the method
      */
     public MethodTypeBuilder flags(Flag ... flags) {
         this.flags.addAll(Arrays.asList(flags));
@@ -86,10 +73,7 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * The name of the method.
-     *
-     * @param name Method name
-     * @return this
+     * @param name The name of the method is required
      */
     public MethodTypeBuilder name(String name) {
         this.name = name;
@@ -97,10 +81,7 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * Set the return type for the method. The default, it no specified, is "void"
-     *
-     * @param type Return type
-     * @return this
+     * @param type The return type for the method. The default, it no specified, is "void"
      */
     public MethodTypeBuilder returnType(String type) {
         this.returnType = JavaType.buildType(type);
@@ -115,8 +96,6 @@ public class MethodTypeBuilder {
      *
      * @param type String representation of the parameter type.
      * @param name The name of the parameter.
-     *
-     * @return this
      */
     public MethodTypeBuilder parameter(String type, String name) {
         this.parameters.add(new Parameter(JavaType.buildType(type), name));
@@ -127,8 +106,6 @@ public class MethodTypeBuilder {
      * Create a method type based on the values defined on this builder. This method will throw an exception if
      * either the method name or declaring class are not defined. The return type will be defaulted to "void" if not
      * specified.
-     *
-     * @return A new instance of JavaType.Method
      */
     public JavaType.Method build() {
         if (StringUtils.isBlank(name)) {

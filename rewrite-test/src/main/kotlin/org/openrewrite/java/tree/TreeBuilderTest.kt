@@ -73,8 +73,9 @@ interface TreeBuilderTest {
         val unary : Expression = snippets[0] as Expression
         assertEquals(unary.type, JavaType.Primitive.Int,"The unary should have a type of int.")
 
-        //Second Statement should be "others.add(m)" and this should be a Unary that has type information.
-        assertTrue(snippets[1] is J.MethodInvocation)
+        //Second Statement should be "others.add(m)" and this should have type information.
+        val methodInv : Expression = snippets[1] as Expression
+        assertNotNull(methodInv.type, "The type information should be populated")
     }
 
     @Test
