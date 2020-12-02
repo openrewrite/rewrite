@@ -462,6 +462,9 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
         if (treeBuilder == null && createTreeBuilderSupplier != null) {
             treeBuilder = createTreeBuilderSupplier.get();
         }
+        if (treeBuilder == null) {
+            throw new IllegalArgumentException("Unable resolve a tree builder reference.");
+        }
         return treeBuilder;
     }
 
