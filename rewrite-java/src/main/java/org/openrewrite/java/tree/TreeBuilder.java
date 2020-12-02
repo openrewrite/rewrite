@@ -202,10 +202,24 @@ public class TreeBuilder {
                                               String snippet,
                                               JavaType... imports) {
 
-        Set<JavaType> allImports = new HashSet<>(Arrays.asList(imports));
-
         //This uses a parser that has the same classpath as the runtime.
         JavaParser javaParser = cu.buildRuntimeParser();
+
+
+        StringBuilder source = new StringBuilder(512);
+
+        for (JavaType importType : imports) {
+            if (importType == null) {
+                continue;
+            }
+            if (importType instanceof JavaType.FullyQualified) {
+                source.append("import ").append(((JavaType.FullyQualified) importType).getFullyQualifiedName()).append(";\n");
+            } else if (importType instanceof JavaType.Method) {
+                JavaType.Method method = (JavaType.Method) importType;
+                source.append("import static ").append(method.getDeclaringType().getFullyQualifiedName())
+                    .append(".").append(method.getName()).append(";\n");
+            }
+        }
 
         //Need to collect any method invocation within the insert scope. These either need to be stubbed out
         //or statically imported into the synthetic class.
@@ -222,44 +236,28 @@ public class TreeBuilder {
                 localMethods.add(method);
             } else {
                 //Any method not belonging to the compilation unit should be statically imported.
-                allImports.add(method);
+                source.append("import static ").append(method.getDeclaringType().getFullyQualifiedName())
+                    .append(".").append(method.getName()).append(";\n");
             }
         }
 
-        StringBuilder source = new StringBuilder(512);
-
-        for (JavaType importType : allImports) {
-            if (importType == null) {
-                continue;
-            }
-            if (importType instanceof JavaType.FullyQualified) {
-                source.append("import ");
-                source.append(((JavaType.FullyQualified) importType).getFullyQualifiedName());
-                source.append(";\n");
-            } else if (importType instanceof JavaType.Method) {
-                source.append("import static ");
-                JavaType.Method method = (JavaType.Method) importType;
-                source.append(method.getDeclaringType().getFullyQualifiedName());
-                source.append(".");
-                source.append(method.getName());
-                source.append(";\n");
-            }
-        }
         source.append("\nclass CodeSnippet {\n");
         if (!localMethods.isEmpty()) {
-            source.append("\n// local methods in scope at insertion point\n");
-            source.append(localMethods.stream().map(TreeBuilder::stubMethodDecl).collect(joining("\n", "\n", "\n")));
+            //Stub out in-scope methods.
+            source.append("\n// local methods in scope at insertion point\n").append(localMethods.stream()
+                .map(TreeBuilder::stubMethod)
+                .collect(joining("\n", "\n", "\n")));
         }
-
         List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(cu);
         if (!localScopeVariables.isEmpty()) {
-            source.append("\n// variables visible in the insertion scope\n");
-            source.append(localScopeVariables.stream()
+            //Stub out in-scope variables
+            source.append("\n// variables visible in the insertion scope\n")
+                    .append(new ListScopeVariables(insertionScope).visit(cu).stream()
                     .collect(joining(";\n", "\n", ";\n")));
         }
-        source.append("\n// begin snippet block\n{\n");
-        source.append(StringUtils.trimIndent(snippet));
-        source.append("\n}\n// end snippet block\n}");
+        source.append("\n// begin snippet block\n{\n")
+            .append(StringUtils.trimIndent(snippet))
+            .append("\n}\n// end snippet block\n}");
 
         String sourceString = source.toString();
         if (logger.isDebugEnabled()) {
@@ -289,51 +287,55 @@ public class TreeBuilder {
      * @param method The method type for which a stub will be generated.
      * @return A snippet representing as method declaration of code that can be included as source in a synthetically generated class.
      */
-    private static String stubMethodDecl(JavaType.Method method) {
+    private static String stubMethod(JavaType.Method method) {
         StringBuilder methodStub = new StringBuilder(128);
-        methodStub.append("  ");
-        methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" ")));
-        methodStub.append(" ");
+
+        if (!method.getFlags().isEmpty()) {
+            methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" "))).append(" ");
+        }
 
         JavaType.FullyQualified returnTypeQualified = TypeUtils.asFullyQualified(method.getResolvedSignature().getReturnType());
         String returnStatement = null;
         if (returnTypeQualified != null) {
-            methodStub.append(returnTypeQualified.getFullyQualifiedName());
-            methodStub.append(" ");
-            returnStatement = "    return null;\n";
+            methodStub.append(returnTypeQualified.getFullyQualifiedName()).append(" ");
+            returnStatement = "  return null;\n";
         } else {
 
             JavaType.Primitive primitiveReturn = TypeUtils.asPrimitive(method.getResolvedSignature().getReturnType());
             if (primitiveReturn != null && primitiveReturn.getDefaultValue() != null) {
-                methodStub.append(primitiveReturn.getKeyword());
-                returnStatement = "    return " + primitiveReturn.getDefaultValue() + ";\n";
+                methodStub.append(primitiveReturn.getKeyword()).append(" ");
+                returnStatement = "  return " + primitiveReturn.getDefaultValue() + ";\n";
+            } else {
+                methodStub.append("void ");
             }
         }
 
-        methodStub.append(method.getName());
-        methodStub.append("(");
+        methodStub.append(method.getName()).append("(");
         int argIndex = 0;
         for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
-            if (parameter instanceof JavaType.Primitive) {
-                methodStub.append(((JavaType.Primitive) parameter).getKeyword());
+            JavaType.Primitive primitive = TypeUtils.asPrimitive(parameter);
+            if (primitive != null) {
+                methodStub.append(primitive.getKeyword());
             } else if (parameter instanceof JavaType.FullyQualified) {
-                methodStub.append(((JavaType.FullyQualified) parameter).getFullyQualifiedName());
+                methodStub.append(TypeUtils.asFullyQualified(parameter).getFullyQualifiedName());
             } else {
                 methodStub.append("Object");
             }
-            methodStub.append(" arg");
-            methodStub.append(argIndex);
+            methodStub.append(" arg").append(argIndex);
             argIndex++;
         }
         methodStub.append(") {\n");
         if (returnStatement != null) {
             methodStub.append(returnStatement);
         }
-        methodStub.append("  }\n");
+        methodStub.append("}\n");
         return methodStub.toString();
     }
 
-
+    /**
+     * Visit each method invocation (within insertion scope) and extract the method type (if the invocation includes
+     * type information)
+     */
     private static class GetMethodTypesInScope extends AbstractJavaSourceVisitor<List<JavaType.Method>> {
         @Nullable
         private final Cursor scope;
@@ -351,8 +353,13 @@ public class TreeBuilder {
         @Override
         public List<JavaType.Method> visitMethodInvocation(J.MethodInvocation method) {
             List<JavaType.Method> methods = super.visitMethodInvocation(method);
-            if (isInSameNameScope(scope) && method.getType() != null) {
-                methods.add(method.getType());
+            if (isInSameNameScope(scope)) {
+                if (method.getSelect() == null && method.getType() != null) {
+                    methods.add(method.getType());
+                } else {
+                    logger.warn("There is an invocation to a method [" + method.getSimpleName()
+                            + "] within the original insertion scope that does not have type information.");
+                }
             }
             return methods;
 

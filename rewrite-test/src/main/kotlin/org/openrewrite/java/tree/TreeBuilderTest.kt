@@ -16,8 +16,7 @@
 package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting.EMPTY
@@ -46,6 +45,117 @@ interface TreeBuilderTest {
                 "others.add(${paramName.printTrimmed()});")
 
         assertTrue(snippets[0] is J.MethodInvocation)
+    }
+
+    @Test
+    fun buildSnippetLocalVariableReference(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.List;
+            public class A {
+                int n = 0;
+                
+                void foo(String m, List<String> others) {
+                    n++;
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body).visit(a)
+        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    n++;
+                    others.add(${paramName.printTrimmed()});
+                 """)
+        val unary : Expression = snippets[0] as Expression
+        assertEquals(unary.type, JavaType.Primitive.Int,"The unary should have a type of int.")
+
+        //Second Statement should be "others.add(m)" and this should have type information.
+        val methodInv : Expression = snippets[1] as Expression
+        assertNotNull(methodInv.type, "The type information should be populated")
+    }
+
+    @Test
+    fun buildSnippetLocalMethodReference(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    incrementCounterByListSize(others);
+                    others.add(m);
+                }
+                void incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
+        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    others.add(${paramName.printTrimmed()});
+                    incrementCounterByListSize(others);
+                 """)
+        val methodInv1 : Expression = snippets[0] as Expression
+        assertNotNull(methodInv1.type, "The type information should be populated")
+        val methodInv2 : Expression = snippets[1] as Expression
+        assertNotNull(methodInv2.type, "The type information should be populated")
+    }
+
+    @Test
+    fun buildSnippetStaticMethodReference(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.List;
+            
+            import static java.util.Arrays.asList;
+
+            public class A {
+                int n = 0;
+                List<String> bucket;
+                
+                void foo(String... m) {
+                    bucket.addAll(asList(m));
+                    incrementCounterByListSize(bucket);
+                }
+                void incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
+        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    if(bucket == null) {
+                        bucket = asList(${paramName.printTrimmed()});
+                    } else {
+                        bucket.addAll(asList(${paramName.printTrimmed()}));
+                    }
+                    incrementCounterByListSize(bucket);
+                 """)
+
+        val ifStatement : J.If = snippets[0] as J.If
+        val thenPart : J.Block<*> = ifStatement.thenPart as J.Block<*>
+        val assign : J.Assign = thenPart.statements[0] as J.Assign
+        val methodInv1 : Expression = assign.assignment as Expression
+        assertNotNull(methodInv1.type, "The type information for the static method asList() should be populated")
+
+        val methodInv2 : Expression = snippets[1] as Expression
+        assertNotNull(methodInv2.type, "The type information should be populated")
     }
 
     @Test

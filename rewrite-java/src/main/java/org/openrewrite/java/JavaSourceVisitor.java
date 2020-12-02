@@ -17,10 +17,11 @@ package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Iterator;
 
 public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
 
@@ -45,32 +46,65 @@ public interface JavaSourceVisitor<R> extends SourceVisitor<R> {
         return getCursor().firstEnclosing(J.ClassDecl.class);
     }
 
-    default boolean isInSameNameScope(Cursor higher, Cursor lower) {
-        AtomicBoolean takeWhile = new AtomicBoolean(true);
-        return higher.getPathAsStream()
+    /**
+     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the base
+     * cursor. (i.e.: Are the variables and declarations visible in the base scope also visible to the child AST
+     * element?)
+     *
+     * The base lexical scope is first established by walking up the path of the base cursor to find its first enclosing
+     * element. The child path is traversed by walking up the child path elements until either the base scope has
+     * been found, a "terminating" element is encountered, or there are no more elements in the path.
+     * <P><P>
+     * A terminating element is one of the following:
+     * <P><P>
+     * <li>A static class declaration</li>
+     * <li>An enumeration declaration</li>
+     * <li>An interface declaration</li>
+     * <li>An annotation declaration</li>
+     *
+     * @param base A pointer within the AST that is used to establish the "base lexical scope".
+     * @param child A pointer within the AST that will be traversed (up the tree) looking for an intersection with the base lexical scope.
+     * @return true if the child is in within the lexical scope of the base
+     */
+    default boolean isInSameNameScope(Cursor base, Cursor child) {
+        //First establish the base scope by finding the first enclosing element.
+        Tree baseScope = base.getPathAsStream()
                 .filter(t -> t instanceof J.Block ||
                         t instanceof J.MethodDecl ||
                         t instanceof J.Try ||
                         t instanceof J.ForLoop ||
-                        t instanceof J.ForEachLoop).findAny()
-                .map(higherNameScope -> lower.getPathAsStream()
-                        .filter(t -> {
-                            takeWhile.set(takeWhile.get() && (
-                                    !(t instanceof J.ClassDecl) ||
-                                            (((J.ClassDecl) t).getKind() instanceof J.ClassDecl.Kind.Class &&
-                                                    !((J.ClassDecl) t).hasModifier("static"))));
-                            return takeWhile.get();
-                        })
-                        .anyMatch(higherNameScope::equals))
-                .orElse(false);
+                        t instanceof J.ForEachLoop)
+                .findFirst().orElseThrow(() -> new IllegalArgumentException("The base cursor does not have an scoped context."));
+
+        //Now walk up the child path looking for the base scope.
+        for (Iterator<Tree> it = child.getPath(); it.hasNext(); ) {
+            Tree childScope = it.next();
+            if (childScope instanceof J.ClassDecl) {
+                J.ClassDecl childClass = (J.ClassDecl) childScope;
+                if (!(childClass.getKind() instanceof J.ClassDecl.Kind.Class) || childClass.hasModifier("static")) {
+                    //Short circuit the search if a terminating element is encountered.
+                    break;
+                }
+            }
+            if (baseScope.isScope(childScope)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * @param lower The cursor of the lower scoped tree element to check.
-     * @return Whether this cursor shares the same name scope as {@code scope}.
+     * Check if a child AST element is in the same lexical scope as that of the AST element associated with the current
+     * cursor.
+     *
+     * See {@link JavaSourceVisitor#isInSameNameScope}
+     *
+     * @param child A pointer to an element within the abstract syntax tree
+     * @return true if the child is in within the lexical scope of the current cursor
      */
-    default boolean isInSameNameScope(Cursor lower) {
-        return isInSameNameScope(getCursor(), lower);
+    default boolean isInSameNameScope(Cursor child) {
+        return isInSameNameScope(getCursor(), child);
     }
 
     default R visitExpression(Expression expr) {
