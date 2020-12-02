@@ -51,7 +51,7 @@ public class ExcludeDependency extends MavenRefactorVisitor {
     public Xml visitTag(Xml.Tag tag) {
         if (isDependencyTag()) {
             Pom.Dependency dependency = findDependency(tag);
-            if (!dependency.findDependencies(groupId, artifactId).isEmpty()) {
+            if (dependency != null && !dependency.findDependencies(groupId, artifactId).isEmpty()) {
                 Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
                 if (maybeExclusions.isPresent()) {
                     Xml.Tag exclusions = maybeExclusions.get();

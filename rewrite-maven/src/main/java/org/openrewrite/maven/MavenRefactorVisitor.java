@@ -86,12 +86,13 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
                         .orElse(artifactId == null);
     }
 
+    @Nullable
     public Pom.Dependency findDependency(Xml.Tag tag) {
         return model.getDependencies().stream()
                 .filter(d -> tag.getChildValue("groupId").orElse(model.getGroupId()).equals(d.getGroupId()) &&
                         tag.getChildValue("artifactId").orElse(model.getArtifactId()).equals(d.getArtifactId()))
                 .findAny()
-                .orElseThrow(() -> new IllegalStateException("Dependency tag has no corresponding model element"));
+                .orElse(null);
     }
 
     /**

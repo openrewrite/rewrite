@@ -71,7 +71,7 @@ public class XRange extends LatestRelease {
 
     public static Validated build(String pattern, String metadataPattern) {
         Matcher matcher = X_RANGE_PATTERN.matcher(pattern);
-        if (!matcher.matches()) {
+        if (!matcher.matches() || !(pattern.contains("x") || pattern.contains("X") || pattern.contains("*"))) {
             return Validated.invalid("xRange", pattern, "not an x-range");
         }
 

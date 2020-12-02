@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Refactor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
@@ -114,32 +115,17 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
             """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/92")
+    @Issue("#92")
     @Test
     fun playsNiceWithAddDependency() {
         val before = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-            
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>integration-testing</artifactId>
                 <version>1.0</version>
-                <name>integration-testing</name>
-            
-                <dependencies>
-                </dependencies>
-            
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-surefire-plugin</artifactId>
-                            <version>3.0.0-M5</version>
-                        </plugin>
-                    </plugins>
-                </build>
             </project>
         """.trimIndent()
+
         val pom = MavenParser.builder().build().parse(before)
         val fixed = Refactor(true)
                 .visit(
@@ -157,13 +143,9 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
 
         val expected = """
             <project>
-                <modelVersion>4.0.0</modelVersion>
-            
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>integration-testing</artifactId>
                 <version>1.0</version>
-                <name>integration-testing</name>
-            
                 <dependencies>
                     <dependency>
                         <groupId>org.junit.jupiter</groupId>
@@ -172,18 +154,8 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
                         <scope>test</scope>
                     </dependency>
                 </dependencies>
-            
-                <build>
-                    <plugins>
-                        <plugin>
-                            <groupId>org.apache.maven.plugins</groupId>
-                            <artifactId>maven-surefire-plugin</artifactId>
-                            <version>3.0.0-M5</version>
-                        </plugin>
-                    </plugins>
-                </build>
             </project>
-        """
+        """.trimIndent()
 
         assertEquals(expected, fixed)
     }

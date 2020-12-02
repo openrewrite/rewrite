@@ -29,6 +29,11 @@ class XRangeTest {
         assertThat(XRange.build("a", null).isValid).isFalse()
     }
 
+    @Test
+    fun doesNotMatchFixedVersion() {
+        assertThat(XRange.build("5.3.0", null).isValid).isFalse()
+    }
+
     /**
      * X := >=0.0.0
      */
