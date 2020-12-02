@@ -94,7 +94,7 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * @param type The return type for the method. The default, it no specified, is "void"
+     * @param type The return type for the method. The default, if not specified, is "void"
      */
     public MethodTypeBuilder returnType(String type) {
         this.returnType = JavaType.buildType(type);
