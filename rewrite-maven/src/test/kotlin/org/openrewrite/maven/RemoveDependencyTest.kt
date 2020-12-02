@@ -16,6 +16,7 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.RefactorVisitor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
@@ -30,14 +31,13 @@ class RemoveDependencyTest : RefactorVisitorTestForParser<Maven> {
             .cache(mavenCache)
             .build()
 
-    private val addDependency = RemoveDependency().apply {
+    override val visitors = listOf(RemoveDependency().apply {
         setGroupId("junit")
         setArtifactId("junit")
-    }
+    })
 
     @Test
     fun removeDependency() = assertRefactored(
-            visitors = listOf(addDependency),
             before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -62,6 +62,27 @@ class RemoveDependencyTest : RefactorVisitorTestForParser<Maven> {
                 </project>
             """,
             after = """
+                <project>
+                  <modelVersion>4.0.0</modelVersion>
+                  
+                  <groupId>com.mycompany.app</groupId>
+                  <artifactId>my-app</artifactId>
+                  <version>1</version>
+                  
+                  <dependencies>
+                    <dependency>
+                      <groupId>com.google.guava</groupId>
+                      <artifactId>guava</artifactId>
+                      <version>29.0-jre</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
+
+    @Test
+    fun noDependencyToRemove() = assertUnchanged(
+            before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   

@@ -15,21 +15,24 @@
  */
 package org.openrewrite.maven
 
+import org.junit.jupiter.api.Assertions
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Refactor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.tree.Maven
 
 class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
-
-    private val excludeDependency = ExcludeDependency().apply {
-        setGroupId("org.junit.vintage")
-        setArtifactId("junit-vintage-engine")
-    }
+    override val visitors = listOf(
+            ExcludeDependency().apply {
+                setGroupId("org.junit.vintage")
+                setArtifactId("junit-vintage-engine")
+            })
 
     @Test
     fun excludeJUnitVintageEngineSpringBoot2_3() = assertRefactored(
-            visitors = listOf(excludeDependency),
             before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
@@ -90,7 +93,6 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
 
     @Test
     fun jUnitVintageEngineDoesntNeedExclusionFromSpringBoot2_4() = assertUnchanged(
-            visitors = listOf(excludeDependency),
             before = """
                 <project>
                   <parent>
@@ -111,4 +113,78 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
                 </project>
             """
     )
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/92")
+    @Test
+    fun playsNiceWithAddDependency() {
+        val before = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+            
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>integration-testing</artifactId>
+                <version>1.0</version>
+                <name>integration-testing</name>
+            
+                <dependencies>
+                </dependencies>
+            
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <version>3.0.0-M5</version>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """.trimIndent()
+        val pom = MavenParser.builder().build().parse(before)
+        val fixed = Refactor(true)
+                .visit(
+                        listOf(AddDependency().apply {
+                            setGroupId("org.junit.jupiter");
+                            setArtifactId("junit-jupiter-engine");
+                            setVersion("5.3.0");
+                            setScope("test")
+                        })
+                                + visitors
+                ).fix(pom)
+                .first()
+                .fixed!!
+                .printTrimmed()
+
+        val expected = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+            
+                <groupId>org.openrewrite.example</groupId>
+                <artifactId>integration-testing</artifactId>
+                <version>1.0</version>
+                <name>integration-testing</name>
+            
+                <dependencies>
+                    <dependency>
+                        <groupId>org.junit.jupiter</groupId>
+                        <artifactId>junit-jupiter-engine</artifactId>
+                        <version>5.3.0</version>
+                        <scope>test</scope>
+                    </dependency>
+                </dependencies>
+            
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <version>3.0.0-M5</version>
+                        </plugin>
+                    </plugins>
+                </build>
+            </project>
+        """
+
+        assertEquals(expected, fixed)
+    }
 }
