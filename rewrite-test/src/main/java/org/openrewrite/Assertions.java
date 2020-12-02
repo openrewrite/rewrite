@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -175,7 +176,13 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> isRefactoredTo(String expected) {
-            SourceFile fixed = doRefactor();
+            return isRefactoredTo(expected, s -> {
+            });
+        }
+
+        @SuppressWarnings("unchecked")
+        public RefactoringAssert<S> isRefactoredTo(String expected, Consumer<S> conditions) {
+            S fixed = (S) doRefactor();
             assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
 
@@ -183,7 +190,13 @@ public class Assertions {
         }
 
         public RefactoringAssert<S> isRefactoredTo(Supplier<String> expected) {
-            SourceFile fixed = doRefactor();
+            return isRefactoredTo(expected, s -> {
+            });
+        }
+
+        @SuppressWarnings("unchecked")
+        public RefactoringAssert<S> isRefactoredTo(Supplier<String> expected, Consumer<S> conditions) {
+            S fixed = (S) doRefactor();
             assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected.get()));
 
@@ -193,10 +206,9 @@ public class Assertions {
         public RefactoringAssert<S> isUnchanged() {
             List<String> results = new ArrayList<>();
             for (Change change : refactor.fix(sources)) {
-                if(change.getFixed() != null) {
+                if (change.getFixed() != null) {
                     results.add(change.getFixed().printTrimmed());
-                }
-                else {
+                } else {
                     assert change.getOriginal() != null;
                     results.add(change.getOriginal().getSourcePath() + " has been DELETED");
                 }

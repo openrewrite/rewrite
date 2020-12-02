@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.cache.InMemoryCache
@@ -78,7 +79,10 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
+            }
     )
 
     @Test
@@ -106,7 +110,10 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
+            }
     )
 
     @Test
@@ -136,7 +143,10 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("org.springframework.boot", "spring-boot")).isNotEmpty()
+            }
     )
 
     @Test
@@ -187,7 +197,10 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("org.junit.jupiter", "junit-jupiter-api")).isNotEmpty()
+            }
     )
 
     @Test
@@ -276,7 +289,10 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
+            }
     )
 
     @Test
@@ -334,6 +350,9 @@ class AddDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
+            }
     )
 }

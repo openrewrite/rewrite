@@ -55,7 +55,9 @@ public class Pom implements Metadata {
     @Nullable
     Pom parent;
 
+    @With
     Collection<Dependency> dependencies;
+
     DependencyManagement dependencyManagement;
 
     @With
@@ -151,6 +153,12 @@ public class Pom implements Metadata {
             }
         }
         return null;
+    }
+
+    public Collection<Pom.Dependency> findDependencies(String groupId, String artifactId) {
+        return dependencies.stream()
+                .flatMap(d -> d.findDependencies(groupId, artifactId).stream())
+                .collect(Collectors.toList());
     }
 
     /**

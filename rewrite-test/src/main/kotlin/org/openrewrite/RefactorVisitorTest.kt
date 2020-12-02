@@ -26,12 +26,12 @@ interface RefactorVisitorTest {
     val visitors: Iterable<RefactorVisitor<*>>
         get() = emptyList()
 
-    private fun assertBeforeAndAfterAreDifferent(before: String, after:String) {
-        if(before.trimIndent() == after.trimIndent()) {
+    private fun assertBeforeAndAfterAreDifferent(before: String, after: String) {
+        if (before.trimIndent() == after.trimIndent()) {
             throw RuntimeException(
                     "'before' and 'after' are equal. " +
-                    "Looks like you're trying to assert that the visitors should make no changes. " +
-                    "Instead of RefactorVisitorTest.assertRefactored(), use RefactorVisitorTest.assertUnchanged()")
+                            "Looks like you're trying to assert that the visitors should make no changes. " +
+                            "Instead of RefactorVisitorTest.assertRefactored(), use RefactorVisitorTest.assertUnchanged()")
         }
     }
 
@@ -45,7 +45,8 @@ interface RefactorVisitorTest {
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
             dependencies: List<String> = listOf(),
             before: String,
-            after: String) {
+            after: String,
+            afterConditions: (S) -> Unit = {}) {
         assertBeforeAndAfterAreDifferent(before, after)
         before.trimIndent()
                 .whenParsedBy(parser)
@@ -53,24 +54,25 @@ interface RefactorVisitorTest {
                 .whenVisitedBy(visitors)
                 .let { visitorsMapped.fold(it) { acc, visitorMapping -> acc.whenVisitedByMapped(visitorMapping) } }
                 .let { visitorsMappedToMany.fold(it) { acc, visitorMapping -> acc.whenVisitedByMany(visitorMapping) } }
-                .isRefactoredTo(after.trimIndent())
+                .isRefactoredTo(after.trimIndent(), afterConditions)
     }
 
     /**
      * Just like the other assertRefactored, but for when you want "after" to be lazily-evaluated.
      * This is niche, for those situations where the result should depend on something figured out during refactoring
      */
-    fun <S: SourceFile> assertRefactored(
+    fun <S : SourceFile> assertRefactored(
             parser: Parser<S>,
             visitors: Iterable<RefactorVisitor<*>>,
             visitorsMapped: Iterable<(S) -> RefactorVisitor<in S>>,
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>>,
             dependencies: List<String>,
             before: String,
-            after: () -> String) {
+            after: () -> String,
+            afterConditions: (S) -> Unit = {}) {
         // To lazily evaluate after() and maintain consistency with the other versions of assertRefactored,
         // curry in a trimIndent() and assertBeforeAndAfterAreDifferent() to be evaluated no sooner than after() is
-        val afterTrimmed: ()->String = {
+        val afterTrimmed: () -> String = {
             val afterText = after().trimIndent()
             assertBeforeAndAfterAreDifferent(before, afterText)
             afterText
@@ -81,18 +83,18 @@ interface RefactorVisitorTest {
                 .whenVisitedBy(visitors)
                 .let { visitorsMapped.fold(it) { acc, visitorMapping -> acc.whenVisitedByMapped(visitorMapping) } }
                 .let { visitorsMappedToMany.fold(it) { acc, visitorMapping -> acc.whenVisitedByMany(visitorMapping) } }
-                .isRefactoredTo(afterTrimmed)
+                .isRefactoredTo(afterTrimmed, afterConditions)
     }
 
     /**
      * Parse the "before" text, apply the visitors, assert that there are no changes
      */
-    fun <S: SourceFile> assertUnchanged(parser: Parser<S>,
-                                        visitors: Iterable<RefactorVisitor<*>> = this.visitors,
-                                        visitorsMapped: Iterable<(S) -> RefactorVisitor<in S>> = emptyList(),
-                                        visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
-                                        dependencies: List<String> = listOf(),
-                                        before: String) {
+    fun <S : SourceFile> assertUnchanged(parser: Parser<S>,
+                                         visitors: Iterable<RefactorVisitor<*>> = this.visitors,
+                                         visitorsMapped: Iterable<(S) -> RefactorVisitor<in S>> = emptyList(),
+                                         visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
+                                         dependencies: List<String> = listOf(),
+                                         before: String) {
         before.trimIndent()
                 .whenParsedBy(parser)
                 .whichDependsOn(*dependencies.toTypedArray())
@@ -112,7 +114,8 @@ interface RefactorVisitorTest {
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
             dependencies: List<File> = listOf(),
             before: File,
-            after: String) {
+            after: String,
+            afterConditions: (S) -> Unit = {}) {
         assertBeforeAndAfterAreDifferent(before.readText(), after)
         before.toPath()
                 .whenParsedBy(parser)
@@ -120,7 +123,7 @@ interface RefactorVisitorTest {
                 .whenVisitedBy(visitors)
                 .let { visitorsMapped.fold(it) { acc, visitorMapping -> acc.whenVisitedByMapped(visitorMapping) } }
                 .let { visitorsMappedToMany.fold(it) { acc, visitorMapping -> acc.whenVisitedByMany(visitorMapping) } }
-                .isRefactoredTo(after.trimIndent())
+                .isRefactoredTo(after.trimIndent(), afterConditions)
     }
 
     /**
@@ -152,17 +155,22 @@ interface RefactorVisitorTestForParser<S : SourceFile> : RefactorVisitorTest {
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
             dependencies: List<String> = listOf(),
             before: String,
-            after: String) {
-        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany, dependencies, before, after)
+            after: String,
+            afterConditions: (S) -> Unit = {}) {
+        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany,
+                dependencies, before, after, afterConditions)
     }
+
     fun assertRefactored(
             visitors: Iterable<RefactorVisitor<*>> = this.visitors,
             visitorsMapped: Iterable<(S) -> RefactorVisitor<in S>> = emptyList(),
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
             dependencies: List<String> = listOf(),
             before: String,
-            after: ()->String) {
-        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany, dependencies, before, after)
+            after: () -> String,
+            afterConditions: (S) -> Unit = {}) {
+        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany,
+                dependencies, before, after, afterConditions)
     }
 
     fun assertRefactored(
@@ -171,8 +179,10 @@ interface RefactorVisitorTestForParser<S : SourceFile> : RefactorVisitorTest {
             visitorsMappedToMany: Iterable<(S) -> Iterable<RefactorVisitor<in S>>> = emptyList(),
             dependencies: List<File> = listOf(),
             before: File,
-            after: String) {
-        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany, dependencies, before, after)
+            after: String,
+            afterConditions: (S) -> Unit = {}) {
+        return assertRefactored(parser, visitors, visitorsMapped, visitorsMappedToMany, dependencies,
+                before, after, afterConditions)
     }
 
     fun assertUnchanged(

@@ -34,10 +34,12 @@ import org.openrewrite.xml.AddToTag;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
+import static java.util.Collections.*;
 import static org.openrewrite.Validated.required;
 
 /**
@@ -170,7 +172,20 @@ public class AddDependency extends MavenRefactorVisitor {
 
         andThen(new InsertDependencyInOrder());
 
-        return maven;
+        Collection<Pom.Dependency> dependencies = new ArrayList<>(model.getDependencies());
+        dependencies.add(
+                new Pom.Dependency(
+                        Scope.fromName(scope),
+                        classifier,
+                        false,
+                        new Pom(null, groupId, artifactId, version, "jar", classifier, null,
+                                emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap()),
+                        version,
+                        emptySet()
+                )
+        );
+
+        return maven.withModel(maven.getModel().withDependencies(dependencies));
     }
 
     private class InsertDependencyInOrder extends MavenRefactorVisitor {

@@ -23,7 +23,9 @@ import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 
@@ -72,7 +74,7 @@ public class Maven extends Xml.Document {
     @Override
     public Maven withRoot(Tag root) {
         Document m = super.withRoot(root);
-        if(m instanceof Maven) {
+        if (m instanceof Maven) {
             return (Maven) m;
         }
         return new Maven(m);
@@ -81,7 +83,7 @@ public class Maven extends Xml.Document {
     @Override
     public Maven withMetadata(Collection<Metadata> metadata) {
         Document m = super.withMetadata(metadata);
-        if(m instanceof Maven) {
+        if (m instanceof Maven) {
             return (Maven) m;
         }
         return new Maven(m);
@@ -90,7 +92,7 @@ public class Maven extends Xml.Document {
     @Override
     public Maven withFormatting(Formatting formatting) {
         Document m = super.withFormatting(formatting);
-        if(m instanceof Maven) {
+        if (m instanceof Maven) {
             return (Maven) m;
         }
         return new Maven(m);
@@ -99,9 +101,21 @@ public class Maven extends Xml.Document {
     @Override
     public Maven withProlog(Prolog prolog) {
         Document m = super.withProlog(prolog);
-        if(m instanceof Maven) {
+        if (m instanceof Maven) {
             return (Maven) m;
         }
         return new Maven(m);
+    }
+
+    public Maven withModel(Pom model) {
+        Pom existing = getMetadata(Pom.class);
+        List<Metadata> metadata = new ArrayList<>(getMetadata());
+        for (int i = 0; i < metadata.size(); i++) {
+            Metadata datum = metadata.get(i);
+            if (datum == existing) {
+                metadata.set(i, model);
+            }
+        }
+        return withMetadata(metadata);
     }
 }
