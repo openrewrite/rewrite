@@ -84,9 +84,9 @@ public enum Scope {
                 switch (this) {
                     case Compile:
                     case Runtime:
+                    case Test:
                         return Test;
                     case Provided:
-                    case Test:
                     default:
                         return null;
                 }
@@ -99,7 +99,7 @@ public enum Scope {
         if (scope == null) {
             return Compile;
         }
-        switch (scope) {
+        switch (scope.toLowerCase()) {
             case "compile":
                 return Compile;
             case "provided":
