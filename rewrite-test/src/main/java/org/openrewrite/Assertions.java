@@ -185,13 +185,12 @@ public class Assertions {
             S fixed = (S) doRefactor();
             assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
-
+            conditions.accept(fixed);
             return this;
         }
 
         public RefactoringAssert<S> isRefactoredTo(Supplier<String> expected) {
-            return isRefactoredTo(expected, s -> {
-            });
+            return isRefactoredTo(expected, s -> {});
         }
 
         @SuppressWarnings("unchecked")

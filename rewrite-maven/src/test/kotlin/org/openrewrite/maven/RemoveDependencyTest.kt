@@ -15,8 +15,8 @@
  */
 package org.openrewrite.maven
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitor
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
@@ -77,7 +77,10 @@ class RemoveDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                   </dependencies>
                 </project>
-            """
+            """,
+            afterConditions = { maven: Maven ->
+                assertEquals(1,  maven.model.dependencies.size)
+            }
     )
 
     @Test

@@ -15,8 +15,17 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.maven.tree.Maven;
+import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.RemoveContent;
 import org.openrewrite.xml.tree.Xml;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.toList;
 
 public class RemoveDependency extends MavenRefactorVisitor {
     private String groupId;
@@ -41,5 +50,19 @@ public class RemoveDependency extends MavenRefactorVisitor {
         }
 
         return super.visitTag(tag);
+    }
+
+    @Override
+    public Maven visitMaven(Maven maven) {
+        model = maven.getModel();
+        if(findDependencies(groupId, artifactId).size() == 0) {
+            return maven;
+        }
+        Maven m = super.visitMaven(maven);
+        List<Pom.Dependency> dependencies = model.getDependencies().stream()
+                .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
+                .collect(toList());
+
+        return m.withModel(model.withDependencies(dependencies));
     }
 }
