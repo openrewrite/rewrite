@@ -21,6 +21,8 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import java.util.function.Supplier;
+
 /**
  * This is the class you want to extend from if your visitor might ever want to swap the AST element being visited
  * for a different type of AST element. For example visiting a method declaration and returning a field.
@@ -29,7 +31,8 @@ import org.openrewrite.java.tree.*;
  */
 public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements JavaSourceVisitor<J> {
     protected JavaFormatter formatter;
-    protected TreeBuilder treeBuilder;
+    private TreeBuilder treeBuilder;
+    private Supplier<TreeBuilder> createTreeBuilderSupplier;
 
     @Override
     public J visitStatement(Statement statement) {
@@ -148,7 +151,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu) {
         formatter = new JavaFormatter(cu);
-        treeBuilder = new TreeBuilder(cu);
+        createTreeBuilderSupplier = () -> createTreeBuilder(cu);
         J.CompilationUnit c = cu;
         c = c.withPackageDecl(refactor(c.getPackageDecl()));
         c = c.withImports(refactor(c.getImports()));
@@ -450,6 +453,30 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     public J visitWildcard(J.Wildcard wildcard) {
         J.Wildcard w = refactor(wildcard, this::visitExpression);
         return w.withBoundedType(refactor(w.getBoundedType()));
+    }
+
+    /**
+     * @return An instance of a tree builder that can be used to create abstract syntax trees from text snippets.
+     */
+    protected final TreeBuilder getTreeBuilder() {
+        if (treeBuilder == null && createTreeBuilderSupplier != null) {
+            treeBuilder = createTreeBuilderSupplier.get();
+        }
+        return treeBuilder;
+    }
+
+    /**
+     * The method provides a hook in which visitors can customize the creation of the TreeBuilder instance and
+     * the classpath used by the parser when creating abstract syntax trees from text snippets. The tree builder
+     * is only constructed if it is used by the visitor.
+     *
+     * The default behavior is to seed the builder with a parser that matches the styles of the compilation unit and
+     * has a classpath that only contains the Java runtime.
+     *
+     * @param cu The compilation unit used to seed the tree builder with a parser.
+     */
+    protected TreeBuilder createTreeBuilder(J.CompilationUnit cu) {
+        return new TreeBuilder(cu.buildParser());
     }
 
     /**

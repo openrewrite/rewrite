@@ -77,7 +77,7 @@ public class GenerateGetter {
                     J.VariableDecls.NamedVar fieldVar = field.getVars().get(0);
                     String fieldName = fieldVar.getSimpleName();
 
-                    J.MethodDecl getMethod = treeBuilder.buildMethodDeclaration(
+                    J.MethodDecl getMethod = getTreeBuilder().buildMethodDeclaration(
                             classDecl,
                             "public " + field.getTypeExpr().print().trim() + " get" + capitalize(fieldName) + "()" + " {\n" +
                                     "    return " + fieldName + ";\n" +

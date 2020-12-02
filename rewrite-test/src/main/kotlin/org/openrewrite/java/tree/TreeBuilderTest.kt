@@ -40,7 +40,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(jp).buildSnippet<Statement>(
                 methodBodyCursor,
                 "others.add(${paramName.printTrimmed()});")
 
@@ -64,7 +64,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(a.buildParser()).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     n++;
@@ -100,7 +100,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(a.buildParser()).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     others.add(${paramName.printTrimmed()});
@@ -137,7 +137,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(a.buildParser()).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     if(bucket == null) {
@@ -175,7 +175,7 @@ interface TreeBuilderTest {
                     val methodBodyCursor = RetrieveCursor(method.body).visit(a)
                     val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name.printTrimmed()
 
-                    val snippets = TreeBuilder(a).buildSnippet<Statement>(methodBodyCursor,
+                    val snippets = TreeBuilder(jp).buildSnippet<Statement>(methodBodyCursor,
                             """
                                 others.add(${paramName});
                                 if(others.contains(${paramName})) {
@@ -215,7 +215,7 @@ interface TreeBuilderTest {
             }
         """.trimIndent())[0]
 
-        @Suppress("UNCHECKED_CAST") val init = TreeBuilder(a)
+        @Suppress("UNCHECKED_CAST") val init = TreeBuilder(jp)
                 .buildDeclaration(a.classes[0],
                         """
                             static {
@@ -244,7 +244,7 @@ interface TreeBuilderTest {
             }
         """.trimIndent())[0]
 
-        val methodDecl = TreeBuilder(a).buildMethodDeclaration(a.classes[0],
+        val methodDecl = TreeBuilder(jp).buildMethodDeclaration(a.classes[0],
                 """
                     B build() {
                         return new B();
@@ -306,7 +306,7 @@ interface TreeBuilderTest {
             }
         """.trimIndent()
 
-        val result = TreeBuilder(a).buildDeclaration(a.classes.first(), innerClassSnippet,
+        val result = TreeBuilder(jp).buildDeclaration(a.classes.first(), innerClassSnippet,
                 JavaType.Class.build("java.util.List"))
         assertThat(result).isExactlyInstanceOf(J.ClassDecl::class.java)
         assertThat(result.printTrimmed()).isEqualTo(innerClassSnippet)
