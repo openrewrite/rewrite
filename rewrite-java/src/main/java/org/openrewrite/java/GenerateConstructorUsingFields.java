@@ -122,7 +122,7 @@ public class GenerateConstructorUsingFields {
             public J.MethodDecl visitMethod(J.MethodDecl method) {
                 if (scope.isScope(method)) {
                     return method.withBody(method.getBody().withStatements(
-                            treeBuilder.buildSnippet(
+                            getTreeBuilder().buildSnippet(
                                     getCursor(),
                                     fields.stream().map(mv -> {
                                         String name = mv.getVars().get(0).getSimpleName();

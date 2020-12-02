@@ -107,7 +107,7 @@ public class GenerateNewBeanUsingProperties {
                         .append(((J) properties[i + 1]).printTrimmed()).append(");\n");
             }
 
-            List<J> beanStatements = treeBuilder.buildSnippet(getCursor(), snippet.toString());
+            List<J> beanStatements = getTreeBuilder().buildSnippet(getCursor(), snippet.toString());
             andThen(new AutoFormat(beanStatements.toArray(new J[0])));
             return beanStatements;
         }
