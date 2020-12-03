@@ -340,7 +340,7 @@ public class TreeBuilder {
     }
 
     /**
-     * Visit each method invocation, new instance constructors,and variables (within insertion scope) and extract the
+     * Visit each method invocation, new instance constructors, and variables (within insertion scope) and extract the
      * method types
      */
     private static class GetTypesInScope extends AbstractJavaSourceVisitor<List<JavaType>> {
