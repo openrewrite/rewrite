@@ -34,6 +34,7 @@ import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.maven.cache.InMemoryCache
@@ -434,5 +435,122 @@ class MavenDependencyResolutionIntegTest {
             })
             return remotes
         }
+    }
+
+
+    @Disabled("https://github.com/openrewrite/rewrite/issues/95")
+    @Test
+    fun dependenciesGetVersionsFromParent() {
+        MavenParser.builder()
+                .build().parse("""
+            <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+            
+                <artifactId>spring-cloud-stream</artifactId>
+                <packaging>jar</packaging>
+                <name>spring-cloud-stream</name>
+                <description>Messaging Microservices with Spring Integration</description>
+            
+                <parent>
+                    <groupId>org.springframework.cloud</groupId>
+                    <artifactId>spring-cloud-stream-parent</artifactId>
+                    <version>2.1.4.RELEASE</version>
+                </parent>
+            
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-actuator</artifactId>
+                        <optional>true</optional>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-validation</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-messaging</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.integration</groupId>
+                        <artifactId>spring-integration-core</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.integration</groupId>
+                        <artifactId>spring-integration-jmx</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework</groupId>
+                        <artifactId>spring-tuple</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.integration</groupId>
+                        <artifactId>spring-integration-tuple</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.retry</groupId>
+                        <artifactId>spring-retry</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-configuration-processor</artifactId>
+                        <optional>true</optional>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-function-context</artifactId>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.integration</groupId>
+                        <artifactId>spring-integration-test</artifactId>
+                        <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-test</artifactId>
+                        <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-autoconfigure-processor</artifactId>
+                        <optional>true</optional>
+                    </dependency>
+            
+                    <dependency>
+                        <groupId>org.springframework.integration</groupId>
+                        <artifactId>spring-integration-http</artifactId>
+                        <scope>test</scope>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter-web</artifactId>
+                        <scope>test</scope>
+                    </dependency>
+                </dependencies>
+            
+                <build>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-jar-plugin</artifactId>
+                            <executions>
+                                <execution>
+                                    <configuration>
+                                        <includes>
+                                            <include>**/test/*</include>
+                                        </includes>
+                                        <classifier>test-binder</classifier>
+                                    </configuration>
+                                    <goals>
+                                        <goal>test-jar</goal>
+                                    </goals>
+                                </execution>
+                            </executions>
+                        </plugin>
+                    </plugins>
+                </build>
+            
+            </project>
+        """.trimIndent())
     }
 }
