@@ -48,7 +48,7 @@ public class MavenParser implements Parser<Maven> {
     @Override
     public List<Maven> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
         Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
-                .map(source -> RawMaven.parse(source, relativeTo))
+                .map(source -> RawMaven.parse(source, relativeTo, null))
                 .collect(toList());
 
         MavenDownloader downloader = new MavenDownloader(mavenCache,

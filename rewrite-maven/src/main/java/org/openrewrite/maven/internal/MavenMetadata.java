@@ -21,6 +21,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
@@ -43,7 +44,7 @@ public class MavenMetadata {
         }
     };
 
-    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList()));
+    public static final MavenMetadata EMPTY = new MavenMetadata(new MavenMetadata.Versioning(emptyList(), null));
 
     Versioning versioning;
 
@@ -51,6 +52,9 @@ public class MavenMetadata {
     @Data
     public static class Versioning {
         Collection<String> versions;
+
+        @Nullable
+        Snapshot snapshot;
     }
 
     public static MavenMetadata parse(byte[] document) {
@@ -59,5 +63,12 @@ public class MavenMetadata {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    public static class Snapshot {
+        String timestamp;
+        String buildNumber;
     }
 }

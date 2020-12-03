@@ -30,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Paths;
 import java.util.*;
@@ -61,7 +62,8 @@ public class MavenDownloader {
         this.projectPoms = projectPoms;
     }
 
-    public MavenMetadata downloadMetadata(String groupId, String artifactId, List<RawPom.Repository> repositories) {
+    public MavenMetadata downloadMetadata(String groupId, String artifactId,
+                                          List<RawPom.Repository> repositories) {
         Timer.Sample sample = Timer.start();
 
         return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
@@ -73,26 +75,8 @@ public class MavenDownloader {
                             .tag("type", "metadata");
 
                     try {
-                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId, () -> {
-                            logger.debug("Resolving {}:{} metadata from {}", groupId, artifactId, repo.getUrl());
-
-                            String uri = repo.getUrl() + "/" +
-                                    groupId.replace('.', '/') + '/' +
-                                    artifactId + '/' +
-                                    "maven-metadata.xml";
-
-                            Request request = new Request.Builder().url(uri).get().build();
-                            try (Response response = httpClient.newCall(request).execute()) {
-                                if (response.isSuccessful() && response.body() != null) {
-                                    @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                            .bytes();
-
-                                    return MavenMetadata.parse(responseBody);
-                                }
-                            }
-
-                            return null;
-                        });
+                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                                () -> forceDownloadMetadata(groupId, artifactId, null, repo));
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
                         return result.getData();
@@ -115,10 +99,35 @@ public class MavenDownloader {
                     } else {
                         return new MavenMetadata(new MavenMetadata.Versioning(
                                 Stream.concat(m1.getVersioning().getVersions().stream(),
-                                        m2.getVersioning().getVersions().stream()).collect(toList())
+                                        m2.getVersioning().getVersions().stream()).collect(toList()),
+                                null
                         ));
                     }
                 });
+    }
+
+    @Nullable
+    private MavenMetadata forceDownloadMetadata(String groupId, String artifactId,
+                                                @Nullable String version, RawPom.Repository repo) throws IOException {
+        logger.debug("Resolving {}:{} metadata from {}", groupId, artifactId, repo.getUrl());
+
+        String uri = repo.getUrl() + "/" +
+                groupId.replace('.', '/') + '/' +
+                artifactId + '/' +
+                (version == null ? "" : version + '/') +
+                "maven-metadata.xml";
+
+        Request request = new Request.Builder().url(uri).get().build();
+        try (Response response = httpClient.newCall(request).execute()) {
+            if (response.isSuccessful() && response.body() != null) {
+                @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                        .bytes();
+
+                return MavenMetadata.parse(responseBody);
+            }
+        }
+
+        return null;
     }
 
     private Timer.Builder addTagsByResult(Timer.Builder timer, CacheResult<?> result) {
@@ -144,6 +153,11 @@ public class MavenDownloader {
                              @Nullable String relativePath,
                              @Nullable RawMaven containingPom,
                              List<RawPom.Repository> repositories) {
+
+        String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
+        if (versionMaybeDatedSnapshot == null) {
+            return null;
+        }
 
         Timer.Sample sample = Timer.start();
 
@@ -177,12 +191,13 @@ public class MavenDownloader {
                             .tag("type", "pom");
 
                     try {
-                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()).toURL(), groupId, artifactId, version, () -> {
+                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                                versionMaybeDatedSnapshot, () -> {
                             String uri = repo.getUrl() + "/" +
                                     groupId.replace('.', '/') + '/' +
                                     artifactId + '/' +
                                     version + '/' +
-                                    artifactId + '-' + version + ".pom";
+                                    artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
                             Request request = new Request.Builder().url(uri).get().build();
                             try (Response response = httpClient.newCall(request).execute()) {
@@ -192,7 +207,8 @@ public class MavenDownloader {
 
                                     return RawMaven.parse(
                                             new Parser.Input(URI.create(uri), () -> new ByteArrayInputStream(responseBody)),
-                                            null
+                                            null,
+                                            versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
                                     );
                                 }
                             }
@@ -212,6 +228,37 @@ public class MavenDownloader {
                 .filter(Objects::nonNull)
                 .findFirst()
                 .orElse(null);
+    }
+
+    @Nullable
+    private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, List<RawPom.Repository> repositories) {
+        if (version.endsWith("-SNAPSHOT")) {
+            MavenMetadata mavenMetadata = repositories.stream()
+                    .distinct()
+                    .map(this::normalizeRepository)
+                    .filter(Objects::nonNull)
+                    .filter(repo -> repo.acceptsVersion(version))
+                    .map(repo -> {
+                        try {
+                            return forceDownloadMetadata(groupId, artifactId, version, repo);
+                        } catch (IOException e) {
+                            logger.debug("Failed to download snapshot metadata for {}:{}:{}", groupId, artifactId, version);
+                            return null;
+                        }
+                    })
+                    .findFirst()
+                    .orElse(null);
+
+            if (mavenMetadata != null) {
+                MavenMetadata.Snapshot snapshot = mavenMetadata.getVersioning().getSnapshot();
+                if (snapshot == null) {
+                    return null;
+                }
+                return version.replaceFirst("SNAPSHOT$", snapshot.getTimestamp() + "-" + snapshot.getBuildNumber());
+            }
+        }
+
+        return version;
     }
 
     @Nullable

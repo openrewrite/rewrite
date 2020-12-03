@@ -178,7 +178,7 @@ public class AddDependency extends MavenRefactorVisitor {
                         Scope.fromName(scope),
                         classifier,
                         false,
-                        new Pom(null, groupId, artifactId, version, "jar", classifier, null,
+                        new Pom(null, groupId, artifactId, version, null, "jar", classifier, null,
                                 emptyList(), new Pom.DependencyManagement(emptyList()), emptyList(), emptyList(), emptyMap()),
                         version,
                         emptySet()

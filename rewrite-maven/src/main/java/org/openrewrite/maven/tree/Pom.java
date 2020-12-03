@@ -46,6 +46,12 @@ public class Pom implements Metadata {
     @Nullable
     String version;
 
+    /**
+     * The timestamp and build numbered version number (the latest snapshot at time dependencies were resolved).
+     */
+    @Nullable
+    String snapshotVersion;
+
     @Nullable
     String type;
 
@@ -70,6 +76,7 @@ public class Pom implements Metadata {
                @Nullable @JsonProperty("groupId") String groupId,
                @JsonProperty("artifactId") String artifactId,
                @Nullable @JsonProperty("version") String version,
+               @Nullable @JsonProperty("snapshotVersion") String snapshotVersion,
                @Nullable @JsonProperty("type") String type,
                @Nullable @JsonProperty("classifier") String classifier,
                @Nullable @JsonProperty("parent") Pom parent,
@@ -82,6 +89,7 @@ public class Pom implements Metadata {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
+        this.snapshotVersion = snapshotVersion;
         this.type = type;
         this.classifier = classifier;
         this.parent = parent;

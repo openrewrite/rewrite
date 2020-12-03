@@ -37,6 +37,7 @@ import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Pom
 import org.openrewrite.xml.tree.Xml
@@ -72,6 +73,47 @@ class MavenDependencyResolutionIntegTest {
         fun afterAll() {
             mavenCache.close()
         }
+    }
+
+    @Issue("#93")
+    @Test
+    fun snapshotVersion() {
+        val pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <repositories>
+                <repository>
+                    <snapshots />
+                    <id>OSS JFrog</id>
+                    <name>OJO</name>
+                    <url>https://oss.jfrog.org/artifactory/libs-snapshot</url>
+                </repository>
+              </repositories>
+              
+              <dependencies>
+                <dependency>
+                    <groupId>org.openrewrite</groupId>
+                    <artifactId>rewrite-core</artifactId>
+                    <version>6.2.0-SNAPSHOT</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+
+        val maven = MavenParser.builder()
+                .cache(mavenCache)
+                .resolveOptional(false)
+                .build()
+                .parse(pom)
+                .first()
+
+        assertThat(maven.model.dependencies.first().version).isEqualTo("6.2.0-SNAPSHOT")
+        assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.2.0")
     }
 
     @Test

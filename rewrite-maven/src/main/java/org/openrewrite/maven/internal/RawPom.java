@@ -56,6 +56,13 @@ public class RawPom {
     @Nullable
     String version;
 
+    @With
+    @Getter
+    @EqualsAndHashCode.Include
+    @ToString.Include
+    @Nullable
+    String snapshotVersion;
+
     @Getter
     @Nullable
     String packaging;
@@ -85,6 +92,7 @@ public class RawPom {
                   @JsonProperty("groupId") @Nullable String groupId,
                   @JsonProperty("artifactId") String artifactId,
                   @JsonProperty("version") @Nullable String version,
+                  @Nullable @JsonProperty("snapshotVersion") String snapshotVersion,
                   @JsonProperty("packaging") @Nullable String packaging,
                   @JsonProperty("dependencies") @Nullable Dependencies dependencies,
                   @JsonProperty("dependencyManagement") @Nullable DependencyManagement dependencyManagement,
@@ -96,6 +104,7 @@ public class RawPom {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
+        this.snapshotVersion = snapshotVersion;
         this.packaging = packaging;
         this.dependencies = dependencies;
         this.dependencyManagement = dependencyManagement;

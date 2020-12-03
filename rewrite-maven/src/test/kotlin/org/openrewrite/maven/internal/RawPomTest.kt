@@ -66,7 +66,7 @@ class RawPomTest {
                 </dependencies>
             </project>
             """.trimIndent().byteInputStream()
-        }, null).pom
+        }, null, null).pom
 
         assertSerializationRoundTrip(tempDir, pom)
     }
@@ -101,7 +101,7 @@ class RawPomTest {
                   </repositories>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null).pom
+        }, null, null).pom
 
         val rawPom = assertSerializationRoundTrip(tempDir, pom)
         assertThat(rawPom.repositories).hasSize(1)

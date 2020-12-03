@@ -43,7 +43,7 @@ class RawMavenTest {
                     </profiles>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null)
+        }, null, null)
 
         assertThat(maven.pom.dependencyManagement?.dependencies).isNull()
         assertThat(maven.pom.repositories).isEmpty()
@@ -71,7 +71,7 @@ class RawMavenTest {
                   </dependencyManagement>
                 </project>
             """.trimIndent().byteInputStream()
-        }, null)
+        }, null, null)
 
         assertThat(maven.pom.dependencyManagement?.dependencies?.dependencies).isNotEmpty()
     }

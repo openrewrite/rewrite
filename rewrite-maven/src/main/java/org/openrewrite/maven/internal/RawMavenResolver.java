@@ -495,6 +495,7 @@ public class RawMavenResolver {
                                 groupId,
                                 rawPom.getArtifactId(),
                                 version,
+                                rawPom.getSnapshotVersion(),
                                 null,
                                 null,
                                 partial.getParent(),

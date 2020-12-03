@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven.cache;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.RawPom;

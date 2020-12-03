@@ -90,12 +90,16 @@ public class RawMaven {
                 '}';
     }
 
-    public static RawMaven parse(Parser.Input source, @Nullable URI relativeTo) {
+    public static RawMaven parse(Parser.Input source, @Nullable URI relativeTo, @Nullable String snapshotVersion) {
         Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo)
                 .iterator().next();
 
         try {
-            return new RawMaven(document, xmlMapper.readValue(source.getSource(), RawPom.class));
+            RawPom pom = xmlMapper.readValue(source.getSource(), RawPom.class);
+            if (snapshotVersion != null) {
+                pom = pom.withSnapshotVersion(snapshotVersion);
+            }
+            return new RawMaven(document, pom);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse " + source.getUri(), e);
         }
