@@ -159,6 +159,35 @@ interface TreeBuilderTest {
     }
 
     @Test
+    fun buildSnippetWithClassInstanceCreation(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.List;
+            
+            import java.io.File;
+
+            public class A {
+                int n = 0;
+                List<Object> bucket;
+                
+                void foo(String... m) {
+                    bucket.add(new File("a file"));
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    bucket.add(new File("some other file"));
+                 """)
+        val methodInv1 : Expression = snippets[0] as Expression
+        assertNotNull(methodInv1.type, "The type information for the static method asList() should be populated")
+    }
+
+    @Test
     fun injectSnippetIntoMethod(jp: JavaParser) {
         """
             import java.util.List;
@@ -229,11 +258,6 @@ interface TreeBuilderTest {
 
     @Test
     fun buildMethodDeclaration(jp: JavaParser) {
-        val b = """
-            package b;
-
-            public class B {}
-        """.trimIndent()
 
         val a = jp.parse("""
             import java.util.ArrayList;
