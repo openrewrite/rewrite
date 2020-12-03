@@ -361,9 +361,9 @@ public class TreeBuilder {
         public List<JavaType> visitMethodInvocation(J.MethodInvocation method) {
             List<JavaType> methods = super.visitMethodInvocation(method);
             if (isInSameNameScope(scope)) {
-                if (method.getType() != null) {
+                if (method.getType() != null && method.getSelect() == null) {
                     methods.add(method.getType());
-                } else {
+                } else if (method.getSelect() == null) {
                     logger.warn("There is an invocation to a method [" + method.getSimpleName()
                             + "] within the original insertion scope that does not have type information.");
                 }
