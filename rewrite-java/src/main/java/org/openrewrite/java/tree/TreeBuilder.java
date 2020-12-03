@@ -208,7 +208,34 @@ public class TreeBuilder {
 
         StringBuilder source = new StringBuilder(512);
 
-        for (JavaType importType : imports) {
+        List<JavaType> allImports = new ArrayList<>(Arrays.asList(imports));
+
+        //Need to collect any types within the insert scope. FullyQualified types will be added as an import
+        //and Method types will either need to be stubbed out or statically imported into the synthetic class.
+        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(cu);
+
+        List<JavaType.Method> localMethods = new ArrayList<>();
+        for (JavaType type: typesInScope) {
+            if (type instanceof JavaType.Method) {
+                JavaType.Method method = (JavaType.Method) type;
+                if (method.getDeclaringType() == null) {
+                    continue;
+                }
+                if (cu.getClasses().stream().map(J.ClassDecl::getType)
+                        .filter(Objects::nonNull)
+                        .anyMatch(t -> t.equals(method.getDeclaringType()))) {
+                    //Local methods are stubbed out below.
+                    localMethods.add(method);
+                } else {
+                    //Any method not belonging to the compilation unit should be statically imported.
+                    allImports.add(method);
+                }
+            } else if (type instanceof JavaType.FullyQualified) {
+                allImports.add(type);
+            }
+        }
+
+        for (JavaType importType : allImports) {
             if (importType == null) {
                 continue;
             }
@@ -216,26 +243,6 @@ public class TreeBuilder {
                 source.append("import ").append(((JavaType.FullyQualified) importType).getFullyQualifiedName()).append(";\n");
             } else if (importType instanceof JavaType.Method) {
                 JavaType.Method method = (JavaType.Method) importType;
-                source.append("import static ").append(method.getDeclaringType().getFullyQualifiedName())
-                    .append(".").append(method.getName()).append(";\n");
-            }
-        }
-
-        //Need to collect any method invocation within the insert scope. These either need to be stubbed out
-        //or statically imported into the synthetic class.
-        List<JavaType.Method> methodTypesInScope = new GetMethodTypesInScope(insertionScope).visit(cu);
-
-        List<JavaType.Method> localMethods = new ArrayList<>();
-        for (JavaType.Method method: methodTypesInScope) {
-            if (method.getDeclaringType() == null) {
-                continue;
-            }
-            if (cu.getClasses().stream().map(J.ClassDecl::getType)
-                    .filter(Objects::nonNull)
-                    .anyMatch(t -> t.equals(method.getDeclaringType()))) {
-                localMethods.add(method);
-            } else {
-                //Any method not belonging to the compilation unit should be statically imported.
                 source.append("import static ").append(method.getDeclaringType().getFullyQualifiedName())
                     .append(".").append(method.getName()).append(";\n");
             }
@@ -317,7 +324,7 @@ public class TreeBuilder {
             if (primitive != null) {
                 methodStub.append(primitive.getKeyword());
             } else if (parameter instanceof JavaType.FullyQualified) {
-                methodStub.append(TypeUtils.asFullyQualified(parameter).getFullyQualifiedName());
+                methodStub.append(((JavaType.FullyQualified) parameter).getFullyQualifiedName());
             } else {
                 methodStub.append("Object");
             }
@@ -333,28 +340,28 @@ public class TreeBuilder {
     }
 
     /**
-     * Visit each method invocation (within insertion scope) and extract the method type (if the invocation includes
-     * type information)
+     * Visit each method invocation, new instance constructors,and variables (within insertion scope) and extract the
+     * method types
      */
-    private static class GetMethodTypesInScope extends AbstractJavaSourceVisitor<List<JavaType.Method>> {
+    private static class GetTypesInScope extends AbstractJavaSourceVisitor<List<JavaType>> {
         @Nullable
         private final Cursor scope;
 
-        private GetMethodTypesInScope(@Nullable Cursor scope) {
+        private GetTypesInScope(@Nullable Cursor scope) {
             this.scope = scope;
             setCursoringOn();
         }
 
         @Override
-        public List<JavaType.Method> defaultTo(@Nullable Tree t) {
+        public List<JavaType> defaultTo(@Nullable Tree t) {
             return emptyList();
         }
 
         @Override
-        public List<JavaType.Method> visitMethodInvocation(J.MethodInvocation method) {
-            List<JavaType.Method> methods = super.visitMethodInvocation(method);
+        public List<JavaType> visitMethodInvocation(J.MethodInvocation method) {
+            List<JavaType> methods = super.visitMethodInvocation(method);
             if (isInSameNameScope(scope)) {
-                if (method.getSelect() == null && method.getType() != null) {
+                if (method.getType() != null) {
                     methods.add(method.getType());
                 } else {
                     logger.warn("There is an invocation to a method [" + method.getSimpleName()
@@ -362,7 +369,28 @@ public class TreeBuilder {
                 }
             }
             return methods;
+        }
 
+        @Override
+        public List<JavaType> visitNewClass(J.NewClass newClass) {
+            List<JavaType> types = super.visitNewClass(newClass);
+            if (isInSameNameScope(scope)) {
+                if (newClass.getType() != null) {
+                    types.add(newClass.getType());
+                }
+            }
+            return types;
+        }
+
+        @Override
+        public List<JavaType> visitVariable(J.VariableDecls.NamedVar variable) {
+            List<JavaType> types = super.visitVariable(variable);
+            if (isInSameNameScope(scope)) {
+                if (variable.getType() != null) {
+                    types.add(variable.getType());
+                }
+            }
+            return types;
         }
     }
 
@@ -398,12 +426,8 @@ public class TreeBuilder {
     private static String variableDefinitionSource(J.VariableDecls variableDecls, J.VariableDecls.NamedVar variable) {
         JavaType type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
         String typeName = "";
-        if (type instanceof JavaType.Class) {
-            typeName = ((JavaType.Class) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.ShallowClass) {
-            typeName = ((JavaType.ShallowClass) type).getFullyQualifiedName();
-        } else if (type instanceof JavaType.GenericTypeVariable) {
-            typeName = ((JavaType.GenericTypeVariable) type).getFullyQualifiedName();
+        if (type instanceof JavaType.FullyQualified) {
+            typeName = ((JavaType.FullyQualified) type).getClassName();
         } else if (type instanceof JavaType.Primitive) {
             typeName = ((JavaType.Primitive) type).getKeyword();
         }
