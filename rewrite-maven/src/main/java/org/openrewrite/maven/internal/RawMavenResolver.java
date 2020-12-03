@@ -603,18 +603,24 @@ public class RawMavenResolver {
 
         @Nullable
         String getVersion(@Nullable String v) {
-            if (v == null) {
-                return null;
-            } else if (v.equals("${project.version}") || v.equals("${pom.version}")) {
-                String version = rawPom.getVersion();
-                if (version != null) {
-                    return version;
+            String last = null;
+            String version;
+            for (version = v; version != null && !version.equals(last);) {
+                last = version;
+                if (version.equals("${project.version}") || version.equals("${pom.version}")) {
+                    String rawVersion = rawPom.getVersion();
+                    if (rawVersion != null) {
+                        version = rawVersion;
+                        continue;
+                    }
+                    version = parent == null ? null : parent.getVersion();
+                } else if (v.equals("${project.parent.version}")) {
+                    version = parent != null ? parent.getVersion() : null;
+                } else {
+                    version = getValue(version);
                 }
-                return parent == null ? null : parent.getVersion();
-            } else if (v.equals("${project.parent.version}")) {
-                return parent != null ? parent.getVersion() : null;
             }
-            return getValue(v);
+            return version;
         }
 
         @Nullable
