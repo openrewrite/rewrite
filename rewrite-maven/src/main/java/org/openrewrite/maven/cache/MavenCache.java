@@ -15,10 +15,9 @@
  */
 package org.openrewrite.maven.cache;
 
-import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.internal.RawMaven;
+import org.openrewrite.maven.internal.RawRepositories;
 
 import java.net.URL;
 import java.util.concurrent.Callable;
@@ -38,9 +37,10 @@ public interface MavenCache extends AutoCloseable {
     /**
      * Store a normalized repository given an input repository. Normalization takes, for example,
      * an http:// scheme repository URL for a repository that now requires https and changes the scheme.
+     * @return
      */
-    CacheResult<RawPom.Repository> computeRepository(RawPom.Repository repository,
-                                                     Callable<RawPom.Repository> orElseGet) throws Exception;
+    CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
+                                                              Callable<RawRepositories.Repository> orElseGet) throws Exception;
 
     @Override
     default void close() {

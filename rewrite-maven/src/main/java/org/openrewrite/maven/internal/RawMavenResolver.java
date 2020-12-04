@@ -20,6 +20,7 @@ import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.*;
 import org.openrewrite.xml.tree.Xml;
 import org.slf4j.Logger;
@@ -57,9 +58,10 @@ public class RawMavenResolver {
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
+    private final MavenSettings mavenSettings;
 
     public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            boolean resolveOptional) {
+                            MavenSettings mavenSettings, boolean resolveOptional) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -67,12 +69,14 @@ public class RawMavenResolver {
         this.downloader = downloader;
         this.forParent = forParent;
         this.activeProfiles = activeProfiles;
+        this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
     }
 
     @Nullable
     public Xml.Document resolve(RawMaven rawMaven) {
-        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(), emptyList());
+        Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(),
+                mavenSettings == null ? emptyList() : mavenSettings.getActiveRepositories(activeProfiles));
         assert pom != null;
         return rawMaven.getDocument().withMetadata(singletonList(pom));
     }
@@ -87,7 +91,7 @@ public class RawMavenResolver {
      * @return A transitively resolved POM model.
      */
     @Nullable
-    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawPom.Repository> repositories) {
+    public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
                 false, null, requestedVersion, repositories);
 
@@ -148,7 +152,7 @@ public class RawMavenResolver {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
-                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, resolveOptional)
+                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional)
                                 .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                         if (maven != null) {
@@ -329,7 +333,7 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, true, activeProfiles, resolveOptional)
+                    parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional)
                             .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
@@ -342,8 +346,8 @@ public class RawMavenResolver {
     }
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
-        List<RawPom.Repository> repositories = new ArrayList<>();
-        for (RawPom.Repository repository : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
+        List<RawRepositories.Repository> repositories = new ArrayList<>();
+        for (RawRepositories.Repository repository : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
             String url = repository.getUrl().trim();
             if (repository.getUrl().contains("${")) {
                 url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
@@ -352,7 +356,7 @@ public class RawMavenResolver {
             try {
                 //noinspection ResultOfMethodCallIgnored
                 URI.create(url);
-                repositories.add(new RawPom.Repository(url, repository.getReleases(), repository.getSnapshots()));
+                repositories.add(new RawRepositories.Repository(url, repository.getReleases(), repository.getSnapshots()));
             } catch (Throwable t) {
                 logger.debug("Unable to make a URI out of repositoriy url {}", url);
             }
@@ -482,7 +486,7 @@ public class RawMavenResolver {
                 }
 
                 List<Pom.Repository> repositories = new ArrayList<>();
-                for (RawPom.Repository repo : partial.getRepositories()) {
+                for (RawRepositories.Repository repo : partial.getRepositories()) {
                     try {
                         repositories.add(new Pom.Repository(URI.create(repo.getUrl()).toURL(),
                                 repo.getReleases() == null || repo.getReleases().isEnabled(),
@@ -544,7 +548,7 @@ public class RawMavenResolver {
         @Nullable
         String requestedVersion;
 
-        List<RawPom.Repository> repositories;
+        List<RawRepositories.Repository> repositories;
 
         @JsonIgnore
         public Set<GroupArtifact> getExclusions() {
@@ -577,7 +581,7 @@ public class RawMavenResolver {
         Pom.DependencyManagement dependencyManagement;
         Collection<ResolutionTask> dependencyTasks = emptyList();
         Collection<Pom.License> licenses = emptyList();
-        List<RawPom.Repository> repositories = emptyList();
+        List<RawRepositories.Repository> repositories = emptyList();
         Map<String, String> properties = emptyMap();
 
         @Nullable

@@ -46,11 +46,14 @@ public class MavenParser implements Parser<Maven> {
 
     private final MavenCache mavenCache;
     private final Collection<String> activeProfiles;
+    private final MavenSettings mavenSettings;
     private final boolean resolveOptional;
 
-    private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles, boolean resolveOptional) {
+    private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles,
+                        MavenSettings mavenSettings, boolean resolveOptional) {
         this.mavenCache = mavenCache;
         this.activeProfiles = activeProfiles;
+        this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
     }
 
@@ -64,7 +67,8 @@ public class MavenParser implements Parser<Maven> {
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())));
 
         List<Maven> parsed = projectPoms.stream()
-                .map(raw -> new RawMavenResolver(downloader, false, activeProfiles, resolveOptional).resolve(raw))
+                .map(raw -> new RawMavenResolver(downloader, false, activeProfiles,
+                        mavenSettings, resolveOptional).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(Maven::new)
                 .collect(toCollection(ArrayList::new));
@@ -124,6 +128,9 @@ public class MavenParser implements Parser<Maven> {
         private final Collection<String> activeProfiles = new HashSet<>();
         private boolean resolveOptional = true;
 
+        @Nullable
+        private MavenSettings mavenSettings;
+
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
             return this;
@@ -152,13 +159,19 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
+        public Builder mavenSettings(Parser.Input source) {
+            this.mavenSettings = MavenSettings.parse(source);
+            return this;
+        }
+
         public Builder cache(MavenCache cache) {
             this.mavenCache = cache;
             return this;
         }
 
         public MavenParser build() {
-            return new MavenParser(mavenCache, activeProfiles, resolveOptional);
+            return new MavenParser(mavenCache, activeProfiles,
+                    mavenSettings, resolveOptional);
         }
     }
 }

@@ -47,8 +47,8 @@ public class MavenDownloader {
             .build();
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final RawPom.Repository SUPER_POM_REPOSITORY = new RawPom.Repository("https://repo.maven.apache.org/maven2",
-            new RawPom.ArtifactPolicy(true), new RawPom.ArtifactPolicy(false));
+    private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("https://repo.maven.apache.org/maven2",
+            new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
     private final Map<String, RawMaven> projectPoms;
@@ -63,7 +63,7 @@ public class MavenDownloader {
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
-                                          List<RawPom.Repository> repositories) {
+                                          List<RawRepositories.Repository> repositories) {
         Timer.Sample sample = Timer.start();
 
         return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
@@ -108,7 +108,7 @@ public class MavenDownloader {
 
     @Nullable
     private MavenMetadata forceDownloadMetadata(String groupId, String artifactId,
-                                                @Nullable String version, RawPom.Repository repo) throws IOException {
+                                                @Nullable String version, RawRepositories.Repository repo) throws IOException {
         logger.debug("Resolving {}:{} metadata from {}", groupId, artifactId, repo.getUrl());
 
         String uri = repo.getUrl() + "/" +
@@ -152,7 +152,7 @@ public class MavenDownloader {
                              @Nullable String classifier,
                              @Nullable String relativePath,
                              @Nullable RawMaven containingPom,
-                             List<RawPom.Repository> repositories) {
+                             List<RawRepositories.Repository> repositories) {
 
         String versionMaybeDatedSnapshot = findDatedSnapshotVersionIfNecessary(groupId, artifactId, version, repositories);
         if (versionMaybeDatedSnapshot == null) {
@@ -231,7 +231,7 @@ public class MavenDownloader {
     }
 
     @Nullable
-    private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, List<RawPom.Repository> repositories) {
+    private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, List<RawRepositories.Repository> repositories) {
         if (version.endsWith("-SNAPSHOT")) {
             MavenMetadata mavenMetadata = repositories.stream()
                     .distinct()
@@ -262,23 +262,23 @@ public class MavenDownloader {
     }
 
     @Nullable
-    private RawPom.Repository normalizeRepository(RawPom.Repository repository) {
+    private RawRepositories.Repository normalizeRepository(RawRepositories.Repository repository) {
         try {
-            CacheResult<RawPom.Repository> result = mavenCache.computeRepository(repository, () -> {
+            CacheResult<RawRepositories.Repository> result = mavenCache.computeRepository(repository, () -> {
                 // FIXME add retry logic
                 String url = repository.getUrl();
                 Request request = new Request.Builder().url(url).head().build();
                 try (Response response = httpClient.newCall(request).execute()) {
                     if (url.toLowerCase().contains("http://")) {
                         return normalizeRepository(
-                                new RawPom.Repository(
+                                new RawRepositories.Repository(
                                         url.toLowerCase().replace("http://", "https://"),
                                         repository.getReleases(),
                                         repository.getSnapshots()
                                 )
                         );
                     } else if (response.isSuccessful()) {
-                        return new RawPom.Repository(
+                        return new RawRepositories.Repository(
                                 url,
                                 repository.getReleases(),
                                 repository.getSnapshots()

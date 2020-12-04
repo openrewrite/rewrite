@@ -15,9 +15,9 @@
  */
 package org.openrewrite.maven.cache;
 
-import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.MavenMetadata;
-import org.openrewrite.maven.internal.RawPom;
+import org.openrewrite.maven.internal.RawMaven;
+import org.openrewrite.maven.internal.RawRepositories;
 
 import java.net.URL;
 import java.util.concurrent.Callable;
@@ -34,7 +34,7 @@ public class NoopCache implements MavenCache {
     }
 
     @Override
-    public CacheResult<RawPom.Repository> computeRepository(RawPom.Repository repository, Callable<RawPom.Repository> orElseGet) throws Exception {
+    public CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository, Callable<RawRepositories.Repository> orElseGet) throws Exception {
         return new CacheResult<>(CacheResult.State.Updated, orElseGet.call());
     }
 }

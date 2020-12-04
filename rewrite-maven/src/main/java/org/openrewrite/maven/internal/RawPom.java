@@ -79,7 +79,7 @@ public class RawPom {
     Map<String, String> properties;
 
     @Nullable
-    Repositories repositories;
+    RawRepositories repositories;
 
     @Nullable
     Licenses licenses;
@@ -97,7 +97,7 @@ public class RawPom {
                   @JsonProperty("dependencies") @Nullable Dependencies dependencies,
                   @JsonProperty("dependencyManagement") @Nullable DependencyManagement dependencyManagement,
                   @JsonProperty("properties") @Nullable Map<String, String> properties,
-                  @JsonProperty("repositories") @Nullable Repositories repositories,
+                  @JsonProperty("repositories") @Nullable RawRepositories repositories,
                   @JsonProperty("licenses") @Nullable Licenses licenses,
                   @JsonProperty("profiles") @Nullable Profiles profiles) {
         this.parent = parent;
@@ -154,8 +154,8 @@ public class RawPom {
         return activeDependencies;
     }
 
-    public List<Repository> getActiveRepositories(Collection<String> activeProfiles) {
-        List<Repository> activeRepositories = new ArrayList<>();
+    public List<RawRepositories.Repository> getActiveRepositories(Collection<String> activeProfiles) {
+        List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
 
         if(repositories != null) {
             activeRepositories.addAll(repositories.getRepositories());
@@ -229,15 +229,6 @@ public class RawPom {
     @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
     @Setter
-    public static class Repositories {
-        @JacksonXmlProperty(localName = "repository")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<Repository> repositories = emptyList();
-    }
-
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
     public static class Licenses {
         @JacksonXmlProperty(localName = "license")
         @JacksonXmlElementWrapper(useWrapping = false)
@@ -251,49 +242,6 @@ public class RawPom {
         @JacksonXmlProperty(localName = "profile")
         @JacksonXmlElementWrapper(useWrapping = false)
         List<Profile> profiles = emptyList();
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    public static class Repository {
-        @With
-        String url;
-
-        @Nullable
-        ArtifactPolicy releases;
-
-        @Nullable
-        ArtifactPolicy snapshots;
-
-        public boolean acceptsVersion(String version) {
-            if (version.endsWith("-SNAPSHOT")) {
-                return snapshots != null && snapshots.isEnabled();
-            } else if (url.equals("https://repo.spring.io/milestone")) {
-                // special case this repository since it will be so commonly used
-                return version.matches(".*(M|RC)\\d+$");
-            }
-            return releases != null && releases.isEnabled();
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode
-    @Getter
-    public static class ArtifactPolicy {
-        boolean enabled;
-
-        @JsonCreator
-        public ArtifactPolicy(@JsonProperty("enabled") @Nullable Boolean enabled) {
-            this.enabled = enabled == null || enabled;
-        }
-
-        /**
-         * Used by Jackson in the event there is an empty tag in the POM.
-         */
-        @SuppressWarnings("unused")
-        public ArtifactPolicy() {
-            this(true);
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -329,7 +277,7 @@ public class RawPom {
         List<Dependency> dependencies;
 
         @Nullable
-        Repositories repositories;
+        RawRepositories repositories;
 
         @JsonIgnore
         public boolean isActive(Collection<String> activeProfiles) {

@@ -36,18 +36,18 @@ import java.util.concurrent.Callable;
 
 public class MapdbCache implements MavenCache {
     private static final Serializer<Optional<RawMaven>> MAVEN_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawMaven.class);
-    private static final Serializer<RawPom.Repository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(RawPom.Repository.class);
-    private static final Serializer<Optional<RawPom.Repository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawPom.Repository.class);
+    private static final Serializer<RawRepositories.Repository> REPOSITORY_SERIALIZER = new JacksonMapdbSerializer<>(RawRepositories.Repository.class);
+    private static final Serializer<Optional<RawRepositories.Repository>> OPTIONAL_REPOSITORY_SERIALIZER = new OptionalJacksonMapdbSerializer<>(RawRepositories.Repository.class);
     private static final Serializer<Optional<MavenMetadata>> MAVEN_METADATA_SERIALIZER = new OptionalJacksonMapdbSerializer<>(MavenMetadata.class);
     private static final Serializer<GroupArtifactRepository> GROUP_ARTIFACT_SERIALIZER = new JacksonMapdbSerializer<>(GroupArtifactRepository.class);
 
     private final HTreeMap<String, Optional<RawMaven>> pomCache;
     private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
-    private final HTreeMap<RawPom.Repository, Optional<RawPom.Repository>> normalizedRepositoryUrls;
+    private final HTreeMap<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls;
 
     CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
     CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawPom.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public MapdbCache(@Nullable File workspace,
                       @Nullable Long maxCacheStoreSize) {
@@ -171,14 +171,14 @@ public class MapdbCache implements MavenCache {
     }
 
     @Override
-    public CacheResult<RawPom.Repository> computeRepository(RawPom.Repository repository,
-                                                            Callable<RawPom.Repository> orElseGet) throws Exception {
-        Optional<RawPom.Repository> normalizedRepository = normalizedRepositoryUrls.get(repository);
+    public CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
+                                                                     Callable<RawRepositories.Repository> orElseGet) throws Exception {
+        Optional<RawRepositories.Repository> normalizedRepository = normalizedRepositoryUrls.get(repository);
 
         //noinspection OptionalAssignedToNull
         if (normalizedRepository == null) {
             try {
-                RawPom.Repository repo = orElseGet.call();
+                RawRepositories.Repository repo = orElseGet.call();
                 normalizedRepositoryUrls.put(repository, Optional.ofNullable(repo));
                 return new CacheResult<>(CacheResult.State.Updated, repo);
             } catch (Exception e) {

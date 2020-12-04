@@ -222,7 +222,7 @@ public class RequestedVersion {
         }
     }
 
-    public String resolve(MavenDownloader downloader, List<RawPom.Repository> repositories) {
+    public String resolve(MavenDownloader downloader, List<RawRepositories.Repository> repositories) {
         String selectedVersion;
         if (isRange() || isDynamic()) {
             MavenMetadata metadata = downloader.downloadMetadata(groupArtifact.getGroupId(),

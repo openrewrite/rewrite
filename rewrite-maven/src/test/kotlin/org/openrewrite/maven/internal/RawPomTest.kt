@@ -22,7 +22,7 @@ import org.junit.jupiter.api.io.TempDir
 import org.mapdb.DBMaker
 import org.mapdb.serializer.SerializerString
 import org.openrewrite.Parser
-import org.openrewrite.maven.internal.RawPom.ArtifactPolicy
+import org.openrewrite.maven.internal.RawRepositories.ArtifactPolicy
 import java.net.URI
 import java.nio.file.Path
 
@@ -73,12 +73,12 @@ class RawPomTest {
 
     @Test
     fun repositorySerializationAndDeserialization() {
-        val repo = RawPom.Repository("https://repo.maven.apache.org/maven2",
+        val repo = RawRepositories.Repository("https://repo.maven.apache.org/maven2",
                 ArtifactPolicy(true), ArtifactPolicy(false))
 
         val mapper = ObjectMapper()
 
-        assertThat(mapper.readValue(mapper.writeValueAsBytes(repo), RawPom.Repository::class.java)).isEqualTo(repo)
+        assertThat(mapper.readValue(mapper.writeValueAsBytes(repo), RawRepositories.Repository::class.java)).isEqualTo(repo)
     }
 
     @Test
