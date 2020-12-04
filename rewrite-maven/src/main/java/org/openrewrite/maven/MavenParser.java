@@ -19,14 +19,20 @@ import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.InMemoryCache;
 import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawMavenResolver;
-import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Modules;
 import org.openrewrite.maven.tree.Pom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -37,6 +43,8 @@ import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
 
 public class MavenParser implements Parser<Maven> {
+    private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
+
     private final MavenCache mavenCache;
     private final boolean resolveOptional;
 
@@ -79,6 +87,23 @@ public class MavenParser implements Parser<Maven> {
         }
 
         return parsed;
+    }
+
+    public List<Maven> parseFileWalk(Path path) {
+        try {
+            List<Path> poms = Files.find(path, Integer.MAX_VALUE, (filePath, fileAttr) -> fileAttr.isRegularFile() && filePath.endsWith("pom.xml"))
+                    .collect(toList());
+
+            if(logger.isInfoEnabled()) {
+                for (Path pom : poms) {
+                    logger.info("Parsing {}", pom);
+                }
+            }
+
+            return parse(poms, path);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @Override

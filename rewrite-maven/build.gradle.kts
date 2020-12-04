@@ -1,3 +1,5 @@
+import nl.javadude.gradle.plugins.license.LicenseExtension
+
 plugins {
     id("nebula.integtest") version "7.0.9" apply false
 }
@@ -41,6 +43,8 @@ dependencies {
 
     integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 
+    integTestImplementation(project(":rewrite-java-11"))
+
     testImplementation("ch.qos.logback:logback-classic:1.0.13")
     testImplementation("org.mapdb:mapdb:latest.release")
 
@@ -66,4 +70,8 @@ tasks.withType<Javadoc> {
     (options as StandardJavadocDocletOptions).addStringOption("Xdoclint:none", "-quiet")
 
     exclude("**/VersionRangeParser**")
+}
+
+configure<LicenseExtension> {
+    excludePatterns.add("**/unresolvable.txt")
 }
