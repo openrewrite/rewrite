@@ -21,10 +21,7 @@ import java.nio.file.Paths
 object ParseMavenProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
-        val mavens = MavenParser.builder()
-            .resolveOptional(false)
-            .build()
-            .parseFileWalk(Paths.get(args.first()))
+        val mavens = MavenParser.parseProject(Paths.get(args.first()))
 
         mavens.forEach {
             println(it.sourcePath)

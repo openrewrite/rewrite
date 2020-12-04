@@ -89,7 +89,7 @@ class PomTest {
 
         val model = mapper.readValue(pom, RawPom::class.java)
 
-        assertThat(model.activeDependencies[0].groupId)
+        assertThat(model.getActiveDependencies(emptyList())[0].groupId)
                 .isEqualTo("org.junit.jupiter")
 
         assertThat(model.dependencyManagement?.dependencies?.dependencies?.first()?.groupId)
@@ -98,7 +98,7 @@ class PomTest {
         assertThat(model.licenses.first()?.name)
                 .isEqualTo("Apache License, Version 2.0")
 
-        assertThat(model.repositories.first()?.url)
+        assertThat(model.getActiveRepositories(emptyList()).first()?.url)
                 .isEqualTo("https://oss.sonatype.org/content/repositories/snapshots")
     }
 }

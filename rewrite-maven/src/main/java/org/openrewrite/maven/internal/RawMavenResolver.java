@@ -55,15 +55,18 @@ public class RawMavenResolver {
      */
     private final boolean forParent;
 
+    private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
 
-    public RawMavenResolver(MavenDownloader downloader, boolean forParent, boolean resolveOptional) {
+    public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
+                            boolean resolveOptional) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
         }
         this.downloader = downloader;
         this.forParent = forParent;
+        this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
     }
 
@@ -116,7 +119,7 @@ public class RawMavenResolver {
     }
 
     private void processProperties(ResolutionTask task, PartialMaven partialMaven) {
-        partialMaven.setProperties(task.getRawMaven().getActiveProperties());
+        partialMaven.setProperties(task.getRawMaven().getActiveProperties(activeProfiles));
     }
 
     private void processDependencyManagement(ResolutionTask task, PartialMaven partialMaven) {
@@ -145,7 +148,7 @@ public class RawMavenResolver {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
-                        Pom maven = new RawMavenResolver(downloader, true, resolveOptional)
+                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, resolveOptional)
                                 .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                         if (maven != null) {
@@ -177,7 +180,7 @@ public class RawMavenResolver {
             }
         }
 
-        partialMaven.setDependencyTasks(rawMaven.getActiveDependencies().stream()
+        partialMaven.setDependencyTasks(rawMaven.getActiveDependencies(activeProfiles).stream()
                 .filter(dep -> {
                     // we don't care about test-jar, etc.
                     return dep.getType() == null || dep.getType().equals("jar");
@@ -326,7 +329,7 @@ public class RawMavenResolver {
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
-                    parent = new RawMavenResolver(downloader, true, resolveOptional)
+                    parent = new RawMavenResolver(downloader, true, activeProfiles, resolveOptional)
                             .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories());
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
@@ -340,7 +343,7 @@ public class RawMavenResolver {
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
         List<RawPom.Repository> repositories = new ArrayList<>();
-        for (RawPom.Repository repository : task.getRawMaven().getPom().getRepositories()) {
+        for (RawPom.Repository repository : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
             String url = repository.getUrl().trim();
             if (repository.getUrl().contains("${")) {
                 url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
@@ -563,7 +566,7 @@ public class RawMavenResolver {
     @RequiredArgsConstructor
     @Getter
     @Setter
-    static class PartialMaven {
+    class PartialMaven {
         @EqualsAndHashCode.Include
         final String sourcePath;
 
@@ -632,7 +635,7 @@ public class RawMavenResolver {
             if (v.startsWith("${") && v.endsWith("}")) {
                 String key = v.replace("${", "").replace("}", "");
 
-                String value = rawPom.getActiveProperties().get(key);
+                String value = rawPom.getActiveProperties(activeProfiles).get(key);
                 if (value != null) {
                     return value;
                 }

@@ -104,7 +104,7 @@ class RawPomTest {
         }, null, null).pom
 
         val rawPom = assertSerializationRoundTrip(tempDir, pom)
-        assertThat(rawPom.repositories).hasSize(1)
+        assertThat(rawPom.getActiveRepositories(emptyList())).hasSize(1)
     }
 
     private fun assertSerializationRoundTrip(tempDir: Path, pom: RawPom): RawPom =

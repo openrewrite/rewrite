@@ -115,7 +115,7 @@ public class RawPom {
     }
 
     @JsonIgnore
-    public Map<String, String> getActiveProperties() {
+    public Map<String, String> getActiveProperties(Collection<String> activeProfiles) {
         Map<String, String> activeProperties = new HashMap<>();
 
         if (properties != null) {
@@ -124,7 +124,7 @@ public class RawPom {
 
         if (profiles != null) {
             for (RawPom.Profile profile : getProfiles()) {
-                if (profile.isActive() && profile.getProperties() != null) {
+                if (profile.isActive(activeProfiles) && profile.getProperties() != null) {
                     activeProperties.putAll(profile.getProperties());
                 }
             }
@@ -134,7 +134,7 @@ public class RawPom {
     }
 
     @JsonIgnore
-    public List<Dependency> getActiveDependencies() {
+    public List<Dependency> getActiveDependencies(Collection<String> activeProfiles) {
         List<Dependency> activeDependencies = new ArrayList<>();
 
         if (dependencies != null) {
@@ -143,7 +143,7 @@ public class RawPom {
 
         if (profiles != null) {
             for (Profile profile : getProfiles()) {
-                if (profile.isActive()) {
+                if (profile.isActive(activeProfiles)) {
                     if (profile.dependencies != null) {
                         activeDependencies.addAll(profile.dependencies);
                     }
@@ -154,9 +154,24 @@ public class RawPom {
         return activeDependencies;
     }
 
-    @JsonIgnore
-    public List<Repository> getRepositories() {
-        return repositories == null ? emptyList() : repositories.getRepositories();
+    public List<Repository> getActiveRepositories(Collection<String> activeProfiles) {
+        List<Repository> activeRepositories = new ArrayList<>();
+
+        if(repositories != null) {
+            activeRepositories.addAll(repositories.getRepositories());
+        }
+
+        if (profiles != null) {
+            for (Profile profile : getProfiles()) {
+                if (profile.isActive(activeProfiles)) {
+                    if (profile.repositories != null) {
+                        activeRepositories.addAll(profile.repositories.getRepositories());
+                    }
+                }
+            }
+        }
+
+        return activeRepositories;
     }
 
     @JsonIgnore
@@ -302,6 +317,9 @@ public class RawPom {
     @Data
     public static class Profile {
         @Nullable
+        String id;
+
+        @Nullable
         ProfileActivation activation;
 
         @Nullable
@@ -310,9 +328,12 @@ public class RawPom {
         @Nullable
         List<Dependency> dependencies;
 
+        @Nullable
+        Repositories repositories;
+
         @JsonIgnore
-        public boolean isActive() {
-            return activation != null && activation.isActive();
+        public boolean isActive(Collection<String> activeProfiles) {
+            return (id != null && activeProfiles.contains(id)) || (activation != null && activation.isActive());
         }
     }
 

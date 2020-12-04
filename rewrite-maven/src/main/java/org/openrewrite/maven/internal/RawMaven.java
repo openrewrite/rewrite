@@ -36,6 +36,7 @@ import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -105,14 +106,12 @@ public class RawMaven {
         }
     }
 
-    @JsonIgnore
-    public Map<String, String> getActiveProperties() {
-        return pom.getActiveProperties();
+    public Map<String, String> getActiveProperties(Collection<String> activeProfiles) {
+        return pom.getActiveProperties(activeProfiles);
     }
 
-    @JsonIgnore
-    public List<RawPom.Dependency> getActiveDependencies() {
-        return pom.getActiveDependencies();
+    public List<RawPom.Dependency> getActiveDependencies(Collection<String> activeProfiles) {
+        return pom.getActiveDependencies(activeProfiles);
     }
 
     private static class MavenXmlParser extends XmlParser {

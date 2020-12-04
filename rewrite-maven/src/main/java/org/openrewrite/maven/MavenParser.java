@@ -33,11 +33,10 @@ import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.*;
 import static java.util.stream.StreamSupport.stream;
@@ -46,10 +45,12 @@ public class MavenParser implements Parser<Maven> {
     private static final Logger logger = LoggerFactory.getLogger(MavenParser.class);
 
     private final MavenCache mavenCache;
+    private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
 
-    private MavenParser(MavenCache mavenCache, boolean resolveOptional) {
+    private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles, boolean resolveOptional) {
         this.mavenCache = mavenCache;
+        this.activeProfiles = activeProfiles;
         this.resolveOptional = resolveOptional;
     }
 
@@ -63,7 +64,7 @@ public class MavenParser implements Parser<Maven> {
                 projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())));
 
         List<Maven> parsed = projectPoms.stream()
-                .map(raw -> new RawMavenResolver(downloader, false, resolveOptional).resolve(raw))
+                .map(raw -> new RawMavenResolver(downloader, false, activeProfiles, resolveOptional).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(Maven::new)
                 .collect(toCollection(ArrayList::new));
@@ -89,18 +90,21 @@ public class MavenParser implements Parser<Maven> {
         return parsed;
     }
 
-    public List<Maven> parseFileWalk(Path path) {
+    public static List<Maven> parseProject(Path path) {
         try {
             List<Path> poms = Files.find(path, Integer.MAX_VALUE, (filePath, fileAttr) -> fileAttr.isRegularFile() && filePath.endsWith("pom.xml"))
                     .collect(toList());
 
-            if(logger.isInfoEnabled()) {
+            if (logger.isInfoEnabled()) {
                 for (Path pom : poms) {
                     logger.info("Parsing {}", pom);
                 }
             }
 
-            return parse(poms, path);
+            return MavenParser.builder()
+                    .mavenConfig(path.resolve(".mvn/maven.config"))
+                    .build()
+                    .parse(poms, path);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -116,11 +120,35 @@ public class MavenParser implements Parser<Maven> {
     }
 
     public static class Builder {
-        private boolean resolveOptional = true;
         private MavenCache mavenCache = new InMemoryCache();
+        private final Collection<String> activeProfiles = new HashSet<>();
+        private boolean resolveOptional = true;
 
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
+            return this;
+        }
+
+        public Builder activeProfiles(@Nullable String... profiles) {
+            if (profiles != null) {
+                Collections.addAll(this.activeProfiles, profiles);
+            }
+            return this;
+        }
+
+        public Builder mavenConfig(@Nullable Path mavenConfig) {
+            if(mavenConfig != null && mavenConfig.toFile().exists()) {
+                try {
+                    String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
+                    Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+([^\\s]+)").matcher(mavenConfigText);
+                    if(matcher.find()) {
+                        String[] profiles = matcher.group(1).split(",");
+                        return activeProfiles(profiles);
+                    }
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
             return this;
         }
 
@@ -130,7 +158,7 @@ public class MavenParser implements Parser<Maven> {
         }
 
         public MavenParser build() {
-            return new MavenParser(mavenCache, resolveOptional);
+            return new MavenParser(mavenCache, activeProfiles, resolveOptional);
         }
     }
 }
