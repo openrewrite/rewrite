@@ -32,7 +32,7 @@ public class TypeUtils {
     }
 
     public static boolean isString(@Nullable JavaType type) {
-        return type instanceof JavaType.Class && "java.lang.String".equals(((JavaType.Class) type).getFullyQualifiedName());
+        return type == JavaType.Primitive.String;
     }
 
     public static boolean isOfClassType(@Nullable JavaType type, String fqn) {
