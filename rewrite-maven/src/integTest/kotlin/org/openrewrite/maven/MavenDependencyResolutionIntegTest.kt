@@ -116,6 +116,42 @@ class MavenDependencyResolutionIntegTest {
     }
 
     @Test
+    fun springBootConfigurationProcessor(@TempDir tempDir: Path) {
+        val pom = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+             
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-cloud-build</artifactId>
+                <version>3.0.0-SNAPSHOT</version>
+              </parent>
+
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <repositories>
+                <repository>
+                    <id>spring-snapshot</id>
+                    <name>Spring Snapshots</name>
+                    <url>http://repo.spring.io/snapshot</url>
+                </repository>
+              </repositories>
+              
+              <dependencies>
+                <dependency>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-configuration-processor</artifactId>
+                </dependency>
+              </dependencies>
+            </project>
+        """.trimIndent()
+
+        assertDependencyResolutionEqualsAether(tempDir, pom)
+    }
+
+    @Test
     fun springBootParent(@TempDir tempDir: Path) {
         val pom = """
             <project>
