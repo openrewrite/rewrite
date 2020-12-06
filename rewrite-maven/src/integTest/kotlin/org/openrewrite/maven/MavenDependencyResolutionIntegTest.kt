@@ -122,8 +122,8 @@ class MavenDependencyResolutionIntegTest {
               <modelVersion>4.0.0</modelVersion>
              
               <parent>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-cloud-build</artifactId>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-netflix</artifactId>
                 <version>3.0.0-SNAPSHOT</version>
               </parent>
 
@@ -136,6 +136,7 @@ class MavenDependencyResolutionIntegTest {
                     <id>spring-snapshot</id>
                     <name>Spring Snapshots</name>
                     <url>http://repo.spring.io/snapshot</url>
+                    <snapshots/>
                 </repository>
               </repositories>
               

@@ -32,6 +32,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
@@ -164,12 +165,13 @@ public class MavenDownloader {
         if (containingPom == null || !containingPom.getSourcePath().contains("http")) {
             if (!StringUtils.isBlank(relativePath)) {
                 return Optional.ofNullable(containingPom)
-                        .map(pom -> projectPoms.get(Paths.get(pom.getSourcePath())
-                                .relativize(Paths.get(relativePath))
-                                .resolve("pom.xml")
-                                .normalize()
-                                .toString()
-                        ))
+                        .map(pom -> {
+                            Path relativePomPath = Paths.get(pom.getSourcePath())
+                                    .getParent() // "relativeTo" the directory containing this pom
+                                    .resolve(Paths.get(relativePath, "pom.xml"))
+                                    .normalize();
+                            return projectPoms.get(relativePomPath.toString());
+                        })
                         .orElse(null);
             }
 
@@ -246,6 +248,7 @@ public class MavenDownloader {
                             return null;
                         }
                     })
+                    .filter(Objects::nonNull)
                     .findFirst()
                     .orElse(null);
 

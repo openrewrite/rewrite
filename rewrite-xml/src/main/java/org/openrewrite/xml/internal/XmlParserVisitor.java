@@ -261,8 +261,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return format(ctx.getStart());
     }
 
-    private Formatting format(TerminalNode terminalNode) {
-        return format(terminalNode.getSymbol());
+    private Formatting format(@Nullable TerminalNode terminalNode) {
+        return terminalNode == null ? Formatting.EMPTY : format(terminalNode.getSymbol());
     }
 
     private Formatting format(Token token) {
