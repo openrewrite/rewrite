@@ -54,9 +54,6 @@ abstract class JavaParserCompatibilityKit {
     inner class ClassDeclTck : ClassDeclTest
 
     @Nested
-    inner class CommentTck : CommentTest
-
-    @Nested
     inner class CompilationUnitTck : CompilationUnitTest
 
     @Nested

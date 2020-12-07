@@ -27,7 +27,6 @@ class Java11ClassDeclTest: Java11Test(), ClassDeclTest
 @ExtendWith(JavaParserResolver::class)
 class Java11CompilationUnitTest: Java11Test(), CompilationUnitTest
 
-
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11EnumTest: Java11Test(), EnumTest
