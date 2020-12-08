@@ -18,10 +18,12 @@ package org.openrewrite.java.search;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.java.AbstractJavaSourceVisitor;
+import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -58,13 +60,15 @@ public class SemanticallyEqual extends AbstractJavaSourceVisitor<Boolean> {
                 if(annotation.getArgs().getArgs() != null &&
                     otherAnnotation.getArgs().getArgs() != null &&
                     annotation.getArgs().getArgs().size() == otherAnnotation.getArgs().getArgs().size()) {
+                    List<Expression> theseArgs = annotation.getArgs().getArgs();
+                    List<Expression> thoseArgs = otherAnnotation.getArgs().getArgs();
 
-                    AtomicInteger index = new AtomicInteger(0);
-                    areArgsEqual = annotation.getArgs().getArgs().stream()
-                        .allMatch(arg ->
-                                new SemanticallyEqual(arg)
-                                        .visit(otherAnnotation.getArgs().getArgs().get(index.getAndIncrement()))
-                        );
+                    areArgsEqual = true;
+                    for(int i = 0; i < theseArgs.size(); i++) {
+                        if(!new SemanticallyEqual(theseArgs.get(i)).visit(thoseArgs.get(i))) {
+                            areArgsEqual = false;
+                        }
+                    }
                 } else {
                     return false;
                 }
