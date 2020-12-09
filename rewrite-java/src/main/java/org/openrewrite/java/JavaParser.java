@@ -138,6 +138,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         protected boolean relaxedClassTypeMatching = false;
         protected MeterRegistry meterRegistry = Metrics.globalRegistry;
         protected boolean logCompilationWarningsAndErrors = true;
+        protected boolean suppressMappingErrors = false;
         protected List<JavaStyle> styles = new ArrayList<>();
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
@@ -167,6 +168,11 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B classpath(String... classpath) {
             this.classpath = dependenciesFromClasspath(classpath);
+            return (B) this;
+        }
+
+        public B suppressMappingErrors(boolean suppressMappingErrors) {
+            this.suppressMappingErrors = suppressMappingErrors;
             return (B) this;
         }
 

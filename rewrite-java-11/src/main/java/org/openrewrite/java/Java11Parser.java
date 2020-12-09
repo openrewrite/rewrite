@@ -41,10 +41,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.LinkedHashMap;
-import java.util.List;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -70,6 +67,8 @@ public class Java11Parser implements JavaParser {
      */
     private final boolean relaxedClassTypeMatching;
 
+    private final boolean suppressMappingErrors;
+
     private final JavacFileManager pfm;
 
     private final Context context = new Context();
@@ -80,12 +79,14 @@ public class Java11Parser implements JavaParser {
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
+                         boolean suppressMappingErrors,
                          MeterRegistry meterRegistry,
                          boolean logCompilationWarningsAndErrors,
                          Collection<JavaStyle> styles) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
+        this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
 
         this.pfm = new JavacFileManager(context, true, charset);
@@ -106,7 +107,7 @@ public class Java11Parser implements JavaParser {
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                var log = new String(Arrays.copyOfRange(cbuf, off, len));
+                String log = new String(Arrays.copyOfRange(cbuf, off, len));
                 if (logCompilationWarningsAndErrors && !log.isBlank()) {
                     logger.warn(log);
                 }
@@ -140,7 +141,7 @@ public class Java11Parser implements JavaParser {
             }
         }
 
-        var cus = acceptedInputs(sourceFiles).stream()
+        LinkedHashMap<Input, JCTree.JCCompilationUnit> cus = acceptedInputs(sourceFiles).stream()
                 .collect(Collectors.toMap(
                         Function.identity(),
                         input -> Timer.builder("rewrite.parse")
@@ -179,22 +180,43 @@ public class Java11Parser implements JavaParser {
             logger.warn("Failed symbol entering or attribution", t);
         }
 
-        return cus.entrySet().stream().map(cuByPath ->
-                Timer.builder("rewrite.parse")
-                        .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
-                        .tag("file.type", "Java")
-                        .tag("step", "Map to Rewrite AST")
-                        .register(meterRegistry)
-                        .record(() -> {
-                            var input = cuByPath.getKey();
-                            logger.trace("Building AST for {}", input.getUri());
-                            Java11ParserVisitor parser = new Java11ParserVisitor(
-                                    input.getRelativePath(relativeTo),
-                                    StringUtils.readFully(input.getSource()),
-                                    relaxedClassTypeMatching, styles);
-                            return (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
-                        })
-        ).collect(toList());
+        return cus.entrySet().stream()
+                .map(cuByPath -> {
+                    Timer.Sample sample = Timer.start();
+                    Input input = cuByPath.getKey();
+                    logger.trace("Building AST for {}", input.getUri());
+                    try {
+                        Java11ParserVisitor parser = new Java11ParserVisitor(
+                                input.getRelativePath(relativeTo),
+                                StringUtils.readFully(input.getSource()),
+                                relaxedClassTypeMatching, styles);
+                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
+                        sample.stop(Timer.builder("rewrite.parse")
+                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                .tag("file.type", "Java")
+                                .tag("outcome", "success")
+                                .tag("exception", "none")
+                                .tag("step", "Map to Rewrite AST")
+                                .register(meterRegistry));
+                        return cu;
+                    } catch (Throwable t) {
+                        sample.stop(Timer.builder("rewrite.parse")
+                                .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
+                                .tag("file.type", "Java")
+                                .tag("outcome", "error")
+                                .tag("exception", t.getClass().getSimpleName())
+                                .tag("step", "Map to Rewrite AST")
+                                .register(meterRegistry));
+
+                        if (!suppressMappingErrors) {
+                            throw t;
+                        }
+
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(toList());
     }
 
     @Override
@@ -212,7 +234,7 @@ public class Java11Parser implements JavaParser {
      * Initialize modules
      */
     private void initModules(Collection<JCTree.JCCompilationUnit> cus) {
-        var modules = Modules.instance(context);
+        Modules modules = Modules.instance(context);
         modules.initModules(com.sun.tools.javac.util.List.from(cus));
     }
 
@@ -220,8 +242,8 @@ public class Java11Parser implements JavaParser {
      * Enter symbol definitions into each compilation unit's scope
      */
     private void enterAll(Collection<JCTree.JCCompilationUnit> cus) {
-        var enter = Enter.instance(context);
-        var compilationUnits = com.sun.tools.javac.util.List.from(
+        Enter enter = Enter.instance(context);
+        com.sun.tools.javac.util.List<JCTree.JCCompilationUnit> compilationUnits = com.sun.tools.javac.util.List.from(
                 cus.toArray(JCTree.JCCompilationUnit[]::new));
         enter.main(compilationUnits);
     }
@@ -268,7 +290,7 @@ public class Java11Parser implements JavaParser {
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    meterRegistry, logCompilationWarningsAndErrors, styles);
+                    suppressMappingErrors, meterRegistry, logCompilationWarningsAndErrors, styles);
         }
     }
 }
