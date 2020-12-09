@@ -137,7 +137,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public String toString() {
-            return "ShallowClass{" + +'}';
+            return "ShallowClass{ " + fullyQualifiedName + " }";
         }
     }
 
