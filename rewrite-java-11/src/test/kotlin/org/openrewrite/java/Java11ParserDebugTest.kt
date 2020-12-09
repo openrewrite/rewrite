@@ -17,10 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.tree.AutoFormatTest
-import org.openrewrite.java.tree.ClassDeclTest
-import org.openrewrite.java.tree.CompilationUnitTest
-import org.openrewrite.java.tree.JavaTypeTest
+import org.openrewrite.java.tree.*
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -30,6 +27,15 @@ class Java11ClassDeclTest: Java11Test(), ClassDeclTest
 @ExtendWith(JavaParserResolver::class)
 class Java11CompilationUnitTest: Java11Test(), CompilationUnitTest
 
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11EnumTest: Java11Test(), EnumTest
+
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11JavaTypeTest: Java11Test(), JavaTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11NewClassTest: Java11Test(), NewClassTest

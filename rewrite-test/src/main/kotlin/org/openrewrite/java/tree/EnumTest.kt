@@ -47,6 +47,29 @@ interface EnumTest {
     }
 
     @Test
+    fun enumConstructor(jp: JavaParser) {
+        val aSource = """
+            public class Outer {
+                public enum A {
+                    A1(1);
+    
+                    A(int n) {}
+                }
+                
+                private static final class ContextFailedToStart {
+                    private static Object[] combineArguments(String context, Throwable ex, Object[] arguments) {
+                        return new Object[arguments.length + 2];
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val a = jp.parse(aSource)[0]
+
+        assertEquals(aSource, a.printTrimmed())
+    }
+
+    @Test
     fun noArguments(jp: JavaParser) {
         val aSource = """
             public enum A {
