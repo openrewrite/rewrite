@@ -113,6 +113,75 @@ interface TreeBuilderTest {
     }
 
     @Test
+    fun buildSnippetMethodReferenceGenerics(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.List;
+            import java.util.ArrayList;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    List<String> clone = cloneList(others);
+                    clone.add(m);
+                }
+                List<String> cloneList(List<String> list) {
+                    return new ArrayList<>(list);
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
+        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    others.add(${paramName.printTrimmed()});
+                    List<String> clone = cloneList(others);
+                 """)
+        val methodInv1 : Expression = snippets[0] as Expression
+        assertNotNull(methodInv1.type, "The type information should be populated")
+        val variableDeclarations : J.VariableDecls = snippets[1] as J.VariableDecls
+        @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+        assertEquals("List<String>", variableDeclarations.typeExpr.printTrimmed())
+    }
+
+    @Test
+    fun buildSnippetMethodReferenceArrays(jp: JavaParser) {
+        val a = jp.parse("""
+            import java.util.Arrays;
+
+            public class A {
+                void foo(String[] others, String m) {
+                    String[] clone = resizeAndCopyArray(others, 1);
+                    clone[others.length] = m;
+                }
+                
+                String[] resizeAndCopyArray(String[] array, int resizeBy) {
+                    return Arrays.copyOf(array, array.length + resizeBy);
+                }
+            }
+        """.trimIndent())[0]
+
+        val method = a.classes[0].methods[0]
+        val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
+        val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
+
+        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+                methodBodyCursor,
+                """
+                    String[] clone = resizeAndCopyArray(${paramName.printTrimmed()}, 1);
+                    clone[clone.length-1] = m;
+                 """)
+        val assignment : J.Assign = snippets[1] as J.Assign
+        assertTrue(TypeUtils.isString(assignment.variable.type))
+        assertTrue(assignment.variable is J.ArrayAccess)
+
+    }
+
+    @Test
     fun buildSnippetStaticMethodReference(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;

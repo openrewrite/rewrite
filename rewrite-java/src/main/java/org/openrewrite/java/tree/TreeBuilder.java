@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -301,39 +302,32 @@ public class TreeBuilder {
             methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" "))).append(" ");
         }
 
-        JavaType.FullyQualified returnTypeQualified = TypeUtils.asFullyQualified(method.getResolvedSignature().getReturnType());
-        String returnStatement = null;
-        if (returnTypeQualified != null) {
-            methodStub.append(returnTypeQualified.getFullyQualifiedName()).append(" ");
-            returnStatement = "  return null;\n";
-        } else {
+        JavaType returnType = method.getResolvedSignature() == null?null:method.getResolvedSignature().getReturnType();
 
-            JavaType.Primitive primitiveReturn = TypeUtils.asPrimitive(method.getResolvedSignature().getReturnType());
-            if (primitiveReturn != null && primitiveReturn.getDefaultValue() != null) {
-                methodStub.append(primitiveReturn.getKeyword()).append(" ");
-                returnStatement = "  return " + primitiveReturn.getDefaultValue() + ";\n";
-            } else {
-                methodStub.append("void ");
-            }
+        if (returnType instanceof JavaType.FullyQualified
+                || returnType instanceof JavaType.Array
+                || returnType instanceof JavaType.Primitive) {
+
+            methodStub.append(getTypeDeclaration(returnType)).append(" ");
+        } else {
+            methodStub.append("void ");
         }
 
         methodStub.append(method.getName()).append("(");
         int argIndex = 0;
         for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
-            JavaType.Primitive primitive = TypeUtils.asPrimitive(parameter);
-            if (primitive != null) {
-                methodStub.append(primitive.getKeyword());
-            } else if (parameter instanceof JavaType.FullyQualified) {
-                methodStub.append(((JavaType.FullyQualified) parameter).getFullyQualifiedName());
-            } else {
-                methodStub.append("Object");
+            if (argIndex > 0) {
+                methodStub.append(", ");
             }
+            methodStub.append(getTypeDeclaration(parameter));
             methodStub.append(" arg").append(argIndex);
             argIndex++;
         }
         methodStub.append(") {\n");
-        if (returnStatement != null) {
-            methodStub.append(returnStatement);
+        if (returnType instanceof JavaType.FullyQualified || returnType instanceof JavaType.Array) {
+            methodStub.append("  return null;\n");
+        } else if (returnType instanceof JavaType.Primitive) {
+            methodStub.append("  return ").append(((JavaType.Primitive) returnType).getDefaultValue()).append(";\n");
         }
         methodStub.append("}\n");
         return methodStub.toString();
@@ -424,14 +418,56 @@ public class TreeBuilder {
     }
 
     private static String variableDefinitionSource(J.VariableDecls variableDecls, J.VariableDecls.NamedVar variable) {
-        JavaType type = variableDecls.getTypeExpr() == null ? variable.getType() : variableDecls.getTypeExpr().getType();
-        String typeName = "";
+
+        String typeDeclaration;
+        if (variableDecls.getTypeExpr() != null) {
+            typeDeclaration = variableDecls.getTypeExpr().printTrimmed();
+        } else {
+            typeDeclaration = getTypeDeclaration(variable.getType());
+        }
+        return "static " + typeDeclaration + variableDecls.getDimensionsBeforeName().stream()
+                .map(d -> "[]").reduce("", (r1,r2) -> r1+r2) +
+                " " + variable.getSimpleName();
+    }
+
+    /**
+     * Given a JaveType, generate the code declration for that type. This method supports full-qualified, array, and
+     * primitive declarations.
+     *
+     * @param type The JavaType that will be converted to a type declaration code snippet
+     * @return code declaration for the type.
+     */
+    private static String getTypeDeclaration(@Nullable JavaType type) {
+
+        if (type instanceof JavaType.Class) {
+            JavaType.Class clazz = (JavaType.Class) type;
+            StringBuilder typeDeclaration = new StringBuilder(50);
+            typeDeclaration.append(clazz.getFullyQualifiedName());
+            if (clazz.getTypeParameters() != null && !clazz.getTypeParameters().isEmpty()) {
+                typeDeclaration
+                        .append("<")
+                        .append(clazz.getTypeParameters().stream().map(TreeBuilder::getTypeDeclaration).collect(joining(",")))
+                        .append(">");
+            }
+            return typeDeclaration.toString();
+
+        }
         if (type instanceof JavaType.FullyQualified) {
-            typeName = ((JavaType.FullyQualified) type).getClassName();
+            return ((JavaType.FullyQualified)type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.Array) {
+            JavaType elementType = ((JavaType.Array) type).getElemType();
+            if (elementType instanceof JavaType.FullyQualified) {
+                return ((JavaType.FullyQualified)elementType).getFullyQualifiedName() + "[]";
+            } else if (elementType instanceof JavaType.Primitive) {
+                return ((JavaType.Primitive)elementType).getKeyword() + "[]";
+            } else {
+                throw new IllegalArgumentException("Cannot resolve the array type declaration.");
+            }
         } else if (type instanceof JavaType.Primitive) {
-            typeName = ((JavaType.Primitive) type).getKeyword();
+            return ((JavaType.Primitive)type).getKeyword();
+        } else {
+            throw new IllegalArgumentException("Cannot resolve type declaration.");
         }
 
-        return "static " + typeName + " " + variable.getSimpleName();
     }
 }
