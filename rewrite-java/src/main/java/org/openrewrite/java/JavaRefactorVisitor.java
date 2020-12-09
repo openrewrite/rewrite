@@ -520,12 +520,12 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
      * is idempotent and calling this method multiple times with the same arguments will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
-     * @param staticMethod The static method to be imported. A wildcard "*" may also be used to statically import all methods.
+     * @param statik The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
      */
-    public void maybeAddImport(@NonNull String fullyQualifiedName, @NonNull String staticMethod) {
+    public void maybeAddImport(@NonNull String fullyQualifiedName, @NonNull String statik) {
         AddImport op = new AddImport();
         op.setType(fullyQualifiedName);
-        op.setStaticMethod(staticMethod);
+        op.setStatic(statik);
         if (!andThen().contains(op)) {
             andThen(op);
         }

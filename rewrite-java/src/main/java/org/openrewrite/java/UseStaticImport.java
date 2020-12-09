@@ -49,7 +49,7 @@ public class UseStaticImport extends JavaIsoRefactorVisitor {
 
                     AddImport addStatic = new AddImport();
                     addStatic.setType(receiverType.getFullyQualifiedName());
-                    addStatic.setStaticMethod(method.getSimpleName());
+                    addStatic.setStatic(method.getSimpleName());
                     addStatic.setOnlyIfReferenced(false);
                     if (!andThen().contains(addStatic)) {
                         andThen(addStatic);

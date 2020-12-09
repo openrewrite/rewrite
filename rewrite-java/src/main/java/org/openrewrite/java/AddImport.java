@@ -41,7 +41,7 @@ import static org.openrewrite.Validated.required;
  * <P><P>
  * The {@link AddImport#type} must be supplied and represents a fully qualified class name.
  * <P><P>
- * The {@link AddImport#staticMethod} is an optional method within the imported type. The staticMethod can be set to "*"
+ * The {@link AddImport#statik} is an optional method within the imported type. The staticMethod can be set to "*"
  * to represent a static wildcard import.
  * <P><P>
  * The {@link AddImport#onlyIfReferenced} is a flag (defaulted to true) to indicate if the import should only be added
@@ -54,7 +54,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
     @EqualsAndHashCode.Include
     @Nullable
-    private String staticMethod;
+    private String statik;
 
     @EqualsAndHashCode.Include
     private boolean onlyIfReferenced = true;
@@ -66,8 +66,8 @@ public class AddImport extends JavaIsoRefactorVisitor {
         this.classType = JavaType.Class.build(type);
     }
 
-    public void setStaticMethod(@Nullable String staticMethod) {
-        this.staticMethod = staticMethod;
+    public void setStatic(@Nullable String statik) {
+        this.statik = statik;
     }
 
     public void setOnlyIfReferenced(boolean onlyIfReferenced) {
@@ -76,7 +76,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
     @Override
     public Iterable<Tag> getTags() {
-        return Tags.of("class", type, "static.method", staticMethod == null ? "none" : staticMethod);
+        return Tags.of("class", type, "static.method", statik == null ? "none" : statik);
     }
 
     @Override
@@ -110,13 +110,13 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
         if (cu.getImports().stream().anyMatch(i -> {
             String ending = i.getQualid().getSimpleName();
-            if (staticMethod == null) {
+            if (statik == null) {
                 return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
                         (ending.equals(classType.getClassName()) ||
                                 ending.equals("*"));
             }
             return i.isStatic() && i.getTypeName().equals(classType.getFullyQualifiedName()) &&
-                    (ending.equals(staticMethod) ||
+                    (ending.equals(statik) ||
                             ending.equals("*"));
         })) {
             return cu;
@@ -124,8 +124,8 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
         J.Import importToAdd = new J.Import(randomId(),
                 TreeBuilder.buildName(classType.getFullyQualifiedName() +
-                        (staticMethod == null ? "" : "." + staticMethod), Formatting.format(" ")),
-                staticMethod != null,
+                        (statik == null ? "" : "." + statik), Formatting.format(" ")),
+                statik != null,
                 EMPTY);
 
         List<J.Import> imports = new ArrayList<>(cu.getImports());
@@ -168,7 +168,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
     @SuppressWarnings("SimplifyStreamApiCallChains")
     private boolean hasReference(J.CompilationUnit compilationUnit) {
 
-        if (staticMethod == null) {
+        if (statik == null) {
             //Non-static imports, we just look for field accesses.
             return new FindType(type).visit(compilationUnit).stream()
                     .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))
@@ -180,7 +180,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
         return compilationUnit.findMethodCalls(type + " *(..)").stream()
                 .filter(
                     invocation -> invocation.getSelect() == null &&
-                            (staticMethod.equals("*") || invocation.getName().getSimpleName().equals(staticMethod))
+                            (statik.equals("*") || invocation.getName().getSimpleName().equals(statik))
                 )
                 .findAny()
                 .isPresent();

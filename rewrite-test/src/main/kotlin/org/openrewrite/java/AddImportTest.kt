@@ -16,26 +16,22 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.RefactorVisitorTest
-import org.openrewrite.java.tree.Flag
 import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JavaType
-import java.util.*
-import java.util.stream.Collectors
-import java.util.stream.Stream
 
-interface AddImportTest: RefactorVisitorTest {
+interface AddImportTest : RefactorVisitorTest {
     @Test
     fun addMultipleImports(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                    AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) },
-                    AddImport().apply { setType("java.util.Set"); setOnlyIfReferenced(false) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) },
+            AddImport().apply { setType("java.util.Set"); setOnlyIfReferenced(false) }
+        ),
+        before = """
                 class A {}
             """,
-            after = """
+        after = """
                 import java.util.List;
                 import java.util.Set;
     
@@ -45,24 +41,25 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun addNamedImport(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
-            ),
-            before = "class A {}",
-            after = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
+        ),
+        before = "class A {}",
+        after = """
                 import java.util.List;
                 
                 class A {}
             """
     )
+
     @Test
     fun doNotAddImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                    AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(true) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(true) }
+        ),
+        before = """
                 package a;
                 
                 class A {}
@@ -71,11 +68,11 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun doNotAddWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                    AddImport().apply { setType("java.util.*"); setOnlyIfReferenced(true) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.*"); setOnlyIfReferenced(true) }
+        ),
+        before = """
                 package a;
                 
                 class A {}
@@ -84,15 +81,15 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun lastImportWhenFirstClassDeclarationHasJavadoc(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                AddImport().apply {
-                    setType("java.util.Collections")
-                    setStaticMethod("*")
-                    setOnlyIfReferenced(false)
-                }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("*")
+                setOnlyIfReferenced(false)
+            }
+        ),
+        before = """
                 import java.util.List;
                 
                 /**
@@ -100,7 +97,7 @@ interface AddImportTest: RefactorVisitorTest {
                  */
                 class A {}
             """,
-            after = """
+        after = """
                 import java.util.List;
                 
                 import static java.util.Collections.*;
@@ -114,15 +111,15 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun namedImportAddedAfterPackageDeclaration(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
+        ),
+        before = """
                 package a;
                 class A {}
             """,
-            after = """
+        after = """
                 package a;
                 
                 import java.util.List;
@@ -145,18 +142,18 @@ interface AddImportTest: RefactorVisitorTest {
             expectedImports.add(order, "$pkg.B")
 
             assertRefactored(
-                    jp,
-                    dependencies = listOf(
-                        *otherImports.toTypedArray(),
-                        """
+                jp,
+                dependencies = listOf(
+                    *otherImports.toTypedArray(),
+                    """
                             package $pkg;
                             public class B {}
                         """
-                    ),
-                    visitors = listOf(
-                        AddImport().apply { setType("$pkg.B"); setOnlyIfReferenced(false) }
-                    ),
-                    before = """
+                ),
+                visitors = listOf(
+                    AddImport().apply { setType("$pkg.B"); setOnlyIfReferenced(false) }
+                ),
+                before = """
                         package a;
             
                         import c.C0;
@@ -165,7 +162,7 @@ interface AddImportTest: RefactorVisitorTest {
             
                         class A {}
                     """,
-                    after = "package a;\n\n${expectedImports.joinToString("\n") { fqn -> "import $fqn;" }}\n\nclass A {}"
+                after = "package a;\n\n${expectedImports.joinToString("\n") { fqn -> "import $fqn;" }}\n\nclass A {}"
             )
 
             jp.reset()
@@ -174,11 +171,11 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun doNotAddImportIfAlreadyExists(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
+        ),
+        before = """
                 package a;
                 
                 import java.util.List;
@@ -188,11 +185,11 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun doNotAddImportIfCoveredByStarImport(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
+        ),
+        before = """
                 package a;
                 
                 import java.util.*;
@@ -202,38 +199,38 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun dontAddImportWhenClassHasNoPackage(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                    AddImport().apply {
-                        setType("C")
-                        setOnlyIfReferenced(false)
-                    }
-            ),
-            before = "class A {}"
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("C")
+                setOnlyIfReferenced(false)
+            }
+        ),
+        before = "class A {}"
     )
 
     @Test
     fun dontAddImportForPrimitive(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(AddImport().apply {
-                setType("int")
-            }),
-            before = "class A {}"
+        jp,
+        visitors = listOf(AddImport().apply {
+            setType("int")
+        }),
+        before = "class A {}"
     )
 
     @Test
     fun addNamedImportIfStarStaticImportExists(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply { setType("java.util.List"); setOnlyIfReferenced(false) }
+        ),
+        before = """
                 package a;
                 
                 import static java.util.List.*;
                 class A {}
             """,
-            after = """
+        after = """
                 package a;
                 
                 import java.util.List;
@@ -246,19 +243,19 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun addNamedStaticImport(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                AddImport().apply {
-                    setType("java.util.Collections")
-                    setStaticMethod("emptyList")
-                    setOnlyIfReferenced(false)
-                }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("emptyList")
+                setOnlyIfReferenced(false)
+            }
+        ),
+        before = """
                 import java.util.*;
                 class A {}
             """,
-            after = """
+        after = """
                 import java.util.*;
                 
                 import static java.util.Collections.emptyList;
@@ -267,17 +264,46 @@ interface AddImportTest: RefactorVisitorTest {
             """
     )
 
+    @Issue("https://github.com/openrewrite/rewrite/issues/108")
+    @Test
+    fun addStaticImportField(jp: JavaParser) = assertRefactored(
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("mycompany.Type")
+                setStatic("FIELD")
+                setOnlyIfReferenced(false)
+            }
+        ),
+        dependencies = listOf(
+            """
+            package mycompany;
+            public class Type {
+                public static String FIELD;
+            }
+        """.trimIndent()
+        ),
+        before = """
+                class A {}
+            """,
+        after = """
+                import static mycompany.Type.FIELD;
+                
+                class A {}
+            """
+    )
+
     @Test
     fun dontAddStaticWildcardImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                    AddImport().apply {
-                        setType("java.util.Collections")
-                        setStaticMethod("*")
-                        setOnlyIfReferenced(true)
-                    }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("*")
+                setOnlyIfReferenced(true)
+            }
+        ),
+        before = """
                 package a;
                 
                 class A {}
@@ -286,16 +312,16 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                    FixEmptyListMethodType(),
-                    AddImport().apply {
-                        setType("java.util.Collections")
-                        setStaticMethod("emptyList")
-                        setOnlyIfReferenced(true)
-                    }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            FixEmptyListMethodType(),
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("emptyList")
+                setOnlyIfReferenced(true)
+            }
+        ),
+        before = """
                 package a;
                 
                 import java.util.List;
@@ -306,7 +332,7 @@ interface AddImportTest: RefactorVisitorTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 package a;
                 
                 import java.util.List;
@@ -323,15 +349,15 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun doNotAddNamedStaticImportIfNotReferenced(jp: JavaParser) = assertUnchanged(
-            jp,
-            visitors = listOf(
-                    AddImport().apply {
-                        setType("java.util.Collections")
-                        setStaticMethod("emptyList")
-                        setOnlyIfReferenced(true)
-                    }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("emptyList")
+                setOnlyIfReferenced(true)
+            }
+        ),
+        before = """
                 package a;
                 
                 class A {}
@@ -340,16 +366,16 @@ interface AddImportTest: RefactorVisitorTest {
 
     @Test
     fun addStaticWildcardImportWhenReferenced(jp: JavaParser) = assertRefactored(
-            jp,
-            visitors = listOf(
-                    FixEmptyListMethodType(),
-                    AddImport().apply {
-                        setType("java.util.Collections")
-                        setStaticMethod("*")
-                        setOnlyIfReferenced(true)
-                    }
-            ),
-            before = """
+        jp,
+        visitors = listOf(
+            FixEmptyListMethodType(),
+            AddImport().apply {
+                setType("java.util.Collections")
+                setStatic("*")
+                setOnlyIfReferenced(true)
+            }
+        ),
+        before = """
                 package a;
                 
                 import java.util.List;
@@ -360,7 +386,7 @@ interface AddImportTest: RefactorVisitorTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 package a;
                 
                 import java.util.List;
