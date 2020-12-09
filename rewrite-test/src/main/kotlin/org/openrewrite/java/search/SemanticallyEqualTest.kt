@@ -18,6 +18,7 @@ package org.openrewrite.java.search
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
+import org.openrewrite.marker.Markers
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.J
@@ -28,25 +29,25 @@ interface SemanticallyEqualTest {
     @Test
     fun tagAnnotationEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 @Tag(FastTests.class)
                 @Tag(FastTests.class)
                 @Tag(SlowTests.class)
                 class A {}
             """,
-            """
+                """
                 @interface Tags {
                     Tag[] value();
                 }
             """,
-            """
+                """
                 @java.lang.annotation.Repeatable(Tags.class)
                 @interface Tag {
                     Class value();
                 }
             """,
-            "public interface FastTests {}",
-            "public interface SlowTests {}"
+                "public interface FastTests {}",
+                "public interface SlowTests {}"
         )
 
         val fastTest = cu[0].classes[0].annotations[0]
@@ -60,11 +61,11 @@ interface SemanticallyEqualTest {
     @Test
     fun annotationEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 @MyAnnotation(value = true, srcValue = "true")
                 class A {}
             """,
-            """
+                """
                 @interface MyAnnotation { 
                     boolean value();
                     String srcValue(); 
@@ -74,14 +75,14 @@ interface SemanticallyEqualTest {
 
         val annotation = cu[0].classes[0].annotations[0]
 
-        jp.reset();
+        jp.reset()
 
         val otherAnnot = jp.parse(
-            """
+                """
                 @MyAnnotation(value = true, srcValue = "true")
                 class B {}
             """,
-            """
+                """
                 @interface MyAnnotation { 
                     boolean value();
                     String srcValue(); 
@@ -95,163 +96,176 @@ interface SemanticallyEqualTest {
     @Test
     fun identEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 @MyAnnotation(value = true)
                 class A {}
             """,
-            "@interface MyAnnotation { boolean value(); }"
+                "@interface MyAnnotation { boolean value(); }"
         )
 
         val ident = cu[0].classes[0].annotations[0].annotationType
 
         assertThat(SemanticallyEqual(ident)
-            .visit(
-                J.Ident.build(
-                    randomId(),
-                    "MyAnnotation",
-                    JavaType.buildType("MyAnnotation"),
-                    Formatting.EMPTY
+                .visit(
+                        J.Ident.build(
+                                randomId(),
+                                "MyAnnotation",
+                                JavaType.buildType("MyAnnotation"),
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
         assertThat(SemanticallyEqual(ident)
-            .visit(
-                J.Ident.build(
-                    randomId(),
-                    "YourAnnotation",
-                    JavaType.buildType("YourAnnotation"),
-                    Formatting.EMPTY
+                .visit(
+                        J.Ident.build(
+                                randomId(),
+                                "YourAnnotation",
+                                JavaType.buildType("YourAnnotation"),
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isFalse()
     }
 
     @Test
     fun fieldAccessEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 @Category(FastTest.class)
                 class A {
                 }
             """,
-            "@interface Category { Class<?>[] value(); }",
-            "class FastTest {}"
+                "@interface Category { Class<?>[] value(); }",
+                "class FastTest {}"
         )
 
-        val annotFieldAccess = cu[0].classes[0].annotations[0].args.args[0];
+        val annotFieldAccess = cu[0].classes[0].annotations[0].args?.args?.first()
 
         assertThat(SemanticallyEqual(annotFieldAccess)
-            .visit(
-                J.FieldAccess(
-                    randomId(),
-                    J.Ident.build(randomId(), "FastTest", JavaType.buildType("FastTest"), Formatting.EMPTY),
-                    J.Ident.build(randomId(), "class", null, Formatting.EMPTY),
-                    JavaType.buildType("java.lang.Class"),
-                    Formatting.EMPTY
+                .visit(
+                        J.FieldAccess(
+                                randomId(),
+                                J.Ident.build(randomId(), "FastTest", JavaType.buildType("FastTest"), Formatting.EMPTY, Markers.EMPTY),
+                                J.Ident.build(randomId(), "class", null, Formatting.EMPTY, Markers.EMPTY),
+                                JavaType.buildType("java.lang.Class"),
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
         assertThat(SemanticallyEqual(annotFieldAccess)
-            .visit(
-                J.FieldAccess(
-                    randomId(),
-                    J.Ident.build(randomId(), "SlowTest", JavaType.buildType("SlowTest"), Formatting.EMPTY),
-                    J.Ident.build(randomId(), "class", null, Formatting.EMPTY),
-                    JavaType.buildType("java.lang.Class"),
-                    Formatting.EMPTY
+                .visit(
+                        J.FieldAccess(
+                                randomId(),
+                                J.Ident.build(randomId(), "SlowTest", JavaType.buildType("SlowTest"), Formatting.EMPTY, Markers.EMPTY),
+                                J.Ident.build(randomId(), "class", null, Formatting.EMPTY, Markers.EMPTY),
+                                JavaType.buildType("java.lang.Class"),
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isFalse()
     }
 
     @Test
     fun assignEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 @MyAnnotation(value = true)
                 class A {}
             """,
-            "@interface MyAnnotation { boolean value(); }"
+                "@interface MyAnnotation { boolean value(); }"
         )
 
-        val assign = cu[0].classes[0].annotations[0].args.args[0]
+        val assign = cu[0].classes[0].annotations[0].args?.args?.first()
 
-        assertThat(SemanticallyEqual(assign).
-            visit(
-                J.Assign(
-                    randomId(),
-                    J.Ident.build(
-                        randomId(),
-                        "value",
-                        null,
-                        Formatting.EMPTY
-                    ),
-                    J.Literal(
-                        randomId(),
-                        true,
-                        "true",
-                        JavaType.Primitive.Boolean,
-                        Formatting.EMPTY
-                    ),
-                    JavaType.Primitive.Boolean,
-                    Formatting.EMPTY
+        assertThat(SemanticallyEqual(assign)
+                .visit(
+                        J.Assign(
+                                randomId(),
+                                J.Ident.build(
+                                        randomId(),
+                                        "value",
+                                        null,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                J.Literal(
+                                        randomId(),
+                                        true,
+                                        "true",
+                                        JavaType.Primitive.Boolean,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                JavaType.Primitive.Boolean,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
-        assertThat(SemanticallyEqual(assign).
-        visit(
-            J.Assign(
-                randomId(),
-                J.Ident.build(
-                    randomId(),
-                    "otherValue",
-                    null,
-                    Formatting.EMPTY
-                ),
-                J.Literal(
-                    randomId(),
-                    true,
-                    "true",
-                    JavaType.Primitive.Boolean,
-                    Formatting.EMPTY
-                ),
-                JavaType.Primitive.Boolean,
-                Formatting.EMPTY
-            )
-        )
+        assertThat(SemanticallyEqual(assign)
+                .visit(
+                        J.Assign(
+                                randomId(),
+                                J.Ident.build(
+                                        randomId(),
+                                        "otherValue",
+                                        null,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                J.Literal(
+                                        randomId(),
+                                        true,
+                                        "true",
+                                        JavaType.Primitive.Boolean,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                JavaType.Primitive.Boolean,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
+                )
         ).isFalse()
 
-        assertThat(SemanticallyEqual(assign).
-            visit(
-                J.Assign(
-                    randomId(),
-                    J.Ident.build(
-                        randomId(),
-                        "value",
-                        null,
-                        Formatting.EMPTY
-                    ),
-                    J.Literal(
-                        randomId(),
-                        false,
-                        "true",
-                        JavaType.Primitive.Boolean,
-                        Formatting.EMPTY
-                    ),
-                    JavaType.Primitive.Boolean,
-                    Formatting.EMPTY
+        assertThat(SemanticallyEqual(assign)
+                .visit(
+                        J.Assign(
+                                randomId(),
+                                J.Ident.build(
+                                        randomId(),
+                                        "value",
+                                        null,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                J.Literal(
+                                        randomId(),
+                                        false,
+                                        "true",
+                                        JavaType.Primitive.Boolean,
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                ),
+                                JavaType.Primitive.Boolean,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isFalse()
     }
 
     @Test
     fun literalEquality(jp: JavaParser) {
         val cu = jp.parse(
-            """
+                """
                 class A {
                     int i = 0;
                     String str = "thisString";
@@ -265,58 +279,62 @@ interface SemanticallyEqualTest {
         val nullLiteral = (cu[0].classes[0].body.statements[2] as J.VariableDecls).vars[0].initializer as J.Literal
 
         assertThat(SemanticallyEqual(intLiteral)
-            .visit(
-                J.Literal(
-                    randomId(),
-                    0,
-                    "0",
-                    JavaType.Primitive.Int,
-                    Formatting.EMPTY
+                .visit(
+                        J.Literal(
+                                randomId(),
+                                0,
+                                "0",
+                                JavaType.Primitive.Int,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
         assertThat(SemanticallyEqual(strLiteral)
-            .visit(
-                J.Literal(
-                    randomId(),
-                    "thisString",
-                    "thisString",
-                    JavaType.Primitive.String,
-                    Formatting.EMPTY
+                .visit(
+                        J.Literal(
+                                randomId(),
+                                "thisString",
+                                "thisString",
+                                JavaType.Primitive.String,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
         assertThat(SemanticallyEqual(nullLiteral)
-            .visit(
-                J.Literal(
-                    randomId(),
-                    null,
-                    "null",
-                    JavaType.Primitive.String,
-                    Formatting.EMPTY
+                .visit(
+                        J.Literal(
+                                randomId(),
+                                null,
+                                "null",
+                                JavaType.Primitive.String,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isTrue()
 
         assertThat(SemanticallyEqual(strLiteral)
-            .visit(
-                J.Literal(
-                    randomId(),
-                    0,
-                    "0",
-                    JavaType.Primitive.Int,
-                    Formatting.EMPTY
+                .visit(
+                        J.Literal(
+                                randomId(),
+                                0,
+                                "0",
+                                JavaType.Primitive.Int,
+                                Formatting.EMPTY,
+                                Markers.EMPTY
+                        )
                 )
-            )
         ).isFalse()
     }
 
     @Test
     fun typeEqualityDependsOnlyOnFqn(jp: JavaParser) {
-        val namea = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar"), Formatting.EMPTY);
-        val nameb = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar", listOf(), listOf(), listOf(JavaType.Class.build("org.foo.Baz")), listOf(), null), Formatting.EMPTY);
+        val namea = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar"), Formatting.EMPTY, Markers.EMPTY)
+        val nameb = J.Ident.build(randomId(), "name", JavaType.Class.build("org.foo.Bar", listOf(), listOf(), listOf(JavaType.Class.build("org.foo.Baz")), listOf(), null), Formatting.EMPTY, Markers.EMPTY)
 
         assertThat(SemanticallyEqual(namea).visit(nameb)).isTrue()
     }

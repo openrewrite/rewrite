@@ -18,14 +18,11 @@ package org.openrewrite.java;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.StreamUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 
 import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;

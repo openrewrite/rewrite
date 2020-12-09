@@ -78,7 +78,7 @@ public class RawMavenResolver {
         Pom pom = resolve(rawMaven, Scope.None, rawMaven.getPom().getVersion(),
                 mavenSettings == null ? emptyList() : mavenSettings.getActiveRepositories(activeProfiles));
         assert pom != null;
-        return rawMaven.getDocument().withMetadata(singletonList(pom));
+        return rawMaven.getDocument().withMarkers(rawMaven.getDocument().getMarkers().addOrUpdate(pom));
     }
 
     /**

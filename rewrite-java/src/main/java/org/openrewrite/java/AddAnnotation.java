@@ -20,14 +20,15 @@ import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.Tree;
 import org.openrewrite.java.search.SemanticallyEqual;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static java.util.Arrays.asList;
-import static java.util.UUID.randomUUID;
-import static org.openrewrite.Formatting.*;
+import static org.openrewrite.Formatting.firstPrefix;
 
 public final class AddAnnotation {
     private AddAnnotation() {

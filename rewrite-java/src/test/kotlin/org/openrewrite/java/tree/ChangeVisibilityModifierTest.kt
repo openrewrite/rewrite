@@ -18,19 +18,20 @@ package org.openrewrite.java.tree
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Formatting
+import org.openrewrite.marker.Markers
 import java.util.*
 
 class ChangeVisibilityModifierTest {
     @Test
     fun publicToPrivate() {
         val beforeMods = listOf(
-               J.Modifier.Public(UUID.randomUUID(), Formatting.EMPTY),
-               J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Public(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val expectedMods = listOf(
-                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY),
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val actualMods = J.Modifier.withVisibility(beforeMods, "private")
@@ -42,13 +43,13 @@ class ChangeVisibilityModifierTest {
     @Test
     fun protectedToPrivate() {
         val beforeMods = listOf(
-                J.Modifier.Protected(UUID.randomUUID(), Formatting.EMPTY),
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Protected(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val expectedMods = listOf(
-                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY),
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val actualMods = J.Modifier.withVisibility(beforeMods, "private")
@@ -60,12 +61,12 @@ class ChangeVisibilityModifierTest {
     @Test
     fun packagePrivateToPrivate() {
         val beforeMods = listOf(
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val expectedMods = listOf(
-                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY),
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Private(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val actualMods = J.Modifier.withVisibility(beforeMods, "private")
@@ -77,12 +78,12 @@ class ChangeVisibilityModifierTest {
     @Test
     fun publicToPackagePrivate() {
         val beforeMods = listOf(
-                J.Modifier.Public(UUID.randomUUID(), Formatting.EMPTY),
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Public(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY),
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val expectedMods = listOf(
-                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY)
+                J.Modifier.Static(UUID.randomUUID(), Formatting.EMPTY, Markers.EMPTY)
         )
 
         val actualMods = J.Modifier.withVisibility(beforeMods, "package")

@@ -38,8 +38,8 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
 import org.openrewrite.maven.cache.InMemoryCache
+import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Pom
-import org.openrewrite.xml.tree.Xml
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -391,14 +391,14 @@ class MavenDependencyResolutionIntegTest {
     private fun assertDependencyResolutionEqualsAether(tempDir: Path, pom: String, ignoreScopes: Boolean = false) {
         val pomFile = tempDir.resolve("pom.xml").toFile().apply { writeText(pom) }
 
-        val pomAst: Xml.Document = MavenParser.builder()
+        val pomAst: Maven = MavenParser.builder()
                 .cache(mavenCache)
                 .resolveOptional(false)
                 .build()
                 .parse(listOf(pomFile.toPath()), null)
                 .first()
 
-        val rewrite = printTreeRecursive(pomAst.getMetadata(Pom::class.java)!!, ignoreScopes)
+        val rewrite = printTreeRecursive(pomAst.model, ignoreScopes)
 
 //        println(rewrite)
 
@@ -425,7 +425,7 @@ class MavenDependencyResolutionIntegTest {
     }
 
     private fun dependencyString(dep: Pom.Dependency, ignoreScopes: Boolean): String =
-            dep.run { "$groupId:$artifactId:$version${if (classifier != null) ":${classifier}" else ""}" } +
+            dep.run { "$groupId:$artifactId:$version${if (classifier?.isNotBlank() == true) ":${classifier}" else ""}" } +
                     (if (ignoreScopes) "" else "[${dep.scope.toString().toLowerCase()}]") +
                     dep.run { " https://repo1.maven.org/maven2/${groupId.replace(".", "/")}/$artifactId/$version/$artifactId-$version.pom" }
 

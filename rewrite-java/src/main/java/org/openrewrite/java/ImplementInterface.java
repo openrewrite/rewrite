@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeTree;
@@ -57,7 +58,8 @@ public class ImplementInterface {
                 if (c.getImplements() == null) {
                     c = c.withImplements(new J.ClassDecl.Implements(randomId(),
                             singletonList(lifeCycle),
-                            format(" ")));
+                            format(" "),
+                            Markers.EMPTY));
                 } else {
                     List<TypeTree> implementings = new ArrayList<>(c.getImplements().getFrom());
                     implementings.add(0, lifeCycle);

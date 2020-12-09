@@ -15,7 +15,7 @@
  */
 package org.openrewrite.properties;
 
-import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.tree.Properties;
@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Pattern;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
@@ -69,7 +68,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             }
 
             if (content != null) {
-                content = content.withFormatting(Formatting.format(prefix.toString(),
+                content = content.withFormatting(format(prefix.toString(),
                         content.getSuffix() + "\n"));
                 prefix = new StringBuilder();
                 contents.add(content);
@@ -101,7 +100,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         }
 
         return new Properties.File(randomId(), sourceFile.toString(),
-                emptyList(), contents, Formatting.format("", suffix));
+                contents, format("", suffix), Markers.EMPTY);
     }
 
     private Properties.Comment commentFromLine(String line) {
@@ -140,7 +139,12 @@ public class PropertiesParser implements Parser<Properties.File> {
             }
         }
 
-        return new Properties.Comment(randomId(), message.toString(), format(prefix.toString(), suffix.toString()));
+        return new Properties.Comment(
+                randomId(),
+                message.toString(),
+                format(prefix.toString(), suffix.toString()),
+                Markers.EMPTY
+        );
     }
 
     private Properties.Entry entryFromLine(String line) {
@@ -203,9 +207,14 @@ public class PropertiesParser implements Parser<Properties.File> {
             }
         }
 
-        return new Properties.Entry(randomId(), key.toString(), value.toString(),
+        return new Properties.Entry(
+                randomId(),
+                key.toString(),
+                value.toString(),
                 format(equalsPrefix.toString(), equalsSuffix.toString()),
-                format(prefix.toString(), suffix.toString()));
+                format(prefix.toString(), suffix.toString()),
+                Markers.EMPTY
+        );
     }
 
     @Override

@@ -24,12 +24,11 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.internal.PrintProperties;
 
 import java.io.Serializable;
-import java.net.URI;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -61,13 +60,13 @@ public interface Properties extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Collection<Metadata> metadata;
-
-        @With
         List<Content> content;
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public Formatting getFormatting() {
@@ -102,6 +101,9 @@ public interface Properties extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
             return v.visitEntry(this);
@@ -120,5 +122,8 @@ public interface Properties extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
     }
 }

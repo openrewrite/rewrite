@@ -31,6 +31,7 @@ import org.openrewrite.java.internal.MethodDeclToString;
 import org.openrewrite.java.internal.PrintJava;
 import org.openrewrite.java.internal.VariableDeclsToString;
 import org.openrewrite.java.search.*;
+import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -49,7 +50,6 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
@@ -87,6 +87,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public JavaType getType() {
             return typeExpr.getType();
@@ -120,6 +123,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @JsonIgnore
         @Override
         public JavaType getType() {
@@ -139,9 +145,10 @@ public interface J extends Serializable, Tree {
 
         public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
             return new J.Annotation(randomId(),
-                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, EMPTY),
-                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, EMPTY),
-                    formatting);
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, Formatting.EMPTY, Markers.EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, Formatting.EMPTY, Markers.EMPTY),
+                    formatting,
+                    Markers.EMPTY);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -156,6 +163,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @Override
@@ -184,6 +194,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitArrayAccess(this);
@@ -201,6 +214,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -219,6 +235,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -248,6 +267,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -263,6 +285,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -295,6 +320,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -337,6 +365,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitAssignOp(this);
@@ -365,6 +396,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -376,6 +410,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -387,6 +424,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -398,6 +438,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -409,6 +452,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -420,6 +466,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -431,6 +480,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -442,6 +494,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -453,6 +508,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -464,6 +522,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -475,6 +536,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
         }
     }
@@ -502,6 +566,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitBinary(this);
@@ -527,6 +594,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -538,6 +608,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -549,6 +622,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -560,6 +636,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -571,6 +650,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -582,6 +664,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -593,6 +678,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -604,6 +692,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -615,6 +706,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -626,6 +720,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -637,6 +734,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -648,6 +748,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -659,6 +762,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -670,6 +776,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -681,6 +790,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -692,6 +804,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -703,6 +818,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -714,6 +832,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -725,6 +846,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
         }
     }
@@ -741,19 +865,23 @@ public interface J extends Serializable, Tree {
         Empty statik;
 
         public Block<T> withStatic(Empty statik) {
-            return new Block<>(id, statik, statements, formatting, end);
+            return new Block<>(id, statik, statements, formatting, Markers.EMPTY, end);
         }
 
-        @With
         @Getter
+        @With
         List<T> statements;
 
         @Getter
         @With
         Formatting formatting;
 
-        @With
         @Getter
+        @With
+        Markers markers;
+
+        @Getter
+        @With
         End end;
 
         @Nullable
@@ -781,6 +909,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -797,6 +928,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -827,6 +961,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitCase(this);
@@ -853,7 +990,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name, typeParameters,
-                    extendings, implementings, body, type, formatting);
+                    extendings, implementings, body, type, formatting, markers);
         }
 
         public ClassDecl withModifiers(String... modifierKeywords) {
@@ -885,11 +1022,11 @@ public interface J extends Serializable, Tree {
         Extends extendings;
 
         public ClassDecl withExtends(@Nullable Extends extendings) {
-            if(extendings == this.extendings) {
+            if (extendings == this.extendings) {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type, formatting);
+                    typeParameters, extendings, implementings, body, type, formatting, markers);
         }
 
         @JsonProperty("extendings")
@@ -902,11 +1039,11 @@ public interface J extends Serializable, Tree {
         Implements implementings;
 
         public ClassDecl withImplements(@Nullable Implements implementings) {
-            if(implementings == this.implementings) {
+            if (implementings == this.implementings) {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type, formatting);
+                    typeParameters, extendings, implementings, body, type, formatting, markers);
         }
 
         @JsonProperty("implementings")
@@ -927,6 +1064,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Formatting formatting;
+
+        @Getter
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -974,6 +1115,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -985,6 +1129,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -996,6 +1143,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1007,6 +1157,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
         }
 
@@ -1022,6 +1175,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1036,6 +1192,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         /**
@@ -1114,9 +1273,6 @@ public interface J extends Serializable, Tree {
         String sourcePath;
 
         @With
-        Collection<Metadata> metadata;
-
-        @With
         @Nullable
         Package packageDecl;
 
@@ -1128,6 +1284,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @With
         Collection<JavaStyle> styles;
@@ -1170,8 +1329,8 @@ public interface J extends Serializable, Tree {
                     (int) getPackageDecl().printTrimmed().chars().filter(c -> c == '.').count();
             // Jump over Java file name
             return Paths.get(sourcePath).getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
-                .mapToObj(n -> "../")
-                .collect(joining(""))).normalize();
+                    .mapToObj(n -> "../")
+                    .collect(joining(""))).normalize();
         }
 
         /**
@@ -1208,24 +1367,26 @@ public interface J extends Serializable, Tree {
                     .resolve(className + ".java")
                     .toString();
 
-            return new J.CompilationUnit(randomId(),
+            return new J.CompilationUnit(
+                    randomId(),
                     sourcePath,
-                    emptyList(),
-                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), EMPTY),
+                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), Formatting.EMPTY, Markers.EMPTY),
                     emptyList(),
                     singletonList(new J.ClassDecl(randomId(),
                             emptyList(),
                             emptyList(),
-                            new ClassDecl.Kind.Class(randomId(), EMPTY),
+                            new ClassDecl.Kind.Class(randomId(), Formatting.EMPTY, Markers.EMPTY),
                             TreeBuilder.buildName(className).withPrefix(" "),
                             null,
                             null,
                             null,
                             new Try.Block<>(randomId(), null, emptyList(), format(" "),
-                                    new Block.End(randomId(), format("\n"))),
+                                    Markers.EMPTY, new Block.End(randomId(), format("\n"), Markers.EMPTY)),
                             JavaType.Class.build(packageName + "." + className),
-                            format("\n\n")).withModifiers("public")),
-                    EMPTY,
+                            format("\n\n"),
+                            Markers.EMPTY).withModifiers("public")),
+                    Formatting.EMPTY,
+                    Markers.EMPTY,
                     emptyList());
         }
     }
@@ -1243,6 +1404,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1272,6 +1436,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitDoWhileLoop(this);
@@ -1295,6 +1462,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -1307,6 +1477,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -1348,6 +1521,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitEnumValue(this);
@@ -1368,6 +1544,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1394,6 +1573,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1448,7 +1630,6 @@ public interface J extends Serializable, Tree {
          * If a methodMatcher is passed that includes wildcards the result will always be "false"
          *
          * @param methodMatcher a methodMatcher whose internal pattern is fully concrete (no wildcards)
-         *
          */
         public boolean isFullyQualifiedClassReference(MethodMatcher methodMatcher) {
             String hopefullyFullyQualifiedMethod = methodMatcher.getTargetTypePattern().pattern() + "." + methodMatcher.getMethodNamePattern().pattern();
@@ -1488,6 +1669,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitForEachLoop(this);
@@ -1508,6 +1692,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -1526,6 +1713,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1550,6 +1740,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -1567,10 +1760,14 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
-        private Ident(UUID id, IdentFlyweight ident, Formatting formatting) {
+        @With
+        Markers markers;
+
+        private Ident(UUID id, IdentFlyweight ident, Formatting formatting, Markers markers) {
             this.id = id;
             this.ident = ident;
             this.formatting = formatting;
+            this.markers = markers;
         }
 
         @Override
@@ -1581,7 +1778,7 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Ident withType(JavaType type) {
-            return build(id, getSimpleName(), type, formatting);
+            return build(id, getSimpleName(), type, formatting, markers);
         }
 
         @JsonIgnore
@@ -1595,21 +1792,23 @@ public interface J extends Serializable, Tree {
         }
 
         public Ident withName(String name) {
-            return build(id, name, getType(), formatting);
+            return build(id, name, getType(), formatting, markers);
         }
 
         @JsonCreator
         public static Ident build(@JsonProperty("id") UUID id,
                                   @JsonProperty("simpleName") String simpleName,
                                   @JsonProperty("type") @Nullable JavaType type,
-                                  @JsonProperty("formatting") Formatting formatting) {
+                                  @JsonProperty("formatting") Formatting formatting,
+                                  @JsonProperty("metadata") Markers markers) {
             synchronized (flyweights) {
                 return new Ident(
                         id,
                         flyweights
                                 .computeIfAbsent(simpleName, n -> HashObjObjMaps.newMutableMap())
                                 .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
-                        formatting
+                        formatting,
+                        markers
                 );
             }
         }
@@ -1620,7 +1819,8 @@ public interface J extends Serializable, Tree {
                     randomId(),
                     classType.getClassName(),
                     classType,
-                    EMPTY
+                    Formatting.EMPTY,
+                    Markers.EMPTY
             );
         }
 
@@ -1661,6 +1861,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitIf(this);
@@ -1678,6 +1881,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
 
             @Override
             public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1704,6 +1910,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Formatting formatting;
+
+        @Getter
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1793,7 +2003,10 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
-        private final Formatting formatting;
+        Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1816,6 +2029,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1846,6 +2062,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitLambda(this);
@@ -1860,6 +2079,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1875,7 +2097,10 @@ public interface J extends Serializable, Tree {
             @With
             List<? extends Tree> params;
 
-            Formatting formatting = EMPTY;
+            Formatting formatting = Formatting.EMPTY;
+
+            @With
+            Markers markers;
 
             @SuppressWarnings("unchecked")
             @Override
@@ -1908,13 +2133,16 @@ public interface J extends Serializable, Tree {
         @Override
         public Literal withType(JavaType type) {
             if (type instanceof JavaType.Primitive) {
-                return new Literal(id, value, valueSource, (JavaType.Primitive) type, formatting);
+                return new Literal(id, value, valueSource, (JavaType.Primitive) type, formatting, markers);
             }
             return this;
         }
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1939,7 +2167,9 @@ public interface J extends Serializable, Tree {
                     randomId(),
                     value,
                     "\"" + value + "\"",
-                    JavaType.Primitive.String, EMPTY
+                    JavaType.Primitive.String,
+                    Formatting.EMPTY,
+                    Markers.EMPTY
             );
         }
     }
@@ -1968,6 +2198,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMemberReference(this);
@@ -1994,7 +2227,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr, name, params,
-                    throwz, body, defaultValue, formatting);
+                    throwz, body, defaultValue, formatting, markers);
         }
 
         public MethodDecl withModifiers(String... modifierKeywords) {
@@ -2043,11 +2276,11 @@ public interface J extends Serializable, Tree {
         Throws throwz;
 
         public MethodDecl withThrows(Throws throwz) {
-            if(throwz == this.throwz) {
+            if (throwz == this.throwz) {
                 return this;
             }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr,
-                    name, params, throwz, body, defaultValue, formatting);
+                    name, params, throwz, body, defaultValue, formatting, markers);
         }
 
         @JsonProperty("throwz")
@@ -2072,6 +2305,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Formatting formatting;
+
+        @Getter
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2109,6 +2346,9 @@ public interface J extends Serializable, Tree {
             @With
             Formatting formatting;
 
+            @With
+            Markers markers;
+
             public boolean isEmpty() {
                 return params.stream().allMatch(p -> p instanceof Empty);
             }
@@ -2126,6 +2366,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2140,6 +2383,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @JsonIgnore
@@ -2184,17 +2430,20 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @SuppressWarnings("unchecked")
         @Override
         public MethodInvocation withType(JavaType type) {
             if (type instanceof JavaType.Method) {
-                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, formatting);
+                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, formatting, markers);
             }
             return this;
         }
 
         public MethodInvocation withDeclaringType(JavaType.FullyQualified type) {
-            if(this.type == null) {
+            if (this.type == null) {
                 return this;
             } else {
                 return withType(this.type.withDeclaringType(type));
@@ -2242,6 +2491,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -2256,7 +2508,7 @@ public interface J extends Serializable, Tree {
             List<J.Modifier> modifiers = new ArrayList<>(existing);
             J.Modifier actualModifier = null;
 
-            if(!visibility.equals("package")) {
+            if (!visibility.equals("package")) {
                 J.Modifier desiredModifier = J.Modifier.buildModifier(visibility, Formatting.EMPTY);
                 actualModifier = existing.stream()
                         .filter(modifier -> modifier.getClass().equals(desiredModifier.getClass()))
@@ -2297,20 +2549,20 @@ public interface J extends Serializable, Tree {
                     for (int i = 0; i < sizeBeforeAdd; i++) {
                         Modifier m = modifiers.get(i);
                         if (m instanceof Static) {
-                            modifiers.add(i + 1, new Final(randomId(), format(" ")));
+                            modifiers.add(i + 1, new Final(randomId(), format(" "), Markers.EMPTY));
                             finalAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getSuffix())));
+                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getSuffix()), Markers.EMPTY));
                             finalAdded = true;
                         }
                     }
 
                     if (!finalAdded) {
-                        modifiers.add(0, new Final(randomId(), EMPTY));
+                        modifiers.add(0, new Final(randomId(), Formatting.EMPTY, Markers.EMPTY));
                     }
                 } else if ("static".equals(modifier) && !hasModifier(existing, "static")) {
                     boolean staticAdded = false;
@@ -2322,20 +2574,20 @@ public interface J extends Serializable, Tree {
                             afterAccessModifier = i + 1;
                         } else if (m instanceof Final) {
                             modifiers.set(i, m.withFormatting(format(" ", m.getSuffix())));
-                            modifiers.add(i, new Static(randomId(), format(m.getPrefix())));
+                            modifiers.add(i, new Static(randomId(), format(m.getPrefix()), Markers.EMPTY));
                             staticAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getSuffix())));
+                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getSuffix()), Markers.EMPTY));
                             staticAdded = true;
                         }
                     }
 
                     if (!staticAdded) {
-                        modifiers.add(0, new Static(randomId(), EMPTY));
+                        modifiers.add(0, new Static(randomId(), Formatting.EMPTY, Markers.EMPTY));
                     }
                 } else if (("public".equals(modifier) || "protected".equals(modifier) || "private".equals(modifier)) &&
                         !hasModifier(existing, modifier)) {
@@ -2360,7 +2612,7 @@ public interface J extends Serializable, Tree {
                     }
 
                     if (!accessModifierAdded) {
-                        modifiers.add(0, buildModifier(modifier, EMPTY));
+                        modifiers.add(0, buildModifier(modifier, Formatting.EMPTY));
                     }
                 }
             }
@@ -2372,14 +2624,14 @@ public interface J extends Serializable, Tree {
             Modifier access;
             switch (modifier) {
                 case "public":
-                    access = new Public(randomId(), formatting);
+                    access = new Public(randomId(), formatting, Markers.EMPTY);
                     break;
                 case "protected":
-                    access = new Protected(randomId(), formatting);
+                    access = new Protected(randomId(), formatting, Markers.EMPTY);
                     break;
                 case "private":
                 default:
-                    access = new Private(randomId(), formatting);
+                    access = new Private(randomId(), formatting, Markers.EMPTY);
                     break;
             }
             return access;
@@ -2394,6 +2646,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2405,6 +2660,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2416,6 +2674,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2427,6 +2688,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2438,6 +2702,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2449,6 +2716,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2460,6 +2730,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2471,6 +2744,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2482,6 +2758,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2493,6 +2772,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2504,6 +2786,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2515,6 +2800,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -2530,6 +2818,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2578,6 +2869,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitNewArray(this);
@@ -2595,6 +2889,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2609,6 +2906,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -2626,7 +2926,7 @@ public interface J extends Serializable, Tree {
         New nooh;
 
         public NewClass withNew(New nooh) {
-            return new NewClass(id, encl, nooh, clazz, args, body, type, formatting);
+            return new NewClass(id, encl, nooh, clazz, args, body, type, formatting, markers);
         }
 
         @Nullable
@@ -2647,6 +2947,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2677,6 +2980,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2688,6 +2994,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -2703,6 +3012,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2726,6 +3038,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -2752,30 +3067,35 @@ public interface J extends Serializable, Tree {
                             randomId(),
                             typeNameType.getClassName(),
                             typeNameType,
-                            EMPTY),
+                            Formatting.EMPTY,
+                            Markers.EMPTY),
                     new J.TypeParameters(
                             randomId(),
                             Formatting.formatFirstPrefix(
-                            stream(genericTypeNames)
-                                .map(generic -> {
-                                    JavaType.Class genericType = JavaType.Class.build(generic);
-                                    return new J.TypeParameter(
-                                            randomId(),
-                                            emptyList(),
-                                            J.Ident.build(
-                                                    randomId(),
-                                                    genericType.getClassName(),
-                                                    genericType,
-                                                    EMPTY
-                                            ),
-                                            null,
-                                            format(" ")
-                                    );
-                                })
-                                .collect(Collectors.toList()), ""
+                                    stream(genericTypeNames)
+                                            .map(generic -> {
+                                                JavaType.Class genericType = JavaType.Class.build(generic);
+                                                return new J.TypeParameter(
+                                                        randomId(),
+                                                        emptyList(),
+                                                        J.Ident.build(
+                                                                randomId(),
+                                                                genericType.getClassName(),
+                                                                genericType,
+                                                                Formatting.EMPTY,
+                                                                Markers.EMPTY
+                                                        ),
+                                                        null,
+                                                        format(" "),
+                                                        Markers.EMPTY
+                                                );
+                                            })
+                                            .collect(Collectors.toList()), ""
                             ),
-                            EMPTY),
-                    EMPTY
+                            Formatting.EMPTY,
+                            Markers.EMPTY),
+                    Formatting.EMPTY,
+                    Markers.EMPTY
             );
         }
     }
@@ -2792,6 +3112,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2836,7 +3159,7 @@ public interface J extends Serializable, Tree {
             if (!(type instanceof JavaType.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitive");
             }
-            return new Primitive(id, (JavaType.Primitive) type, formatting);
+            return new Primitive(id, (JavaType.Primitive) type, formatting, markers);
         }
 
         @Override
@@ -2848,6 +3171,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Formatting formatting;
+
+        @Getter
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2868,6 +3195,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2897,6 +3227,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitSwitch(this);
@@ -2918,6 +3251,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2948,6 +3284,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitTernary(this);
@@ -2966,6 +3305,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3004,10 +3346,10 @@ public interface J extends Serializable, Tree {
         Finally finallie;
 
         public Try withFinally(Finally finallie) {
-            if(finallie == this.finallie) {
+            if (finallie == this.finallie) {
                 return this;
             }
-            return new Try(id, resources, body, catches, finallie, formatting);
+            return new Try(id, resources, body, catches, finallie, formatting, markers);
         }
 
         @Nullable
@@ -3018,6 +3360,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Formatting formatting;
+
+        @Getter
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3036,6 +3382,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3053,6 +3402,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
 
             @Override
             public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3072,6 +3424,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
 
             @Override
             public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3095,6 +3450,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -3137,6 +3495,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitTypeParameter(this);
@@ -3154,6 +3515,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
     }
 
@@ -3169,6 +3533,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3195,6 +3562,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3225,7 +3595,10 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = EMPTY;
+                Formatting formatting = Formatting.EMPTY;
+
+                @With
+                Markers markers;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -3241,7 +3614,10 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = EMPTY;
+                Formatting formatting = Formatting.EMPTY;
+
+                @With
+                Markers markers;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -3259,6 +3635,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3270,6 +3649,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3279,7 +3661,10 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = EMPTY;
+                Formatting formatting = Formatting.EMPTY;
+
+                @With
+                Markers markers;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -3295,7 +3680,10 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                Formatting formatting = EMPTY;
+                Formatting formatting = Formatting.EMPTY;
+
+                @With
+                Markers markers;
 
                 @SuppressWarnings("unchecked")
                 @Override
@@ -3313,6 +3701,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3324,6 +3715,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
         }
     }
@@ -3340,6 +3734,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -3375,7 +3772,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new VariableDecls(id, annotations, modifiers, typeExpr, varargs,
-                    dimensionsBeforeName, vars, formatting);
+                    dimensionsBeforeName, vars, formatting, markers);
         }
 
         public VariableDecls withModifiers(String... modifierKeywords) {
@@ -3414,6 +3811,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMultiVariable(this);
@@ -3443,6 +3843,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3457,6 +3860,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3482,6 +3888,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Formatting formatting;
+
+            @With
+            Markers markers;
 
             @JsonIgnore
             public String getSimpleName() {
@@ -3529,6 +3938,9 @@ public interface J extends Serializable, Tree {
         @With
         Formatting formatting;
 
+        @With
+        Markers markers;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitWhileLoop(this);
@@ -3552,6 +3964,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Formatting formatting;
+
+        @With
+        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -3580,6 +3995,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3591,6 +4009,9 @@ public interface J extends Serializable, Tree {
 
                 @With
                 Formatting formatting;
+
+                @With
+                Markers markers;
             }
         }
     }

@@ -17,8 +17,9 @@ package org.openrewrite.xml.tree
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.Markers
 import org.openrewrite.TreeSerializer
-import org.openrewrite.git.GitMetadata
+import org.openrewrite.git.Git
 import org.openrewrite.xml.XmlParser
 
 class XmlDocumentSerializerTest {
@@ -26,7 +27,11 @@ class XmlDocumentSerializerTest {
     @Test
     fun roundTripSerialization() {
         val serializer = TreeSerializer<Xml.Document>()
-        val a = XmlParser().parse("<root></root>")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val a = XmlParser().parse("<root></root>")[0].withMarkers(
+            Markers(
+                listOf(Git().apply { headCommitId = "123" })
+            )
+        )
 
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)
@@ -37,8 +42,14 @@ class XmlDocumentSerializerTest {
     @Test
     fun roundTripSerializationList() {
         val serializer = TreeSerializer<Xml.Document>()
-        val x1 = XmlParser().parse("<root></root>")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
-        val x2 = XmlParser().parse("<another></another>")[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val x1 = XmlParser().parse("<root></root>")[0]
+                .withMarkers(Markers(listOf(Git().apply {
+                    headCommitId = "123"
+                })))
+        val x2 = XmlParser().parse("<another></another>")[0]
+                .withMarkers(Markers(listOf(Git().apply {
+                    headCommitId = "123"
+                })))
 
         val serialized = serializer.write(listOf(x1, x2))
         val deserialized = serializer.readList(serialized)

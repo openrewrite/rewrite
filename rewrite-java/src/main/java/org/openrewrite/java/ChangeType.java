@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
@@ -154,7 +155,7 @@ public class ChangeType extends JavaIsoRefactorVisitor {
         }
 
         if (m.getType() != null) {
-            if(m.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
+            if (m.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
                 m = m.withDeclaringType(targetType);
             }
         }
@@ -227,7 +228,8 @@ public class ChangeType extends JavaIsoRefactorVisitor {
         if (nameField instanceof NameTree) {
             JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
             if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(type)) {
-                return (T) J.Ident.build(randomId(), targetType.getClassName(), targetType, nameField.getFormatting());
+                return (T) J.Ident.build(randomId(), targetType.getClassName(), targetType, nameField.getFormatting(),
+                        Markers.EMPTY);
             }
         }
         return nameField;
@@ -246,7 +248,7 @@ public class ChangeType extends JavaIsoRefactorVisitor {
                 JavaType.Class nodeTypeAsClass = TypeUtils.asClass(((NameTree) tree).getType());
                 if (nodeTypeAsClass != null && nodeTypeAsClass.getFullyQualifiedName().equals(type)) {
                     atLeastOneChanged = true;
-                    transformed.add((T) J.Ident.build(randomId(), targetType.getClassName(), targetType, tree.getFormatting()));
+                    transformed.add((T) J.Ident.build(randomId(), targetType.getClassName(), targetType, tree.getFormatting(), Markers.EMPTY));
                     continue;
                 }
             }

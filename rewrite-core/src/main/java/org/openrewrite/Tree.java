@@ -19,9 +19,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Tree {
@@ -30,6 +30,8 @@ public interface Tree {
     }
 
     Formatting getFormatting();
+
+    Markers getMarkers();
 
     /**
      * An id that can be used to identify a particular AST element, even after transformations have taken place on it

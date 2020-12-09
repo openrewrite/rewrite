@@ -67,7 +67,7 @@ public class GenerateNewBeanUsingProperties {
         }
 
         @Override
-        public J.Block visitBlock(J.Block<J> block) {
+        public J.Block<J> visitBlock(J.Block<J> block) {
             J.Block<J> b = super.visitBlock(block);
 
             if (b.isScope(scope)) {

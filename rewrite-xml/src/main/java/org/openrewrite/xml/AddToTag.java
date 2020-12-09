@@ -15,9 +15,9 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.ArrayList;
@@ -59,7 +59,8 @@ public class AddToTag {
             if (scope.isScope(tag)) {
                 boolean formatRequested = false;
                 if (t.getClosing() == null) {
-                    t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), tag.getName(), "", format("\n")))
+                    t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), tag.getName(), "", format("\n"),
+                                Markers.EMPTY))
                             .withBeforeTagDelimiterPrefix("");
                     andThen(new AutoFormat(t));
                     formatRequested = true;

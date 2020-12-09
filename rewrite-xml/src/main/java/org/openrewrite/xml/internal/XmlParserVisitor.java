@@ -19,6 +19,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
 
-import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
@@ -52,10 +52,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
                 uri.toString(),
-                emptyList(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
-                format)
+                format,
+                Markers.EMPTY)
         );
         return d == null ? null : d.withSuffix(source.substring(cursor));
     }
@@ -66,7 +66,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 randomId(),
                 ctx.xmldecl().stream().map(this::visitXmldecl).collect(toList()),
                 ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
-                format)
+                format,
+                Markers.EMPTY)
         );
     }
 
@@ -75,7 +76,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         if (ctx.COMMENT() != null) {
             return convert(ctx.COMMENT(), (comment, format) -> new Xml.Comment(randomId(),
                     comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length()),
-                    format));
+                    format,
+                    Markers.EMPTY));
         } else {
             return super.visitMisc(ctx);
         }
@@ -89,7 +91,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 return new Xml.CharData(randomId(),
                         true,
                         formatAndText.getValue().substring("<![CDATA[".length(), cdata.getText().length() - "]]>".length()),
-                        formatAndText.getKey());
+                        formatAndText.getKey(),
+                        Markers.EMPTY);
             });
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
@@ -99,7 +102,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                 return new Xml.CharData(randomId(),
                         false,
                         formatAndText.getValue(),
-                        formatAndText.getKey());
+                        formatAndText.getKey(),
+                        Markers.EMPTY);
             });
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
@@ -108,7 +112,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             return new Xml.CharData(randomId(),
                     false,
                     ctx.reference().EntityRef().getText(),
-                    Formatting.EMPTY);
+                    Formatting.EMPTY,
+                    Markers.EMPTY);
         }
 
         return super.visitContent(ctx);
@@ -157,7 +162,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             "xml",
                             attributes,
                             format(ctx.getStop()).getPrefix(),
-                            format
+                            format,
+                            Markers.EMPTY
                     );
                 }
         );
@@ -175,7 +181,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             name,
                             attributes,
                             format(ctx.getStop()).getPrefix(),
-                            format
+                            format,
+                            Markers.EMPTY
                     );
                 }
         );
@@ -211,12 +218,14 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                                 randomId(),
                                 convert(ctx.Name(1), (n, f) -> n.getText()),
                                 format(ctx.CLOSE(1)).getPrefix(),
-                                closeTagFormat
+                                closeTagFormat,
+                                Markers.EMPTY
                         );
                         cursor++;
                     }
 
-                    return new Xml.Tag(randomId(), name, attributes, content, closeTag, beforeTagDelimiterPrefix, format);
+                    return new Xml.Tag(randomId(), name, attributes, content, closeTag,
+                            beforeTagDelimiterPrefix, format, Markers.EMPTY);
                 }
         );
     }
@@ -224,18 +233,19 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, format) -> {
-            Xml.Ident key = convert(c.Name(), (t, f) -> new Xml.Ident(randomId(), t.getText(), f))
+            Xml.Ident key = convert(c.Name(), (t, f) -> new Xml.Ident(randomId(), t.getText(), f, Markers.EMPTY))
                     .withSuffix(convert(c.EQUALS(), (e, f) -> f.getPrefix()));
 
             Xml.Attribute.Value value = convert(c.STRING(), (v, f) -> new Xml.Attribute.Value(
                             randomId(),
                             v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
                             v.getText().substring(1, c.STRING().getText().length() - 1),
-                            f
+                            f,
+                            Markers.EMPTY
                     )
             );
 
-            return new Xml.Attribute(randomId(), key, value, format);
+            return new Xml.Attribute(randomId(), key, value, format, Markers.EMPTY);
         });
     }
 
@@ -243,9 +253,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.DocTypeDecl visitDoctypedecl(XMLParser.DoctypedeclContext ctx) {
         return convert(ctx, (c, format) -> {
             skip(c.DOCTYPE());
-            Xml.Ident name = convert(c.Name(), (n, f) -> new Xml.Ident(randomId(), n.getText(), f));
-            Xml.Ident externalId = convert(c.externalid(), (n, f) -> new Xml.Ident(randomId(), n.Name().getText(), f));
-            List<Xml.Ident> internalSubset = c.STRING().stream().map(s -> convert(s, (attr, f) -> new Xml.Ident(randomId(), attr.getText(), f))).collect(toList());
+            Xml.Ident name = convert(c.Name(), (n, f) -> new Xml.Ident(randomId(), n.getText(), f, Markers.EMPTY));
+            Xml.Ident externalId = convert(c.externalid(), (n, f) -> new Xml.Ident(randomId(), n.Name().getText(), f, Markers.EMPTY));
+            List<Xml.Ident> internalSubset = c.STRING().stream()
+                    .map(s -> convert(s, (attr, f) -> new Xml.Ident(randomId(), attr.getText(), f, Markers.EMPTY)))
+                    .collect(toList());
             String beforeTagDelimiterPrefix = format(c.CLOSE()).getPrefix();
             return new Xml.DocTypeDecl(randomId(),
                     name,
@@ -253,7 +265,8 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     internalSubset,
                     null, // TODO implement me!
                     beforeTagDelimiterPrefix,
-                    format);
+                    format,
+                    Markers.EMPTY);
         });
     }
 

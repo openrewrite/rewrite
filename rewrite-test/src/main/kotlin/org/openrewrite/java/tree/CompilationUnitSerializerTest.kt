@@ -18,8 +18,9 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.Markers
 import org.openrewrite.TreeSerializer
-import org.openrewrite.git.GitMetadata
+import org.openrewrite.git.Git
 import org.openrewrite.java.JavaParser
 
 /**
@@ -42,7 +43,9 @@ interface CompilationUnitSerializerTest {
 
     @Test
     fun roundTripSerializationPreservesFlyweights(jp: JavaParser) {
-        val a = jp.parse(aSource)[0].withMetadata(listOf(GitMetadata().apply { headCommitId = "123" }))
+        val a = jp.parse(aSource)[0].withMarkers(Markers(listOf(Git().apply {
+            headCommitId = "123"
+        })))
 
         val aBytes = serializer.write(a)
         val aDeser = serializer.read(aBytes)

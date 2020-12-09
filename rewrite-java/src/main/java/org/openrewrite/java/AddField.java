@@ -17,6 +17,8 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -26,7 +28,6 @@ import java.util.List;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
@@ -78,17 +79,21 @@ public final class AddField {
                 J.VariableDecls newField = new J.VariableDecls(randomId(),
                         emptyList(),
                         modifiers,
-                        J.Ident.build(randomId(), fieldTypeString, javaType, modifiers.isEmpty() ? EMPTY : format(" ")),
+                        J.Ident.build(randomId(), fieldTypeString, javaType,
+                                modifiers.isEmpty() ? Formatting.EMPTY : format(" "), Markers.EMPTY),
                         null,
                         emptyList(),
                         singletonList(new J.VariableDecls.NamedVar(randomId(),
-                                J.Ident.build(randomId(), name, null, format("", init == null ? "" : " ")),
+                                J.Ident.build(randomId(), name, null, format("", init == null ? "" : " "),
+                                        Markers.EMPTY),
                                 emptyList(),
-                                init == null ? null : new J.UnparsedSource(randomId(), init, format(" ")),
+                                init == null ? null : new J.UnparsedSource(randomId(), init, format(" "), Markers.EMPTY),
                                 javaType,
-                                format(" ")
+                                format(" "),
+                                Markers.EMPTY
                         )),
-                        formatter.format(body)
+                        formatter.format(body),
+                        Markers.EMPTY
                 );
 
                 List<J> statements = new ArrayList<>(body.getStatements().size() + 1);

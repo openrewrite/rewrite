@@ -30,7 +30,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Optional;
 import java.util.Scanner;
 
 /**
@@ -66,7 +65,7 @@ public class GithubChangePublisher implements ChangePublisher {
         if (change.getFixed() == null) {
             // FIXME delete file
         } else {
-            Optional.ofNullable(change.getFixed().getMetadata(GithubMetadata.class)).ifPresent(metadata -> {
+            change.getFixed().getMarkers().findFirst(Github.class).ifPresent(metadata -> {
                 String organization = metadata.getOrganization();
                 String repository = metadata.getRepository();
 

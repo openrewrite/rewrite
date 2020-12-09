@@ -17,7 +17,6 @@ package org.openrewrite.maven;
 
 import org.openrewrite.Validated;
 import org.openrewrite.xml.ChangeTagValue;
-import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;

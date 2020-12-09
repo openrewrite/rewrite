@@ -25,6 +25,7 @@ import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.tree.JCTree.*;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
@@ -50,7 +51,6 @@ import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
-import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
@@ -96,7 +96,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 expressions = convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")"));
             }
 
-            args = new J.Annotation.Arguments(randomId(), expressions, format(argsPrefix));
+            args = new J.Annotation.Arguments(randomId(), expressions, format(argsPrefix), Markers.EMPTY);
         } else {
             var remaining = source.substring(cursor, endPos(node));
 
@@ -106,13 +106,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             if (remaining.contains("(") && remaining.contains(")")) {
                 var parenPrefix = sourceBefore("(");
                 args = new J.Annotation.Arguments(randomId(),
-                        singletonList(new J.Empty(randomId(), format(sourceBefore(")")))),
-                        format(parenPrefix)
+                        singletonList(new J.Empty(randomId(), format(sourceBefore(")")), Markers.EMPTY)),
+                        format(parenPrefix),
+                        Markers.EMPTY
                 );
             }
         }
 
-        return new J.Annotation(randomId(), name, args, fmt);
+        return new J.Annotation(randomId(), name, args, fmt, Markers.EMPTY);
     }
 
     @Override
@@ -121,9 +122,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         var dimensionPrefix = sourceBefore("[");
         var dimension = new J.ArrayAccess.Dimension(randomId(), convert(node.getIndex(), t -> sourceBefore("]")),
-                format(dimensionPrefix));
+                format(dimensionPrefix), Markers.EMPTY);
 
-        return new J.ArrayAccess(randomId(), indexed, dimension, type(node), fmt);
+        return new J.ArrayAccess(randomId(), indexed, dimension, type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -140,22 +141,26 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         var dimensions = IntStream.range(0, dimCount).mapToObj(n -> {
             var dimPrefix = sourceBefore("[");
-            return new J.ArrayType.Dimension(randomId(), new J.Empty(randomId(), format(sourceBefore("]"))), format(dimPrefix));
+            return new J.ArrayType.Dimension(randomId(),
+                    new J.Empty(randomId(), format(sourceBefore("]")), Markers.EMPTY),
+                    format(dimPrefix),
+                    Markers.EMPTY);
         }).collect(toList());
 
-        return new J.ArrayType(randomId(), elemType, dimensions, fmt);
+        return new J.ArrayType(randomId(), elemType, dimensions, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitAssert(AssertTree node, Formatting fmt) {
         skip("assert");
-        return new J.Assert(randomId(), convert(((JCAssert) node).cond), fmt);
+        return new J.Assert(randomId(), convert(((JCAssert) node).cond), fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitAssignment(AssignmentTree node, Formatting fmt) {
         Expression variable = convert(node.getVariable(), t -> sourceBefore("="));
-        return new J.Assign(randomId(), variable, convert(node.getExpression()), type(node), fmt);
+        return new J.Assign(randomId(), variable, convert(node.getExpression()), type(node), fmt,
+                Markers.EMPTY);
     }
 
     @Override
@@ -167,85 +172,85 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         switch (((JCBinary) node).getTag()) {
             case PLUS:
                 skip("+");
-                op = new J.Binary.Operator.Addition(randomId(), opPrefix);
+                op = new J.Binary.Operator.Addition(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MINUS:
                 skip("-");
-                op = new J.Binary.Operator.Subtraction(randomId(), opPrefix);
+                op = new J.Binary.Operator.Subtraction(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case DIV:
                 skip("/");
-                op = new J.Binary.Operator.Division(randomId(), opPrefix);
+                op = new J.Binary.Operator.Division(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MUL:
                 skip("*");
-                op = new J.Binary.Operator.Multiplication(randomId(), opPrefix);
+                op = new J.Binary.Operator.Multiplication(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MOD:
                 skip("%");
-                op = new J.Binary.Operator.Modulo(randomId(), opPrefix);
+                op = new J.Binary.Operator.Modulo(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case AND:
                 skip("&&");
-                op = new J.Binary.Operator.And(randomId(), opPrefix);
+                op = new J.Binary.Operator.And(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case OR:
                 skip("||");
-                op = new J.Binary.Operator.Or(randomId(), opPrefix);
+                op = new J.Binary.Operator.Or(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITAND:
                 skip("&");
-                op = new J.Binary.Operator.BitAnd(randomId(), opPrefix);
+                op = new J.Binary.Operator.BitAnd(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITOR:
                 skip("|");
-                op = new J.Binary.Operator.BitOr(randomId(), opPrefix);
+                op = new J.Binary.Operator.BitOr(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITXOR:
                 skip("^");
-                op = new J.Binary.Operator.BitXor(randomId(), opPrefix);
+                op = new J.Binary.Operator.BitXor(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case SL:
                 skip("<<");
-                op = new J.Binary.Operator.LeftShift(randomId(), opPrefix);
+                op = new J.Binary.Operator.LeftShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case SR:
                 skip(">>");
-                op = new J.Binary.Operator.RightShift(randomId(), opPrefix);
+                op = new J.Binary.Operator.RightShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case USR:
                 skip(">>>");
-                op = new J.Binary.Operator.UnsignedRightShift(randomId(), opPrefix);
+                op = new J.Binary.Operator.UnsignedRightShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case LT:
                 skip("<");
-                op = new J.Binary.Operator.LessThan(randomId(), opPrefix);
+                op = new J.Binary.Operator.LessThan(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case GT:
                 skip(">");
-                op = new J.Binary.Operator.GreaterThan(randomId(), opPrefix);
+                op = new J.Binary.Operator.GreaterThan(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case LE:
                 skip("<=");
-                op = new J.Binary.Operator.LessThanOrEqual(randomId(), opPrefix);
+                op = new J.Binary.Operator.LessThanOrEqual(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case GE:
                 skip(">=");
-                op = new J.Binary.Operator.GreaterThanOrEqual(randomId(), opPrefix);
+                op = new J.Binary.Operator.GreaterThanOrEqual(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case EQ:
                 skip("==");
-                op = new J.Binary.Operator.Equal(randomId(), opPrefix);
+                op = new J.Binary.Operator.Equal(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case NE:
                 skip("!=");
-                op = new J.Binary.Operator.NotEqual(randomId(), opPrefix);
+                op = new J.Binary.Operator.NotEqual(randomId(), opPrefix, Markers.EMPTY);
                 break;
             default:
                 throw new IllegalArgumentException("Unexpected binary tag " + ((JCBinary) node).getTag());
         }
 
-        return new J.Binary(randomId(), left, op, convert(node.getRightOperand()), type(node), fmt);
+        return new J.Binary(randomId(), left, op, convert(node.getRightOperand()), type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -254,7 +259,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         if ((((JCBlock) node).flags & (long) Flags.STATIC) != 0L) {
             skip("static");
-            stat = new J.Empty(randomId(), format("", sourceBefore("{")));
+            stat = new J.Empty(randomId(), format("", sourceBefore("{")), Markers.EMPTY);
         } else {
             skip("{");
         }
@@ -266,7 +271,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 })
                 .collect(toList()));
 
-        return new J.Block<>(randomId(), stat, statements, fmt, new J.Block.End(randomId(), format(sourceBefore("}"))));
+        return new J.Block<>(randomId(), stat, statements, fmt, Markers.EMPTY, new J.Block.End(randomId(), format(sourceBefore("}")), Markers.EMPTY));
     }
 
     @Override
@@ -276,23 +281,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.Ident label = null;
         Name labelName = node.getLabel();
         if (labelName != null) {
-            label = J.Ident.build(randomId(), labelName.toString(), null, format(sourceBefore(labelName.toString())));
+            label = J.Ident.build(randomId(), labelName.toString(), null, format(sourceBefore(labelName.toString())), Markers.EMPTY);
             skip(labelName.toString());
         }
 
-        return new J.Break(randomId(), label, fmt);
+        return new J.Break(randomId(), label, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitCase(CaseTree node, Formatting fmt) {
         Expression pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
         if (pattern == null) {
-            pattern = J.Ident.build(randomId(), skip("default"), null, format(sourceBefore(":")));
+            pattern = J.Ident.build(randomId(), skip("default"), null, format(sourceBefore(":")), Markers.EMPTY);
         }
         return new J.Case(randomId(),
                 pattern,
                 convertPossibleMultiVariable(node.getStatements()),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -302,9 +308,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         var paramPrefix = sourceBefore("(");
         J.VariableDecls paramDecl = convert(node.getParameter(), t -> sourceBefore(")"));
-        var param = new J.Parentheses<>(randomId(), paramDecl, format(paramPrefix));
+        var param = new J.Parentheses<>(randomId(), paramDecl, format(paramPrefix), Markers.EMPTY);
 
-        return new J.Try.Catch(randomId(), param, convert(node.getBlock()), fmt);
+        return new J.Try.Catch(randomId(), param, convert(node.getBlock()), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -314,24 +320,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.ClassDecl.Kind kind;
         if (hasFlag(node.getModifiers(), Flags.ENUM)) {
-            kind = new J.ClassDecl.Kind.Enum(randomId(), format(sourceBefore("enum")));
+            kind = new J.ClassDecl.Kind.Enum(randomId(), format(sourceBefore("enum")), Markers.EMPTY);
         } else if (hasFlag(node.getModifiers(), Flags.ANNOTATION)) {
             // note that annotations ALSO have the INTERFACE flag
-            kind = new J.ClassDecl.Kind.Annotation(randomId(), format(sourceBefore("@interface")));
+            kind = new J.ClassDecl.Kind.Annotation(randomId(), format(sourceBefore("@interface")), Markers.EMPTY);
         } else if (hasFlag(node.getModifiers(), Flags.INTERFACE)) {
-            kind = new J.ClassDecl.Kind.Interface(randomId(), format(sourceBefore("interface")));
+            kind = new J.ClassDecl.Kind.Interface(randomId(), format(sourceBefore("interface")), Markers.EMPTY);
         } else {
-            kind = new J.ClassDecl.Kind.Class(randomId(), format(sourceBefore("class")));
+            kind = new J.ClassDecl.Kind.Class(randomId(), format(sourceBefore("class")), Markers.EMPTY);
         }
 
         var name = J.Ident.build(randomId(), ((JCClassDecl) node).getSimpleName().toString(), type(node),
-                format(sourceBefore(node.getSimpleName().toString())));
+                format(sourceBefore(node.getSimpleName().toString())), Markers.EMPTY);
 
         J.TypeParameters typeParams = null;
         if (!node.getTypeParameters().isEmpty()) {
             var genericPrefix = sourceBefore("<");
             typeParams = new J.TypeParameters(randomId(), convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
-                    format(genericPrefix));
+                    format(genericPrefix), Markers.EMPTY);
         }
 
         J.ClassDecl.Extends extendings = null;
@@ -340,7 +346,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             extendings = new J.ClassDecl.Extends(
                     randomId(),
                     convertOrNull(node.getExtendsClause()),
-                    format(extendsPrefix)
+                    format(extendsPrefix),
+                    Markers.EMPTY
             );
         }
 
@@ -352,7 +359,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             implementings = new J.ClassDecl.Implements(
                     randomId(),
                     convertAll(node.getImplementsClause(), commaDelim, noDelim),
-                    format(implementsPrefix)
+                    format(implementsPrefix),
+                    Markers.EMPTY
             );
         }
 
@@ -375,7 +383,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 return semicolonPresent.get() ? sourceBefore(";", '}') : "";
             });
 
-            enumSet = new J.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), EMPTY);
+            enumSet = new J.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), Formatting.EMPTY, Markers.EMPTY);
         }
 
         List<? extends Tree> membersMultiVariablesSeparated = node.getMembers().stream()
@@ -397,9 +405,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 convertPossibleMultiVariable(membersMultiVariablesSeparated).stream()
         ).collect(toList());
 
-        var body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
+        var body = new J.Block<>(randomId(), null, members, format(bodyPrefix), Markers.EMPTY, new J.Block.End(randomId(), format(sourceBefore("}")), Markers.EMPTY));
 
-        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node), fmt);
+        return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -418,12 +426,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
             String packagePrefix = sourceBefore("package");
-            packageDecl = new J.Package(randomId(), convert(cu.getPackageName()), format(packagePrefix, sourceBefore(";")));
+            packageDecl = new J.Package(randomId(), convert(cu.getPackageName()), format(packagePrefix, sourceBefore(";")), Markers.EMPTY);
         }
 
-        return new J.CompilationUnit(randomId(),
+        return new J.CompilationUnit(
+                randomId(),
                 uri.toString(),
-                emptyList(),
                 packageDecl,
                 convertAll(node.getImports(), semiDelim, semiDelim),
                 convertAll(node.getTypeDecls().stream()
@@ -431,6 +439,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                                 .collect(toList()),
                         this::whitespace, noDelim),
                 format(prefix, source.substring(cursor)),
+                Markers.EMPTY,
                 styles
         );
     }
@@ -444,47 +453,47 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         switch (((JCAssignOp) node).getTag()) {
             case PLUS_ASG:
                 skip("+=");
-                op = new J.AssignOp.Operator.Addition(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.Addition(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MINUS_ASG:
                 skip("-=");
-                op = new J.AssignOp.Operator.Subtraction(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.Subtraction(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case DIV_ASG:
                 skip("/=");
-                op = new J.AssignOp.Operator.Division(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.Division(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MUL_ASG:
                 skip("*=");
-                op = new J.AssignOp.Operator.Multiplication(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.Multiplication(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case MOD_ASG:
                 skip("%=");
-                op = new J.AssignOp.Operator.Modulo(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.Modulo(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITAND_ASG:
                 skip("&=");
-                op = new J.AssignOp.Operator.BitAnd(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.BitAnd(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITOR_ASG:
                 skip("|=");
-                op = new J.AssignOp.Operator.BitOr(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.BitOr(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case BITXOR_ASG:
                 skip("^=");
-                op = new J.AssignOp.Operator.BitXor(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.BitXor(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case SL_ASG:
                 skip("<<=");
-                op = new J.AssignOp.Operator.LeftShift(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.LeftShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case SR_ASG:
                 skip(">>=");
-                op = new J.AssignOp.Operator.RightShift(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.RightShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             case USR_ASG:
                 skip(">>>=");
-                op = new J.AssignOp.Operator.UnsignedRightShift(randomId(), opPrefix);
+                op = new J.AssignOp.Operator.UnsignedRightShift(randomId(), opPrefix, Markers.EMPTY);
                 break;
             default:
                 throw new IllegalArgumentException("Unexpected compound assignment tag " + ((JCAssignOp) node).getTag());
@@ -495,7 +504,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 op,
                 convert(((JCAssignOp) node).rhs),
                 type(node),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -506,7 +516,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 convert(node.getTrueExpression(), t -> sourceBefore(":")),
                 convert(node.getFalseExpression()),
                 type(node),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -515,8 +526,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         skip("continue");
         Name label = node.getLabel();
         return new J.Continue(randomId(),
-                label == null ? null : J.Ident.build(randomId(), label.toString(), null, format(sourceBefore(label.toString()))),
-                fmt
+                label == null ? null : J.Ident.build(randomId(), label.toString(), null, format(sourceBefore(label.toString())), Markers.EMPTY),
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -527,14 +539,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         var whilePrefix = sourceBefore("while");
         return new J.DoWhileLoop(randomId(),
                 stat,
-                new J.DoWhileLoop.While(randomId(), convert(node.getCondition()), format(whilePrefix)),
-                fmt
+                new J.DoWhileLoop.While(randomId(), convert(node.getCondition()), format(whilePrefix), Markers.EMPTY),
+                fmt,
+                Markers.EMPTY
         );
     }
 
     @Override
     public J visitEmptyStatement(EmptyStatementTree node, Formatting fmt) {
-        return new J.Empty(randomId(), fmt);
+        return new J.Empty(randomId(), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -545,22 +558,23 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         Expression expression = convert(node.getExpression(), t -> sourceBefore(")"));
 
         return new J.ForEachLoop(randomId(),
-                new J.ForEachLoop.Control(randomId(), variable, expression, format(ctrlPrefix)),
+                new J.ForEachLoop.Control(randomId(), variable, expression, format(ctrlPrefix), Markers.EMPTY),
                 convert(node.getStatement(), statementDelim),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
     private J visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
-        var name = J.Ident.build(randomId(), node.getName().toString(), type(node), EMPTY);
+        var name = J.Ident.build(randomId(), node.getName().toString(), type(node), Formatting.EMPTY, Markers.EMPTY);
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
             initializer = convert(node.getInitializer());
         }
 
-        return new J.EnumValue(randomId(), name, initializer, fmt);
+        return new J.EnumValue(randomId(), name, initializer, fmt, Markers.EMPTY);
     }
 
     @Override
@@ -573,16 +587,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 .filter(Statement.class::isInstance)
                 .map(Statement.class::cast)
                 .findAny()
-                .orElseGet(() -> new J.Empty(randomId(), format("", sourceBefore(";"))));
+                .orElseGet(() -> new J.Empty(randomId(), format("", sourceBefore(";")), Markers.EMPTY));
 
         Expression condition = convertOrNull(node.getCondition(), semiDelim);
         if (condition == null) {
-            condition = new J.Empty(randomId(), format("", sourceBefore(";")));
+            condition = new J.Empty(randomId(), format("", sourceBefore(";")), Markers.EMPTY);
         }
 
         List<Statement> update;
         if (node.getUpdate().isEmpty()) {
-            update = singletonList(new J.Empty(randomId(), format("", sourceBefore(")"))));
+            update = singletonList(new J.Empty(randomId(), format("", sourceBefore(")")), Markers.EMPTY));
         } else {
             update = new ArrayList<>();
             List<? extends ExpressionStatementTree> nodeUpdate = node.getUpdate();
@@ -593,16 +607,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         return new J.ForLoop(randomId(),
-                new J.ForLoop.Control(randomId(), init, condition, update, format(ctrlPrefix)),
+                new J.ForLoop.Control(randomId(), init, condition, update, format(ctrlPrefix), Markers.EMPTY),
                 convert(node.getStatement(), statementDelim),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
     @Override
     public J visitIdentifier(IdentifierTree node, Formatting fmt) {
         cursor += node.getName().toString().length();
-        return J.Ident.build(randomId(), node.getName().toString(), type(node), fmt);
+        return J.Ident.build(randomId(), node.getName().toString(), type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -615,17 +630,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.If.Else elsePart = null;
         if (node.getElseStatement() instanceof JCTree.JCStatement) {
             var elsePrefix = sourceBefore("else");
-            elsePart = new J.If.Else(randomId(), convert(node.getElseStatement(), statementDelim), format(elsePrefix));
+            elsePart = new J.If.Else(randomId(), convert(node.getElseStatement(), statementDelim), format(elsePrefix), Markers.EMPTY);
         }
 
-        return new J.If(randomId(), ifPart, then, elsePart, fmt);
+        return new J.If(randomId(), ifPart, then, elsePart, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitImport(ImportTree node, Formatting fmt) {
         skip("import");
         skipPattern("\\s+static");
-        return new J.Import(randomId(), convert(node.getQualifiedIdentifier()), node.isStatic(), fmt);
+        return new J.Import(randomId(), convert(node.getQualifiedIdentifier()), node.isStatic(), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -634,7 +649,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 convert(node.getExpression(), t -> sourceBefore("instanceof")),
                 convert(node.getType()),
                 type(node),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -642,9 +658,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitLabeledStatement(LabeledStatementTree node, Formatting fmt) {
         skip(node.getLabel().toString());
         return new J.Label(randomId(),
-                J.Ident.build(randomId(), node.getLabel().toString(), null, format("", sourceBefore(":"))),
+                J.Ident.build(randomId(), node.getLabel().toString(), null, format("", sourceBefore(":")), Markers.EMPTY),
                 convert(node.getStatement()),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -655,14 +672,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         List<Expression> paramList;
         if (parenthesized && node.getParameters().isEmpty()) {
-            paramList = singletonList(new J.Empty(randomId(), format(sourceBefore(")"))));
+            paramList = singletonList(new J.Empty(randomId(), format(sourceBefore(")")), Markers.EMPTY));
         } else {
             paramList = convertAll(node.getParameters(), commaDelim,
                     t -> parenthesized ? sourceBefore(")") : "");
         }
 
-        var params = new J.Lambda.Parameters(randomId(), parenthesized, paramList);
-        var arrow = new J.Lambda.Arrow(randomId(), format(sourceBefore("->")));
+        var params = new J.Lambda.Parameters(randomId(), parenthesized, paramList, Markers.EMPTY);
+        var arrow = new J.Lambda.Arrow(randomId(), format(sourceBefore("->")), Markers.EMPTY);
 
         J body;
         if (node.getBody() instanceof JCTree.JCBlock) {
@@ -679,7 +696,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 arrow,
                 body,
                 type(node),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -692,7 +710,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 value,
                 source.substring(((JCLiteral) node).getStartPosition(), endPos(node)),
                 type,
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -713,17 +732,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         var typeParams = convertTypeParameters(node.getTypeArguments());
-        var reference = J.Ident.build(randomId(), referenceName, null, format(sourceBefore(referenceName)));
+        var reference = J.Ident.build(randomId(), referenceName, null, format(sourceBefore(referenceName)), Markers.EMPTY);
 
-        return new J.MemberReference(randomId(), expr, typeParams, reference, type(node), fmt);
+        return new J.MemberReference(randomId(), expr, typeParams, reference, type(node), fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitMemberSelect(MemberSelectTree node, Formatting fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
         Expression target = convert(fieldAccess.selected, t -> sourceBefore("."));
-        var name = J.Ident.build(randomId(), fieldAccess.name.toString(), null, format(sourceBefore(fieldAccess.name.toString())));
-        return new J.FieldAccess(randomId(), target, name, type(node), fmt);
+        var name = J.Ident.build(randomId(), fieldAccess.name.toString(), null,
+                format(sourceBefore(fieldAccess.name.toString())), Markers.EMPTY);
+        return new J.FieldAccess(randomId(), target, name, type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -742,16 +762,20 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         if (!node.getTypeArguments().isEmpty()) {
             var genericPrefix = sourceBefore("<");
             List<Expression> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
-            typeParams = new J.TypeParameters(randomId(), genericParams.stream()
-                    .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
-                    .collect(toList()),
-                    format(genericPrefix));
+            typeParams = new J.TypeParameters(
+                    randomId(),
+                    genericParams.stream()
+                            .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(Formatting.EMPTY), null, gp.getFormatting(), Markers.EMPTY))
+                            .collect(toList()),
+                    format(genericPrefix),
+                    Markers.EMPTY
+            );
         }
 
         J.Ident name;
         if (jcSelect instanceof JCFieldAccess) {
             String selectName = ((JCFieldAccess) jcSelect).name.toString();
-            name = J.Ident.build(randomId(), selectName, null, format(sourceBefore(selectName)));
+            name = J.Ident.build(randomId(), selectName, null, format(sourceBefore(selectName)), Markers.EMPTY);
         } else {
             name = convert(jcSelect);
         }
@@ -759,9 +783,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         var argsPrefix = sourceBefore("(");
         var args = new J.MethodInvocation.Arguments(randomId(),
                 node.getArguments().isEmpty() ?
-                        singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
+                        singletonList(new J.Empty(randomId(), format(sourceBefore(")")), Markers.EMPTY)) :
                         convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")),
-                format(argsPrefix)
+                format(argsPrefix),
+                Markers.EMPTY
         );
 
         var genericSymbolAny = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
@@ -797,7 +822,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             );
         }
 
-        return new J.MethodInvocation(randomId(), select, typeParams, name, args, type, fmt);
+        return new J.MethodInvocation(randomId(), select, typeParams, name, args, type, fmt, Markers.EMPTY);
     }
 
     @Override
@@ -812,7 +837,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         if (!node.getTypeParameters().isEmpty()) {
             var genericPrefix = sourceBefore("<");
             typeParams = new J.TypeParameters(randomId(), convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
-                    format(genericPrefix));
+                    format(genericPrefix), Markers.EMPTY);
         }
 
         TypeTree returnType = convertOrNull(node.getReturnType());
@@ -828,20 +853,21 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                             .map(cd -> cd.getSimpleName().toString())
                             .orElseThrow() :
                     ((JCMethodDecl) node).sym.owner.name.toString();
-            name = J.Ident.build(randomId(), owner, null, format(sourceBefore(owner)));
+            name = J.Ident.build(randomId(), owner, null, format(sourceBefore(owner)), Markers.EMPTY);
         } else {
-            name = J.Ident.build(randomId(), node.getName().toString(), null, format(sourceBefore(node.getName().toString())));
+            name = J.Ident.build(randomId(), node.getName().toString(), null,
+                    format(sourceBefore(node.getName().toString())), Markers.EMPTY);
         }
 
         var paramFmt = format(sourceBefore("("));
         var params = !node.getParameters().isEmpty() ?
-                new J.MethodDecl.Parameters(randomId(), convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")), paramFmt) :
-                new J.MethodDecl.Parameters(randomId(), singletonList(new J.Empty(randomId(), format(sourceBefore(")")))), paramFmt);
+                new J.MethodDecl.Parameters(randomId(), convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")), paramFmt, Markers.EMPTY) :
+                new J.MethodDecl.Parameters(randomId(), singletonList(new J.Empty(randomId(), format(sourceBefore(")")), Markers.EMPTY)), paramFmt, Markers.EMPTY);
 
         J.MethodDecl.Throws throwss = null;
         if (!node.getThrows().isEmpty()) {
             var throwsPrefix = sourceBefore("throws");
-            throwss = new J.MethodDecl.Throws(randomId(), convertAll(node.getThrows(), commaDelim, noDelim), format(throwsPrefix));
+            throwss = new J.MethodDecl.Throws(randomId(), convertAll(node.getThrows(), commaDelim, noDelim), format(throwsPrefix), Markers.EMPTY);
         }
 
         J.Block<Statement> body = convertOrNull(node.getBody());
@@ -849,10 +875,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.MethodDecl.Default defaultValue = null;
         if (node.getDefaultValue() != null) {
             var defaultPrefix = sourceBefore("default");
-            defaultValue = new J.MethodDecl.Default(randomId(), convert(node.getDefaultValue()), format(defaultPrefix));
+            defaultValue = new J.MethodDecl.Default(randomId(), convert(node.getDefaultValue()), format(defaultPrefix), Markers.EMPTY);
         }
 
-        return new J.MethodDecl(randomId(), annotations, modifiers, typeParams, returnType, name, params, throwss, body, defaultValue, fmt);
+        return new J.MethodDecl(randomId(), annotations, modifiers, typeParams, returnType, name, params, throwss, body, defaultValue, fmt, Markers.EMPTY);
     }
 
     @Override
@@ -877,27 +903,31 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         for (int i = 0; i < nodeDimensions.size(); i++) {
             ExpressionTree dim = nodeDimensions.get(i);
             var dimensionPrefix = sourceBefore("[");
-            dimensions.add(new J.NewArray.Dimension(randomId(), convert(dim, t -> sourceBefore("]")),
-                    format(dimensionPrefix, (i == node.getDimensions().size() - 1 && node.getInitializers() != null) ? sourceBefore("}") : "")));
+            dimensions.add(new J.NewArray.Dimension(
+                    randomId(),
+                    convert(dim, t -> sourceBefore("]")),
+                    format(dimensionPrefix, (i == node.getDimensions().size() - 1 && node.getInitializers() != null) ? sourceBefore("}") : ""),
+                    Markers.EMPTY
+            ));
         }
 
         var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
-            var ws = new J.Empty(randomId(), format(matcher.group(2)));
-            dimensions.add(new J.NewArray.Dimension(randomId(), ws, format(matcher.group(1))));
+            var ws = new J.Empty(randomId(), format(matcher.group(2)), Markers.EMPTY);
+            dimensions.add(new J.NewArray.Dimension(randomId(), ws, format(matcher.group(1)), Markers.EMPTY));
         }
 
         J.NewArray.Initializer initializer = null;
         if (node.getInitializers() != null) {
             var initPrefix = sourceBefore("{");
             List<Expression> initializers = node.getInitializers().isEmpty() ?
-                    singletonList(new J.Empty(randomId(), format("", sourceBefore("}")))) :
+                    singletonList(new J.Empty(randomId(), format("", sourceBefore("}")), Markers.EMPTY)) :
                     convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}"));
-            initializer = new J.NewArray.Initializer(randomId(), initializers, format(initPrefix));
+            initializer = new J.NewArray.Initializer(randomId(), initializers, format(initPrefix), Markers.EMPTY);
         }
 
-        return new J.NewArray(randomId(), typeExpr, dimensions, initializer, type(node), fmt);
+        return new J.NewArray(randomId(), typeExpr, dimensions, initializer, type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -924,9 +954,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             var argPrefix = sourceBefore("(");
             args = new J.NewClass.Arguments(randomId(),
                     node.getArguments().isEmpty() ?
-                            singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
+                            singletonList(new J.Empty(randomId(), format(sourceBefore(")")), Markers.EMPTY)) :
                             convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")),
-                    format(argPrefix));
+                    format(argPrefix),
+                    Markers.EMPTY);
         }
 
         J.Block<?> body = null;
@@ -939,29 +970,32 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                     .filter(m -> !(m instanceof JCMethodDecl) || (((JCMethodDecl) m).getModifiers().flags & Flags.GENERATEDCONSTR) == 0L)
                     .collect(toList()), noDelim, noDelim);
 
-            body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
+            body = new J.Block<>(randomId(), null, members, format(bodyPrefix), Markers.EMPTY,
+                    new J.Block.End(randomId(), format(sourceBefore("}")), Markers.EMPTY));
         }
 
         return new J.NewClass(
                 randomId(),
                 encl,
-                new J.NewClass.New(UUID.randomUUID(), format(whitespaceBeforeNew)),
+                new J.NewClass.New(UUID.randomUUID(), format(whitespaceBeforeNew), Markers.EMPTY),
                 clazz,
                 args,
                 body,
                 type(((JCNewClass) node).type),
-                fmt);
+                fmt,
+                Markers.EMPTY
+        );
     }
 
     @Override
     public J visitParameterizedType(ParameterizedTypeTree node, Formatting fmt) {
-        return new J.ParameterizedType(randomId(), convert(node.getType()), convertTypeParameters(node.getTypeArguments()), fmt);
+        return new J.ParameterizedType(randomId(), convert(node.getType()), convertTypeParameters(node.getTypeArguments()), fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitParenthesized(ParenthesizedTree node, Formatting fmt) {
         skip("(");
-        return new J.Parentheses<Expression>(randomId(), convert(node.getExpression(), t -> sourceBefore(")")), fmt);
+        return new J.Parentheses<Expression>(randomId(), convert(node.getExpression(), t -> sourceBefore(")")), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1001,13 +1035,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 throw new IllegalArgumentException("Unknown primitive type " + node.getPrimitiveTypeKind());
         }
 
-        return new J.Primitive(randomId(), primitiveType, fmt);
+        return new J.Primitive(randomId(), primitiveType, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitReturn(ReturnTree node, Formatting fmt) {
         skip("return");
-        return new J.Return(randomId(), convertOrNull(node.getExpression()), fmt);
+        return new J.Return(randomId(), convertOrNull(node.getExpression()), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1018,8 +1052,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         var casePrefix = sourceBefore("{");
         List<J.Case> cases = convertAll(node.getCases(), noDelim, noDelim);
 
-        return new J.Switch(randomId(), selector, new J.Block<>(randomId(), null, cases, format(casePrefix),
-                new J.Block.End(randomId(), format(sourceBefore("}")))), fmt);
+        return new J.Switch(
+                randomId(),
+                selector,
+                new J.Block<>(randomId(), null, cases, format(casePrefix),
+                        Markers.EMPTY,
+                        new J.Block.End(randomId(), format(sourceBefore("}")), Markers.EMPTY)),
+                fmt,
+                Markers.EMPTY
+        );
     }
 
     @Override
@@ -1028,14 +1069,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         return new J.Synchronized(randomId(),
                 convert(node.getExpression()),
                 convert(node.getBlock()),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
     @Override
     public J visitThrow(ThrowTree node, Formatting fmt) {
         skip("throw");
-        return new J.Throw(randomId(), convert(node.getExpression()), fmt);
+        return new J.Throw(randomId(), convert(node.getExpression()), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1045,7 +1087,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         if (!node.getResources().isEmpty()) {
             var resourcesPrefix = sourceBefore("(");
             List<J.VariableDecls> decls = convertAll(node.getResources(), semiDelim, t -> sourceBefore(")"));
-            resources = new J.Try.Resources(randomId(), decls, format(resourcesPrefix));
+            resources = new J.Try.Resources(randomId(), decls, format(resourcesPrefix), Markers.EMPTY);
         }
 
         J.Block<Statement> block = convert(node.getBlock());
@@ -1054,26 +1096,33 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.Try.Finally finallyy = null;
         if (node.getFinallyBlock() != null) {
             var finallyPrefix = sourceBefore("finally");
-            finallyy = new J.Try.Finally(randomId(), convert(node.getFinallyBlock()),
-                    format(finallyPrefix));
+            finallyy = new J.Try.Finally(randomId(),
+                    convert(node.getFinallyBlock()),
+                    format(finallyPrefix),
+                    Markers.EMPTY
+            );
         }
 
-        return new J.Try(randomId(), resources, block, catches, finallyy, fmt);
+        return new J.Try(randomId(), resources, block, catches, finallyy, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitTypeCast(TypeCastTree node, Formatting fmt) {
         var clazzPrefix = sourceBefore("(");
-        var clazz = new J.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
-                format(clazzPrefix));
+        var clazz = new J.Parentheses<TypeTree>(
+                randomId(),
+                convert(node.getType(), t -> sourceBefore(")")),
+                format(clazzPrefix),
+                Markers.EMPTY
+        );
 
-        return new J.TypeCast(randomId(), clazz, convert(node.getExpression()), fmt);
+        return new J.TypeCast(randomId(), clazz, convert(node.getExpression()), fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitAnnotatedType(AnnotatedTypeTree node, Formatting formatting) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations(), noDelim, noDelim);
-        return new J.AnnotatedType(randomId(), annotations, convert(node.getUnderlyingType()), formatting);
+        return new J.AnnotatedType(randomId(), annotations, convert(node.getUnderlyingType()), formatting, Markers.EMPTY);
     }
 
     @Override
@@ -1087,15 +1136,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             var boundPrefix = !node.getBounds().isEmpty() ? sourceBefore("extends") : "";
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
             bounds = new J.TypeParameter.Bounds(randomId(), convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim),
-                    format(boundPrefix));
+                    format(boundPrefix), Markers.EMPTY);
         }
 
-        return new J.TypeParameter(randomId(), annotations, name, bounds, fmt);
+        return new J.TypeParameter(randomId(), annotations, name, bounds, fmt, Markers.EMPTY);
     }
 
     @Override
     public J visitUnionType(UnionTypeTree node, Formatting fmt) {
-        return new J.MultiCatch(randomId(), convertAll(node.getTypeAlternatives(), t -> sourceBefore("|"), noDelim), fmt);
+        return new J.MultiCatch(randomId(), convertAll(node.getTypeAlternatives(), t -> sourceBefore("|"), noDelim), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1108,47 +1157,47 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         switch (tag) {
             case POS:
                 skip("+");
-                op = new J.Unary.Operator.Positive(randomId());
+                op = new J.Unary.Operator.Positive(randomId(), Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             case NEG:
                 skip("-");
-                op = new J.Unary.Operator.Negative(randomId());
+                op = new J.Unary.Operator.Negative(randomId(), Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             case PREDEC:
                 skip("--");
-                op = new J.Unary.Operator.PreDecrement(randomId());
+                op = new J.Unary.Operator.PreDecrement(randomId(), Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             case PREINC:
                 skip("++");
-                op = new J.Unary.Operator.PreIncrement(randomId());
+                op = new J.Unary.Operator.PreIncrement(randomId(), Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             case POSTDEC:
                 expr = convert(unary.arg);
-                op = new J.Unary.Operator.PostDecrement(randomId(), format(sourceBefore("--")));
+                op = new J.Unary.Operator.PostDecrement(randomId(), format(sourceBefore("--")), Markers.EMPTY);
                 break;
             case POSTINC:
                 expr = convert(unary.arg);
-                op = new J.Unary.Operator.PostIncrement(randomId(), format(sourceBefore("++")));
+                op = new J.Unary.Operator.PostIncrement(randomId(), format(sourceBefore("++")), Markers.EMPTY);
                 break;
             case COMPL:
                 skip("~");
-                op = new J.Unary.Operator.Complement(randomId(), EMPTY);
+                op = new J.Unary.Operator.Complement(randomId(), Formatting.EMPTY, Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             case NOT:
                 skip("!");
-                op = new J.Unary.Operator.Not(randomId(), EMPTY);
+                op = new J.Unary.Operator.Not(randomId(), Formatting.EMPTY, Markers.EMPTY);
                 expr = convert(unary.arg);
                 break;
             default:
                 throw new IllegalArgumentException("Unexpected unary tag " + tag);
         }
 
-        return new J.Unary(randomId(), op, expr, type(node), fmt);
+        return new J.Unary(randomId(), op, expr, type(node), fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1190,8 +1239,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             List<J.VariableDecls.Dimension> dims = new ArrayList<>();
             while (matcher.find(cursor)) {
                 cursor(matcher.end());
-                var ws = new J.Empty(randomId(), format(matcher.group(2)));
-                dims.add(new J.VariableDecls.Dimension(randomId(), ws, format(matcher.group(1))));
+                var ws = new J.Empty(randomId(), format(matcher.group(2)), Markers.EMPTY);
+                dims.add(new J.VariableDecls.Dimension(randomId(), ws, format(matcher.group(1)), Markers.EMPTY));
             }
             return dims;
         };
@@ -1203,7 +1252,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.VariableDecls.Varargs varargs = null;
         if (varargMatcher.find()) {
             skipPattern("(\\s*)\\.{3}");
-            varargs = new J.VariableDecls.Varargs(randomId(), format(varargMatcher.group(1)));
+            varargs = new J.VariableDecls.Varargs(randomId(), format(varargMatcher.group(1)), Markers.EMPTY);
         }
 
         List<J.VariableDecls.NamedVar> vars = new ArrayList<>();
@@ -1220,7 +1269,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             }
 
             var name = J.Ident.build(randomId(), n.getName().toString(), type(node),
-                    format("", (dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : ""));
+                    format("", (dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : ""),
+                    Markers.EMPTY);
 
             vars.add(
                     new J.VariableDecls.NamedVar(randomId(),
@@ -1228,12 +1278,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                             dimensionsAfterName,
                             convertOrNull(vd.init),
                             type(n),
-                            i == nodes.size() - 1 ? format(namedVarPrefix) : format(namedVarPrefix, sourceBefore(","))
+                            i == nodes.size() - 1 ? format(namedVarPrefix) : format(namedVarPrefix, sourceBefore(",")),
+                            Markers.EMPTY
                     )
             );
         }
 
-        return new J.VariableDecls(randomId(), annotations, modifiers, typeExpr, varargs, beforeDimensions, vars, fmt);
+        return new J.VariableDecls(randomId(), annotations, modifiers, typeExpr, varargs, beforeDimensions, vars, fmt, Markers.EMPTY);
     }
 
     @Override
@@ -1242,7 +1293,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         return new J.WhileLoop(randomId(),
                 convert(node.getCondition()),
                 convert(node.getStatement(), statementDelim),
-                fmt
+                fmt,
+                Markers.EMPTY
         );
     }
 
@@ -1255,17 +1307,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         J.Wildcard.Bound bound;
         switch (wildcard.kind.kind) {
             case EXTENDS:
-                bound = new J.Wildcard.Bound.Extends(randomId(), format(sourceBefore("extends")));
+                bound = new J.Wildcard.Bound.Extends(randomId(), format(sourceBefore("extends")), Markers.EMPTY);
                 break;
             case SUPER:
-                bound = new J.Wildcard.Bound.Super(randomId(), format(sourceBefore("super")));
+                bound = new J.Wildcard.Bound.Super(randomId(), format(sourceBefore("super")), Markers.EMPTY);
                 break;
             case UNBOUND:
             default:
                 bound = null;
         }
 
-        return new J.Wildcard(randomId(), bound, convertOrNull(wildcard.inner), fmt);
+        return new J.Wildcard(randomId(), bound, convertOrNull(wildcard.inner), fmt, Markers.EMPTY);
     }
 
     /**
@@ -1347,17 +1399,21 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         if (typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
             // adding space before > as a suffix to be consistent with space before > for non-empty lists of type args
-            typeArgs = singletonList(new J.Empty(randomId(), format("", sourceBefore(">"))));
+            typeArgs = singletonList(new J.Empty(randomId(), format("", sourceBefore(">")), Markers.EMPTY));
         } else {
             typeArgs = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }
 
         // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
         // elsewhere in the tree
-        return new J.TypeParameters(randomId(), typeArgs.stream()
-                .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
-                .collect(toList()),
-                format(typeArgPrefix));
+        return new J.TypeParameters(
+                randomId(),
+                typeArgs.stream()
+                        .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(Formatting.EMPTY), null, gp.getFormatting(), Markers.EMPTY))
+                        .collect(toList()),
+                format(typeArgPrefix),
+                Markers.EMPTY
+        );
     }
 
     private final Function<Tree, String> statementDelim = (@Nullable Tree t) -> {
@@ -1495,7 +1551,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 }
             }
         } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {
-            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(((com.sun.tools.javac.code.Type.TypeVar) type).getUpperBound(), stack)));
+            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(type.getUpperBound(), stack)));
         } else if (type instanceof com.sun.tools.javac.code.Type.JCPrimitiveType) {
             return primitive(type.getTag());
         } else if (type instanceof com.sun.tools.javac.code.Type.ArrayType) {
@@ -1771,29 +1827,29 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                     cursor += mod.name().length();
                     switch (mod) {
                         case DEFAULT:
-                            return new J.Modifier.Default(randomId(), modFormat);
+                            return new J.Modifier.Default(randomId(), modFormat, Markers.EMPTY);
                         case PUBLIC:
-                            return new J.Modifier.Public(randomId(), modFormat);
+                            return new J.Modifier.Public(randomId(), modFormat, Markers.EMPTY);
                         case PROTECTED:
-                            return new J.Modifier.Protected(randomId(), modFormat);
+                            return new J.Modifier.Protected(randomId(), modFormat, Markers.EMPTY);
                         case PRIVATE:
-                            return new J.Modifier.Private(randomId(), modFormat);
+                            return new J.Modifier.Private(randomId(), modFormat, Markers.EMPTY);
                         case ABSTRACT:
-                            return new J.Modifier.Abstract(randomId(), modFormat);
+                            return new J.Modifier.Abstract(randomId(), modFormat, Markers.EMPTY);
                         case STATIC:
-                            return new J.Modifier.Static(randomId(), modFormat);
+                            return new J.Modifier.Static(randomId(), modFormat, Markers.EMPTY);
                         case FINAL:
-                            return new J.Modifier.Final(randomId(), modFormat);
+                            return new J.Modifier.Final(randomId(), modFormat, Markers.EMPTY);
                         case NATIVE:
-                            return new J.Modifier.Native(randomId(), modFormat);
+                            return new J.Modifier.Native(randomId(), modFormat, Markers.EMPTY);
                         case STRICTFP:
-                            return new J.Modifier.Strictfp(randomId(), modFormat);
+                            return new J.Modifier.Strictfp(randomId(), modFormat, Markers.EMPTY);
                         case SYNCHRONIZED:
-                            return new J.Modifier.Synchronized(randomId(), modFormat);
+                            return new J.Modifier.Synchronized(randomId(), modFormat, Markers.EMPTY);
                         case TRANSIENT:
-                            return new J.Modifier.Transient(randomId(), modFormat);
+                            return new J.Modifier.Transient(randomId(), modFormat, Markers.EMPTY);
                         case VOLATILE:
-                            return new J.Modifier.Volatile(randomId(), modFormat);
+                            return new J.Modifier.Volatile(randomId(), modFormat, Markers.EMPTY);
                         default:
                             throw new IllegalArgumentException("Unexpected modifier " + mod);
                     }

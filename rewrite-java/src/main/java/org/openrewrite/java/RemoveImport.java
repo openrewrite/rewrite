@@ -19,6 +19,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -139,7 +140,7 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
         } else if (starImport != null && referencedTypes.size() == 1) {
             return cu.withImports(cu.getImports().stream().map(i -> i == starImport ?
                     new J.Import(randomId(), TreeBuilder.buildName(referencedTypes.iterator().next(),
-                            Formatting.format(" ")), false, i.getFormatting()) :
+                            Formatting.format(" ")), false, i.getFormatting(), Markers.EMPTY) :
                     i
             ).collect(toList()));
         } else {

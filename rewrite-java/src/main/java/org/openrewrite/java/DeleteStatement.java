@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Formatting;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.java.search.FindReferencedTypes;
 import org.openrewrite.java.tree.J;
@@ -75,7 +76,7 @@ public class DeleteStatement {
         }
 
         @Override
-        public J.Block visitBlock(J.Block<J> block) {
+        public J.Block<J> visitBlock(J.Block<J> block) {
             J.Block<J> b = super.visitBlock(block);
 
             if (block.getStatements().stream().anyMatch(statement::isScope)) {
@@ -96,7 +97,8 @@ public class DeleteStatement {
         }
 
         private J.Block<J> emptyBlock() {
-            return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY, new J.Block.End(randomId(), format("")));
+            return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY,
+                    Markers.EMPTY, new J.Block.End(randomId(), format(""), Markers.EMPTY));
         }
     }
 }
