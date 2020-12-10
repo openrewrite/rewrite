@@ -26,7 +26,7 @@ interface InsertDeclarationTest : RefactorVisitorTest {
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(
                         cu.classes[0],
-                        TreeBuilder(cu).buildDeclaration(
+                        TreeBuilder(cu.buildParser()).buildDeclaration(
                                 cu.classes[0],
                                 "void setSomething() {}"
                         )
@@ -50,7 +50,7 @@ interface InsertDeclarationTest : RefactorVisitorTest {
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(
                         cu.classes[0],
-                        TreeBuilder(cu).buildDeclaration(
+                        TreeBuilder(cu.buildParser()).buildDeclaration(
                                 cu.classes[0],
                                 "void setSomething() {}"
                         )
@@ -80,7 +80,7 @@ interface InsertDeclarationTest : RefactorVisitorTest {
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(
                         cu.classes[0],
-                        TreeBuilder(cu).buildDeclaration(
+                        TreeBuilder(cu.buildParser()).buildDeclaration(
                                 cu.classes[0],
                                 "void setSomething() {}"
                         )

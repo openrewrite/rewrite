@@ -20,6 +20,7 @@ import org.openrewrite.Formatting;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.*;
@@ -46,10 +47,10 @@ public class TreeBuilder {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    private final J.CompilationUnit cu;
+    private final JavaParser parser;
 
-    public TreeBuilder(J.CompilationUnit cu) {
-        this.cu = cu;
+    public TreeBuilder(JavaParser parser) {
+        this.parser = parser;
     }
 
     public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
@@ -107,7 +108,6 @@ public class TreeBuilder {
      * @param types          specify any
      */
     public J buildDeclaration(J.ClassDecl insertionScope, String snippet, JavaType... types) {
-        JavaParser javaParser = cu.buildParser();
 
         // Turn this on in IntelliJ: Preferences > Editor > Code Style > Formatter Control
         // @formatter:off
@@ -137,7 +137,7 @@ public class TreeBuilder {
             logger.debug(source);
         }
 
-        J.CompilationUnit cu = javaParser.parse(source).get(0);
+        J.CompilationUnit cu = parser.parse(source).get(0);
         List<J> statements = cu.getClasses().get(0).getBody().getStatements();
         return new FillTypeAttributions(imports).visit(statements.get(statements.size() - 1));
     }
@@ -200,21 +200,21 @@ public class TreeBuilder {
      * @return A list of AST elements constructed from the snippet.
      */
     @SuppressWarnings("unchecked")
-    public <T extends J> List<T> buildSnippet(Cursor insertionScope,
-                                              String snippet,
-                                              JavaType... imports) {
-
-        //This uses a parser that has the same classpath as the runtime.
-        JavaParser javaParser = cu.buildRuntimeParser();
-
+    public <T extends J> List<T> buildSnippet(
+                Cursor insertionScope,
+                String snippet,
+                JavaType... imports) {
 
         StringBuilder source = new StringBuilder(512);
 
         List<JavaType> allImports = new ArrayList<>(Arrays.asList(imports));
 
+        J.CompilationUnit compilationUnit = getCompilationUnit(insertionScope);
+
         //Need to collect any types within the insert scope. FullyQualified types will be added as an import
         //and Method types will either need to be stubbed out or statically imported into the synthetic class.
-        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(cu);
+        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(compilationUnit);
+
 
         List<JavaType.Method> localMethods = new ArrayList<>();
         for (JavaType type: typesInScope) {
@@ -223,7 +223,7 @@ public class TreeBuilder {
                 if (method.getDeclaringType() == null) {
                     continue;
                 }
-                if (cu.getClasses().stream().map(J.ClassDecl::getType)
+                if (compilationUnit.getClasses().stream().map(J.ClassDecl::getType)
                         .filter(Objects::nonNull)
                         .anyMatch(t -> t.equals(method.getDeclaringType()))) {
                     //Local methods are stubbed out below.
@@ -257,11 +257,11 @@ public class TreeBuilder {
                 .map(TreeBuilder::stubMethod)
                 .collect(joining("\n", "\n", "\n")));
         }
-        List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(cu);
+        List<String> localScopeVariables = new ListScopeVariables(insertionScope).visit(compilationUnit);
         if (!localScopeVariables.isEmpty()) {
             //Stub out in-scope variables
             source.append("\n// variables visible in the insertion scope\n")
-                    .append(new ListScopeVariables(insertionScope).visit(cu).stream()
+                    .append(new ListScopeVariables(insertionScope).visit(compilationUnit).stream()
                     .collect(joining(";\n", "\n", ";\n")));
         }
         source.append("\n// begin snippet block\n{\n")
@@ -274,11 +274,11 @@ public class TreeBuilder {
             logger.debug(sourceString);
         }
 
-        J.CompilationUnit cu = javaParser.parse(sourceString).get(0);
-        List<J> statements = cu.getClasses().get(0).getBody().getStatements();
+        J.CompilationUnit syntheticCompliationUnit = parser.parse(sourceString).get(0);
+        List<J> statements = syntheticCompliationUnit.getClasses().get(0).getBody().getStatements();
         J.Block<T> block = (J.Block<T>) statements.get(statements.size() - 1);
 
-        JavaFormatter formatter = new JavaFormatter(cu);
+        JavaFormatter formatter = new JavaFormatter(syntheticCompliationUnit);
 
         return block.getStatements().stream()
                 .map(stat -> {
@@ -287,6 +287,22 @@ public class TreeBuilder {
                     return (T) shiftRight.visit(stat);
                 })
                 .collect(toList());
+    }
+
+    /**
+     * Starting at the AST element referenced by the cursor, walk up the tree to find the compilation unit.
+     *
+     * @param cursor The cursor to an element in the AST.
+     * @return The parent compilation unit.
+     * @throws IllegalStateException If the AST element does not have a parent compilation unit
+     */
+    @NonNull
+    private J.CompilationUnit getCompilationUnit(Cursor cursor) {
+        J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
+        if (cu == null) {
+            throw new IllegalStateException("The AST does does not have a compilation unit.");
+        }
+        return cu;
     }
 
     /**
