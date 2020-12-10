@@ -135,7 +135,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(jp).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     others.add(${paramName.printTrimmed()});
@@ -169,7 +169,7 @@ interface TreeBuilderTest {
         val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
         val paramName = (method.params.params[0] as J.VariableDecls).vars[0].name
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(jp).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     String[] clone = resizeAndCopyArray(${paramName.printTrimmed()}, 1);
@@ -247,7 +247,7 @@ interface TreeBuilderTest {
         val method = a.classes[0].methods[0]
         val methodBodyCursor = RetrieveCursor(method.body!!.statements[0]).visit(a)
 
-        val snippets = TreeBuilder(a).buildSnippet<Statement>(
+        val snippets = TreeBuilder(jp).buildSnippet<Statement>(
                 methodBodyCursor,
                 """
                     bucket.add(new File("some other file"));
