@@ -72,10 +72,15 @@ public interface JavaType extends Serializable {
 
         @Override
         public TypeTree toTypeTree() {
-            return new J.MultiCatch(randomId(), throwableTypes.stream()
-                    .map(JavaType::toTypeTree)
-                    .collect(toList()), Formatting.EMPTY,
-                    Markers.EMPTY);
+            return new J.MultiCatch(
+                    randomId(),
+                    throwableTypes.stream()
+                            .map(JavaType::toTypeTree)
+                            .collect(toList()),
+                    emptyList(),
+                    Formatting.EMPTY,
+                    Markers.EMPTY
+            );
         }
     }
 
@@ -479,7 +484,9 @@ public interface JavaType extends Serializable {
         public TypeTree toTypeTree() {
             return new J.ArrayType(
                     randomId(),
-                    elemType.toTypeTree(), emptyList(),
+                    elemType.toTypeTree(),
+                    emptyList(),
+                    emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY
             );
@@ -487,19 +494,19 @@ public interface JavaType extends Serializable {
     }
 
     enum Primitive implements JavaType {
-        Boolean("boolean","false"),
-        Byte("byte","0"),
-        Char("char","'\u0000'"),
-        Double("double","0.0d"),
-        Float("float","0.0f"),
-        Int("int","0"),
-        Long("long","0L"),
-        Short("short","0"),
-        Void("void",null),
-        String("String",null),
-        None("",null),
-        Wildcard("*",null),
-        Null("null",null);
+        Boolean("boolean", "false"),
+        Byte("byte", "0"),
+        Char("char", "'\u0000'"),
+        Double("double", "0.0d"),
+        Float("float", "0.0f"),
+        Int("int", "0"),
+        Long("long", "0L"),
+        Short("short", "0"),
+        Void("void", null),
+        String("String", null),
+        None("", null),
+        Wildcard("*", null),
+        Null("null", null);
 
         private final String keyword;
         private final String defaultValue;
@@ -535,7 +542,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public TypeTree toTypeTree() {
-            return new J.Primitive(randomId(), this, Formatting.EMPTY, Markers.EMPTY);
+            return new J.Primitive(randomId(), this, emptyList(), Formatting.EMPTY, Markers.EMPTY);
         }
 
         public J.Literal toLiteral(String value) {
@@ -577,7 +584,7 @@ public interface JavaType extends Serializable {
                     throw new IllegalArgumentException("Unable to build literals for void, none, and wildcards");
             }
 
-            return new J.Literal(randomId(), primitiveValue, value, this, Formatting.EMPTY, Markers.EMPTY);
+            return new J.Literal(randomId(), primitiveValue, value, this, emptyList(), Formatting.EMPTY, Markers.EMPTY);
         }
     }
 }

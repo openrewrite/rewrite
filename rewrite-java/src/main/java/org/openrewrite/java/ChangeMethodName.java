@@ -83,7 +83,9 @@ public class ChangeMethodName extends JavaIsoRefactorVisitor {
             if(target instanceof J.FieldAccess) {
                 String className = target.printTrimmed();
                 String fullyQualified = className + "." + name;
-                return TreeBuilder.buildName(fullyQualified, f.getFormatting(), f.getId());
+                return TreeBuilder.buildName(fullyQualified, f.getId())
+                        .withComments(f.getComments())
+                        .withFormatting(f.getFormatting());
             }
         }
         return f;

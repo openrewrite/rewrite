@@ -25,7 +25,7 @@ import java.util.Collections.singletonList
 
 interface AddFieldTest : RefactorVisitorTest {
     companion object {
-        val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), EMPTY, Markers.EMPTY) as J.Modifier)
+        val private: List<J.Modifier> = singletonList(J.Modifier.Private(randomId(), emptyList(), EMPTY, Markers.EMPTY) as J.Modifier)
     }
 
     @Test

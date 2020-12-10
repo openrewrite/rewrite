@@ -97,8 +97,8 @@ public class DeleteStatement {
         }
 
         private J.Block<J> emptyBlock() {
-            return new J.Block<>(randomId(), null, emptyList(), Formatting.EMPTY,
-                    Markers.EMPTY, new J.Block.End(randomId(), format(""), Markers.EMPTY));
+            return new J.Block<>(randomId(), null, emptyList(), emptyList(), Formatting.EMPTY,
+                    Markers.EMPTY, new J.Block.End(randomId(), emptyList(), format(""), Markers.EMPTY));
         }
     }
 }

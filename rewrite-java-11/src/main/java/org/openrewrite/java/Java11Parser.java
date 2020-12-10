@@ -199,7 +199,7 @@ public class Java11Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 relaxedClassTypeMatching, styles);
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Formatting.EMPTY);
+                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), new CommentsAndFormatting(Collections.emptyList(), Formatting.EMPTY));
                         sample.stop(Timer.builder("rewrite.parse")
                                 .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
                                 .tag("file.type", "Java")

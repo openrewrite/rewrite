@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.J;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
@@ -83,7 +84,7 @@ public class DeleteMethodArgument extends JavaIsoRefactorVisitor {
 
                 args.remove(index);
                 if (args.isEmpty()) {
-                    args = singletonList(new J.Empty(randomId(), Formatting.EMPTY, Markers.EMPTY));
+                    args = singletonList(new J.Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
                 }
 
                 return method.withArgs(method.getArgs().withArgs(args));

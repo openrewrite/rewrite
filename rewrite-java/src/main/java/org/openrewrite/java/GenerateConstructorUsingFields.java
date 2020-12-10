@@ -64,6 +64,7 @@ public class GenerateConstructorUsingFields {
                                 null,
                                 formatFirstPrefix(mv.getDimensionsBeforeName(), ""),
                                 formatFirstPrefix(mv.getVars(), " "),
+                                emptyList(),
                                 Formatting.EMPTY,
                                 Markers.EMPTY))
                         .collect(toList());
@@ -76,17 +77,18 @@ public class GenerateConstructorUsingFields {
                 J.MethodDecl constructor = new J.MethodDecl(
                         randomId(),
                         emptyList(),
-                        singletonList(new J.Modifier.Public(randomId(), Formatting.EMPTY, Markers.EMPTY)),
+                        singletonList(new J.Modifier.Public(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY)),
                         null,
                         null,
-                        J.Ident.build(randomId(), classDecl.getSimpleName(), classDecl.getType(), format(" "), Markers.EMPTY),
-                        new J.MethodDecl.Parameters(randomId(), constructorParams, Formatting.EMPTY, Markers.EMPTY),
+                        J.Ident.build(randomId(), classDecl.getSimpleName(), classDecl.getType(), emptyList(), format(" "), Markers.EMPTY),
+                        new J.MethodDecl.Parameters(randomId(), constructorParams, emptyList(), Formatting.EMPTY, Markers.EMPTY),
                         null,
-                        new J.Block<>(randomId(), null, emptyList(), format(" "),
+                        new J.Block<>(randomId(), null, emptyList(), emptyList(), format(" "),
                                 Markers.EMPTY,
-                                new J.Block.End(randomId(), format(formatter.findIndent(classDecl.getBody().getIndent(),
+                                new J.Block.End(randomId(), emptyList(), format(formatter.findIndent(classDecl.getBody().getIndent(),
                                         classDecl.getBody().getStatements().toArray(new Tree[0])).getPrefix()), Markers.EMPTY)),
                         null,
+                        emptyList(),
                         constructorFormatting.withPrefix("\n" + constructorFormatting.getPrefix()),
                         Markers.EMPTY
                 );
