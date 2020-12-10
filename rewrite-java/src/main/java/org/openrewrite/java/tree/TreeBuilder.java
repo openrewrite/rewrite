@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,7 +47,7 @@ public class TreeBuilder {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    private JavaParser parser;
+    private final JavaParser parser;
 
     public TreeBuilder(JavaParser parser) {
         this.parser = parser;
@@ -210,11 +209,12 @@ public class TreeBuilder {
 
         List<JavaType> allImports = new ArrayList<>(Arrays.asList(imports));
 
+        J.CompilationUnit compilationUnit = getCompilationUnit(insertionScope);
+
         //Need to collect any types within the insert scope. FullyQualified types will be added as an import
         //and Method types will either need to be stubbed out or statically imported into the synthetic class.
-        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(cu);
+        List<JavaType> typesInScope = new GetTypesInScope(insertionScope).visit(compilationUnit);
 
-        J.CompilationUnit compilationUnit = getCompilationUnit(insertionScope);
 
         List<JavaType.Method> localMethods = new ArrayList<>();
         for (JavaType type: typesInScope) {
