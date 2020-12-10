@@ -23,6 +23,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -92,6 +93,7 @@ public class InsertMethodArgument extends JavaIsoRefactorVisitor {
                 modifiedArgs.add(index,
                         new J.UnparsedSource(randomId(),
                                 source,
+                                Collections.emptyList(),
                                 index == 0 ?
                                         modifiedArgs.stream().findFirst().map(Tree::getFormatting).orElse(Formatting.EMPTY) :
                                         format(" "),

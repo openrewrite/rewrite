@@ -25,6 +25,7 @@ import org.openrewrite.java.tree.TypeTree;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
@@ -58,6 +59,7 @@ public class ImplementInterface {
                 if (c.getImplements() == null) {
                     c = c.withImplements(new J.ClassDecl.Implements(randomId(),
                             singletonList(lifeCycle),
+                            emptyList(),
                             format(" "),
                             Markers.EMPTY));
                 } else {

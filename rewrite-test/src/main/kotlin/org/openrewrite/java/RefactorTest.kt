@@ -32,14 +32,15 @@ class RefactorTest {
     class RefactorTestException : RuntimeException("")
 
     val cu = J.CompilationUnit(
-            randomId(),
-            "A.java",
-            null,
-            listOf(),
-            listOf(),
-            Formatting.EMPTY,
-            Markers.EMPTY,
-            emptyList()
+        randomId(),
+        "A.java",
+        null,
+        listOf(),
+        listOf(),
+        emptyList(),
+        Formatting.EMPTY,
+        Markers.EMPTY,
+        emptyList()
     )
 
     private val throwingVisitor = object : JavaRefactorVisitor() {
@@ -51,23 +52,36 @@ class RefactorTest {
     private val addClassDecl = object : JavaIsoRefactorVisitor() {
         override fun getName(): String = "AddClassDecl"
 
-        override fun visitCompilationUnit(compilationUnit : J.CompilationUnit?): J.CompilationUnit {
+        override fun visitCompilationUnit(compilationUnit: J.CompilationUnit?): J.CompilationUnit {
             var cu = super.visitCompilationUnit(compilationUnit)
-            if(cu.classes.size == 0) {
-                cu = cu.withClasses(listOf(J.ClassDecl(
-                        randomId(),
-                        emptyList(),
-                        emptyList(),
-                        J.ClassDecl.Kind.Class(randomId(), Formatting.EMPTY, Markers.EMPTY),
-                        J.Ident.buildClassName("Foo").withPrefix(" "),
-                        null,
-                        null,
-                        null,
-                        J.Block(randomId(), null, emptyList(), Formatting.EMPTY, Markers.EMPTY, J.Block.End(randomId(), Formatting.EMPTY, Markers.EMPTY)),
-                        JavaType.Class.build("Foo"),
-                        format("", "\n"),
-                        Markers.EMPTY
-                )))
+            if (cu.classes.size == 0) {
+                cu = cu.withClasses(
+                    listOf(
+                        J.ClassDecl(
+                            randomId(),
+                            emptyList(),
+                            emptyList(),
+                            J.ClassDecl.Kind.Class(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                            J.Ident.buildClassName("Foo").withPrefix(" "),
+                            null,
+                            null,
+                            null,
+                            J.Block(
+                                randomId(),
+                                null,
+                                emptyList(),
+                                emptyList(),
+                                Formatting.EMPTY,
+                                Markers.EMPTY,
+                                J.Block.End(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY)
+                            ),
+                            JavaType.Class.build("Foo"),
+                            emptyList(),
+                            format("", "\n"),
+                            Markers.EMPTY
+                        )
+                    )
+                )
             }
             return cu
         }
@@ -77,16 +91,16 @@ class RefactorTest {
     fun throwsEagerly() {
         assertThrows(RefactorTestException::class.java) {
             Refactor(true)
-                    .visit(throwingVisitor)
-                    .fix(listOf(cu))
+                .visit(throwingVisitor)
+                .fix(listOf(cu))
         }
     }
 
     @Test
     fun suppressesExceptions() {
         Refactor()
-                .visit(throwingVisitor)
-                .fix(listOf(cu))
+            .visit(throwingVisitor)
+            .fix(listOf(cu))
     }
 
     @Disabled("https://github.com/openrewrite/rewrite/issues/60")
@@ -98,8 +112,8 @@ class RefactorTest {
             }
         }
         val results = Refactor()
-                .visit(deletingVisitor)
-                .fix(listOf(cu))
+            .visit(deletingVisitor)
+            .fix(listOf(cu))
 
         assertEquals(1, results.size)
         val result = results.first()
@@ -110,14 +124,15 @@ class RefactorTest {
     @Test
     fun canGenerate() {
         val cuToGenerate = J.CompilationUnit(
-                randomId(),
-                "A.java",
-                null,
-                listOf(),
-                listOf(),
-                Formatting.EMPTY,
-                Markers.EMPTY,
-                listOf()
+            randomId(),
+            "A.java",
+            null,
+            listOf(),
+            listOf(),
+            emptyList(),
+            Formatting.EMPTY,
+            Markers.EMPTY,
+            listOf()
         )
         val generatingVisitor = object : JavaIsoRefactorVisitor() {
             var generationComplete = false
@@ -131,8 +146,8 @@ class RefactorTest {
             }
         }
         val results = Refactor()
-                .visit(generatingVisitor)
-                .fix(listOf(cu))
+            .visit(generatingVisitor)
+            .fix(listOf(cu))
         assertEquals(1, results.size, "The only change returned should be the generated file")
         val result = results.first()
         assertNull(result.original, "The generated file should have no \"original\"")
@@ -146,31 +161,50 @@ class RefactorTest {
         val addMethod = object : JavaIsoRefactorVisitor() {
             override fun visitClassDecl(classDecl: J.ClassDecl?): J.ClassDecl {
                 var cd = super.visitClassDecl(classDecl)
-                if(cd.methods.size == 0) {
-                    cd = cd.withBody(cd.body.withStatements(listOf(
-                            J.MethodDecl(
+                if (cd.methods.size == 0) {
+                    cd = cd.withBody(
+                        cd.body.withStatements(
+                            listOf(
+                                J.MethodDecl(
                                     randomId(),
                                     emptyList(),
                                     emptyList(),
                                     null,
                                     JavaType.Primitive.Void.toTypeTree(),
-                                    J.Ident.build(randomId(), "bar", null, format(" "), Markers.EMPTY),
-                                    J.MethodDecl.Parameters(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                                    J.Ident.build(randomId(), "bar", null, emptyList(), format(" "), Markers.EMPTY),
+                                    J.MethodDecl.Parameters(
+                                        randomId(),
+                                        emptyList(),
+                                        emptyList(),
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY
+                                    ),
                                     null,
-                                    J.Block(randomId(), null, emptyList(), Formatting.EMPTY, Markers.EMPTY, J.Block.End(randomId(), Formatting.EMPTY, Markers.EMPTY)),
+                                    J.Block(
+                                        randomId(),
+                                        null,
+                                        emptyList(),
+                                        emptyList(),
+                                        Formatting.EMPTY,
+                                        Markers.EMPTY,
+                                        J.Block.End(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY)
+                                    ),
                                     null,
+                                    emptyList(),
                                     Formatting.EMPTY,
                                     Markers.EMPTY
+                                )
                             )
-                    )))
+                        )
+                    )
                 }
                 return cd
             }
         }
 
         val results = Refactor(true)
-                .visit(addClassDecl, addMethod)
-                .fix(listOf(cu))
+            .visit(addClassDecl, addMethod)
+            .fix(listOf(cu))
         assertEquals(1, results.size)
 
         val result = results.first().fixed as J.CompilationUnit
@@ -181,11 +215,12 @@ class RefactorTest {
     @Test
     fun generateDiff() {
         val results = Refactor(true)
-                .visit(addClassDecl)
-                .fix(listOf(cu))
+            .visit(addClassDecl)
+            .fix(listOf(cu))
 
         assertEquals(1, results.size)
-        assertThat(results.first().diff()).isEqualTo("""
+        assertThat(results.first().diff()).isEqualTo(
+            """
                 diff --git a/A.java b/A.java
                 index e69de29..aaaae2e 100644
                 --- a/A.java

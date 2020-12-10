@@ -70,6 +70,12 @@ public interface J extends Serializable, Tree {
         return new PrintJava().visit(this);
     }
 
+    default J withComments(List<Comment> comments) {
+        return this;
+    }
+
+    List<Comment> getComments();
+
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -83,6 +89,9 @@ public interface J extends Serializable, Tree {
 
         @With
         TypeTree typeExpr;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -121,6 +130,9 @@ public interface J extends Serializable, Tree {
         Arguments args;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -145,8 +157,9 @@ public interface J extends Serializable, Tree {
 
         public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
             return new J.Annotation(randomId(),
-                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, Formatting.EMPTY, Markers.EMPTY),
-                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, Formatting.EMPTY, Markers.EMPTY),
+                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                    emptyList(),
                     formatting,
                     Markers.EMPTY);
         }
@@ -160,6 +173,9 @@ public interface J extends Serializable, Tree {
 
             @With
             List<Expression> args;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -192,6 +208,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -213,6 +232,9 @@ public interface J extends Serializable, Tree {
             Expression index;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -232,6 +254,9 @@ public interface J extends Serializable, Tree {
 
         @With
         List<Dimension> dimensions;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -266,6 +291,9 @@ public interface J extends Serializable, Tree {
             Empty inner;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -282,6 +310,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Expression condition;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -317,6 +348,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -363,6 +397,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -395,6 +432,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -407,6 +447,9 @@ public interface J extends Serializable, Tree {
             public static final class Subtraction extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -423,6 +466,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -435,6 +481,9 @@ public interface J extends Serializable, Tree {
             public static final class Division extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -451,6 +500,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -463,6 +515,9 @@ public interface J extends Serializable, Tree {
             public static final class BitAnd extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -479,6 +534,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -491,6 +549,9 @@ public interface J extends Serializable, Tree {
             public static final class BitXor extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -507,6 +568,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -521,6 +585,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -533,6 +600,9 @@ public interface J extends Serializable, Tree {
             public static final class UnsignedRightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -564,6 +634,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -593,6 +666,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -605,6 +681,9 @@ public interface J extends Serializable, Tree {
             public static final class Subtraction extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -621,6 +700,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -633,6 +715,9 @@ public interface J extends Serializable, Tree {
             public static final class Division extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -649,6 +734,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -661,6 +749,9 @@ public interface J extends Serializable, Tree {
             public static final class LessThan extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -677,6 +768,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -689,6 +783,9 @@ public interface J extends Serializable, Tree {
             public static final class LessThanOrEqual extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -705,6 +802,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -717,6 +817,9 @@ public interface J extends Serializable, Tree {
             public static final class Equal extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -733,6 +836,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -745,6 +851,9 @@ public interface J extends Serializable, Tree {
             public static final class BitAnd extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -761,6 +870,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -773,6 +885,9 @@ public interface J extends Serializable, Tree {
             public static final class BitXor extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -789,6 +904,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -801,6 +919,9 @@ public interface J extends Serializable, Tree {
             public static final class RightShift extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -817,6 +938,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -831,6 +955,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -843,6 +970,9 @@ public interface J extends Serializable, Tree {
             public static final class And extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -865,12 +995,16 @@ public interface J extends Serializable, Tree {
         Empty statik;
 
         public Block<T> withStatic(Empty statik) {
-            return new Block<>(id, statik, statements, formatting, Markers.EMPTY, end);
+            return new Block<>(id, statik, statements, comments, formatting, Markers.EMPTY, end);
         }
 
         @Getter
         @With
         List<T> statements;
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -908,6 +1042,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -925,6 +1062,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         Ident label;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -959,6 +1099,9 @@ public interface J extends Serializable, Tree {
         List<Statement> statements;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -990,7 +1133,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name, typeParameters,
-                    extendings, implementings, body, type, formatting, markers);
+                    extendings, implementings, body, type, comments, formatting, markers);
         }
 
         public ClassDecl withModifiers(String... modifierKeywords) {
@@ -1026,7 +1169,8 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type, formatting, markers);
+                    typeParameters, extendings, implementings, body, type,
+                    comments, formatting, markers);
         }
 
         @JsonProperty("extendings")
@@ -1043,7 +1187,8 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type, formatting, markers);
+                    typeParameters, extendings, implementings, body, type,
+                    comments, formatting, markers);
         }
 
         @JsonProperty("implementings")
@@ -1060,6 +1205,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @Nullable
         JavaType.Class type;
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -1114,6 +1263,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -1126,6 +1278,9 @@ public interface J extends Serializable, Tree {
             public static final class Enum extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -1142,6 +1297,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -1154,6 +1312,9 @@ public interface J extends Serializable, Tree {
             public static final class Annotation extends Kind {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;
@@ -1174,6 +1335,9 @@ public interface J extends Serializable, Tree {
             TypeTree from;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -1189,6 +1353,9 @@ public interface J extends Serializable, Tree {
 
             @With
             List<TypeTree> from;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -1265,6 +1432,38 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
+    final class Comment implements J, Statement {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        CommentStyle style;
+
+        @With
+        String text;
+
+        @With
+        Formatting formatting;
+
+        @With
+        Markers markers;
+
+        @Override
+        public List<Comment> getComments() {
+            return emptyList();
+        }
+
+        enum CommentStyle {
+            LINE,
+            BLOCK,
+            JAVADOC,
+            WHITESPACE
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
     final class CompilationUnit implements J, SourceFile {
         @EqualsAndHashCode.Include
         UUID id;
@@ -1281,6 +1480,9 @@ public interface J extends Serializable, Tree {
 
         @With
         List<ClassDecl> classes;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1353,7 +1555,7 @@ public interface J extends Serializable, Tree {
          *
          * @return A JavaParser with a classpath matching the current runtime classpath
          */
-        @Incubating(since="6.1.0")
+        @Incubating(since = "6.1.0")
         public JavaParser buildRuntimeParser() {
             return JavaParser.fromJavaVersion()
                     .classpath(JavaParser.allDependenciesFromClasspath())
@@ -1370,21 +1572,23 @@ public interface J extends Serializable, Tree {
             return new J.CompilationUnit(
                     randomId(),
                     sourcePath,
-                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), Formatting.EMPTY, Markers.EMPTY),
+                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), emptyList(), Formatting.EMPTY, Markers.EMPTY),
                     emptyList(),
                     singletonList(new J.ClassDecl(randomId(),
                             emptyList(),
                             emptyList(),
-                            new ClassDecl.Kind.Class(randomId(), Formatting.EMPTY, Markers.EMPTY),
+                            new ClassDecl.Kind.Class(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
                             TreeBuilder.buildName(className).withPrefix(" "),
                             null,
                             null,
                             null,
-                            new Try.Block<>(randomId(), null, emptyList(), format(" "),
-                                    Markers.EMPTY, new Block.End(randomId(), format("\n"), Markers.EMPTY)),
+                            new Try.Block<>(randomId(), null, emptyList(), emptyList(), format(" "),
+                                    Markers.EMPTY, new Block.End(randomId(), emptyList(), format("\n"), Markers.EMPTY)),
                             JavaType.Class.build(packageName + "." + className),
+                            emptyList(),
                             format("\n\n"),
                             Markers.EMPTY).withModifiers("public")),
+                    emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY,
                     emptyList());
@@ -1401,6 +1605,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         Ident label;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1434,6 +1641,9 @@ public interface J extends Serializable, Tree {
         While whileCondition;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -1461,6 +1671,9 @@ public interface J extends Serializable, Tree {
             Parentheses<Expression> condition;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -1474,6 +1687,9 @@ public interface J extends Serializable, Tree {
     final class Empty implements J, Statement, Expression, TypeTree {
         @EqualsAndHashCode.Include
         UUID id;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1519,6 +1735,9 @@ public interface J extends Serializable, Tree {
         NewClass initializer;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -1541,6 +1760,9 @@ public interface J extends Serializable, Tree {
         List<EnumValue> enums;
 
         boolean terminatedWithSemicolon;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1570,6 +1792,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1667,6 +1892,9 @@ public interface J extends Serializable, Tree {
         Statement body;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -1691,6 +1919,9 @@ public interface J extends Serializable, Tree {
             Expression iterable;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -1710,6 +1941,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Statement body;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -1739,6 +1973,9 @@ public interface J extends Serializable, Tree {
             List<Statement> update;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -1758,14 +1995,18 @@ public interface J extends Serializable, Tree {
         IdentFlyweight ident;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
         Markers markers;
 
-        private Ident(UUID id, IdentFlyweight ident, Formatting formatting, Markers markers) {
+        private Ident(UUID id, IdentFlyweight ident, List<Comment> comments, Formatting formatting, Markers markers) {
             this.id = id;
             this.ident = ident;
+            this.comments = comments;
             this.formatting = formatting;
             this.markers = markers;
         }
@@ -1778,7 +2019,7 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Ident withType(JavaType type) {
-            return build(id, getSimpleName(), type, formatting, markers);
+            return build(id, getSimpleName(), type, comments, formatting, markers);
         }
 
         @JsonIgnore
@@ -1792,13 +2033,14 @@ public interface J extends Serializable, Tree {
         }
 
         public Ident withName(String name) {
-            return build(id, name, getType(), formatting, markers);
+            return build(id, name, getType(), comments, formatting, markers);
         }
 
         @JsonCreator
         public static Ident build(@JsonProperty("id") UUID id,
                                   @JsonProperty("simpleName") String simpleName,
                                   @JsonProperty("type") @Nullable JavaType type,
+                                  @JsonProperty("comments") List<Comment> comments,
                                   @JsonProperty("formatting") Formatting formatting,
                                   @JsonProperty("metadata") Markers markers) {
             synchronized (flyweights) {
@@ -1807,6 +2049,7 @@ public interface J extends Serializable, Tree {
                         flyweights
                                 .computeIfAbsent(simpleName, n -> HashObjObjMaps.newMutableMap())
                                 .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
+                        comments,
                         formatting,
                         markers
                 );
@@ -1819,6 +2062,7 @@ public interface J extends Serializable, Tree {
                     randomId(),
                     classType.getClassName(),
                     classType,
+                    emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY
             );
@@ -1859,6 +2103,9 @@ public interface J extends Serializable, Tree {
         Else elsePart;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -1878,6 +2125,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Statement statement;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -1906,6 +2156,10 @@ public interface J extends Serializable, Tree {
 
         @With
         boolean statik;
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -2003,6 +2257,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -2026,6 +2283,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Statement statement;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -2060,6 +2320,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -2076,6 +2339,9 @@ public interface J extends Serializable, Tree {
         public static final class Arrow implements J {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2096,6 +2362,8 @@ public interface J extends Serializable, Tree {
 
             @With
             List<? extends Tree> params;
+
+            List<Comment> comments = emptyList();
 
             Formatting formatting = Formatting.EMPTY;
 
@@ -2133,10 +2401,13 @@ public interface J extends Serializable, Tree {
         @Override
         public Literal withType(JavaType type) {
             if (type instanceof JavaType.Primitive) {
-                return new Literal(id, value, valueSource, (JavaType.Primitive) type, formatting, markers);
+                return new Literal(id, value, valueSource, (JavaType.Primitive) type, comments, formatting, markers);
             }
             return this;
         }
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -2168,6 +2439,7 @@ public interface J extends Serializable, Tree {
                     value,
                     "\"" + value + "\"",
                     JavaType.Primitive.String,
+                    emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY
             );
@@ -2194,6 +2466,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -2227,7 +2502,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr, name, params,
-                    throwz, body, defaultValue, formatting, markers);
+                    throwz, body, defaultValue, comments, formatting, markers);
         }
 
         public MethodDecl withModifiers(String... modifierKeywords) {
@@ -2280,7 +2555,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr,
-                    name, params, throwz, body, defaultValue, formatting, markers);
+                    name, params, throwz, body, defaultValue, comments, formatting, markers);
         }
 
         @JsonProperty("throwz")
@@ -2301,6 +2576,10 @@ public interface J extends Serializable, Tree {
         @Getter
         @Nullable
         Default defaultValue;
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -2344,6 +2623,9 @@ public interface J extends Serializable, Tree {
             List<Statement> params;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2365,6 +2647,9 @@ public interface J extends Serializable, Tree {
             List<NameTree> exceptions;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2380,6 +2665,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Expression value;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2428,6 +2716,9 @@ public interface J extends Serializable, Tree {
         JavaType.Method type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -2437,7 +2728,7 @@ public interface J extends Serializable, Tree {
         @Override
         public MethodInvocation withType(JavaType type) {
             if (type instanceof JavaType.Method) {
-                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, formatting, markers);
+                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, comments, formatting, markers);
             }
             return this;
         }
@@ -2488,6 +2779,9 @@ public interface J extends Serializable, Tree {
 
             @With
             List<Expression> args;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2549,20 +2843,20 @@ public interface J extends Serializable, Tree {
                     for (int i = 0; i < sizeBeforeAdd; i++) {
                         Modifier m = modifiers.get(i);
                         if (m instanceof Static) {
-                            modifiers.add(i + 1, new Final(randomId(), format(" "), Markers.EMPTY));
+                            modifiers.add(i + 1, new Final(randomId(), emptyList(), format(" "), Markers.EMPTY));
                             finalAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(i + 1, new Final(randomId(), format(" ", m.getSuffix()), Markers.EMPTY));
+                            modifiers.add(i + 1, new Final(randomId(), emptyList(), format(" ", m.getSuffix()), Markers.EMPTY));
                             finalAdded = true;
                         }
                     }
 
                     if (!finalAdded) {
-                        modifiers.add(0, new Final(randomId(), Formatting.EMPTY, Markers.EMPTY));
+                        modifiers.add(0, new Final(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
                     }
                 } else if ("static".equals(modifier) && !hasModifier(existing, "static")) {
                     boolean staticAdded = false;
@@ -2574,20 +2868,20 @@ public interface J extends Serializable, Tree {
                             afterAccessModifier = i + 1;
                         } else if (m instanceof Final) {
                             modifiers.set(i, m.withFormatting(format(" ", m.getSuffix())));
-                            modifiers.add(i, new Static(randomId(), format(m.getPrefix()), Markers.EMPTY));
+                            modifiers.add(i, new Static(randomId(), emptyList(), format(m.getPrefix()), Markers.EMPTY));
                             staticAdded = true;
                             break;
                         }
 
                         if (i == modifiers.size() - 1) {
                             modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(afterAccessModifier, new Static(randomId(), format(" ", m.getSuffix()), Markers.EMPTY));
+                            modifiers.add(afterAccessModifier, new Static(randomId(), emptyList(), format(" ", m.getSuffix()), Markers.EMPTY));
                             staticAdded = true;
                         }
                     }
 
                     if (!staticAdded) {
-                        modifiers.add(0, new Static(randomId(), Formatting.EMPTY, Markers.EMPTY));
+                        modifiers.add(0, new Static(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
                     }
                 } else if (("public".equals(modifier) || "protected".equals(modifier) || "private".equals(modifier)) &&
                         !hasModifier(existing, modifier)) {
@@ -2624,14 +2918,14 @@ public interface J extends Serializable, Tree {
             Modifier access;
             switch (modifier) {
                 case "public":
-                    access = new Public(randomId(), formatting, Markers.EMPTY);
+                    access = new Public(randomId(), emptyList(), formatting, Markers.EMPTY);
                     break;
                 case "protected":
-                    access = new Protected(randomId(), formatting, Markers.EMPTY);
+                    access = new Protected(randomId(), emptyList(), formatting, Markers.EMPTY);
                     break;
                 case "private":
                 default:
-                    access = new Private(randomId(), formatting, Markers.EMPTY);
+                    access = new Private(randomId(), emptyList(), formatting, Markers.EMPTY);
                     break;
             }
             return access;
@@ -2643,6 +2937,9 @@ public interface J extends Serializable, Tree {
         public static final class Default extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2659,6 +2956,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2671,6 +2971,9 @@ public interface J extends Serializable, Tree {
         public static final class Protected extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2687,6 +2990,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2699,6 +3005,9 @@ public interface J extends Serializable, Tree {
         public static final class Abstract extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2715,6 +3024,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2727,6 +3039,9 @@ public interface J extends Serializable, Tree {
         public static final class Final extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2743,6 +3058,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2755,6 +3073,9 @@ public interface J extends Serializable, Tree {
         public static final class Strictfp extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2771,6 +3092,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2785,6 +3109,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2797,6 +3124,9 @@ public interface J extends Serializable, Tree {
         public static final class Volatile extends Modifier {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2815,6 +3145,9 @@ public interface J extends Serializable, Tree {
 
         @With
         List<NameTree> alternatives;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -2867,6 +3200,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -2888,6 +3224,9 @@ public interface J extends Serializable, Tree {
             Expression size;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2903,6 +3242,9 @@ public interface J extends Serializable, Tree {
 
             @With
             List<Expression> elements;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -2926,7 +3268,7 @@ public interface J extends Serializable, Tree {
         New nooh;
 
         public NewClass withNew(New nooh) {
-            return new NewClass(id, encl, nooh, clazz, args, body, type, formatting, markers);
+            return new NewClass(id, encl, nooh, clazz, args, body, type, comments, formatting, markers);
         }
 
         @Nullable
@@ -2944,6 +3286,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -2979,6 +3324,9 @@ public interface J extends Serializable, Tree {
             List<Expression> args;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -2991,6 +3339,9 @@ public interface J extends Serializable, Tree {
         public static final class New implements J {
             @EqualsAndHashCode.Include
             UUID id;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -3009,6 +3360,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Expression expr;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3035,6 +3389,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         TypeParameters typeParameters;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3067,6 +3424,7 @@ public interface J extends Serializable, Tree {
                             randomId(),
                             typeNameType.getClassName(),
                             typeNameType,
+                            emptyList(),
                             Formatting.EMPTY,
                             Markers.EMPTY),
                     new J.TypeParameters(
@@ -3082,18 +3440,22 @@ public interface J extends Serializable, Tree {
                                                                 randomId(),
                                                                 genericType.getClassName(),
                                                                 genericType,
+                                                                emptyList(),
                                                                 Formatting.EMPTY,
                                                                 Markers.EMPTY
                                                         ),
                                                         null,
+                                                        emptyList(),
                                                         format(" "),
                                                         Markers.EMPTY
                                                 );
                                             })
                                             .collect(Collectors.toList()), ""
                             ),
+                            emptyList(),
                             Formatting.EMPTY,
                             Markers.EMPTY),
+                    emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY
             );
@@ -3109,6 +3471,9 @@ public interface J extends Serializable, Tree {
 
         @With
         T tree;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3159,7 +3524,7 @@ public interface J extends Serializable, Tree {
             if (!(type instanceof JavaType.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitive");
             }
-            return new Primitive(id, (JavaType.Primitive) type, formatting, markers);
+            return new Primitive(id, (JavaType.Primitive) type, comments, formatting, markers);
         }
 
         @Override
@@ -3167,6 +3532,10 @@ public interface J extends Serializable, Tree {
         public JavaType.Primitive getType() {
             return type;
         }
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -3192,6 +3561,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         Expression expr;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3225,6 +3597,9 @@ public interface J extends Serializable, Tree {
         Block<Case> cases;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -3248,6 +3623,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Block<Statement> body;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3282,6 +3660,9 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -3302,6 +3683,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Expression exception;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3349,13 +3733,17 @@ public interface J extends Serializable, Tree {
             if (finallie == this.finallie) {
                 return this;
             }
-            return new Try(id, resources, body, catches, finallie, formatting, markers);
+            return new Try(id, resources, body, catches, finallie, comments, formatting, markers);
         }
 
         @Nullable
         public Finally getFinally() {
             return finallie;
         }
+
+        @Getter
+        @With
+        List<Comment> comments;
 
         @Getter
         @With
@@ -3381,6 +3769,9 @@ public interface J extends Serializable, Tree {
             List<VariableDecls> decls;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -3399,6 +3790,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Block<Statement> body;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -3421,6 +3815,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Block<Statement> body;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -3447,6 +3844,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Expression expr;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3493,6 +3893,9 @@ public interface J extends Serializable, Tree {
         Bounds bounds;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -3514,6 +3917,9 @@ public interface J extends Serializable, Tree {
             List<TypeTree> types;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -3530,6 +3936,9 @@ public interface J extends Serializable, Tree {
 
         @With
         List<TypeParameter> params;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3559,6 +3968,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3595,6 +4007,8 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
+                List<Comment> comments = emptyList();
+
                 Formatting formatting = Formatting.EMPTY;
 
                 @With
@@ -3613,6 +4027,8 @@ public interface J extends Serializable, Tree {
             public static final class PreDecrement extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                List<Comment> comments = emptyList();
 
                 Formatting formatting = Formatting.EMPTY;
 
@@ -3634,6 +4050,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -3648,6 +4067,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -3660,6 +4082,8 @@ public interface J extends Serializable, Tree {
             public static final class Positive extends Operator {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                List<Comment> comments = emptyList();
 
                 Formatting formatting = Formatting.EMPTY;
 
@@ -3680,6 +4104,8 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
+                List<Comment> comments = emptyList();
+
                 Formatting formatting = Formatting.EMPTY;
 
                 @With
@@ -3699,11 +4125,18 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                @With
-                Formatting formatting;
+                List<Comment> comments = emptyList();
+
+                Formatting formatting = Formatting.EMPTY;
 
                 @With
                 Markers markers;
+
+                @SuppressWarnings("unchecked")
+                @Override
+                public <T extends Tree> T withFormatting(Formatting fmt) {
+                    return (T) this;
+                }
             }
 
             @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3713,11 +4146,18 @@ public interface J extends Serializable, Tree {
                 @EqualsAndHashCode.Include
                 UUID id;
 
-                @With
-                Formatting formatting;
+                List<Comment> comments = emptyList();
+
+                Formatting formatting = Formatting.EMPTY;
 
                 @With
                 Markers markers;
+
+                @SuppressWarnings("unchecked")
+                @Override
+                public <T extends Tree> T withFormatting(Formatting fmt) {
+                    return (T) this;
+                }
             }
         }
     }
@@ -3731,6 +4171,9 @@ public interface J extends Serializable, Tree {
 
         @With
         String source;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3772,7 +4215,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new VariableDecls(id, annotations, modifiers, typeExpr, varargs,
-                    dimensionsBeforeName, vars, formatting, markers);
+                    dimensionsBeforeName, vars, comments, formatting, markers);
         }
 
         public VariableDecls withModifiers(String... modifierKeywords) {
@@ -3809,6 +4252,9 @@ public interface J extends Serializable, Tree {
         List<NamedVar> vars;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -3842,6 +4288,9 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
+            List<Comment> comments;
+
+            @With
             Formatting formatting;
 
             @With
@@ -3857,6 +4306,9 @@ public interface J extends Serializable, Tree {
 
             @With
             Empty whitespace;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -3885,6 +4337,9 @@ public interface J extends Serializable, Tree {
             @With
             @Nullable
             JavaType type;
+
+            @With
+            List<Comment> comments;
 
             @With
             Formatting formatting;
@@ -3936,6 +4391,9 @@ public interface J extends Serializable, Tree {
         Statement body;
 
         @With
+        List<Comment> comments;
+
+        @With
         Formatting formatting;
 
         @With
@@ -3961,6 +4419,9 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         NameTree boundedType;
+
+        @With
+        List<Comment> comments;
 
         @With
         Formatting formatting;
@@ -3994,6 +4455,9 @@ public interface J extends Serializable, Tree {
                 UUID id;
 
                 @With
+                List<Comment> comments;
+
+                @With
                 Formatting formatting;
 
                 @With
@@ -4006,6 +4470,9 @@ public interface J extends Serializable, Tree {
             public static final class Super extends Bound {
                 @EqualsAndHashCode.Include
                 UUID id;
+
+                @With
+                List<Comment> comments;
 
                 @With
                 Formatting formatting;

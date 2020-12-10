@@ -18,7 +18,6 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -111,7 +110,9 @@ public class ChangeType extends JavaIsoRefactorVisitor {
     public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess) {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess);
         if (f.isFullyQualifiedClassReference(type)) {
-            return TreeBuilder.buildName(targetType.getFullyQualifiedName(), f.getFormatting(), f.getId());
+            return TreeBuilder.buildName(targetType.getFullyQualifiedName(), f.getId())
+                    .withComments(f.getComments())
+                    .withFormatting(f.getFormatting());
         }
         return f;
     }
@@ -224,11 +225,13 @@ public class ChangeType extends JavaIsoRefactorVisitor {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends Tree> T transformName(@Nullable T nameField) {
+    private <T extends J> T transformName(@Nullable T nameField) {
         if (nameField instanceof NameTree) {
             JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
             if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(type)) {
-                return (T) J.Ident.build(randomId(), targetType.getClassName(), targetType, nameField.getFormatting(),
+                return (T) J.Ident.build(randomId(), targetType.getClassName(), targetType,
+                        nameField.getComments(),
+                        nameField.getFormatting(),
                         Markers.EMPTY);
             }
         }
@@ -236,7 +239,7 @@ public class ChangeType extends JavaIsoRefactorVisitor {
     }
 
     @SuppressWarnings("unchecked")
-    private <T extends Tree> List<T> transformNames(@Nullable List<T> trees) {
+    private <T extends J> List<T> transformNames(@Nullable List<T> trees) {
         if (trees == null) {
             return null;
         }
@@ -248,7 +251,8 @@ public class ChangeType extends JavaIsoRefactorVisitor {
                 JavaType.Class nodeTypeAsClass = TypeUtils.asClass(((NameTree) tree).getType());
                 if (nodeTypeAsClass != null && nodeTypeAsClass.getFullyQualifiedName().equals(type)) {
                     atLeastOneChanged = true;
-                    transformed.add((T) J.Ident.build(randomId(), targetType.getClassName(), targetType, tree.getFormatting(), Markers.EMPTY));
+                    transformed.add((T) J.Ident.build(randomId(), targetType.getClassName(), targetType,
+                            tree.getComments(),  tree.getFormatting(), Markers.EMPTY));
                     continue;
                 }
             }

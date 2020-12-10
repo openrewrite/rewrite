@@ -38,3 +38,7 @@ class Java11JavaTypeTest: Java11Test(), JavaTypeTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11NewClassTest: Java11Test(), NewClassTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SwitchTest: Java11Test(), SwitchTest

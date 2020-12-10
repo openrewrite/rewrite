@@ -23,6 +23,7 @@ import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -99,6 +100,7 @@ public class ChangeMethodTargetToVariable extends JavaIsoRefactorVisitor {
 
                 return method
                         .withSelect(J.Ident.build(randomId(), variable, type,
+                                select == null ? Collections.emptyList() : select.getComments(),
                                 select == null ? Formatting.EMPTY : select.getFormatting(),
                                 Markers.EMPTY))
                         .withType(methodType);

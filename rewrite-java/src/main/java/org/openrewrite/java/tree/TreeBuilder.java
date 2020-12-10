@@ -54,15 +54,11 @@ public class TreeBuilder {
     }
 
     public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
-        return buildName(fullyQualifiedName, Formatting.EMPTY);
+        return buildName(fullyQualifiedName, randomId());
     }
 
-    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt) {
-        return buildName(fullyQualifiedName, fmt, randomId());
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, Formatting fmt, UUID id) {
+    @SuppressWarnings({"ResultOfMethodCallIgnored", "unchecked"})
+    public static <T extends TypeTree & Expression> T buildName(String fullyQualifiedName, UUID id) {
         String[] parts = fullyQualifiedName.split("\\.");
 
         String fullName = "";
@@ -71,7 +67,7 @@ public class TreeBuilder {
             String part = parts[i];
             if (i == 0) {
                 fullName = part;
-                expr = J.Ident.build(randomId(), part, null, Formatting.EMPTY, Markers.EMPTY);
+                expr = J.Ident.build(randomId(), part, null, emptyList(), Formatting.EMPTY, Markers.EMPTY);
             } else {
                 fullName += "." + part;
 
@@ -85,10 +81,11 @@ public class TreeBuilder {
                 expr = new J.FieldAccess(
                         i == parts.length - 1 ? id : randomId(),
                         expr,
-                        J.Ident.build(randomId(), part.trim(), null, identFmt, Markers.EMPTY),
+                        J.Ident.build(randomId(), part.trim(), null, emptyList(), identFmt, Markers.EMPTY),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.Class.build(fullName) :
                                 null,
+                        emptyList(),
                         partFmt,
                         Markers.EMPTY
                 );
@@ -96,7 +93,7 @@ public class TreeBuilder {
         }
 
         //noinspection ConstantConditions
-        return expr.withFormatting(fmt);
+        return (T) expr;
     }
 
     /**

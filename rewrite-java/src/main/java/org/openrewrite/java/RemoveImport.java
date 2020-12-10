@@ -139,8 +139,13 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
             return delete(cu, starImport);
         } else if (starImport != null && referencedTypes.size() == 1) {
             return cu.withImports(cu.getImports().stream().map(i -> i == starImport ?
-                    new J.Import(randomId(), TreeBuilder.buildName(referencedTypes.iterator().next(),
-                            Formatting.format(" ")), false, i.getFormatting(), Markers.EMPTY) :
+                    new J.Import(randomId(),
+                            TreeBuilder.buildName(referencedTypes.iterator().next())
+                                    .withFormatting(Formatting.format(" ")),
+                            false,
+                            i.getComments(),
+                            i.getFormatting(),
+                            Markers.EMPTY) :
                     i
             ).collect(toList()));
         } else {

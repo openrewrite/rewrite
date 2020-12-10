@@ -16,11 +16,11 @@
 package org.openrewrite.java;
 
 import org.openrewrite.AbstractSourceVisitor;
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.tree.*;
-
-import java.util.concurrent.atomic.AtomicBoolean;
+import org.openrewrite.java.tree.Flag;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.Statement;
 
 import static java.util.stream.Collectors.toList;
 

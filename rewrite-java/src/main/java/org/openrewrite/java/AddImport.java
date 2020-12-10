@@ -19,18 +19,19 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
@@ -124,8 +125,9 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
         J.Import importToAdd = new J.Import(randomId(),
                 TreeBuilder.buildName(classType.getFullyQualifiedName() +
-                        (statik == null ? "" : "." + statik), Formatting.format(" ")),
+                        (statik == null ? "" : "." + statik)).withFormatting(Formatting.format(" ")),
                 statik != null,
+                emptyList(),
                 Formatting.EMPTY,
                 Markers.EMPTY);
 

@@ -84,7 +84,8 @@ public class ChangeFieldType extends JavaIsoRefactorVisitor {
 
                 mv = mv.withTypeExpr(mv.getTypeExpr() == null ?
                         null :
-                        J.Ident.build(mv.getTypeExpr().getId(), type.getClassName(), type, mv.getTypeExpr().getFormatting(), Markers.EMPTY)
+                        J.Ident.build(mv.getTypeExpr().getId(), type.getClassName(), type,
+                                mv.getTypeExpr().getComments(), mv.getTypeExpr().getFormatting(), Markers.EMPTY)
                 );
 
                 mv = mv.withVars(mv.getVars().stream().map(var -> {

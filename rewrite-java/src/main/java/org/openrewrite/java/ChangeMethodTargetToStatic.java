@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
@@ -76,6 +77,7 @@ public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
                 JavaType.FullyQualified classType = JavaType.Class.build(targetType);
                 J.MethodInvocation m = method.withSelect(
                         J.Ident.build(randomId(), classType.getClassName(), classType,
+                                method.getSelect() == null ? Collections.emptyList() : method.getSelect().getComments(),
                                 method.getSelect() == null ? Formatting.EMPTY : method.getSelect().getFormatting(),
                                 Markers.EMPTY));
 
