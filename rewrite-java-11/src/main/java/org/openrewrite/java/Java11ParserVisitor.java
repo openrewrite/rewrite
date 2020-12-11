@@ -39,16 +39,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.lang.Math.max;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Formatting.EMPTY;
 import static org.openrewrite.Formatting.format;
@@ -79,10 +78,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.Annotation.Arguments args = null;
         if (node.getArguments().size() > 0) {
-            var argsPrefix = sourceBefore("(");
+            String argsPrefix = sourceBefore("(");
             List<Expression> expressions;
             if (node.getArguments().size() == 1) {
-                var arg = node.getArguments().get(0);
+                ExpressionTree arg = node.getArguments().get(0);
                 if (arg instanceof JCAssign) {
                     if (endPos(arg) < 0) {
                         expressions = singletonList(convert(((JCAssign) arg).rhs, t -> sourceBefore(")")));
@@ -98,13 +97,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
             args = new J.Annotation.Arguments(randomId(), expressions, format(argsPrefix));
         } else {
-            var remaining = source.substring(cursor, endPos(node));
+            String remaining = source.substring(cursor, endPos(node));
 
             // NOTE: technically, if there is code like this, we have a bug, but seems exceedingly unlikely:
             // @MyAnnotation /* Comment () that contains parentheses */ ()
 
             if (remaining.contains("(") && remaining.contains(")")) {
-                var parenPrefix = sourceBefore("(");
+                String parenPrefix = sourceBefore("(");
                 args = new J.Annotation.Arguments(randomId(),
                         singletonList(new J.Empty(randomId(), format(sourceBefore(")")))),
                         format(parenPrefix)
@@ -119,8 +118,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitArrayAccess(ArrayAccessTree node, Formatting fmt) {
         Expression indexed = convert(node.getExpression());
 
-        var dimensionPrefix = sourceBefore("[");
-        var dimension = new J.ArrayAccess.Dimension(randomId(), convert(node.getIndex(), t -> sourceBefore("]")),
+        String dimensionPrefix = sourceBefore("[");
+        J.ArrayAccess.Dimension dimension = new J.ArrayAccess.Dimension(randomId(), convert(node.getIndex(), t -> sourceBefore("]")),
                 format(dimensionPrefix));
 
         return new J.ArrayAccess(randomId(), indexed, dimension, type(node), fmt);
@@ -128,8 +127,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitArrayType(ArrayTypeTree node, Formatting fmt) {
-        var typeIdent = node.getType();
-        var dimCount = 1;
+        Tree typeIdent = node.getType();
+        int dimCount = 1;
 
         while (typeIdent instanceof ArrayTypeTree) {
             dimCount++;
@@ -138,8 +137,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         TypeTree elemType = convert(typeIdent);
 
-        var dimensions = IntStream.range(0, dimCount).mapToObj(n -> {
-            var dimPrefix = sourceBefore("[");
+        List<J.ArrayType.Dimension> dimensions = IntStream.range(0, dimCount).mapToObj(n -> {
+            String dimPrefix = sourceBefore("[");
             return new J.ArrayType.Dimension(randomId(), new J.Empty(randomId(), format(sourceBefore("]"))), format(dimPrefix));
         }).collect(toList());
 
@@ -162,7 +161,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitBinary(BinaryTree node, Formatting fmt) {
         Expression left = convert(node.getLeftOperand());
 
-        var opPrefix = format(whitespace());
+        Formatting opPrefix = format(whitespace());
         J.Binary.Operator op;
         switch (((JCBinary) node).getTag()) {
             case PLUS:
@@ -259,12 +258,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             skip("{");
         }
 
-        List<Statement> statements = convertPossibleMultiVariable(node.getStatements().stream()
-                .filter(s -> {
-                    // filter out synthetic super() invocations and the like
-                    return endPos(s) > 0;
-                })
-                .collect(toList()));
+        // filter out synthetic super() invocations and the like
+        List<StatementTree> statementTrees = new ArrayList<>();
+        for (StatementTree s : node.getStatements()) {
+            if (endPos(s) > 0) {
+                statementTrees.add(s);
+            }
+        }
+
+        List<Statement> statements = convertPossibleMultiVariable(statementTrees);
 
         return new J.Block<>(randomId(), stat, statements, fmt, new J.Block.End(randomId(), format(sourceBefore("}"))));
     }
@@ -300,9 +302,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitCatch(CatchTree node, Formatting fmt) {
         skip("catch");
 
-        var paramPrefix = sourceBefore("(");
+        String paramPrefix = sourceBefore("(");
         J.VariableDecls paramDecl = convert(node.getParameter(), t -> sourceBefore(")"));
-        var param = new J.Parentheses<>(randomId(), paramDecl, format(paramPrefix));
+        J.Parentheses<J.VariableDecls> param = new J.Parentheses<>(randomId(), paramDecl, format(paramPrefix));
 
         return new J.Try.Catch(randomId(), param, convert(node.getBlock()), fmt);
     }
@@ -324,19 +326,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             kind = new J.ClassDecl.Kind.Class(randomId(), format(sourceBefore("class")));
         }
 
-        var name = J.Ident.build(randomId(), ((JCClassDecl) node).getSimpleName().toString(), type(node),
+        J.Ident name = J.Ident.build(randomId(), ((JCClassDecl) node).getSimpleName().toString(), type(node),
                 format(sourceBefore(node.getSimpleName().toString())));
 
         J.TypeParameters typeParams = null;
         if (!node.getTypeParameters().isEmpty()) {
-            var genericPrefix = sourceBefore("<");
+            String genericPrefix = sourceBefore("<");
             typeParams = new J.TypeParameters(randomId(), convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
                     format(genericPrefix));
         }
 
         J.ClassDecl.Extends extendings = null;
         if (node.getExtendsClause() != null) {
-            var extendsPrefix = sourceBefore("extends");
+            String extendsPrefix = sourceBefore("extends");
             extendings = new J.ClassDecl.Extends(
                     randomId(),
                     convertOrNull(node.getExtendsClause()),
@@ -346,7 +348,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.ClassDecl.Implements implementings = null;
         if (node.getImplementsClause() != null && !node.getImplementsClause().isEmpty()) {
-            var implementsPrefix = sourceBefore(kind instanceof J.ClassDecl.Kind.Interface ?
+            String implementsPrefix = sourceBefore(kind instanceof J.ClassDecl.Kind.Interface ?
                     "extends" : "implements");
 
             implementings = new J.ClassDecl.Implements(
@@ -356,13 +358,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             );
         }
 
-        var bodyPrefix = sourceBefore("{");
+        String bodyPrefix = sourceBefore("{");
 
         // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
-        var jcEnums = node.getMembers().stream()
-                .filter(JCVariableDecl.class::isInstance)
-                .filter(m -> hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM))
-                .collect(toList());
+        List<Tree> jcEnums = new ArrayList<>();
+        for (Tree tree : node.getMembers()) {
+            if (tree instanceof JCVariableDecl) {
+                if (hasFlag(((JCVariableDecl) tree).getModifiers(), Flags.ENUM)) {
+                    jcEnums.add(tree);
+                }
+            }
+        }
 
         J.EnumValueSet enumSet = null;
         if (!jcEnums.isEmpty()) {
@@ -378,26 +384,26 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             enumSet = new J.EnumValueSet(randomId(), enumValues, semicolonPresent.get(), EMPTY);
         }
 
-        List<? extends Tree> membersMultiVariablesSeparated = node.getMembers().stream()
-                .filter(m -> {
-                    // we don't care about the compiler-inserted default constructor,
-                    // since it will never be subject to refactoring
-                    if (m instanceof JCMethodDecl) {
-                        return !hasFlag(((JCMethodDecl) m).getModifiers(), Flags.GENERATEDCONSTR);
-                    }
-                    if (m instanceof JCVariableDecl) {
-                        return !hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM);
-                    }
-                    return true;
-                })
-                .collect(toList());
+        List<Tree> membersMultiVariablesSeparated = new ArrayList<>();
+        for (Tree m : node.getMembers()) {
+            // we don't care about the compiler-inserted default constructor,
+            // since it will never be subject to refactoring
+            if (m instanceof JCMethodDecl && hasFlag(((JCMethodDecl) m).getModifiers(), Flags.GENERATEDCONSTR)) {
+                continue;
+            }
+            if (m instanceof JCVariableDecl && hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM)) {
+                continue;
+            }
+            membersMultiVariablesSeparated.add(m);
+        }
 
-        var members = Stream.concat(
-                Stream.ofNullable((J) enumSet),
-                convertPossibleMultiVariable(membersMultiVariablesSeparated).stream()
-        ).collect(toList());
+        List<J> members = new ArrayList<>();
+        if (enumSet != null) {
+            members.add(enumSet);
+        }
+        members.addAll(convertPossibleMultiVariable(membersMultiVariablesSeparated));
 
-        var body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
+        J.Block<J> body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
 
         return new J.ClassDecl(randomId(), annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node), fmt);
     }
@@ -407,7 +413,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         logger.debug("Building AST for: " + uri);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
-        var prefix = source.substring(0, cu.getStartPosition());
+        String prefix = source.substring(0, cu.getStartPosition());
         cursor(cu.getStartPosition());
 
         endPosTable = cu.endPositions;
@@ -439,7 +445,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitCompoundAssignment(CompoundAssignmentTree node, Formatting fmt) {
         Expression left = convert(((JCAssignOp) node).lhs);
 
-        var opPrefix = format(whitespace());
+        Formatting opPrefix = format(whitespace());
         J.AssignOp.Operator op;
         switch (((JCAssignOp) node).getTag()) {
             case PLUS_ASG:
@@ -524,7 +530,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitDoWhileLoop(DoWhileLoopTree node, Formatting fmt) {
         skip("do");
         Statement stat = convert(node.getStatement());
-        var whilePrefix = sourceBefore("while");
+        String whilePrefix = sourceBefore("while");
         return new J.DoWhileLoop(randomId(),
                 stat,
                 new J.DoWhileLoop.While(randomId(), convert(node.getCondition()), format(whilePrefix)),
@@ -540,7 +546,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitEnhancedForLoop(EnhancedForLoopTree node, Formatting fmt) {
         skip("for");
-        var ctrlPrefix = sourceBefore("(");
+        String ctrlPrefix = sourceBefore("(");
         J.VariableDecls variable = convert(node.getVariable(), t -> sourceBefore(":"));
         Expression expression = convert(node.getExpression(), t -> sourceBefore(")"));
 
@@ -553,7 +559,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     private J visitEnumVariable(VariableTree node, Formatting fmt) {
         skip(node.getName().toString());
-        var name = J.Ident.build(randomId(), node.getName().toString(), type(node), EMPTY);
+        J.Ident name = J.Ident.build(randomId(), node.getName().toString(), type(node), EMPTY);
 
         J.NewClass initializer = null;
         if (source.charAt(endPos(node) - 1) == ')' || source.charAt(endPos(node) - 1) == '}') {
@@ -566,7 +572,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitForLoop(ForLoopTree node, Formatting fmt) {
         skip("for");
-        var ctrlPrefix = sourceBefore("(");
+        String ctrlPrefix = sourceBefore("(");
 
         Statement init = convertPossibleMultiVariable(node.getInitializer())
                 .stream()
@@ -614,7 +620,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.If.Else elsePart = null;
         if (node.getElseStatement() instanceof JCTree.JCStatement) {
-            var elsePrefix = sourceBefore("else");
+            String elsePrefix = sourceBefore("else");
             elsePart = new J.If.Else(randomId(), convert(node.getElseStatement(), statementDelim), format(elsePrefix));
         }
 
@@ -650,7 +656,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitLambdaExpression(LambdaExpressionTree node, Formatting fmt) {
-        var parenthesized = source.charAt(cursor) == '(';
+        boolean parenthesized = source.charAt(cursor) == '(';
         skip("(");
 
         List<Expression> paramList;
@@ -661,12 +667,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                     t -> parenthesized ? sourceBefore(")") : "");
         }
 
-        var params = new J.Lambda.Parameters(randomId(), parenthesized, paramList);
-        var arrow = new J.Lambda.Arrow(randomId(), format(sourceBefore("->")));
+        J.Lambda.Parameters params = new J.Lambda.Parameters(randomId(), parenthesized, paramList);
+        J.Lambda.Arrow arrow = new J.Lambda.Arrow(randomId(), format(sourceBefore("->")));
 
         J body;
         if (node.getBody() instanceof JCTree.JCBlock) {
-            var prefix = sourceBefore("{");
+            String prefix = sourceBefore("{");
             cursor--;
             body = convert(node.getBody());
             body = body.withPrefix(prefix);
@@ -686,8 +692,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitLiteral(LiteralTree node, Formatting fmt) {
         cursor(endPos(node));
-        var value = node.getValue();
-        var type = primitive(((JCTree.JCLiteral) node).typetag);
+        Object value = node.getValue();
+        JavaType.Primitive type = primitive(((JCTree.JCLiteral) node).typetag);
         return new J.Literal(randomId(),
                 value,
                 source.substring(((JCLiteral) node).getStartPosition(), endPos(node)),
@@ -712,8 +718,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 break;
         }
 
-        var typeParams = convertTypeParameters(node.getTypeArguments());
-        var reference = J.Ident.build(randomId(), referenceName, null, format(sourceBefore(referenceName)));
+        J.TypeParameters typeParams = convertTypeParameters(node.getTypeArguments());
+        J.Ident reference = J.Ident.build(randomId(), referenceName, null, format(sourceBefore(referenceName)));
 
         return new J.MemberReference(randomId(), expr, typeParams, reference, type(node), fmt);
     }
@@ -722,13 +728,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitMemberSelect(MemberSelectTree node, Formatting fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
         Expression target = convert(fieldAccess.selected, t -> sourceBefore("."));
-        var name = J.Ident.build(randomId(), fieldAccess.name.toString(), null, format(sourceBefore(fieldAccess.name.toString())));
+        J.Ident name = J.Ident.build(randomId(), fieldAccess.name.toString(), null, format(sourceBefore(fieldAccess.name.toString())));
         return new J.FieldAccess(randomId(), target, name, type(node), fmt);
     }
 
     @Override
     public J visitMethodInvocation(MethodInvocationTree node, Formatting fmt) {
-        var jcSelect = ((JCTree.JCMethodInvocation) node).getMethodSelect();
+        JCExpression jcSelect = ((JCTree.JCMethodInvocation) node).getMethodSelect();
 
         Expression select = null;
         if (jcSelect instanceof JCFieldAccess) {
@@ -740,12 +746,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         // generic type parameters can only exist on qualified targets
         J.MethodInvocation.TypeParameters typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
-            var genericPrefix = sourceBefore("<");
+            String genericPrefix = sourceBefore("<");
             List<Expression> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
-            typeParams = new J.TypeParameters(randomId(), genericParams.stream()
-                    .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
-                    .collect(toList()),
-                    format(genericPrefix));
+
+            List<J.TypeParameter> mappedGenericParams = new ArrayList<>();
+            for (Expression gp : genericParams) {
+                J.TypeParameter typeParameter = new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting());
+                mappedGenericParams.add(typeParameter);
+            }
+
+            typeParams = new J.TypeParameters(randomId(), mappedGenericParams, format(genericPrefix));
         }
 
         J.Ident name;
@@ -756,15 +766,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             name = convert(jcSelect);
         }
 
-        var argsPrefix = sourceBefore("(");
-        var args = new J.MethodInvocation.Arguments(randomId(),
+        String argsPrefix = sourceBefore("(");
+        J.MethodInvocation.Arguments args = new J.MethodInvocation.Arguments(randomId(),
                 node.getArguments().isEmpty() ?
                         singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
                         convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")),
                 format(argsPrefix)
         );
 
-        var genericSymbolAny = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+        Symbol genericSymbolAny = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
         // if the symbol is not a method symbol, there is a parser error in play
         Symbol.MethodSymbol genericSymbol = genericSymbolAny instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) genericSymbolAny : null;
@@ -774,8 +784,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
                 if (t instanceof com.sun.tools.javac.code.Type.MethodType) {
                     com.sun.tools.javac.code.Type.MethodType mt = (com.sun.tools.javac.code.Type.MethodType) t;
-                    return new JavaType.Method.Signature(type(mt.restype), mt.argtypes.stream().filter(Objects::nonNull)
-                            .map(this::type).collect(toList()));
+
+                    List<JavaType> paramTypes = new ArrayList<>();
+                    for (Type argtype : mt.argtypes) {
+                        if (argtype != null) {
+                            JavaType javaType = type(argtype);
+                            paramTypes.add(javaType);
+                        }
+                    }
+
+                    return new JavaType.Method.Signature(type(mt.restype), paramTypes);
                 }
                 return null;
             };
@@ -787,12 +805,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 genericSignature = signature.apply(genericSymbol.type);
             }
 
+            List<String> paramNames = new ArrayList<>();
+            for (Symbol.VarSymbol p : genericSymbol.params()) {
+                String s = p.name.toString();
+                paramNames.add(s);
+            }
+
             type = JavaType.Method.build(
                     TypeUtils.asClass(type(genericSymbol.owner)),
                     name.getSimpleName(),
                     genericSignature,
                     signature.apply(jcSelect.type),
-                    genericSymbol.params().stream().map(p -> p.name.toString()).collect(toList()),
+                    paramNames,
                     filteredFlags(genericSymbol)
             );
         }
@@ -810,7 +834,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         // see https://docs.oracle.com/javase/tutorial/java/generics/methods.html
         J.TypeParameters typeParams = null;
         if (!node.getTypeParameters().isEmpty()) {
-            var genericPrefix = sourceBefore("<");
+            String genericPrefix = sourceBefore("<");
             typeParams = new J.TypeParameters(randomId(), convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
                     format(genericPrefix));
         }
@@ -819,28 +843,35 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.Ident name;
         if ("<init>".equals(node.getName().toString())) {
-            var nodeSym = ((JCMethodDecl) node).sym;
-            var owner = nodeSym == null ?
-                    stream(getCurrentPath().spliterator(), false)
-                            .filter(JCClassDecl.class::isInstance)
-                            .map(JCClassDecl.class::cast)
-                            .findFirst()
-                            .map(cd -> cd.getSimpleName().toString())
-                            .orElseThrow() :
-                    ((JCMethodDecl) node).sym.owner.name.toString();
+            Symbol.MethodSymbol nodeSym = ((JCMethodDecl) node).sym;
+            String owner = null;
+            if (nodeSym == null) {
+                for (Tree tree : getCurrentPath()) {
+                    if (tree instanceof JCClassDecl) {
+                        owner = ((JCClassDecl) tree).getSimpleName().toString();
+                        break;
+                    }
+                }
+
+                if (owner == null) {
+                    throw new IllegalStateException("Should have been able to locate an owner");
+                }
+            } else {
+                owner = ((JCMethodDecl) node).sym.owner.name.toString();
+            }
             name = J.Ident.build(randomId(), owner, null, format(sourceBefore(owner)));
         } else {
             name = J.Ident.build(randomId(), node.getName().toString(), null, format(sourceBefore(node.getName().toString())));
         }
 
-        var paramFmt = format(sourceBefore("("));
-        var params = !node.getParameters().isEmpty() ?
+        Formatting paramFmt = format(sourceBefore("("));
+        J.MethodDecl.Parameters params = !node.getParameters().isEmpty() ?
                 new J.MethodDecl.Parameters(randomId(), convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")), paramFmt) :
                 new J.MethodDecl.Parameters(randomId(), singletonList(new J.Empty(randomId(), format(sourceBefore(")")))), paramFmt);
 
         J.MethodDecl.Throws throwss = null;
         if (!node.getThrows().isEmpty()) {
-            var throwsPrefix = sourceBefore("throws");
+            String throwsPrefix = sourceBefore("throws");
             throwss = new J.MethodDecl.Throws(randomId(), convertAll(node.getThrows(), commaDelim, noDelim), format(throwsPrefix));
         }
 
@@ -848,7 +879,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.MethodDecl.Default defaultValue = null;
         if (node.getDefaultValue() != null) {
-            var defaultPrefix = sourceBefore("default");
+            String defaultPrefix = sourceBefore("default");
             defaultValue = new J.MethodDecl.Default(randomId(), convert(node.getDefaultValue()), format(defaultPrefix));
         }
 
@@ -859,11 +890,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     public J visitNewArray(NewArrayTree node, Formatting fmt) {
         skip("new");
 
-        var jcVarType = ((JCNewArray) node).elemtype;
+        JCExpression jcVarType = ((JCNewArray) node).elemtype;
         TypeTree typeExpr;
         if (jcVarType instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
-            var elementType = ((JCArrayTypeTree) jcVarType).elemtype;
+            JCExpression elementType = ((JCArrayTypeTree) jcVarType).elemtype;
             while (elementType instanceof JCArrayTypeTree) {
                 elementType = ((JCArrayTypeTree) elementType).elemtype;
             }
@@ -876,21 +907,21 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
         for (int i = 0; i < nodeDimensions.size(); i++) {
             ExpressionTree dim = nodeDimensions.get(i);
-            var dimensionPrefix = sourceBefore("[");
+            String dimensionPrefix = sourceBefore("[");
             dimensions.add(new J.NewArray.Dimension(randomId(), convert(dim, t -> sourceBefore("]")),
                     format(dimensionPrefix, (i == node.getDimensions().size() - 1 && node.getInitializers() != null) ? sourceBefore("}") : "")));
         }
 
-        var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
+        Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
-            var ws = new J.Empty(randomId(), format(matcher.group(2)));
+            J.Empty ws = new J.Empty(randomId(), format(matcher.group(2)));
             dimensions.add(new J.NewArray.Dimension(randomId(), ws, format(matcher.group(1))));
         }
 
         J.NewArray.Initializer initializer = null;
         if (node.getInitializers() != null) {
-            var initPrefix = sourceBefore("{");
+            String initPrefix = sourceBefore("{");
             List<Expression> initializers = node.getInitializers().isEmpty() ?
                     singletonList(new J.Empty(randomId(), format("", sourceBefore("}")))) :
                     convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}"));
@@ -921,7 +952,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.NewClass.Arguments args = null;
         if (positionOfNext("(", '{') > -1) {
-            var argPrefix = sourceBefore("(");
+            String argPrefix = sourceBefore("(");
             args = new J.NewClass.Arguments(randomId(),
                     node.getArguments().isEmpty() ?
                             singletonList(new J.Empty(randomId(), format(sourceBefore(")")))) :
@@ -931,15 +962,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.Block<?> body = null;
         if (node.getClassBody() != null) {
-            var bodyPrefix = sourceBefore("{");
+            String bodyPrefix = sourceBefore("{");
 
-            var members = convertAll(node.getClassBody().getMembers().stream()
-                    // we don't care about the compiler-inserted default constructor,
-                    // since it will never be subject to refactoring
-                    .filter(m -> !(m instanceof JCMethodDecl) || (((JCMethodDecl) m).getModifiers().flags & Flags.GENERATEDCONSTR) == 0L)
-                    .collect(toList()), noDelim, noDelim);
+            // we don't care about the compiler-inserted default constructor,
+            // since it will never be subject to refactoring
+            List<Tree> members = new ArrayList<>();
+            for (Tree m : node.getClassBody().getMembers()) {
+                if (!(m instanceof JCMethodDecl) || (((JCMethodDecl) m).getModifiers().flags & Flags.GENERATEDCONSTR) == 0L) {
+                    members.add(m);
+                }
+            }
 
-            body = new J.Block<>(randomId(), null, members, format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
+            body = new J.Block<>(randomId(), null, convertAll(members, noDelim, noDelim),
+                    format(bodyPrefix), new J.Block.End(randomId(), format(sourceBefore("}"))));
         }
 
         return new J.NewClass(
@@ -1015,7 +1050,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         skip("switch");
         J.Parentheses<Expression> selector = convert(node.getExpression());
 
-        var casePrefix = sourceBefore("{");
+        String casePrefix = sourceBefore("{");
         List<J.Case> cases = convertAll(node.getCases(), noDelim, noDelim);
 
         return new J.Switch(randomId(), selector, new J.Block<>(randomId(), null, cases, format(casePrefix),
@@ -1043,7 +1078,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         skip("try");
         J.Try.Resources resources = null;
         if (!node.getResources().isEmpty()) {
-            var resourcesPrefix = sourceBefore("(");
+            String resourcesPrefix = sourceBefore("(");
             List<J.VariableDecls> decls = convertAll(node.getResources(), semiDelim, t -> sourceBefore(")"));
             resources = new J.Try.Resources(randomId(), decls, format(resourcesPrefix));
         }
@@ -1053,7 +1088,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.Try.Finally finallyy = null;
         if (node.getFinallyBlock() != null) {
-            var finallyPrefix = sourceBefore("finally");
+            String finallyPrefix = sourceBefore("finally");
             finallyy = new J.Try.Finally(randomId(), convert(node.getFinallyBlock()),
                     format(finallyPrefix));
         }
@@ -1063,8 +1098,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitTypeCast(TypeCastTree node, Formatting fmt) {
-        var clazzPrefix = sourceBefore("(");
-        var clazz = new J.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
+        String clazzPrefix = sourceBefore("(");
+        J.Parentheses<TypeTree> clazz = new J.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
                 format(clazzPrefix));
 
         return new J.TypeCast(randomId(), clazz, convert(node.getExpression()), fmt);
@@ -1084,7 +1119,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         J.TypeParameter.Bounds bounds = null;
         if (!node.getBounds().isEmpty()) {
-            var boundPrefix = !node.getBounds().isEmpty() ? sourceBefore("extends") : "";
+            String boundPrefix = !node.getBounds().isEmpty() ? sourceBefore("extends") : "";
             // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
             bounds = new J.TypeParameter.Bounds(randomId(), convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim),
                     format(boundPrefix));
@@ -1101,7 +1136,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitUnary(UnaryTree node, Formatting fmt) {
         JCUnary unary = (JCUnary) node;
-        var tag = unary.getTag();
+        Tag tag = unary.getTag();
         J.Unary.Operator op;
         Expression expr;
 
@@ -1162,7 +1197,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         JCTree.JCVariableDecl node = (JCVariableDecl) nodes.get(0);
         List<J.Annotation> annotations = convertAll(node.getModifiers().annotations, noDelim, noDelim);
 
-        var vartype = node.vartype;
+        JCExpression vartype = node.vartype;
 
         List<J.Modifier> modifiers;
         if (node.getModifiers().pos >= 0) {
@@ -1176,7 +1211,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             typeExpr = null; // this is a lambda parameter with an inferred type expression
         } else if (vartype instanceof JCArrayTypeTree) {
             // we'll capture the array dimensions in a bit, just convert the element type
-            var elementType = ((JCArrayTypeTree) vartype).elemtype;
+            JCExpression elementType = ((JCArrayTypeTree) vartype).elemtype;
             while (elementType instanceof JCArrayTypeTree) {
                 elementType = ((JCArrayTypeTree) elementType).elemtype;
             }
@@ -1186,20 +1221,20 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         Supplier<List<J.VariableDecls.Dimension>> dimensions = () -> {
-            var matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
+            Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
             List<J.VariableDecls.Dimension> dims = new ArrayList<>();
             while (matcher.find(cursor)) {
                 cursor(matcher.end());
-                var ws = new J.Empty(randomId(), format(matcher.group(2)));
+                J.Empty ws = new J.Empty(randomId(), format(matcher.group(2)));
                 dims.add(new J.VariableDecls.Dimension(randomId(), ws, format(matcher.group(1))));
             }
             return dims;
         };
 
-        var beforeDimensions = dimensions.get();
+        List<J.VariableDecls.Dimension> beforeDimensions = dimensions.get();
 
-        var vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
-        var varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
+        String vartypeString = typeExpr == null ? "" : source.substring(vartype.getStartPosition(), endPos(vartype));
+        Matcher varargMatcher = Pattern.compile("(\\s*)\\.{3}").matcher(vartypeString);
         J.VariableDecls.Varargs varargs = null;
         if (varargMatcher.find()) {
             skipPattern("(\\s*)\\.{3}");
@@ -1211,15 +1246,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         for (int i = 0; i < nodes.size(); i++) {
             VariableTree n = nodes.get(i);
 
-            var namedVarPrefix = sourceBefore(n.getName().toString());
+            String namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
 
-            var dimensionsAfterName = dimensions.get();
+            List<J.VariableDecls.Dimension> dimensionsAfterName = dimensions.get();
             if (!dimensionsAfterName.isEmpty()) {
                 dimensionsAfterName = Formatting.formatLastSuffix(dimensionsAfterName, vd.init != null ? sourceBefore("=") : "");
             }
 
-            var name = J.Ident.build(randomId(), n.getName().toString(), type(node),
+            J.Ident name = J.Ident.build(randomId(), n.getName().toString(), type(node),
                     format("", (dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : ""));
 
             vars.add(
@@ -1280,7 +1315,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     private <T extends J> T convert(Tree t2, Function<Tree, String> suffix) {
         try {
-            var prefix = source.substring(cursor, max(((JCTree) t2).getStartPosition(), cursor));
+            String prefix = source.substring(cursor, max(((JCTree) t2).getStartPosition(), cursor));
             cursor += prefix.length();
             @SuppressWarnings("unchecked") T t = (T) scan(t2, format(prefix));
             if (t != null) {
@@ -1299,7 +1334,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private void logCurrentPathAsError() {
         logger.error("--- BEGIN PATH ---");
 
-        var paths = stream(getCurrentPath().spliterator(), false).collect(toList());
+        List<Tree> paths = stream(getCurrentPath().spliterator(), false).collect(toList());
         for (int i = paths.size(); i-- > 0; ) {
             JCTree tree = (JCTree) paths.get(i);
             if (tree instanceof JCCompilationUnit) {
@@ -1342,7 +1377,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             return null;
         }
 
-        var typeArgPrefix = sourceBefore("<");
+        String typeArgPrefix = sourceBefore("<");
         List<Expression> typeArgs;
         if (typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
@@ -1352,11 +1387,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             typeArgs = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }
 
+        List<J.TypeParameter> params = new ArrayList<>();
+        for (Expression gp : typeArgs) {
+            J.TypeParameter typeParameter = new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting());
+            params.add(typeParameter);
+        }
+
         // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
         // elsewhere in the tree
-        return new J.TypeParameters(randomId(), typeArgs.stream()
-                .map(gp -> new J.TypeParameter(randomId(), emptyList(), gp.withFormatting(EMPTY), null, gp.getFormatting()))
-                .collect(toList()),
+        return new J.TypeParameters(randomId(), params,
                 format(typeArgPrefix));
     }
 
@@ -1386,28 +1425,30 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         if (trees == null)
             return emptyList();
 
-        return trees.stream()
-                .collect(Collectors.groupingBy(t -> ((JCTree) t).getStartPosition(), LinkedHashMap::new, toList()))
-                .values()
-                .stream()
-                .map(treeGroup -> {
-                    if (treeGroup.size() == 1) {
-                        return (T) convert(treeGroup.get(0), statementDelim);
-                    } else {
-                        // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                        var prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
-                        cursor += prefix.length();
+        Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
+        for (Tree t : trees) {
+            treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>()).add(t);
+        }
 
-                        var last = treeGroup.get(treeGroup.size() - 1);
+        List<T> converted = new ArrayList<>();
+        for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
+            if (treeGroup.size() == 1) {
+                converted.add((T) convert(treeGroup.get(0), statementDelim));
+            } else {
+                // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
+                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                cursor += prefix.length();
 
-                        @SuppressWarnings("unchecked")
-                        J.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
-                        vars = vars.withSuffix(semiDelim.apply(last));
-                        cursor(max(endPos(last), cursor));
-                        return (T) vars;
-                    }
-                })
-                .collect(toList());
+                Tree last = treeGroup.get(treeGroup.size() - 1);
+
+                @SuppressWarnings("unchecked")
+                J.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                vars = vars.withSuffix(semiDelim.apply(last));
+                cursor(max(endPos(last), cursor));
+                converted.add((T) vars);
+            }
+        }
+        return converted;
     }
 
     /**
@@ -1429,10 +1470,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     );
 
     private Set<Flag> filteredFlags(Symbol sym) {
-        return flagMasks.entrySet().stream()
-                .filter(mask -> (sym.flags() & mask.getKey()) != 0L)
-                .map(Map.Entry::getValue)
-                .collect(toSet());
+        Set<Flag> set = new HashSet<>();
+        for (Map.Entry<Long, Flag> mask : flagMasks.entrySet()) {
+            if ((sym.flags() & mask.getKey()) != 0L) {
+                Flag value = mask.getValue();
+                set.add(value);
+            }
+        }
+        return set;
     }
 
     @Nullable
@@ -1463,7 +1508,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 return null;
             }
 
-            var sym = (Symbol.ClassSymbol) type.tsym;
+            Symbol.ClassSymbol sym = (Symbol.ClassSymbol) type.tsym;
 
             if (stack.contains(sym))
                 return new JavaType.Cyclic(sym.className());
@@ -1474,21 +1519,57 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                     List<Symbol> stackWithSym = new ArrayList<>(stack);
                     stackWithSym.add(sym);
 
-                    var fields = (sym.members_field == null ? Stream.empty() : stream(sym.members_field.getSymbols().spliterator(), false))
-                            .filter(elem -> elem instanceof Symbol.VarSymbol)
-                            .map(Symbol.VarSymbol.class::cast)
-                            .map(elem -> new JavaType.Var(
-                                    elem.name.toString(),
-                                    type(elem.type, stackWithSym),
-                                    filteredFlags(elem)
-                            ))
-                            .collect(toList());
+                    List<JavaType.Var> fields;
+                    if (sym.members_field == null) {
+                        fields = emptyList();
+                    } else {
+                        fields = new ArrayList<>();
+                        for (Symbol elem : sym.members_field.getSymbols()) {
+                            if (elem instanceof Symbol.VarSymbol) {
+                                fields.add(new JavaType.Var(
+                                        elem.name.toString(),
+                                        type(elem.type, stackWithSym),
+                                        filteredFlags(elem)
+                                ));
+                            }
+                        }
+                    }
 
-                    var classType = (com.sun.tools.javac.code.Type.ClassType) type;
-                    var symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
-                    return JavaType.Class.build(sym.className(), fields,
-                            classType.typarams_field == null ? emptyList() : classType.typarams_field.stream().map(tParam -> type(tParam, stackWithSym, true)).filter(Objects::nonNull).collect(toList()),
-                            symType.interfaces_field == null ? emptyList() : symType.interfaces_field.stream().map(iParam -> type(iParam, stackWithSym, false)).filter(Objects::nonNull).collect(toList()),
+                    Type.ClassType classType = (com.sun.tools.javac.code.Type.ClassType) type;
+                    Type.ClassType symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
+
+
+                    List<JavaType> typeParameters;
+                    if (classType.typarams_field == null) {
+                        typeParameters = emptyList();
+                    } else {
+                        typeParameters = new ArrayList<>();
+                        for (Type tParam : classType.typarams_field) {
+                            JavaType javaType = type(tParam, stackWithSym, true);
+                            if (javaType != null) {
+                                typeParameters.add(javaType);
+                            }
+                        }
+                    }
+
+                    List<JavaType> interfaces;
+                    if (symType.interfaces_field == null) {
+                        interfaces = emptyList();
+                    } else {
+                        interfaces = new ArrayList<>();
+                        for (Type iParam : symType.interfaces_field) {
+                            JavaType javaType = type(iParam, stackWithSym, false);
+                            if (javaType != null) {
+                                interfaces.add(javaType);
+                            }
+                        }
+                    }
+
+                    return JavaType.Class.build(
+                            sym.className(),
+                            fields,
+                            typeParameters,
+                            interfaces,
                             null,
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
                             relaxedClassTypeMatching);
@@ -1563,21 +1644,21 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
      * <code>untilDelim</code> return the empty String.
      */
     private String sourceBefore(String untilDelim, @Nullable Character stop) {
-        var delimIndex = positionOfNext(untilDelim, stop);
+        int delimIndex = positionOfNext(untilDelim, stop);
         if (delimIndex < 0) {
             return ""; // unable to find this delimiter
         }
 
-        var prefix = source.substring(cursor, delimIndex);
+        String prefix = source.substring(cursor, delimIndex);
         cursor += prefix.length() + untilDelim.length(); // advance past the delimiter
         return prefix;
     }
 
     private int positionOfNext(String untilDelim, @Nullable Character stop) {
-        var inMultiLineComment = false;
-        var inSingleLineComment = false;
+        boolean inMultiLineComment = false;
+        boolean inSingleLineComment = false;
 
-        var delimIndex = cursor;
+        int delimIndex = cursor;
         for (; delimIndex < source.length() - untilDelim.length() + 1; delimIndex++) {
             if (inSingleLineComment && source.charAt(delimIndex) == '\n') {
                 inSingleLineComment = false;
@@ -1622,8 +1703,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     }
 
     private String whitespace(@Nullable Tree t) {
-        var inMultiLineComment = false;
-        var inSingleLineComment = false;
+        boolean inMultiLineComment = false;
+        boolean inSingleLineComment = false;
 
         int delimIndex = cursor;
         for (; delimIndex < source.length(); delimIndex++) {
@@ -1670,7 +1751,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     }
 
     private void skipPattern(String pattern) {
-        var matcher = Pattern.compile("\\G" + pattern).matcher(source);
+        Matcher matcher = Pattern.compile("\\G" + pattern).matcher(source);
         if (matcher.find(cursor)) {
             cursor(matcher.end());
         }
@@ -1685,8 +1766,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         return (((JCModifiers) modifiers).flags & flag) != 0L;
     }
 
+    @SuppressWarnings("unused")
+    // Used for debugging
     private List<String> listFlags(long flags) {
-        var allFlags = Arrays.stream(Flags.class.getDeclaredFields())
+        Map<String, Long> allFlags = Arrays.stream(Flags.class.getDeclaredFields())
                 .filter(field -> {
                     field.setAccessible(true);
                     try {
@@ -1723,13 +1806,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             return emptyList();
         }
 
-        var sortedModifiers = new ArrayList<Modifier>();
+        ArrayList<Modifier> sortedModifiers = new ArrayList<Modifier>();
 
-        var inComment = false;
-        var inMultilineComment = false;
-        final var word = new AtomicReference<>("");
+        boolean inComment = false;
+        boolean inMultilineComment = false;
+        final AtomicReference<String> word = new AtomicReference<>("");
         for (int i = cursor; i < source.length(); i++) {
-            var c = source.charAt(i);
+            char c = source.charAt(i);
             if (c == '/' && source.length() > i + 1) {
                 char next = source.charAt(i + 1);
                 if (next == '*') {
@@ -1746,17 +1829,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             } else if (!inMultilineComment && !inComment) {
                 if (Character.isWhitespace(c)) {
                     if (!word.get().isEmpty()) {
-                        Optional<Modifier> matching = modifiers.getFlags().stream()
-                                .filter(mod -> mod.name().toLowerCase().equals(word.get()))
-                                .findAny();
+                        Modifier matching = null;
+                        for (Modifier modifier : modifiers.getFlags()) {
+                            if (modifier.name().toLowerCase().equals(word.get())) {
+                                matching = modifier;
+                                break;
+                            }
+                        }
 
-                        matching.ifPresent(mod -> {
-                            sortedModifiers.add(mod);
-                            word.set("");
-                        });
-
-                        if (matching.isEmpty()) {
+                        if (matching == null) {
                             break;
+                        } else {
+                            sortedModifiers.add(matching);
+                            word.set("");
                         }
                     }
                 } else {
@@ -1765,39 +1850,52 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             }
         }
 
-        return sortedModifiers.stream()
-                .map(mod -> {
-                    var modFormat = format(whitespace());
-                    cursor += mod.name().length();
-                    switch (mod) {
-                        case DEFAULT:
-                            return new J.Modifier.Default(randomId(), modFormat);
-                        case PUBLIC:
-                            return new J.Modifier.Public(randomId(), modFormat);
-                        case PROTECTED:
-                            return new J.Modifier.Protected(randomId(), modFormat);
-                        case PRIVATE:
-                            return new J.Modifier.Private(randomId(), modFormat);
-                        case ABSTRACT:
-                            return new J.Modifier.Abstract(randomId(), modFormat);
-                        case STATIC:
-                            return new J.Modifier.Static(randomId(), modFormat);
-                        case FINAL:
-                            return new J.Modifier.Final(randomId(), modFormat);
-                        case NATIVE:
-                            return new J.Modifier.Native(randomId(), modFormat);
-                        case STRICTFP:
-                            return new J.Modifier.Strictfp(randomId(), modFormat);
-                        case SYNCHRONIZED:
-                            return new J.Modifier.Synchronized(randomId(), modFormat);
-                        case TRANSIENT:
-                            return new J.Modifier.Transient(randomId(), modFormat);
-                        case VOLATILE:
-                            return new J.Modifier.Volatile(randomId(), modFormat);
-                        default:
-                            throw new IllegalArgumentException("Unexpected modifier " + mod);
-                    }
-                })
-                .collect(toList());
+        List<J.Modifier> mappedModifiers = new ArrayList<>();
+        for (Modifier mod : sortedModifiers) {
+            Formatting modFormat = format(whitespace());
+            cursor += mod.name().length();
+            switch (mod) {
+                case DEFAULT:
+                    mappedModifiers.add(new J.Modifier.Default(randomId(), modFormat));
+                    break;
+                case PUBLIC:
+                    mappedModifiers.add(new J.Modifier.Public(randomId(), modFormat));
+                    break;
+                case PROTECTED:
+                    mappedModifiers.add(new J.Modifier.Protected(randomId(), modFormat));
+                    break;
+                case PRIVATE:
+                    mappedModifiers.add(new J.Modifier.Private(randomId(), modFormat));
+                    break;
+                case ABSTRACT:
+                    mappedModifiers.add(new J.Modifier.Abstract(randomId(), modFormat));
+                    break;
+                case STATIC:
+                    mappedModifiers.add(new J.Modifier.Static(randomId(), modFormat));
+                    break;
+                case FINAL:
+                    mappedModifiers.add(new J.Modifier.Final(randomId(), modFormat));
+                    break;
+                case NATIVE:
+                    mappedModifiers.add(new J.Modifier.Native(randomId(), modFormat));
+                    break;
+                case STRICTFP:
+                    mappedModifiers.add(new J.Modifier.Strictfp(randomId(), modFormat));
+                    break;
+                case SYNCHRONIZED:
+                    mappedModifiers.add(new J.Modifier.Synchronized(randomId(), modFormat));
+                    break;
+                case TRANSIENT:
+                    mappedModifiers.add(new J.Modifier.Transient(randomId(), modFormat));
+                    break;
+                case VOLATILE:
+                    mappedModifiers.add(new J.Modifier.Volatile(randomId(), modFormat));
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unexpected modifier " + mod);
+            }
+        }
+
+        return mappedModifiers;
     }
 }
