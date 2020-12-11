@@ -34,7 +34,7 @@ object ParseJavaProjectOnDisk {
         }
 
         val paths = Files.find(srcDir, 999, predicate)
-            .limit(25)
+            .limit(if (args.size > 1) args[1].toLong() else Long.MAX_VALUE)
             .toList()
 
         var start = System.nanoTime()

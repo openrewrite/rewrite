@@ -286,8 +286,7 @@ public class Java11Parser implements JavaParser {
         @Override
         public Env<AttrContext> remove() {
             this.sample = Timer.start();
-            Env<AttrContext> env = todo.remove();
-            return env;
+            return todo.remove();
         }
     }
 
