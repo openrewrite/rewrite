@@ -178,7 +178,7 @@ public class Java11Parser implements JavaParser {
                     .tag("file.type", "Java")
                     .tag("step", "Type attribution")
                     .register(meterRegistry)
-                    .recordCallable(() -> compiler.attribute(new TimedTodo(compiler.todo)));
+                    .recordCallable(() -> compiler.attribute(compiler.todo));
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
@@ -260,34 +260,6 @@ public class Java11Parser implements JavaParser {
 
         public void reset() {
             sourceMap.clear();
-        }
-    }
-
-    private class TimedTodo extends Todo {
-        private final Todo todo;
-        private Timer.Sample sample;
-
-        private TimedTodo(Todo todo) {
-            super(new Context());
-            this.todo = todo;
-        }
-
-        @Override
-        public boolean isEmpty() {
-            if (sample != null) {
-                sample.stop(Timer.builder("rewrite.parse")
-                        .description("The time spent by the JDK in type attributing the source file")
-                        .tag("file.type", "Java")
-                        .tag("step", "Type attribution")
-                        .register(meterRegistry));
-            }
-            return todo.isEmpty();
-        }
-
-        @Override
-        public Env<AttrContext> remove() {
-            this.sample = Timer.start();
-            return todo.remove();
         }
     }
 
