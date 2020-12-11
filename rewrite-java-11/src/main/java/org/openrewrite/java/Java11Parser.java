@@ -147,7 +147,9 @@ public class Java11Parser implements JavaParser {
                         input -> Timer.builder("rewrite.parse")
                                 .description("The time spent by the JDK in parsing and tokenizing the source file")
                                 .tag("file.type", "Java")
-                                .tag("step", "JDK parsing")
+                                .tag("step", "(1) JDK parsing")
+                                .tag("outcome", "success")
+                                .tag("exception", "none")
                                 .register(meterRegistry)
                                 .record(() -> {
                                     try {
@@ -173,12 +175,7 @@ public class Java11Parser implements JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-            Timer.builder("rewrite.parse")
-                    .description("The time spent by the JDK in type attributing its internal AST")
-                    .tag("file.type", "Java")
-                    .tag("step", "Type attribution")
-                    .register(meterRegistry)
-                    .recordCallable(() -> compiler.attribute(compiler.todo));
+            compiler.attribute(new TimedTodo(compiler.todo));
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
@@ -201,7 +198,7 @@ public class Java11Parser implements JavaParser {
                                 .tag("file.type", "Java")
                                 .tag("outcome", "success")
                                 .tag("exception", "none")
-                                .tag("step", "Map to Rewrite AST")
+                                .tag("step", "(3) Map to Rewrite AST")
                                 .register(meterRegistry));
                         return cu;
                     } catch (Throwable t) {
@@ -210,7 +207,7 @@ public class Java11Parser implements JavaParser {
                                 .tag("file.type", "Java")
                                 .tag("outcome", "error")
                                 .tag("exception", t.getClass().getSimpleName())
-                                .tag("step", "Map to Rewrite AST")
+                                .tag("step", "(3) Map to Rewrite AST")
                                 .register(meterRegistry));
 
                         if (!suppressMappingErrors) {
@@ -260,6 +257,37 @@ public class Java11Parser implements JavaParser {
 
         public void reset() {
             sourceMap.clear();
+        }
+    }
+
+    private class TimedTodo extends Todo {
+        private final Todo todo;
+        private Timer.Sample sample;
+
+        private TimedTodo(Todo todo) {
+            super(new Context());
+            this.todo = todo;
+        }
+
+        @Override
+        public boolean isEmpty() {
+            if (sample != null) {
+                sample.stop(Timer.builder("rewrite.parse")
+                        .description("The time spent by the JDK in type attributing the source file")
+                        .tag("file.type", "Java")
+                        .tag("step", "(2) Type attribution")
+                        .tag("outcome", "success")
+                        .tag("exception", "none")
+                        .register(meterRegistry));
+            }
+            return todo.isEmpty();
+        }
+
+        @Override
+        public Env<AttrContext> remove() {
+            this.sample = Timer.start();
+            Env<AttrContext> env = todo.remove();
+            return env;
         }
     }
 
