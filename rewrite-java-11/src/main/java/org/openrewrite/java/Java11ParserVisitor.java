@@ -418,9 +418,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
         endPosTable = cu.endPositions;
 
-        // TODO when we want to implement refactoring into javadoc comments as well, refer to this table by JCTree node
-//        DocCommentTable docTable = cu.docComments;
-
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
             String packagePrefix = sourceBefore("package");

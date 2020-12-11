@@ -95,6 +95,10 @@ public class Java11Parser implements JavaParser {
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
         Options.instance(context).put("allowStringFolding", "false");
+        Options.instance(context).put("compilePolicy", "check");
+
+        // JavaCompiler line 452 (call to ImplicitSourcePolicy.decode(..))
+        Options.instance(context).put("-implicit", "none");
 
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
@@ -102,14 +106,19 @@ public class Java11Parser implements JavaParser {
         // otherwise the JavacParser will use EmptyEndPosTable, effectively setting -1 as the end position
         // for every tree element
         compiler.genEndPos = true;
-        compiler.keepComments = true;
+
+        // we don't need either of these, so as a minor performance improvement, omit these compiler features
+        compiler.keepComments = false;
+        compiler.lineDebugInfo = false;
 
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                String log = new String(Arrays.copyOfRange(cbuf, off, len));
-                if (logCompilationWarningsAndErrors && !log.isBlank()) {
-                    logger.warn(log);
+                if (logCompilationWarningsAndErrors && logger.isWarnEnabled()) {
+                    String log = new String(Arrays.copyOfRange(cbuf, off, len));
+                    if (!log.isBlank()) {
+                        logger.warn(log);
+                    }
                 }
             }
 
