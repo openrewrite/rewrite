@@ -31,8 +31,7 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singleton;
+import static java.util.Collections.*;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
@@ -135,14 +134,14 @@ public interface JavaType extends Serializable {
 
         @Override
         public String toString() {
-            return "ShallowClass{" +  + '}';
+            return "ShallowClass{" + +'}';
         }
     }
 
     @Getter
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
-        private static final Map<String, HashObjSet<Class>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Set<Class>> flyweights = HashObjObjMaps.newMutableMap();
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -205,33 +204,34 @@ public interface JavaType extends Serializable {
             // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
             // name, where equality is determined by whether the supertype hierarchy and members through the entire
             // supertype hierarchy are equal
-            JavaType.Class test = new Class(fullyQualifiedName,
-                    members.stream().sorted(comparing(Var::getName)).collect(toList()),
-                    typeParameters, interfaces, constructors, supertype);
+            List<Var> sortedMembers = new ArrayList<>(members);
+            sortedMembers.sort(comparing(Var::getName));
+            JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
                 Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
 
                 if (relaxedClassTypeMatching) {
-                    return variants.stream()
-                            .findFirst()
-                            .orElseGet(() -> {
-                                variants.add(test);
-                                return test;
-                            });
+                    if (variants.isEmpty()) {
+                        variants.add(test);
+                        return test;
+                    }
+                    return variants.iterator().next();
                 } else {
-                    return variants.stream().filter(v -> v.deepEquals(test))
-                            .findFirst()
-                            .orElseGet(() -> {
-                                if (test.supertype == null) {
-                                    return variants.stream().findFirst().orElseGet(() -> {
-                                        variants.add(test);
-                                        return test;
-                                    });
-                                }
-                                variants.add(test);
-                                return test;
-                            });
+                    for (Class v : variants) {
+                        if (v.deepEquals(test)) {
+                            return v;
+                        }
+                    }
+
+                    if (test.supertype == null) {
+                        return variants.stream().findFirst().orElseGet(() -> {
+                            variants.add(test);
+                            return test;
+                        });
+                    }
+                    variants.add(test);
+                    return test;
                 }
             }
         }
@@ -480,19 +480,19 @@ public interface JavaType extends Serializable {
     }
 
     enum Primitive implements JavaType {
-        Boolean("boolean","false"),
-        Byte("byte","0"),
-        Char("char","'\u0000'"),
-        Double("double","0.0d"),
-        Float("float","0.0f"),
-        Int("int","0"),
-        Long("long","0L"),
-        Short("short","0"),
-        Void("void",null),
-        String("String",null),
-        None("",null),
-        Wildcard("*",null),
-        Null("null",null);
+        Boolean("boolean", "false"),
+        Byte("byte", "0"),
+        Char("char", "'\u0000'"),
+        Double("double", "0.0d"),
+        Float("float", "0.0f"),
+        Int("int", "0"),
+        Long("long", "0L"),
+        Short("short", "0"),
+        Void("void", null),
+        String("String", null),
+        None("", null),
+        Wildcard("*", null),
+        Null("null", null);
 
         private final String keyword;
         private final String defaultValue;

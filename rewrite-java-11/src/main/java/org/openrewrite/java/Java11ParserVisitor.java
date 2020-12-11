@@ -60,15 +60,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
+    private final Map<String, JavaType.Class> sharedClassTypes;
 
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles) {
+    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+                               Map<String, JavaType.Class> sharedClassTypes) {
         this.uri = uri;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
+        this.sharedClassTypes = sharedClassTypes;
     }
 
     @Override
@@ -1096,7 +1099,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     @Override
     public J visitTypeCast(TypeCastTree node, Formatting fmt) {
         String clazzPrefix = sourceBefore("(");
-        J.Parentheses<TypeTree> clazz = new J.Parentheses<TypeTree>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
+        J.Parentheses<TypeTree> clazz = new J.Parentheses<>(randomId(), convert(node.getType(), t -> sourceBefore(")")),
                 format(clazzPrefix));
 
         return new J.TypeCast(randomId(), clazz, convert(node.getExpression()), fmt);
@@ -1430,7 +1433,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         List<T> converted = new ArrayList<>();
         for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
             if (treeGroup.size() == 1) {
-                converted.add((T) convert(treeGroup.get(0), statementDelim));
+                converted.add(convert(treeGroup.get(0), statementDelim));
             } else {
                 // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
                 String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
@@ -1513,6 +1516,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                 if (shallow) {
                     return new JavaType.ShallowClass(sym.className());
                 } else {
+                    JavaType.Class flyweight = sharedClassTypes.get(sym.className());
+                    if(flyweight != null) {
+                        return flyweight;
+                    }
+
                     List<Symbol> stackWithSym = new ArrayList<>(stack);
                     stackWithSym.add(sym);
 
@@ -1534,7 +1542,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
                     Type.ClassType classType = (com.sun.tools.javac.code.Type.ClassType) type;
                     Type.ClassType symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
-
 
                     List<JavaType> typeParameters;
                     if (classType.typarams_field == null) {
@@ -1562,7 +1569,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                         }
                     }
 
-                    return JavaType.Class.build(
+                    JavaType.Class clazz = JavaType.Class.build(
                             sym.className(),
                             fields,
                             typeParameters,
@@ -1570,10 +1577,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
                             null,
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
                             relaxedClassTypeMatching);
+
+                    sharedClassTypes.put(sym.className(), clazz);
+
+                    return clazz;
                 }
             }
         } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {
-            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(((com.sun.tools.javac.code.Type.TypeVar) type).getUpperBound(), stack)));
+            return new JavaType.GenericTypeVariable(type.tsym.name.toString(),
+                    TypeUtils.asClass(type(type.getUpperBound(), stack)));
         } else if (type instanceof com.sun.tools.javac.code.Type.JCPrimitiveType) {
             return primitive(type.getTag());
         } else if (type instanceof com.sun.tools.javac.code.Type.ArrayType) {
@@ -1803,7 +1815,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
             return emptyList();
         }
 
-        ArrayList<Modifier> sortedModifiers = new ArrayList<Modifier>();
+        ArrayList<Modifier> sortedModifiers = new ArrayList<>();
 
         boolean inComment = false;
         boolean inMultilineComment = false;
