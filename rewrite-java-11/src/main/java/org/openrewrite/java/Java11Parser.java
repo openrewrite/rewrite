@@ -22,7 +22,7 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.StringUtils;
@@ -173,7 +173,12 @@ public class Java11Parser implements JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-            compiler.attribute(new TimedTodo(compiler.todo));
+            Timer.builder("rewrite.parse")
+                    .description("The time spent by the JDK in type attributing its internal AST")
+                    .tag("file.type", "Java")
+                    .tag("step", "Type attribution")
+                    .register(meterRegistry)
+                    .recordCallable(() -> compiler.attribute(new TimedTodo(compiler.todo)));
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)

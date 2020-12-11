@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven;
+package org.openrewrite;
 
 import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.Metrics;
@@ -30,9 +30,7 @@ import java.net.InetSocketAddress;
 import java.time.Duration;
 
 /**
- * Used to understand the performance implications of resolving large dependency trees.
- * Launch prometheus.sh and grafana.sh and navigate to localhost:3000 to see a dashboard
- * of resolution performance.
+ * Used to understand the performance implications of various operations.
  */
 public class MetricsDestinations {
     public static PrometheusMeterRegistry prometheus() {
@@ -64,9 +62,9 @@ public class MetricsDestinations {
             throw new RuntimeException(e);
         }
 
-//        new JvmHeapPressureMetrics().bindTo(prometheusRegistry);
-//        new ProcessorMetrics().bindTo(prometheusRegistry);
-//        new JvmGcMetrics().bindTo(prometheusRegistry);
+        new JvmHeapPressureMetrics().bindTo(prometheusRegistry);
+        new ProcessorMetrics().bindTo(prometheusRegistry);
+        new JvmGcMetrics().bindTo(prometheusRegistry);
 
         Metrics.addRegistry(prometheusRegistry);
         return prometheusRegistry;

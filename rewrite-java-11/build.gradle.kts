@@ -1,3 +1,11 @@
+plugins {
+    id("nebula.integtest") version "7.0.9" apply false
+}
+
+apply(plugin = "nebula.integtest-standalone")
+
+val integTestImplementation = configurations.getByName("integTestImplementation")
+
 dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
@@ -5,6 +13,8 @@ dependencies {
     implementation("org.slf4j:slf4j-api:1.7.+")
 
     testImplementation(project(":rewrite-test"))
+
+    integTestImplementation("io.micrometer:micrometer-registry-prometheus:latest.release")
 }
 
 tasks.named<JavaCompile>("compileJava") {

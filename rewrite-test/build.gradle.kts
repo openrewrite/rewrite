@@ -2,6 +2,8 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
+    compileOnly("io.micrometer:micrometer-registry-prometheus:latest.release")
+
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
 
