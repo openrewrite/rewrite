@@ -42,9 +42,4 @@ class CommentsAndFormatting {
         // FIXME actually parse comments
         return new CommentsAndFormatting(Collections.emptyList(), Formatting.format(prefix));
     }
-
-    public static CommentsAndFormatting format(String prefix, String suffix) {
-        // FIXME actually parse comments
-        return new CommentsAndFormatting(Collections.emptyList(), Formatting.format(prefix, suffix));
-    }
 }

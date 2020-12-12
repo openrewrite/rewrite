@@ -265,7 +265,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
 
         if ((((JCBlock) node).flags & (long) Flags.STATIC) != 0L) {
             skip("static");
-            CommentsAndFormatting emptyFmt = format("", sourceBefore("{"));
+            CommentsAndFormatting emptyFmt = format(sourceBefore("{"));
             stat = new J.Empty(randomId(), emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY);
         } else {
             skip("{");
@@ -452,17 +452,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         logger.debug("Building AST for: " + uri);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
-        String prefix = source.substring(0, cu.getStartPosition());
+        CommentsAndFormatting prefix = format(source.substring(0, cu.getStartPosition()));
         cursor(cu.getStartPosition());
 
         endPosTable = cu.endPositions;
 
         J.Package packageDecl = null;
         if (cu.getPackageName() != null) {
-            String packagePrefix = sourceBefore("package");
+            CommentsAndFormatting packageFmt = format(sourceBefore("package"));
             Expression packageName = convert(cu.getPackageName());
-            CommentsAndFormatting endFmt = format(packagePrefix, sourceBefore(";"));
-            packageDecl = new J.Package(randomId(), packageName, endFmt.getComments(), endFmt.getFormatting(), Markers.EMPTY);
+            CommentsAndFormatting endFmt = format(sourceBefore(";"));
+            packageDecl = new J.Package(
+                    randomId(),
+                    packageName,
+                    new J.Empty(randomId(), endFmt.getComments(), endFmt.getFormatting(), Markers.EMPTY),
+                    packageFmt.getComments(),
+                    packageFmt.getFormatting(),
+                    Markers.EMPTY
+            );
         }
 
         List<J.Import> imports = convertAll(node.getImports(), semiDelim, semiDelim);
@@ -470,15 +477,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                         .filter(JCClassDecl.class::isInstance)
                         .collect(toList()),
                 this::whitespace, noDelim);
-        CommentsAndFormatting cuFmt = format(prefix, source.substring(cursor));
+        CommentsAndFormatting endFmt = format(source.substring(cursor));
         return new J.CompilationUnit(
                 randomId(),
                 uri.toString(),
                 packageDecl,
                 imports,
                 classDecls,
-                cuFmt.getComments(),
-                cuFmt.getFormatting(),
+                new J.Empty(randomId(), endFmt.getComments(), endFmt.getFormatting(), Markers.EMPTY),
+                prefix.getComments(),
+                prefix.getFormatting(),
                 Markers.EMPTY,
                 styles
         );
@@ -638,19 +646,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                 .map(Statement.class::cast)
                 .findAny()
                 .orElseGet(() -> {
-                    CommentsAndFormatting emptyFmt = format("", sourceBefore(";"));
+                    CommentsAndFormatting emptyFmt = format(sourceBefore(";"));
                     return new J.Empty(randomId(), emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY);
                 });
 
         Expression condition = convertOrNull(node.getCondition(), semiDelim);
         if (condition == null) {
-            CommentsAndFormatting emptyFmt = format("", sourceBefore(";"));
+            CommentsAndFormatting emptyFmt = format(sourceBefore(";"));
             condition = new J.Empty(randomId(), emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY);
         }
 
         List<Statement> update;
         if (node.getUpdate().isEmpty()) {
-            CommentsAndFormatting emptyFmt = format("", sourceBefore(")"));
+            CommentsAndFormatting emptyFmt = format(sourceBefore(")"));
             update = singletonList(new J.Empty(randomId(), emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY));
         } else {
             update = new ArrayList<>();
@@ -719,10 +727,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
     @Override
     public J visitLabeledStatement(LabeledStatementTree node, CommentsAndFormatting fmt) {
         skip(node.getLabel().toString());
-        CommentsAndFormatting labelFmt = format("", sourceBefore(":"));
-        return new J.Label(randomId(),
-                J.Ident.build(randomId(), node.getLabel().toString(), null, labelFmt.getComments(),
-                        labelFmt.getFormatting(), Markers.EMPTY),
+        CommentsAndFormatting endFmt = format(sourceBefore(":"));
+        return new J.Label(
+                randomId(),
+                J.Ident.build(randomId(), node.getLabel().toString(), null, emptyList(),
+                        Formatting.EMPTY, Markers.EMPTY),
+                new J.Empty(randomId(), endFmt.getComments(), endFmt.getFormatting(), Markers.EMPTY),
                 convert(node.getStatement()),
                 fmt.getComments(),
                 fmt.getFormatting(),
@@ -1032,11 +1042,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
 
         List<J.NewArray.Dimension> dimensions = new ArrayList<>();
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
-        for (int i = 0; i < nodeDimensions.size(); i++) {
-            ExpressionTree dim = nodeDimensions.get(i);
+        for (ExpressionTree dim : nodeDimensions) {
             String dimensionPrefix = sourceBefore("[");
             Expression size = convert(dim, t -> sourceBefore("]"));
-            CommentsAndFormatting dimFmt = format(dimensionPrefix, (i == node.getDimensions().size() - 1 && node.getInitializers() != null) ? sourceBefore("}") : "");
+            CommentsAndFormatting dimFmt = format(dimensionPrefix);
             dimensions.add(new J.NewArray.Dimension(
                     randomId(),
                     size,
@@ -1060,7 +1069,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             CommentsAndFormatting initFmt = format(sourceBefore("{"));
             List<Expression> initializers;
             if (node.getInitializers().isEmpty()) {
-                CommentsAndFormatting emptyFmt = format("", sourceBefore("}"));
+                CommentsAndFormatting emptyFmt = format(sourceBefore("}"));
                 initializers = singletonList(new J.Empty(randomId(), emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY));
             } else {
                 initializers = convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}"));
@@ -1440,7 +1449,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         for (int i = 0; i < nodes.size(); i++) {
             VariableTree n = nodes.get(i);
 
-            String namedVarPrefix = sourceBefore(n.getName().toString());
+            CommentsAndFormatting namedVarFmt = format(sourceBefore(n.getName().toString()));
             JCVariableDecl vd = (JCVariableDecl) n;
 
             List<J.VariableDecls.Dimension> dimensionsAfterName = dimensions.get();
@@ -1448,18 +1457,28 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                 dimensionsAfterName = Formatting.formatLastSuffix(dimensionsAfterName, vd.init != null ? sourceBefore("=") : "");
             }
 
-            CommentsAndFormatting nameFmt = format("", (dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : "");
             J.Ident name = J.Ident.build(randomId(), n.getName().toString(), type(node),
-                    nameFmt.getComments(), nameFmt.getFormatting(), Markers.EMPTY);
+                    emptyList(), Formatting.EMPTY, Markers.EMPTY);
+
+            CommentsAndFormatting afterNameFmt = format((dimensionsAfterName.isEmpty() && vd.init != null) ? sourceBefore("=") : "");
 
             Expression init = convertOrNull(vd.init);
-            CommentsAndFormatting namedVarFmt = i == nodes.size() - 1 ? format(namedVarPrefix) : format(namedVarPrefix, sourceBefore(","));
+
+            J.Empty beforeComma = null;
+            if(i != nodes.size() - 1) {
+                CommentsAndFormatting beforeCommaFmt = format(sourceBefore(","));
+                beforeComma = new J.Empty(randomId(), beforeCommaFmt.getComments(), beforeCommaFmt.getFormatting(),
+                        Markers.EMPTY);
+            }
+
             vars.add(
                     new J.VariableDecls.NamedVar(
                             randomId(),
                             name,
+                            new J.Empty(randomId(), afterNameFmt.getComments(), afterNameFmt.getFormatting(), Markers.EMPTY),
                             dimensionsAfterName,
                             init,
+                            beforeComma,
                             type(n),
                             namedVarFmt.getComments(),
                             namedVarFmt.getFormatting(),
@@ -1588,7 +1607,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         if (typeArguments.isEmpty()) {
             // raw type, see http://docs.oracle.com/javase/tutorial/java/generics/rawTypes.html
             // adding space before > as a suffix to be consistent with space before > for non-empty lists of type args
-            CommentsAndFormatting emptyFmt = format("", sourceBefore(">"));
+            CommentsAndFormatting emptyFmt = format(sourceBefore(">"));
             typeArgs = singletonList(new J.Empty(randomId(),
                     emptyFmt.getComments(), emptyFmt.getFormatting(), Markers.EMPTY));
         } else {

@@ -25,42 +25,42 @@ interface LabelTest {
     
     @Test
     fun labeledWhileLoop(jp: JavaParser) {
-        val orig = """
-            |public class A {
-            |    public void test() {
-            |        labeled: while(true) {
-            |        }
-            |    }
-            |}
-        """.trimMargin()
+        val aSrc = """
+            public class A {
+                public void test() {
+                    labeled : while(true) {
+                    }
+                }
+            }
+        """.trimIndent()
 
-        val a = jp.parse(orig)[0]
+        val a = jp.parse(aSrc)[0]
         
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("labeled", labeled.label.simpleName)
         assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals(orig, a.print())
+        assertEquals(aSrc, a.print())
     }
 
     @Test
     fun nonEmptyLabeledWhileLoop(jp: JavaParser) {
-        val orig = """
-            |public class A {
-            |    public void test() {
-            |        outer: while(true) {
-            |            while(true) {
-            |                break outer;
-            |            }
-            |        }
-            |    }
-            |}
-        """.trimMargin()
+        val aSrc = """
+            public class A {
+                public void test() {
+                    outer : while(true) {
+                        while(true) {
+                            break outer;
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
 
-        val a = jp.parse(orig)[0]
+        val a = jp.parse(aSrc)[0]
 
         val labeled = a.firstMethodStatement() as J.Label
         assertEquals("outer", labeled.label.simpleName)
         assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals(orig, a.print())
+        assertEquals(aSrc, a.print())
     }
 }

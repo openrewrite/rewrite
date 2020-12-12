@@ -108,11 +108,11 @@ interface VariableDeclsTest {
     fun multipleDeclarationOneAssignment(jp: JavaParser) {
         val a = jp.parse("""
             public class A {
-                int i, j = 0;
+                int i , j = 0;
             }
         """)[0]
 
-        assertEquals("int i, j = 0", a.classes[0].fields[0].printTrimmed())
+        assertEquals("int i , j = 0", a.classes[0].fields[0].printTrimmed())
     }
 
     @Suppress("UNCHECKED_CAST")

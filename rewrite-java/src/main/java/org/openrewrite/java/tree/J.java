@@ -991,12 +991,10 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @Getter
+        @With
         @Nullable
-        Empty statik;
-
-        public Block<T> withStatic(Empty statik) {
-            return new Block<>(id, statik, statements, comments, formatting, Markers.EMPTY, end);
-        }
+        Empty afterStatic;
 
         @Getter
         @With
@@ -1017,11 +1015,6 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         End end;
-
-        @Nullable
-        public Empty getStatic() {
-            return statik;
-        }
 
         @SuppressWarnings("unchecked")
         @Override
@@ -1482,6 +1475,9 @@ public interface J extends Serializable, Tree {
         List<ClassDecl> classes;
 
         @With
+        Empty eof;
+
+        @With
         List<Comment> comments;
 
         @With
@@ -1572,7 +1568,9 @@ public interface J extends Serializable, Tree {
             return new J.CompilationUnit(
                     randomId(),
                     sourcePath,
-                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "), emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "),
+                            new J.Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
+                            emptyList(), Formatting.EMPTY, Markers.EMPTY),
                     emptyList(),
                     singletonList(new J.ClassDecl(randomId(),
                             emptyList(),
@@ -1588,6 +1586,7 @@ public interface J extends Serializable, Tree {
                             emptyList(),
                             format("\n\n"),
                             Markers.EMPTY).withModifiers("public")),
+                    new Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
                     emptyList(),
                     Formatting.EMPTY,
                     Markers.EMPTY,
@@ -2280,6 +2279,9 @@ public interface J extends Serializable, Tree {
 
         @With
         Ident label;
+
+        @With
+        Empty beforeColon;
 
         @With
         Statement statement;
@@ -3362,6 +3364,9 @@ public interface J extends Serializable, Tree {
         Expression expr;
 
         @With
+        Empty beforeSemicolon;
+
+        @With
         List<Comment> comments;
 
         @With
@@ -4328,11 +4333,18 @@ public interface J extends Serializable, Tree {
             Ident name;
 
             @With
+            Empty afterName;
+
+            @With
             List<Dimension> dimensionsAfterName;
 
             @With
             @Nullable
             Expression initializer;
+
+            @With
+            @Nullable
+            Empty beforeComma;
 
             @With
             @Nullable

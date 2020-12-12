@@ -18,7 +18,6 @@ package org.openrewrite.java.internal;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.AbstractJavaSourceVisitor;
-import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
@@ -221,8 +220,12 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitBlock(Block<J> block) {
-        return fmt(block, fmt(block.getStatic(), "static") + "{" + visitStatements(block.getStatements()) +
-                block.getEnd().getPrefix() + "}");
+        return fmt(block,
+                (block.getAfterStatic() == null ? "" : "static") +
+                        visit(block.getAfterStatic()) +
+                        "{" + visitStatements(block.getStatements()) +
+                        block.getEnd().getPrefix() + "}"
+        );
     }
 
     @Override
@@ -272,7 +275,8 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
     public String visitCompilationUnit(CompilationUnit cu) {
         return fmt(cu, (cu.getPackageDecl() == null ? "" : visit(cu.getPackageDecl()) + ";") +
                 visit(cu.getImports(), ";", ";") +
-                visit(cu.getClasses()));
+                visit(cu.getClasses())) +
+                visit(cu.getEof());
     }
 
     @Override
@@ -358,7 +362,9 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitLabel(Label label) {
-        return fmt(label, visit(label.getLabel()) + ":" + visit(label.getStatement()));
+        return fmt(label, visit(label.getLabel()) +
+                visit(label.getBeforeColon()) + ":" +
+                visit(label.getStatement()));
     }
 
     @Override
@@ -442,7 +448,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitPackage(J.Package pkg) {
-        return fmt(pkg, "package" + visit(pkg.getExpr()));
+        return fmt(pkg, "package" + visit(pkg.getExpr()) + visit(pkg.getBeforeSemicolon()));
     }
 
     @Override
@@ -585,9 +591,11 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitVariable(VariableDecls.NamedVar variable) {
-        String init = variable.getInitializer() == null ? "" :
-                "=" + visit(variable.getInitializer());
-        return fmt(variable, visit(variable.getName()) + visitDims(variable.getDimensionsAfterName()) + init);
+        return fmt(variable, visit(variable.getName()) +
+                visit(variable.getAfterName()) +
+                visitDims(variable.getDimensionsAfterName()) +
+                (variable.getInitializer() == null ? "" : "=" + visit(variable.getInitializer())) +
+                visit(variable.getBeforeComma()));
     }
 
     @Override

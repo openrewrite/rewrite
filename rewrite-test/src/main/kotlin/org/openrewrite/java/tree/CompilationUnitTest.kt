@@ -71,6 +71,7 @@ interface CompilationUnitTest {
             import java.util.List;
             
             public class A { }
+            // comment
         """
 
         assertEquals(a.trimIndent(), jp.parse(a)[0].printTrimmed())

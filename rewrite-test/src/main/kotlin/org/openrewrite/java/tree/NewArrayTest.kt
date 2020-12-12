@@ -40,17 +40,20 @@ interface NewArrayTest {
 
     @Test
     fun newArrayWithInitializers(jp: JavaParser) {
-        val a = jp.parse("""
+        val aSrc = """
             public class A {
                 int[] n = new int[] { 0, 1, 2 };
             }
-        """)[0]
+        """.trimIndent()
+
+        val a = jp.parse(aSrc)[0]
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertTrue(newArr.dimensions[0].size is J.Empty)
         assertTrue(newArr.type is JavaType.Array)
         assertTrue(newArr.type.asArray()?.elemType is JavaType.Primitive)
         assertEquals(3, newArr.initializer?.elements?.size)
+        assertEquals(a.print(), aSrc)
     }
 
     @Test
@@ -67,14 +70,17 @@ interface NewArrayTest {
 
     @Test
     fun formatWithEmptyDimension(jp: JavaParser) {
-        val a = jp.parse("""
+        val aSrc = """
             public class A {
                 int[][] n = new int [ 0 ] [ ];
             }
-        """)[0]
+        """.trimIndent()
+
+        val a = jp.parse(aSrc)[0]
 
         val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
         assertEquals("new int [ 0 ] [ ]", newArr.printTrimmed())
+        assertEquals(a.print(), aSrc)
     }
 
     @Test
