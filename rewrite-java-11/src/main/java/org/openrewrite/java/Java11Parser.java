@@ -22,13 +22,14 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -156,7 +157,9 @@ public class Java11Parser implements JavaParser {
                         input -> Timer.builder("rewrite.parse")
                                 .description("The time spent by the JDK in parsing and tokenizing the source file")
                                 .tag("file.type", "Java")
-                                .tag("step", "JDK parsing")
+                                .tag("step", "(1) JDK parsing")
+                                .tag("outcome", "success")
+                                .tag("exception", "none")
                                 .register(meterRegistry)
                                 .record(() -> {
                                     try {
@@ -189,6 +192,7 @@ public class Java11Parser implements JavaParser {
             logger.warn("Failed symbol entering or attribution", t);
         }
 
+        Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
         return cus.entrySet().stream()
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
@@ -198,14 +202,14 @@ public class Java11Parser implements JavaParser {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching, styles);
+                                relaxedClassTypeMatching, styles, sharedClassTypes);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), new CommentsAndFormatting(Collections.emptyList(), Formatting.EMPTY));
                         sample.stop(Timer.builder("rewrite.parse")
                                 .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
                                 .tag("file.type", "Java")
                                 .tag("outcome", "success")
                                 .tag("exception", "none")
-                                .tag("step", "Map to Rewrite AST")
+                                .tag("step", "(3) Map to Rewrite AST")
                                 .register(meterRegistry));
                         return cu;
                     } catch (Throwable t) {
@@ -214,7 +218,7 @@ public class Java11Parser implements JavaParser {
                                 .tag("file.type", "Java")
                                 .tag("outcome", "error")
                                 .tag("exception", t.getClass().getSimpleName())
-                                .tag("step", "Map to Rewrite AST")
+                                .tag("step", "(3) Map to Rewrite AST")
                                 .register(meterRegistry));
 
                         if (!suppressMappingErrors) {
@@ -282,7 +286,9 @@ public class Java11Parser implements JavaParser {
                 sample.stop(Timer.builder("rewrite.parse")
                         .description("The time spent by the JDK in type attributing the source file")
                         .tag("file.type", "Java")
-                        .tag("step", "Type attribution")
+                        .tag("step", "(2) Type attribution")
+                        .tag("outcome", "success")
+                        .tag("exception", "none")
                         .register(meterRegistry));
             }
             return todo.isEmpty();

@@ -44,12 +44,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.lang.Math.max;
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.java.CommentsAndFormatting.format;
 import static org.openrewrite.Tree.randomId;
@@ -61,15 +59,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
+    private final Map<String, JavaType.Class> sharedClassTypes;
 
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles) {
+    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+                               Map<String, JavaType.Class> sharedClassTypes) {
         this.uri = uri;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
+        this.sharedClassTypes = sharedClassTypes;
     }
 
     @Override
@@ -270,12 +271,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             skip("{");
         }
 
-        List<Statement> statements = convertPossibleMultiVariable(node.getStatements().stream()
-                .filter(s -> {
-                    // filter out synthetic super() invocations and the like
-                    return endPos(s) > 0;
-                })
-                .collect(toList()));
+        // filter out synthetic super() invocations and the like
+        List<StatementTree> statementTrees = new ArrayList<>();
+        for (StatementTree s : node.getStatements()) {
+            if (endPos(s) > 0) {
+                statementTrees.add(s);
+            }
+        }
+
+        List<Statement> statements = convertPossibleMultiVariable(statementTrees);
 
         CommentsAndFormatting endFmt = format(sourceBefore("}"));
         return new J.Block<>(randomId(), stat, statements, fmt.getComments(), fmt.getFormatting(), Markers.EMPTY,
@@ -391,10 +395,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         CommentsAndFormatting bodyFmt = format(sourceBefore("{"));
 
         // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
-        List<? extends Tree> jcEnums = node.getMembers().stream()
-                .filter(JCVariableDecl.class::isInstance)
-                .filter(m -> hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM))
-                .collect(toList());
+        // enum values are required by the grammar to occur before any ordinary field, constructor, or method members
+        List<Tree> jcEnums = new ArrayList<>();
+        for (Tree tree : node.getMembers()) {
+            if (tree instanceof JCVariableDecl) {
+                if (hasFlag(((JCVariableDecl) tree).getModifiers(), Flags.ENUM)) {
+                    jcEnums.add(tree);
+                }
+            }
+        }
 
         J.EnumValueSet enumSet = null;
         if (!jcEnums.isEmpty()) {
@@ -411,24 +420,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                     emptyList(), Formatting.EMPTY, Markers.EMPTY);
         }
 
-        List<? extends Tree> membersMultiVariablesSeparated = node.getMembers().stream()
-                .filter(m -> {
-                    // we don't care about the compiler-inserted default constructor,
-                    // since it will never be subject to refactoring
-                    if (m instanceof JCMethodDecl) {
-                        return !hasFlag(((JCMethodDecl) m).getModifiers(), Flags.GENERATEDCONSTR);
-                    }
-                    if (m instanceof JCVariableDecl) {
-                        return !hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM);
-                    }
-                    return true;
-                })
-                .collect(toList());
+        List<Tree> membersMultiVariablesSeparated = new ArrayList<>();
+        for (Tree m : node.getMembers()) {
+            // we don't care about the compiler-inserted default constructor,
+            // since it will never be subject to refactoring
+            if (m instanceof JCMethodDecl && hasFlag(((JCMethodDecl) m).getModifiers(), Flags.GENERATEDCONSTR)) {
+                continue;
+            }
+            if (m instanceof JCVariableDecl && hasFlag(((JCVariableDecl) m).getModifiers(), Flags.ENUM)) {
+                continue;
+            }
+            membersMultiVariablesSeparated.add(m);
+        }
 
-        List<J> members = Stream.concat(
-                Stream.ofNullable((J) enumSet),
-                convertPossibleMultiVariable(membersMultiVariablesSeparated).stream()
-        ).collect(toList());
+        List<J> members = new ArrayList<>();
+        if (enumSet != null) {
+            members.add(enumSet);
+        }
+        members.addAll(convertPossibleMultiVariable(membersMultiVariablesSeparated));
 
         CommentsAndFormatting endFmt = format(sourceBefore("}"));
         var body = new J.Block<>(randomId(), null, members, bodyFmt.getComments(), bodyFmt.getFormatting(),
@@ -825,15 +834,20 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         J.MethodInvocation.TypeParameters typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
             CommentsAndFormatting genericFmt = format(sourceBefore("<"));
-            List<J.TypeParameter> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"))
-                    .stream()
-                    .map(gp -> new J.TypeParameter(randomId(), emptyList(),
-                            gp.withComments(emptyList()).withFormatting(Formatting.EMPTY), null,
-                            gp.getComments(), gp.getFormatting(), Markers.EMPTY))
-                    .collect(toList());
+
+            List<Expression> genericParams = convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">"));
+
+            List<J.TypeParameter> mappedGenericParams = new ArrayList<>();
+            for (Expression gp : genericParams) {
+                J.TypeParameter typeParameter = new J.TypeParameter(randomId(), emptyList(),
+                        gp.withComments(emptyList()).withFormatting(Formatting.EMPTY), null, gp.getComments(),
+                        gp.getFormatting(), Markers.EMPTY);
+                mappedGenericParams.add(typeParameter);
+            }
+
             typeParams = new J.TypeParameters(
                     randomId(),
-                    genericParams,
+                    mappedGenericParams,
                     genericFmt.getComments(),
                     genericFmt.getFormatting(),
                     Markers.EMPTY
@@ -879,8 +893,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
                 if (t instanceof com.sun.tools.javac.code.Type.MethodType) {
                     com.sun.tools.javac.code.Type.MethodType mt = (com.sun.tools.javac.code.Type.MethodType) t;
-                    return new JavaType.Method.Signature(type(mt.restype), mt.argtypes.stream().filter(Objects::nonNull)
-                            .map(this::type).collect(toList()));
+
+                    List<JavaType> paramTypes = new ArrayList<>();
+                    for (Type argtype : mt.argtypes) {
+                        if (argtype != null) {
+                            JavaType javaType = type(argtype);
+                            paramTypes.add(javaType);
+                        }
+                    }
+
+                    return new JavaType.Method.Signature(type(mt.restype), paramTypes);
                 }
                 return null;
             };
@@ -892,12 +914,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                 genericSignature = signature.apply(genericSymbol.type);
             }
 
+            List<String> paramNames = new ArrayList<>();
+            for (Symbol.VarSymbol p : genericSymbol.params()) {
+                String s = p.name.toString();
+                paramNames.add(s);
+            }
+
             type = JavaType.Method.build(
                     TypeUtils.asClass(type(genericSymbol.owner)),
                     name.getSimpleName(),
                     genericSignature,
                     signature.apply(jcSelect.type),
-                    genericSymbol.params().stream().map(p -> p.name.toString()).collect(toList()),
+                    paramNames,
                     filteredFlags(genericSymbol)
             );
         }
@@ -925,14 +953,22 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         J.Ident name;
         if ("<init>".equals(node.getName().toString())) {
             Symbol.MethodSymbol nodeSym = ((JCMethodDecl) node).sym;
-            String owner = nodeSym == null ?
-                    stream(getCurrentPath().spliterator(), false)
-                            .filter(JCClassDecl.class::isInstance)
-                            .map(JCClassDecl.class::cast)
-                            .findFirst()
-                            .map(cd -> cd.getSimpleName().toString())
-                            .orElseThrow() :
-                    ((JCMethodDecl) node).sym.owner.name.toString();
+            String owner = null;
+            if (nodeSym == null) {
+                for (Tree tree : getCurrentPath()) {
+                    if (tree instanceof JCClassDecl) {
+                        owner = ((JCClassDecl) tree).getSimpleName().toString();
+                        break;
+                    }
+                }
+
+                if (owner == null) {
+                    throw new IllegalStateException("Should have been able to locate an owner");
+                }
+            } else {
+                owner = ((JCMethodDecl) node).sym.owner.name.toString();
+            }
+            
             CommentsAndFormatting ownerFmt = format(sourceBefore(owner));
             name = J.Ident.build(randomId(), owner, null, ownerFmt.getComments(),
                     ownerFmt.getFormatting(), Markers.EMPTY);
@@ -1075,14 +1111,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         if (node.getClassBody() != null) {
             CommentsAndFormatting bodyFmt = format(sourceBefore("{"));
 
-            List<J> members = convertAll(node.getClassBody().getMembers().stream()
-                    // we don't care about the compiler-inserted default constructor,
-                    // since it will never be subject to refactoring
-                    .filter(m -> !(m instanceof JCMethodDecl) || (((JCMethodDecl) m).getModifiers().flags & Flags.GENERATEDCONSTR) == 0L)
-                    .collect(toList()), noDelim, noDelim);
+            // we don't care about the compiler-inserted default constructor,
+            // since it will never be subject to refactoring
+            List<Tree> members = new ArrayList<>();
+            for (Tree m : node.getClassBody().getMembers()) {
+                if (!(m instanceof JCMethodDecl) || (((JCMethodDecl) m).getModifiers().flags & Flags.GENERATEDCONSTR) == 0L) {
+                    members.add(m);
+                }
+            }
+
+            List<J> mappedMembers = convertAll(members, noDelim, noDelim);
 
             CommentsAndFormatting endFmt = format(sourceBefore("}"));
-            body = new J.Block<>(randomId(), null, members, bodyFmt.getComments(), bodyFmt.getFormatting(), Markers.EMPTY,
+            body = new J.Block<>(randomId(), null, mappedMembers, bodyFmt.getComments(), bodyFmt.getFormatting(), Markers.EMPTY,
                     new J.Block.End(randomId(), endFmt.getComments(), endFmt.getFormatting(), Markers.EMPTY));
         }
 
@@ -1554,19 +1595,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             typeArgs = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }
 
+        List<J.TypeParameter> params = new ArrayList<>();
+        for (Expression gp : typeArgs) {
+            J.TypeParameter typeParameter = new J.TypeParameter(randomId(), emptyList(),
+                    gp.withComments(emptyList()).withFormatting(Formatting.EMPTY), null, gp.getComments(),
+                    gp.getFormatting(), Markers.EMPTY);
+            params.add(typeParameter);
+        }
+
         // pull formatting up to TypeParameter rather than Expression, to match what happens in type parameter conversions
         // elsewhere in the tree
         return new J.TypeParameters(
                 randomId(),
-                typeArgs.stream()
-                        .map(gp -> new J.TypeParameter(randomId(), 
-                                emptyList(), 
-                                gp.withComments(emptyList()).withFormatting(Formatting.EMPTY), 
-                                null, 
-                                gp.getComments(),
-                                gp.getFormatting(),
-                                Markers.EMPTY))
-                        .collect(toList()),
+                params,
                 typeArgFmt.getComments(),
                 typeArgFmt.getFormatting(),
                 Markers.EMPTY
@@ -1596,31 +1637,34 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
 
     @SuppressWarnings("unchecked")
     private <T extends J> List<T> convertPossibleMultiVariable(@Nullable List<? extends Tree> trees) {
-        if (trees == null)
+        if (trees == null) {
             return emptyList();
+        }
 
-        return trees.stream()
-                .collect(Collectors.groupingBy(t -> ((JCTree) t).getStartPosition(), LinkedHashMap::new, toList()))
-                .values()
-                .stream()
-                .map(treeGroup -> {
-                    if (treeGroup.size() == 1) {
-                        return (T) convert(treeGroup.get(0), statementDelim);
-                    } else {
-                        // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
-                        String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
-                        cursor += prefix.length();
+        Map<Integer, List<Tree>> treesGroupedByStartPosition = new LinkedHashMap<>();
+        for (Tree t : trees) {
+            treesGroupedByStartPosition.computeIfAbsent(((JCTree) t).getStartPosition(), k -> new ArrayList<>()).add(t);
+        }
 
-                        Tree last = treeGroup.get(treeGroup.size() - 1);
+        List<T> converted = new ArrayList<>();
+        for (List<? extends Tree> treeGroup : treesGroupedByStartPosition.values()) {
+            if (treeGroup.size() == 1) {
+                converted.add(convert(treeGroup.get(0), statementDelim));
+            } else {
+                // multi-variable declarations are split into independent overlapping JCVariableDecl's by the OpenJDK AST
+                String prefix = source.substring(cursor, max(((JCTree) treeGroup.get(0)).getStartPosition(), cursor));
+                cursor += prefix.length();
 
-                        @SuppressWarnings("unchecked")
-                        J.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
-                        vars = vars.withSuffix(semiDelim.apply(last));
-                        cursor(max(endPos(last), cursor));
-                        return (T) vars;
-                    }
-                })
-                .collect(toList());
+                Tree last = treeGroup.get(treeGroup.size() - 1);
+
+                @SuppressWarnings("unchecked")
+                J.VariableDecls vars = visitVariables((List<VariableTree>) treeGroup, format(prefix));
+                vars = vars.withSuffix(semiDelim.apply(last));
+                cursor(max(endPos(last), cursor));
+                converted.add((T) vars);
+            }
+        }
+        return converted;
     }
 
     /**
@@ -1642,10 +1686,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
     );
 
     private Set<Flag> filteredFlags(Symbol sym) {
-        return flagMasks.entrySet().stream()
-                .filter(mask -> (sym.flags() & mask.getKey()) != 0L)
-                .map(Map.Entry::getValue)
-                .collect(toSet());
+        Set<Flag> set = new HashSet<>();
+        for (Map.Entry<Long, Flag> mask : flagMasks.entrySet()) {
+            if ((sym.flags() & mask.getKey()) != 0L) {
+                Flag value = mask.getValue();
+                set.add(value);
+            }
+        }
+        return set;
     }
 
     @Nullable
@@ -1684,31 +1732,76 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
                 if (shallow) {
                     return new JavaType.ShallowClass(sym.className());
                 } else {
+                    JavaType.Class flyweight = sharedClassTypes.get(sym.className());
+                    if(flyweight != null) {
+                        return flyweight;
+                    }
+
                     List<Symbol> stackWithSym = new ArrayList<>(stack);
                     stackWithSym.add(sym);
 
-                    List<JavaType.Var> fields = (sym.members_field == null ? Stream.empty() : stream(sym.members_field.getSymbols().spliterator(), false))
-                            .filter(elem -> elem instanceof Symbol.VarSymbol)
-                            .map(Symbol.VarSymbol.class::cast)
-                            .map(elem -> new JavaType.Var(
-                                    elem.name.toString(),
-                                    type(elem.type, stackWithSym),
-                                    filteredFlags(elem)
-                            ))
-                            .collect(toList());
+                    List<JavaType.Var> fields;
+                    if (sym.members_field == null) {
+                        fields = emptyList();
+                    } else {
+                        fields = new ArrayList<>();
+                        for (Symbol elem : sym.members_field.getSymbols()) {
+                            if (elem instanceof Symbol.VarSymbol) {
+                                fields.add(new JavaType.Var(
+                                        elem.name.toString(),
+                                        type(elem.type, stackWithSym),
+                                        filteredFlags(elem)
+                                ));
+                            }
+                        }
+                    }
 
                     Type.ClassType classType = (com.sun.tools.javac.code.Type.ClassType) type;
                     Type.ClassType symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
-                    return JavaType.Class.build(sym.className(), fields,
-                            classType.typarams_field == null ? emptyList() : classType.typarams_field.stream().map(tParam -> type(tParam, stackWithSym, true)).filter(Objects::nonNull).collect(toList()),
-                            symType.interfaces_field == null ? emptyList() : symType.interfaces_field.stream().map(iParam -> type(iParam, stackWithSym, false)).filter(Objects::nonNull).collect(toList()),
+
+                    List<JavaType> typeParameters;
+                    if (classType.typarams_field == null) {
+                        typeParameters = emptyList();
+                    } else {
+                        typeParameters = new ArrayList<>();
+                        for (Type tParam : classType.typarams_field) {
+                            JavaType javaType = type(tParam, stackWithSym, true);
+                            if (javaType != null) {
+                                typeParameters.add(javaType);
+                            }
+                        }
+                    }
+
+                    List<JavaType> interfaces;
+                    if (symType.interfaces_field == null) {
+                        interfaces = emptyList();
+                    } else {
+                        interfaces = new ArrayList<>();
+                        for (Type iParam : symType.interfaces_field) {
+                            JavaType javaType = type(iParam, stackWithSym, false);
+                            if (javaType != null) {
+                                interfaces.add(javaType);
+                            }
+                        }
+                    }
+
+                    JavaType.Class clazz = JavaType.Class.build(
+                            sym.className(),
+                            fields,
+                            typeParameters,
+                            interfaces,
                             null,
                             TypeUtils.asClass(type(classType.supertype_field, stackWithSym)),
                             relaxedClassTypeMatching);
+
+                    sharedClassTypes.put(sym.className(), clazz);
+
+                    return clazz;
                 }
             }
         } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {
-            return new JavaType.GenericTypeVariable(type.tsym.name.toString(), TypeUtils.asClass(type(type.getUpperBound(), stack)));
+            return new JavaType.GenericTypeVariable(type.tsym.name.toString(),
+                    TypeUtils.asClass(type(type.getUpperBound(), stack)));
         } else if (type instanceof com.sun.tools.javac.code.Type.JCPrimitiveType) {
             return primitive(type.getTag());
         } else if (type instanceof com.sun.tools.javac.code.Type.ArrayType) {
@@ -1899,6 +1992,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
     }
 
     @SuppressWarnings("unused")
+    // Used for debugging
     private List<String> listFlags(long flags) {
         Map<String, Long> allFlags = Arrays.stream(Flags.class.getDeclaredFields())
                 .filter(field -> {
@@ -1960,17 +2054,19 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             } else if (!inMultilineComment && !inComment) {
                 if (Character.isWhitespace(c)) {
                     if (!word.get().isEmpty()) {
-                        Optional<Modifier> matching = modifiers.getFlags().stream()
-                                .filter(mod -> mod.name().toLowerCase().equals(word.get()))
-                                .findAny();
+                        Modifier matching = null;
+                        for (Modifier modifier : modifiers.getFlags()) {
+                            if (modifier.name().toLowerCase().equals(word.get())) {
+                                matching = modifier;
+                                break;
+                            }
+                        }
 
-                        matching.ifPresent(mod -> {
-                            sortedModifiers.add(mod);
-                            word.set("");
-                        });
-
-                        if (matching.isEmpty()) {
+                        if (matching == null) {
                             break;
+                        } else {
+                            sortedModifiers.add(matching);
+                            word.set("");
                         }
                     }
                 } else {
@@ -1979,39 +2075,52 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             }
         }
 
-        return sortedModifiers.stream()
-                .map(mod -> {
-                    CommentsAndFormatting modFormat = format(whitespace());
-                    cursor += mod.name().length();
-                    switch (mod) {
-                        case DEFAULT:
-                            return new J.Modifier.Default(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case PUBLIC:
-                            return new J.Modifier.Public(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case PROTECTED:
-                            return new J.Modifier.Protected(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case PRIVATE:
-                            return new J.Modifier.Private(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case ABSTRACT:
-                            return new J.Modifier.Abstract(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case STATIC:
-                            return new J.Modifier.Static(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case FINAL:
-                            return new J.Modifier.Final(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case NATIVE:
-                            return new J.Modifier.Native(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case STRICTFP:
-                            return new J.Modifier.Strictfp(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case SYNCHRONIZED:
-                            return new J.Modifier.Synchronized(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case TRANSIENT:
-                            return new J.Modifier.Transient(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        case VOLATILE:
-                            return new J.Modifier.Volatile(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY);
-                        default:
-                            throw new IllegalArgumentException("Unexpected modifier " + mod);
-                    }
-                })
-                .collect(toList());
+        List<J.Modifier> mappedModifiers = new ArrayList<>();
+        for (Modifier mod : sortedModifiers) {
+            CommentsAndFormatting modFormat = format(whitespace());
+            cursor += mod.name().length();
+            switch (mod) {
+                case DEFAULT:
+                    mappedModifiers.add(new J.Modifier.Default(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case PUBLIC:
+                    mappedModifiers.add(new J.Modifier.Public(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case PROTECTED:
+                    mappedModifiers.add(new J.Modifier.Protected(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case PRIVATE:
+                    mappedModifiers.add(new J.Modifier.Private(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case ABSTRACT:
+                    mappedModifiers.add(new J.Modifier.Abstract(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case STATIC:
+                    mappedModifiers.add(new J.Modifier.Static(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case FINAL:
+                    mappedModifiers.add(new J.Modifier.Final(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case NATIVE:
+                    mappedModifiers.add(new J.Modifier.Native(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case STRICTFP:
+                    mappedModifiers.add(new J.Modifier.Strictfp(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case SYNCHRONIZED:
+                    mappedModifiers.add(new J.Modifier.Synchronized(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case TRANSIENT:
+                    mappedModifiers.add(new J.Modifier.Transient(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                case VOLATILE:
+                    mappedModifiers.add(new J.Modifier.Volatile(randomId(), modFormat.getComments(), modFormat.getFormatting(), Markers.EMPTY));
+                    break;
+                default:
+                    throw new IllegalArgumentException("Unexpected modifier " + mod);
+            }
+        }
+
+        return mappedModifiers;
     }
 }

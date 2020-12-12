@@ -17,15 +17,14 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
 import com.koloboke.collect.map.hash.HashObjObjMaps;
-import com.koloboke.collect.set.hash.HashObjSet;
 import com.koloboke.collect.set.hash.HashObjSets;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.With;
 import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
@@ -149,7 +148,7 @@ public interface JavaType extends Serializable {
     @Getter
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
-        private static final Map<String, HashObjSet<Class>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Set<Class>> flyweights = HashObjObjMaps.newMutableMap();
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -212,33 +211,34 @@ public interface JavaType extends Serializable {
             // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
             // name, where equality is determined by whether the supertype hierarchy and members through the entire
             // supertype hierarchy are equal
-            JavaType.Class test = new Class(fullyQualifiedName,
-                    members.stream().sorted(comparing(Var::getName)).collect(toList()),
-                    typeParameters, interfaces, constructors, supertype);
+            List<Var> sortedMembers = new ArrayList<>(members);
+            sortedMembers.sort(comparing(Var::getName));
+            JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
                 Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
 
                 if (relaxedClassTypeMatching) {
-                    return variants.stream()
-                            .findFirst()
-                            .orElseGet(() -> {
-                                variants.add(test);
-                                return test;
-                            });
+                    if (variants.isEmpty()) {
+                        variants.add(test);
+                        return test;
+                    }
+                    return variants.iterator().next();
                 } else {
-                    return variants.stream().filter(v -> v.deepEquals(test))
-                            .findFirst()
-                            .orElseGet(() -> {
-                                if (test.supertype == null) {
-                                    return variants.stream().findFirst().orElseGet(() -> {
-                                        variants.add(test);
-                                        return test;
-                                    });
-                                }
-                                variants.add(test);
-                                return test;
-                            });
+                    for (Class v : variants) {
+                        if (v.deepEquals(test)) {
+                            return v;
+                        }
+                    }
+
+                    if (test.supertype == null) {
+                        return variants.stream().findFirst().orElseGet(() -> {
+                            variants.add(test);
+                            return test;
+                        });
+                    }
+                    variants.add(test);
+                    return test;
                 }
             }
         }
