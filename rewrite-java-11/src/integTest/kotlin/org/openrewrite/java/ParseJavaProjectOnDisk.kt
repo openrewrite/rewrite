@@ -43,7 +43,7 @@ object ParseJavaProjectOnDisk {
             .meterRegistry(meterRegistry)
             .build()
 
-        println("Loaded ${paths.size} files and project dependencies in ${(System.nanoTime() - start) * 1e-6}ms")
+        println("Loaded ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
 
         start = System.nanoTime()
         parser.parse(paths, srcDir)
