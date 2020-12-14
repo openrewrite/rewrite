@@ -19,6 +19,7 @@ import com.sun.net.httpserver.HttpServer;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmHeapPressureMetrics;
+import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.lang.Nullable;
 import io.micrometer.prometheus.PrometheusConfig;
@@ -65,6 +66,7 @@ public class MetricsDestinations {
         new JvmHeapPressureMetrics().bindTo(prometheusRegistry);
         new ProcessorMetrics().bindTo(prometheusRegistry);
         new JvmGcMetrics().bindTo(prometheusRegistry);
+        new FileDescriptorMetrics().bindTo(prometheusRegistry);
 
         Metrics.addRegistry(prometheusRegistry);
         return prometheusRegistry;
