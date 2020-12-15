@@ -107,6 +107,11 @@ public class Java11Parser implements JavaParser {
 //        Options.instance(context).put("useUnsharedTable", "true");
         Options.instance(context).put("-proc", "none");
 
+        //This is a little strange, but by constructing this ahead of the compiler, we are setting the "to do"
+        //instance within the context to a version that is instrumented with micrometer. The compiler will
+        //use this instance by pulling it out of the context.
+        new TimedTodo(context);
+
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
 
@@ -191,7 +196,6 @@ public class Java11Parser implements JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-//            compiler.attribute(new TimedTodo(compiler.todo));
             compiler.attribute(compiler.todo);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
@@ -279,12 +283,10 @@ public class Java11Parser implements JavaParser {
     }
 
     private class TimedTodo extends Todo {
-        private final Todo todo;
         private Timer.Sample sample;
 
-        private TimedTodo(Todo todo) {
-            super(new Context());
-            this.todo = todo;
+        private TimedTodo(Context context) {
+            super(context);
         }
 
         @Override
@@ -298,13 +300,13 @@ public class Java11Parser implements JavaParser {
                         .tag("exception", "none")
                         .register(meterRegistry));
             }
-            return todo.isEmpty();
+            return super.isEmpty();
         }
 
         @Override
         public Env<AttrContext> remove() {
             this.sample = Timer.start();
-            return todo.remove();
+            return super.remove();
         }
     }
 
