@@ -34,6 +34,7 @@ import org.eclipse.aether.internal.impl.DefaultRemoteRepositoryManager
 import org.eclipse.aether.repository.RemoteRepository
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.Issue
