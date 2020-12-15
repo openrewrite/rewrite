@@ -16,9 +16,6 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
-import com.koloboke.collect.set.hash.HashObjSet;
-import com.koloboke.collect.set.hash.HashObjSets;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -141,7 +138,7 @@ public interface JavaType extends Serializable {
     @Getter
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
-        private static final Map<String, Set<Class>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Set<Class>> flyweights = new HashMap<>();
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -209,7 +206,7 @@ public interface JavaType extends Serializable {
             JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
@@ -354,7 +351,7 @@ public interface JavaType extends Serializable {
 
     @Getter
     class Method implements JavaType {
-        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new HashMap<>();
 
         @With
         private final FullyQualified declaringType;
@@ -387,8 +384,8 @@ public interface JavaType extends Serializable {
 
             synchronized (flyweights) {
                 Set<Method> methods = flyweights
-                        .computeIfAbsent(declaringType, dt -> HashObjObjMaps.newMutableMap())
-                        .computeIfAbsent(name, n -> HashObjSets.newMutableSet());
+                        .computeIfAbsent(declaringType, dt -> new HashMap<>())
+                        .computeIfAbsent(name, n -> new HashSet<>());
 
                 return methods
                         .stream()

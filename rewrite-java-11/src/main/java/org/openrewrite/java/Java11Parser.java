@@ -95,11 +95,17 @@ public class Java11Parser implements JavaParser {
 
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
-        Options.instance(context).put("allowStringFolding", "false");
-        Options.instance(context).put("compilePolicy", "check");
+//        Options.instance(context).put("allowStringFolding", "false");
+        Options.instance(context).put("compilePolicy", "attr");
 
         // JavaCompiler line 452 (call to ImplicitSourcePolicy.decode(..))
-        Options.instance(context).put("-implicit", "none");
+//        Options.instance(context).put("-implicit", "none");
+
+        // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
+        Options.instance(context).put("-g", "-g");
+
+//        Options.instance(context).put("useUnsharedTable", "true");
+        Options.instance(context).put("-proc", "none");
 
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
@@ -185,7 +191,8 @@ public class Java11Parser implements JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-            compiler.attribute(new TimedTodo(compiler.todo));
+//            compiler.attribute(new TimedTodo(compiler.todo));
+            compiler.attribute(compiler.todo);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
