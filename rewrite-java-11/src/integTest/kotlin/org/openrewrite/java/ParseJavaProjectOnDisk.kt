@@ -48,5 +48,8 @@ object ParseJavaProjectOnDisk {
         start = System.nanoTime()
         parser.parse(paths, srcDir)
         println("Parsed ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
+
+        //Sleep long enough for prometheus to scape the final metrics.
+        Thread.sleep(11000)
     }
 }
