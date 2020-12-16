@@ -16,7 +16,6 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
@@ -1986,7 +1985,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
     final class Ident implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new HashMap<>();
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -2046,7 +2045,7 @@ public interface J extends Serializable, Tree {
                 return new Ident(
                         id,
                         flyweights
-                                .computeIfAbsent(simpleName, n -> HashObjObjMaps.newMutableMap())
+                                .computeIfAbsent(simpleName, n -> new HashMap<>())
                                 .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
                         comments,
                         formatting,

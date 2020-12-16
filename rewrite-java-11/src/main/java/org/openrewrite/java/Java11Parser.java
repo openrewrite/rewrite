@@ -25,6 +25,7 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,6 +43,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -77,18 +79,22 @@ public class Java11Parser implements JavaParser {
     private final ResettableLog compilerLog = new ResettableLog(context);
     private final Collection<JavaStyle> styles;
 
+    private final Duration attributionAlertThreshold;
+
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
                          boolean suppressMappingErrors,
                          MeterRegistry meterRegistry,
                          boolean logCompilationWarningsAndErrors,
-                         Collection<JavaStyle> styles) {
+                         Collection<JavaStyle> styles,
+                         Duration attributionAlertThreshold) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
+        this.attributionAlertThreshold = attributionAlertThreshold;
 
         this.pfm = new JavacFileManager(context, true, charset);
         context.put(JavaFileManager.class, this.pfm);
@@ -96,10 +102,19 @@ public class Java11Parser implements JavaParser {
         // otherwise, consecutive string literals in binary expressions are concatenated by the parser, losing the original
         // structure of the expression!
         Options.instance(context).put("allowStringFolding", "false");
-        Options.instance(context).put("compilePolicy", "check");
+        Options.instance(context).put("compilePolicy", "attr");
 
         // JavaCompiler line 452 (call to ImplicitSourcePolicy.decode(..))
         Options.instance(context).put("-implicit", "none");
+
+        // https://docs.oracle.com/en/java/javacard/3.1/guide/setting-java-compiler-options.html
+        Options.instance(context).put("-g", "-g");
+        Options.instance(context).put("-proc", "none");
+
+        //This is a little strange, but by constructing this ahead of the compiler, we are setting the "to do"
+        //instance within the context to a version that is instrumented with micrometer. The compiler will
+        //use this instance by pulling it out of the context.
+        new TimedTodo(context);
 
         // MUST be created (registered with the context) after pfm and compilerLog
         compiler = new JavaCompiler(context);
@@ -185,7 +200,7 @@ public class Java11Parser implements JavaParser {
                 annotate.unblockAnnotations(); // also flushes once unblocked
             }
 
-            compiler.attribute(new TimedTodo(compiler.todo));
+            compiler.attribute(compiler.todo);
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
@@ -272,12 +287,12 @@ public class Java11Parser implements JavaParser {
     }
 
     private class TimedTodo extends Todo {
-        private final Todo todo;
+        private URI sourceFile;
+        private long start;
         private Timer.Sample sample;
 
-        private TimedTodo(Todo todo) {
-            super(new Context());
-            this.todo = todo;
+        private TimedTodo(Context context) {
+            super(context);
         }
 
         @Override
@@ -290,22 +305,38 @@ public class Java11Parser implements JavaParser {
                         .tag("outcome", "success")
                         .tag("exception", "none")
                         .register(meterRegistry));
+
+                Duration time = Duration.ofNanos(System.nanoTime() - start);
+                if(time.compareTo(attributionAlertThreshold) > 0) {
+                    logger.warn("Type attribution took too long for {} ({})", sourceFile, time);
+                }
             }
-            return todo.isEmpty();
+            return super.isEmpty();
         }
 
         @Override
         public Env<AttrContext> remove() {
+            this.start = System.nanoTime();
             this.sample = Timer.start();
-            return todo.remove();
+            Env<AttrContext> env = super.remove();
+            this.sourceFile = env.toplevel.sourcefile.toUri();
+            return env;
         }
     }
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+        Duration attributionAlertThreshold = Duration.ofSeconds(3);
+
+        @Incubating(since = "6.1.8")
+        public Builder attributionAlertThreshold(Duration threshold) {
+            this.attributionAlertThreshold = threshold;
+            return this;
+        }
+
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    suppressMappingErrors, meterRegistry, logCompilationWarningsAndErrors, styles);
+                    suppressMappingErrors, meterRegistry, logCompilationWarningsAndErrors, styles, attributionAlertThreshold);
         }
     }
 }

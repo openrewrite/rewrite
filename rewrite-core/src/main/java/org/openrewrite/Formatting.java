@@ -16,15 +16,11 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
 import lombok.Getter;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * The stylistic surroundings of a tree element
@@ -33,7 +29,7 @@ import java.util.Objects;
 @Getter
 public class Formatting implements Serializable {
     // suffixes are uncommon, so we'll treat them as a secondary index
-    private static final Map<String, Map<String, Formatting>> flyweights = HashObjObjMaps.newMutableMap();
+    private static final Map<String, Map<String, Formatting>> flyweights = new HashMap<>();
 
     public static Formatting EMPTY = new Formatting("", "") {
         @Override
@@ -62,7 +58,7 @@ public class Formatting implements Serializable {
             }
 
             return flyweights
-                    .computeIfAbsent(prefix, p -> HashObjObjMaps.newMutableMap())
+                    .computeIfAbsent(prefix, p -> new HashMap<>())
                     .computeIfAbsent(suffix, s -> new Formatting(prefix, s));
         }
     }
