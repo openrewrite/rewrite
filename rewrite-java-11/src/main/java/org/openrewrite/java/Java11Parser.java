@@ -25,6 +25,7 @@ import com.sun.tools.javac.util.Options;
 import io.micrometer.core.instrument.*;
 import io.micrometer.core.instrument.Timer;
 import org.openrewrite.Formatting;
+import org.openrewrite.Incubating;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
@@ -42,6 +43,7 @@ import java.io.Writer;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -77,18 +79,22 @@ public class Java11Parser implements JavaParser {
     private final ResettableLog compilerLog = new ResettableLog(context);
     private final Collection<JavaStyle> styles;
 
+    private final Duration attributionAlertThreshold;
+
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
                          boolean suppressMappingErrors,
                          MeterRegistry meterRegistry,
                          boolean logCompilationWarningsAndErrors,
-                         Collection<JavaStyle> styles) {
+                         Collection<JavaStyle> styles,
+                         Duration attributionAlertThreshold) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
+        this.attributionAlertThreshold = attributionAlertThreshold;
 
         this.pfm = new JavacFileManager(context, true, charset);
         context.put(JavaFileManager.class, this.pfm);
@@ -281,6 +287,8 @@ public class Java11Parser implements JavaParser {
     }
 
     private class TimedTodo extends Todo {
+        private URI sourceFile;
+        private long start;
         private Timer.Sample sample;
 
         private TimedTodo(Context context) {
@@ -297,22 +305,38 @@ public class Java11Parser implements JavaParser {
                         .tag("outcome", "success")
                         .tag("exception", "none")
                         .register(meterRegistry));
+
+                Duration time = Duration.ofNanos(System.nanoTime() - start);
+                if(time.compareTo(attributionAlertThreshold) > 0) {
+                    logger.warn("Type attribution took too long for {} ({})", sourceFile, time);
+                }
             }
             return super.isEmpty();
         }
 
         @Override
         public Env<AttrContext> remove() {
+            this.start = System.nanoTime();
             this.sample = Timer.start();
-            return super.remove();
+            Env<AttrContext> env = super.remove();
+            this.sourceFile = env.toplevel.sourcefile.toUri();
+            return env;
         }
     }
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+        Duration attributionAlertThreshold = Duration.ofSeconds(3);
+
+        @Incubating(since = "6.1.8")
+        public Builder attributionAlertThreshold(Duration threshold) {
+            this.attributionAlertThreshold = threshold;
+            return this;
+        }
+
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    suppressMappingErrors, meterRegistry, logCompilationWarningsAndErrors, styles);
+                    suppressMappingErrors, meterRegistry, logCompilationWarningsAndErrors, styles, attributionAlertThreshold);
         }
     }
 }
