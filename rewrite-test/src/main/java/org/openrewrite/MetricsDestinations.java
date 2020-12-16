@@ -57,8 +57,9 @@ public class MetricsDestinations {
                 os.write(response.getBytes());
                 os.close();
             });
-
-            new Thread(server::start).start();
+            Thread serverThread = new Thread(server::start);
+            serverThread.setDaemon(true);
+            serverThread.start();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
