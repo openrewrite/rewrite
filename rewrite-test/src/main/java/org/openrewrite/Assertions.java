@@ -129,7 +129,7 @@ public class Assertions {
         }
 
         private S primary(List<S> sources) {
-            return sources.stream().filter(s -> s.getSourcePath().equals(primarySource.toUri().toString())).findAny()
+            return sources.stream().filter(s -> s.getSourcePath().equals(primarySource.toString())).findAny()
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
         }
     }

@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
-import java.net.URI;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,7 +55,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
-    private final URI sourcePath;
+    private final Path path;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
@@ -67,9 +67,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public Java11ParserVisitor(URI sourcePath, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
                                Map<String, JavaType.Class> sharedClassTypes) {
-        this.sourcePath = sourcePath;
+        this.path = path;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
@@ -413,7 +413,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Space fmt) {
-        logger.debug("Building AST for: " + sourcePath);
+        logger.debug("Building AST for: " + path);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         fmt = format(source.substring(0, cu.getStartPosition()));
@@ -432,7 +432,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 randomId(),
                 fmt,
                 Markers.EMPTY,
-                sourcePath.toString(),
+                path.toString(),
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),

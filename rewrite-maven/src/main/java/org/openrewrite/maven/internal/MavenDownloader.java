@@ -162,23 +162,23 @@ public class MavenDownloader {
 
         Timer.Sample sample = Timer.start();
 
-        if (containingPom == null || !containingPom.getSourcePath().contains("http")) {
-            if (!StringUtils.isBlank(relativePath)) {
-                return Optional.ofNullable(containingPom)
-                        .map(pom -> {
-                            Path relativePomPath = Paths.get(pom.getSourcePath())
-                                    .getParent() // "relativeTo" the directory containing this pom
-                                    .resolve(Paths.get(relativePath, "pom.xml"))
-                                    .normalize();
-                            return projectPoms.get(relativePomPath.toString());
-                        })
-                        .orElse(null);
+        // The pom being examined might be from a remote repository or a local filesystem.
+        // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
+        for (RawMaven projectPom : projectPoms.values()) {
+            if (groupId.equals(projectPom.getPom().getGroupId()) &&
+                    artifactId.equals(projectPom.getPom().getArtifactId())) {
+                return projectPom;
             }
-
-            for (RawMaven projectPom : projectPoms.values()) {
-                if (groupId.equals(projectPom.getPom().getGroupId()) &&
-                        artifactId.equals(projectPom.getPom().getArtifactId())) {
-                    return projectPom;
+        }
+        if(containingPom != null && !StringUtils.isBlank(relativePath)) {
+            Path folderContainingPom = Paths.get(containingPom.getSourcePath())
+                    .getParent();
+            if(folderContainingPom != null) {
+                RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                        .normalize()
+                        .toString());
+                if(maybeLocalPom != null) {
+                    return maybeLocalPom;
                 }
             }
         }
@@ -207,8 +207,10 @@ public class MavenDownloader {
                                     @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                             .bytes();
 
+                                    // This path doesn't matter except for debugging/error logs where it might get displayed
+                                    Path inputPath = Paths.get(groupId, artifactId, version);
                                     return RawMaven.parse(
-                                            new Parser.Input(URI.create(uri), () -> new ByteArrayInputStream(responseBody)),
+                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
                                             null,
                                             versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
                                     );

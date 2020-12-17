@@ -35,7 +35,7 @@ import org.openrewrite.xml.tree.Xml;
 import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -91,7 +91,7 @@ public class RawMaven {
                 '}';
     }
 
-    public static RawMaven parse(Parser.Input source, @Nullable URI relativeTo, @Nullable String snapshotVersion) {
+    public static RawMaven parse(Parser.Input source, @Nullable Path relativeTo, @Nullable String snapshotVersion) {
         Xml.Document document = new MavenXmlParser().parseInputs(singletonList(source), relativeTo)
                 .iterator().next();
 
@@ -102,7 +102,7 @@ public class RawMaven {
             }
             return new RawMaven(document, pom);
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse " + source.getUri(), e);
+            throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }
     }
 
@@ -116,7 +116,7 @@ public class RawMaven {
 
     private static class MavenXmlParser extends XmlParser {
         @Override
-        public boolean accept(URI path) {
+        public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");
         }
     }

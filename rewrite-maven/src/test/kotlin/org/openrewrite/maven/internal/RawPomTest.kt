@@ -25,6 +25,7 @@ import org.openrewrite.Parser
 import org.openrewrite.maven.internal.RawRepositories.ArtifactPolicy
 import java.net.URI
 import java.nio.file.Path
+import java.nio.file.Paths
 
 class RawPomTest {
     @Test
@@ -36,7 +37,7 @@ class RawPomTest {
 
     @Test
     fun serializeAndDeserialize(@TempDir tempDir: Path) {
-        val pom = RawMaven.parse(Parser.Input(URI.create("pom.xml")) {
+        val pom = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
             """
                 <project>
                 <modelVersion>4.0.0</modelVersion>
@@ -83,7 +84,7 @@ class RawPomTest {
 
     @Test
     fun repositoriesSerializationAndDeserialization(@TempDir tempDir: Path) {
-        val pom = RawMaven.parse(Parser.Input(URI.create("pom.xml")) {
+        val pom = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
             """
                 <project>
                   `<modelVersion>4.0.0</modelVersion>

@@ -77,7 +77,7 @@ public class MavenSettings {
         try {
             return xmlMapper.readValue(source.getSource(), MavenSettings.class);
         } catch (IOException e) {
-            throw new UncheckedIOException("Failed to parse " + source.getUri(), e);
+            throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }
     }
 

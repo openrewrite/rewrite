@@ -545,13 +545,13 @@ class MavenDependencyResolutionIntegTest {
         assertThat(maven.model.dependencies.first().version).isEqualTo("5.1.8.RELEASE")
     }
 
-    @Disabled
     @Issue("https://github.com/openrewrite/rewrite/issues/124")
     @Test
     fun indirectBomImportedFromParent() {
         val maven = MavenParser.builder()
             .build()
-            .parse("""
+            .parse(
+                """
                 <project>
                     <modelVersion>4.0.0</modelVersion>
                     <groupId>com.mycompany.app</groupId>
@@ -559,42 +559,30 @@ class MavenDependencyResolutionIntegTest {
                     <version>1</version>
                     
                     <parent>
-                    <groupId>org.springframework.cloud</groupId>
-                    <artifactId>spring-cloud-build</artifactId>
-                    <version>3.0.0-SNAPSHOT</version>
-                    <relativePath/>
+                        <groupId>org.springframework.cloud</groupId>
+                        <artifactId>spring-cloud-netflix-eureka-server</artifactId>
+                        <version>3.0.0-SNAPSHOT</version>
+                        <relativePath/>
                     </parent>
                     
                     <dependencies>
-                    <dependency>
-                        <groupId>org.springframework.boot</groupId>
-                        <artifactId>spring-boot-starter-web</artifactId>
-                    </dependency>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter-web</artifactId>
+                        </dependency>
                     </dependencies>
                     
-                    <profiles>
-                    <profile>
-                        <id>spring</id>
-                        <activation>
-                        <activeByDefault>true</activeByDefault>
-                        </activation>
-                        <repositories>
-                        <repository>
-                            <id>spring-snapshots</id>
-                            <name>Spring Snapshots</name>
-                            <url>https://repo.spring.io/libs-snapshot-local</url>
-                            <snapshots>
-                            <enabled>true</enabled>
-                            </snapshots>
-                            <releases>
-                            <enabled>false</enabled>
-                            </releases>
-                        </repository>
-                        </repositories>
-                    </profile>
-                    </profiles>
+                    <repositories>
+                      <repository>
+                        <snapshots />
+                        <id>Spring Snapshots</id>
+                        <name>SpringSnapshots</name>
+                        <url>https://repo.spring.io/libs-snapshot</url>
+                      </repository>
+                    </repositories>
                 </project>
-                """.trimIndent()).first()
+                """.trimIndent())
+            .find { it.model.artifactId == "my-app" }!!
 
         assertThat(maven.model.dependencies.first().version).isNotBlank
     }
