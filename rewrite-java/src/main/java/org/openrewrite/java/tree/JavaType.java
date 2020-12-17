@@ -58,8 +58,8 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(@Nullable JavaType type) {
-            return type instanceof MultiCatch &&
-                    TypeUtils.deepEquals(throwableTypes, ((MultiCatch) type).throwableTypes);
+            return this == type  || (type instanceof MultiCatch &&
+                    TypeUtils.deepEquals(throwableTypes, ((MultiCatch) type).throwableTypes));
         }
     }
 
@@ -109,8 +109,8 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(JavaType type) {
-            return type instanceof ShallowClass &&
-                    fullyQualifiedName.equals(((ShallowClass) type).fullyQualifiedName);
+            return this == type  || (type instanceof ShallowClass &&
+                    fullyQualifiedName.equals(((ShallowClass) type).fullyQualifiedName));
         }
 
         @Override
@@ -275,10 +275,12 @@ public interface JavaType extends Serializable {
             }
 
             Class c = (Class) type;
-            return fullyQualifiedName.equals(c.fullyQualifiedName) &&
+            return
+                    this == c || (
+                    fullyQualifiedName.equals(c.fullyQualifiedName) &&
                     TypeUtils.deepEquals(members, c.members) &&
                     TypeUtils.deepEquals(supertype, c.supertype) &&
-                    TypeUtils.deepEquals(typeParameters, c.typeParameters);
+                    TypeUtils.deepEquals(typeParameters, c.typeParameters));
         }
 
         @Override
@@ -323,8 +325,8 @@ public interface JavaType extends Serializable {
             }
 
             Var v = (Var) type;
-            return name.equals(v.name) && TypeUtils.deepEquals(this.type, v.type) &&
-                    flags.equals(v.flags);
+            return this == v  || (name.equals(v.name) && TypeUtils.deepEquals(this.type, v.type) &&
+                    flags.equals(v.flags));
         }
     }
 
@@ -386,9 +388,9 @@ public interface JavaType extends Serializable {
         }
 
         private static boolean signatureDeepEquals(@Nullable Signature s1, @Nullable Signature s2) {
-            return s1 == null ? s2 == null : s2 != null &&
+            return s1 == null ? s2 == null : s1 == s2  || (s2 != null &&
                     TypeUtils.deepEquals(s1.returnType, s2.returnType) &&
-                    TypeUtils.deepEquals(s1.paramTypes, s2.paramTypes);
+                    TypeUtils.deepEquals(s1.paramTypes, s2.paramTypes));
         }
 
         public boolean hasFlags(Flag... test) {
@@ -402,11 +404,12 @@ public interface JavaType extends Serializable {
             }
 
             Method m = (Method) type;
-            return paramNames.equals(m.paramNames) &&
+            return this == m || (
+                    paramNames.equals(m.paramNames) &&
                     flags.equals(m.flags) &&
                     declaringType.deepEquals(m.declaringType) &&
                     signatureDeepEquals(genericSignature, m.genericSignature) &&
-                    signatureDeepEquals(resolvedSignature, m.resolvedSignature);
+                    signatureDeepEquals(resolvedSignature, m.resolvedSignature));
         }
     }
 
@@ -425,8 +428,8 @@ public interface JavaType extends Serializable {
             }
 
             GenericTypeVariable generic = (GenericTypeVariable) type;
-            return fullyQualifiedName.equals(generic.fullyQualifiedName) &&
-                    TypeUtils.deepEquals(bound, generic.bound);
+            return this == generic || (fullyQualifiedName.equals(generic.fullyQualifiedName) &&
+                    TypeUtils.deepEquals(bound, generic.bound));
         }
     }
 
@@ -436,7 +439,7 @@ public interface JavaType extends Serializable {
 
         @Override
         public boolean deepEquals(JavaType type) {
-            return type instanceof Array && elemType != null && elemType.deepEquals(((Array) type).elemType);
+            return type instanceof Array && (this == type || (elemType != null && elemType.deepEquals(((Array) type).elemType)));
         }
     }
 
