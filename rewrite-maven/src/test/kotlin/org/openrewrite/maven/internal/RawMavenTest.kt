@@ -18,12 +18,12 @@ package org.openrewrite.maven.internal
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
-import java.net.URI
+import java.nio.file.Paths
 
 class RawMavenTest {
     @Test
     fun emptyContainers() {
-        val maven = RawMaven.parse(Parser.Input(URI.create("pom.xml")) {
+        val maven = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
             """
                 <project>
                     <dependencyManagement>
@@ -53,7 +53,7 @@ class RawMavenTest {
 
     @Test
     fun dependencyManagement() {
-        val maven = RawMaven.parse(Parser.Input(URI.create("pom.xml")) {
+        val maven = RawMaven.parse(Parser.Input(Paths.get("pom.xml")) {
             """
                 <project>
                   <modelVersion>4.0.0</modelVersion>

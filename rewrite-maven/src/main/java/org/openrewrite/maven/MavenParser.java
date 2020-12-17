@@ -30,7 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -58,7 +57,7 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable URI relativeTo) {
+    public List<Maven> parseInputs(Iterable<Input> sources, @Nullable Path relativeTo) {
         Collection<RawMaven> projectPoms = stream(sources.spliterator(), false)
                 .map(source -> RawMaven.parse(source, relativeTo, null))
                 .collect(toList());
@@ -115,7 +114,7 @@ public class MavenParser implements Parser<Maven> {
     }
 
     @Override
-    public boolean accept(URI path) {
+    public boolean accept(Path path) {
         return path.toString().equals("pom.xml") || path.toString().endsWith(".pom");
     }
 

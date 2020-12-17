@@ -28,13 +28,14 @@ import org.openrewrite.xml.tree.Xml;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
 
 public class XmlParser implements Parser<Xml.Document> {
     @Override
-    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
+    public List<Xml.Document> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try {
@@ -59,7 +60,7 @@ public class XmlParser implements Parser<Xml.Document> {
     }
 
     @Override
-    public boolean accept(URI path) {
+    public boolean accept(Path path) {
         return path.toString().endsWith(".xml");
     }
 }

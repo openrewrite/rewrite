@@ -33,7 +33,7 @@ import org.slf4j.LoggerFactory;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
-import java.net.URI;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -56,7 +56,7 @@ import static org.openrewrite.Tree.randomId;
 public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
-    private final URI uri;
+    private final Path path;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
@@ -65,9 +65,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
                                Map<String, JavaType.Class> sharedClassTypes) {
-        this.uri = uri;
+        this.path = path;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
@@ -413,7 +413,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Formatting fmt) {
-        logger.debug("Building AST for: " + uri);
+        logger.debug("Building AST for: " + path);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         String prefix = source.substring(0, cu.getStartPosition());
@@ -428,7 +428,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         return new J.CompilationUnit(randomId(),
-                uri.toString(),
+                path.toString(),
                 emptyList(),
                 packageDecl,
                 convertAll(node.getImports(), semiDelim, semiDelim),

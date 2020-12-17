@@ -18,12 +18,12 @@ package org.openrewrite.maven
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
-import java.net.URI
+import java.nio.file.Paths
 
 class MavenSettingsTest {
     @Test
     fun parse() {
-        val settings = MavenSettings.parse(Parser.Input(URI.create("settings.xml")) {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"

@@ -27,6 +27,7 @@ import org.openrewrite.xml.XmlParser;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.Collection;
 
 import static java.util.Collections.emptyList;
@@ -39,7 +40,7 @@ public class MavenMetadata {
 
     private static final XmlParser xmlParser = new XmlParser() {
         @Override
-        public boolean accept(URI path) {
+        public boolean accept(Path path) {
             return super.accept(path) || path.toString().endsWith(".pom");
         }
     };
