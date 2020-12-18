@@ -29,7 +29,6 @@ import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -673,7 +672,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        String sourcePath;
+        Path sourcePath;
 
         @With
         @Nullable
@@ -728,7 +727,7 @@ public interface J extends Serializable, Tree {
             int packageLevelsUp = getPackageDecl() == null ? 0 :
                     (int) getPackageDecl().getElem().printTrimmed().chars().filter(c -> c == '.').count();
             // Jump over Java file name
-            return Paths.get(sourcePath).getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
+            return sourcePath.getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
                     .mapToObj(n -> "../")
                     .collect(joining(""))).normalize();
         }

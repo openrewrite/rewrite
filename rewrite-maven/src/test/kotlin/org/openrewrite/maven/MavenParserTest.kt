@@ -74,4 +74,49 @@ class MavenParserTest {
             </project>
         """.trimIndent())
     }
+
+    @Test
+    fun handlesRepositories() {
+        MavenParser.builder().build().parse("""
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>single-project</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+
+                <properties>
+                    <maven.compiler.source>1.8</maven.compiler.source>
+                    <maven.compiler.target>1.8</maven.compiler.target>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>org.openrewrite.recipe</groupId>
+                        <artifactId>rewrite-checkstyle</artifactId>
+                        <version>2.0.1</version>
+                    </dependency>
+                </dependencies>
+
+                <repositories>
+                    <repository>
+                        <id>jcenter</id>
+                        <name>JCenter</name>
+                        <url>https://jcenter.bintray.com/</url>
+                    </repository>
+                    <repository>
+                        <id>bintray</id>
+                        <name>Bintray</name>
+                        <url>https://dl.bintray.com/openrewrite/maven</url>
+                    </repository>
+                </repositories>
+            </project>
+
+        """)
+    }
 }

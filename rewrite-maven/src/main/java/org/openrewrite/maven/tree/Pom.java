@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -36,7 +37,7 @@ import java.util.stream.Stream;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
 public class Pom implements Marker {
-    String sourcePath;
+    Path sourcePath;
 
     @Nullable
     String groupId;
@@ -72,7 +73,7 @@ public class Pom implements Marker {
     Collection<Repository> repositories;
     Map<String, String> properties;
 
-    public Pom(@Nullable @JsonProperty("sourcePath") String sourcePath,
+    public Pom(@Nullable @JsonProperty("sourcePath") Path sourcePath,
                @Nullable @JsonProperty("groupId") String groupId,
                @JsonProperty("artifactId") String artifactId,
                @Nullable @JsonProperty("version") String version,
@@ -306,7 +307,7 @@ public class Pom implements Marker {
 
         @JsonIgnore
         public URI getArtifactUri() {
-            return URI.create(model.getSourcePath())
+            return model.getSourcePath().toUri()
                     .resolve(getArtifactId() + '-' + getVersion() +
                             (StringUtils.isBlank(classifier) ? "" : '-' + classifier) +
                             ".jar")

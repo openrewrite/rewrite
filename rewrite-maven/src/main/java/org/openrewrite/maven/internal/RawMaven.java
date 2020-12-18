@@ -75,7 +75,7 @@ public class RawMaven {
     }
 
     @JsonIgnore
-    public String getSourcePath() {
+    public Path getSourcePath() {
         return document.getSourcePath();
     }
 

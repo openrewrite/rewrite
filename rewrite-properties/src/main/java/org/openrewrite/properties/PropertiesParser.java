@@ -102,7 +102,7 @@ public class PropertiesParser implements Parser<Properties.File> {
 
         return new Properties.File(
                 randomId(),
-                sourceFile.toString(),
+                sourceFile,
                 contents,
                 format(suffix),
                 Formatting.EMPTY,

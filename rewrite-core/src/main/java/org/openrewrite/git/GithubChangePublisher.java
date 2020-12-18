@@ -83,7 +83,7 @@ public class GithubChangePublisher implements ChangePublisher {
                     GHRepository ghRepo = github.getRepository(organization + "/" + repository);
 
                     try {
-                        GHContent fileContent = ghRepo.getFileContent(result.getAfter().getSourcePath());
+                        GHContent fileContent = ghRepo.getFileContent(result.getAfter().getSourcePath().toString());
 
                         if (verifyOriginal && result.getBefore() != null) {
                             try (Scanner scanner = new Scanner(fileContent.read(), StandardCharsets.UTF_8.name())) {
@@ -115,7 +115,7 @@ public class GithubChangePublisher implements ChangePublisher {
 
                         ghRepo.createContent()
                                 .branch("master")
-                                .path(result.getAfter().getSourcePath())
+                                .path(result.getAfter().getSourcePath().toString())
                                 .content(result.getAfter().print())
                                 .message(commitMessage)
                                 .commit();
