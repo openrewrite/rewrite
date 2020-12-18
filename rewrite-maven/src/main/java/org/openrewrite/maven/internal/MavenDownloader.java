@@ -176,7 +176,13 @@ public class MavenDownloader {
             if(folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize());
-                if(maybeLocalPom != null) {
+                // Even poms published to remote repositories still contain relative paths to their parent poms
+                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
+                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
+                if(maybeLocalPom != null
+                        && groupId.equals(maybeLocalPom.getPom().getGroupId())
+                        && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
+                        && version.equals(maybeLocalPom.getPom().getVersion()) ) {
                     return maybeLocalPom;
                 }
             }
