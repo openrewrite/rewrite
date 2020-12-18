@@ -30,7 +30,7 @@ public interface SourceFile extends Tree {
     /**
      * This can refer to an absolute or relative file path or a remote location like an HTTP(s) URL.
      */
-    String getSourcePath();
+    Path getSourcePath();
 
     /**
      * {@link SourceVisitor} may respond to metadata to determine whether to act on

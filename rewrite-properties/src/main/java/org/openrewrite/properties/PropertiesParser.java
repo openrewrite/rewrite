@@ -100,7 +100,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             throw new UncheckedIOException(e);
         }
 
-        return new Properties.File(randomId(), sourceFile.toString(),
+        return new Properties.File(randomId(), sourceFile,
                 emptyList(), contents, Formatting.format("", suffix));
     }
 

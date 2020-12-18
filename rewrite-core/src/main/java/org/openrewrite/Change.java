@@ -73,7 +73,7 @@ public class Change {
     public String diff(@Nullable Path relativeTo) {
         // FIXME fix source path when deleting files
         Path sourcePath = fixed != null ?
-                Paths.get(fixed.getSourcePath()) :
+                fixed.getSourcePath() :
                 (relativeTo == null ? Paths.get(".") : relativeTo).resolve("partial-" + System.nanoTime());
 
         return new InMemoryDiffEntry(sourcePath, relativeTo,

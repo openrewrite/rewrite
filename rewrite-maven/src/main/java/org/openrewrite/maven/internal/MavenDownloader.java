@@ -52,13 +52,13 @@ public class MavenDownloader {
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
-    private final Map<String, RawMaven> projectPoms;
+    private final Map<Path, RawMaven> projectPoms;
 
     public MavenDownloader(MavenCache mavenCache) {
         this(mavenCache, emptyMap());
     }
 
-    public MavenDownloader(MavenCache mavenCache, Map<String, RawMaven> projectPoms) {
+    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
     }
@@ -171,12 +171,11 @@ public class MavenDownloader {
             }
         }
         if(containingPom != null && !StringUtils.isBlank(relativePath)) {
-            Path folderContainingPom = Paths.get(containingPom.getSourcePath())
+            Path folderContainingPom = containingPom.getSourcePath()
                     .getParent();
             if(folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
-                        .normalize()
-                        .toString());
+                        .normalize());
                 if(maybeLocalPom != null) {
                     return maybeLocalPom;
                 }

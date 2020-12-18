@@ -428,7 +428,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Formatting> {
         }
 
         return new J.CompilationUnit(randomId(),
-                path.toString(),
+                path,
                 emptyList(),
                 packageDecl,
                 convertAll(node.getImports(), semiDelim, semiDelim),

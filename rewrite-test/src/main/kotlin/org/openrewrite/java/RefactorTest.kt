@@ -26,13 +26,14 @@ import org.openrewrite.SourceFile
 import org.openrewrite.Tree.randomId
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
+import java.nio.file.Paths
 
 class RefactorTest {
     class RefactorTestException : RuntimeException("")
 
     val cu = J.CompilationUnit(
             randomId(),
-            "A.java",
+            Paths.get("A.java"),
             listOf(),
             null,
             listOf(),
@@ -109,7 +110,7 @@ class RefactorTest {
     fun canGenerate() {
         val cuToGenerate = J.CompilationUnit(
                 randomId(),
-                "A.java",
+                Paths.get("A.java"),
                 listOf(),
                 null,
                 listOf(),
