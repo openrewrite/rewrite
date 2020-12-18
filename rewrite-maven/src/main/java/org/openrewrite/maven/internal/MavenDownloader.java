@@ -175,8 +175,12 @@ public class MavenDownloader {
                     .getParent();
             if(folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
-                        .normalize());
-                if(maybeLocalPom != null) {
+                        .normalize()
+                        .toString());
+                if(maybeLocalPom != null
+                        && groupId.equals(maybeLocalPom.getPom().getGroupId())
+                        && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
+                        && version.equals(maybeLocalPom.getPom().getVersion()) ) {
                     return maybeLocalPom;
                 }
             }
