@@ -15,6 +15,9 @@
  */
 package org.openrewrite.java
 
+import io.micrometer.core.instrument.Meter
+import io.micrometer.core.instrument.config.MeterFilter
+import io.micrometer.core.instrument.distribution.DistributionStatisticConfig
 import org.openrewrite.MetricsDestinations
 import java.nio.file.Files
 import java.nio.file.Path
@@ -27,6 +30,18 @@ object ParseJavaProjectOnDisk {
     @JvmStatic
     fun main(args: Array<String>) {
         val meterRegistry = MetricsDestinations.prometheus()
+
+        meterRegistry.config().meterFilter(object: MeterFilter {
+            override fun configure(id: Meter.Id, config: DistributionStatisticConfig): DistributionStatisticConfig? {
+                if(id.name == "rewrite.parse") {
+                    return DistributionStatisticConfig.builder()
+                        .percentilesHistogram(true)
+                        .build()
+                        .merge(config)
+                }
+                return config
+            }
+        })
 
         val srcDir = Paths.get(args[0])
         val predicate = BiPredicate<Path, BasicFileAttributes> { p, bfa ->
@@ -48,5 +63,8 @@ object ParseJavaProjectOnDisk {
         start = System.nanoTime()
         parser.parse(paths, srcDir)
         println("Parsed ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
+
+        //Sleep long enough for prometheus to scape the final metrics.
+        Thread.sleep(11000)
     }
 }

@@ -134,8 +134,7 @@ public class TypeUtils {
 
         return true;
     }
-
     static boolean deepEquals(@Nullable JavaType t, @Nullable JavaType t2) {
-        return t == null ? t2 == null : t.deepEquals(t2);
+        return t == null ? t2 == null : t == t2 || t.deepEquals(t2);
     }
 }
