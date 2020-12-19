@@ -48,9 +48,6 @@ abstract class JavaParserCompatibilityKit {
     inner class BreakTck : BreakTest
 
     @Nested
-    inner class BodyTck : BodyTest
-
-    @Nested
     inner class ClassDeclTck : ClassDeclTest
 
     @Nested
@@ -58,9 +55,6 @@ abstract class JavaParserCompatibilityKit {
 
     @Nested
     inner class ContinueTck : ContinueTest
-
-    @Nested
-    inner class CursorTck : CursorTest
 
     @Nested
     inner class CyclicTypeTck : CyclicTypeTest
@@ -114,9 +108,6 @@ abstract class JavaParserCompatibilityKit {
     inner class MethodInvocationTck : MethodInvocationTest
 
     @Nested
-    inner class ModifierTck : ModifierTest
-
-    @Nested
     inner class NewArrayTck : NewArrayTest
 
     @Nested
@@ -145,9 +136,6 @@ abstract class JavaParserCompatibilityKit {
 
     @Nested
     inner class ThrowTck : ThrowTest
-
-    @Nested
-    inner class TreeBuilderTck : TreeBuilderTest
 
     @Nested
     inner class CompilationUnitSerializerTck : CompilationUnitSerializerTest

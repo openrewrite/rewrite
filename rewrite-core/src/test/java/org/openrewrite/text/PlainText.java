@@ -20,7 +20,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Style;
 import org.openrewrite.Tree;
-import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
