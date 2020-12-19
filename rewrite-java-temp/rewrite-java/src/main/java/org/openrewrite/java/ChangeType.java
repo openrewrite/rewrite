@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.Tags;
+import org.openrewrite.AutoConfigure;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;

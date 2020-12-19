@@ -28,7 +28,6 @@ class PropertiesParserTest: PropertiesParser() {
 
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
                 .hasSize(1).containsExactly("key")
-        assertThat(props.formatting.suffix).isEmpty()
     }
 
     @Test
@@ -40,7 +39,7 @@ class PropertiesParserTest: PropertiesParser() {
 
         val entries = props.content.map { it as Properties.Entry }
         assertThat(entries.map { it.key }).containsExactly("key")
-        assertThat(entries[0].formatting.suffix).isEqualTo("\n")
+        assertThat(props.eof.prefix).isEqualTo("\n")
     }
 
     @Test
@@ -63,7 +62,7 @@ class PropertiesParserTest: PropertiesParser() {
 
         assertThat(props.content.map { it as Properties.Entry }.map { it.key })
                 .hasSize(2).containsExactly("key", "key2")
-        assertThat(props.content.map { it as Properties.Entry }.map { it.value })
+        assertThat(props.content.map { it as Properties.Entry }.map { it.value.text })
                 .hasSize(2).containsExactly("value", "value2")
     }
 }

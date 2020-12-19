@@ -73,6 +73,6 @@ public class PrintYaml extends AbstractYamlSourceVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
+        return tree == null || code == null ? "" : tree.getPrefix() + code;
     }
 }

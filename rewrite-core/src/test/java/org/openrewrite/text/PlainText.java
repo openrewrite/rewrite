@@ -77,6 +77,6 @@ public class PlainText implements SourceFile, Tree {
 
     @Override
     public String print() {
-        return formatting.getPrefix() + text + formatting.getSuffix();
+        return formatting.getPrefix() + text;
     }
 }

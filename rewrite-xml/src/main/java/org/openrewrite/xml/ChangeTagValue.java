@@ -59,7 +59,8 @@ public class ChangeTagValue {
                     // if the previous content was also character data, preserve its formatting
                     formatting = existingValue.getFormatting();
                 }
-                t = t.withContent(singletonList(new Xml.CharData(randomId(), false, value, formatting, Markers.EMPTY)));
+                t = t.withContent(singletonList(new Xml.CharData(randomId(), false, value,
+                        new Xml.Empty(randomId(), Formatting.EMPTY, Markers.EMPTY), formatting, Markers.EMPTY)));
             }
 
             return t;

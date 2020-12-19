@@ -109,10 +109,12 @@ public class GenerateSetter {
                             fieldVar.getName(),
                             fieldType,
                             emptyList(),
-                            format("", " "),
+                            // FIXME this previously had a suffix of one space
+                            Formatting.EMPTY,
                             Markers.EMPTY);
                 } else {
-                    assignmentExp = fieldVar.getName().withFormatting(format("", " "));
+                    // FIXME this previously had a suffix of one space
+                    assignmentExp = fieldVar.getName();
                 }
                 J.MethodDecl setMethod = new J.MethodDecl(randomId(),
                         emptyList(),

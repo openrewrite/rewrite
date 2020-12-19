@@ -37,6 +37,7 @@ public class Maven extends Xml.Document {
                 document.getSourcePath(),
                 document.getProlog(),
                 document.getRoot(),
+                document.getEof(),
                 document.getFormatting(),
                 document.getMarkers()
         );

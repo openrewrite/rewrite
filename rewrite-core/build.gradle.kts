@@ -5,9 +5,6 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
-    implementation("com.koloboke:koloboke-api-jdk8:latest.release")
-    implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
-
     implementation("io.github.classgraph:classgraph:latest.release")
 
     implementation("org.yaml:snakeyaml:latest.release")

@@ -135,6 +135,7 @@ public class ChangePropertyKey extends YamlRefactorVisitor {
                                 new Yaml.Mapping.Entry(randomId(),
                                         new Yaml.Scalar(randomId(), Yaml.Scalar.Style.PLAIN, subproperty,
                                                 Formatting.EMPTY, Markers.EMPTY),
+                                        scope.getAfterKey().copyPaste(),
                                         value.copyPaste(),
                                         newEntryFormatting,
                                         Markers.EMPTY

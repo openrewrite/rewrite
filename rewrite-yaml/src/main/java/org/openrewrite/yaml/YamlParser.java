@@ -16,8 +16,8 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 import org.yaml.snakeyaml.events.Event;
 import org.yaml.snakeyaml.events.ScalarEvent;
@@ -177,11 +177,10 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 block = block.withPrefix(keySuffix.substring(keySuffix.lastIndexOf(':') + 1));
 
                 String keyPrefix = key.getPrefix();
-                key = key.withFormatting(format(
-                        "",
-                        keySuffix.substring(0, keySuffix.lastIndexOf(':'))
-                ));
-                entries.add(new Yaml.Mapping.Entry(randomId(), key, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1)), Markers.EMPTY));
+                key = key.withFormatting(format(""));
+
+                Yaml.Empty afterKey = new Yaml.Empty(randomId(), format(keySuffix.substring(0, keySuffix.lastIndexOf(':'))), Markers.EMPTY);
+                entries.add(new Yaml.Mapping.Entry(randomId(), key, afterKey, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1)), Markers.EMPTY));
                 key = null;
             }
         }

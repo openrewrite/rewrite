@@ -19,9 +19,6 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
 
-    implementation("com.koloboke:koloboke-api-jdk8:latest.release")
-    implementation("com.koloboke:koloboke-impl-jdk8:latest.release")
-
     implementation("org.slf4j:slf4j-api:1.7.+")
 
     compileOnly("org.mapdb:mapdb:latest.release")

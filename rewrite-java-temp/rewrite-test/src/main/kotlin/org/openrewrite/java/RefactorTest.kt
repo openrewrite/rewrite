@@ -78,11 +78,11 @@ class RefactorTest {
                             ),
                             JavaType.Class.build("Foo"),
                             emptyList(),
-                            format("", "\n"),
+                            format(""),
                             Markers.EMPTY
                         )
                     )
-                )
+                ).withEof(cu.eof.withPrefix("\n"))
             }
             return cu
         }

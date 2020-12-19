@@ -33,7 +33,8 @@ public class PrintXml extends AbstractXmlSourceVisitor<String> {
 
     @Override
     public String visitDocument(Xml.Document document) {
-        return fmt(document, visit(document.getProlog()) + visit(document.getRoot()));
+        return fmt(document, visit(document.getProlog()) + visit(document.getRoot())) +
+                visit(document.getEof());
     }
 
     @Override
@@ -77,7 +78,7 @@ public class PrintXml extends AbstractXmlSourceVisitor<String> {
         return fmt(charData, charData.isCdata() ?
                 "<![CDATA[" + charData.getText() + "]]>" :
                 charData.getText()
-        );
+        ) + visit(charData.getAfterText());
     }
 
     @Override
@@ -101,6 +102,6 @@ public class PrintXml extends AbstractXmlSourceVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
+        return tree == null || code == null ? "" : tree.getPrefix() + code;
     }
 }

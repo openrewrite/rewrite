@@ -19,8 +19,8 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.internal.grammar.XMLParser;
 import org.openrewrite.xml.internal.grammar.XMLParserBaseVisitor;
 import org.openrewrite.xml.tree.Content;
@@ -28,9 +28,7 @@ import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.net.URI;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiFunction;
 
 import static java.util.stream.Collectors.toList;
@@ -49,15 +47,15 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
     @Override
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
-        Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
+        return convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
                 uri.toString(),
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
+                new Xml.Empty(randomId(), Formatting.format(source.substring(cursor)), Markers.EMPTY),
                 format,
                 Markers.EMPTY)
         );
-        return d == null ? null : d.withSuffix(source.substring(cursor));
     }
 
     @Override
@@ -86,25 +84,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml visitContent(XMLParser.ContentContext ctx) {
         if (ctx.CDATA() != null) {
-            Xml.CharData charData = convert(ctx.CDATA(), (cdata, format) -> {
-                Map.Entry<Formatting, String> formatAndText = charDataFormat(cdata.getText());
-                return new Xml.CharData(randomId(),
-                        true,
-                        formatAndText.getValue().substring("<![CDATA[".length(), cdata.getText().length() - "]]>".length()),
-                        formatAndText.getKey(),
-                        Markers.EMPTY);
-            });
+            Xml.CharData charData = convert(ctx.CDATA(), (cdata, format) ->
+                    charData(cdata.getText(), true));
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
         } else if (ctx.chardata() != null) {
-            Xml.CharData charData = convert(ctx.chardata(), (chardata, format) -> {
-                Map.Entry<Formatting, String> formatAndText = charDataFormat(chardata.getText());
-                return new Xml.CharData(randomId(),
-                        false,
-                        formatAndText.getValue(),
-                        formatAndText.getKey(),
-                        Markers.EMPTY);
-            });
+            Xml.CharData charData = convert(ctx.chardata(), (chardata, format) ->
+                    charData(chardata.getText(), false));
             cursor++; // otherwise an off-by-one on cursor positioning for close tags?
             return charData;
         } else if (ctx.reference() != null && ctx.reference().EntityRef() != null) {
@@ -112,6 +98,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
             return new Xml.CharData(randomId(),
                     false,
                     ctx.reference().EntityRef().getText(),
+                    new Xml.Empty(randomId(), Formatting.EMPTY, Markers.EMPTY),
                     Formatting.EMPTY,
                     Markers.EMPTY);
         }
@@ -119,7 +106,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         return super.visitContent(ctx);
     }
 
-    private Map.Entry<Formatting, String> charDataFormat(String text) {
+    private Xml.CharData charData(String text, boolean cdata) {
         boolean prefixDone = false;
         StringBuilder prefix = new StringBuilder();
         StringBuilder value = new StringBuilder();
@@ -144,10 +131,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         }
 
         String valueStr = value.toString();
-        Map<Formatting, String> charDataFormat = new HashMap<>(1);
-        charDataFormat.put(Formatting.format(prefix.toString(), suffix.toString()),
-                valueStr.substring(0, valueStr.length() - suffix.length()));
-        return charDataFormat.entrySet().iterator().next();
+        valueStr = valueStr.substring(0, valueStr.length() - suffix.length());
+
+        return new Xml.CharData(randomId(),
+                cdata,
+                cdata ?
+                        valueStr.substring("<![CDATA[".length(), text.length() - "]]>".length()) :
+                        valueStr,
+                new Xml.Empty(randomId(), Formatting.format(suffix.toString()), Markers.EMPTY),
+                Formatting.format(prefix.toString()),
+                Markers.EMPTY);
     }
 
     @Override
@@ -233,8 +226,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, format) -> {
-            Xml.Ident key = convert(c.Name(), (t, f) -> new Xml.Ident(randomId(), t.getText(), f, Markers.EMPTY))
-                    .withSuffix(convert(c.EQUALS(), (e, f) -> f.getPrefix()));
+            Xml.Ident key = convert(c.Name(), (t, f) -> new Xml.Ident(randomId(), t.getText(), f, Markers.EMPTY));
+
+            Xml.Empty beforeEquals = new Xml.Empty(randomId(), Formatting.format(convert(c.EQUALS(), (e, f) -> f.getPrefix())),
+                    Markers.EMPTY);
 
             Xml.Attribute.Value value = convert(c.STRING(), (v, f) -> new Xml.Attribute.Value(
                             randomId(),
@@ -245,7 +240,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                     )
             );
 
-            return new Xml.Attribute(randomId(), key, value, format, Markers.EMPTY);
+            return new Xml.Attribute(randomId(), key, beforeEquals, value, format, Markers.EMPTY);
         });
     }
 

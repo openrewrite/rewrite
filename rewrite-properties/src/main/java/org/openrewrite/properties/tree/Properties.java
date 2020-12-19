@@ -63,6 +63,9 @@ public interface Properties extends Serializable, Tree {
         List<Content> content;
 
         @With
+        Formatting eof;
+
+        @With
         Formatting formatting;
 
         @With
@@ -93,10 +96,13 @@ public interface Properties extends Serializable, Tree {
         String key;
 
         @With
-        String value;
+        Formatting beforeEquals;
 
         @With
-        Formatting equalsFormatting;
+        Value value;
+
+        @With
+        Formatting afterValue;
 
         @With
         Formatting formatting;
@@ -108,6 +114,20 @@ public interface Properties extends Serializable, Tree {
         public <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
             return v.visitEntry(this);
         }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    class Value {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        String text;
+
+        @With
+        Formatting formatting;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

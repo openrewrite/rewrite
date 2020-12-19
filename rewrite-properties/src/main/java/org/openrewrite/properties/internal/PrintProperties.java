@@ -17,7 +17,6 @@ package org.openrewrite.properties.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.properties.AbstractPropertiesSourceVisitor;
-import org.openrewrite.properties.PropertiesSourceVisitor;
 import org.openrewrite.properties.tree.Properties;
 
 public class PrintProperties extends AbstractPropertiesSourceVisitor<String> {
@@ -28,14 +27,14 @@ public class PrintProperties extends AbstractPropertiesSourceVisitor<String> {
 
     @Override
     public String visitFile(Properties.File file) {
-        return file.getPrefix() + visit(file.getContent()) + file.getSuffix();
+        return file.getPrefix() + visit(file.getContent()) + file.getEof().getPrefix();
     }
 
     @Override
     public String visitEntry(Properties.Entry entry) {
         return entry.getPrefix() + entry.getKey() +
-                entry.getEqualsFormatting().getPrefix() + "=" + entry.getEqualsFormatting().getSuffix() +
-                entry.getValue() +
-                entry.getSuffix();
+                entry.getBeforeEquals().getPrefix() + "=" +
+                entry.getValue().getFormatting().getPrefix() + entry.getValue().getText() +
+                entry.getAfterValue().getPrefix();
     }
 }

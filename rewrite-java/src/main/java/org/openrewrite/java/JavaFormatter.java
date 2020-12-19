@@ -46,18 +46,6 @@ public class JavaFormatter extends Formatter {
         return format(cursor.firstEnclosing(J.Block.class));
     }
 
-    /**
-     * @param moving The tree that is moving
-     * @param into   The block the tree is moving into
-     * @return A shift right format visitor that can be appended to a refactor visitor pipeline
-     */
-    public ShiftFormatRightVisitor shiftRight(Tree moving, Tree into, Tree enclosesBoth) {
-        // NOTE: This isn't absolutely perfect... suppose the block moving was indented with tabs and the surrounding source was spaces.
-        // Should be close enough in the vast majority of cases.
-        int shift = enclosingIndent(into) - findIndent(enclosingIndent(enclosesBoth), moving).getEnclosingIndent();
-        return new ShiftFormatRightVisitor(moving, shift, wholeSourceIndent().isIndentedWithSpaces());
-    }
-
     public static int enclosingIndent(Tree enclosesBoth) {
         AtomicBoolean dropWhile = new AtomicBoolean(false);
         AtomicBoolean takeWhile = new AtomicBoolean(true);

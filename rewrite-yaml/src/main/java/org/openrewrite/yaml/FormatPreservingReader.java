@@ -60,7 +60,7 @@ class FormatPreservingReader extends Reader {
                 System.arraycopy(currentBuffer, lastEnd - currentBufferIndex, prefix, 0, prefixLen);
             }
 
-            return Formatting.format(new String(prefix), "");
+            return Formatting.format(new String(prefix));
         }
         return Formatting.EMPTY;
     }

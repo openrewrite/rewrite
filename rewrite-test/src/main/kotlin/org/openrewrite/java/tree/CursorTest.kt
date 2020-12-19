@@ -22,7 +22,6 @@ import org.openrewrite.Tree
 import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.RetrieveCursor
-import org.openrewrite.java.JavaSourceVisitor
 
 interface CursorTest {
     @Test

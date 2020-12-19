@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties;
 
+import org.openrewrite.Formatting;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
@@ -68,8 +69,8 @@ public class PropertiesParser implements Parser<Properties.File> {
             }
 
             if (content != null) {
-                content = content.withFormatting(format(prefix.toString(),
-                        content.getSuffix() + "\n"));
+                content = content.withFormatting(format(prefix.toString()));
+                // FIXME content.getSuffix() + "\n")
                 prefix = new StringBuilder();
                 contents.add(content);
             }
@@ -86,7 +87,7 @@ public class PropertiesParser implements Parser<Properties.File> {
             }
 
             buffer.flush();
-            String line = new String(buffer.toByteArray());
+            String line = buffer.toString();
 
             if (line.trim().startsWith("#")) {
                 contents.add(commentFromLine(line));
@@ -99,14 +100,19 @@ public class PropertiesParser implements Parser<Properties.File> {
             throw new UncheckedIOException(e);
         }
 
-        return new Properties.File(randomId(), sourceFile.toString(),
-                contents, format("", suffix), Markers.EMPTY);
+        return new Properties.File(
+                randomId(),
+                sourceFile.toString(),
+                contents,
+                format(suffix),
+                Formatting.EMPTY,
+                Markers.EMPTY
+        );
     }
 
     private Properties.Comment commentFromLine(String line) {
-        StringBuilder prefix = new StringBuilder(),
-                message = new StringBuilder(),
-                suffix = new StringBuilder();
+        StringBuilder prefix = new StringBuilder();
+        StringBuilder message = new StringBuilder();
 
         int state = 0;
         for (char c : line.toCharArray()) {
@@ -128,13 +134,11 @@ public class PropertiesParser implements Parser<Properties.File> {
                 case 2:
                     if (!Character.isWhitespace(c)) {
                         // multi-word comment
-                        message.append(suffix);
                         message.append(c);
-                        suffix = new StringBuilder();
                         state--;
                         break;
                     } else {
-                        suffix.append(c);
+                        message.append(c);
                     }
             }
         }
@@ -142,7 +146,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         return new Properties.Comment(
                 randomId(),
                 message.toString(),
-                format(prefix.toString(), suffix.toString()),
+                format(prefix.toString()),
                 Markers.EMPTY
         );
     }
@@ -151,9 +155,9 @@ public class PropertiesParser implements Parser<Properties.File> {
         StringBuilder prefix = new StringBuilder(),
                 key = new StringBuilder(),
                 equalsPrefix = new StringBuilder(),
-                equalsSuffix = new StringBuilder(),
+                valuePrefix = new StringBuilder(),
                 value = new StringBuilder(),
-                suffix = new StringBuilder();
+                afterValue = new StringBuilder();
 
         int state = 0;
         for (char c : line.toCharArray()) {
@@ -183,7 +187,7 @@ public class PropertiesParser implements Parser<Properties.File> {
                     if (c == '=') {
                         continue;
                     } else if (Character.isWhitespace(c)) {
-                        equalsSuffix.append(c);
+                        valuePrefix.append(c);
                         break;
                     }
                     state++;
@@ -196,13 +200,13 @@ public class PropertiesParser implements Parser<Properties.File> {
                 case 5:
                     if (!Character.isWhitespace(c)) {
                         // multi-word value
-                        value.append(suffix);
+                        value.append(afterValue);
                         value.append(c);
-                        suffix = new StringBuilder();
+                        afterValue = new StringBuilder();
                         state--;
                         break;
                     } else {
-                        suffix.append(c);
+                        afterValue.append(c);
                     }
             }
         }
@@ -210,9 +214,10 @@ public class PropertiesParser implements Parser<Properties.File> {
         return new Properties.Entry(
                 randomId(),
                 key.toString(),
-                value.toString(),
-                format(equalsPrefix.toString(), equalsSuffix.toString()),
-                format(prefix.toString(), suffix.toString()),
+                format(equalsPrefix.toString()),
+                new Properties.Value(randomId(), value.toString(), format(valuePrefix.toString())),
+                format(afterValue.toString()),
+                format(prefix.toString()),
                 Markers.EMPTY
         );
     }

@@ -41,8 +41,8 @@ public class ChangePropertyValue extends PropertiesRefactorVisitor {
     @Override
     public Properties visitEntry(Properties.Entry entry) {
         Properties.Entry e = refactor(entry, super::visitEntry);
-        if (e.getKey().equals(key) && !e.getValue().equals(toValue)) {
-            e = e.withValue(toValue);
+        if (e.getKey().equals(key) && !e.getValue().getText().equals(toValue)) {
+            e = e.withValue(e.getValue().withText(toValue));
         }
         return e;
     }

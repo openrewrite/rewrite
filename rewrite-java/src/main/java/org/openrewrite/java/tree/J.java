@@ -16,13 +16,11 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaParser;
 import org.openrewrite.java.JavaSourceVisitor;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.MethodMatcher;
@@ -43,16 +41,14 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.format;
-import static org.openrewrite.Tree.randomId;
 
+@SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Serializable, Tree {
     @Override
@@ -70,11 +66,9 @@ public interface J extends Serializable, Tree {
         return new PrintJava().visit(this);
     }
 
-    default J withComments(List<Comment> comments) {
-        return this;
-    }
+    <J2 extends J> J2 withPrefix(Space space);
 
-    List<Comment> getComments();
+    Space getPrefix();
 
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -85,19 +79,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         List<J.Annotation> annotations;
 
         @With
         TypeTree typeExpr;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -123,20 +114,17 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        NameTree annotationType;
-
-        @With
-        @Nullable
-        Arguments args;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        NameTree annotationType;
+
+        @Nullable
+        @With
+        JContainer<Expression> args;
 
         @JsonIgnore
         @Override
@@ -154,40 +142,6 @@ public interface J extends Serializable, Tree {
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitAnnotation(this);
         }
-
-        public static J.Annotation buildAnnotation(Formatting formatting, JavaType.Class annotationType, List<Expression> arguments) {
-            return new J.Annotation(randomId(),
-                    J.Ident.build(randomId(), annotationType.getClassName(), annotationType, emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                    arguments.isEmpty() ? null : new J.Annotation.Arguments(randomId(), arguments, emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                    emptyList(),
-                    formatting,
-                    Markers.EMPTY);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Arguments implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Expression> args;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @Override
-        public <T extends Tree> Optional<T> whenType(Class<T> treeType) {
-            return Optional.empty();
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -198,47 +152,24 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Expression indexed;
 
         @With
-        Dimension dimension;
+        JLeftPadded<JRightPadded<? extends Expression>> dimension;
 
         @With
         @Nullable
         JavaType type;
 
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitArrayAccess(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Dimension implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Expression index;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
         }
     }
 
@@ -250,19 +181,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        TypeTree elementType;
-
-        @With
-        List<Dimension> dimensions;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        TypeTree elementType;
+
+        @With
+        List<JRightPadded<Space>> dimensions;
 
         @Override
         public JavaType getType() {
@@ -279,26 +207,6 @@ public interface J extends Serializable, Tree {
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitArrayType(this);
         }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Dimension implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Empty inner;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -309,26 +217,17 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression condition;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        Expression condition;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitAssert(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
     }
 
@@ -340,7 +239,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression variable;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JRightPadded<? extends Expression> variable;
 
         @With
         Expression assignment;
@@ -348,15 +253,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -368,12 +264,6 @@ public interface J extends Serializable, Tree {
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -384,10 +274,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Expression variable;
 
         @With
-        Operator operator;
+        JLeftPadded<Type> operator;
 
         @With
         Expression assignment;
@@ -395,15 +291,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -416,200 +303,18 @@ public interface J extends Serializable, Tree {
             return singletonList(this);
         }
 
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
-
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Operator implements J {
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Addition extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Subtraction extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Multiplication extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Division extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Modulo extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitAnd extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitOr extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitXor extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class LeftShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class RightShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class UnsignedRightShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
+        public enum Type {
+            Addition,
+            Subtraction,
+            Multiplication,
+            Division,
+            Modulo,
+            BitAnd,
+            BitOr,
+            BitXor,
+            LeftShift,
+            RightShift,
+            UnsignedRightShift
         }
     }
 
@@ -621,10 +326,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Expression left;
 
         @With
-        Operator operator;
+        JLeftPadded<Type> operator;
 
         @With
         Expression right;
@@ -632,15 +343,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -656,392 +358,72 @@ public interface J extends Serializable, Tree {
             return sideEffects;
         }
 
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Operator implements J {
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Addition extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Subtraction extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Multiplication extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Division extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Modulo extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class LessThan extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class GreaterThan extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class LessThanOrEqual extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class GreaterThanOrEqual extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Equal extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class NotEqual extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitAnd extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitOr extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class BitXor extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class LeftShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class RightShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class UnsignedRightShift extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Or extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class And extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
+        public enum Type {
+            Addition,
+            Subtraction,
+            Multiplication,
+            Division,
+            Modulo,
+            LessThan,
+            GreaterThan,
+            LessThanOrEqual,
+            GreaterThanOrEqual,
+            Equal,
+            NotEqual,
+            BitAnd,
+            BitOr,
+            BitXor,
+            LeftShift,
+            RightShift,
+            UnsignedRightShift,
+            Or,
+            And
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @AllArgsConstructor
-    final class Block<T extends J> implements J, Statement {
+    final class Block implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
         @Getter
         @With
-        @Nullable
-        Empty afterStatic;
-
-        @Getter
-        @With
-        List<T> statements;
-
-        @Getter
-        @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @Getter
         @With
         Markers markers;
 
+        /**
+         * These comments and whitespace are AFTER the static keyword
+         */
+        @Nullable
+        @With
+        Space statik;
+
+        @Nullable
+        public Space getStatic() {
+            return statik;
+        }
+
+        public Block withStatic(@Nullable Space statik) {
+            return new Block(id, prefix, markers, statik, statements, end);
+        }
+
         @Getter
         @With
-        End end;
+        List<JRightPadded<Statement>> statements;
 
-        @SuppressWarnings("unchecked")
+        @Getter
+        @With
+        Space end;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitBlock((Block<J>) this);
-        }
-
-        @JsonIgnore
-        public int getIndent() {
-            return Formatting.getIndent(end.getPrefix());
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class End implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
+            return v.visitBlock(this);
         }
     }
 
@@ -1053,27 +435,18 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        @Nullable
-        Ident label;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        @Nullable
+        Ident label;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitBreak(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
     }
 
@@ -1085,20 +458,20 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        @Nullable
-        Expression pattern;
-
-        @With
-        List<Statement> statements;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        /**
+         * Right padded before the ':'
+         */
+        @With
+        @Nullable
+        JRightPadded<? extends Expression> pattern;
+
+        @With
+        List<JRightPadded<Statement>> statements;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1116,34 +489,23 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        List<Annotation> annotations;
-
-        @Getter
-        List<Modifier> modifiers;
-
-        public ClassDecl withModifiers(List<Modifier> modifiers) {
-            if (modifiers == this.modifiers) {
-                return this;
-            }
-            return new ClassDecl(id, annotations, modifiers, kind, name, typeParameters,
-                    extendings, implementings, body, type, comments, formatting, markers);
-        }
-
-        public ClassDecl withModifiers(String... modifierKeywords) {
-            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
-
-            if (fixedModifiers == modifiers) {
-                return this;
-            } else if (modifiers.isEmpty()) {
-                return withModifiers(fixedModifiers).withKind(kind.withPrefix(" "));
-            }
-
-            return withModifiers(fixedModifiers);
-        }
+        Space prefix;
 
         @With
         @Getter
-        Kind kind;
+        Markers markers;
+
+        @With
+        @Getter
+        List<Annotation> annotations;
+
+        @With
+        @Getter
+        List<Modifier> modifiers;
+
+        @With
+        @Getter
+        JLeftPadded<Kind> kind;
 
         @With
         @Getter
@@ -1152,64 +514,50 @@ public interface J extends Serializable, Tree {
         @With
         @Getter
         @Nullable
-        TypeParameters typeParameters;
+        JContainer<TypeParameter> typeParameters;
 
         @Nullable
-        Extends extendings;
+        JLeftPadded<TypeTree> extendings;
 
-        public ClassDecl withExtends(@Nullable Extends extendings) {
+        public ClassDecl withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
             if (extendings == this.extendings) {
                 return this;
             }
-            return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type,
-                    comments, formatting, markers);
+            return new ClassDecl(id, prefix, markers, annotations, modifiers, kind, name,
+                    typeParameters, extendings, implementings, body, type);
         }
 
         @JsonProperty("extendings")
         @Nullable
-        public Extends getExtends() {
+        public JLeftPadded<TypeTree> getExtends() {
             return extendings;
         }
 
         @Nullable
-        Implements implementings;
+        JContainer<TypeTree> implementings;
 
-        public ClassDecl withImplements(@Nullable Implements implementings) {
+        public ClassDecl withImplements(@Nullable JContainer<TypeTree> implementings) {
             if (implementings == this.implementings) {
                 return this;
             }
-            return new ClassDecl(id, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type,
-                    comments, formatting, markers);
+            return new ClassDecl(id, prefix, markers, annotations, modifiers, kind, name,
+                    typeParameters, extendings, implementings, body, type);
         }
 
         @JsonProperty("implementings")
         @Nullable
-        public Implements getImplements() {
+        public JContainer<TypeTree> getImplements() {
             return implementings;
         }
 
         @With
         @Getter
-        Block<J> body;
+        Block body;
 
         @With
         @Getter
         @Nullable
         JavaType.Class type;
-
-        @Getter
-        @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
-
-        @Getter
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1221,140 +569,45 @@ public interface J extends Serializable, Tree {
             return name.getSimpleName();
         }
 
+        public enum Kind {
+            Class,
+            Enum,
+            Interface,
+            Annotation
+        }
+
         @Nullable
         public EnumValueSet getEnumValues() {
-            return body.getStatements().stream()
-                    .filter(EnumValueSet.class::isInstance)
-                    .map(EnumValueSet.class::cast)
-                    .findAny()
-                    .orElse(null);
+            for (JRightPadded<Statement> stat : body.getStatements()) {
+                if (stat.getElem() instanceof EnumValueSet) {
+                    return (EnumValueSet) stat.getElem();
+                }
+            }
+            return null;
         }
 
         @JsonIgnore
         public List<VariableDecls> getFields() {
-            return body.getStatements().stream()
-                    .filter(VariableDecls.class::isInstance)
-                    .map(VariableDecls.class::cast)
-                    .collect(toList());
+            List<VariableDecls> list = new ArrayList<>();
+            for (JRightPadded<Statement> stat : body.getStatements()) {
+                if (stat.getElem() instanceof VariableDecls) {
+                    VariableDecls variableDecls = (VariableDecls) stat.getElem();
+                    list.add(variableDecls);
+                }
+            }
+            return list;
         }
 
         @JsonIgnore
         public List<MethodDecl> getMethods() {
-            return body.getStatements().stream()
-                    .filter(MethodDecl.class::isInstance)
-                    .map(MethodDecl.class::cast)
-                    .collect(toList());
-        }
-
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public static abstract class Kind implements J {
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Class extends Kind {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
+            List<MethodDecl> list = new ArrayList<>();
+            for (JRightPadded<Statement> stat : body.getStatements()) {
+                if (stat.getElem() instanceof MethodDecl) {
+                    MethodDecl methodDecl = (MethodDecl) stat.getElem();
+                    list.add(methodDecl);
+                }
             }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Enum extends Kind {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Interface extends Kind {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Annotation extends Kind {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Extends implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            TypeTree from;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Implements implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<TypeTree> from;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
+            return list;
         }
 
         /**
@@ -1396,61 +649,9 @@ public interface J extends Serializable, Tree {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
-        @JsonIgnore
-        public boolean isEnum() {
-            return kind instanceof Kind.Enum;
-        }
-
-        @JsonIgnore
-        public boolean isClass() {
-            return kind instanceof Kind.Class;
-        }
-
-        @JsonIgnore
-        public boolean isInterface() {
-            return kind instanceof Kind.Interface;
-        }
-
-        @JsonIgnore
-        public boolean isAnnotation() {
-            return kind instanceof Kind.Annotation;
-        }
-
         @Override
         public String toString() {
             return "ClassDecl{" + ClassDeclToString.toString(this) + "}";
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Comment implements J, Statement {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        CommentStyle style;
-
-        @With
-        String text;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
-        @Override
-        public List<Comment> getComments() {
-            return emptyList();
-        }
-
-        enum CommentStyle {
-            LINE,
-            BLOCK,
-            JAVADOC,
-            WHITESPACE
         }
     }
 
@@ -1462,6 +663,12 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         String sourcePath;
 
         @With
@@ -1469,22 +676,13 @@ public interface J extends Serializable, Tree {
         Package packageDecl;
 
         @With
-        List<Import> imports;
+        List<JRightPadded<Import>> imports;
 
         @With
         List<ClassDecl> classes;
 
         @With
-        Empty eof;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
+        Space eof;
 
         @With
         Collection<JavaStyle> styles;
@@ -1530,68 +728,6 @@ public interface J extends Serializable, Tree {
                     .mapToObj(n -> "../")
                     .collect(joining(""))).normalize();
         }
-
-        /**
-         * Build a parser that matches the styles for this compilation unit with just the named artifacts on the
-         * classpath.
-         *
-         * @param artifactNames The artifact names are the artifact portion of group:artifact:version coordinates
-         * @return A JavaParser with an explcit set of dependencies derived from the runtime classpath
-         */
-        public JavaParser buildParser(String... artifactNames) {
-            return JavaParser.fromJavaVersion()
-                    .classpath(JavaParser.dependenciesFromClasspath(artifactNames))
-                    .styles(styles)
-                    .build();
-        }
-
-        /**
-         * Build a parser that matches the styles for this compilation unit with all dependencies from the runtime
-         * classpath included.
-         *
-         * @return A JavaParser with a classpath matching the current runtime classpath
-         */
-        @Incubating(since = "6.1.0")
-        public JavaParser buildRuntimeParser() {
-            return JavaParser.fromJavaVersion()
-                    .classpath(JavaParser.allDependenciesFromClasspath())
-                    .styles(styles)
-                    .build();
-        }
-
-        public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
-            String sourcePath = sourceSet
-                    .resolve(packageName.replace(".", "/"))
-                    .resolve(className + ".java")
-                    .toString();
-
-            return new J.CompilationUnit(
-                    randomId(),
-                    sourcePath,
-                    new J.Package(randomId(), TreeBuilder.buildName(packageName).withPrefix(" "),
-                            new J.Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                            emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                    emptyList(),
-                    singletonList(new J.ClassDecl(randomId(),
-                            emptyList(),
-                            emptyList(),
-                            new ClassDecl.Kind.Class(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                            TreeBuilder.buildName(className).withPrefix(" "),
-                            null,
-                            null,
-                            null,
-                            new Try.Block<>(randomId(), null, emptyList(), emptyList(), format(" "),
-                                    Markers.EMPTY, new Block.End(randomId(), emptyList(), format("\n"), Markers.EMPTY)),
-                            JavaType.Class.build(packageName + "." + className),
-                            emptyList(),
-                            format("\n\n"),
-                            Markers.EMPTY).withModifiers("public")),
-                    new Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY),
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY,
-                    emptyList());
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1602,27 +738,18 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        @Nullable
-        Ident label;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        @Nullable
+        Ident label;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitContinue(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
     }
 
@@ -1634,49 +761,20 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Statement body;
-
-        @With
-        While whileCondition;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        Statement body;
+
+        @With
+        JLeftPadded<Parentheses<Expression>> whileCondition;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitDoWhileLoop(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class While implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Parentheses<Expression> condition;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
         }
     }
 
@@ -1688,10 +786,7 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
@@ -1711,20 +806,20 @@ public interface J extends Serializable, Tree {
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitEmpty(this);
         }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class EnumValue implements J, Statement {
+    final class EnumValue implements J {
         @EqualsAndHashCode.Include
         UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
 
         @With
         Ident name;
@@ -1732,15 +827,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         NewClass initializer;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1756,18 +842,15 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        List<EnumValue> enums;
-
-        boolean terminatedWithSemicolon;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        List<JRightPadded<EnumValue>> enums;
+
+        boolean terminatedWithSemicolon;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1783,7 +866,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression target;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JRightPadded<Expression> target;
 
         @With
         Ident name;
@@ -1791,15 +880,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1814,7 +894,7 @@ public interface J extends Serializable, Tree {
         @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
-            return target.getSideEffects();
+            return target.getElem().getSideEffects();
         }
 
         /**
@@ -1867,11 +947,11 @@ public interface J extends Serializable, Tree {
             if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
                 return false;
             }
-            if (fieldAccess.getTarget() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
+            if (fieldAccess.getTarget().getElem() instanceof J.FieldAccess) {
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget().getElem(), className.substring(0, className.lastIndexOf('.')));
             }
-            if (fieldAccess.getTarget() instanceof J.Ident) {
-                return ((J.Ident) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+            if (fieldAccess.getTarget().getElem() instanceof J.Ident) {
+                return ((J.Ident) fieldAccess.getTarget().getElem()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
             }
             return false;
         }
@@ -1885,19 +965,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Control control;
 
         @With
         Statement body;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1912,19 +989,16 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
-            VariableDecls variable;
-
-            @With
-            Expression iterable;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
+            Space prefix;
 
             @With
             Markers markers;
+
+            @With
+            JRightPadded<VariableDecls> variable;
+
+            @With
+            JRightPadded<Expression> iterable;
         }
     }
 
@@ -1936,19 +1010,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Control control;
 
         @With
         Statement body;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -1963,22 +1034,19 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
-            Statement init;
-
-            @With
-            Expression condition;
-
-            @With
-            List<Statement> update;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
+            Space prefix;
 
             @With
             Markers markers;
+
+            @With
+            JRightPadded<Statement> init;
+
+            @With
+            JRightPadded<Expression> condition;
+
+            @With
+            List<JRightPadded<Statement>> update;
         }
     }
 
@@ -1986,27 +1054,23 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
     final class Ident implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new HashMap<>();
 
         @EqualsAndHashCode.Include
         UUID id;
 
-        IdentFlyweight ident;
-
         @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
-        private Ident(UUID id, IdentFlyweight ident, List<Comment> comments, Formatting formatting, Markers markers) {
+        IdentFlyweight ident;
+
+        private Ident(UUID id, IdentFlyweight ident, Space prefix, Markers markers) {
             this.id = id;
             this.ident = ident;
-            this.comments = comments;
-            this.formatting = formatting;
+            this.prefix = prefix;
             this.markers = markers;
         }
 
@@ -2018,7 +1082,7 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Ident withType(JavaType type) {
-            return build(id, getSimpleName(), type, comments, formatting, markers);
+            return build(id, prefix, markers, getSimpleName(), type);
         }
 
         @JsonIgnore
@@ -2032,39 +1096,25 @@ public interface J extends Serializable, Tree {
         }
 
         public Ident withName(String name) {
-            return build(id, name, getType(), comments, formatting, markers);
+            return build(id, prefix, markers, name, getType());
         }
 
         @JsonCreator
         public static Ident build(@JsonProperty("id") UUID id,
+                                  @JsonProperty("prefix") Space prefix,
+                                  @JsonProperty("metadata") Markers markers,
                                   @JsonProperty("simpleName") String simpleName,
-                                  @JsonProperty("type") @Nullable JavaType type,
-                                  @JsonProperty("comments") List<Comment> comments,
-                                  @JsonProperty("formatting") Formatting formatting,
-                                  @JsonProperty("metadata") Markers markers) {
+                                  @JsonProperty("type") @Nullable JavaType type) {
             synchronized (flyweights) {
                 return new Ident(
                         id,
                         flyweights
-                                .computeIfAbsent(simpleName, n -> HashObjObjMaps.newMutableMap())
+                                .computeIfAbsent(simpleName, n -> new HashMap<>())
                                 .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
-                        comments,
-                        formatting,
+                        prefix,
                         markers
                 );
             }
-        }
-
-        public static Ident buildClassName(String fullyQualifiedName) {
-            JavaType.Class classType = JavaType.Class.build(fullyQualifiedName);
-            return J.Ident.build(
-                    randomId(),
-                    classType.getClassName(),
-                    classType,
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY
-            );
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2092,52 +1142,24 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Parentheses<Expression> ifCondition;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JLeftPadded<Expression> ifCondition;
 
         @With
         Statement thenPart;
 
         @With
         @Nullable
-        Else elsePart;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
+        JLeftPadded<Statement> elsePart;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitIf(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Else implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Statement statement;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-
-            @Override
-            public <R> R acceptJava(JavaSourceVisitor<R> v) {
-                return v.visitElse(this);
-            }
         }
     }
 
@@ -2149,47 +1171,49 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
-        @Getter
-        FieldAccess qualid;
-
-        @With
-        boolean statik;
-
         @Getter
         @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @Getter
         @With
         Markers markers;
+
+        @With
+        @Nullable
+        Space statik;
+
+        @With
+        @Getter
+        FieldAccess qualid;
+
+        public boolean isStatic() {
+            return statik != null;
+        }
+
+        @Nullable
+        public Space getStatic() {
+            return statik;
+        }
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitImport(this);
         }
 
-        public boolean isStatic() {
-            return statik;
-        }
-
         @JsonIgnore
         public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
-                return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
+                return qualid.target.getElem().printTrimmed().equals(Arrays.stream(clazz.split("\\."))
                         .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
                         .collect(Collectors.joining("."))
                 );
             }
-            return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
+            return (isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed()).equals(clazz);
         }
 
         public String getTypeName() {
-            return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
+            return isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed();
         }
 
         /**
@@ -2207,7 +1231,7 @@ public interface J extends Serializable, Tree {
             }
 
             AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return stream(qualid.getTarget().printTrimmed().split("\\."))
+            return stream(qualid.getTarget().getElem().printTrimmed().split("\\."))
                     .filter(pkg -> {
                         takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
                         return takeWhile.get();
@@ -2246,7 +1270,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression expr;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JRightPadded<Expression> expr;
 
         @With
         Tree clazz;
@@ -2254,15 +1284,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2278,22 +1299,19 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Ident label;
-
-        @With
-        Empty beforeColon;
-
-        @With
-        Statement statement;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        /**
+         * Right padded before the ':'
+         */
+        @With
+        JRightPadded<Ident> label;
+
+        @With
+        Statement statement;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2309,10 +1327,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Parameters paramSet;
+        Space prefix;
 
         @With
-        Arrow arrow;
+        Markers markers;
+
+        @With
+        Parameters parameters;
+
+        @With
+        Space arrow;
 
         @With
         Tree body;
@@ -2321,35 +1345,9 @@ public interface J extends Serializable, Tree {
         @Nullable
         JavaType type;
 
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitLambda(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Arrow implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2360,23 +1358,16 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
-            boolean parenthesized;
-
-            @With
-            List<? extends Tree> params;
-
-            List<Comment> comments = emptyList();
-
-            Formatting formatting = Formatting.EMPTY;
+            Space prefix;
 
             @With
             Markers markers;
 
-            @SuppressWarnings("unchecked")
-            @Override
-            public <T extends Tree> T withFormatting(Formatting fmt) {
-                return (T) this;
-            }
+            @With
+            boolean parenthesized;
+
+            @With
+            List<JRightPadded<J>> params;
         }
     }
 
@@ -2386,6 +1377,12 @@ public interface J extends Serializable, Tree {
     final class Literal implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
 
         @With
         @Nullable
@@ -2403,19 +1400,10 @@ public interface J extends Serializable, Tree {
         @Override
         public Literal withType(JavaType type) {
             if (type instanceof JavaType.Primitive) {
-                return new Literal(id, value, valueSource, (JavaType.Primitive) type, comments, formatting, markers);
+                return new Literal(id, prefix, markers, value, valueSource, (JavaType.Primitive) type);
             }
             return this;
         }
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2434,18 +1422,6 @@ public interface J extends Serializable, Tree {
             }
             throw new IllegalStateException("Encountered a literal `" + this + "` that could not be transformed");
         }
-
-        public static Literal buildString(String value) {
-            return new J.Literal(
-                    randomId(),
-                    value,
-                    "\"" + value + "\"",
-                    JavaType.Primitive.String,
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY
-            );
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2456,11 +1432,20 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression containing;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        /**
+         * Right padded before the '::'
+         */
+        @With
+        JRightPadded<Expression> containing;
 
         @With
         @Nullable
-        TypeParameters typeParameters;
+        JContainer<Expression> typeParameters;
 
         @With
         Ident reference;
@@ -2468,15 +1453,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2487,51 +1463,31 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
-    final class MethodDecl implements J {
+    final class MethodDecl implements J, Statement {
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
         @With
         @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        @With
+        @Getter
         List<Annotation> annotations;
 
+        @With
         @Getter
         List<Modifier> modifiers;
-
-        public MethodDecl withModifiers(List<Modifier> modifiers) {
-            if (modifiers == this.modifiers) {
-                return this;
-            }
-            return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr, name, params,
-                    throwz, body, defaultValue, comments, formatting, markers);
-        }
-
-        public MethodDecl withModifiers(String... modifierKeywords) {
-            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
-
-            if (fixedModifiers == modifiers) {
-                return this;
-            } else if (modifiers.isEmpty()) {
-                if (typeParameters != null) {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeParameters.getPrefix()))
-                            .withTypeParameters(typeParameters.withPrefix(" "));
-                } else if (returnTypeExpr != null) {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, returnTypeExpr.getPrefix()))
-                            .withReturnTypeExpr(returnTypeExpr.withPrefix(" "));
-                } else {
-                    return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, name.getPrefix()))
-                            .withName(name.withPrefix(" "));
-                }
-            }
-
-            return withModifiers(fixedModifiers);
-        }
 
         @With
         @Getter
         @Nullable
-        TypeParameters typeParameters;
+        JContainer<TypeParameter> typeParameters;
 
         /**
          * Null for constructor declarations.
@@ -2547,22 +1503,22 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        Parameters params;
+        JContainer<Statement> params;
 
         @Nullable
-        Throws throwz;
+        JContainer<NameTree> throwz;
 
-        public MethodDecl withThrows(Throws throwz) {
+        public MethodDecl withThrows(JContainer<NameTree> throwz) {
             if (throwz == this.throwz) {
                 return this;
             }
-            return new MethodDecl(id, annotations, modifiers, typeParameters, returnTypeExpr,
-                    name, params, throwz, body, defaultValue, comments, formatting, markers);
+            return new MethodDecl(id, prefix, markers, annotations, modifiers, typeParameters, returnTypeExpr,
+                    name, params, throwz, body, defaultValue);
         }
 
         @JsonProperty("throwz")
         @Nullable
-        public Throws getThrows() {
+        public JContainer<NameTree> getThrows() {
             return throwz;
         }
 
@@ -2572,24 +1528,15 @@ public interface J extends Serializable, Tree {
         @With
         @Getter
         @Nullable
-        Block<Statement> body;
+        Block body;
 
+        /**
+         * For default values on definitions of annotation parameters.
+         */
         @With
         @Getter
         @Nullable
-        Default defaultValue;
-
-        @Getter
-        @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
-
-        @Getter
-        @With
-        Markers markers;
+        JLeftPadded<Expression> defaultValue;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -2612,70 +1559,6 @@ public interface J extends Serializable, Tree {
         @JsonIgnore
         public boolean isConstructor() {
             return getReturnTypeExpr() == null;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Parameters implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Statement> params;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-
-            public boolean isEmpty() {
-                return params.stream().allMatch(p -> p instanceof Empty);
-            }
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Throws implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<NameTree> exceptions;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Default implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Expression value;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
         }
 
         @JsonIgnore
@@ -2701,36 +1584,36 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        /**
+         * Right padded before the '.'
+         */
+        @With
         @Nullable
-        Expression select;
+        JRightPadded<Expression> select;
 
         @With
         @Nullable
-        TypeParameters typeParameters;
+        JContainer<TypeParameter> typeParameters;
 
         @With
         Ident name;
 
         @With
-        Arguments args;
+        JContainer<Expression> args;
 
         @Nullable
         JavaType.Method type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @SuppressWarnings("unchecked")
         @Override
         public MethodInvocation withType(JavaType type) {
             if (type instanceof JavaType.Method) {
-                return new MethodInvocation(id, select, typeParameters, name, args, (JavaType.Method) type, comments, formatting, markers);
+                return new MethodInvocation(id, prefix, markers, select, typeParameters, name, args, (JavaType.Method) type);
             }
             return this;
         }
@@ -2746,12 +1629,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMethodInvocation(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
 
         @JsonIgnore
@@ -2771,370 +1648,42 @@ public interface J extends Serializable, Tree {
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Arguments implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Expression> args;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
     }
 
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    abstract class Modifier implements J {
+    @Data
+    final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
             return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
                     .toLowerCase().equals(modifier));
         }
 
-        public static List<Modifier> withVisibility(List<Modifier> existing, String visibility) {
-            List<J.Modifier> modifiers = new ArrayList<>(existing);
-            J.Modifier actualModifier = null;
-
-            if (!visibility.equals("package")) {
-                J.Modifier desiredModifier = J.Modifier.buildModifier(visibility, Formatting.EMPTY);
-                actualModifier = existing.stream()
-                        .filter(modifier -> modifier.getClass().equals(desiredModifier.getClass()))
-                        .findAny()
-                        .orElse(desiredModifier);
-            }
-
-            modifiers = Stream.concat(
-                    Stream.of(actualModifier),
-                    modifiers.stream()
-                            .filter(mod -> !(mod instanceof J.Modifier.Protected || mod instanceof J.Modifier.Private || mod instanceof J.Modifier.Public))
-            )
-                    .filter(Objects::nonNull)
-                    .collect(toList());
-
-            return modifiers;
-        }
-
-        /**
-         * Adds a new modifier(s) to a modifier list in a canonical way, e.g. add final after static and visibility modifiers,
-         * static before final and after visibility modifiers.
-         *
-         * @param existing         The existing list of modifiers to add to.
-         * @param modifierKeywords The new modifiers to add.
-         * @return A new list containing the new modifier, or the original list instance if the modifier
-         * is already present in the list.
-         */
-        public static List<Modifier> withModifiers(List<Modifier> existing, String... modifierKeywords) {
-            boolean visibilityChanged = false;
-            List<Modifier> modifiers = new ArrayList<>(existing);
-
-            for (String modifier : modifierKeywords) {
-                int sizeBeforeAdd = modifiers.size();
-
-                if ("final".equals(modifier) && !hasModifier(existing, "final")) {
-                    boolean finalAdded = false;
-
-                    for (int i = 0; i < sizeBeforeAdd; i++) {
-                        Modifier m = modifiers.get(i);
-                        if (m instanceof Static) {
-                            modifiers.add(i + 1, new Final(randomId(), emptyList(), format(" "), Markers.EMPTY));
-                            finalAdded = true;
-                            break;
-                        }
-
-                        if (i == modifiers.size() - 1) {
-                            modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(i + 1, new Final(randomId(), emptyList(), format(" ", m.getSuffix()), Markers.EMPTY));
-                            finalAdded = true;
-                        }
-                    }
-
-                    if (!finalAdded) {
-                        modifiers.add(0, new Final(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
-                    }
-                } else if ("static".equals(modifier) && !hasModifier(existing, "static")) {
-                    boolean staticAdded = false;
-                    int afterAccessModifier = 0;
-
-                    for (int i = 0; i < sizeBeforeAdd; i++) {
-                        Modifier m = modifiers.get(i);
-                        if (m instanceof Private || m instanceof Protected || m instanceof Public) {
-                            afterAccessModifier = i + 1;
-                        } else if (m instanceof Final) {
-                            modifiers.set(i, m.withFormatting(format(" ", m.getSuffix())));
-                            modifiers.add(i, new Static(randomId(), emptyList(), format(m.getPrefix()), Markers.EMPTY));
-                            staticAdded = true;
-                            break;
-                        }
-
-                        if (i == modifiers.size() - 1) {
-                            modifiers.set(i, m.withSuffix(""));
-                            modifiers.add(afterAccessModifier, new Static(randomId(), emptyList(), format(" ", m.getSuffix()), Markers.EMPTY));
-                            staticAdded = true;
-                        }
-                    }
-
-                    if (!staticAdded) {
-                        modifiers.add(0, new Static(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
-                    }
-                } else if (("public".equals(modifier) || "protected".equals(modifier) || "private".equals(modifier)) &&
-                        !hasModifier(existing, modifier)) {
-                    boolean accessModifierAdded = false;
-
-                    for (int i = 0; i < sizeBeforeAdd; i++) {
-                        Modifier m = modifiers.get(i);
-                        if (m instanceof Private || m instanceof Protected || m instanceof Public) {
-                            // replace a different access modifier in place
-                            modifiers.set(i, buildModifier(modifier, m.getFormatting()));
-                            accessModifierAdded = true;
-                            visibilityChanged = true;
-                            break;
-                        }
-
-                        if (i == modifiers.size() - 1) {
-                            modifiers.add(0, buildModifier(modifier, format(modifiers.get(0).getPrefix(),
-                                    m.getSuffix())));
-                            modifiers.set(i + 1, m.withFormatting(format(" ", "")));
-                            accessModifierAdded = true;
-                        }
-                    }
-
-                    if (!accessModifierAdded) {
-                        modifiers.add(0, buildModifier(modifier, Formatting.EMPTY));
-                    }
-                }
-            }
-
-            return visibilityChanged || modifiers.size() > existing.size() ? modifiers : existing;
-        }
-
-        public static J.Modifier buildModifier(String modifier, Formatting formatting) {
-            Modifier access;
-            switch (modifier) {
-                case "public":
-                    access = new Public(randomId(), emptyList(), formatting, Markers.EMPTY);
-                    break;
-                case "protected":
-                    access = new Protected(randomId(), emptyList(), formatting, Markers.EMPTY);
-                    break;
-                case "private":
-                default:
-                    access = new Private(randomId(), emptyList(), formatting, Markers.EMPTY);
-                    break;
-            }
-            return access;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Default extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Public extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Protected extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Private extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Abstract extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Static extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Final extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Native extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Strictfp extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Synchronized extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Transient extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Volatile extends Modifier {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        Type type;
+
+        public enum Type {
+            Default,
+            Public,
+            Protected,
+            Private,
+            Abstract,
+            Static,
+            Final,
+            Native,
+            Strictfp,
+            Synchronized,
+            Transient,
+            Volatile,
         }
     }
 
@@ -3146,16 +1695,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        List<NameTree> alternatives;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        List<JRightPadded<NameTree>> alternatives;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3174,7 +1720,7 @@ public interface J extends Serializable, Tree {
         public JavaType getType() {
             return new JavaType.MultiCatch(alternatives.stream()
                     .filter(Objects::nonNull)
-                    .map(NameTree::getType)
+                    .map(alt -> alt.getElem().getType())
                     .collect(toList()));
         }
     }
@@ -3187,116 +1733,86 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         @Nullable
         TypeTree typeExpr;
 
         @With
-        List<Dimension> dimensions;
+        List<JLeftPadded<JRightPadded<Expression>>> dimensions;
 
         @With
         @Nullable
-        Initializer initializer;
+        JContainer<Expression> initializer;
 
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitNewArray(this);
         }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Dimension implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Expression size;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Initializer implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Expression> elements;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @AllArgsConstructor
     final class NewClass implements J, Statement, Expression {
+        @Getter
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
+        /**
+         * Right padded before the '.'
+         */
         @Nullable
         @With
-        Expression encl;
+        @Getter
+        JRightPadded<Expression> encl;
 
-        New nooh;
+        Space nooh;
 
-        public NewClass withNew(New nooh) {
-            return new NewClass(id, encl, nooh, clazz, args, body, type, comments, formatting, markers);
+        public NewClass withNew(Space nooh) {
+            return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
+        }
+
+        @JsonProperty("nooh")
+        public Space getNew() {
+            return nooh;
         }
 
         @Nullable
         @With
+        @Getter
         TypeTree clazz;
 
         @Nullable
         @With
-        Arguments args;
+        @Getter
+        JContainer<Expression> args;
 
         @With
         @Nullable
-        Block<? extends Tree> body;
+        @Getter
+        Block body;
 
         @With
         @Nullable
+        @Getter
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3308,49 +1824,6 @@ public interface J extends Serializable, Tree {
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Arguments implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Expression> args;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class New implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3361,19 +1834,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression expr;
-
-        @With
-        Empty beforeSemicolon;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        JRightPadded<Expression> expr;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3389,20 +1856,17 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         NameTree clazz;
 
         @With
         @Nullable
-        TypeParameters typeParameters;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
+        JContainer<Expression> typeParameters;
 
         @Override
         public JavaType getType() {
@@ -3419,72 +1883,23 @@ public interface J extends Serializable, Tree {
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitParameterizedType(this);
         }
-
-        public static ParameterizedType build(String typeName, String... genericTypeNames) {
-            JavaType.Class typeNameType = JavaType.Class.build(typeName);
-
-            return new J.ParameterizedType(
-                    randomId(),
-                    J.Ident.build(
-                            randomId(),
-                            typeNameType.getClassName(),
-                            typeNameType,
-                            emptyList(),
-                            Formatting.EMPTY,
-                            Markers.EMPTY),
-                    new J.TypeParameters(
-                            randomId(),
-                            Formatting.formatFirstPrefix(
-                                    stream(genericTypeNames)
-                                            .map(generic -> {
-                                                JavaType.Class genericType = JavaType.Class.build(generic);
-                                                return new J.TypeParameter(
-                                                        randomId(),
-                                                        emptyList(),
-                                                        J.Ident.build(
-                                                                randomId(),
-                                                                genericType.getClassName(),
-                                                                genericType,
-                                                                emptyList(),
-                                                                Formatting.EMPTY,
-                                                                Markers.EMPTY
-                                                        ),
-                                                        null,
-                                                        emptyList(),
-                                                        format(" "),
-                                                        Markers.EMPTY
-                                                );
-                                            })
-                                            .collect(Collectors.toList()), ""
-                            ),
-                            emptyList(),
-                            Formatting.EMPTY,
-                            Markers.EMPTY),
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY
-            );
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Parentheses<T extends J> implements J, Expression {
+    final class Parentheses<J2 extends J> implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
         @With
-        T tree;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        JRightPadded<J2> tree;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3506,7 +1921,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Parentheses<T> withType(JavaType type) {
+        public Parentheses<J2> withType(JavaType type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
@@ -3521,6 +1936,14 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
+        @Getter
+        Space prefix;
+
+        @With
+        @Getter
+        Markers markers;
+
         JavaType.Primitive type;
 
         @SuppressWarnings("unchecked")
@@ -3529,7 +1952,7 @@ public interface J extends Serializable, Tree {
             if (!(type instanceof JavaType.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitive");
             }
-            return new Primitive(id, (JavaType.Primitive) type, comments, formatting, markers);
+            return new Primitive(id, prefix, markers, (JavaType.Primitive) type);
         }
 
         @Override
@@ -3537,18 +1960,6 @@ public interface J extends Serializable, Tree {
         public JavaType.Primitive getType() {
             return type;
         }
-
-        @Getter
-        @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
-
-        @Getter
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3564,27 +1975,18 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        @Nullable
-        Expression expr;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        @Nullable
+        JRightPadded<Expression> expr;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitReturn(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
     }
 
@@ -3596,19 +1998,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Parentheses<Expression> selector;
-
-        @With
-        Block<Case> cases;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        Parentheses<Expression> selector;
+
+        @With
+        Block cases;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3624,19 +2023,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Parentheses<Expression> lock;
-
-        @With
-        Block<Statement> body;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
+
+        @With
+        Parentheses<Expression> lock;
+
+        @With
+        Block body;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3652,10 +2048,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression condition;
+        Space prefix;
 
         @With
-        Expression truePart;
+        Markers markers;
+
+        @With
+        JRightPadded<Expression> condition;
+
+        @With
+        JRightPadded<Expression> truePart;
 
         @With
         Expression falsePart;
@@ -3663,15 +2065,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3687,26 +2080,17 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Expression exception;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
+        Space prefix;
 
         @With
         Markers markers;
 
+        @With
+        Expression exception;
+
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitThrow(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
     }
 
@@ -3720,43 +2104,40 @@ public interface J extends Serializable, Tree {
 
         @With
         @Getter
-        @Nullable
-        Resources resources;
+        Space prefix;
 
         @With
         @Getter
-        Block<Statement> body;
+        Markers markers;
+
+        @With
+        @Getter
+        @Nullable
+        JContainer<Resource> resources;
+
+        @With
+        @Getter
+        Block body;
 
         @With
         @Getter
         List<Catch> catches;
 
         @Nullable
-        Finally finallie;
+        JLeftPadded<Block> finallie;
 
-        public Try withFinally(Finally finallie) {
+        public Try withFinally(JLeftPadded<Block> finallie) {
             if (finallie == this.finallie) {
                 return this;
             }
-            return new Try(id, resources, body, catches, finallie, comments, formatting, markers);
+            return new Try(id, prefix, markers, resources, body, catches, finallie);
         }
 
+        @JsonProperty("finallie")
         @Nullable
-        public Finally getFinally() {
+        public JLeftPadded<Block> getFinally() {
             return finallie;
         }
-
-        @Getter
-        @With
-        List<Comment> comments;
-
-        @Getter
-        @With
-        Formatting formatting;
-
-        @Getter
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3766,21 +2147,24 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static final class Resources implements J {
+        public static final class Resource implements J {
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
-            List<VariableDecls> decls;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
+            Space prefix;
 
             @With
             Markers markers;
+
+            @With
+            VariableDecls variableDecls;
+
+            /**
+             * Only honored on the last resource in a collection of resources.
+             */
+            @With
+            boolean terminatedWithSemicolon;
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3791,48 +2175,20 @@ public interface J extends Serializable, Tree {
             UUID id;
 
             @With
-            Parentheses<VariableDecls> param;
-
-            @With
-            Block<Statement> body;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
+            Space prefix;
 
             @With
             Markers markers;
+
+            @With
+            Parentheses<VariableDecls> param;
+
+            @With
+            Block body;
 
             @Override
             public <R> R acceptJava(JavaSourceVisitor<R> v) {
                 return v.visitCatch(this);
-            }
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Finally implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Block<Statement> body;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-
-            @Override
-            public <R> R acceptJava(JavaSourceVisitor<R> v) {
-                return v.visitFinally(this);
             }
         }
     }
@@ -3845,19 +2201,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Parentheses<TypeTree> clazz;
 
         @With
         Expression expr;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -3884,6 +2237,12 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         List<Annotation> annotations;
 
         /**
@@ -3895,65 +2254,11 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Bounds bounds;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
+        JContainer<TypeTree> bounds;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitTypeParameter(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Bounds implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<TypeTree> types;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class TypeParameters implements J {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        List<TypeParameter> params;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitTypeParameters(this);
         }
     }
 
@@ -3965,7 +2270,13 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        Operator operator;
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JLeftPadded<Type> operator;
 
         @With
         Expression expr;
@@ -3973,15 +2284,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -3994,212 +2296,15 @@ public interface J extends Serializable, Tree {
             return expr.getSideEffects();
         }
 
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
-        }
-
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public abstract static class Operator implements J {
-            // NOTE: only some operators may have empty formatting
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class PreIncrement extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class PreDecrement extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class PostIncrement extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class PostDecrement extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Positive extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Negative extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Complement extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Not extends Operator {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                List<Comment> comments = emptyList();
-
-                Formatting formatting = Formatting.EMPTY;
-
-                @With
-                Markers markers;
-
-                @SuppressWarnings("unchecked")
-                @Override
-                public <T extends Tree> T withFormatting(Formatting fmt) {
-                    return (T) this;
-                }
-            }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class UnparsedSource implements J, Statement, Expression {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        String source;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
-        @Override
-        public JavaType getType() {
-            return null;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public UnparsedSource withType(JavaType type) {
-            return null;
-        }
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitUnparsedSource(this);
+        public enum Type {
+            PreIncrement,
+            PreDecrement,
+            PostIncrement,
+            PostDecrement,
+            Positive,
+            Negative,
+            Complement,
+            Not
         }
     }
 
@@ -4211,6 +2316,12 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         List<Annotation> annotations;
 
         List<Modifier> modifiers;
@@ -4219,27 +2330,8 @@ public interface J extends Serializable, Tree {
             if (modifiers == this.modifiers) {
                 return this;
             }
-            return new VariableDecls(id, annotations, modifiers, typeExpr, varargs,
-                    dimensionsBeforeName, vars, comments, formatting, markers);
-        }
-
-        public VariableDecls withModifiers(String... modifierKeywords) {
-            if (typeExpr == null) {
-                // cannot place modifiers on VariableDecls that occur in places where a type expression
-                // is not also present (e.g. Lambda parameters).
-                return this;
-            }
-
-            List<Modifier> fixedModifiers = Modifier.withModifiers(modifiers, modifierKeywords);
-
-            if (fixedModifiers == modifiers) {
-                return this;
-            } else if (modifiers.isEmpty()) {
-                return withModifiers(Formatting.formatFirstPrefix(fixedModifiers, typeExpr.getPrefix()))
-                        .withTypeExpr(typeExpr.withPrefix(" "));
-            }
-
-            return withModifiers(fixedModifiers);
+            return new VariableDecls(id, prefix, markers, annotations, modifiers, typeExpr, varargs,
+                    dimensionsBeforeName, vars);
         }
 
         @With
@@ -4248,32 +2340,17 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        Varargs varargs;
+        Space varargs;
 
         @With
-        List<Dimension> dimensionsBeforeName;
+        List<JLeftPadded<Space>> dimensionsBeforeName;
 
         @With
-        List<NamedVar> vars;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
+        List<JRightPadded<NamedVar>> vars;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
             return v.visitMultiVariable(this);
-        }
-
-        @JsonIgnore
-        @Override
-        public boolean isSemicolonTerminated() {
-            return true;
         }
 
         public List<Annotation> findAnnotations(String signature) {
@@ -4288,76 +2365,29 @@ public interface J extends Serializable, Tree {
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
-        public static final class Varargs implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Dimension implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Empty whitespace;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
         public static final class NamedVar implements J, NameTree {
             @EqualsAndHashCode.Include
             UUID id;
 
             @With
+            Space prefix;
+
+            @With
+            Markers markers;
+
+            @With
             Ident name;
 
             @With
-            Empty afterName;
-
-            @With
-            List<Dimension> dimensionsAfterName;
+            List<JLeftPadded<Space>> dimensionsAfterName;
 
             @With
             @Nullable
-            Expression initializer;
-
-            @With
-            @Nullable
-            Empty beforeComma;
+            JLeftPadded<Expression> initializer;
 
             @With
             @Nullable
             JavaType type;
-
-            @With
-            List<Comment> comments;
-
-            @With
-            Formatting formatting;
-
-            @With
-            Markers markers;
 
             @JsonIgnore
             public String getSimpleName() {
@@ -4397,19 +2427,16 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         Parentheses<Expression> condition;
 
         @With
         Statement body;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public <R> R acceptJava(JavaSourceVisitor<R> v) {
@@ -4425,21 +2452,18 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
         @Nullable
-        Bound bound;
+        JLeftPadded<Bound> bound;
 
         @With
         @Nullable
         NameTree boundedType;
-
-        @With
-        List<Comment> comments;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
 
         @Override
         public JavaType getType() {
@@ -4457,41 +2481,9 @@ public interface J extends Serializable, Tree {
             return v.visitWildcard(this);
         }
 
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        public abstract static class Bound implements J {
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Extends extends Bound {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
-
-            @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-            @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-            @Data
-            public static final class Super extends Bound {
-                @EqualsAndHashCode.Include
-                UUID id;
-
-                @With
-                List<Comment> comments;
-
-                @With
-                Formatting formatting;
-
-                @With
-                Markers markers;
-            }
+        public enum Bound {
+            Extends,
+            Super
         }
     }
 }

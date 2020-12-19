@@ -64,7 +64,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
     }
 
     private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code + tree.getSuffix();
+        return tree == null || code == null ? "" : tree.getPrefix() + code;
     }
 
     String visitModifiers(Iterable<Modifier> modifiers) {
@@ -369,8 +369,8 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitLambda(Lambda lambda) {
-        String params = visit(lambda.getParamSet().getParams(), ",");
-        String paramSet = fmt(lambda.getParamSet(), lambda.getParamSet().isParenthesized() ? "(" + params + ")" : params);
+        String params = visit(lambda.getParameters().getParams(), ",");
+        String paramSet = fmt(lambda.getParameters(), lambda.getParameters().isParenthesized() ? "(" + params + ")" : params);
         return fmt(lambda, paramSet + fmt(lambda.getArrow(), "->") + visit(lambda.getBody()));
     }
 
@@ -439,7 +439,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
 
     @Override
     public String visitNewClass(NewClass newClass) {
-        String encl = newClass.getEncl() == null ? "" : visit(newClass.getEncl()) + ".";
+        String encl = newClass.getEncl() == null ? "" : visit(newClass.getEncl()) + visit(newClass.getAfterEncl()) + ".";
         String nooh = newClass.getNooh() == null ? "" : fmt(newClass.getNooh(), "");
         String args = newClass.getArgs() == null ? "" :
                 fmt(newClass.getArgs(), "(" + visit(newClass.getArgs().getArgs(), ",") + ")");
@@ -594,6 +594,7 @@ public class PrintJava extends AbstractJavaSourceVisitor<String> {
         return fmt(variable, visit(variable.getName()) +
                 visit(variable.getAfterName()) +
                 visitDims(variable.getDimensionsAfterName()) +
+                visit(variable.getAfterDimensions()) +
                 (variable.getInitializer() == null ? "" : "=" + visit(variable.getInitializer())) +
                 visit(variable.getBeforeComma()));
     }

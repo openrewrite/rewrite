@@ -404,7 +404,7 @@ public abstract class AbstractJavaSourceVisitor<R> extends AbstractSourceVisitor
                 defaultTo(lambda),
                 reduce(
                         visitExpression(lambda),
-                        visitAfter(visit(lambda.getParamSet().getParams()), lambda.getBody())
+                        visitAfter(visit(lambda.getParameters().getParams()), lambda.getBody())
                 )
         );
     }

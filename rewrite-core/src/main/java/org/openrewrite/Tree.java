@@ -29,8 +29,6 @@ public interface Tree {
         return UUID.randomUUID();
     }
 
-    Formatting getFormatting();
-
     Markers getMarkers();
 
     /**
@@ -39,34 +37,6 @@ public interface Tree {
      * @return A unique identifier
      */
     UUID getId();
-
-    /**
-     * An overload that allows us to create a copy of any Tree element, optionally
-     * changing formatting
-     *
-     * @param <T> The type of this tree.
-     * @param fmt The formatting to apply to this tree.
-     * @return A copy of this tree, with formatting changed.
-     */
-    <T extends Tree> T withFormatting(Formatting fmt);
-
-    @JsonIgnore
-    default String getPrefix() {
-        return getFormatting().getPrefix();
-    }
-
-    default <T extends Tree> T withPrefix(String prefix) {
-        return withFormatting(getFormatting().withPrefix(prefix));
-    }
-
-    @JsonIgnore
-    default String getSuffix() {
-        return getFormatting().getSuffix();
-    }
-
-    default <T extends Tree> T withSuffix(String suffix) {
-        return withFormatting(getFormatting().withSuffix(suffix));
-    }
 
     default <R> R accept(SourceVisitor<R> v) {
         return v.defaultTo(null);
@@ -77,11 +47,6 @@ public interface Tree {
     }
 
     String print();
-
-    @SuppressWarnings("unchecked")
-    default <T extends Tree> Optional<T> whenType(Class<T> treeType) {
-        return treeType.isAssignableFrom(this.getClass()) ? Optional.of((T) this) : Optional.empty();
-    }
 
     default boolean isScope(@Nullable Tree tree) {
         return tree != null && tree.getId().equals(getId());

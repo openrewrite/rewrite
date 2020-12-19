@@ -78,6 +78,9 @@ public interface Xml extends Serializable, Tree {
         Tag root;
 
         @With
+        Empty eof;
+
+        @With
         Formatting formatting;
 
         @With
@@ -175,7 +178,9 @@ public interface Xml extends Serializable, Tree {
             if (content != null && content.get(0) instanceof CharData) {
                 charData = ((CharData) content.get(0)).withText(value);
             } else {
-                charData = new CharData(randomId(), false, value, Formatting.EMPTY, Markers.EMPTY);
+                charData = new CharData(randomId(), false, value,
+                        new Empty(randomId(), Formatting.EMPTY, Markers.EMPTY),
+                        Formatting.EMPTY, Markers.EMPTY);
             }
             return withContent(Collections.singletonList(charData));
         }
@@ -357,6 +362,9 @@ public interface Xml extends Serializable, Tree {
         Ident key;
 
         @With
+        Empty beforeEquals;
+
+        @With
         Value value;
 
         @With
@@ -417,6 +425,9 @@ public interface Xml extends Serializable, Tree {
 
         @With
         String text;
+
+        @With
+        Empty afterText;
 
         @With
         Formatting formatting;
@@ -560,5 +571,19 @@ public interface Xml extends Serializable, Tree {
         public String toString() {
             return "Ident{" + name + "}";
         }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class Empty implements Xml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Formatting formatting;
+
+        @With
+        Markers markers;
     }
 }

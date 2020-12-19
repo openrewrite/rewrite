@@ -259,7 +259,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     @Override
     public J visitLambda(J.Lambda lambda) {
         J.Lambda l = refactor(lambda, this::visitExpression);
-        l = l.withParamSet(refactor(l.getParamSet()));
+        l = l.withParameters(refactor(l.getParameters()));
         l = l.withArrow(refactor(l.getArrow()));
         return l.withBody(refactor(l.getBody()));
     }

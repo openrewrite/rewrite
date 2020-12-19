@@ -17,13 +17,16 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.*;
+import org.openrewrite.java.AbstractJavaSourceVisitor;
+import org.openrewrite.java.FillTypeAttributions;
+import org.openrewrite.java.JavaFormatter;
+import org.openrewrite.java.JavaParser;
+import org.openrewrite.marker.Markers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,10 +38,8 @@ import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.java.JavaFormatter.enclosingIndent;
 
 @NonNullApi
 public class TreeBuilder {
@@ -76,7 +77,6 @@ public class TreeBuilder {
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 whitespaceSuffix.matches();
-                Formatting partFmt = i == parts.length - 1 ? Formatting.EMPTY : format("", whitespaceSuffix.group(1));
 
                 expr = new J.FieldAccess(
                         i == parts.length - 1 ? id : randomId(),
@@ -86,7 +86,7 @@ public class TreeBuilder {
                                 JavaType.Class.build(fullName) :
                                 null,
                         emptyList(),
-                        partFmt,
+                        Formatting.EMPTY,
                         Markers.EMPTY
                 );
             }
@@ -277,13 +277,15 @@ public class TreeBuilder {
 
         JavaFormatter formatter = new JavaFormatter(syntheticCompliationUnit);
 
-        return block.getStatements().stream()
-                .map(stat -> {
-                    ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat, enclosingIndent(insertionScope.getTree()) +
-                            formatter.findIndent(enclosingIndent(insertionScope.getTree()), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
-                    return (T) shiftRight.visit(stat);
-                })
-                .collect(toList());
+        // FIXME AutoFormat instead of ShiftFormatRightVisitor
+//        return block.getStatements().stream()
+//                .map(stat -> {
+//                    ShiftFormatRightVisitor shiftRight = new ShiftFormatRightVisitor(stat, enclosingIndent(insertionScope.getTree()) +
+//                            formatter.findIndent(enclosingIndent(insertionScope.getTree()), stat).getEnclosingIndent(), formatter.isIndentedWithSpaces());
+//                    return (T) shiftRight.visit(stat);
+//                })
+//                .collect(toList());
+        return block.getStatements();
     }
 
     /**

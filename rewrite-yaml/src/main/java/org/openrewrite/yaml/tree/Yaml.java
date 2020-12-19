@@ -23,7 +23,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.*;
+import org.openrewrite.Formatting;
+import org.openrewrite.SourceFile;
+import org.openrewrite.SourceVisitor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -100,7 +103,7 @@ public interface Yaml extends Serializable, Tree {
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), sourcePath,
-                    documents.stream().map(Document::copyPaste).collect(toList()), formatting, markers);
+                    documents.stream().map(Document::copyPaste).collect(toList()), formatting, Markers.EMPTY);
         }
     }
 
@@ -135,7 +138,7 @@ public interface Yaml extends Serializable, Tree {
         @Override
         public Document copyPaste() {
             return new Document(randomId(), explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
-                    end == null ? null : end.copyPaste(), formatting, markers);
+                    end == null ? null : end.copyPaste(), formatting, Markers.EMPTY);
         }
 
         /**
@@ -149,14 +152,14 @@ public interface Yaml extends Serializable, Tree {
             UUID id;
 
             @With
-        Formatting formatting;
+            Formatting formatting;
 
-        @With
-        Markers markers;
+            @With
+            Markers markers;
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), formatting, markers);
+                return new End(randomId(), formatting, Markers.EMPTY);
             }
         }
     }
@@ -195,7 +198,7 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), style, value, formatting, markers);
+            return new Scalar(randomId(), style, value, formatting, Markers.EMPTY);
         }
     }
 
@@ -222,7 +225,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Mapping copyPaste() {
-            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting, markers);
+            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting,
+                    Markers.EMPTY);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -236,13 +240,16 @@ public interface Yaml extends Serializable, Tree {
             Scalar key;
 
             @With
+            Empty afterKey;
+
+            @With
             Block value;
 
             @With
-        Formatting formatting;
+            Formatting formatting;
 
-        @With
-        Markers markers;
+            @With
+            Markers markers;
 
             @Override
             public <R> R acceptYaml(YamlSourceVisitor<R> v) {
@@ -251,7 +258,7 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), key.copyPaste(), value.copyPaste(), formatting, markers);
+                return new Entry(randomId(), key.copyPaste(), afterKey, value.copyPaste(), formatting, Markers.EMPTY);
             }
         }
     }
@@ -279,7 +286,8 @@ public interface Yaml extends Serializable, Tree {
 
         @Override
         public Sequence copyPaste() {
-            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting, markers);
+            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting,
+                    Markers.EMPTY);
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -293,10 +301,10 @@ public interface Yaml extends Serializable, Tree {
             Block block;
 
             @With
-        Formatting formatting;
+            Formatting formatting;
 
-        @With
-        Markers markers;
+            @With
+            Markers markers;
 
             @Override
             public <R> R acceptYaml(YamlSourceVisitor<R> v) {
@@ -305,8 +313,27 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), block.copyPaste(), formatting, markers);
+                return new Entry(randomId(), block.copyPaste(), formatting, Markers.EMPTY);
             }
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class Empty implements Yaml {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Formatting formatting;
+
+        @With
+        Markers markers;
+
+        @Override
+        public Empty copyPaste() {
+            return new Empty(randomId(), formatting, Markers.EMPTY);
         }
     }
 
