@@ -61,7 +61,8 @@ public class MethodTypeBuilder {
 
     JavaType.FullyQualified declaringType = null;
     Set<Flag> flags = new HashSet<>();
-    JavaType returnType;
+    JavaType resolvedReturnType;
+    JavaType genericReturnType;
     String name;
     List<Parameter> parameters = new ArrayList<>();
 
@@ -94,10 +95,20 @@ public class MethodTypeBuilder {
     }
 
     /**
-     * @param type The return type for the method. The default, if not specified, is "void"
+     * @param type A String representation of the return type for the method.
      */
     public MethodTypeBuilder returnType(String type) {
-        this.returnType = JavaType.buildType(type);
+        this.resolvedReturnType = JavaType.buildType(type);
+        return this;
+    }
+
+    /**
+     * @param resolvedType A String representation of the resolved return type for the method.
+     * @param genericType A String representation of the generic return type for the method.
+     */
+    public MethodTypeBuilder returnType(String resolvedType, String genericType) {
+        this.resolvedReturnType = JavaType.buildType(resolvedType);
+        this.genericReturnType = new JavaType.GenericTypeVariable(genericType, JavaType.Class.build("java.lang.Object"));
         return this;
     }
 
@@ -105,7 +116,17 @@ public class MethodTypeBuilder {
      * @param type The return type for the method. The default, if not specified, is "void"
      */
     public MethodTypeBuilder returnType(JavaType type) {
-        this.returnType = type;
+        this.resolvedReturnType = type;
+        return this;
+    }
+
+    /**
+     * @param resolvedType The resolved return type for the method.
+     * @param genericType The generic return type for the method.
+     */
+    public MethodTypeBuilder returnType(JavaType resolvedType, JavaType genericType) {
+        this.resolvedReturnType = resolvedType;
+        this.genericReturnType = genericType;
         return this;
     }
 
@@ -119,7 +140,38 @@ public class MethodTypeBuilder {
      * @param name The name of the parameter.
      */
     public MethodTypeBuilder parameter(String type, String name) {
-        this.parameters.add(new Parameter(JavaType.buildType(type), name));
+        this.parameters.add(
+                new Parameter(
+                        JavaType.buildType(type),
+                        JavaType.buildType(type),
+                        name
+                )
+        );
+        return this;
+    }
+
+    /**
+     * Add a parameter to the method type. The parameters are added in the same order they are added to the builder.
+     *
+     * The parameter type is either expressed as a fully-qualified class name or can be one of the primitive
+     * {@link JavaType.Primitive} keywords.
+     *
+     * @param resolvedType String representation of the resolved parameter type.
+     * @param genericType String representation of the generic parameter type.
+     * @param name The name of the parameter.
+     */
+    public MethodTypeBuilder
+    parameter(String resolvedType, String genericType, String name) {
+        this.parameters.add(
+                new Parameter(
+                        JavaType.buildType(resolvedType),
+                        new JavaType.GenericTypeVariable(
+                                genericType,
+                                JavaType.Class.build("java.lang.Object")
+                        ),
+                        name
+                )
+        );
         return this;
     }
 
@@ -130,7 +182,19 @@ public class MethodTypeBuilder {
      * @param name The name of the parameter.
      */
     public MethodTypeBuilder parameter(JavaType type, String name) {
-        this.parameters.add(new Parameter(type, name));
+        this.parameters.add(new Parameter(type, type, name));
+        return this;
+    }
+
+    /**
+     * Add a parameter to the method type. The parameters are added in the same order they are added to the builder.
+     *
+     * @param resolvedType The resolved parameter type.
+     * @param genericType The generic parameter type.
+     * @param name The name of the parameter.
+     */
+    public MethodTypeBuilder parameter(JavaType resolvedType, JavaType genericType, String name) {
+        this.parameters.add(new Parameter(resolvedType, genericType, name));
         return this;
     }
 
@@ -146,19 +210,30 @@ public class MethodTypeBuilder {
         if (declaringType == null) {
             throw new IllegalArgumentException("The declaring type is required.");
         }
-        if (returnType == null) {
-            returnType = JavaType.Primitive.Void;
+
+        if (resolvedReturnType == null) {
+            resolvedReturnType = JavaType.Primitive.Void;
         }
-        JavaType.Method.Signature signature = new JavaType.Method.Signature(
-                this.returnType,
-                parameters.stream().map(Parameter::getType).collect(Collectors.toList())
+
+        if (genericReturnType == null) {
+            genericReturnType = JavaType.Primitive.Void;
+        }
+
+        JavaType.Method.Signature resolvedSignature = new JavaType.Method.Signature(
+                resolvedReturnType,
+                parameters.stream().map(Parameter::getResolvedType).collect(Collectors.toList())
+        );
+
+        JavaType.Method.Signature genericSignature = new JavaType.Method.Signature(
+                genericReturnType,
+                parameters.stream().map(Parameter::getGenericType).collect(Collectors.toList())
         );
 
         return JavaType.Method.build(
                 declaringType,
                 name,
-                signature,
-                signature,
+                genericSignature,
+                resolvedSignature,
                 parameters.stream().map(Parameter::getName).collect(Collectors.toList()),
                 flags);
     }
@@ -166,7 +241,8 @@ public class MethodTypeBuilder {
     @Getter
     @AllArgsConstructor
     private static class Parameter {
-        JavaType type;
+        JavaType resolvedType;
+        JavaType genericType;
         String name;
     }
 }
