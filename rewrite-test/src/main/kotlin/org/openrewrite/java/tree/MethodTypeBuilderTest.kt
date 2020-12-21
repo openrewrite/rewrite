@@ -119,7 +119,7 @@ interface MethodTypeBuilderTest {
                 }
                 
                 <T> T notification() {
-                    return "You have been notified";
+                    return (T) "You have been notified";
                 }
             }
         """.trimIndent())
