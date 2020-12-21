@@ -28,10 +28,6 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
  */
 @Incubating(since = "2.1.0")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
-@JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
+@JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Style {
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
 }

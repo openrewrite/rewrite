@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.java.style.ImportLayoutStyle
 
 interface OrderImportsTest : RefactorVisitorTest {
     companion object {
@@ -268,22 +269,21 @@ interface OrderImportsTest : RefactorVisitorTest {
     )
 
     @Test
-    fun springCloudFormat(jp: JavaParser) = assertUnchanged(
-            jp,
+    fun springCloudFormat() = assertUnchanged(
+            JavaParser.fromJavaVersion().
+            styles(mutableListOf(ImportLayoutStyle.layout(999,999,
+                    "import java.*",
+                    "<blank line>",
+                    "import javax.*",
+                    "<blank line>",
+                    "import all other imports",
+                    "<blank line>",
+                    "import org.springframework.*",
+                    "<blank line>",
+                    "import static all other imports"
+                ))).build(),
             visitors = listOf(
                 OrderImports().apply {
-                    setLayout(OrderImports.Layout.builder(999, 999)
-                            .importPackage("java.*")
-                            .blankLine()
-                            .importPackage("javax.*")
-                            .blankLine()
-                            .importAllOthers()
-                            .blankLine()
-                            .importPackage("org.springframework.*")
-                            .blankLine()
-                            .importStaticAllOthers()
-                            .build())
-
                     setRemoveUnused(false)
                 }
             ),
