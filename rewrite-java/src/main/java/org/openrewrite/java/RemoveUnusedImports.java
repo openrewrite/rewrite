@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Tree;
+import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -26,19 +27,18 @@ import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
 
 /**
- * Assumes imports are ordered. Only meant to be used by {@link OrderImports}.
+ * This visitor will remove any imports for types that are not referenced within the compilation unit. This visitor
+ * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
+ * drop below the configured values.
  */
-class RemoveUnusedImports extends JavaIsoRefactorVisitor {
-    private final int classCountToUseStarImport;
-    private final int nameCountToUseStarImport;
-
-    RemoveUnusedImports(int classCountToUseStarImport, int nameCountToUseStarImport) {
-        this.classCountToUseStarImport = classCountToUseStarImport;
-        this.nameCountToUseStarImport = nameCountToUseStarImport;
-    }
+public class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+
+        ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+                .orElse(ImportLayoutStyle.getDefaultImportLayoutStyle());
+
         Map<String, Set<String>> methodsByTypeName = new StaticMethodsByType().visit(cu);
         Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
         boolean changed = false;
@@ -54,9 +54,10 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     continue;
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
-                    if (methods.size() < nameCountToUseStarImport) {
+                    if (methods.size() < layoutStyle.getNameCountToUseStarImport()) {
                         methods.stream().sorted().forEach(method ->
-                                importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
+                                importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
+                                        .withName(method))).withPrefix("\n"))
                         );
                         changed = true;
                     } else {
@@ -72,10 +73,10 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     continue;
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
-                    if (types.size() < classCountToUseStarImport) {
+                    if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                         types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
                             importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
-                                    .withName(typeClassName))))
+                                    .withName(typeClassName))).withPrefix("\n"))
                         );
                         changed = true;
                     } else {
@@ -86,7 +87,6 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                 }
             }
         }
-
         return changed ? cu.withImports(importsWithUsage) : cu;
     }
 

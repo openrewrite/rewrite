@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.DebugOnly
 import org.openrewrite.java.tree.AutoFormatTest
 import org.openrewrite.java.utilities.SpansMultipleLinesTest
 
@@ -86,6 +87,9 @@ abstract class JavaRefactorCompatibilityKit {
 
     @Nested
     inner class RemoveImportTck : RemoveImportTest
+
+    @Nested
+    inner class RemoveUnusedImportsTck: RemoveUnusedOrdersTest
 
     @Nested
     inner class RenameVariableTck : RenameVariableTest
