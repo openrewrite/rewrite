@@ -16,45 +16,28 @@
 package org.openrewrite.java;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openrewrite.Tree;
 import org.openrewrite.Validated;
-import org.openrewrite.internal.StreamUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.J;
 
 import java.util.*;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
-import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.valid;
-import static org.openrewrite.internal.StreamUtils.distinctBy;
+import static org.openrewrite.java.style.ImportLayoutStyle.Layout;
+import static org.openrewrite.java.style.ImportLayoutStyle.Layout.Block;
 
+/**
+ * This visitor will group and order the imports for a compilation unit using the rules defined by a {@link ImportLayoutStyle}.
+ * This layout style can either be set via a style element on the compilation unit or explicitly defined via the layout
+ * attribute on this visitor. If a style has not been defined, this visitor will use the default import layout style that
+ * is modelled after IntelliJ's default import settings.
+ * <P><P>
+ * The @{link {@link OrderImports#setRemoveUnused}} flag (which is defaulted to true) can be used to also remove any
+ * imports that are not referenced within the compilation unit.
+ */
 public class OrderImports extends JavaIsoRefactorVisitor {
-    // VisibleForTesting
-    final static Comparator<J.Import> IMPORT_SORTING = (i1, i2) -> {
-        String[] import1 = i1.getQualid().printTrimmed().split("\\.");
-        String[] import2 = i2.getQualid().printTrimmed().split("\\.");
-
-        for (int i = 0; i < Math.min(import1.length, import2.length); i++) {
-            int diff = import1[i].compareTo(import2[i]);
-            if (diff != 0) {
-                return diff;
-            }
-        }
-
-        if (import1.length == import2.length) {
-            return 0;
-        }
-
-        return import1.length > import2.length ? 1 : -1;
-    };
 
     // VisibleForTesting
     @Nullable
@@ -71,25 +54,12 @@ public class OrderImports extends JavaIsoRefactorVisitor {
         this.removeUnused = removeUnused;
     }
 
-    /**
-     * @return The default import ordering of IntelliJ IDEA.
-     */
-    public static OrderImports.Layout intellij() {
-        return Layout.builder(5, 3)
-                .importAllOthers()
-                .blankLine()
-                .importPackage("javax.*")
-                .importPackage("java.*")
-                .blankLine()
-                .importStaticAllOthers()
-                .build();
-    }
-
     @Override
     public Validated validate() {
-        return importLayout == null ?
-                Validated.none() :
-                importLayout.validate();
+        return importLayout == null ? Validated.none():
+                valid("layout", importLayout.getBlocks().stream()
+                        .filter(b -> b instanceof Block.AllOthers && !((Block.AllOthers) b).isStatic())
+                        .count() == 1);
     }
 
     @Override
@@ -98,15 +68,15 @@ public class OrderImports extends JavaIsoRefactorVisitor {
 
         if (importLayout == null) {
             importLayout = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .map(ImportLayoutStyle::orderImportLayout)
-                    .orElse(intellij());
+                    .map(ImportLayoutStyle::getLayout)
+                    .orElse(ImportLayoutStyle.getDefaultImportLayout());
         }
 
-        List<Layout.Block> blocks = importLayout.blocks;
-        blocks.forEach(Layout.Block::reset);
-        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).statik))
+        List<Block> blocks = importLayout.getBlocks();
+        blocks.forEach(Block::reset);
+        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).isStatic()))
                 : "There must be at least one block that accepts all static imports, but no such block was found in the specified layout";
-        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).statik))
+        assert (blocks.stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).isStatic()))
                 : "There must be at least one block that accepts all non-static imports, but no such block was found in the specified layout";
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
@@ -137,10 +107,10 @@ public class OrderImports extends JavaIsoRefactorVisitor {
 
         int importIndex = 0;
         String extraLineSpace = "";
-        for (Layout.Block block : blocks) {
-            if (block instanceof Layout.Block.BlankLines) {
+        for (Block block : blocks) {
+            if (block instanceof Block.BlankLines) {
                 extraLineSpace = "";
-                for (int i = 0; i < ((Layout.Block.BlankLines) block).count; i++) {
+                for (int i = 0; i < ((Block.BlankLines) block).getCount(); i++) {
                     //noinspection StringConcatenationInLoop
                     extraLineSpace += "\n";
                 }
@@ -161,9 +131,7 @@ public class OrderImports extends JavaIsoRefactorVisitor {
         }
 
         if (removeUnused) {
-            andThen(new RemoveUnusedImports(
-                    importLayout.classCountToUseStarImport,
-                    importLayout.nameCountToUseStarImport));
+            andThen(new RemoveUnusedImports());
         }
 
         if (orderedImports.size() != cu.getImports().size()) {
@@ -177,227 +145,5 @@ public class OrderImports extends JavaIsoRefactorVisitor {
         }
 
         return cu;
-    }
-
-    public static class Layout {
-        private final List<Block> blocks;
-        private final int classCountToUseStarImport;
-        private final int nameCountToUseStarImport;
-
-        Layout(List<Block> blocks, int classCountToUseStarImport, int nameCountToUseStarImport) {
-            this.blocks = blocks;
-            this.classCountToUseStarImport = classCountToUseStarImport;
-            this.nameCountToUseStarImport = nameCountToUseStarImport;
-        }
-
-        public List<Block> getBlocks() {
-            return blocks;
-        }
-
-        public int getClassCountToUseStarImport() {
-            return classCountToUseStarImport;
-        }
-
-        public int getNameCountToUseStarImport() {
-            return nameCountToUseStarImport;
-        }
-
-        public interface Block {
-            boolean accept(J.Import anImport);
-
-            void reset();
-
-            /**
-             * @return Imports belonging to this block, folded appropriately.
-             */
-            List<J.Import> orderedImports();
-
-            class BlankLines implements Block {
-                private int count = 1;
-
-                @Override
-                public boolean accept(J.Import anImport) {
-                    return false;
-                }
-
-                @Override
-                public void reset() {
-                }
-
-                @Override
-                public List<J.Import> orderedImports() {
-                    return emptyList();
-                }
-            }
-
-            class ImportPackage implements Block {
-                private final List<J.Import> imports = new ArrayList<>();
-
-                private final boolean statik;
-                private final Pattern packageWildcard;
-                private final int classCountToUseStarImport;
-                private final int nameCountToUseStarImport;
-
-                public ImportPackage(boolean statik, String packageWildcard, boolean withSubpackages,
-                                     int classCountToUseStarImport, int nameCountToUseStarImport) {
-                    this.statik = statik;
-                    this.classCountToUseStarImport = classCountToUseStarImport;
-                    this.nameCountToUseStarImport = nameCountToUseStarImport;
-                    this.packageWildcard = Pattern.compile(packageWildcard
-                            .replace(".", "\\.")
-                            .replace("*", withSubpackages ? ".+" : "[^.]+"));
-                }
-
-                @Override
-                public boolean accept(J.Import anImport) {
-                    if (anImport.isStatic() == statik &&
-                            packageWildcard.matcher(anImport.getQualid().printTrimmed()).matches()) {
-                        imports.add(anImport);
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                public void reset() {
-                    imports.clear();
-                }
-
-                @Override
-                public List<J.Import> orderedImports() {
-                    Map<String, List<J.Import>> groupedImports = imports
-                            .stream()
-                            .sorted(IMPORT_SORTING)
-                            .collect(groupingBy(
-                                    anImport -> {
-                                        if (anImport.isStatic()) {
-                                            return anImport.getTypeName();
-                                        } else {
-                                            return anImport.getPackageName();
-                                        }
-                                    },
-                                    LinkedHashMap::new, // Use an ordered map to preserve sorting
-                                    Collectors.toList()
-                            ));
-
-                    return groupedImports.values().stream()
-                            .flatMap(importGroup -> {
-                                J.Import toStar = importGroup.get(0);
-                                boolean statik1 = toStar.isStatic();
-                                int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
-                                boolean starImportExists = importGroup.stream().anyMatch(it -> it.getQualid().getSimpleName().equals("*"));
-                                if(importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
-                                    return Stream.of(toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
-                                            .getName().withName("*"))));
-                                } else {
-                                    return importGroup.stream()
-                                            .filter(distinctBy(Tree::printTrimmed));
-                                }
-                            }).collect(toList());
-                }
-            }
-
-            class AllOthers extends ImportPackage {
-                private final boolean statik;
-                private Collection<ImportPackage> packageImports = emptyList();
-
-                public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
-                    super(statik, "*", true,
-                            classCountToUseStarImport, nameCountToUseStarImport);
-                    this.statik = statik;
-                }
-
-                public void setPackageImports(Collection<ImportPackage> packageImports) {
-                    this.packageImports = packageImports;
-                }
-
-                public boolean isStatic() {
-                    return statik;
-                }
-
-                @Override
-                public boolean accept(J.Import anImport) {
-                    if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
-                        super.accept(anImport);
-                    }
-                    return anImport.isStatic() == statik;
-                }
-            }
-        }
-
-        public Validated validate() {
-            return valid("layout", blocks.stream()
-                    .filter(b -> b instanceof Block.AllOthers && !((Block.AllOthers) b).isStatic())
-                    .count() == 1);
-        }
-
-        public static Builder builder(int classCountToUseStarImport,
-                                      int nameCountToUseStarImport) {
-            return new Builder(classCountToUseStarImport, nameCountToUseStarImport);
-        }
-
-        public static class Builder {
-            private final List<Block> blocks = new ArrayList<>();
-            private final int classCountToUseStarImport;
-            private final int nameCountToUseStarImport;
-
-            public Builder(int classCountToUseStarImport, int nameCountToUseStarImport) {
-                this.classCountToUseStarImport = classCountToUseStarImport;
-                this.nameCountToUseStarImport = nameCountToUseStarImport;
-            }
-
-            public Builder importAllOthers() {
-                blocks.add(new Block.AllOthers(false, classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
-            }
-
-            public Builder importStaticAllOthers() {
-                blocks.add(new Block.AllOthers(true, classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
-            }
-
-            public Builder blankLine() {
-                if (!blocks.isEmpty() &&
-                        blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
-                    ((Block.BlankLines) blocks.get(blocks.size() - 1)).count++;
-                } else {
-                    blocks.add(new Block.BlankLines());
-                }
-                return this;
-            }
-
-            public Builder importPackage(String packageWildcard, boolean withSubpackages) {
-                blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages,
-                        classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
-            }
-
-            public Builder importPackage(String packageWildcard) {
-                return importPackage(packageWildcard, true);
-            }
-
-            public Builder staticImportPackage(String packageWildcard, boolean withSubpackages) {
-                blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages,
-                        classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
-            }
-
-            public Builder staticImportPackage(String packageWildcard) {
-                return staticImportPackage(packageWildcard, true);
-            }
-
-            public Layout build() {
-                for (Block block : blocks) {
-                    if (block instanceof Block.AllOthers) {
-                        ((Block.AllOthers) block).setPackageImports(blocks.stream()
-                                .filter(b -> b.getClass().equals(Block.ImportPackage.class))
-                                .map(Block.ImportPackage.class::cast)
-                                .collect(toList()));
-                    }
-                }
-
-                return new Layout(blocks, classCountToUseStarImport, nameCountToUseStarImport);
-            }
-        }
     }
 }

@@ -15,7 +15,11 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Tree;
+import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -24,21 +28,33 @@ import java.util.stream.Stream;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.toSet;
+import static org.openrewrite.Validated.valid;
+import static org.openrewrite.java.style.ImportLayoutStyle.Layout;
 
 /**
- * Assumes imports are ordered. Only meant to be used by {@link OrderImports}.
+ * This visitor will remove any imports for types that are not referenced within the compilation unit. This visitor
+ * is aware of the import layout style and will correctly handle unfolding of wildcard imports if the import counts
+ * drops below the configured values.
  */
-class RemoveUnusedImports extends JavaIsoRefactorVisitor {
-    private final int classCountToUseStarImport;
-    private final int nameCountToUseStarImport;
+public class RemoveUnusedImports extends JavaIsoRefactorVisitor {
 
-    RemoveUnusedImports(int classCountToUseStarImport, int nameCountToUseStarImport) {
-        this.classCountToUseStarImport = classCountToUseStarImport;
-        this.nameCountToUseStarImport = nameCountToUseStarImport;
+    @Nullable
+    Layout importLayout;
+
+    @JsonIgnore
+    public void setLayout(Layout importLayout) {
+        this.importLayout = importLayout;
     }
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+
+        if (importLayout == null) {
+            importLayout = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
+                    .map(ImportLayoutStyle::getLayout)
+                    .orElse(ImportLayoutStyle.getDefaultImportLayout());
+        }
+
         Map<String, Set<String>> methodsByTypeName = new StaticMethodsByType().visit(cu);
         Map<String, Set<JavaType.Class>> typesByPackage = new TypesByPackage().visit(cu);
         boolean changed = false;
@@ -54,7 +70,7 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     continue;
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
-                    if (methods.size() < nameCountToUseStarImport) {
+                    if (methods.size() < importLayout.getNameCountToUseStarImport()) {
                         methods.stream().sorted().forEach(method ->
                                 importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
                         );
@@ -72,7 +88,7 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     continue;
                 }
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
-                    if (types.size() < classCountToUseStarImport) {
+                    if (types.size() < importLayout.getClassCountToUseStarImport()) {
                         types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
                             importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
                                     .withName(typeClassName))))
@@ -86,7 +102,6 @@ class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                 }
             }
         }
-
         return changed ? cu.withImports(importsWithUsage) : cu;
     }
 
