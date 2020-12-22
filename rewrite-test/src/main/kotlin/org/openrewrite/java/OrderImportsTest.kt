@@ -269,7 +269,7 @@ interface OrderImportsTest : RefactorVisitorTest {
     )
 
     @Test
-    fun springCloudFormat(jp: JavaParser) = assertUnchanged(
+    fun springCloudFormat() = assertUnchanged(
             JavaParser.fromJavaVersion().
             styles(mutableListOf(ImportLayoutStyle.layout(999,999,
                 listOf(
