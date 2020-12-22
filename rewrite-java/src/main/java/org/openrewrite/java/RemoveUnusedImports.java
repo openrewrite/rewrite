@@ -56,7 +56,8 @@ public class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                 if ("*".equals(anImport.getQualid().getSimpleName())) {
                     if (methods.size() < layoutStyle.getNameCountToUseStarImport()) {
                         methods.stream().sorted().forEach(method ->
-                                importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName().withName(method))))
+                                importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
+                                        .withName(method))).withPrefix("\n"))
                         );
                         changed = true;
                     } else {
@@ -75,7 +76,7 @@ public class RemoveUnusedImports extends JavaIsoRefactorVisitor {
                     if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                         types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
                             importsWithUsage.add(anImport.withQualid(anImport.getQualid().withName(anImport.getQualid().getName()
-                                    .withName(typeClassName))))
+                                    .withName(typeClassName))).withPrefix("\n"))
                         );
                         changed = true;
                     } else {

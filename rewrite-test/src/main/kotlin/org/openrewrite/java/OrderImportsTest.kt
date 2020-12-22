@@ -272,7 +272,6 @@ interface OrderImportsTest : RefactorVisitorTest {
     fun springCloudFormat() = assertUnchanged(
             JavaParser.fromJavaVersion().
             styles(mutableListOf(ImportLayoutStyle.layout(999,999,
-                listOf(
                     "import java.*",
                     "<blank line>",
                     "import javax.*",
@@ -281,8 +280,8 @@ interface OrderImportsTest : RefactorVisitorTest {
                     "<blank line>",
                     "import org.springframework.*",
                     "<blank line>",
-                    "import static all other imports",
-                )))).build(),
+                    "import static all other imports"
+                ))).build(),
             visitors = listOf(
                 OrderImports().apply {
                     setRemoveUnused(false)

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaStyle;
@@ -68,6 +68,9 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 public class ImportLayoutStyle implements JavaStyle {
 
+    //We maintain the layout as a map for serialization.
+    private Map<String, Object> layout;
+
     private Layout.Builder layoutBuilder;
     private int classCountToUseStarImport = 5;
     private int nameCountToUseStarImport = 3;
@@ -75,10 +78,12 @@ public class ImportLayoutStyle implements JavaStyle {
     public ImportLayoutStyle() {
     }
 
+    @JsonIgnore
     public int getClassCountToUseStarImport() {
         return classCountToUseStarImport;
     }
 
+    @JsonIgnore
     public int getNameCountToUseStarImport() {
         return nameCountToUseStarImport;
     }
@@ -90,6 +95,7 @@ public class ImportLayoutStyle implements JavaStyle {
     @JsonProperty("layout")
     public void setLayout(Map<String, Object> layout) {
 
+        this.layout = layout;
         this.classCountToUseStarImport = (Integer) layout.getOrDefault("classCountToUseStarImport", 5);
         this.nameCountToUseStarImport = (Integer) layout.getOrDefault("nameCountToUseStarImport", 3);
 
@@ -99,7 +105,7 @@ public class ImportLayoutStyle implements JavaStyle {
         for (String block : (List<String>) layout.get("blocks")) {
             block = block.trim();
             if (block.equals("<blank line>")) {
-                builder = builder.blankLine();
+                builder.blankLine();
             } else if (block.startsWith("import ")) {
                 block = block.substring("import ".length());
                 boolean statik = false;
@@ -108,17 +114,27 @@ public class ImportLayoutStyle implements JavaStyle {
                     block = block.substring("static ".length());
                 }
                 if (block.equals("all other imports")) {
-                    builder = statik ?
-                            builder.importStaticAllOthers() :
-                            builder.importAllOthers();
+                    if (statik) {
+                        builder.importStaticAllOthers();
+                    } else {
+                        builder.importAllOthers();
+                    }
                 } else {
-                    builder = statik ?
-                            builder.staticImportPackage(block) :
-                            builder.importPackage(block);
+                    if (statik) {
+                        builder.staticImportPackage(block);
+                    } else {
+                        builder.importPackage(block);
+                    }
                 }
+            } else {
+                throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
             }
         }
         this.layoutBuilder = builder;
+    }
+
+    public Map<String, Object> getLayout() {
+        return layout;
     }
 
     /**
@@ -208,7 +224,8 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     /**
-     * See {@link ImportLayoutStyle}
+     * A method to create an import layout style programatically using the same block syntax as that of the declartive
+     * approach. See {@link ImportLayoutStyle}
      * <P><P>Block Syntax:<P>
      *
      * <PRE>
@@ -223,11 +240,11 @@ public class ImportLayoutStyle implements JavaStyle {
      * @param blocks An ordered list of import groupings which define exactly how imports should be organized within a compilation unit
      * @return ImportLayoutStyle
      */
-    public static @NonNull ImportLayoutStyle layout(int classCountToUseStarImport, int nameCountToUseStarImport, @NonNull  List<String> blocks) {
+    public static @NonNull ImportLayoutStyle layout(int classCountToUseStarImport, int nameCountToUseStarImport, String... blocks) {
         Map<String, Object> settings = new HashMap<>(3);
         settings.put("classCountToUseStarImport", classCountToUseStarImport);
         settings.put("nameCountToUseStarImport", nameCountToUseStarImport);
-        settings.put("blocks", blocks);
+        settings.put("blocks", Arrays.asList(blocks));
         ImportLayoutStyle style = new ImportLayoutStyle();
         style.setLayout(settings);
         return style;
@@ -239,26 +256,15 @@ public class ImportLayoutStyle implements JavaStyle {
     private static class Layout {
 
         private final List<Block> blocks;
-        private final int classCountToUseStarImport;
-        private final int nameCountToUseStarImport;
 
-        private Layout(List<Block> blocks, int classCountToUseStarImport, int nameCountToUseStarImport) {
+        private Layout(List<Block> blocks) {
             this.blocks = blocks==null?Collections.emptyList():blocks;
-            this.classCountToUseStarImport = classCountToUseStarImport;
-            this.nameCountToUseStarImport = nameCountToUseStarImport;
         }
 
         private List<Block> getBlocks() {
             return blocks;
         }
 
-        private int getClassCountToUseStarImport() {
-            return classCountToUseStarImport;
-        }
-
-        private int getNameCountToUseStarImport() {
-            return nameCountToUseStarImport;
-        }
 
         /**
          * A block represents a grouping of imports based on matching rules. The block provides a mechanism for matching
@@ -289,9 +295,7 @@ public class ImportLayoutStyle implements JavaStyle {
                 private int getCount() {
                     return count;
                 }
-                private boolean matches(J.Import anImport) {
-                    return false;
-                }
+
                 @Override
                 public boolean accept(J.Import anImport) {
                     return false;
@@ -470,7 +474,7 @@ public class ImportLayoutStyle implements JavaStyle {
                                 .collect(toList()));
                     }
                 }
-                return new Layout(blocks, classCountToUseStarImport, nameCountToUseStarImport);
+                return new Layout(blocks);
             }
         }
     }

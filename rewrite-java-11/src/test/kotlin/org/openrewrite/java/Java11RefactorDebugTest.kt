@@ -115,6 +115,10 @@ class Java11RemoveImportTest: Java11Test(), RemoveImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RemoveUnusedImportsTest: Java11Test(), RemoveUnusedOrdersTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11RenameVariableTest: Java11Test(), RenameVariableTest
 
 @DebugOnly
