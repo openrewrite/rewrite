@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.*;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaStyle;
-import org.openrewrite.java.OrderImports;
 import org.openrewrite.java.tree.J;
 
 import java.util.*;
@@ -68,7 +67,7 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  */
 public class ImportLayoutStyle implements JavaStyle {
 
-    //We maintain the layout as a map for serialization.
+    //The layout is maintained as a map for serialization.
     private Map<String, Object> layout;
 
     private Layout.Builder layoutBuilder;
@@ -134,7 +133,7 @@ public class ImportLayoutStyle implements JavaStyle {
     }
 
     public Map<String, Object> getLayout() {
-        return layout;
+        return Collections.unmodifiableMap(layout);
     }
 
     /**
