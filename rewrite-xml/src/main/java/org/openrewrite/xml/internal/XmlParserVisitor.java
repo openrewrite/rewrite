@@ -27,7 +27,7 @@ import org.openrewrite.xml.tree.Content;
 import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
-import java.net.URI;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,13 +37,13 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
-    private final URI uri;
+    private final Path path;
     private final String source;
 
     private int cursor = 0;
 
-    public XmlParserVisitor(URI uri, String source) {
-        this.uri = uri;
+    public XmlParserVisitor(Path path, String source) {
+        this.path = path;
         this.source = source;
     }
 
@@ -51,7 +51,7 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         Xml.Document d = convert(ctx, (c, format) -> new Xml.Document(
                 randomId(),
-                uri.toString(),
+                path,
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 format,

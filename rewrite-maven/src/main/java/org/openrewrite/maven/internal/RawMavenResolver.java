@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.nio.CharBuffer;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -572,7 +573,7 @@ public class RawMavenResolver {
     @Setter
     class PartialMaven {
         @EqualsAndHashCode.Include
-        final String sourcePath;
+        final Path sourcePath;
 
         @EqualsAndHashCode.Include
         final RawPom rawPom;

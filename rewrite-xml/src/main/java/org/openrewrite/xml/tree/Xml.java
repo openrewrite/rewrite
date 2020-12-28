@@ -32,6 +32,7 @@ import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.internal.PrintXml;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -69,7 +70,7 @@ public interface Xml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String sourcePath;
+        Path sourcePath;
 
         @With
         Prolog prolog;

@@ -52,13 +52,13 @@ public class MavenDownloader {
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
-    private final Map<String, RawMaven> projectPoms;
+    private final Map<Path, RawMaven> projectPoms;
 
     public MavenDownloader(MavenCache mavenCache) {
         this(mavenCache, emptyMap());
     }
 
-    public MavenDownloader(MavenCache mavenCache, Map<String, RawMaven> projectPoms) {
+    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
     }
@@ -162,23 +162,28 @@ public class MavenDownloader {
 
         Timer.Sample sample = Timer.start();
 
-        if (containingPom == null || !containingPom.getSourcePath().contains("http")) {
-            if (!StringUtils.isBlank(relativePath)) {
-                return Optional.ofNullable(containingPom)
-                        .map(pom -> {
-                            Path relativePomPath = Paths.get(pom.getSourcePath())
-                                    .getParent() // "relativeTo" the directory containing this pom
-                                    .resolve(Paths.get(relativePath, "pom.xml"))
-                                    .normalize();
-                            return projectPoms.get(relativePomPath.toString());
-                        })
-                        .orElse(null);
+        // The pom being examined might be from a remote repository or a local filesystem.
+        // First try to match the requested download with one of the project poms so we don't needlessly ping remote repos
+        for (RawMaven projectPom : projectPoms.values()) {
+            if (groupId.equals(projectPom.getPom().getGroupId()) &&
+                    artifactId.equals(projectPom.getPom().getArtifactId())) {
+                return projectPom;
             }
-
-            for (RawMaven projectPom : projectPoms.values()) {
-                if (groupId.equals(projectPom.getPom().getGroupId()) &&
-                        artifactId.equals(projectPom.getPom().getArtifactId())) {
-                    return projectPom;
+        }
+        if(containingPom != null && !StringUtils.isBlank(relativePath)) {
+            Path folderContainingPom = containingPom.getSourcePath()
+                    .getParent();
+            if(folderContainingPom != null) {
+                RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
+                        .normalize());
+                // Even poms published to remote repositories still contain relative paths to their parent poms
+                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
+                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
+                if(maybeLocalPom != null
+                        && groupId.equals(maybeLocalPom.getPom().getGroupId())
+                        && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
+                        && version.equals(maybeLocalPom.getPom().getVersion()) ) {
+                    return maybeLocalPom;
                 }
             }
         }
@@ -207,8 +212,10 @@ public class MavenDownloader {
                                     @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                             .bytes();
 
+                                    // This path doesn't matter except for debugging/error logs where it might get displayed
+                                    Path inputPath = Paths.get(groupId, artifactId, version);
                                     return RawMaven.parse(
-                                            new Parser.Input(URI.create(uri), () -> new ByteArrayInputStream(responseBody)),
+                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
                                             null,
                                             versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
                                     );

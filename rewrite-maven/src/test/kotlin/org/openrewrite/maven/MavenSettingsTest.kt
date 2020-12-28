@@ -16,14 +16,16 @@
 package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.Parser
-import java.net.URI
+import java.nio.file.Paths
 
 class MavenSettingsTest {
     @Test
     fun parse() {
-        val settings = MavenSettings.parse(Parser.Input(URI.create("settings.xml")) {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
             """
             <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -50,5 +52,96 @@ class MavenSettingsTest {
         })
 
         assertThat(settings.getActiveRepositories(emptyList())).hasSize(1)
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/131")
+    @Test
+    fun defaultActiveWhenNoOthersAreActive() {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+            """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <profiles>
+                    <profile>
+                        <id>default</id>
+                        <activation>
+                            <activeByDefault>true</activeByDefault>
+                        </activation>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones-default</id>
+                                <name>Spring Milestones</name>
+                                <url>https://activebydefault.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>https://actviebyactivationlist.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
+            """.trimIndent().byteInputStream()
+        })
+
+        assertThat(settings.getActiveRepositories(emptyList()))
+            .hasSize(1)
+            .allMatch { it.url == "https://activebydefault.com" }
+    }
+
+    @Disabled
+    @Issue("https://github.com/openrewrite/rewrite/issues/131")
+    @Test
+    fun defaultOnlyActiveIfNoOthersAreActive() {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+            """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                <activeProfiles>
+                    <activeProfile>
+                        repo
+                    </activeProfile>
+                </activeProfiles>
+                <profiles>
+                    <profile>
+                        <id>default</id>
+                        <activation>
+                            <activeByDefault>true</activeByDefault>
+                        </activation>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones-default</id>
+                                <name>Spring Milestones</name>
+                                <url>https://activebydefault.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                    <profile>
+                        <id>repo</id>
+                        <repositories>
+                            <repository>
+                                <id>spring-milestones</id>
+                                <name>Spring Milestones</name>
+                                <url>https://actviebyactivationlist.com</url>
+                            </repository>
+                        </repositories>
+                    </profile>
+                </profiles>
+            </settings>
+            """.trimIndent().byteInputStream()
+        })
+
+        assertThat(settings.getActiveRepositories(emptyList()))
+            .hasSize(1)
+            .allMatch { it.url == "https://actviebyactivationlist.com" }
     }
 }

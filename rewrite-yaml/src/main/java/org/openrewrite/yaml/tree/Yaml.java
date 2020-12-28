@@ -31,6 +31,7 @@ import org.openrewrite.yaml.YamlSourceVisitor;
 import org.openrewrite.yaml.internal.PrintYaml;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -81,7 +82,7 @@ public interface Yaml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        String sourcePath;
+        Path sourcePath;
 
         @With
         List<Document> documents;

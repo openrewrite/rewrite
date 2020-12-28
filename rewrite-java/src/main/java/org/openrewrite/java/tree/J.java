@@ -1461,7 +1461,7 @@ public interface J extends Serializable, Tree {
         UUID id;
 
         @With
-        String sourcePath;
+        Path sourcePath;
 
         @With
         @Nullable
@@ -1525,9 +1525,9 @@ public interface J extends Serializable, Tree {
             int packageLevelsUp = getPackageDecl() == null ? 0 :
                     (int) getPackageDecl().printTrimmed().chars().filter(c -> c == '.').count();
             // Jump over Java file name
-            return Paths.get(sourcePath).getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
-                    .mapToObj(n -> "../")
-                    .collect(joining(""))).normalize();
+            return sourcePath.getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
+                .mapToObj(n -> "../")
+                .collect(joining(""))).normalize();
         }
 
         /**
@@ -1559,10 +1559,9 @@ public interface J extends Serializable, Tree {
         }
 
         public static J.CompilationUnit buildEmptyClass(Path sourceSet, String packageName, String className) {
-            String sourcePath = sourceSet
+            Path sourcePath = sourceSet
                     .resolve(packageName.replace(".", "/"))
-                    .resolve(className + ".java")
-                    .toString();
+                    .resolve(className + ".java");
 
             return new J.CompilationUnit(
                     randomId(),

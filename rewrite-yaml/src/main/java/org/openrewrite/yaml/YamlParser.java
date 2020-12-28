@@ -32,6 +32,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Stack;
@@ -45,7 +46,7 @@ import static org.openrewrite.Tree.randomId;
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
 
     @Override
-    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
+    public List<Yaml.Documents> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         return acceptedInputs(sourceFiles).stream()
                 .map(sourceFile -> {
                     try (InputStream is = sourceFile.getSource()) {
@@ -56,7 +57,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }).collect(toList());
     }
 
-    private Yaml.Documents parseFromInput(URI sourceFile, InputStream source) {
+    private Yaml.Documents parseFromInput(Path sourceFile, InputStream source) {
         try (FormatPreservingReader reader = new FormatPreservingReader(new InputStreamReader(source))) {
             StreamReader streamReader = new StreamReader(reader);
             Scanner scanner = new ScannerImpl(streamReader);
@@ -138,7 +139,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 }
             }
 
-            return new Yaml.Documents(randomId(), sourceFile.toString(),
+            return new Yaml.Documents(randomId(), sourceFile,
                     documents, Formatting.EMPTY, Markers.EMPTY);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
@@ -146,7 +147,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     }
 
     @Override
-    public boolean accept(URI path) {
+    public boolean accept(Path path) {
         String fileName = path.toString();
         return fileName.endsWith(".yml") || fileName.endsWith(".yaml");
     }

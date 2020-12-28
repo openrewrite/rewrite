@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import java.lang.reflect.Field;
-import java.net.URI;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,7 +55,7 @@ import static org.openrewrite.Tree.randomId;
 public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormatting> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
-    private final URI uri;
+    private final Path path;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
@@ -64,9 +64,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
     private EndPosTable endPosTable;
     private int cursor = 0;
 
-    public Java11ParserVisitor(URI uri, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
                                Map<String, JavaType.Class> sharedClassTypes) {
-        this.uri = uri;
+        this.path = path;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
@@ -449,7 +449,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, CommentsAndFormatting fmt) {
-        logger.debug("Building AST for: " + uri);
+        logger.debug("Building AST for: " + path);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         CommentsAndFormatting prefix = format(source.substring(0, cu.getStartPosition()));
@@ -480,7 +480,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
         CommentsAndFormatting endFmt = format(source.substring(cursor));
         return new J.CompilationUnit(
                 randomId(),
-                uri.toString(),
+                path,
                 packageDecl,
                 imports,
                 classDecls,
@@ -978,7 +978,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, CommentsAndFormattin
             } else {
                 owner = ((JCMethodDecl) node).sym.owner.name.toString();
             }
-            
+
             CommentsAndFormatting ownerFmt = format(sourceBefore(owner));
             name = J.Ident.build(randomId(), owner, null, ownerFmt.getComments(),
                     ownerFmt.getFormatting(), Markers.EMPTY);

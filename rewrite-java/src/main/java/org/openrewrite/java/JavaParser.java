@@ -27,6 +27,7 @@ import java.io.File;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -106,10 +107,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return parseInputs(
                 Arrays.stream(sources)
                         .map(sourceFile -> {
-                            URI uri = URI.create(Optional.ofNullable(simpleName.apply(sourceFile))
+                            Path path = Paths.get(Optional.ofNullable(simpleName.apply(sourceFile))
                                 .orElse(Long.toString(System.nanoTime())) + ".java");
                             return new Input(
-                                    uri,
+                                    path,
                                     () -> new ByteArrayInputStream(sourceFile.getBytes())
                             );
                         })
@@ -119,7 +120,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     }
 
     @Override
-    default boolean accept(URI path) {
+    default boolean accept(Path path) {
         return path.toString().endsWith(".java");
     }
 

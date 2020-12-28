@@ -44,6 +44,7 @@ import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -153,7 +154,7 @@ public class Java11Parser implements JavaParser {
     }
 
     @Override
-    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable URI relativeTo) {
+    public List<J.CompilationUnit> parseInputs(Iterable<Input> sourceFiles, @Nullable Path relativeTo) {
         if (classpath != null) { // override classpath
             if (context.get(JavaFileManager.class) != pfm) {
                 throw new IllegalStateException("JavaFileManager has been forked unexpectedly");
@@ -212,7 +213,7 @@ public class Java11Parser implements JavaParser {
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
-                    logger.trace("Building AST for {}", input.getUri());
+                    logger.trace("Building AST for {}", input.getPath());
                     try {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),

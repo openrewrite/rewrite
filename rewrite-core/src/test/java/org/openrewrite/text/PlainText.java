@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 
+import java.nio.file.Path;
 import java.util.Collection;
 import java.util.UUID;
 
@@ -46,7 +47,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public String getSourcePath() {
+    public Path getSourcePath() {
         return null;
     }
 

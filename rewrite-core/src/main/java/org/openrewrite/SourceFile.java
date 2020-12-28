@@ -18,6 +18,7 @@ package org.openrewrite;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.nio.file.Path;
 import java.util.Collection;
 
 import static java.util.Collections.emptyList;
@@ -26,7 +27,7 @@ public interface SourceFile extends Tree {
     /**
      * This can refer to an absolute or relative file path or a remote location like an HTTP(s) URL.
      */
-    String getSourcePath();
+    Path getSourcePath();
 
     /**
      * Styles encode the surrounding project's expectation of formatting, etc.
