@@ -31,6 +31,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Validated.required;
 
 public class UpgradeParentVersion extends MavenRefactorVisitor {
@@ -102,7 +103,8 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
 
     private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
         if (availableVersions == null) {
-            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
+            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
+                    .downloadMetadata(groupId, artifactId, emptyList());
             availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                     .filter(versionComparator::isValid)
                     .collect(Collectors.toList());
