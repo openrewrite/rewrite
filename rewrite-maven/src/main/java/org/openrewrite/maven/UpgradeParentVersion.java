@@ -102,8 +102,7 @@ public class UpgradeParentVersion extends MavenRefactorVisitor {
 
     private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
         if (availableVersions == null) {
-            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                    .downloadMetadata(groupId, artifactId, emptyList());
+            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
             availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                     .filter(versionComparator::isValid)
                     .collect(Collectors.toList());

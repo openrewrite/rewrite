@@ -24,6 +24,7 @@ import okhttp3.Response;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenCache;
 import org.slf4j.Logger;
@@ -48,26 +49,31 @@ public class MavenDownloader {
             .build();
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("https://repo.maven.apache.org/maven2",
+    private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("central", "https://repo.maven.apache.org/maven2",
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
     private final Map<Path, RawMaven> projectPoms;
+    @Nullable
+    private final MavenSettings.Mirrors mirrors;
 
     public MavenDownloader(MavenCache mavenCache) {
-        this(mavenCache, emptyMap());
+        this(mavenCache, emptyMap(), null);
     }
 
-    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms) {
+    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings.Mirrors mirrors) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
+        this.mirrors = mirrors;
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
                                           List<RawRepositories.Repository> repositories) {
         Timer.Sample sample = Timer.start();
 
-        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
+        return Stream.concat(repositories.stream().distinct(), Stream.of(SUPER_POM_REPOSITORY))
+                .map(this::normalizeRepository)
+                .distinct()
                 .filter(Objects::nonNull)
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
@@ -188,8 +194,10 @@ public class MavenDownloader {
             }
         }
 
-        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
+        return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+                .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
+                .distinct()
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
@@ -243,9 +251,9 @@ public class MavenDownloader {
     private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, List<RawRepositories.Repository> repositories) {
         if (version.endsWith("-SNAPSHOT")) {
             MavenMetadata mavenMetadata = repositories.stream()
-                    .distinct()
                     .map(this::normalizeRepository)
                     .filter(Objects::nonNull)
+                    .distinct()
                     .filter(repo -> repo.acceptsVersion(version))
                     .map(repo -> {
                         try {
@@ -274,24 +282,27 @@ public class MavenDownloader {
     @Nullable
     private RawRepositories.Repository normalizeRepository(RawRepositories.Repository repository) {
         try {
-            CacheResult<RawRepositories.Repository> result = mavenCache.computeRepository(repository, () -> {
+            RawRepositories.Repository repoWithMirrors = applyMirrors(repository);
+            CacheResult<RawRepositories.Repository> result = mavenCache.computeRepository(repoWithMirrors, () -> {
                 // FIXME add retry logic
-                String url = repository.getUrl();
+                String url = repoWithMirrors.getUrl();
                 Request request = new Request.Builder().url(url).head().build();
                 try (Response response = httpClient.newCall(request).execute()) {
                     if (url.toLowerCase().contains("http://")) {
                         return normalizeRepository(
                                 new RawRepositories.Repository(
+                                        repoWithMirrors.getId(),
                                         url.toLowerCase().replace("http://", "https://"),
-                                        repository.getReleases(),
-                                        repository.getSnapshots()
+                                        repoWithMirrors.getReleases(),
+                                        repoWithMirrors.getSnapshots()
                                 )
                         );
                     } else if (response.isSuccessful()) {
                         return new RawRepositories.Repository(
+                                repoWithMirrors.getId(),
                                 url,
-                                repository.getReleases(),
-                                repository.getSnapshots()
+                                repoWithMirrors.getReleases(),
+                                repoWithMirrors.getSnapshots()
                         );
                     }
 
@@ -302,6 +313,14 @@ public class MavenDownloader {
             return result.getData();
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    private RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
+        if(mirrors == null) {
+            return repository;
+        } else {
+            return mirrors.applyMirrors(repository);
         }
     }
 }

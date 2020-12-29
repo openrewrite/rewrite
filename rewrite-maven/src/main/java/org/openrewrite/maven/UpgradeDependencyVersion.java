@@ -101,6 +101,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     @Override
     public Maven visitMaven(Maven maven) {
         versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
+        downloader = maven.getDownloader();
 
         maybeChangeDependencyVersion(maven.getModel());
 
@@ -139,8 +140,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
 
     private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
         if (availableVersions == null) {
-            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                    .downloadMetadata(groupId, artifactId, emptyList());
+            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
             availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                     .filter(versionComparator::isValid)
                     .collect(Collectors.toList());
