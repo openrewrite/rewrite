@@ -74,7 +74,7 @@ class RawPomTest {
 
     @Test
     fun repositorySerializationAndDeserialization() {
-        val repo = RawRepositories.Repository("https://repo.maven.apache.org/maven2",
+        val repo = RawRepositories.Repository("central","https://repo.maven.apache.org/maven2",
                 ArtifactPolicy(true), ArtifactPolicy(false))
 
         val mapper = ObjectMapper()

@@ -150,6 +150,7 @@ public class AddDependency extends MavenRefactorVisitor {
     @Override
     public Maven visitMaven(Maven maven) {
         model = maven.getModel();
+        downloader = maven.getDownloader();
 
         Validated versionValidation = Semver.validate(version, metadataPattern);
         if (versionValidation.isValid()) {
@@ -239,8 +240,7 @@ public class AddDependency extends MavenRefactorVisitor {
             return version;
         }
 
-        MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                .downloadMetadata(groupId, artifactId, emptyList());
+        MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);
         return mavenMetadata.getVersioning().getVersions().stream()

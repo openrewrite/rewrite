@@ -59,10 +59,10 @@ public class RawMavenResolver {
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
-    private final MavenSettings mavenSettings;
+    @Nullable private final MavenSettings mavenSettings;
 
     public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            MavenSettings mavenSettings, boolean resolveOptional) {
+                            @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -348,7 +348,12 @@ public class RawMavenResolver {
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
         List<RawRepositories.Repository> repositories = new ArrayList<>();
-        for (RawRepositories.Repository repository : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
+        List<RawRepositories.Repository> repositoriesFromPom = task.getRawMaven().getPom().getActiveRepositories(activeProfiles);
+        if(mavenSettings != null) {
+            repositoriesFromPom = mavenSettings.applyMirrors(repositoriesFromPom);
+        }
+
+        for (RawRepositories.Repository repository : repositoriesFromPom) {
             String url = repository.getUrl().trim();
             if (repository.getUrl().contains("${")) {
                 url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
@@ -357,7 +362,7 @@ public class RawMavenResolver {
             try {
                 //noinspection ResultOfMethodCallIgnored
                 URI.create(url);
-                repositories.add(new RawRepositories.Repository(url, repository.getReleases(), repository.getSnapshots()));
+                repositories.add(new RawRepositories.Repository(repository.getId(), url, repository.getReleases(), repository.getSnapshots()));
             } catch (Throwable t) {
                 logger.debug("Unable to make a URI out of repositoriy url {}", url);
             }
