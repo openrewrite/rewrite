@@ -33,6 +33,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Validated.required;
 
 /**
@@ -101,7 +102,7 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     @Override
     public Maven visitMaven(Maven maven) {
         versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
-        downloader = maven.getDownloader();
+        settings = maven.getSettings();
 
         maybeChangeDependencyVersion(maven.getModel());
 
@@ -140,7 +141,8 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
 
     private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
         if (availableVersions == null) {
-            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
+            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
+                    .downloadMetadata(groupId, artifactId, emptyList());
             availableVersions = mavenMetadata.getVersioning().getVersions().stream()
                     .filter(versionComparator::isValid)
                     .collect(Collectors.toList());

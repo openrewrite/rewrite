@@ -38,13 +38,13 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
 
     protected Pom model;
     protected Collection<Pom> modules;
-    protected MavenDownloader downloader;
+    protected MavenSettings settings;
 
     @Override
     public Maven visitMaven(Maven maven) {
         this.model = maven.getModel();
         this.modules = maven.getModules();
-        this.downloader = maven.getDownloader();
+        this.settings = maven.getSettings();
         return (Maven) visitDocument(maven);
     }
 
@@ -52,7 +52,7 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
     public final Xml visitDocument(Xml.Document document) {
         Xml.Document refactored = refactor(document, super::visitDocument);
         if (refactored != document) {
-            return new Maven(refactored, downloader);
+            return new Maven(refactored, settings);
         }
         return refactored;
     }
