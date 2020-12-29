@@ -93,6 +93,7 @@ public class UpgradeDependencyVersion extends Recipe {
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
+            downloader = maven.getDownloader();
 
             maybeChangeDependencyVersion(maven.getModel());
 
@@ -123,14 +124,13 @@ public class UpgradeDependencyVersion extends Recipe {
             }
         }
 
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
-            if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                        .downloadMetadata(groupId, artifactId, emptyList());
-                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
-                        .collect(Collectors.toList());
-            }
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        if (availableVersions == null) {
+            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
+            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .collect(Collectors.toList());
+        }
 
             LatestRelease latestRelease = new LatestRelease(metadataPattern);
             return availableVersions.stream()

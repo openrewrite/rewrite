@@ -95,14 +95,13 @@ public class UpgradeParentVersion extends Recipe {
             return super.visitTag(tag, ctx);
         }
 
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
-            if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                        .downloadMetadata(groupId, artifactId, emptyList());
-                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
-                        .collect(Collectors.toList());
-            }
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        if (availableVersions == null) {
+            MavenMetadata mavenMetadata = downloader.downloadMetadata(groupId, artifactId, emptyList());
+            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .collect(Collectors.toList());
+        }
 
             LatestRelease latestRelease = new LatestRelease(metadataPattern);
             return availableVersions.stream()

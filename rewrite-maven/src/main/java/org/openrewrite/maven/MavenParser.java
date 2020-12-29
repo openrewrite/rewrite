@@ -66,13 +66,14 @@ public class MavenParser implements Parser<Maven> {
                 .collect(toList());
 
         MavenDownloader downloader = new MavenDownloader(mavenCache,
-                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())));
+                projectPoms.stream().collect(toMap(RawMaven::getSourcePath, Function.identity())),
+                (mavenSettings == null) ? null : mavenSettings.getMirrors());
 
         List<Maven> parsed = projectPoms.stream()
                 .map(raw -> new RawMavenResolver(downloader, false, activeProfiles,
                         mavenSettings, resolveOptional).resolve(raw))
                 .filter(Objects::nonNull)
-                .map(Maven::new)
+                .map(xmlDoc -> new Maven(xmlDoc, downloader))
                 .collect(toCollection(ArrayList::new));
 
         for (int i = 0; i < parsed.size(); i++) {
