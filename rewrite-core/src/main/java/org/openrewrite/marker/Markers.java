@@ -15,10 +15,11 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.Incubating;
-import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
 
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ public class Markers {
     }
 
     /**
-     * {@link SourceVisitor} may respond to a marker to determine whether to act on
+     * {@link org.openrewrite.EvalVisitor} may respond to a marker to determine whether to act on
      * a source file or not.
      *
      * @return A marker collection containing any additional context about the containing {@link Tree} element.

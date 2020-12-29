@@ -22,7 +22,7 @@ public class ClassDeclToString {
         return CLASS_DECL_PRINTER.visit(clazz);
     }
 
-    private static final PrintJava CLASS_DECL_PRINTER = new PrintJava() {
+    private static final PrintJava CLASS_DECL_PRINTER = new PrintJava(treePrinter) {
         @Override
         public String visitClassDecl(J.ClassDecl classDecl) {
             String modifiers = visitModifiers(classDecl.getModifiers()).trim();

@@ -40,7 +40,7 @@ public class RecipeConfiguration {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @SuppressWarnings("rawtypes")
-    private final Map<Class<? extends SourceVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
+    private final Map<Class<? extends EvalVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
     private String name = null;
     private Set<Pattern> include = emptySet();
@@ -112,7 +112,7 @@ public class RecipeConfiguration {
             }
 
             @Override
-            public FilterReply accept(RefactorVisitor<?> visitor) {
+            public FilterReply accept(EvalVisitor<?> visitor) {
                 return inOrderConfigurations.stream().reduce(
                         NEUTRAL,
                         (reply, config) -> reply.equals(NEUTRAL) ? config.accept(visitor) : reply,
@@ -121,7 +121,7 @@ public class RecipeConfiguration {
             }
 
             @Override
-            public <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor) {
+            public <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor) {
                 Iterator<RecipeConfiguration> configs = inOrderConfigurations.descendingIterator();
                 while (configs.hasNext()) {
                     configs.next().configure(visitor);
@@ -137,7 +137,7 @@ public class RecipeConfiguration {
         };
     }
 
-    private void configure(SourceVisitor<?> visitor) {
+    private void configure(EvalVisitor<?> visitor) {
         try {
             propertyConverter.updateValue(visitor, propertyMap(visitor));
         } catch (JsonMappingException e) {
@@ -145,7 +145,7 @@ public class RecipeConfiguration {
         }
     }
 
-    protected Map<String, Object> propertyMap(SourceVisitor<?> visitor) {
+    protected Map<String, Object> propertyMap(EvalVisitor<?> visitor) {
         return propertiesByVisitor.computeIfAbsent(visitor.getClass(),
                 clazz -> propertyMap(clazz.getName(), configure));
     }
@@ -200,7 +200,7 @@ public class RecipeConfiguration {
         return properties;
     }
 
-    private Recipe.FilterReply accept(SourceVisitor<?> visitor) {
+    private Recipe.FilterReply accept(EvalVisitor<?> visitor) {
         if (visitor.validate().isInvalid() || exclude.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
             return Recipe.FilterReply.DENY;
         }

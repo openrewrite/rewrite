@@ -17,9 +17,7 @@ package org.openrewrite;
 
 import java.util.Collection;
 
-import static java.util.stream.Collectors.toList;
-
 @Incubating(since = "2.0.0")
 public interface ChangePublisher {
-    void publish(Collection<Change> changes);
+    void publish(Collection<Result> results);
 }

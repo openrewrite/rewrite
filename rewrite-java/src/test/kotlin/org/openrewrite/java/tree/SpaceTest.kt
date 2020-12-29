@@ -21,13 +21,11 @@ class SpaceTest {
         assertThat(c2.text).isEqualTo(" Short and stout //")
         assertThat(c3.text).isEqualTo(" Here is my handle")
 
-        assertThat(c1.prefix).isEmpty()
-        assertThat(c2.prefix).isEqualTo("\n")
-        assertThat(c3.prefix).isEqualTo("\n    ")
+        assertThat(c1.suffix).isEqualTo("\n")
+        assertThat(c2.suffix).isEqualTo("\n    ")
+        assertThat(c3.suffix).isEqualTo("\n\\u00A0  \\u00A0")
 
-        assertThat(cf.whitespace).isEqualTo("""
-            
-            \u00A0  \u00A0""".trimIndent())
+        assertThat(cf.whitespace).isEmpty()
     }
 
     @Test
@@ -49,13 +47,11 @@ class SpaceTest {
         assertThat(c2.text).isEqualTo(" When I get all steamed up ")
         assertThat(c3.text).isEqualTo(" /*\nHere me shout\n")
 
-        assertThat(c1.prefix).isEmpty()
-        assertThat(c2.prefix).isEqualTo("\n")
-        assertThat(c3.prefix).isEqualTo("\n")
+        assertThat(c1.suffix).isEqualTo("\n")
+        assertThat(c2.suffix).isEqualTo("\n    ")
+        assertThat(c3.suffix).isEqualTo("\n\\u00A0  \\u00A0")
 
-        assertThat(cf.whitespace).isEqualTo("""
-            
-            \u00A0  \u00A0""".trimIndent())
+        assertThat(cf.whitespace).isEmpty()
     }
 
     @Test
@@ -69,8 +65,7 @@ class SpaceTest {
 
         assertThat(cf.comments).hasSize(1)
         assertThat(cf.comments.first().text).isEqualTo("\n * /** Tip me over and pour me out!\n ")
-
-        assertThat(cf.whitespace).isEqualTo("""
+        assertThat(cf.comments.first().suffix).isEqualTo("""
             
             \u00A0  \u00A0""".trimIndent())
     }

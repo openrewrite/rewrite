@@ -16,11 +16,15 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class JContainer<T> extends JLeftPadded<List<JRightPadded<T>>> {
+public class JContainer<T> {
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList());
 
-    public JContainer(Space before, List<JRightPadded<T>> elem) {
-        super(before, elem);
+    private final Space before;
+    private final List<JRightPadded<T>> elem;
+
+    private JContainer(Space before, List<JRightPadded<T>> elem) {
+        this.before = before;
+        this.elem = elem;
     }
 
     public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elem) {
@@ -35,13 +39,19 @@ public class JContainer<T> extends JLeftPadded<List<JRightPadded<T>>> {
         return (JContainer<T>) EMPTY;
     }
 
-    @Override
-    public JLeftPadded<List<JRightPadded<T>>> withBefore(Space before) {
-        return build(before, getElem());
+    public JContainer<T> withBefore(Space before) {
+        return build(before, elem);
     }
 
-    @Override
-    public JLeftPadded<List<JRightPadded<T>>> withElem(List<JRightPadded<T>> elem) {
+    public JContainer<T> withElem(List<JRightPadded<T>> elem) {
         return build(getBefore(), elem);
+    }
+
+    public List<JRightPadded<T>> getElem() {
+        return elem;
+    }
+
+    public Space getBefore() {
+        return before;
     }
 }

@@ -47,8 +47,8 @@ public class YamlResourceLoader implements ResourceLoader {
             new PropertyPlaceholderHelper("${", "}", ":");
 
     private final Map<String, RecipeConfiguration> recipes = new HashMap<>();
-    private final Collection<CompositeRefactorVisitor> visitors = new ArrayList<>();
-    private final Map<CompositeRefactorVisitor, String> visitorExtensions = new HashMap<>();
+    private final Collection<CompositeEvalVisitor> visitors = new ArrayList<>();
+    private final Map<CompositeEvalVisitor, String> visitorExtensions = new HashMap<>();
     private final Map<String, Collection<Style>> styles = new HashMap<>();
 
     private final URI source;
@@ -128,7 +128,7 @@ public class YamlResourceLoader implements ResourceLoader {
                     }
                 }
 
-                for (Map.Entry<CompositeRefactorVisitor, String> extendingVisitor : visitorExtensions.entrySet()) {
+                for (Map.Entry<CompositeEvalVisitor, String> extendingVisitor : visitorExtensions.entrySet()) {
                     visitors.stream().filter(v -> v.getName().equals(extendingVisitor.getValue())).findAny()
                             .ifPresent(v -> extendingVisitor.getKey().extendsFrom(v));
                 }
@@ -152,21 +152,21 @@ public class YamlResourceLoader implements ResourceLoader {
             throw new ValidationException(validation, source);
         }
 
-        List<RefactorVisitor<? extends Tree>> subVisitors = new ArrayList<>();
+        List<EvalVisitor<? extends Tree>> subVisitors = new ArrayList<>();
 
         //noinspection unchecked
         for (Object subVisitorNameAndConfig : (List<Object>) visitorMap.get("visitors")) {
             try {
                 if (subVisitorNameAndConfig instanceof String) {
                     //noinspection unchecked
-                    subVisitors.add((RefactorVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
+                    subVisitors.add((EvalVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
                             .getDeclaredConstructor().newInstance());
                 } else if (subVisitorNameAndConfig instanceof Map) {
                     //noinspection unchecked
                     for (Map.Entry<String, Object> subVisitorEntry : ((Map<String, Object>) subVisitorNameAndConfig)
                             .entrySet()) {
-                        @SuppressWarnings("unchecked") RefactorVisitor<Tree> subVisitor =
-                                (RefactorVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
+                        @SuppressWarnings("unchecked") EvalVisitor<Tree> subVisitor =
+                                (EvalVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
                                         .getDeclaredConstructor().newInstance();
 
                         propertyConverter.updateValue(subVisitor, subVisitorEntry.getValue());
@@ -254,7 +254,7 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<? extends RefactorVisitor<?>> loadVisitors() {
+    public Collection<? extends EvalVisitor<?>> loadVisitors() {
         return visitors;
     }
 
@@ -263,10 +263,10 @@ public class YamlResourceLoader implements ResourceLoader {
         return styles;
     }
 
-    private static class ResourceLoadedVisitor extends CompositeRefactorVisitor {
+    private static class ResourceLoadedVisitor extends CompositeEvalVisitor {
         private final String name;
 
-        public ResourceLoadedVisitor(String name, List<RefactorVisitor<? extends Tree>> delegates) {
+        public ResourceLoadedVisitor(String name, List<EvalVisitor<? extends Tree>> delegates) {
             this.name = name;
             delegates.forEach(this::addVisitor);
         }

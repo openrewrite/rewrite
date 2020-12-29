@@ -11,18 +11,17 @@ import lombok.experimental.FieldDefaults;
 @Data
 public class Comment {
     @With
-    String prefix;
-
-    @With
     Style style;
 
     @With
     String text;
 
-    enum Style {
+    @With
+    String suffix;
+
+    public enum Style {
         LINE,
         BLOCK,
-        JAVADOC,
-        WHITESPACE
+        JAVADOC
     }
 }

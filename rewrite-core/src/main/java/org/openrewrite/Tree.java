@@ -15,13 +15,12 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 
-import java.util.*;
+import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Tree {
@@ -38,8 +37,8 @@ public interface Tree {
      */
     UUID getId();
 
-    default <R> R accept(SourceVisitor<R> v) {
-        return v.defaultTo(null);
+    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+        return v.defaultValue(null, p);
     }
 
     default String printTrimmed() {

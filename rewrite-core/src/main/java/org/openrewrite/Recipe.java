@@ -21,11 +21,11 @@ import java.util.regex.Pattern;
 public interface Recipe {
     String getName();
 
-    default FilterReply accept(RefactorVisitor<?> visitor) {
+    default FilterReply accept(EvalVisitor<?> visitor) {
         return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
     }
 
-    default <T extends Tree, R extends RefactorVisitor<T>> R configure(R visitor) {
+    default <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor) {
         return visitor;
     }
 

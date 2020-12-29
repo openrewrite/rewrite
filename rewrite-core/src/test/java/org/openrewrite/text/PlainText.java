@@ -17,7 +17,9 @@ package org.openrewrite.text;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.*;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Style;
+import org.openrewrite.Tree;
 import org.openrewrite.marker.Markers;
 
 import java.util.Collection;
@@ -26,17 +28,14 @@ import java.util.UUID;
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
     private final String text;
-    private final Formatting formatting;
     private final Collection<Style> styles;
 
     @JsonCreator
     public PlainText(@JsonProperty("id") UUID id,
                      @JsonProperty("text") String text,
-                     @JsonProperty("formatting") Formatting formatting,
                      @JsonProperty("styles") Collection<Style> styles) {
         this.id = id;
         this.text = text;
-        this.formatting = formatting;
         this.styles = styles;
     }
 
@@ -56,27 +55,16 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public Formatting getFormatting() {
-        return formatting;
-    }
-
-    @Override
     public UUID getId() {
         return id;
     }
 
     public PlainText withText(String toText) {
-        return new PlainText(id, toText, formatting, styles);
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public <T extends Tree> T withFormatting(Formatting fmt) {
-        return (T) new PlainText(id, text, fmt, styles);
+        return new PlainText(id, toText, styles);
     }
 
     @Override
     public String print() {
-        return formatting.getPrefix() + text;
+        return text;
     }
 }

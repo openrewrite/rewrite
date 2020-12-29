@@ -24,7 +24,7 @@ public class VariableDeclsToString {
         return VARIABLE_PRINTER.visit(v);
     }
 
-    private static final PrintJava VARIABLE_PRINTER = new PrintJava() {
+    private static final PrintJava VARIABLE_PRINTER = new PrintJava(treePrinter) {
         @Override
         public String visitMultiVariable(J.VariableDecls multiVariable) {
             String modifiers = visitModifiers(multiVariable.getModifiers()).trim();

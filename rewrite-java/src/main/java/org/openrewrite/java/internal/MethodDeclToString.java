@@ -22,7 +22,7 @@ public class MethodDeclToString {
         return METHOD_PRINTER.visit(method);
     }
 
-    private static final PrintJava METHOD_PRINTER = new PrintJava() {
+    private static final PrintJava METHOD_PRINTER = new PrintJava(treePrinter) {
         @Override
         public String visitMethod(J.MethodDecl method) {
             String modifiers = visitModifiers(method.getModifiers()).trim();

@@ -20,7 +20,7 @@ import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.internal.storage.dfs.InMemoryRepository;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
-import org.openrewrite.Change;
+import org.openrewrite.Result;
 import org.openrewrite.ChangePublisher;
 import org.openrewrite.Incubating;
 import org.slf4j.Logger;
@@ -39,7 +39,7 @@ public class GitChangePublisher implements ChangePublisher {
     private final String commitMessage;
 
     @Override
-    public void publish(Collection<Change> changes) {
+    public void publish(Collection<Result> results) {
         UsernamePasswordCredentialsProvider credentials = new UsernamePasswordCredentialsProvider(user, password);
 
         try {
@@ -59,7 +59,7 @@ public class GitChangePublisher implements ChangePublisher {
         }
     }
 
-    public void publishChangesForRepository(Collection<Change> changes) {
+    public void publishChangesForRepository(Collection<Result> results) {
 //        Change change = changes.iterator().next();
 //        Optional<GitMetadata> gitMetadata = change.getFixed().getMetadata(GitMetadata.class);
 

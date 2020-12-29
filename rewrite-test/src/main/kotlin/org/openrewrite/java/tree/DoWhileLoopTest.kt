@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -35,5 +36,21 @@ interface DoWhileLoopTest {
         assertTrue(whileLoop.whileCondition.condition.tree is J.Literal)
         assertTrue(whileLoop.body is J.Block<*>)
         assertEquals("{ do { } while ( true ) ; }", a.classes[0].methods[0].body!!.printTrimmed())
+    }
+
+    @Test
+    fun nonBlockStatement(jp: JavaParser) {
+        val aSrc = """
+            public class A {
+                public void test() {
+                    int i = 0;
+                    do i++ ; while(i < 10);
+                }
+            }
+        """.trimIndent()
+
+        val a = jp.parse(aSrc)
+
+        assertThat(a[0].printTrimmed()).isEqualTo(aSrc)
     }
 }

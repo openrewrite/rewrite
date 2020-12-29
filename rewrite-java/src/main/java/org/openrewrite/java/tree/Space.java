@@ -11,12 +11,12 @@ import java.util.List;
  * So whitespace and comments are like peanut butter and jelly.
  */
 public class Space {
-    public static Space EMPTY = new Space(Collections.emptyList(), "");
+    public static Space EMPTY = new Space("", Collections.emptyList());
 
     private final List<Comment> comments;
     private final String whitespace;
 
-    public Space(List<Comment> comments, String whitespace) {
+    public Space(String whitespace, List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace;
     }
@@ -33,14 +33,14 @@ public class Space {
         if(comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(comments, whitespace);
+        return new Space(whitespace, comments);
     }
 
     public Space withWhitespace(String whitespace) {
         if(comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(comments, whitespace);
+        return new Space(whitespace, comments);
     }
 
     public boolean isEmpty() {
@@ -72,13 +72,13 @@ public class Space {
                     } else if (last == '*' && inMultiLineComment) {
                         inMultiLineComment = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(prefix.toString(), Comment.Style.BLOCK, comment.toString()));
+                        comments.add(new Comment(Comment.Style.BLOCK, comment.toString(), prefix.toString()));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                     } else if (last == '*' && inJavadoc) {
                         inJavadoc = false;
                         comment.setLength(comment.length() - 1); // trim the last '*'
-                        comments.add(new Comment(prefix.toString(), Comment.Style.JAVADOC, comment.toString()));
+                        comments.add(new Comment(Comment.Style.JAVADOC, comment.toString(), prefix.toString()));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                     } else {
@@ -89,7 +89,7 @@ public class Space {
                 case '\n':
                     if (inSingleLineComment) {
                         inSingleLineComment = false;
-                        comments.add(new Comment(prefix.toString(), Comment.Style.LINE, comment.toString()));
+                        comments.add(new Comment(Comment.Style.LINE, comment.toString(), prefix.toString()));
                         prefix = new StringBuilder();
                         comment = new StringBuilder();
                         prefix.append(c);
@@ -121,7 +121,20 @@ public class Space {
             last = c;
         }
 
-        return new Space(comments, prefix.toString());
+        // Shift the whitespace on each comment forward to be a suffix of the comment before it, and the
+        // whitespace on the first comment to be the whitespace of the tree element. The remaining prefix is the suffix
+        // of the last comment.
+        String whitespace = prefix.toString();
+        if(!comments.isEmpty()) {
+            for (int i = comments.size() - 1; i >= 0; i--) {
+                Comment c = comments.get(i);
+                String next = c.getSuffix();
+                comments.set(i, c.withSuffix(whitespace));
+                whitespace = next;
+            }
+        }
+
+        return new Space(whitespace, comments);
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,

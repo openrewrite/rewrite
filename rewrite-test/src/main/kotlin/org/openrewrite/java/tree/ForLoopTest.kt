@@ -19,10 +19,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
 import org.openrewrite.java.firstMethodStatement
 
 interface ForLoopTest {
-    
     @Test
     fun forLoop(jp: JavaParser) {
         val a = jp.parse("""

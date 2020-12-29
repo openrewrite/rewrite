@@ -15,12 +15,10 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.Tree;
-import org.openrewrite.AutoConfigure;
-import org.openrewrite.Validated;
+import org.openrewrite.*;
 
 @AutoConfigure
-public class ChangeText extends PlainTextRefactorVisitor {
+public class ChangeText extends EvalVisitor<PlainText> {
     private String toText;
 
     public ChangeText() {
@@ -40,13 +38,8 @@ public class ChangeText extends PlainTextRefactorVisitor {
     }
 
     @Override
-    public PlainText visitTree(Tree tree) {
+    public PlainText visit(Tree tree, EvalContext ctx) {
         PlainText text = (PlainText) tree;
         return text.withText(toText);
-    }
-
-    @Override
-    public PlainText defaultTo(Tree t) {
-        return (PlainText) t;
     }
 }

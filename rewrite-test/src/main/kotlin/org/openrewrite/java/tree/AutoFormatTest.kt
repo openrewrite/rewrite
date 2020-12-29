@@ -17,11 +17,11 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.EvalVisitorTest
 import org.openrewrite.java.AutoFormat
 import org.openrewrite.java.JavaParser
 
-interface AutoFormatTest : RefactorVisitorTest {
+interface AutoFormatTest : EvalVisitorTest {
     companion object {
         var dependencies = listOf(
                 "package a;\npublic @interface A {}",
