@@ -55,16 +55,16 @@ public class MavenDownloader {
     private final MavenCache mavenCache;
     private final Map<Path, RawMaven> projectPoms;
     @Nullable
-    private final MavenSettings.Mirrors mirrors;
+    private final MavenSettings settings;
 
     public MavenDownloader(MavenCache mavenCache) {
         this(mavenCache, emptyMap(), null);
     }
 
-    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings.Mirrors mirrors) {
+    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
-        this.mirrors = mirrors;
+        this.settings = settings;
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
@@ -314,10 +314,10 @@ public class MavenDownloader {
     }
 
     private RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
-        if(mirrors == null) {
+        if(settings == null) {
             return repository;
         } else {
-            return mirrors.applyMirrors(repository);
+            return settings.applyMirrors(repository);
         }
     }
 }

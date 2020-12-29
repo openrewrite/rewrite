@@ -23,7 +23,6 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.tree.GroupArtifact;
 
 import java.util.*;

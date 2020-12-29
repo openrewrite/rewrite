@@ -16,7 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openrewrite.maven.internal.MavenDownloader;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -31,9 +31,9 @@ import static java.util.Collections.emptyList;
 public class Maven extends Xml.Document {
     private final transient Pom model;
     private final transient Collection<Pom> modules;
-    private final transient MavenDownloader downloader;
+    private final transient MavenSettings settings;
 
-    public Maven(Xml.Document document, MavenDownloader downloader) {
+    public Maven(Xml.Document document, MavenSettings settings) {
         super(
                 document.getId(),
                 document.getPrefix(),
@@ -44,7 +44,7 @@ public class Maven extends Xml.Document {
                 document.getEof()
         );
 
-        this.downloader = downloader;
+        this.settings = settings;
 
         model = document.getMarkers().findFirst(Pom.class).orElse(null);
         assert model != null;
@@ -65,8 +65,8 @@ public class Maven extends Xml.Document {
     }
 
     @JsonIgnore
-    public MavenDownloader getDownloader() {
-        return downloader;
+    public MavenSettings getSettings() {
+        return settings;
     }
 
     @Override
@@ -86,7 +86,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, downloader);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -95,7 +95,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, downloader);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -104,7 +104,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, downloader);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -113,7 +113,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m, downloader);
+        return new Maven(m, settings);
     }
 
     public Maven withModel(Pom model) {
