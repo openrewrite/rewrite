@@ -53,7 +53,7 @@ interface CompilationUnitSerializerTest {
         assertEquals(a, aDeser)
         assertTrue(a.classes[0].type === aDeser.classes[0].type)
         assertTrue((a.classes[0].fields + aDeser.classes[0].fields)
-                .map { it.vars[0].initializer?.type }
+                .map { it.vars[0].elem.initializer?.elem?.type }
                 .toSet()
                 .size == 1)
     }

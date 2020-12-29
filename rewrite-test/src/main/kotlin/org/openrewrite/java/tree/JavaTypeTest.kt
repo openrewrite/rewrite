@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.asClass
 
 interface JavaTypeTest {
+
     @Test
     fun memberVisibility(jp: JavaParser) {
         val b = """
@@ -51,7 +52,7 @@ interface JavaTypeTest {
             }
         """.trimIndent())[0]
 
-        val (list, collection) = a.imports.map { TypeUtils.asClass(it.qualid.type)!! }
+        val (list, collection) = a.imports.map { TypeUtils.asClass(it.elem.qualid.type)!! }
         val (listArr, collectionArr) = a.classes[0].fields.map { TypeUtils.asClass(it.typeExpr!!.type)!! }
 
         assertTrue(collection.isAssignableFrom(list))

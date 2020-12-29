@@ -15,22 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface AssertTest {
+interface AssertTest : JavaParserTest {
 
     @Test
-    fun assertStatement(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                void test() {
-                    assert 1 == 1;
-                }
-            }
-        """)[0]
-
-        assertEquals("assert 1 == 1", a.classes[0].methods[0].body!!.statements[0].printTrimmed())
-    }
+    fun assert(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            assert 1 == 1;
+        """
+    )
 }

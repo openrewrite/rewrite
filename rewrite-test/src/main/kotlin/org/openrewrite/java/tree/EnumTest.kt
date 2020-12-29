@@ -15,14 +15,16 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface EnumTest {
+interface EnumTest : JavaParserTest {
+
     @Test
-    fun anonymousClassInitializer(jp: JavaParser) {
-        val aSource = """
+    fun anonymousClassInitializer(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public enum A {
                 A1(1) {
                     @Override
@@ -39,16 +41,12 @@ interface EnumTest {
                 
                 abstract void foo();
             }
-        """.trimIndent()
-
-        val a = jp.parse(aSource)[0]
-
-        assertEquals(aSource, a.printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun enumConstructor(jp: JavaParser) {
-        val aSource = """
+    fun enumConstructor(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public class Outer {
                 public enum A {
                     A1(1);
@@ -62,23 +60,42 @@ interface EnumTest {
                     }
                 }
             }
-        """.trimIndent()
-
-        val a = jp.parse(aSource)[0]
-
-        assertEquals(aSource, a.printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun noArguments(jp: JavaParser) {
-        val aSource = """
+    fun noArguments(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public enum A {
                 A1, A2();
             }
-        """.trimIndent()
+        """
+    )
 
-        val a = jp.parse(aSource)[0]
+    @Test
+    fun enumWithParameters(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public enum A {
+                ONE(1),
+                TWO(2);
+            
+                A(int n) {}
+            }
+        """
+    )
 
-        assertEquals(aSource, a.printTrimmed())
-    }
+    @Test
+    fun enumWithoutParameters(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, "public enum A { ONE, TWO }"
+    )
+
+    @Test
+    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, "public enum A { ONE ; }"
+    )
+
+    @Test
+    fun enumWithEmptyParameters(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, "public enum A { ONE ( ), TWO ( ) }"
+    )
 }

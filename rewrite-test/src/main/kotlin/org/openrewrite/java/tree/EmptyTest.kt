@@ -15,28 +15,16 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface EmptyTest {
+interface EmptyTest : JavaParserTest {
     @Test
-    fun empty(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    ;
-                }
-            }
-        """)[0]
-
-        assertTrue(a.firstMethodStatement() is J.Empty)
-        assertEquals("""
-            |public void test() {
-            |    ;
-            |}
-        """.trimMargin(), a.classes[0].methods[0].printTrimmed())
-    }
+    fun empty(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            ;
+        """
+    )
 }

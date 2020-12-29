@@ -74,7 +74,7 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
     }
 
     @Nullable
-    public final T visit(@Nullable Tree tree, EvalContext ctx) {
+    public T visit(@Nullable Tree tree, EvalContext ctx) {
         if (tree == null) {
             return defaultValue(null, ctx);
         }

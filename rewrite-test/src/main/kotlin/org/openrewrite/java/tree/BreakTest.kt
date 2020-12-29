@@ -15,56 +15,25 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface BreakTest {
-
-    @Test
-    fun breakFromWhileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    while(true) break;
-                }
-            }
-        """)[0]
-
-        val whileLoop = a.firstMethodStatement() as J.WhileLoop
-        assertTrue(whileLoop.body is J.Break)
-        assertNull((whileLoop.body as J.Break).label)
-    }
+interface BreakTest : JavaParserTest {
 
     @Test
-    fun breakFromLabeledWhileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    labeled: while(true)
-                        break labeled;
-                }
-            }
-        """)[0]
-
-        val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
-        assertTrue(whileLoop.body is J.Break)
-        assertEquals("labeled", (whileLoop.body as J.Break).label?.simpleName)
-    }
+    fun breakFromWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            while(true) break;
+        """
+    )
 
     @Test
-    fun formatLabeledBreak(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    labeled : while(true)
-                        break labeled;
-                }
-            }
-        """)[0]
-
-        val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
-        assertEquals("break labeled", whileLoop.body.printTrimmed())
-    }
+    fun breakFromLabeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            labeled: while(true)
+                break labeled;
+        """
+    )
 }

@@ -15,117 +15,61 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface TryCatchTest {
-    
-    @Test
-    fun tryFinally(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    try {
-                    }
-                    finally {
-                    }
-                }
-            }
-        """)[0]
-        
-        val tryable = a.firstMethodStatement() as J.Try
-        assertEquals(0, tryable.catches.size)
-        assertTrue(tryable.finally is J.Try.Finally)
-    }
-    
-    @Test
-    fun tryCatchNoFinally(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    try {
-                    }
-                    catch(Throwable t) {
-                    }
-                }
-            }
-        """)[0]
-
-        val tryable = a.firstMethodStatement() as J.Try
-        assertEquals(1, tryable.catches.size)
-    }
-    
-    @Test
-    fun tryWithResources(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.io.*;
-            public class A {
-                File f;
-                public void test() {
-                    try(FileInputStream fis = new FileInputStream(f)) {
-                    }
-                    catch(IOException e) {
-                    }
-                }
-            }
-        """)[0]
-
-        val tryable = a.firstMethodStatement() as J.Try
-        assertEquals(1, tryable.resources?.decls?.size ?: -1)
-    }
+interface TryCatchTest : JavaParserTest {
 
     @Test
-    fun formatTryWithResources(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.io.*;
-            public class A {
-                File f;
-                public void test() {
-                    try(FileInputStream fis = new FileInputStream(f)) { }
-                }
+    fun tryFinally(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            try {
             }
-        """)[0]
-
-        val tryable = a.firstMethodStatement() as J.Try
-        assertEquals("try(FileInputStream fis = new FileInputStream(f)) { }",
-                tryable.printTrimmed())
-    }
+            finally {
+            }
+        """
+    )
 
     @Test
-    fun formatMultiCatch(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.io.*;
-            public class A {
-                File f;
-                public void test() {
-                    try(FileInputStream fis = new FileInputStream(f)) {}
-                    catch(FileNotFoundException | RuntimeException e) {}
-                }
+    fun tryCatchNoFinally(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            try {
             }
-        """)[0]
-
-        val multiCatch = (a.firstMethodStatement() as J.Try).catches[0].param.tree.typeExpr as J.MultiCatch
-        assertEquals("FileNotFoundException | RuntimeException", multiCatch.printTrimmed())
-    }
+            catch(Throwable t) {
+            }
+        """
+    )
 
     @Test
-    fun formatTryCatchFinally(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    try {}
-                    catch(Exception e) {}
-                    catch(RuntimeException e) {}
-                    catch(Throwable t) {}
-                    finally {}
-                }
+    fun tryWithResources(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            File f = new File("file.txt");
+            try(FileInputStream fis = new FileInputStream(f)) {
             }
-        """)[0]
+            catch(IOException e) {
+            }
+        """, "java.io.*"
+    )
 
-        val tryable = a.firstMethodStatement() as J.Try
-        assertEquals("try {}\ncatch(Exception e) {}\ncatch(RuntimeException e) {}\ncatch(Throwable t) {}\nfinally {}", tryable.printTrimmed())
-    }
+    @Test
+    fun multiCatch(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            File f = new File("file.txt");
+            try(FileInputStream fis = new FileInputStream(f)) {}
+            catch(FileNotFoundException | RuntimeException e) {}
+        """, "java.io.*"
+    )
+
+    @Test
+    fun tryCatchFinally(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            try {}
+            catch(Exception e) {}
+            catch(RuntimeException e) {}
+            catch(Throwable t) {}
+            finally {}
+        """
+    )
 }

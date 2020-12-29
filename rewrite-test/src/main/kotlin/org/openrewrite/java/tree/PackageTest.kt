@@ -15,18 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface PackageTest {
+interface PackageTest : JavaParserTest {
     @Test
-    fun packageFormatting(jp: JavaParser) {
-        val a = """
+    fun packageFormatting(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             /*comment*/package a ;
             class A {}
-        """.trimIndent()
-
-        assertThat(jp.parse(a)[0].printTrimmed()).isEqualTo(a)
-    }
+        """
+    )
 }

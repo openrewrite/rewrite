@@ -3,6 +3,11 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 public interface TreePrinter<T extends Tree, P> {
+    static <T extends Tree, P> TreePrinter<T, P> identity() {
+        return new TreePrinter<T, P>() {
+        };
+    }
+
     /**
      * Transform the AST before a printer prints the subtree.
      *

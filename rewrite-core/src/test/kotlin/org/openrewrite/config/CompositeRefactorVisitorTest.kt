@@ -17,8 +17,7 @@ package org.openrewrite.config
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.Formatting
-import org.openrewrite.Refactor
+import org.openrewrite.Eval
 import org.openrewrite.Tree.randomId
 import org.openrewrite.text.PlainText
 import java.util.*
@@ -40,8 +39,8 @@ class CompositeRefactorVisitorTest {
 
         val visitors = loader.loadVisitors()
 
-        val fixed = Refactor().visit(*visitors.toTypedArray())
-                .fixed(PlainText(randomId(), "Hi Jon", Formatting.EMPTY, emptyList()))
+        val fixed = Eval.builder().visit(*visitors.toTypedArray()).build()
+                .results(PlainText(randomId(), "Hi Jon", emptyList()))
 
         assertThat(fixed!!.printTrimmed()).isEqualTo("Hello Jonathan!")
     }

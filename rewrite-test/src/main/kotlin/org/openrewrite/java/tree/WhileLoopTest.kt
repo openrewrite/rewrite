@@ -15,42 +15,23 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
 
-interface WhileLoopTest {
+interface WhileLoopTest : JavaParserTest {
 
     @Test
-    fun whileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
+    fun whileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, JavaParserTest.NestingLevel.Block, """
                     while ( true ) { }
-                }
-            }
-        """)[0]
-
-        val whileLoop = a.firstMethodStatement() as J.WhileLoop
-
-        assertTrue(whileLoop.condition.tree is J.Literal)
-        assertTrue(whileLoop.body is J.Block<*>)
-        assertEquals("while ( true ) { }", whileLoop.printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun statementTerminatorForSingleLineWhileLoops(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
+    fun statementTerminatorForSingleLineWhileLoops(jp: JavaParser) = assertParseAndPrint(
+        jp, JavaParserTest.NestingLevel.Block, """
                     while(true) test();
-                }
-            }
-        """)[0]
-
-        val forLoop = a.classes[0].methods[0].body!!.statements[0] as J.WhileLoop
-        assertEquals("while(true) test();", forLoop.printTrimmed())
-    }
+        """
+    )
 }

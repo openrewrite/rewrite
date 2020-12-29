@@ -15,90 +15,45 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Tree
-import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface AnnotationTest {
-    
-    @Test
-    fun annotation(jp: JavaParser) {
-        val a = jp.parse("""
-            @SuppressWarnings("ALL")
-            public class A {}
-        """)[0]
-        
-        val ann = a.classes[0].annotations[0]
-        
-        assertEquals("java.lang.SuppressWarnings", ann.type.asClass()?.fullyQualifiedName)
-        assertEquals("ALL", ann.args!!.args.filterIsInstance<J.Literal>().firstOrNull()?.value)
-    }
-    
-    @Test
-    fun formatImplicitDefaultArgument(jp: JavaParser) {
-        val a = jp.parse("""
-            @SuppressWarnings("ALL")
-            public class A {}
-        """)[0]
-        
-        val ann = a.classes[0].annotations[0]
-        
-        assertEquals("@SuppressWarnings(\"ALL\")", ann.printTrimmed())
-    }
+interface AnnotationTest : JavaParserTest {
 
     @Test
-    fun preserveOptionalEmptyParentheses(jp: JavaParser) {
-        val a = jp.parse("""
-            @Deprecated ( )
-            public class A {}
-        """)[0]
-
-        val ann = a.classes[0].annotations[0]
-
-        assertEquals("@Deprecated ( )", ann.printTrimmed())
-    }
+    fun annotationWithDefaultArgument(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+           @SuppressWarnings("ALL")
+           public class A {}
+        """
+    )
 
     @Test
-    fun default(jp: JavaParser) {
-        val a = jp.parse("""
-            public @interface A {
-                String foo() default "foo";
-            }
-        """)[0]
-
-        assertEquals("""String foo() default "foo"""", a.classes[0].methods[0].printTrimmed())
-    }
+    fun annotationWithArgument(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+           @SuppressWarnings(value = "ALL")
+           public class A {}
+        """
+    )
 
     @Test
-    fun newArrayArgument(jp: JavaParser) {
-        val a = jp.parse("""
+    fun preserveOptionalEmptyParentheses(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+           @Deprecated ( )
+           public class A {}
+        """
+    )
+
+    @Test
+    fun newArrayArgument(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.lang.annotation.Target;
             import static java.lang.annotation.ElementType.*;
 
             @Target({ FIELD, PARAMETER })
             public @interface Annotation {}
-        """)[0]
-
-        assertEquals("@Target({ FIELD, PARAMETER })", a.classes[0].annotations[0].printTrimmed())
-    }
-
-    @Test
-    fun annotationArgTypesVisited(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.lang.annotation.Target;
-            import static java.lang.annotation.ElementType.*;
-
-            @Target({ FIELD, PARAMETER })
-            public @interface Annotation {}
-        """)[0]
-
-        assertEquals(true, object: AbstractJavaSourceVisitor<Boolean>() {
-            override fun defaultTo(t: Tree?): Boolean = false
-
-            override fun visitTypeName(name: NameTree): Boolean = name.type.asClass()?.fullyQualifiedName == "java.lang.annotation.ElementType"
-        }.visit(a))
-    }
+        """
+    )
 }

@@ -15,42 +15,25 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface DoWhileLoopTest {
-    @Test
-    fun doWhileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() { do { } while ( true ) ; }
-            }
-        """)[0]
-
-        val whileLoop = a.firstMethodStatement() as J.DoWhileLoop
-
-        assertTrue(whileLoop.whileCondition.condition.tree is J.Literal)
-        assertTrue(whileLoop.body is J.Block<*>)
-        assertEquals("{ do { } while ( true ) ; }", a.classes[0].methods[0].body!!.printTrimmed())
-    }
+interface DoWhileLoopTest : JavaParserTest {
 
     @Test
-    fun nonBlockStatement(jp: JavaParser) {
-        val aSrc = """
-            public class A {
-                public void test() {
-                    int i = 0;
+    fun doWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            do { } while ( true ) ;
+        """
+    )
+
+    @Test
+    fun nonBlockStatement(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int i = 0;
                     do i++ ; while(i < 10);
-                }
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)
-
-        assertThat(a[0].printTrimmed()).isEqualTo(aSrc)
-    }
+        """
+    )
 }

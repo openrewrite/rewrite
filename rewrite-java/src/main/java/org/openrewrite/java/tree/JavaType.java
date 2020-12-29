@@ -16,15 +16,11 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.*;
-import com.koloboke.collect.map.hash.HashObjObjMaps;
-import com.koloboke.collect.set.hash.HashObjSets;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.With;
-import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
 import java.lang.reflect.Constructor;
@@ -37,14 +33,11 @@ import static java.util.Collections.singleton;
 import static java.util.Comparator.comparing;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Tree.randomId;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
     boolean deepEquals(@Nullable JavaType type);
-
-    TypeTree toTypeTree();
 
     /**
      * Return a JavaType for the specified string.
@@ -68,29 +61,10 @@ public interface JavaType extends Serializable {
             return type instanceof MultiCatch &&
                     TypeUtils.deepEquals(throwableTypes, ((MultiCatch) type).throwableTypes);
         }
-
-        @Override
-        public TypeTree toTypeTree() {
-            return new J.MultiCatch(
-                    randomId(),
-                    throwableTypes.stream()
-                            .map(JavaType::toTypeTree)
-                            .collect(toList()),
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY
-            );
-        }
     }
 
     abstract class FullyQualified implements JavaType {
         public abstract String getFullyQualifiedName();
-
-        @Override
-        public TypeTree toTypeTree() {
-            return TreeBuilder.buildName(getFullyQualifiedName())
-                    .withType(JavaType.Class.build(getFullyQualifiedName()));
-        }
 
         @JsonIgnore
         public String getClassName() {
@@ -148,7 +122,7 @@ public interface JavaType extends Serializable {
     @Getter
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
-        private static final Map<String, Set<Class>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<String, Set<Class>> flyweights = new HashMap<>();
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -216,7 +190,7 @@ public interface JavaType extends Serializable {
             JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> HashObjSets.newMutableSet());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
@@ -352,16 +326,11 @@ public interface JavaType extends Serializable {
             return name.equals(v.name) && TypeUtils.deepEquals(this.type, v.type) &&
                     flags.equals(v.flags);
         }
-
-        @Override
-        public TypeTree toTypeTree() {
-            return type == null ? null : type.toTypeTree();
-        }
     }
 
     @Getter
     class Method implements JavaType {
-        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = HashObjObjMaps.newMutableMap();
+        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new HashMap<>();
 
         @With
         private final FullyQualified declaringType;
@@ -394,8 +363,8 @@ public interface JavaType extends Serializable {
 
             synchronized (flyweights) {
                 Set<Method> methods = flyweights
-                        .computeIfAbsent(declaringType, dt -> HashObjObjMaps.newMutableMap())
-                        .computeIfAbsent(name, n -> HashObjSets.newMutableSet());
+                        .computeIfAbsent(declaringType, dt -> new HashMap<>())
+                        .computeIfAbsent(name, n -> new HashSet<>());
 
                 return methods
                         .stream()
@@ -439,11 +408,6 @@ public interface JavaType extends Serializable {
                     signatureDeepEquals(genericSignature, m.genericSignature) &&
                     signatureDeepEquals(resolvedSignature, m.resolvedSignature);
         }
-
-        @Override
-        public TypeTree toTypeTree() {
-            throw new UnsupportedOperationException("Cannot build a type tree for a Method");
-        }
     }
 
     @EqualsAndHashCode(callSuper = false)
@@ -464,11 +428,6 @@ public interface JavaType extends Serializable {
             return fullyQualifiedName.equals(generic.fullyQualifiedName) &&
                     TypeUtils.deepEquals(bound, generic.bound);
         }
-
-        @Override
-        public TypeTree toTypeTree() {
-            throw new UnsupportedOperationException("Cannot build a type tree for a GenericTypeVariable");
-        }
     }
 
     @Data
@@ -478,18 +437,6 @@ public interface JavaType extends Serializable {
         @Override
         public boolean deepEquals(JavaType type) {
             return type instanceof Array && elemType != null && elemType.deepEquals(((Array) type).elemType);
-        }
-
-        @Override
-        public TypeTree toTypeTree() {
-            return new J.ArrayType(
-                    randomId(),
-                    elemType.toTypeTree(),
-                    emptyList(),
-                    emptyList(),
-                    Formatting.EMPTY,
-                    Markers.EMPTY
-            );
         }
     }
 
@@ -538,53 +485,6 @@ public interface JavaType extends Serializable {
         @Override
         public boolean deepEquals(JavaType type) {
             return this == type;
-        }
-
-        @Override
-        public TypeTree toTypeTree() {
-            return new J.Primitive(randomId(), this, emptyList(), Formatting.EMPTY, Markers.EMPTY);
-        }
-
-        public J.Literal toLiteral(String value) {
-            Object primitiveValue;
-
-            switch (this) {
-                case Int:
-                    primitiveValue = Integer.parseInt(value);
-                    break;
-                case Boolean:
-                    primitiveValue = java.lang.Boolean.parseBoolean(value);
-                    break;
-                case Byte:
-                case Char:
-                    primitiveValue = "'" + (value.length() > 0 ? value.charAt(0) : 0) + "'";
-                    break;
-                case Double:
-                    primitiveValue = java.lang.Double.parseDouble(value);
-                    break;
-                case Float:
-                    primitiveValue = java.lang.Float.parseFloat(value);
-                    break;
-                case Long:
-                    primitiveValue = java.lang.Long.parseLong(value);
-                    break;
-                case Short:
-                    primitiveValue = java.lang.Short.parseShort(value);
-                    break;
-                case Null:
-                    primitiveValue = null;
-                    break;
-                case String:
-                    primitiveValue = "\"" + value + "\"";
-                    break;
-                case Void:
-                case None:
-                case Wildcard:
-                default:
-                    throw new IllegalArgumentException("Unable to build literals for void, none, and wildcards");
-            }
-
-            return new J.Literal(randomId(), primitiveValue, value, this, emptyList(), Formatting.EMPTY, Markers.EMPTY);
         }
     }
 }

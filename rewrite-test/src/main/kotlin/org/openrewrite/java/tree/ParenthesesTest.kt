@@ -15,27 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ParenthesesTest {
+interface ParenthesesTest : JavaParserTest {
 
     @Test
-    fun parentheses(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    int n = ( 0 );
-                }
-            }
-        """)[0]
-
-        val variable by lazy { (a.firstMethodStatement() as J.VariableDecls).vars[0].initializer }
-
-        assertTrue(variable is J.Parentheses<*>)
-        assertEquals("( 0 )", variable?.printTrimmed())
-    }
+    fun parentheses(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n = (0);
+        """
+    )
 }

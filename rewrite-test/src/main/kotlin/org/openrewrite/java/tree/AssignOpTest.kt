@@ -15,27 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface AssignOpTest {
+interface AssignOpTest : JavaParserTest {
+
     @Test
-    fun compoundAssignment(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n = 0;
-                public void test() {
-                    n += 1;
-                }
-            }
-        """)[0]
-
-        val assign = a.firstMethodStatement() as J.AssignOp
-
-        assertTrue(assign.operator is J.AssignOp.Operator.Addition)
-        assertEquals("n += 1", assign.printTrimmed())
-    }
+    fun compoundAssignment(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n = 0;
+            n += 1;
+        """
+    )
 }

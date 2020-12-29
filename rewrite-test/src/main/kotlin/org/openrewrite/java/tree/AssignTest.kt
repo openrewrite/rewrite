@@ -15,39 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface AssignTest {
-    
+interface AssignTest: JavaParserTest {
+
     @Test
-    fun assignmentToField(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                String s;
-                public void test() {
-                    s = "foo";
-                }
-            }
-        """)[0]
-        
-        val assign = a.firstMethodStatement() as J.Assign
-        assertEquals("s", (assign.variable as J.Ident).simpleName)
-        assertTrue(assign.assignment is J.Literal)
-    }
-    
-    @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            @SuppressWarnings(value = "ALL")
-            public class A {}
-        """)[0]
-        
-        val assign = a.classes[0].annotations[0].args!!.args[0] as J.Assign
-        
-        assertEquals("value = \"ALL\"", assign.printTrimmed())
-    }
+    fun assignment(jp: JavaParser)  = assertParseAndPrint(
+        jp, Block, """
+            String s;
+            s = "foo";
+        """
+    )
 }

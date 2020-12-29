@@ -16,6 +16,7 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.Validated;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 

@@ -1059,10 +1059,8 @@ public interface J extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
-        @With
         Space prefix;
 
-        @With
         Markers markers;
 
         IdentFlyweight ident;
@@ -1097,6 +1095,13 @@ public interface J extends Serializable, Tree {
 
         public Ident withName(String name) {
             return build(id, prefix, markers, name, getType());
+        }
+
+        public Ident withMarkers(Markers markers) { return build(id, prefix, markers, ident.getSimpleName(), getType()); }
+
+        @SuppressWarnings("unchecked")
+        public Ident withPrefix(Space prefix) {
+            return build(id, prefix, markers, ident.getSimpleName(), getType());
         }
 
         @JsonCreator

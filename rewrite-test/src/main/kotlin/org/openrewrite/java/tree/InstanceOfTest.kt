@@ -15,28 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface InstanceOfTest {
+interface InstanceOfTest : JavaParserTest {
+
     @Test
-    fun instanceOf(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                Object o;
-                public void test() {
-                    boolean b = o instanceof String;
-                }
-            }
-        """)[0]
-
-        val variable by lazy { a.firstMethodStatement() as J.VariableDecls }
-        val instanceof by lazy { variable.vars[0].initializer as J.InstanceOf }
-
-        assertEquals("java.lang.String", (instanceof.clazz as J.Ident).type.asClass()?.fullyQualifiedName)
-        assertEquals("o instanceof String", instanceof.printTrimmed())
-    }
+    fun instanceOf(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            boolean b = o instanceof String;
+        """
+    )
 }

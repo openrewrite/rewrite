@@ -15,19 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.Tree
-import org.openrewrite.java.AbstractJavaSourceVisitor
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import java.util.concurrent.CountDownLatch
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface MemberReferenceTest {
+interface MemberReferenceTest : JavaParserTest {
 
     @Test
-    fun staticFunctionReference(jp: JavaParser) {
-        val a = jp.parse("""
+    fun staticFunctionReference(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.stream.Stream;
 
             public class StaticLambdaRef {
@@ -39,36 +37,14 @@ interface MemberReferenceTest {
             class A {
                 static void func(String s) {}
             }
-        """)[0]
-
-        val memberRefLatch = CountDownLatch(1)
-
-        object: AbstractJavaSourceVisitor<Unit?>() {
-            override fun defaultTo(t: Tree?): Nothing? = null
-
-            override fun visitMemberReference(memberRef: J.MemberReference): Unit? {
-                memberRefLatch.countDown()
-                assertEquals("java.util.function.Consumer", memberRef.type.asClass()?.fullyQualifiedName)
-                assertEquals("A :: func", memberRef.printTrimmed())
-                return null
-            }
-        }.visit(a)
-
-        assertEquals(0L, memberRefLatch.count)
-    }
+        """
+    )
 
     @Test
-    fun constructorMethodReference(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.*;
-            import java.util.stream.*;
-            public class A {
-                Stream<Integer> n = Stream.of(1, 2);
-                Set<Integer> n2 = n.collect(HashSet<Integer>::new, HashSet::add);
-            }
-        """)[0]
-
-        val collect = a.classes[0].fields[1].vars[0].initializer!!
-        assertEquals("n.collect(HashSet<Integer>::new, HashSet::add)", collect.printTrimmed())
-    }
+    fun constructorMethodReference(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            Stream<Integer> n = Stream.of(1, 2);
+            Set<Integer> n2 = n.collect(HashSet<Integer>::new, HashSet::add);
+        """, "java.util.*", "java.util.stream.*"
+    )
 }

@@ -25,10 +25,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.Expression;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.java.tree.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,11 +64,12 @@ public class MethodMatcher {
             return false;
         }
 
-        String signaturePattern = method.getParams().getParams().stream()
+        String signaturePattern = method.getParams().getElem().stream()
+                .map(JRightPadded::getElem)
                 .map(v -> {
-                    if(v instanceof J.VariableDecls) {
-                        J.VariableDecls vd = (J.VariableDecls)v;
-                        if(vd.getTypeAsClass() != null) {
+                    if (v instanceof J.VariableDecls) {
+                        J.VariableDecls vd = (J.VariableDecls) v;
+                        if (vd.getTypeAsClass() != null) {
                             return vd.getTypeAsClass();
                         } else {
                             return vd.getTypeExpr() != null ? vd.getTypeExpr().getType() : null;
@@ -115,12 +113,12 @@ public class MethodMatcher {
             return false;
         }
         String signaturePattern = Optional.ofNullable(constructor.getArgs())
-                .map(args ->
-                        args.getArgs().stream()
-                                .map(Expression::getType)
-                                .map(this::typePattern)
-                                .filter(Objects::nonNull)
-                                .collect(joining(","))
+                .map(args -> args.getElem().stream()
+                        .map(JRightPadded::getElem)
+                        .map(Expression::getType)
+                        .map(this::typePattern)
+                        .filter(Objects::nonNull)
+                        .collect(joining(","))
                 ).orElse("");
 
         JavaType.Class type = TypeUtils.asClass(constructor.getType());

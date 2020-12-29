@@ -15,75 +15,40 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface ImportTest {
+interface ImportTest : JavaParserTest {
 
     @Test
-    fun matchImport(jp: JavaParser) {
-        val a = jp.parse("""
+    fun classImport(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.List;
             public class A {}
-        """)[0]
-
-        assertTrue(a.imports.first().isFromType("java.util.List"))
-    }
+        """
+    )
 
     @Test
-    fun matchStarImport(jp: JavaParser) {
-        val a = jp.parse("""
+    fun starImport(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.*;
             public class A {}
-        """)[0]
-
-        assertTrue(a.imports.first().isFromType("java.util.List"))
-    }
-
-    @Test
-    fun hasStarImportOnInnerClass(jp: JavaParser) {
-        val a = """
-            package a;
-            public class A {
-               public static class B { }
-            }
         """
-
-        val c = """
-            import a.*;
-            public class C {
-                A.B b = new A.B();
-            }
-        """
-
-        val cu = jp.parse(c, a)[0]
-        val import = cu.imports.first()
-        assertTrue(import.isFromType("a.A.B"))
-        assertTrue(import.isFromType("a.A"))
-    }
-    
-    @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.List;
-            import static java.util.Collections.*;
-            public class A {}
-        """)[0]
-        
-        assertEquals("import java.util.List", a.imports[0].printTrimmed())
-        assertEquals("import static java.util.Collections.*", a.imports[1].printTrimmed())
-    }
+    )
 
     @Test
     fun compare(jp: JavaParser) {
-        val a = jp.parse("""
+        val a = jp.parse(
+            """
             import b.B;
             import c.c.C;
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
-        val (b, c) = a.imports
+        val (b, c) = a.imports.map { it.elem }
 
         assertTrue(b < c)
         assertTrue(c > b)
@@ -91,12 +56,14 @@ interface ImportTest {
 
     @Test
     fun compareSamePackageDifferentNameLengths(jp: JavaParser) {
-        val a = jp.parse("""
+        val a = jp.parse(
+            """
             import org.springframework.context.annotation.Bean;
             import org.springframework.context.annotation.Configuration;
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
-        val (b, c) = a.imports
+        val (b, c) = a.imports.map { it.elem }
 
         assertTrue(b < c)
         assertTrue(c > b)

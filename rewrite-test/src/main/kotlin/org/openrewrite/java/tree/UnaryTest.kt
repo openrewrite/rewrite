@@ -15,38 +15,26 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface UnaryTest {
-    
-    @Test
-    fun negation(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                boolean b = !(1 == 2);
-            }
-        """)[0]
-
-        val unary = a.classes[0].fields[0].vars[0].initializer as J.Unary
-        assertTrue(unary.operator is J.Unary.Operator.Not)
-        assertTrue(unary.expr is J.Parentheses<*>)
-    }
+interface UnaryTest : JavaParserTest {
 
     @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int i = 0;
-                int j = ++i;
-                int k = i ++;
-            }
-        """)[0]
+    fun negation(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            boolean b = !(1 == 2);
+        """
+    )
 
-        val (prefix, postfix) = a.classes[0].fields.subList(1, 3)
-        assertEquals("int j = ++i", prefix.printTrimmed())
-        assertEquals("int k = i ++", postfix.printTrimmed())
-    }
+    @Test
+    fun format(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int i = 0;
+            int j = ++i;
+            int k = i ++;
+        """
+    )
 }

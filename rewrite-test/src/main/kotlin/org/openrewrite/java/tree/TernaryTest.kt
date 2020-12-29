@@ -15,33 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface TernaryTest {
+interface TernaryTest : JavaParserTest {
 
     @Test
-    fun ternary(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n;
-                public void test() {
-                    String evenOrOdd = n % 2 == 0 ? "even" : "odd";
-                }
-            }
-        """)[0]
-
-        val evenOrOdd = a.firstMethodStatement() as J.VariableDecls
-        val ternary = evenOrOdd.vars[0].initializer as J.Ternary
-
-        assertEquals("java.lang.String", ternary.type.asClass()?.fullyQualifiedName)
-        assertTrue(ternary.condition is J.Binary)
-        assertTrue(ternary.truePart is J.Literal)
-        assertTrue(ternary.falsePart is J.Literal)
-        assertEquals("""n % 2 == 0 ? "even" : "odd"""", ternary.printTrimmed())
-    }
+    fun ternary(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n;
+            String evenOrOdd = n % 2 == 0 ? "even" : "odd";
+        """
+    )
 }

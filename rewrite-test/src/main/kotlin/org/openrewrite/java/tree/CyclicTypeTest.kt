@@ -84,7 +84,7 @@ interface CyclicTypeTest {
             }
         """)[0]
         
-        val fieldType = a.classes[0].fields[0].vars[0].type.asArray()
+        val fieldType = a.classes[0].fields[0].vars[0].elem.type.asArray()
         assertTrue(fieldType is JavaType.Array)
 
         val elemType = fieldType!!.elemType.asClass()

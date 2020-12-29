@@ -15,29 +15,19 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface SynchronizedTest {
+interface SynchronizedTest : JavaParserTest {
 
     @Test
-    fun synchronized(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
+    fun synchronized(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
                 Integer n = 0;
-                public void test() {
-                    synchronized(n) {
-                    }
+                synchronized(n) {
                 }
-            }
-        """)[0]
-
-        val sync = a.firstMethodStatement() as J.Synchronized
-
-        assertTrue(sync.lock.tree is J.Ident)
-        assertEquals("synchronized(n) {\n}", sync.printTrimmed())
-    }
+        """
+    )
 }

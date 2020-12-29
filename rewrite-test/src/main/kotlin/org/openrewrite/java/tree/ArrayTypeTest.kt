@@ -15,22 +15,17 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ArrayTypeTest {
+interface ArrayTypeTest : JavaParserTest {
 
     @Test
-    fun formatArrayReturnType(jp: JavaParser) {
-        val a = jp.parse("""
-            package a;
-            public class A {
-                public String[][] foo() { return null; }
-            }
-        """)[0]
-
-        val meth = a.classes[0].methods[0]
-        assertEquals("public String[][] foo() { return null; }", meth.printTrimmed())
-    }
+    fun arrayType(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            String [] [ ] s;
+        """
+    )
 }

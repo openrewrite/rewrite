@@ -15,57 +15,25 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import java.net.URI
-import java.nio.file.Paths
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface CompilationUnitTest {
-
-    @Test
-    fun newClass(jp: JavaParser) {
-        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
-
-        assertThat(a.printTrimmed()).isEqualTo("""
-            package my.org;
-            
-            public class MyClass {
-            }
-        """.trimIndent())
-    }
+interface CompilationUnitTest : JavaParserTest {
 
     @Test
-    fun sourceSet(jp: JavaParser) {
-        val a = J.CompilationUnit.buildEmptyClass(Paths.get("sourceSet"), "my.org", "MyClass")
-        assertThat(a.sourceSet.toString()).isEqualTo("sourceSet")
-    }
-
-    @Test
-    fun imports(jp: JavaParser) {
-        val a = jp.parse("""
+    fun imports(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.List;
             import java.io.*;
             public class A {}
-        """)[0]
-
-        assertEquals(2, a.imports.size)
-    }
+        """
+    )
 
     @Test
-    fun classes(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {}
-            class B{}
-        """)[0]
-
-        assertEquals(2, a.classes.size)
-    }
-
-    @Test
-    fun format(jp: JavaParser) {
-        val a = """
+    fun packageAndComments(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             /* Comment */
             package a;
             import java.util.List;
@@ -73,7 +41,5 @@ interface CompilationUnitTest {
             public class A { }
             // comment
         """
-
-        assertEquals(a.trimIndent(), jp.parse(a)[0].printTrimmed())
-    }
+    )
 }

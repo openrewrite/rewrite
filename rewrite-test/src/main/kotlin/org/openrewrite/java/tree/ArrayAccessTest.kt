@@ -15,29 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ArrayAccessTest {
+interface ArrayAccessTest : JavaParserTest {
+
     @Test
-    fun arrayAccess(jp: JavaParser) {
-        val a = jp.parse("""
-            public class a {
-                int n[] = new int[] { 0 };
-                public void test() {
-                    int m = n[0];
-                }
-            }
-        """)[0]
-
-        val vars = a.firstMethodStatement() as J.VariableDecls
-        val arrAccess = vars.vars[0].initializer as J.ArrayAccess
-
-        assertTrue(arrAccess.indexed is J.Ident)
-        assertTrue(arrAccess.dimension.index is J.Literal)
-        assertEquals("n[0]", arrAccess.printTrimmed())
-    }
+    fun arrayAccess(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n[] = new int[] { 0 };
+            int m = n [ 0 ];
+        """
+    )
 }

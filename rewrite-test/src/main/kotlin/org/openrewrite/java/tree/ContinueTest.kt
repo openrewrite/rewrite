@@ -15,56 +15,25 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ContinueTest {
+interface ContinueTest : JavaParserTest {
     
     @Test
-    fun continueFromWhileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    while(true) continue;
-                }
-            }
-        """)[0]
-        
-        val whileLoop = a.firstMethodStatement() as J.WhileLoop
-        assertTrue(whileLoop.body is J.Continue)
-        assertNull((whileLoop.body as J.Continue).label)
-    }
+    fun continueFromWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            while(true) continue;
+        """
+    )
 
     @Test
-    fun continueFromLabeledWhileLoop(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    labeled: while(true)
-                        continue labeled;
-                }
-            }
-        """)[0]
-
-        val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
-        assertTrue(whileLoop.body is J.Continue)
-        assertEquals("labeled", (whileLoop.body as J.Continue).label?.simpleName)
-    }
-
-    @Test
-    fun formatContinueLabeled(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    labeled : while(true)
-                        continue labeled;
-                }
-            }
-        """)[0]
-
-        val whileLoop = (a.firstMethodStatement() as J.Label).statement as J.WhileLoop
-        assertEquals("continue labeled", whileLoop.body.printTrimmed())
-    }
+    fun continueFromLabeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            labeled: while(true)
+                continue labeled;
+        """
+    )
 }

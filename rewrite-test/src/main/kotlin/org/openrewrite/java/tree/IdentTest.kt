@@ -15,25 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asClass
-import org.openrewrite.java.fields
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Class
 
-interface IdentTest {
-    
+interface IdentTest : JavaParserTest {
+
     @Test
-    fun referToField(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
+    fun referToField(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
                 Integer n = 0;
                 Integer m = n;
-            }
-        """)[0]
-
-        val ident = a.fields(1..1)[0].vars[0].initializer as J.Ident
-        assertEquals("n", ident.simpleName)
-        assertEquals("java.lang.Integer", ident.type.asClass()?.fullyQualifiedName)
-    }
+        """
+    )
 }

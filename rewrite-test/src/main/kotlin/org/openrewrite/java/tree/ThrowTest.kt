@@ -15,27 +15,19 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Class
 
-interface ThrowTest {
+interface ThrowTest : JavaParserTest {
 
     @Test
-    fun throwException(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() throws Exception {
-                    throw new UnsupportedOperationException();
-                }
+    fun throwException(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            public void test() throws Exception {
+                throw new UnsupportedOperationException();
             }
-        """)[0]
-
-        val thrown = a.firstMethodStatement() as J.Throw
-
-        assertTrue(thrown.exception is J.NewClass)
-        assertEquals("throw new UnsupportedOperationException()", thrown.printTrimmed())
-    }
+        """
+    )
 }

@@ -1,52 +1,49 @@
 package org.openrewrite.java;
 
-import org.openrewrite.ParserTest;
-import org.openrewrite.Tree;
-import org.openrewrite.internal.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.openrewrite.java.tree.J;
 
 import java.util.Arrays;
-import java.util.List;
 
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-public class JavaParserTest extends ParserTest {
-    public void assertParseAndPrint(JavaParser parser, Parseable before, String... imports) {
+public interface JavaParserTest {
+    default void assertParseAndPrint(JavaParser parser, NestingLevel nestingLevel, String code, String... imports) {
         String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
-        switch(before.level) {
+        switch(nestingLevel) {
             case Block:
-                source = source + "class A" + System.nanoTime() + "{{" + before.code + "}}";
+                source = source + "class A" + System.nanoTime() + "{{\n" + code + "\n}}";
                 break;
             case Class:
-                source = source + "class A" + System.nanoTime() + "{" + before.code + "}";
+                source = source + "class A" + System.nanoTime() + "{\n" + code + "\n}";
+                break;
+            case CompilationUnit:
+                source = source + "/*<START>*/\n" + code;
                 break;
         }
 
-//        assertThat(printed).isEqualTo(StringUtils.trimIndent(before.code));
-    }
+        J.CompilationUnit cu = parser.parse(source).iterator().next();
 
-    public static Parseable blockLevel(String code) {
-        return new Parseable(code, NestingLevel.Block);
-    }
-
-    public static Parseable classLevel(String code) {
-        return new Parseable(code, NestingLevel.Class);
-    }
-
-    public static Parseable outerLevel(String code) {
-        return new Parseable(code, NestingLevel.CompilationUnit);
-    }
-
-    public static class Parseable {
-        private final String code;
-        private final NestingLevel level;
-
-        public Parseable(String code, NestingLevel level) {
-            this.code = code;
-            this.level = level;
+        String printed;
+        switch(nestingLevel) {
+            case Block:
+                printed = cu.getClasses().iterator().next().getBody().getStatements().iterator().next().getElem().printTrimmed();
+                printed = printed.substring(0, printed.length() - 1);
+                break;
+            case Class:
+                printed = cu.getClasses().iterator().next().getBody().printTrimmed();
+                printed = printed.substring(0, printed.length() - 1);
+                break;
+            case CompilationUnit:
+            default:
+                printed = cu.printTrimmed();
+                printed = printed.substring(printed.indexOf("/*<START>*/") + "/*<START>*/".length());
+                break;
         }
+
+        assertThat(printed).isEqualTo(StringUtils.trim(code));
     }
 
     enum NestingLevel {

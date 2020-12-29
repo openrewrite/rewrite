@@ -15,64 +15,40 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface LambdaTest {
-
-    @Test
-    fun lambda(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.function.Function;
-            public class A {
-                Function<String, String> func = (String s) -> "";
-            }
-        """)[0]
-
-        val lambda = a.classes[0].fields[0].vars[0].initializer as J.Lambda
-
-        assertEquals(1, lambda.paramSet.params.size)
-        assertTrue(lambda.body is J.Literal)
-        assertEquals("(String s) -> \"\"", lambda.printTrimmed())
-    }
+interface LambdaTest : JavaParserTest {
 
     @Test
-    fun untypedLambdaParameter(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.*;
-            public class A {
-                List<String> list = new ArrayList<>();
-                public void test() {
-                    list.stream().filter(s -> s.isEmpty());
-                }
-            }
-        """)[0]
-
-        assertEquals("list.stream().filter(s -> s.isEmpty())",
-                a.classes[0].methods[0].body!!.statements[0].printTrimmed())
-    }
+    fun lambda(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            Function<String, String> func = (String s) -> "";
+        """, "java.util.function.Function"
+    )
 
     @Test
-    fun optionalSingleParameterParentheses(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.*;
-            public class A {
-                List<String> list = new ArrayList<>();
-                public void test() {
-                    list.stream().filter((s) -> s.isEmpty());
-                }
-            }
-        """)[0]
-
-        assertEquals("list.stream().filter((s) -> s.isEmpty())",
-                a.classes[0].methods[0].body!!.statements[0].printTrimmed())
-    }
+    fun untypedLambdaParameter(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            List<String> list = new ArrayList<>();
+            list.stream().filter(s -> s.isEmpty());
+        """, "java.util.*"
+    )
 
     @Test
-    fun rightSideBlock(jp: JavaParser) {
-        val a = jp.parse("""
+    fun optionalSingleParameterParentheses(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            List<String> list = new ArrayList<>();
+            list.stream().filter((s) -> s.isEmpty());
+        """, "java.util.*"
+    )
+
+    @Test
+    fun rightSideBlock(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public class A {
                 Action a = ( ) -> { };
             }
@@ -80,22 +56,13 @@ interface LambdaTest {
             interface Action {
                 void call();
             }
-        """)[0]
-
-        val lambda = a.classes[0].fields[0].vars[0].initializer!!
-        assertEquals("( ) -> { }", lambda.printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun multipleParameters(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.function.BiConsumer;
-            public class A {
-                BiConsumer<String, String> a = (s1, s2) -> { };
-            }
-        """)[0]
-
-        val lambda = a.classes[0].fields[0].vars[0].initializer!!
-        assertEquals("(s1, s2) -> { }", lambda.printTrimmed())
-    }
+    fun multipleParameters(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            BiConsumer<String, String> a = (s1, s2) -> { };
+        """, "java.util.function.BiConsumer"
+    )
 }

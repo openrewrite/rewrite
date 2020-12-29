@@ -15,69 +15,37 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface BinaryTest {
-    
-    @Test
-    fun arithmetic(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n = 0 + 1;
-            }
-        """)[0]
-        
-        val bin = a.classes[0].fields[0].vars[0].initializer as J.Binary
-        assertTrue(bin.operator is J.Binary.Operator.Addition)
-        assertTrue(bin.left is J.Literal)
-        assertTrue(bin.right is J.Literal)
-    }
+interface BinaryTest : JavaParserTest {
 
     @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n = 0 + 1;
-            }
-        """)[0]
-
-        val bin = a.classes[0].fields[0].vars[0].initializer as J.Binary
-        assertEquals("0 + 1", bin.printTrimmed())
-    }
+    fun arithmetic(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n = 0 + 1;
+        """
+    )
 
     /**
      * String folding needs to be disabled in the parser to preserve the binary expression in the AST!
      * @see com.sun.tools.javac.parser.JavacParser.allowStringFolding
      */
     @Test
-    fun formatFoldableStrings(jp: JavaParser) {
-        val a = """
-            public class A {
-                String s = "a" + "b";
-            }
+    fun formatFoldableStrings(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            String n = "a" + "b";
         """
-
-        assertEquals("\"a\" + \"b\"", jp.parse(a)[0].classes[0].fields[0].vars[0].initializer?.printTrimmed())
-    }
+    )
 
     @Test
-    fun endOfLineBreaks(jp: JavaParser) {
-        val aSource = """
-            import java.util.Objects;
-            public class A {
-                {
-                    boolean b = Objects.equals(1, 2) //
+    fun endOfLineBreaks(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            boolean b = Objects.equals(1, 2) //
                         && Objects.equals(3, 4) //
                         && Objects.equals(4, 5);
-                }
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSource)[0]
-
-        assertEquals(aSource, a.print())
-    }
+        """
+    )
 }

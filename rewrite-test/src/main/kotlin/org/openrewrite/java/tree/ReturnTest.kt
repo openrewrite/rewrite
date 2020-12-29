@@ -15,52 +15,24 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ReturnTest {
-    
-    @Test
-    fun returnValue(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public String test() {
-                    return "";
-                }
-            }
-        """)[0]
-        
-        val rtn = a.firstMethodStatement() as J.Return
-        assertTrue(rtn.expr is J.Literal)
-    }
+interface ReturnTest : JavaParserTest {
 
     @Test
-    fun returnVoid(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void test() {
-                    return;
-                }
-            }
-        """)[0]
+    fun returnValue(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+           return "";
+        """
+    )
 
-        val rtn = a.firstMethodStatement() as J.Return
-        assertNull(rtn.expr)
-    }
-    
     @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public int test() {
-                    return 0;
-                }
-            }
-        """)[0]
-
-        val rtn = a.firstMethodStatement() as J.Return
-        assertEquals("return 0", rtn.printTrimmed())
-    }
+    fun returnVoid(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            return;
+        """
+    )
 }

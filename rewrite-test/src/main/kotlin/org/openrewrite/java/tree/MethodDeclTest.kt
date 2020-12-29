@@ -15,101 +15,61 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Class
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface MethodDeclTest {
+interface MethodDeclTest : JavaParserTest {
 
     @Test
-    fun constructor(jp: JavaParser) {
-        val a = jp.parse("""
-            package a;
+    fun default(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public @interface A {
+                String foo() default "foo";
+            }
+        """
+    )
+
+    @Test
+    fun constructor(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public class A {
                 public A() { }
             }
-        """)[0]
-
-        assertNull(a.classes[0].methods[0].returnTypeExpr)
-    }
+        """
+    )
 
     @Test
-    fun methodDecl(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public <P, R> R foo(P p, String s, String... args) {
-                    return null;
-                }
+    fun typeArguments(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            public <P, R> R foo(P p, String s, String... args) {
+                return null;
             }
-        """)[0]
-        
-        val meth = a.classes[0].methods[0]
-        assertEquals("foo", meth.simpleName)
-        assertEquals(3, meth.params.params.size)
-        assertEquals(1, meth.body!!.statements.size)
-        assertEquals("R", ((meth.returnTypeExpr as J.Ident).type as JavaType.GenericTypeVariable).fullyQualifiedName)
-
-        assertTrue(meth.hasModifier("public"))
-    }
+        """
+    )
 
     @Test
-    fun interfaceMethodDecl(jp: JavaParser) {
-        val aSrc = """
+    fun interfaceMethodDecl(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public interface A {
                 String getName() ;
             }
-        """.trimIndent()
-
-        assertEquals(aSrc, jp.parse(aSrc)[0].printTrimmed())
-    }
-    
-    @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public < P > P foo(P p, String s, String ... args)  throws Exception { return p; }
-            }
-        """)[0]
-
-        val meth = a.classes[0].methods[0]
-        assertEquals("public < P > P foo(P p, String s, String ... args)  throws Exception { return p; }", meth.printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun formatDefaultMethod(jp: JavaParser) {
-        val a = jp.parse("""
-            public interface A {
-                default int foo() { return 0; }
-            }
-        """)[0]
-
-        val meth = a.classes[0].methods[0]
-        assertEquals("default int foo() { return 0; }", meth.printTrimmed())
-    }
+    fun throws(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            public void foo()  throws Exception { }
+        """
+    )
 
     @Test
-    fun formatConstructor(jp: JavaParser) {
-        val a = jp.parse("""
-            package a;
-            public class A {
-                public A() { }
-            }
-        """)[0]
-
-        val meth = a.classes[0].methods[0]
-        assertEquals("public A() { }", meth.printTrimmed())
-    }
-
-    @Test
-    fun nativeModifier(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public native void foo();
-            }
-        """)[0]
-
-        val meth = a.classes[0].methods[0]
-        assertEquals("public native void foo()", meth.printTrimmed())
-    }
+    fun nativeModifier(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            public native void foo();
+        """
+    )
 }

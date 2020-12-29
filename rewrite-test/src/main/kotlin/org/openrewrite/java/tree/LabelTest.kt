@@ -15,52 +15,29 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface LabelTest {
-    
-    @Test
-    fun labeledWhileLoop(jp: JavaParser) {
-        val aSrc = """
-            public class A {
-                public void test() {
-                    labeled : while(true) {
-                    }
-                }
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)[0]
-        
-        val labeled = a.firstMethodStatement() as J.Label
-        assertEquals("labeled", labeled.label.simpleName)
-        assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals(aSrc, a.print())
-    }
+interface LabelTest : JavaParserTest {
 
     @Test
-    fun nonEmptyLabeledWhileLoop(jp: JavaParser) {
-        val aSrc = """
-            public class A {
-                public void test() {
-                    outer : while(true) {
-                        while(true) {
-                            break outer;
-                        }
-                    }
+    fun labeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            labeled : while(true) {
+            }
+        """
+    )
+
+    @Test
+    fun nonEmptyLabeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            outer : while(true) {
+                while(true) {
+                    break outer;
                 }
             }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)[0]
-
-        val labeled = a.firstMethodStatement() as J.Label
-        assertEquals("outer", labeled.label.simpleName)
-        assertTrue(labeled.statement is J.WhileLoop)
-        assertEquals(aSrc, a.print())
-    }
+        """
+    )
 }

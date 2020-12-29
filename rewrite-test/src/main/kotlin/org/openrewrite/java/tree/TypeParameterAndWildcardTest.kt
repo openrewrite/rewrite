@@ -15,34 +15,30 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface TypeParameterAndWildcardTest {
-    companion object {
-        private val bc = listOf("public interface B {}", "public interface C {}")
-    }
+interface TypeParameterAndWildcardTest : JavaParserTest {
 
     @Test
-    fun annotatedTypeParametersOnWildcardBounds(jp: JavaParser) {
-        val aSource = """
+    fun annotatedTypeParametersOnWildcardBounds(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.List;
-            public class A {
+            interface B {}
+            class A {
                 List<? extends @NotNull B> checks;
             }
-        """.trimIndent()
-
-        val a = jp.parse(aSource, "public class B {}")[0]
-
-        assertEquals(aSource, a.print())
-    }
+        """
+    )
 
     @Test
-    fun annotatedTypeParametersOnReturnTypeExpression(jp: JavaParser) {
-        val aSource = """
+    fun annotatedTypeParametersOnReturnTypeExpression(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.List;
-            public class A {
+            interface B {}
+            class A {
                 public List<
                     @NotNull(groups = Prioritized.P1.class)
                     @javax.validation.Valid
@@ -50,55 +46,48 @@ interface TypeParameterAndWildcardTest {
                     return null;
                 }
             }
-        """.trimIndent()
-
-        val a = jp.parse(aSource, "public class B {}")[0]
-
-        assertEquals(aSource, a.print())
-    }
+        """
+    )
 
     @Test
-    fun extendsAndSuper(jp: JavaParser) {
-        val a = jp.parse(*arrayOf("""
+    fun extendsAndSuper(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.List;
+            interface B {}
+            interface C {}
             public class A {
                 public <P  extends B> void foo(List<P> out, List<? super C> in) {}
             }
-        """).plus(bc))[0]
-
-        assertEquals("public <P  extends B> void foo(List<P> out, List<? super C> in) {}",
-                a.classes[0].methods[0].printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun multipleExtends(jp: JavaParser) {
-        val a = jp.parse(*arrayOf("public class A< T extends  B & C > {}").plus(bc))[0]
-        assertEquals("public class A< T extends  B & C > {}", a.printTrimmed())
-    }
+    fun multipleExtends(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            interface B {}
+            interface C {}
+            public class A< T extends  B & C > {}
+        """
+    )
 
     @Test
-    fun wildcardExtends(jp: JavaParser) {
-        val a = jp.parse("""
+    fun wildcardExtends(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.*;
+            interface B {}
             public class A {
                 List< ?  extends  B > bs;
             }
-        """, "public class B {}")[0]
-
-        val typeParam = a.classes[0].fields[0].typeExpr as J.ParameterizedType
-        assertEquals("List< ?  extends  B >", typeParam.print())
-    }
+        """
+    )
 
     @Test
-    fun emptyWildcard(jp: JavaParser) {
-        val a = jp.parse("""
+    fun emptyWildcard(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.util.*;
             public class A {
                 List< ? > a;
             }
-        """)[0]
-
-        val typeParam = a.classes[0].fields[0].typeExpr as J.ParameterizedType
-        assertEquals("List< ? >", typeParam.print())
-    }
+        """
+    )
 }

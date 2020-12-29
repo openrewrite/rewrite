@@ -15,180 +15,109 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.fields
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface LiteralTest {
-
-    @Test
-    fun literalField(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n = 0;
-            }
-        """)[0]
-
-        val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals(0, literal.value)
-        assertEquals(JavaType.Primitive.Int, literal.type)
-        assertEquals("0", literal.printTrimmed())
-    }
+interface LiteralTest : JavaParserTest {
 
     @Test
-    fun literalCharacter(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                char c = 'a';
-            }
-        """)[0]
-
-        val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals('a', literal.value)
-        assertEquals(JavaType.Primitive.Char, literal.type)
-        assertEquals("'a'", literal.printTrimmed())
-    }
+    fun literalField(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n = 0;
+        """
+    )
 
     @Test
-    fun literalNumerics(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                double d1 = 1.0d;
-                double d2 = 1.0;
-                long l1 = 1L;
-                long l2 = 1;
-            }
-        """)[0]
-
-        val (d1, d2, l1, l2) = a.fields(0..3).map { it.vars[0].initializer as J.Literal }
-        assertEquals("1.0d", d1.printTrimmed())
-        assertEquals("1.0", d2.printTrimmed())
-        assertEquals("1L", l1.printTrimmed())
-        assertEquals("1", l2.printTrimmed())
-    }
+    fun literalCharacter(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            char c = 'a';
+        """
+    )
 
     @Test
-    fun literalOctal(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                long l = 01L;
-                byte b = 01;
-                short s = 01;
-                int i = 01;
-                double d = 01;
-                float f = 01;
-            }
-        """)[0]
-
-        a.fields(0..5).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("01", it.printTrimmed().trimEnd('L'), "expected octal notation for ${it.type}")
-        }
-    }
+    fun literalNumerics(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            double d1 = 1.0d;
+            double d2 = 1.0;
+            long l1 = 1L;
+            long l2 = 1;
+        """
+    )
 
     @Test
-    fun literalBinary(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                long l = 0b10L;
-                byte b = 0b10;
-                short s = 0b10;
-                int i = 0b10;
-            }
-        """)[0]
-
-        a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("0b10", it.printTrimmed().trimEnd('L'), "expected binary notation for ${it.type}")
-        }
-    }
+    fun literalOctal(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            long l = 01L;
+            byte b = 01;
+            short s = 01;
+            int i = 01;
+            double d = 01;
+            float f = 01;
+        """
+    )
 
     @Test
-    fun literalHex(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                long l = 0xA0L;
-                byte b = 0xA0;
-                short s = 0xA0;
-                int i = 0xA0;
-            }
-        """)[0]
-
-        a.fields(0..3).map { it.vars[0].initializer as J.Literal }.forEach {
-            assertEquals("0xA0", it.printTrimmed().trimEnd('L'), "expected hex notation for ${it.type}")
-        }
-    }
+    fun literalBinary(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            long l = 0b10L;
+            byte b = 0b10;
+            short s = 0b10;
+            int i = 0b10;
+        """
+    )
 
     @Test
-    fun transformString(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                String s = "foo ''";
-            }
-        """)[0]
-
-        val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals("\"foo\"", literal.transformValue<String> { it.substringBefore(' ') })
-    }
+    fun literalHex(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            long l = 0xA0L;
+            byte b = 0xA0;
+            short s = 0xA0;
+            int i = 0xA0;
+        """
+    )
 
     @Test
-    fun nullLiteral(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                String s = null;
-            }
-        """)[0]
-
-        assertEquals("null", a.classes[0].fields[0].vars[0].initializer?.printTrimmed())
-    }
+    fun transformString(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            String s = "foo ''";
+        """
+    )
 
     @Test
-    fun transformLong(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                Long l = 2L;
-            }
-        """)[0]
-
-        val literal = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals("4L", literal.transformValue<Long> { it * 2 })
-    }
+    fun nullLiteral(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            String s = null;
+        """
+    )
 
     @Test
-    fun variationInSuffixCasing(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                Long l = 0l;
-                Long m = 0L;
-            }
-        """)[0]
-
-        val (lower, upper) = a.fields(0..1).map { it.vars[0].initializer as J.Literal }
-
-        assertEquals("0L", upper.printTrimmed())
-        assertEquals("0l", lower.printTrimmed())
-    }
+    fun transformLong(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            Long l = 2L;
+        """
+    )
 
     @Test
-    fun escapedString(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                String s = "\"";
-            }
-        """)[0]
-
-        val s = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals("\"\\\"\"", s.printTrimmed())
-    }
+    fun variationInSuffixCasing(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            Long l = 0l;
+            Long m = 0L;
+        """
+    )
 
     @Test
-    fun escapedCharacter(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                char c = '\'';
-            }
-        """)[0]
+    fun escapedString(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            String s = "\"";
+        """
+    )
 
-        val s = a.classes[0].fields[0].vars[0].initializer as J.Literal
-        assertEquals("'\\''", s.printTrimmed())
-    }
+    @Test
+    fun escapedCharacter(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            char c = '\'';
+        """
+    )
 }

@@ -15,101 +15,52 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.asArray
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface NewArrayTest {
-    
-    @Test
-    fun newArray(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int[] n = new int[0];
-            }
-        """)[0]
-
-        val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
-        assertNull(newArr.initializer)
-        assertTrue(newArr.type is JavaType.Array)
-        assertTrue(newArr.type.asArray()?.elemType is JavaType.Primitive)
-        assertEquals(1, newArr.dimensions.size)
-        assertTrue(newArr.dimensions[0].size is J.Literal)
-    }
+interface NewArrayTest : JavaParserTest {
 
     @Test
-    fun newArrayWithInitializers(jp: JavaParser) {
-        val aSrc = """
-            public class A {
-                int[] n = new int[] { 0, 1, 2 };
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)[0]
-
-        val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
-        assertTrue(newArr.dimensions[0].size is J.Empty)
-        assertTrue(newArr.type is JavaType.Array)
-        assertTrue(newArr.type.asArray()?.elemType is JavaType.Primitive)
-        assertEquals(3, newArr.initializer?.elements?.size)
-        assertEquals(a.print(), aSrc)
-    }
+    fun newArray(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int[] n = new int[0];
+        """
+    )
 
     @Test
-    fun formatWithDimensions(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int[][] n = new int [ 0 ] [ 1 ];
-            }
-        """)[0]
-
-        val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
-        assertEquals("new int [ 0 ] [ 1 ]", newArr.printTrimmed())
-    }
+    fun initializers(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int[] n = new int[] { 0, 1, 2 };    
+        """
+    )
 
     @Test
-    fun formatWithEmptyDimension(jp: JavaParser) {
-        val aSrc = """
-            public class A {
+    fun dimensions(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int[][] n = new int [ 0 ] [ 1 ];
+        """
+    )
+
+    @Test
+    fun emptyDimension(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
                 int[][] n = new int [ 0 ] [ ];
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)[0]
-
-        val newArr = a.classes[0].fields[0].vars[0].initializer as J.NewArray
-        assertEquals("new int [ 0 ] [ ]", newArr.printTrimmed())
-        assertEquals(a.print(), aSrc)
-    }
+        """
+    )
 
     @Test
-    fun formatWithInitializers(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int[] m = new int[] { 0 };
-                int[][] n = new int [ ] [ ] { m, m, m };
-            }
-        """)[0]
-
-        val newArr = a.classes[0].fields[1].vars[0].initializer as J.NewArray
-        assertEquals("new int [ ] [ ] { m, m, m }", newArr.printTrimmed())
-    }
-
-    @Test
-    fun newArrayShortcut(jp: JavaParser) {
-        val produces = """
+    fun newArrayShortcut(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             import java.lang.annotation.*;
             @Target({ElementType.TYPE})
             public @interface Produces {
                 String[] value() default "*/*";
             }
+            
+            @Produces({"something"}) class A {}
         """
-
-        val a = jp.parse("""@Produces({"something"}) class A {}""", produces)[0]
-        val arr = a.classes[0].annotations[0].args!!.args[0] as J.NewArray
-
-        assertNull(arr.typeExpr)
-        assertEquals("""{"something"}""", arr.printTrimmed())
-    }
+    )
 }

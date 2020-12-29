@@ -15,23 +15,18 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.fields
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface PrimitiveTest {
+interface PrimitiveTest : JavaParserTest {
 
     @Test
-    fun primitiveField(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
+    fun primitiveField(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
                 int n = 0;
                 char c = 'a';
-            }
-        """)[0]
-
-        assertThat(a.fields(0..1).map { it.typeExpr?.type })
-                .containsExactlyInAnyOrder(JavaType.Primitive.Int, JavaType.Primitive.Char)
-    }
+        """
+    )
 }

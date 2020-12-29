@@ -15,154 +15,69 @@
  */
 package org.openrewrite.java.tree
 
-import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
 
-interface ClassDeclTest {
+interface ClassDeclTest : JavaParserTest {
 
     @Issue("#70")
     @Test
-    fun singleLineCommentBeforeModifier(jp: JavaParser) {
-        val a = jp.parse("""
+    fun singleLineCommentBeforeModifier(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             @Deprecated
             // Some comment
-            public final class B {
-            }
-        """.trimIndent())[0]
-
-        assertThat(a.classes[0].kind.prefix).doesNotContain("public")
-    }
+            public final class A {}
+        """
+    )
 
     @Test
-    fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) {
-        val a = jp.parse("""
+    fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public class A {}
             class B {}
-        """)[0]
-
-        assertEquals(listOf("A", "B"), a.classes.map { it.simpleName }.sorted())
-    }
+        """
+    )
 
     @Test
-    fun modifiers(jp: JavaParser) {
-        val a = jp.parse("public class A {}")[0]
-
-        assertTrue(a.classes[0].hasModifier("public"))
-    }
-    
-    @Test
-    fun fields(jp: JavaParser) {
-        val a = jp.parse("""
-            import java.util.*;
-            public class A {
-                List l;
-            }
-        """)[0]
-
-        assertEquals(1, a.classes[0].fields.size)
-    }
+    fun implements(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public interface B {}
+            class A implements B {}
+        """
+    )
 
     @Test
-    fun methods(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void fun() {}
-            }
-        """)[0]
-
-        assertEquals(1, a.classes[0].methods.size)
-    }
-    
-    @Test
-    fun implements(jp: JavaParser) {
-        val b = "public interface B {}"
-        val a = "public class A implements B {}"
-        
-        assertEquals(1, jp.parse(a, b)[0].classes[0].implements?.from?.size)
-    }
+    fun extends(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public interface B {}
+            class A extends B {}
+        """
+    )
 
     @Test
-    fun extends(jp: JavaParser) {
-        val b = "public class B {}"
-        val a = "public class A extends B {}"
-
-        val aClass = jp.parse(a, b)[0].classes[0]
-        assertNotNull(aClass.extends)
-    }
-
-    @Test
-    fun format(jp: JavaParser) {
-        val b = "public class B<T> {}"
-        val a = "@Deprecated public class A < T > extends B < T > {}"
-        assertEquals(a, jp.parse(a, b)[0].classes.find { it.simpleName == "A" }?.printTrimmed())
-    }
-
-    @Test
-    fun formatInterface(jp: JavaParser) {
-        val b = "public interface B {}"
-        val a = "public interface A extends B {}"
-        assertEquals(a, jp.parse(a, b)[0].classes.find { it.simpleName == "A" }?.printTrimmed())
-    }
-
-    @Test
-    fun formatAnnotation(jp: JavaParser) {
-        val a = "public @interface Produces { }"
-        assertEquals(a, jp.parse(a)[0].classes[0].printTrimmed())
-    }
-
-    @Test
-    fun enumWithParameters(jp: JavaParser) {
-        val aSrc = """
-            public enum A {
-                ONE(1),
-                TWO(2);
-            
-                A(int n) {}
-            }
-        """.trimIndent()
-
-        val a = jp.parse(aSrc)[0]
-
-        assertTrue(a.classes[0].kind is J.ClassDecl.Kind.Enum)
-        assertEquals("ONE(1),\nTWO(2);", a.classes[0].enumValues?.printTrimmed())
-        assertEquals(aSrc, a.printTrimmed())
-    }
-
-    @Test
-    fun enumWithoutParameters(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE, TWO }")[0]
-        assertEquals("public enum A { ONE, TWO }", a.classes[0].printTrimmed())
-        assertEquals("ONE, TWO", a.classes[0].enumValues?.printTrimmed())
-    }
-
-    @Test
-    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE ; }")[0]
-        assertEquals("{ ONE ; }", a.classes[0].body.printTrimmed())
-    }
-
-    @Test
-    fun enumWithEmptyParameters(jp: JavaParser) {
-        val a = jp.parse("public enum A { ONE ( ), TWO ( ) }")[0]
-        assertEquals("public enum A { ONE ( ), TWO ( ) }", a.classes[0].printTrimmed())
-        assertEquals("ONE ( ), TWO ( )", a.classes[0].enumValues?.printTrimmed())
-    }
+    fun typeArgumentsAndAnnotation(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public class B<T> {}
+            @Deprecated public class A < T > extends B < T > {}
+        """
+    )
 
     /**
      * OpenJDK does NOT preserve the order of modifiers in its AST representation
      */
     @Test
-    fun modifierOrdering(jp: JavaParser) {
-        val a = jp.parse("public /* abstract */ final abstract class A {}")[0]
-        assertEquals("public /* abstract */ final abstract class A {}", a.printTrimmed())
-    }
+    fun modifierOrdering(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public /* abstract */ final abstract class A {}
+        """
+    )
 
     @Test
-    fun innerClass(jp: JavaParser) {
-        val aSrc = """
+    fun innerClass(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
             public class A {
                 public enum B {
                     ONE,
@@ -171,14 +86,13 @@ interface ClassDeclTest {
             
                 private B b;
             }
-        """.trimIndent()
-
-        assertEquals(aSrc, jp.parse(aSrc)[0].printTrimmed())
-    }
+        """
+    )
 
     @Test
-    fun strictfpClass(jp: JavaParser) {
-        val a = jp.parse("public strictfp class A {}")[0]
-        assertEquals(a.classes[0].printTrimmed(), "public strictfp class A {}")
-    }
+    fun strictfp(jp: JavaParser) = assertParseAndPrint(
+        jp, CompilationUnit, """
+            public strictfp class A {}
+        """
+    )
 }

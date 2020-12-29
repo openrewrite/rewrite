@@ -15,44 +15,24 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Class
 
-interface BlockTest {
-    
-    @Test
-    fun methodBlock(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void foo() {
-                    System.out.println("foo");
-                }
-            }
-        """)[0]
-        
-        assertEquals(1, a.classes[0].methods[0].body!!.statements.size)
-    }
+interface BlockTest: JavaParserTest {
 
     @Test
-    fun format(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                public void foo() {  }
-            }
-        """)[0]
-        
-        assertEquals("{  }", a.classes[0].methods[0].body!!.printTrimmed())
-    }
+    fun format(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            public void foo() {  }
+        """
+    )
 
     @Test
-    fun staticInitBlock(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                static {}
-            }
-        """)[0]
-
-        assertEquals("static {}", a.classes[0].body.statements[0].printTrimmed())
-    }
+    fun staticInitBlock(jp: JavaParser) = assertParseAndPrint(
+        jp, Class, """
+            static { }
+        """
+    )
 }

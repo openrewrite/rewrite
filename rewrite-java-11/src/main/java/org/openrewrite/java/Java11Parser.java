@@ -22,14 +22,14 @@ import com.sun.tools.javac.tree.JCTree;
 import com.sun.tools.javac.util.Context;
 import com.sun.tools.javac.util.Log;
 import com.sun.tools.javac.util.Options;
-import io.micrometer.core.instrument.*;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
-import org.openrewrite.Formatting;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNullApi;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -203,7 +203,7 @@ public class Java11Parser implements JavaParser {
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
                                 relaxedClassTypeMatching, styles, sharedClassTypes);
-                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), new CommentsAndFormatting(Collections.emptyList(), Formatting.EMPTY));
+                        J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(Timer.builder("rewrite.parse")
                                 .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
                                 .tag("file.type", "Java")

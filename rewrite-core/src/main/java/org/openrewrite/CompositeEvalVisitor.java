@@ -18,11 +18,8 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-
-import static java.util.stream.Collectors.toList;
 
 public class CompositeEvalVisitor extends EvalVisitor<Tree> {
     private final List<EvalVisitor<? extends Tree>> delegates = new ArrayList<>();

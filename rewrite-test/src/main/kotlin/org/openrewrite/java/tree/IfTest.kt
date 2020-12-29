@@ -15,84 +15,42 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface IfTest {
+interface IfTest : JavaParserTest {
 
     @Test
-    fun ifElse(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n;
-                public void test() {
-                    if(n == 0) {
-                    }
-                    else if(n == 1) {
-                    }
-                    else {
-                    }
-                }
-            }
-        """)[0]
-
-        val iff = a.firstMethodStatement() as J.If
-
-        assertTrue(iff.ifCondition.tree is J.Binary)
-        assertTrue(iff.thenPart is J.Block<*>)
-        
-        assertTrue(iff.elsePart?.statement is J.If)
-        val elseIf = iff.elsePart?.statement as J.If
-        assertTrue(elseIf.ifCondition.tree is J.Binary)
-        assertTrue(elseIf.thenPart is J.Block<*>)
-        assertTrue(elseIf.elsePart?.statement is J.Block<*>)
-
-        assertEquals("""
+    fun ifElse(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n;
             if(n == 0) {
             }
             else if(n == 1) {
             }
             else {
             }
-        """.trimIndent(), iff.printTrimmed())
-    }
-    
-    @Test
-    fun noElse(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n;
-                public void test() {
-                    if(n == 0) {} 
-                }
-            }
-        """)[0]
-        
-        val iff = a.firstMethodStatement() as J.If
-        assertNull(iff.elsePart)
-    }
+        """
+    )
 
     @Test
-    fun singleLineIfElseStatements(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                int n;
-                public void test() {
-                    if(n == 0) test();
-                    else if(n == 1) test();
-                    else test();
-                }
+    fun noElse(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n;
+            if (n == 0) {
             }
-        """)[0]
+        """
+    )
 
-        assertEquals("""
-            public void test() {
-                if(n == 0) test();
-                else if(n == 1) test();
+    @Test
+    fun singleLineIfElseStatements(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            int n;
+                if (n == 0) test();
+                else if (n == 1) test();
                 else test();
-            }
-        """.trimIndent(), a.classes[0].methods[0].printTrimmed())
-    }
+        """
+    )
 }

@@ -15,40 +15,25 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.firstMethodStatement
+import org.openrewrite.java.JavaParserTest
+import org.openrewrite.java.JavaParserTest.NestingLevel.Block
 
-interface ForEachLoopTest {
-    @Test
-    fun format(jp: JavaParser) {
-        val a= jp.parse("""
-            public class A {
-                public void test() {
-                    for(Integer n: new Integer[] { 0, 1 }) {
-                    }
-                }
-            }
-        """)[0]
-
-        val forEachLoop = a.firstMethodStatement() as J.ForEachLoop
-
-        assertEquals("for(Integer n: new Integer[] { 0, 1 }) {\n}", forEachLoop.printTrimmed())
-    }
+interface ForEachLoopTest : JavaParserTest {
 
     @Test
-    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) {
-        val a = jp.parse("""
-            public class A {
-                Integer[] n;
-                public void test() {
-                    for(Integer i : n) test();
-                }
+    fun format(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            for(Integer n: new Integer[] { 0, 1 }) {
             }
-        """)[0]
+        """
+    )
 
-        val forLoop = a.classes[0].methods[0].body!!.statements[0] as J.ForEachLoop
-        assertEquals("for(Integer i : n) test();", forLoop.printTrimmed())
-    }
+    @Test
+    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            for(Integer i : n) test();
+        """
+    )
 }

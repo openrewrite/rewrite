@@ -31,14 +31,15 @@ class EnvironmentTest {
         }
 
         val planBuilder = Environment.builder()
-                .loadRecipe(parent)
-                .loadVisitors(listOf(ChangeText()))
+            .loadRecipe(parent)
+            .loadVisitors(listOf(ChangeText()))
 
         val visitors = planBuilder.build().visitors("org.openrewrite.example")
 
-        val fixed: PlainText = Refactor()
-                .visit(visitors)
-                .fixed(PlainText(Tree.randomId(), "Goodbye World.", Formatting.EMPTY, emptyList()))!!
+        val fixed: PlainText = Eval.builder()
+            .visit(visitors)
+            .build()
+            .results(PlainText(Tree.randomId(), "Goodbye World.", emptyList()))!!
 
         assertThat(fixed.print()).isEqualTo("Hello World!")
     }
@@ -46,19 +47,20 @@ class EnvironmentTest {
     @Test
     fun scanAutoConfigurableRules() {
         val plan = Environment.builder()
-                .scanClasspath(emptyList(), "org.openrewrite.text")
-                .loadRecipe(RecipeConfiguration().apply {
-                    name = "org.openrewrite.HelloJon"
-                    setInclude(setOf("org.openrewrite.text.*"))
-                    setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
-                })
-                .build()
+            .scanClasspath(emptyList(), "org.openrewrite.text")
+            .loadRecipe(RecipeConfiguration().apply {
+                name = "org.openrewrite.HelloJon"
+                setInclude(setOf("org.openrewrite.text.*"))
+                setConfigure(mapOf("org.openrewrite.text.ChangeText.toText" to "Hello Jon!"))
+            })
+            .build()
 
         val visitors = plan.visitors("org.openrewrite.HelloJon")
 
-        val fixed = Refactor()
-                .visit(visitors)
-                .fixed(PlainText(Tree.randomId(), "Hello World!", Formatting.EMPTY, emptyList()))
+        val fixed = Eval.builder()
+            .visit(visitors)
+            .build()
+            .results(PlainText(Tree.randomId(), "Hello World!", emptyList()))
 
         assertThat(fixed!!.print()).isEqualTo("Hello Jon!")
     }
@@ -66,8 +68,8 @@ class EnvironmentTest {
     @Test
     fun scanRecipeAndDeclarativeRule() {
         val plan = Environment.builder()
-                .scanClasspath(emptyList())
-                .build()
+            .scanClasspath(emptyList())
+            .build()
 
         val visitors = plan.visitors("org.openrewrite.HelloJon")
 
