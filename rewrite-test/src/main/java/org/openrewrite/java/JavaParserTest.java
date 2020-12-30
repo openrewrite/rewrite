@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.TreeSerializer;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 
@@ -41,6 +42,27 @@ public interface JavaParserTest {
 
         J.CompilationUnit cu = parser.parse(source).iterator().next();
 
+        TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>();
+        J.CompilationUnit roundTripCu = treeSerializer.read(treeSerializer.write(cu));
+
+        assertThat(JavaParserTestUtil.print(nestingLevel, cu))
+                .as("Source code is printed the same after parsing")
+                .isEqualTo(StringUtils.trimIndent(code));
+
+        assertThat(JavaParserTestUtil.print(nestingLevel, roundTripCu))
+                .as("Source code is printed the same after round trip serialization")
+                .isEqualTo(StringUtils.trimIndent(code));
+    }
+
+    enum NestingLevel {
+        Block,
+        Class,
+        CompilationUnit
+    }
+}
+
+class JavaParserTestUtil {
+    static String print(JavaParserTest.NestingLevel nestingLevel, J.CompilationUnit cu) {
         String printed;
         switch(nestingLevel) {
             case Block:
@@ -57,13 +79,6 @@ public interface JavaParserTest {
                 printed = printed.substring(printed.indexOf("/*<START>*/") + "/*<START>*/".length());
                 break;
         }
-
-        assertThat(StringUtils.trimIndent(printed)).isEqualTo(StringUtils.trimIndent(code));
-    }
-
-    enum NestingLevel {
-        Block,
-        Class,
-        CompilationUnit
+        return StringUtils.trimIndent(printed);
     }
 }

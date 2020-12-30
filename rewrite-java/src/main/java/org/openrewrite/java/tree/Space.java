@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -31,7 +33,10 @@ public class Space {
     private final List<Comment> comments;
     private final String whitespace;
 
-    public Space(String whitespace, List<Comment> comments) {
+    @JsonCreator
+    public Space(
+            @JsonProperty("whitespace") String whitespace,
+            @JsonProperty("comments") List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace;
     }

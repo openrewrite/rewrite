@@ -38,7 +38,7 @@ public interface Tree {
     UUID getId();
 
     default <R, P> R accept(TreeVisitor<R, P> v, P p) {
-        return v.defaultValue(null, p);
+        return v.defaultValue(this, p);
     }
 
     default String printTrimmed() {

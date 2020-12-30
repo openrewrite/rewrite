@@ -38,7 +38,11 @@ public class CompositeEvalVisitor extends EvalVisitor<Tree> {
     @Nullable
     @Override
     public Tree visit(@Nullable Tree tree, EvalContext ctx) {
-        return tree;
+        Tree acc = tree;
+        for (EvalVisitor<? extends Tree> delegate : delegates) {
+            acc = delegate.visit(acc, ctx);
+        }
+        return acc;
     }
 
     public void extendsFrom(CompositeEvalVisitor delegate) {
@@ -48,9 +52,7 @@ public class CompositeEvalVisitor extends EvalVisitor<Tree> {
     @Override
     public Tree defaultValue(Tree t, EvalContext ctx) {
         return delegates.stream()
-                .map(d -> d instanceof CompositeEvalVisitor ?
-                        ((CompositeEvalVisitor) d).defaultValue(t, ctx) :
-                        d.defaultValue(t, ctx))
+                .map(d -> d.defaultValue(t, ctx))
                 .filter(Objects::nonNull)
                 .findAny()
                 .orElse(null);
