@@ -13,26 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree;
+package org.openrewrite.java
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.With;
-import lombok.experimental.FieldDefaults;
-
-/**
- * A Java element that could have trailing space.
- *
- * @param <T>
- */
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-@Data
-public class JRightPadded<T> {
-    @With
-    T elem;
-
-    @With
-    Space after;
+class Java11ParserCompatibilityTest: JavaParserCompatibilityKit() {
+    override fun javaParser(): Java11Parser = Java11Parser.builder().build()
 }
