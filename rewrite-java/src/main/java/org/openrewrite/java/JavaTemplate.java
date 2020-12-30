@@ -20,6 +20,7 @@ import org.openrewrite.EvalContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.internal.PrintJava;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
@@ -27,11 +28,8 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-
-import static java.util.Collections.emptyList;
 
 public class JavaTemplate {
 
@@ -73,7 +71,7 @@ public class JavaTemplate {
     private JavaTemplate(JavaParser parser, String code, Set<String> imports, boolean autoFormat, String parameterMarker) {
         this.parser = parser;
         this.code = code;
-        this.parameterCount = StringUtils.countOccurances(code, parameterMarker);
+        this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
         this.autoFormat = autoFormat;
         this.parameterMarker = parameterMarker;
@@ -269,7 +267,7 @@ public class JavaTemplate {
          * Define an alternate marker to denote where a parameter should be inserted into the template. If not specified, the
          * default format for parameter marker is "#{}"
          */
-        public Builder parameterMarker(String parameterMarker) {
+        public Builder parameterMarker(@NonNull String parameterMarker) {
             this.parameterMarker = parameterMarker;
             return this;
         }

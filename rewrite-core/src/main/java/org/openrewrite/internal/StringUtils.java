@@ -15,7 +15,6 @@
  */
 package org.openrewrite.internal;
 
-import org.openrewrite.internal.lang.Assert;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -285,7 +284,7 @@ public class StringUtils {
      * @param substring The substring to search for
      * @return the number of times the substring is found in the target. 0 if no occurances are found.
      */
-    public static int countOccurances(@NonNull String text, @NonNull String substring) {
+    public static int countOccurrences(@NonNull String text, @NonNull String substring) {
 
         if (text.isEmpty() || substring.isEmpty()) {
             return 0;

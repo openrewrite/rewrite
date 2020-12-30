@@ -16,7 +16,6 @@
 package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.openrewrite.internal.StringUtils.*
 
@@ -166,9 +165,9 @@ class StringUtilsTest {
 
     @Test
     fun occuranceCount() {
-        assertThat(countOccurances("yoyoyoyoyo", "yo")).isEqualTo(5)
-        assertThat(countOccurances("yoyoyoyoyo", "yoyo")).isEqualTo(2)
-        assertThat(countOccurances("nonononono", "yo")).isEqualTo(0)
-        assertThat(countOccurances("", "")).isEqualTo(0)
+        assertThat(countOccurrences("yoyoyoyoyo", "yo")).isEqualTo(5)
+        assertThat(countOccurrences("yoyoyoyoyo", "yoyo")).isEqualTo(2)
+        assertThat(countOccurrences("nonononono", "yo")).isEqualTo(0)
+        assertThat(countOccurrences("", "")).isEqualTo(0)
     }
 }
