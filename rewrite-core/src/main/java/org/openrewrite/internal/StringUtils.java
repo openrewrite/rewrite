@@ -15,6 +15,8 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.internal.lang.Assert;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -98,7 +100,7 @@ public class StringUtils {
         for (Map.Entry<Integer, Long> indentFrequency : indentFrequencies.entrySet()) {
             int indent = indentFrequency.getKey();
             int freq;
-            switch(indent) {
+            switch (indent) {
                 case 0:
                     freq = indentFrequency.getValue().intValue();
                     break;
@@ -116,7 +118,7 @@ public class StringUtils {
             indentFrequencyAsDivisors.put(indent, freq);
         }
 
-        if(indentFrequencies.getOrDefault(0, 0L) > 1) {
+        if (indentFrequencies.getOrDefault(0, 0L) > 1) {
             return 0;
         }
 
@@ -138,7 +140,7 @@ public class StringUtils {
 
     /**
      * Check if the String is null or has only whitespaces.
-     *
+     * <p>
      * Modified from apache commons lang StringUtils.
      *
      * @param string String to check
@@ -157,7 +159,7 @@ public class StringUtils {
     }
 
     public static String readFully(InputStream inputStream) {
-        try(InputStream is = inputStream) {
+        try (InputStream is = inputStream) {
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buffer = new byte[4096];
             int n;
@@ -184,41 +186,41 @@ public class StringUtils {
     /**
      * Given a prefix comprised of segments that are exclusively whitespace, single line comments, or multi-line comments,
      * return a list of each segment.
-     *
+     * <p>
      * Operates on C-style comments:
-     *  // single line
-     *  /* multi-line
-     *
+     * // single line
+     * /* multi-line
+     * <p>
      * If the provided input contains anything except whitespace and c-style comments this will probably explode
      */
     public static List<String> splitCStyleComments(String text) {
         List<String> result = new ArrayList<>();
-        if(text == null || text.equals("")) {
+        if (text == null || text.equals("")) {
             result.add("");
             return result;
         }
         int segmentStartIndex = 0;
         boolean inSingleLineComment = false;
         boolean inMultiLineComment = false;
-        for(int i = 0; i < text.length(); i++) {
+        for (int i = 0; i < text.length(); i++) {
             char current = text.charAt(i);
             char previous = (i > 0) ? text.charAt(i - 1) : '\0';
-            if(i == text.length() - 1) {
+            if (i == text.length() - 1) {
                 result.add(text.substring(segmentStartIndex, i + 1));
                 break;
             }
 
-            if(inSingleLineComment && current == '\n') {
+            if (inSingleLineComment && current == '\n') {
                 result.add(text.substring(segmentStartIndex, i));
                 segmentStartIndex = i;
                 inSingleLineComment = false;
-            } else if(inMultiLineComment && previous == '*' && current == '/') {
+            } else if (inMultiLineComment && previous == '*' && current == '/') {
                 result.add(text.substring(segmentStartIndex, i + 1));
                 segmentStartIndex = i + 1;
                 inMultiLineComment = false;
-            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '/') {
+            } else if (!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '/') {
                 inSingleLineComment = true;
-            } else if(!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '*') {
+            } else if (!inMultiLineComment && !inSingleLineComment && previous == '/' && current == '*') {
                 inMultiLineComment = true;
             }
         }
@@ -228,28 +230,28 @@ public class StringUtils {
     /**
      * Return a copy of the supplied text that contains exactly the desired number of newlines appear before characters
      * that indicate the beginning of a C-style comment, "//" and "/*".
-     *
+     * <p>
      * If the supplied text does not contain a comment indicator then this is equivalent to calling ensureNewlineCount()
      */
     public static String ensureNewlineCountBeforeComment(String text, int desiredNewlineCount) {
         StringBuilder result = new StringBuilder();
         int prefixEndsIndex = indexOfNonWhitespace(text);
         String suffix;
-        if(prefixEndsIndex == -1) {
+        if (prefixEndsIndex == -1) {
             prefixEndsIndex = text.length();
             suffix = "";
         } else {
             suffix = text.substring(prefixEndsIndex);
         }
         int newlinesSoFar = 0;
-        for(int i = prefixEndsIndex - 1; i >= 0 && newlinesSoFar < desiredNewlineCount; i--) {
+        for (int i = prefixEndsIndex - 1; i >= 0 && newlinesSoFar < desiredNewlineCount; i--) {
             char current = text.charAt(i);
-            if(current == '\n') {
+            if (current == '\n') {
                 newlinesSoFar++;
             }
             result.append(current);
         }
-        while(newlinesSoFar < desiredNewlineCount) {
+        while (newlinesSoFar < desiredNewlineCount) {
             result.append('\n');
             newlinesSoFar++;
         }
@@ -268,11 +270,57 @@ public class StringUtils {
      * Or -1 if no character in the string matches the predicate.
      */
     public static int indexOf(String text, Predicate<Character> test) {
-        for(int i = 0; i < text.length(); i++) {
-            if(test.test(text.charAt(i))) {
+        for (int i = 0; i < text.length(); i++) {
+            if (test.test(text.charAt(i))) {
                 return i;
             }
         }
         return -1;
+    }
+
+    /**
+     * Return the number of times a substring occurs within a target string.
+     *
+     * @param text      A target string
+     * @param substring The substring to search for
+     * @return the number of times the substring is found in the target. 0 if no occurances are found.
+     */
+    public static int countOccurances(@NonNull String text, @NonNull String substring) {
+
+        if (text.isEmpty() || substring.isEmpty()) {
+            return 0;
+        }
+
+        int count = 0;
+        for (int index = text.indexOf(substring); index >= 0; index = text.indexOf(substring, index + substring.length())) {
+            count++;
+        }
+        return count;
+    }
+
+    /**
+     * This method will search and replace the first occurrence of a matching substring. There is a a replaceFirst method
+     * on the String class but that version leverages regular expressions and is a magnitude slower than this simple
+     * replacement.
+     *
+     * @param text        The source string to search
+     * @param match       The substring that is being searched for
+     * @param replacement The replacement.
+     * @return The original string with the first occurrence replaced or the original text if a match is not found.
+     */
+    public static String replaceFirst(@NonNull String text, @NonNull String match, @NonNull String replacement) {
+        int start = text.indexOf(match);
+        if (match.isEmpty() || text.isEmpty() || start == -1) {
+            return text;
+        } else {
+            StringBuilder newValue = new StringBuilder(text.length());
+            newValue.append(text, 0, start);
+            newValue.append(replacement);
+            int end = start + match.length();
+            if (end < text.length()) {
+                newValue.append(text, end, text.length());
+            }
+            return newValue.toString();
+        }
     }
 }

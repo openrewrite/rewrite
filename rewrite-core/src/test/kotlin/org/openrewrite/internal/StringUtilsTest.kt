@@ -16,13 +16,14 @@
 package org.openrewrite.internal
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.openrewrite.internal.StringUtils.*
 
 class StringUtilsTest {
     @Test
     fun detectIndentLevel() {
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             |<
             |   <
             |   <
@@ -30,32 +31,32 @@ class StringUtilsTest {
             |<
         """.trimMargin())).isEqualTo(0)
 
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             |<
             |   <
         """.trimMargin())).isEqualTo(3)
 
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             |<
             |    <
             |      <
         """.trimMargin())).isEqualTo(4)
 
         // ignores the last line if it is all blank
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             class {
                 A field;
             }
         """)).isEqualTo(12)
 
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             | <
             |  <
             |   <
             |    <
         """.trimMargin())).isEqualTo(1)
 
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             | <
             |  <
             |    <
@@ -63,13 +64,13 @@ class StringUtilsTest {
             |      <
         """.trimMargin())).isEqualTo(1)
 
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             |<
             |<
         """.trimMargin())).isEqualTo(0)
 
         // doesn't consider newlines that occur as the first character on the first line or terminating newlines
-        assertThat(StringUtils.indentLevel("""
+        assertThat(indentLevel("""
             |
             |  <
             |    <
@@ -86,7 +87,7 @@ class StringUtilsTest {
             }
         """
 
-        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
     @Test
@@ -97,14 +98,14 @@ class StringUtilsTest {
             }
         """
 
-        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
     @Test
     fun trimIndentNoIndent() {
         val input = "class{\n   A field;\n}"
 
-        assertThat(StringUtils.trimIndent(input)).isEqualTo(input.trimIndent())
+        assertThat(trimIndent(input)).isEqualTo(input.trimIndent())
     }
 
 
@@ -114,14 +115,14 @@ class StringUtilsTest {
         assertThat(splitCStyleComments(" ")).isEqualTo(listOf(" "))
         assertThat(splitCStyleComments("///**/")).isEqualTo(listOf("///**/"))
         assertThat(splitCStyleComments("/*\n//aoeu\n*/")).isEqualTo(listOf("/*\n//aoeu\n*/"))
-        var comments =
+        val comments =
                 """
                     
                 // aoeu 
                 /***/    // wasd
             """.trimIndent()
-        var expected = listOf("    \n// aoeu ", "\n/***/", "    // wasd")
-        var splitComments = splitCStyleComments(comments);
+        val expected = listOf("    \n// aoeu ", "\n/***/", "    // wasd")
+        val splitComments = splitCStyleComments(comments)
         assertThat(splitComments).isEqualTo(expected)
     }
 
@@ -141,5 +142,33 @@ class StringUtilsTest {
         assertThat(ensureNewlineCountBeforeComment("\n    //", 1)).isEqualTo("\n    //")
         assertThat(ensureNewlineCountBeforeComment("\n    \n    //", 1)).isEqualTo("\n    //")
         assertThat(ensureNewlineCountBeforeComment("\n\n\n    /***/", 2)).isEqualTo("\n\n    /***/")
+    }
+
+    @Test
+    fun replaceFirst() {
+        var result = replaceFirst("#{} Fred #{}", "#{}", "I am")
+        assertThat(result).isEqualTo("I am Fred #{}")
+        result = replaceFirst(result, "#{}", "surely.")
+        assertThat(result).isEqualTo("I am Fred surely.")
+        result = replaceFirst("#{}#{}#{}", "#{}", "yo")
+        assertThat(result).isEqualTo("yo#{}#{}")
+        result = replaceFirst(result, "#{}", "yo")
+        assertThat(result).isEqualTo("yoyo#{}")
+        result = replaceFirst(result, "#{}", "yo")
+        assertThat(result).isEqualTo("yoyoyo")
+        result = replaceFirst("Nothing to see here", "#{}", "nonsense")
+        assertThat(result).isEqualTo("Nothing to see here")
+        result = replaceFirst("Nothing to see here", "", "nonsense")
+        assertThat(result).isEqualTo("Nothing to see here")
+        result = replaceFirst("", "", "nonsense")
+        assertThat(result).isEqualTo("")
+    }
+
+    @Test
+    fun occuranceCount() {
+        assertThat(countOccurances("yoyoyoyoyo", "yo")).isEqualTo(5)
+        assertThat(countOccurances("yoyoyoyoyo", "yoyo")).isEqualTo(2)
+        assertThat(countOccurances("nonononono", "yo")).isEqualTo(0)
+        assertThat(countOccurances("", "")).isEqualTo(0)
     }
 }

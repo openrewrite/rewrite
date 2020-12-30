@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.EvalContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.internal.PrintJava;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
@@ -26,15 +27,20 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Statement;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 
 public class JavaTemplate {
+
     private final JavaParser parser;
     private final String code;
-    private final String extraImports;
+    private final int parameterCount;
+    private final Set<String> imports;
     private final boolean autoFormat;
+    private final String parameterMarker;
 
     private final PrintJava<String> printer = new PrintJava<String>(new TreePrinter<J, String>() {
         @Override
@@ -64,11 +70,13 @@ public class JavaTemplate {
         }
     };
 
-    public JavaTemplate(JavaParser parser, String code, String extraImports, boolean autoFormat) {
+    private JavaTemplate(JavaParser parser, String code, Set<String> imports, boolean autoFormat, String parameterMarker) {
         this.parser = parser;
         this.code = code;
-        this.extraImports = extraImports;
+        this.parameterCount = StringUtils.countOccurances(code, parameterMarker);
+        this.imports = imports;
         this.autoFormat = autoFormat;
+        this.parameterMarker = parameterMarker;
     }
 
     public static Builder builder(String code) {
@@ -76,10 +84,15 @@ public class JavaTemplate {
     }
 
     public <J2 extends J> List<J2> generate(Cursor insertionScope, Object... params) {
+
+        if (params.length != parameterCount) {
+            throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
+        }
+
         // flat map params to list of method declaration and variable, i.e. JavaType.Method and JavaType
 
-        // TODO substitute params in code
-        String printedInsertionScope = code;
+        String printedInsertionScope = substituteParameters(params);
+
         for (Cursor scope = insertionScope; scope != null; scope = scope.getParent()) {
             printedInsertionScope = printer.visit((J) scope.getTree(), printedInsertionScope);
         }
@@ -98,6 +111,21 @@ public class JavaTemplate {
 
         //noinspection unchecked
         return (List<J2>) extractTemplatedCode.templated;
+    }
+
+    private String substituteParameters(Object... parameters) {
+
+        String codeInstance = code;
+        for (Object parameter : parameters) {
+            String value;
+            if (parameter instanceof Tree) {
+                value = ((Tree) parameter).printTrimmed();
+            } else {
+                value = parameter.toString();
+            }
+            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker, value);
+        }
+        return codeInstance;
     }
 
     private static class ExtractTemplatedCode extends JavaEvalVisitor {
@@ -136,37 +164,94 @@ public class JavaTemplate {
         }
     }
 
+
+    /**
+     * Convert a JavaType into a string import statement of the form:
+     * <P><PRE>
+     * FullyQualfied Types : import {}fully-qualified-name};
+     * Method Types        : static import {fully-qualified-name}.{methodName};
+     * </PRE>
+     */
+    private static String javaTypeToImport(JavaType type) {
+        StringBuilder anImport = new StringBuilder(256);
+        if (type instanceof JavaType.FullyQualified) {
+            anImport.append("import ").append(((JavaType.FullyQualified) type).getFullyQualifiedName()).append(";\n");
+        } else if (type instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            anImport.append("static import ").append(method.getDeclaringType().getFullyQualifiedName())
+                    .append(".").append(method.getName()).append(";\n");
+        } else {
+            throw new IllegalArgumentException("Unsupported import type.");
+        }
+        return anImport.toString();
+    }
+
     public static class Builder {
-        private JavaParser javaParser = JavaParser.fromJavaVersion()
-                .logCompilationWarningsAndErrors(false)
-                .build();
+
         private final String code;
-        private String extraImports = "";
+        private JavaParser javaParser;
+        private Set<String> imports;
+
         private boolean autoFormat = true;
+        private String parameterMarker = "#{}";
 
         Builder(String code) {
             this.code = code;
         }
 
-        public Builder extraImports(String... imports) {
-            StringBuilder extra = new StringBuilder();
-            for (String anImport : imports) {
-                extra.append("import ").append(anImport).append(";");
+        /**
+         * A list of fully-qualified types that will be added when generating/compiling snippets
+         *
+         * <PRE>
+         *     Examples:
+         *
+         *     java.util.Collections
+         *     java.util.Date
+         * </PRE>
+         */
+        public Builder imports(String... fullyQualifiedTypeNames) {
+            for (String typeName : fullyQualifiedTypeNames) {
+                if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
+                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
+                } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
+                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
+                }
+                this.imports.add("import " + typeName + ";\n");
             }
-            this.extraImports += extra;
             return this;
         }
 
-        public Builder extraImports(JavaType... types) {
-            StringBuilder extra = new StringBuilder();
-            for (JavaType type : types) {
-                if (type instanceof JavaType.FullyQualified) {
-                    extra.append("import ")
-                            .append(((JavaType.FullyQualified) type).getFullyQualifiedName())
-                            .append(";");
+        /**
+         * A list of fully-qualified member type names that will be statically imported when generating/compiling snippets.
+         *
+         * <PRE>
+         *     Examples:
+         *
+         *     java.util.Collections.emptyList
+         *     java.util.Collections.*
+         * </PRE>
+         */
+        public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
+            for (String typeName : fullyQualifiedMemberTypeNames) {
+                if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
+                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
+                } else if (typeName.endsWith(";") || typeName.endsWith("\n")) {
+                    throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include a suffixed terminator");
                 }
+                this.imports.add("static import " + typeName + ";\n");
             }
-            this.extraImports += extra;
+            return this;
+        }
+
+        /**
+         * A list of JavaTypes that will be imported/statically imported when generating/compiling snippets.
+         * <P><P>
+         * FullyQualified types will be added as an import and Method types will be statically imported
+         */
+        public Builder imports(JavaType... types) {
+            for (JavaType type : types) {
+                imports.add(javaTypeToImport(type));
+            }
             return this;
         }
 
@@ -180,8 +265,23 @@ public class JavaTemplate {
             return this;
         }
 
+        /**
+         * Define an alternate marker to denote where a parameter should be inserted into the template. If not specified, the
+         * default format for parameter marker is "#{}"
+         */
+        public Builder parameterMarker(String parameterMarker) {
+            this.parameterMarker = parameterMarker;
+            return this;
+        }
+
         public JavaTemplate build() {
-            return new JavaTemplate(javaParser, code, extraImports, autoFormat);
+            if (javaParser == null) {
+                javaParser = JavaParser.fromJavaVersion()
+                        .logCompilationWarningsAndErrors(false)
+                        .build();
+            }
+            return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
         }
     }
+
 }
