@@ -337,7 +337,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.INTERFACE)) {
             kind = padLeft(sourceBefore("interface"), J.ClassDecl.Kind.Interface);
         } else {
-            kind = padLeft(sourceBefore("class"), J.ClassDecl.Kind.Enum);
+            kind = padLeft(sourceBefore("class"), J.ClassDecl.Kind.Class);
         }
 
         J.Ident name = J.Ident.build(randomId(), sourceBefore(node.getSimpleName().toString()),
@@ -430,7 +430,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 fmt,
                 Markers.EMPTY,
                 sourcePath.toString(),
-                packageDecl == null ? padRight(packageDecl, sourceBefore(";")) : null,
+                packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
                 format(source.substring(cursor)),
@@ -602,7 +602,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitImport(ImportTree node, Space fmt) {
         skip("import");
         return new J.Import(randomId(), fmt, Markers.EMPTY,
-                node.isStatic() ? sourceBefore("static") : Space.EMPTY,
+                node.isStatic() ? sourceBefore("static") : null,
                 convert(node.getQualifiedIdentifier()));
     }
 
@@ -1193,7 +1193,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             Space namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
 
-            J.Ident name = J.Ident.build(randomId(), sourceBefore(n.getName().toString()), Markers.EMPTY, n.getName().toString(), type(node));
+            J.Ident name = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
 
             vars.add(
@@ -1616,10 +1616,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
+        assert tree != null;
         return new JRightPadded<>(tree, right);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
+        assert tree != null;
         return new JLeftPadded<>(left, tree);
     }
 

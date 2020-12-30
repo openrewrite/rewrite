@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.apache.commons.lang3.StringUtils;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.tree.J;
 
 import java.util.Arrays;
@@ -45,11 +45,11 @@ public interface JavaParserTest {
         switch(nestingLevel) {
             case Block:
                 printed = cu.getClasses().iterator().next().getBody().getStatements().iterator().next().getElem().printTrimmed();
-                printed = printed.substring(0, printed.length() - 1);
+                printed = printed.substring(1, printed.length() - 1);
                 break;
             case Class:
                 printed = cu.getClasses().iterator().next().getBody().printTrimmed();
-                printed = printed.substring(0, printed.length() - 1);
+                printed = printed.substring(1, printed.length() - 1);
                 break;
             case CompilationUnit:
             default:
@@ -58,7 +58,7 @@ public interface JavaParserTest {
                 break;
         }
 
-        assertThat(printed).isEqualTo(StringUtils.trim(code));
+        assertThat(StringUtils.trimIndent(printed)).isEqualTo(StringUtils.trimIndent(code));
     }
 
     enum NestingLevel {

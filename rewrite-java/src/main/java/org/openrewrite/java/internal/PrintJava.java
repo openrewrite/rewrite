@@ -65,8 +65,12 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     protected String visit(List<? extends JRightPadded<? extends J>> nodes, String suffixBetween, P p) {
         StringBuilder acc = new StringBuilder();
-        for (JRightPadded<? extends J> node : nodes) {
-            acc.append(visit(node.getElem(), p)).append(visit(node.getAfter())).append(suffixBetween);
+        for (int i = 0; i < nodes.size(); i++) {
+            JRightPadded<? extends J> node = nodes.get(i);
+            acc.append(visit(node.getElem(), p)).append(visit(node.getAfter()));
+            if(i < nodes.size() - 1) {
+                acc.append(suffixBetween);
+            }
         }
         return acc.toString();
     }
@@ -105,12 +109,12 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     }
 
     protected String fmt(@Nullable J tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code;
+        return tree == null || code == null ? "" : visit(tree.getPrefix()) + code;
     }
 
     protected String visit(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, P p) {
-        return leftPadded == null ? "" : (prefix == null ? "" : prefix) +
-                visit(leftPadded.getBefore()) + visit(leftPadded.getElem(), p);
+        return leftPadded == null ? "" : visit(leftPadded.getBefore()) + (prefix == null ? "" : prefix) +
+                visit(leftPadded.getElem(), p);
     }
 
     protected String visit(@Nullable JRightPadded<? extends J> leftPadded, @Nullable String suffix, P p) {
@@ -614,7 +618,7 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     public String visitNewArray(NewArray newArray, P p) {
         StringBuilder acc = new StringBuilder();
         if (newArray.getTypeExpr() != null) {
-            acc.append("new").append(newArray.getTypeExpr());
+            acc.append("new").append(visit(newArray.getTypeExpr(), p));
         }
 
         for (JLeftPadded<JRightPadded<Expression>> dimension : newArray.getDimensions()) {

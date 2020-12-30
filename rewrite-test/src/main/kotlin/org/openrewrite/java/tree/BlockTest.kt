@@ -23,14 +23,14 @@ import org.openrewrite.java.JavaParserTest.NestingLevel.Class
 interface BlockTest: JavaParserTest {
 
     @Test
-    fun format(jp: JavaParser) = assertParseAndPrint(
+    fun method(jp: JavaParser) = assertParseAndPrint(
         jp, Class, """
             public void foo() {  }
         """
     )
 
     @Test
-    fun staticInitBlock(jp: JavaParser) = assertParseAndPrint(
+    fun staticInit(jp: JavaParser) = assertParseAndPrint(
         jp, Class, """
             static { }
         """
