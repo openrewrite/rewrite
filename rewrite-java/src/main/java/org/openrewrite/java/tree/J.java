@@ -1153,14 +1153,14 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        JLeftPadded<Expression> ifCondition;
+        Parentheses<Expression> ifCondition;
 
         @With
         JRightPadded<Statement> thenPart;
 
         @With
         @Nullable
-        JLeftPadded<Statement> elsePart;
+        JLeftPadded<JRightPadded<Statement>> elsePart;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {

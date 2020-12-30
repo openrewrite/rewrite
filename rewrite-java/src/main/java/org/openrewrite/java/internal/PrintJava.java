@@ -39,12 +39,12 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visit(Tree tree, P p) {
-        if(tree == null) {
+        if (tree == null) {
             return defaultValue(null, p);
         }
 
         J t = treePrinter.doFirst((J) tree, p);
-        if(t == null) {
+        if (t == null) {
             return defaultValue(null, p);
         }
 
@@ -68,7 +68,7 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
             acc.append(visit(node.getElem(), p)).append(visit(node.getAfter()));
-            if(i < nodes.size() - 1) {
+            if (i < nodes.size() - 1) {
                 acc.append(suffixBetween);
             }
         }
@@ -367,6 +367,10 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
                 return acc + ';';
             }
 
+            if (s instanceof MethodDecl && ((MethodDecl) s).isAbstract()) {
+                return acc + ';';
+            }
+
             if (s instanceof Label) {
                 s = ((Label) s).getStatement();
                 continue;
@@ -512,9 +516,10 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitIf(If iff, P p) {
-        return fmt(iff, visit("if", iff.getIfCondition(), p) +
+        return fmt(iff, "if" + visit(iff.getIfCondition(), p) +
                 visitStatement(iff.getThenPart(), p) +
-                visit("else", iff.getElsePart(), p));
+                (iff.getElsePart() == null ? "" :
+                        visit(iff.getElsePart().getBefore()) + "else" + visitStatement(iff.getElsePart().getElem(), p)));
     }
 
     @Override
@@ -626,6 +631,7 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
         return fmt(newClass,
                 visit(newClass.getEncl(), ".", p) +
                         visit(newClass.getNew()) + "new" +
+                        visit(newClass.getClazz(), p) +
                         visit("(", newClass.getArgs(), ",", ")", p) +
                         visit(newClass.getBody(), p));
     }
@@ -731,10 +737,15 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
             List<JRightPadded<Try.Resource>> resources = tryable.getResources().getElem();
             for (int i = 0; i < resources.size(); i++) {
                 JRightPadded<Try.Resource> resource = resources.get(i);
-                acc.append(visit(resource.getElem(), p)).append(visit(resource.getAfter()));
+
+                acc.append(visit(resource.getElem().getPrefix()))
+                        .append(visit(resource.getElem().getVariableDecls(), p));
+
                 if (i < resources.size() - 1 || resource.getElem().isTerminatedWithSemicolon()) {
                     acc.append(';');
                 }
+
+                acc.append(visit(resource.getAfter()));
             }
             acc.append(')');
         }

@@ -226,7 +226,14 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
         i = eval(i, ctx, this::visitStatement);
         i = i.withIfCondition(eval(i.getIfCondition(), ctx));
         i = i.withThenPart(eval(i.getThenPart(), ctx));
-        return i.withElsePart(eval(i.getElsePart(), ctx));
+
+        if(i.getElsePart() != null) {
+            JRightPadded<Statement> elze = eval(i.getElsePart().getElem(), ctx);
+            if(elze != i.getElsePart().getElem()) {
+                i = i.withElsePart(new JLeftPadded<>(i.getElsePart().getBefore(), elze));
+            }
+        }
+        return i;
     }
 
     @Override

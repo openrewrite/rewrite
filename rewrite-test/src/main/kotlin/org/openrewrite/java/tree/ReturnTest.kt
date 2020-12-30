@@ -19,20 +19,25 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaParserTest
 import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaParserTest.NestingLevel.Class
 
 interface ReturnTest : JavaParserTest {
 
     @Test
     fun returnValue(jp: JavaParser) = assertParseAndPrint(
-        jp, Block, """
-           return "";
+        jp, Class, """
+            public String string() {
+                return "";
+            }
         """
     )
 
     @Test
     fun returnVoid(jp: JavaParser) = assertParseAndPrint(
-        jp, Block, """
-            return;
+        jp, Class, """
+            public void nothing() {
+                return ;
+            }
         """
     )
 }

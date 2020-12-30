@@ -46,7 +46,18 @@ interface TryCatchTest : JavaParserTest {
     fun tryWithResources(jp: JavaParser) = assertParseAndPrint(
         jp, Block, """
             File f = new File("file.txt");
-            try(FileInputStream fis = new FileInputStream(f)) {
+            try (FileInputStream fis = new FileInputStream(f)) {
+            }
+            catch(IOException e) {
+            }
+        """, "java.io.*"
+    )
+
+    @Test
+    fun tryWithResourcesSemiTerminated(jp: JavaParser) = assertParseAndPrint(
+        jp, Block, """
+            File f = new File("file.txt");
+            try (FileInputStream fis = new FileInputStream(f) ; ) {
             }
             catch(IOException e) {
             }

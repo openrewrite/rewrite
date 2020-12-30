@@ -25,7 +25,7 @@ interface IfTest : JavaParserTest {
     @Test
     fun ifElse(jp: JavaParser) = assertParseAndPrint(
         jp, Block, """
-            int n;
+            int n = 0;
             if(n == 0) {
             }
             else if(n == 1) {
@@ -38,7 +38,7 @@ interface IfTest : JavaParserTest {
     @Test
     fun noElse(jp: JavaParser) = assertParseAndPrint(
         jp, Block, """
-            int n;
+            int n = 0;
             if (n == 0) {
             }
         """
@@ -47,10 +47,10 @@ interface IfTest : JavaParserTest {
     @Test
     fun singleLineIfElseStatements(jp: JavaParser) = assertParseAndPrint(
         jp, Block, """
-            int n;
-                if (n == 0) test();
-                else if (n == 1) test();
-                else test();
+            int n = 0;
+            if (n == 0) n++;
+            else if (n == 1) n++;
+            else n++;
         """
     )
 }

@@ -301,10 +301,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-        JRightPadded<Expression> pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
-        if (pattern == null) {
+        JRightPadded<Expression> pattern;
+        if (node.getExpression() == null) {
             pattern = padRight(J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null),
                     sourceBefore(":"));
+        } else {
+            skip("case");
+            pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
         }
         return new J.Case(randomId(), fmt, Markers.EMPTY, pattern, convertStatements(node.getStatements()));
     }
@@ -593,9 +596,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("if");
         return new J.If(randomId(), fmt, Markers.EMPTY,
                 convert(node.getCondition()),
-                convert(node.getThenStatement()),
+                convert(node.getThenStatement(), this::statementDelim),
                 node.getElseStatement() instanceof JCTree.JCStatement ?
-                        padLeft(sourceBefore("else"), convert(node.getElseStatement())) : null);
+                        padLeft(sourceBefore("else"), convert(node.getElseStatement(), this::statementDelim)) : null);
     }
 
     @Override
@@ -817,7 +820,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.Block body = convertOrNull(node.getBody());
 
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
-            padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
+                padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
         return new J.MethodDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeParams,
                 returnType, name, params, throwss, body, defaultValue);
@@ -851,7 +854,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
-            dimensions.add(padLeft(format(matcher.group(2)), padRight(new J.Empty(randomId(), EMPTY,
+            dimensions.add(padLeft(format(matcher.group(1)), padRight(new J.Empty(randomId(), format(matcher.group(2)),
                     Markers.EMPTY), EMPTY)));
         }
 
@@ -990,8 +993,34 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitTry(TryTree node, Space fmt) {
         skip("try");
-        JContainer<J.Try.Resource> resources = node.getResources().isEmpty() ? null :
-                JContainer.build(sourceBefore("("), convertAll(node.getResources(), semiDelim, t -> sourceBefore(")")));
+        JContainer<J.Try.Resource> resources;
+        if (node.getResources().isEmpty()) {
+            resources = null;
+        } else {
+            Space before = sourceBefore("(");
+            List<JRightPadded<J.Try.Resource>> resourceList = new ArrayList<>();
+
+            for (int i = 0; i < node.getResources().size(); i++) {
+                Tree resource = node.getResources().get(i);
+                J.VariableDecls resourceVar = convert(resource);
+                boolean semicolonPresent = true;
+                if (i == node.getResources().size() - 1) {
+                    semicolonPresent = positionOfNext(";", ')') > 0;
+                }
+
+                Space resourcePrefix = resourceVar.getPrefix();
+                resourceVar = resourceVar.withPrefix(EMPTY); // moved to the containing Try.Resource
+
+                if (semicolonPresent) {
+                    resourceVar = resourceVar.withVars(Space.formatLastSuffix(resourceVar.getVars(), sourceBefore(";")));
+                }
+
+                resourceList.add(padRight(new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
+                        resourceVar.withPrefix(EMPTY), semicolonPresent), sourceBefore(")")));
+            }
+
+            resources = JContainer.build(before, resourceList);
+        }
 
         J.Block block = convert(node.getBlock());
         List<J.Try.Catch> catches = convertAll(node.getCatches());
@@ -1198,13 +1227,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
             vars.add(
                     padRight(
-                        new J.VariableDecls.NamedVar(randomId(), namedVarPrefix, Markers.EMPTY,
-                                name,
-                                dimensionsAfterName,
-                                vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
-                                type(n)
-                        ),
-                        i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
+                            new J.VariableDecls.NamedVar(randomId(), namedVarPrefix, Markers.EMPTY,
+                                    name,
+                                    dimensionsAfterName,
+                                    vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
+                                    type(n)
+                            ),
+                            i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
                     )
             );
         }
