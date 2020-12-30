@@ -27,6 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.tree.Maven;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,7 +39,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
 
 public class MavenDownloader {
@@ -57,10 +57,11 @@ public class MavenDownloader {
     @Nullable
     private final MavenSettings settings;
 
-    public MavenDownloader(MavenCache mavenCache) {
-        this(mavenCache, emptyMap(), null);
-    }
-
+    /**
+     * Any visitor constructing a MavenDownloader should provide the MavenSettings from {@link Maven#getSettings()}.
+     * Failing to do this will result in being unable to download dependencies or their metadata when information from settings.xml is required to access artifact
+     * repositories.
+     */
     public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
