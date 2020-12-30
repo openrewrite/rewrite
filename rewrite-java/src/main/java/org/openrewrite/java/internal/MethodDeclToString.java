@@ -15,27 +15,22 @@
  */
 package org.openrewrite.java.internal;
 
+import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
 
 public class MethodDeclToString {
     public static String toString(J.MethodDecl method) {
-        return METHOD_PRINTER.visit(method);
+        return METHOD_PRINTER.visit(method, null);
     }
 
-    private static final PrintJava METHOD_PRINTER = new PrintJava(treePrinter) {
+    private static final PrintJava<Void> METHOD_PRINTER = new PrintJava<Void>(TreePrinter.identity()) {
         @Override
-        public String visitMethod(J.MethodDecl method) {
-            String modifiers = visitModifiers(method.getModifiers()).trim();
-            String params = "(" + visit(method.getParams().getParams(), ",") + ")";
-            String thrown = method.getThrows() == null ? "" :
-                    "throws" + visit(method.getThrows().getExceptions(), ",");
-
-            return (modifiers.isEmpty() ? "" : modifiers + " ") +
-                    (method.getTypeParameters() == null ? "" : method.getTypeParameters() + " ") +
+        public String visitMethod(J.MethodDecl method, Void unused) {
+            return visitModifiers(method.getModifiers()).trim() +
+                    visit("<", method.getTypeParameters(), ",", ">", unused) +
                     (method.getReturnTypeExpr() == null ? "" : method.getReturnTypeExpr().printTrimmed() + " ") +
-                    method.getName().printTrimmed() +
-                    params +
-                    thrown;
+                    visit("(", method.getParams(), ",", ")", unused) +
+                    visit("throws", method.getThrows(), ",", "", unused);
         }
     };
 }

@@ -16,6 +16,7 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
@@ -27,6 +28,9 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Validated.valid;
+import static org.openrewrite.internal.StreamUtils.distinctBy;
 
 public class ImportLayoutStyle implements JavaStyle {
     // VisibleForTesting

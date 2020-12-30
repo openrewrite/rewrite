@@ -40,6 +40,7 @@ interface MethodMatcherTest {
         assertTrue(typeRegex("com.bar.MyClass foo()").matches("com.bar.MyClass"))
         assertTrue(typeRegex("com.*.MyClass foo()").matches("com.bar.MyClass"))
     }
+
     @Test
     fun matchesMethodName(jp: JavaParser) {
         assertTrue(nameRegex("A foo()").matches("foo"))
@@ -110,7 +111,8 @@ interface MethodMatcherTest {
 
     @Test
     fun matchesConstructorUsage(jp: JavaParser) {
-        val cu = jp.parse("""
+        val cu = jp.parse(
+            """
             package a;
 
             class A { 
@@ -118,17 +120,22 @@ interface MethodMatcherTest {
                     A a = new A(); 
                 }
             }
-        """.trimIndent())[0]
+        """.trimIndent()
+        )[0]
 
-        assertTrue(MethodMatcher("a.A A()").matches(
-                ((cu.classes.first().body.statements.first() as J.Block<*>)
-                        .statements
-                        .first() as J.VariableDecls).vars.first().initializer as J.NewClass))
+        assertTrue(
+            MethodMatcher("a.A A()").matches(
+                ((cu.classes.first().body.statements.first().elem as J.Block)
+                    .statements.first().elem as J.VariableDecls)
+                    .vars.first().elem?.initializer?.elem as J.NewClass
+            )
+        )
     }
 
     @Test
     fun matchesMethod(jp: JavaParser) {
-        val cu = jp.parse("""
+        val cu = jp.parse(
+            """
             package a;
             
             class A {
@@ -137,12 +144,13 @@ interface MethodMatcherTest {
                 void setInteger(Integer value) {}
                 Integer getInteger(){}
             }
-        """.trimIndent()).first()
+        """.trimIndent()
+        ).first()
         val classDecl = cu.classes.first()
-        val setIntMethod = classDecl.body.statements[0] as J.MethodDecl;
-        val getIntMethod = classDecl.body.statements[1] as J.MethodDecl;
-        val setIntegerMethod = classDecl.body.statements[2] as J.MethodDecl;
-        val getIntegerMethod = classDecl.body.statements[3] as J.MethodDecl;
+        val setIntMethod = classDecl.body.statements[0].elem as J.MethodDecl;
+        val getIntMethod = classDecl.body.statements[1].elem as J.MethodDecl;
+        val setIntegerMethod = classDecl.body.statements[2].elem as J.MethodDecl;
+        val getIntegerMethod = classDecl.body.statements[3].elem as J.MethodDecl;
         assertTrue(MethodMatcher("a.A setInt(int)").matches(setIntMethod, classDecl))
         assertTrue(MethodMatcher("a.A getInt()").matches(getIntMethod, classDecl))
         assertTrue(MethodMatcher("a.A setInteger(Integer)").matches(setIntegerMethod, classDecl))

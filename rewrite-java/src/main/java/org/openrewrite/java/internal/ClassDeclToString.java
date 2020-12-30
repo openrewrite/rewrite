@@ -47,8 +47,8 @@ public class ClassDeclToString {
             return (modifiers.isEmpty() ? "" : modifiers + " ") +
                     kind + classDecl.getName().printTrimmed() +
                     (classDecl.getTypeParameters() == null ? "" : visit("<", classDecl.getTypeParameters(), ",", ">", unused) + " ") +
-                    visit("extends ", classDecl.getExtends(), unused) +
-                    (classDecl.getImplements() == null ? "" : (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem()) ? "extends " : "implements ") +
+                    visit("extends", classDecl.getExtends(), unused) +
+                    (classDecl.getImplements() == null ? "" : (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem()) ? "extends" : "implements") +
                             visit("", classDecl.getImplements(), ",", "", unused));
         }
     };

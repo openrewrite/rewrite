@@ -64,6 +64,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private EndPosTable endPosTable;
     private int cursor = 0;
 
+    private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
+    private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
+
     public Java11ParserVisitor(URI sourcePath, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
                                Map<String, JavaType.Class> sharedClassTypes) {
         this.sourcePath = sourcePath;
@@ -1018,7 +1021,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitTypeParameter(TypeParameterTree node, Space fmt) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations());
 
-        Expression name = TreeBuilder.buildName(node.getName().toString())
+        Expression name = buildName(node.getName().toString())
                 .withPrefix(sourceBefore(node.getName().toString()));
 
         // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
@@ -1027,6 +1030,43 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim));
 
         return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
+    }
+
+    private <T extends TypeTree & Expression> T buildName(String fullyQualifiedName) {
+        String[] parts = fullyQualifiedName.split("\\.");
+
+        String fullName = "";
+        Expression expr = null;
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (i == 0) {
+                fullName = part;
+                expr = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, part, null);
+            } else {
+                fullName += "." + part;
+
+                Matcher whitespacePrefix = whitespacePrefixPattern.matcher(part);
+                Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Space.EMPTY;
+
+                Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
+                whitespaceSuffix.matches();
+                Space partSuffix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
+
+                expr = new J.FieldAccess(
+                        randomId(),
+                        EMPTY,
+                        Markers.EMPTY,
+                        padRight(expr, partSuffix),
+                        J.Ident.build(randomId(), identFmt, Markers.EMPTY, part.trim(), null),
+                        (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
+                                JavaType.Class.build(fullName) :
+                                null
+                );
+            }
+        }
+
+        //noinspection unchecked
+        return (T) expr;
     }
 
     @Override

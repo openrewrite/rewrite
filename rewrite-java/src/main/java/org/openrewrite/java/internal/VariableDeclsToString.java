@@ -15,28 +15,28 @@
  */
 package org.openrewrite.java.internal;
 
+import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 
 import java.util.stream.Collectors;
 
 public class VariableDeclsToString {
     public static String toString(J.VariableDecls v) {
-        return VARIABLE_PRINTER.visit(v);
+        return VARIABLE_PRINTER.visit(v, null);
     }
 
-    private static final PrintJava VARIABLE_PRINTER = new PrintJava(treePrinter) {
+    private static final PrintJava<Void> VARIABLE_PRINTER = new PrintJava<Void>(TreePrinter.identity()) {
         @Override
-        public String visitMultiVariable(J.VariableDecls multiVariable) {
-            String modifiers = visitModifiers(multiVariable.getModifiers()).trim();
-            String varargs = multiVariable.getVarargs() == null ? "" : "...";
-
-            return (modifiers.isEmpty() ? "" : modifiers + " ") +
+        public String visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
+            return visitModifiers(multiVariable.getModifiers()).trim() +
                     (multiVariable.getTypeExpr() == null ? "" : multiVariable.getTypeExpr().printTrimmed() + " ") +
                     multiVariable.getDimensionsBeforeName().stream()
                             .map(d -> "[]")
-                            .reduce("", this::reduce) +
-                    varargs +
+                            .collect(Collectors.joining("")) +
+                    (multiVariable.getVarargs() == null ? "" : "...") +
                     multiVariable.getVars().stream()
+                            .map(JRightPadded::getElem)
                             .map(J.VariableDecls.NamedVar::getSimpleName)
                             .collect(Collectors.joining(", "));
         }

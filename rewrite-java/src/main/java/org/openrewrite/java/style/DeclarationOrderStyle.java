@@ -177,37 +177,36 @@ public class DeclarationOrderStyle implements JavaStyle {
             }
         }
 
-        public List<J> orderedDeclarations() {
-            List<J> orderedDeclarations = new ArrayList<>();
-
-            AtomicInteger blankLines = new AtomicInteger(0);
-            for (Block<?> block : blocks) {
-                System.out.println(block);
-                if (block instanceof Block.BlankLines) {
-                    blankLines.addAndGet(((Block.BlankLines) block).count);
-                } else {
-                    AtomicBoolean first = new AtomicBoolean(true);
-                    orderedDeclarations.addAll(block.orderedDeclarations().stream()
-                            .peek(declaration -> System.out.println("  " + declaration.toString()))
-                            .map(declaration -> {
-                                if (first.getAndSet(false)) {
-                                    return declaration.withFormatting(declaration.getFormatting()
-                                            .withMinimumBlankLines(blankLines.getAndSet(0)));
-                                }
-
-                                if (declaration instanceof J.MethodDecl) {
-                                    return declaration.withFormatting(declaration.getFormatting()
-                                            .withMinimumBlankLines(1));
-                                }
-
-                                return declaration;
-                            })
-                            .collect(toList()));
-                    blankLines.set(0);
-                }
-            }
-            return orderedDeclarations;
-        }
+//        public List<J> orderedDeclarations() {
+//            List<J> orderedDeclarations = new ArrayList<>();
+//
+//            AtomicInteger blankLines = new AtomicInteger(0);
+//            for (Block<?> block : blocks) {
+//                if (block instanceof Block.BlankLines) {
+//                    blankLines.addAndGet(((Block.BlankLines) block).count);
+//                } else {
+//                    AtomicBoolean first = new AtomicBoolean(true);
+//                    orderedDeclarations.addAll(block.orderedDeclarations().stream()
+//                            .peek(declaration -> System.out.println("  " + declaration.toString()))
+//                            .map(declaration -> {
+//                                if (first.getAndSet(false)) {
+//                                    return declaration.withFormatting(declaration.getFormatting()
+//                                            .withMinimumBlankLines(blankLines.getAndSet(0)));
+//                                }
+//
+//                                if (declaration instanceof J.MethodDecl) {
+//                                    return declaration.withFormatting(declaration.getFormatting()
+//                                            .withMinimumBlankLines(1));
+//                                }
+//
+//                                return declaration;
+//                            })
+//                            .collect(toList()));
+//                    blankLines.set(0);
+//                }
+//            }
+//            return orderedDeclarations;
+//        }
 
         public Validated validate() {
             return test("accessors", "'all accessors' can only be used when 'all getters', 'all setters', or 'all with' are not",
@@ -289,7 +288,7 @@ public class DeclarationOrderStyle implements JavaStyle {
                         if (modComp != 0) {
                             return modComp;
                         }
-                        return f1.getVars().get(0).getSimpleName().compareTo(f2.getVars().get(0).getSimpleName());
+                        return f1.getVars().get(0).getElem().getSimpleName().compareTo(f2.getVars().get(0).getElem().getSimpleName());
                     });
                 }
 
@@ -493,8 +492,7 @@ public class DeclarationOrderStyle implements JavaStyle {
                         return false;
                     }
 
-                    List<Statement> params = method.getParams().getParams();
-                    return params.size() == 1;
+                    return method.getParams().getElem().size() == 1;
                 }
 
                 @Override
@@ -520,7 +518,7 @@ public class DeclarationOrderStyle implements JavaStyle {
                     }
 
                     J.MethodDecl method = (J.MethodDecl) declaration;
-                    return method.getSimpleName().equals("toString") && method.getParams().isEmpty();
+                    return method.getSimpleName().equals("toString") && method.getParams().getElem().isEmpty();
                 }
 
                 @Override
@@ -541,7 +539,7 @@ public class DeclarationOrderStyle implements JavaStyle {
                     }
 
                     J.MethodDecl method = (J.MethodDecl) declaration;
-                    return method.getSimpleName().equals("hashCode") && method.getParams().isEmpty();
+                    return method.getSimpleName().equals("hashCode") && method.getParams().getElem().isEmpty();
                 }
 
                 @Override
