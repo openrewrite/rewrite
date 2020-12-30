@@ -405,6 +405,7 @@ public interface J extends Serializable, Tree {
         @With
         Space statik;
 
+        @JsonProperty("statik")
         @Nullable
         public Space getStatic() {
             return statik;
@@ -1196,6 +1197,7 @@ public interface J extends Serializable, Tree {
             return statik != null;
         }
 
+        @JsonProperty("statik")
         @Nullable
         public Space getStatic() {
             return statik;

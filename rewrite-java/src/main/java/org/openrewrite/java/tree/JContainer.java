@@ -15,6 +15,9 @@
  */
 package org.openrewrite.java.tree;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -42,7 +45,10 @@ public class JContainer<T> {
         this.elem = elem;
     }
 
-    public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elem) {
+    @JsonCreator
+    public static <T> JContainer<T> build(
+            @JsonProperty("before") Space before,
+            @JsonProperty("elem") List<JRightPadded<T>> elem) {
         if (before.isEmpty() && elem.isEmpty()) {
             return empty();
         }
