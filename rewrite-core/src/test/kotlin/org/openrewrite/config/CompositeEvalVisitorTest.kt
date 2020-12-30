@@ -22,7 +22,7 @@ import org.openrewrite.Tree.randomId
 import org.openrewrite.text.PlainText
 import java.util.*
 
-class CompositeRefactorVisitorTest {
+class CompositeEvalVisitorTest {
     @Test
     fun delegateToVisitorsInOrder() {
         val yaml = """

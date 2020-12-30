@@ -38,8 +38,7 @@ public class ChangeText extends EvalVisitor<PlainText> {
     }
 
     @Override
-    public PlainText visit(Tree tree, EvalContext ctx) {
-        PlainText text = (PlainText) tree;
-        return text.withText(toText);
+    public PlainText visitEach(PlainText tree, EvalContext ctx) {
+        return tree.withText(toText);
     }
 }

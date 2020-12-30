@@ -64,6 +64,13 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
     }
 
     public void next() {
+        synchronized (this) {
+            if (andThen.get() != null) {
+                andThen.get().clear();
+            } else {
+                andThen.set(new ArrayList<>());
+            }
+        }
     }
 
     public boolean isIdempotent() {
@@ -79,7 +86,7 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
     }
 
     @Nullable
-    public T visitEach(@Nullable T tree, EvalContext ctx) {
+    public T visitEach(T tree, EvalContext ctx) {
         return defaultValue(tree, ctx);
     }
 
@@ -98,7 +105,12 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
             cursor.set(new Cursor(cursor.get(), tree));
         }
 
-        T t = tree.accept(this, ctx);
+        @SuppressWarnings("unchecked") T t = visitEach((T) tree, ctx);
+        if(t == null) {
+            return defaultValue(null, ctx);
+        }
+
+        t = t.accept(this, ctx);
 
         if (cursored) {
             cursor.set(cursor.get().getParent());

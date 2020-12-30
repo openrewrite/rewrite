@@ -47,7 +47,8 @@ public class Eval {
     @SuppressWarnings("unchecked")
     @Nullable
     public <S extends SourceFile> S results(S tree) {
-        return (S) visit(Collections.singletonList(tree)).iterator().next().getAfter();
+        Collection<Result> results = visit(Collections.singletonList(tree));
+        return results.iterator().hasNext() ? (S) results.iterator().next().getAfter() : null;
     }
 
     /**

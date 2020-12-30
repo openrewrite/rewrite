@@ -22,10 +22,11 @@ class SpaceTest {
     @Test
     fun singleLineComment() {
         val cf = Space.format("""
+              
             // I'm a little // teapot
             // Short and stout //
                 // Here is my handle
-            \u00A0  \u00A0
+              
         """.trimIndent())
 
         assertThat(cf.comments).hasSize(3)
@@ -38,20 +39,21 @@ class SpaceTest {
 
         assertThat(c1.suffix).isEqualTo("\n")
         assertThat(c2.suffix).isEqualTo("\n    ")
-        assertThat(c3.suffix).isEqualTo("\n\\u00A0  \\u00A0")
+        assertThat(c3.suffix).isEqualTo("\n  ")
 
-        assertThat(cf.whitespace).isEmpty()
+        assertThat(cf.whitespace).isEqualTo("  \n")
     }
 
     @Test
     fun multiLineComment() {
         val cf = Space.format("""
+              
             /*   /*    Here is my spout     */
             /* When I get all steamed up */
             /* /*
             Here me shout
             */
-            \u00A0  \u00A0
+              
         """.trimIndent())
 
         assertThat(cf.comments).hasSize(3)
@@ -63,25 +65,26 @@ class SpaceTest {
         assertThat(c3.text).isEqualTo(" /*\nHere me shout\n")
 
         assertThat(c1.suffix).isEqualTo("\n")
-        assertThat(c2.suffix).isEqualTo("\n    ")
-        assertThat(c3.suffix).isEqualTo("\n\\u00A0  \\u00A0")
+        assertThat(c2.suffix).isEqualTo("\n")
+        assertThat(c3.suffix).isEqualTo("\n  ")
 
-        assertThat(cf.whitespace).isEmpty()
+        assertThat(cf.whitespace).isEqualTo("  \n")
     }
 
     @Test
     fun javadocComment() {
         val cf = Space.format("""
+              
             /**
              * /** Tip me over and pour me out!
              */
-            \u00A0  \u00A0
+              
         """.trimIndent())
 
         assertThat(cf.comments).hasSize(1)
         assertThat(cf.comments.first().text).isEqualTo("\n * /** Tip me over and pour me out!\n ")
-        assertThat(cf.comments.first().suffix).isEqualTo("""
-            
-            \u00A0  \u00A0""".trimIndent())
+        assertThat(cf.comments.first().suffix).isEqualTo("\n  ")
+
+        assertThat(cf.whitespace).isEqualTo("  \n")
     }
 }
