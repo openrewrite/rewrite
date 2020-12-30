@@ -357,24 +357,13 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
                     s instanceof Break ||
                     s instanceof Continue ||
                     s instanceof DoWhileLoop ||
+                    s instanceof Empty ||
                     s instanceof MethodInvocation ||
                     s instanceof NewClass ||
                     s instanceof Return ||
                     s instanceof Throw ||
                     s instanceof Unary ||
                     s instanceof VariableDecls) {
-                return acc + ';';
-            }
-
-            if (s instanceof WhileLoop && !(((WhileLoop) s).getBody().getElem() instanceof Block)) {
-                return acc + ';';
-            }
-
-            if (s instanceof ForLoop && !(((ForLoop) s).getBody().getElem() instanceof Block)) {
-                return acc + ';';
-            }
-
-            if (s instanceof ForEachLoop && !(((ForEachLoop) s).getBody().getElem() instanceof Block)) {
                 return acc + ';';
             }
 

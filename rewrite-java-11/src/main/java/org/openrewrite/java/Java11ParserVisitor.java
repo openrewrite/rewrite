@@ -519,7 +519,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitDoWhileLoop(DoWhileLoopTree node, Space fmt) {
         skip("do");
         return new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
-                convert(node.getStatement()),
+                convert(node.getStatement(), this::statementDelim),
                 padLeft(sourceBefore("while"), convert(node.getCondition())));
     }
 
@@ -535,7 +535,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 new J.ForEachLoop.Control(randomId(), sourceBefore("("), Markers.EMPTY,
                         convert(node.getVariable(), t -> sourceBefore(":")),
                         convert(node.getExpression(), t -> sourceBefore(")"))),
-                convert(node.getStatement()));
+                convert(node.getStatement(), this::statementDelim));
     }
 
     private J visitEnumVariable(VariableTree node, Space fmt) {
@@ -579,7 +579,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         return new J.ForLoop(randomId(), fmt, Markers.EMPTY,
                 new J.ForLoop.Control(randomId(), ctrlPrefix, Markers.EMPTY, init, condition, update),
-                convert(node.getStatement()));
+                convert(node.getStatement(), this::statementDelim));
     }
 
     @Override
@@ -1217,7 +1217,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("while");
         return new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
                 convert(node.getCondition()),
-                convert(node.getStatement()));
+                convert(node.getStatement(), this::statementDelim));
     }
 
     @Override
@@ -1353,10 +1353,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 t instanceof JCExpressionStatement ||
                 t instanceof JCVariableDecl) {
             return sourceBefore(";");
-        }
-
-        if (t instanceof JCWhileLoop) {
-            return ((JCWhileLoop) t).body instanceof JCBlock ? EMPTY : sourceBefore(";");
         }
 
         if (t instanceof JCLabeledStatement) {
