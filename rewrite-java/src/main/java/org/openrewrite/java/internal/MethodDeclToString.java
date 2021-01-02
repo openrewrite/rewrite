@@ -27,8 +27,10 @@ public class MethodDeclToString {
         @Override
         public String visitMethod(J.MethodDecl method, Void unused) {
             return visitModifiers(method.getModifiers()).trim() +
+                    (method.getModifiers().isEmpty() ? "" : " ") +
                     visit("<", method.getTypeParameters(), ",", ">", unused) +
                     (method.getReturnTypeExpr() == null ? "" : method.getReturnTypeExpr().printTrimmed() + " ") +
+                    method.getSimpleName() +
                     visit("(", method.getParams(), ",", ")", unused) +
                     visit("throws", method.getThrows(), ",", "", unused);
         }

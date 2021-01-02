@@ -13,20 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.tree
+package org.openrewrite.java
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.DebugOnly
+import org.openrewrite.java.format.BlankLinesTest
 
-interface AssignTest : JavaParserTest {
-
-    @Test
-    fun assignment(jp: JavaParser) = assertParseAndPrint(
-        jp, Block, """
-            String s;
-            s = "foo";
-        """
-    )
-}
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11BlankLinesTest: Java11Test(), BlankLinesTest

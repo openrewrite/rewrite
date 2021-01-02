@@ -72,10 +72,37 @@ public class Java11Parser implements JavaParser {
 
     private final JavacFileManager pfm;
 
-    private final Context context = new Context();
+    private final Context context;
     private final JavaCompiler compiler;
-    private final ResettableLog compilerLog = new ResettableLog(context);
+    private final ResettableLog compilerLog;
+
     private final Collection<JavaStyle> styles;
+
+    @Override
+    public JavaParser withStyles(Collection<JavaStyle> styles) {
+        return new Java11Parser(classpath, context, compiler, pfm, compilerLog,
+                relaxedClassTypeMatching, suppressMappingErrors, meterRegistry, styles);
+    }
+
+    private Java11Parser(@Nullable Collection<Path> classpath,
+                         Context context,
+                         JavaCompiler compiler,
+                         JavacFileManager pfm,
+                         ResettableLog compilerLog,
+                         boolean relaxedClassTypeMatching,
+                         boolean suppressMappingErrors,
+                         MeterRegistry meterRegistry,
+                         Collection<JavaStyle> styles) {
+        this.classpath = classpath;
+        this.context = context;
+        this.compiler = compiler;
+        this.pfm = pfm;
+        this.compilerLog = compilerLog;
+        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
+        this.suppressMappingErrors = suppressMappingErrors;
+        this.meterRegistry = meterRegistry;
+        this.styles = styles;
+    }
 
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
@@ -90,6 +117,8 @@ public class Java11Parser implements JavaParser {
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
 
+        this.context = new Context();
+        this.compilerLog = new ResettableLog(context);
         this.pfm = new JavacFileManager(context, true, charset);
         context.put(JavaFileManager.class, this.pfm);
 

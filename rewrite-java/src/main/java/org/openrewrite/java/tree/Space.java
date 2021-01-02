@@ -16,7 +16,9 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.apache.commons.lang.StringEscapeUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -41,6 +43,17 @@ public class Space {
         this.whitespace = whitespace;
     }
 
+    @JsonIgnore
+    public String getIndent() {
+        int lastNewline = whitespace.lastIndexOf('\n');
+        if (lastNewline >= 0) {
+            return whitespace.substring(lastNewline + 1);
+        } else if (lastNewline == whitespace.length() - 1) {
+            return "";
+        }
+        return whitespace;
+    }
+
     public List<Comment> getComments() {
         return comments;
     }
@@ -50,14 +63,14 @@ public class Space {
     }
 
     public Space withComments(List<Comment> comments) {
-        if(comments.isEmpty() && whitespace.isEmpty()) {
+        if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
         return new Space(whitespace, comments);
     }
 
     public Space withWhitespace(String whitespace) {
-        if(comments.isEmpty() && whitespace.isEmpty()) {
+        if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
         return new Space(whitespace, comments);
@@ -145,7 +158,7 @@ public class Space {
         // whitespace on the first comment to be the whitespace of the tree element. The remaining prefix is the suffix
         // of the last comment.
         String whitespace = prefix.toString();
-        if(!comments.isEmpty()) {
+        if (!comments.isEmpty()) {
             for (int i = comments.size() - 1; i >= 0; i--) {
                 Comment c = comments.get(i);
                 String next = c.getSuffix();
@@ -187,5 +200,18 @@ public class Space {
         }
 
         return trees;
+    }
+
+    @Override
+    public String toString() {
+        return "Space(" +
+                "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
+                ">, whitespace='" +
+                whitespace
+                        .replace("\n", "\\n")
+                        .replace("\r", "\\r")
+                        .replace('\t', '-')
+                        .replace(" ", "·") +
+                "')";
     }
 }

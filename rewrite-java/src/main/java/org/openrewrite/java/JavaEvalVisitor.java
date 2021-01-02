@@ -280,6 +280,7 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
     @Override
     public J visitMethod(J.MethodDecl method, EvalContext ctx) {
         J.MethodDecl m = eval(method, ctx, this::visitEach);
+        m = eval(m, ctx, this::visitStatement);
         m = m.withAnnotations(eval(m.getAnnotations(), ctx));
         m = m.withModifiers(eval(m.getModifiers(), ctx));
         m = m.withTypeParameters(eval(m.getTypeParameters(), ctx));

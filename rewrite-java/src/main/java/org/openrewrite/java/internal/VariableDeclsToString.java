@@ -30,6 +30,7 @@ public class VariableDeclsToString {
         @Override
         public String visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
             return visitModifiers(multiVariable.getModifiers()).trim() +
+                    (multiVariable.getModifiers().isEmpty() ? "" : " ") +
                     (multiVariable.getTypeExpr() == null ? "" : multiVariable.getTypeExpr().printTrimmed() + " ") +
                     multiVariable.getDimensionsBeforeName().stream()
                             .map(d -> "[]")

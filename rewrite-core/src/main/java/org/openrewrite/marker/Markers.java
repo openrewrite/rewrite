@@ -40,7 +40,7 @@ public class Markers {
     public static Markers EMPTY = new Markers(emptyList()) {
         @Override
         public String toString() {
-            return "markers{EMPTY}";
+            return "Markers{EMPTY}";
         }
     };
 

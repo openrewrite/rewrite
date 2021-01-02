@@ -166,7 +166,8 @@ public class StringUtils {
                 bos.write(buffer, 0, n);
             }
 
-            return new String(bos.toByteArray(), StandardCharsets.UTF_8);
+            byte[] bytes = bos.toByteArray();
+            return new String(bytes, 0, bytes.length, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UnsupportedOperationException(e);
         }

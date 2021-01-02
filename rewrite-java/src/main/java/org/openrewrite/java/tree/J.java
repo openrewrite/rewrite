@@ -24,10 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.internal.ClassDeclToString;
-import org.openrewrite.java.internal.MethodDeclToString;
-import org.openrewrite.java.internal.PrintJava;
-import org.openrewrite.java.internal.VariableDeclsToString;
+import org.openrewrite.java.internal.*;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -70,6 +67,14 @@ public interface J extends Serializable, Tree {
     <J2 extends J> J2 withPrefix(Space space);
 
     Space getPrefix();
+
+    default List<Comment> getComments() {
+        return getPrefix().getComments();
+    }
+
+    default <J2 extends J> J2 withComments(List<Comment> comments) {
+        return withPrefix(getPrefix().withComments(comments));
+    }
 
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -652,7 +657,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "ClassDecl{" + ClassDeclToString.toString(this) + "}";
+            return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
     }
 
@@ -1267,6 +1272,13 @@ public interface J extends Serializable, Tree {
             return p1s.length < p2s.length ? -1 :
                     this.getQualid().getSimpleName().compareTo(o.getQualid().getSimpleName());
         }
+
+        /**
+         * Make debugging a bit easier
+         */
+        public String toString() {
+            return "Import(" + ImportToString.toString(this) + ")";
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1579,7 +1591,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "MethodDecl{" + MethodDeclToString.toString(this) + "}";
+            return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
         }
     }
 
@@ -2422,7 +2434,7 @@ public interface J extends Serializable, Tree {
 
         @Override
         public String toString() {
-            return "VariableDecls{" + VariableDeclsToString.toString(this) + "}";
+            return "VariableDecls(" + VariableDeclsToString.toString(this) + ")";
         }
     }
 

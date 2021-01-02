@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.style;
+package org.openrewrite.java
 
-import lombok.Getter;
-import lombok.Setter;
-import org.openrewrite.java.JavaStyle;
+import org.junit.jupiter.api.Nested
+import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.format.BlankLinesTest
 
-@Getter
-@Setter
-public class TabAndIndentStyle implements JavaStyle {
-    private boolean useTabCharacter = false;
-    private int tabSize = 4;
-    private int indentSize = 4;
-    private int continuationIndent = 8;
+@ExtendWith(JavaParserResolver::class)
+abstract class JavaEvalCompatibilityKit {
+    abstract fun javaParser(): JavaParser
+
+    @Nested
+    inner class BlankLinesTck : BlankLinesTest
 }
