@@ -240,4 +240,27 @@ interface TabsAndIndentsTest : EvalVisitorTest {
             }
         """
     )
+
+    @Test
+    fun tabs(jp: JavaParser) = assertRefactored(
+        // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
+        jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+            isUseTabCharacter = true
+        })),
+        before = """
+            public class A {
+                public void method() {
+                int n = 0;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void method() {
+                	int n = 0;
+                }
+            }
+
+        """
+    )
 }

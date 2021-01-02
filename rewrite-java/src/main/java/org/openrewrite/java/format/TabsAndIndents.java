@@ -104,8 +104,8 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     private Space indent(Space space, Tree parent) {
-        int parentIndent = ((J) parent).getPrefix().getIndent().length();
-        int indent = space.getIndent().length();
+        int parentIndent = indent(((J) parent).getPrefix());
+        int indent = indent(space);
 
         if (indent - parentIndent < style.getContinuationIndent()) {
             int shiftRight = style.getIndentSize() + parentIndent - indent;
@@ -118,8 +118,8 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     private Space align(Space space, Tree parent) {
-        int parentIndent = ((J) parent).getPrefix().getIndent().length();
-        int indent = space.getIndent().length();
+        int parentIndent = indent(((J) parent).getPrefix());
+        int indent = indent(space);
 
         if (indent - parentIndent < 0) {
             int shiftRight = parentIndent - indent;
@@ -133,9 +133,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
 
     private Comment indentComment(Comment comment, int shiftRight) {
         StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
-        for (int i = 0; i < shiftRight; i++) {
-            newSuffix.append(' ');
-        }
+        shiftRight(newSuffix, shiftRight);
 
         String newText = comment.getText();
         if (comment.getStyle() != Comment.Style.LINE) {
@@ -143,9 +141,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
             for (char c : comment.getText().toCharArray()) {
                 newTextBuilder.append(c);
                 if (c == '\n') {
-                    for (int i = 0; i < shiftRight; i++) {
-                        newTextBuilder.append(' ');
-                    }
+                    shiftRight(newTextBuilder, shiftRight);
                 }
             }
             newText = newTextBuilder.toString();
@@ -156,9 +152,31 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
 
     private String indent(String whitespace, int shiftRight) {
         StringBuilder newWhitespace = new StringBuilder(whitespace);
-        for (int i = 0; i < shiftRight; i++) {
-            newWhitespace.append(' ');
-        }
+        shiftRight(newWhitespace, shiftRight);
         return newWhitespace.toString();
+    }
+
+    private void shiftRight(StringBuilder text, int shiftRight) {
+        int tabIndent = style.getTabSize();
+        if (!style.isUseTabCharacter()) {
+            tabIndent = Integer.MAX_VALUE;
+        }
+
+        for (int i = 0; i < shiftRight / tabIndent; i++) {
+            text.append('\t');
+        }
+
+        for (int i = 0; i < shiftRight % tabIndent; i++) {
+            text.append(' ');
+        }
+    }
+
+    private int indent(Space space) {
+        String indent = space.getIndent();
+        int size = 0;
+        for (char c : indent.toCharArray()) {
+            size += c == '\t' ? style.getTabSize() : 1;
+        }
+        return size;
     }
 }
