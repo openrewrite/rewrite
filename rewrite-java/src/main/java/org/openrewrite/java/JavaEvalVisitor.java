@@ -125,7 +125,7 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitCatch(J.Try.Catch catzh, EvalContext ctx) {
-        J.Try.Catch c = catzh;
+        J.Try.Catch c = eval(catzh, ctx, this::visitEach);
         c = c.withParam(eval(c.getParam(), ctx));
         return c.withBody(eval(c.getBody(), ctx));
     }
@@ -217,7 +217,14 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitIdentifier(J.Ident ident, EvalContext ctx) {
-        return eval(ident, ctx, this::visitExpression);
+        J.Ident i = eval(ident, ctx, this::visitEach);
+        return eval(i, ctx, this::visitExpression);
+    }
+
+    @Override
+    public J visitElse(J.If.Else elze, EvalContext ctx) {
+        J.If.Else e = eval(elze, ctx, this::visitEach);
+        return e.withBody(eval(e.getBody(), ctx));
     }
 
     @Override
@@ -226,19 +233,14 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
         i = eval(i, ctx, this::visitStatement);
         i = i.withIfCondition(eval(i.getIfCondition(), ctx));
         i = i.withThenPart(eval(i.getThenPart(), ctx));
-
-        if(i.getElsePart() != null) {
-            JRightPadded<Statement> elze = eval(i.getElsePart().getElem(), ctx);
-            if(elze != i.getElsePart().getElem()) {
-                i = i.withElsePart(new JLeftPadded<>(i.getElsePart().getBefore(), elze));
-            }
-        }
+        i = i.withElsePart(eval(i.getElsePart(), ctx));
         return i;
     }
 
     @Override
     public J visitImport(J.Import impoort, EvalContext ctx) {
-        return impoort.withQualid(eval(impoort.getQualid(), ctx));
+        J.Import i = eval(impoort, ctx, this::visitEach);
+        return i.withQualid(eval(i.getQualid(), ctx));
     }
 
     @Override
@@ -305,7 +307,8 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitMultiCatch(J.MultiCatch multiCatch, EvalContext ctx) {
-        return multiCatch.withAlternatives(evalMany(multiCatch.getAlternatives(), ctx));
+        J.MultiCatch m = eval(multiCatch, ctx, this::visitEach);
+        return m.withAlternatives(evalMany(m.getAlternatives(), ctx));
     }
 
     @Override
@@ -338,7 +341,8 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitPackage(J.Package pkg, EvalContext ctx) {
-        return pkg.withExpr(eval(pkg.getExpr(), ctx));
+        J.Package p = eval(pkg, ctx, this::visitEach);
+        return p.withExpr(eval(p.getExpr(), ctx));
     }
 
     @Override
@@ -351,13 +355,15 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, EvalContext ctx) {
-        J.Parentheses<T> p = eval(parens, ctx, this::visitExpression);
+        J.Parentheses<T> p = eval(parens, ctx, this::visitEach);
+        p = eval(p, ctx, this::visitExpression);
         return p.withTree(eval(p.getTree(), ctx));
     }
 
     @Override
     public J visitPrimitive(J.Primitive primitive, EvalContext ctx) {
-        return eval(primitive, ctx, this::visitExpression);
+        J.Primitive p = eval(primitive, ctx, this::visitEach);
+        return eval(p, ctx, this::visitExpression);
     }
 
     @Override
@@ -435,7 +441,7 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitVariable(J.VariableDecls.NamedVar variable, EvalContext ctx) {
-        J.VariableDecls.NamedVar v = variable;
+        J.VariableDecls.NamedVar v = eval(variable, ctx, this::visitEach);
         v = v.withName(eval(v.getName(), ctx));
         return v.withInitializer(eval(v.getInitializer(), ctx));
     }

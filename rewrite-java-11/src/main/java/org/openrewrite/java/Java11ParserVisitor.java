@@ -598,7 +598,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 convert(node.getCondition()),
                 convert(node.getThenStatement(), this::statementDelim),
                 node.getElseStatement() instanceof JCTree.JCStatement ?
-                        padLeft(sourceBefore("else"), convert(node.getElseStatement(), this::statementDelim)) : null);
+                        new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY, convert(node.getElseStatement(), this::statementDelim)) :
+                        null);
     }
 
     @Override

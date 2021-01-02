@@ -25,7 +25,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> mapLast(List<T> ls, Function<T, T> mapLast) {
-        if(ls.isEmpty()) {
+        if (ls.isEmpty()) {
             return ls;
         }
         T last = ls.get(ls.size() - 1);
@@ -39,7 +39,7 @@ public final class ListUtils {
     }
 
     public static <T> List<T> mapFirst(List<T> ls, Function<T, T> mapFirst) {
-        if(ls.isEmpty()) {
+        if (ls.isEmpty()) {
             return ls;
         }
         T first = ls.iterator().next();
@@ -53,14 +53,14 @@ public final class ListUtils {
     }
 
     public static <T> List<T> map(List<T> ls, BiFunction<Integer, T, T> map) {
-        if(ls.isEmpty()) {
+        if (ls.isEmpty()) {
             return ls;
         }
         List<T> newLs = ls;
         for (int i = 0; i < ls.size(); i++) {
             T tree = ls.get(i);
             T newTree = map.apply(i, tree);
-            if(newTree != tree) {
+            if (newTree != tree) {
                 if (newLs == ls) {
                     newLs = new ArrayList<>(ls);
                 }
@@ -68,5 +68,9 @@ public final class ListUtils {
             }
         }
         return newLs;
+    }
+
+    public static <T> List<T> map(List<T> ls, Function<T, T> map) {
+        return map(ls, (i, t) -> map.apply(t));
     }
 }

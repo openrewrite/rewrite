@@ -458,6 +458,11 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     }
 
     @Override
+    public String visitElse(If.Else elze, P p) {
+        return fmt(elze, "else" + visitStatement(elze.getBody(), p));
+    }
+
+    @Override
     public String visitEmpty(Empty empty, P p) {
         return fmt(empty, "");
     }
@@ -518,8 +523,7 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     public String visitIf(If iff, P p) {
         return fmt(iff, "if" + visit(iff.getIfCondition(), p) +
                 visitStatement(iff.getThenPart(), p) +
-                (iff.getElsePart() == null ? "" :
-                        visit(iff.getElsePart().getBefore()) + "else" + visitStatement(iff.getElsePart().getElem(), p)));
+                visit(iff.getElsePart(), p));
     }
 
     @Override

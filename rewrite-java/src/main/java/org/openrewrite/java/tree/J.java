@@ -68,6 +68,7 @@ public interface J extends Serializable, Tree {
 
     Space getPrefix();
 
+    @JsonIgnore
     default List<Comment> getComments() {
         return getPrefix().getComments();
     }
@@ -1166,11 +1167,33 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        JLeftPadded<JRightPadded<Statement>> elsePart;
+        Else elsePart;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitIf(this, p);
+        }
+
+        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+        @Data
+        public static final class Else implements J {
+            @EqualsAndHashCode.Include
+            UUID id;
+
+            @With
+            Space prefix;
+
+            @With
+            Markers markers;
+
+            @With
+            JRightPadded<Statement> body;
+
+            @Override
+            public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+                return v.visitElse(this, p);
+            }
         }
     }
 

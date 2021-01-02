@@ -63,6 +63,10 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
         this.cursored = true;
     }
 
+    protected void rebaseCursor(Tree t) {
+        this.cursor.set(new Cursor(getCursor().getParent(), t));
+    }
+
     public void next() {
         synchronized (this) {
             if (andThen.get() != null) {

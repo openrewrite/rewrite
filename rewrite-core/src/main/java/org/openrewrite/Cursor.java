@@ -112,5 +112,4 @@ public class Cursor {
     public boolean isScopeInPath(Tree scope) {
         return (tree != null && tree.getId().equals(scope.getId())) || getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
     }
-
 }

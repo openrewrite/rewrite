@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.format.BlankLinesTest
+import org.openrewrite.java.format.TabsAndIndentsTest
 
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaEvalCompatibilityKit {
@@ -25,4 +26,7 @@ abstract class JavaEvalCompatibilityKit {
 
     @Nested
     inner class BlankLinesTck : BlankLinesTest
+
+    @Nested
+    inner class TabsAndIndentsTck : TabsAndIndentsTest
 }

@@ -16,8 +16,19 @@
 package org.openrewrite.java.style;
 
 public class IntelliJ {
+    public static TabsAndIndentsStyle defaultTabsAndIndents() {
+        TabsAndIndentsStyle style = new TabsAndIndentsStyle();
+
+        style.setUseTabCharacter(false);
+        style.setTabSize(4);
+        style.setIndentSize(4);
+        style.setContinuationIndent(8);
+
+        return style;
+    }
+
     public static BlankLineStyle defaultBlankLine() {
-        BlankLineStyle defaultBlankLine = new BlankLineStyle();
+        BlankLineStyle style = new BlankLineStyle();
 
         BlankLineStyle.KeepMaximum max = new BlankLineStyle.KeepMaximum();
         max.setInDeclarations(2);
@@ -25,7 +36,7 @@ public class IntelliJ {
         max.setBeforeEndOfBlock(2);
         max.setBetweenHeaderAndPackage(2);
 
-        defaultBlankLine.setKeepMaximum(max);
+        style.setKeepMaximum(max);
 
         BlankLineStyle.Minimum min = new BlankLineStyle.Minimum();
         min.setBeforePackage(0);
@@ -39,8 +50,8 @@ public class IntelliJ {
         min.setAroundFieldInInterface(0);
         min.setAroundField(0);
 
-        defaultBlankLine.setMinimum(min);
+        style.setMinimum(min);
 
-        return defaultBlankLine;
+        return style;
     }
 }

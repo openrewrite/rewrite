@@ -21,7 +21,7 @@ import org.openrewrite.java.JavaStyle;
 
 @Getter
 @Setter
-public class TabAndIndentStyle implements JavaStyle {
+public class TabsAndIndentsStyle implements JavaStyle {
     private boolean useTabCharacter = false;
     private int tabSize = 4;
     private int indentSize = 4;

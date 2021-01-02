@@ -120,6 +120,11 @@ public class JavaIsoEvalVisitor extends JavaEvalVisitor {
     }
 
     @Override
+    public J.If.Else visitElse(J.If.Else elze, EvalContext ctx) {
+        return (J.If.Else) super.visitElse(elze, ctx);
+    }
+
+    @Override
     public J.Empty visitEmpty(J.Empty empty, EvalContext ctx) {
         return (J.Empty) super.visitEmpty(empty, ctx);
     }

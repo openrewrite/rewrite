@@ -35,6 +35,7 @@ public interface JavaVisitor<R, P> extends TreeVisitor<R, P> {
     R visitCompilationUnit(J.CompilationUnit cu, P p);
     R visitContinue(J.Continue continueStatement, P p);
     R visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p);
+    R visitElse(J.If.Else elze, P p);
     R visitEmpty(J.Empty empty, P p);
     R visitEnumValue(J.EnumValue enoom, P p);
     R visitEnumValueSet(J.EnumValueSet enums, P p);

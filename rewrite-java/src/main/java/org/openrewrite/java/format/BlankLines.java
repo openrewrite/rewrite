@@ -29,7 +29,7 @@ import org.openrewrite.java.tree.Statement;
 import java.util.List;
 
 public class BlankLines extends JavaEvalVisitor {
-    BlankLineStyle blankLineStyle;
+    BlankLineStyle style;
 
     public BlankLines() {
         setCursoringOn();
@@ -37,9 +37,9 @@ public class BlankLines extends JavaEvalVisitor {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, EvalContext ctx) {
-        blankLineStyle = cu.getStyle(BlankLineStyle.class);
-        if (blankLineStyle == null) {
-            blankLineStyle = IntelliJ.defaultBlankLine();
+        style = cu.getStyle(BlankLineStyle.class);
+        if (style == null) {
+            style = IntelliJ.defaultBlankLine();
         }
 
         J.CompilationUnit j = eval(cu, ctx, super::visitCompilationUnit);
@@ -47,12 +47,12 @@ public class BlankLines extends JavaEvalVisitor {
         if (j.getPackageDecl() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c -> {
-                    String suffix = keepMaximumLines(c.getSuffix(), blankLineStyle.getKeepMaximum().getBetweenHeaderAndPackage());
-                    suffix = minimumLines(suffix, blankLineStyle.getMinimum().getBeforePackage());
+                    String suffix = keepMaximumLines(c.getSuffix(), style.getKeepMaximum().getBetweenHeaderAndPackage());
+                    suffix = minimumLines(suffix, style.getMinimum().getBeforePackage());
                     return c.withSuffix(suffix);
                 }));
             } else {
-                j = minimumLines(j, blankLineStyle.getMinimum().getBeforePackage());
+                j = minimumLines(j, style.getMinimum().getBeforePackage());
             }
         }
 
@@ -64,23 +64,23 @@ public class BlankLines extends JavaEvalVisitor {
                 }));
             } else {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c ->
-                        c.withSuffix(minimumLines(c.getSuffix(), blankLineStyle.getMinimum().getBeforeImports()))));
+                        c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
             }
         } else {
             j = j.withImports(ListUtils.mapFirst(j.getImports(), i ->
                     minimumLines(i, Math.max(
-                            blankLineStyle.getMinimum().getBeforeImports(),
-                            blankLineStyle.getMinimum().getAfterPackage()))));
+                            style.getMinimum().getBeforeImports(),
+                            style.getMinimum().getAfterPackage()))));
 
             if (j.getImports().isEmpty()) {
                 j = j.withClasses(ListUtils.mapFirst(j.getClasses(), c ->
-                        minimumLines(c, blankLineStyle.getMinimum().getAfterPackage())));
+                        minimumLines(c, style.getMinimum().getAfterPackage())));
             }
         }
 
         j = j.withClasses(ListUtils.map(j.getClasses(), (i, c) -> i == 0 ?
-                minimumLines(c, blankLineStyle.getMinimum().getAfterImports()) :
-                minimumLines(c, blankLineStyle.getMinimum().getAroundClass())
+                minimumLines(c, style.getMinimum().getAfterImports()) :
+                minimumLines(c, style.getMinimum().getAroundClass())
         ));
 
         return j;
@@ -92,34 +92,34 @@ public class BlankLines extends JavaEvalVisitor {
 
         List<JRightPadded<Statement>> statements = j.getBody().getStatements();
         j = j.withBody(j.getBody().withStatements(ListUtils.map(statements, (i, s) -> {
-            s = keepMaximumLines(s, blankLineStyle.getKeepMaximum().getInDeclarations());
+            s = keepMaximumLines(s, style.getKeepMaximum().getInDeclarations());
             if (i == 0) {
-                s = minimumLines(s, blankLineStyle.getMinimum().getAfterClassHeader());
+                s = minimumLines(s, style.getMinimum().getAfterClassHeader());
             } else if (s.getElem() instanceof J.VariableDecls) {
                 if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
-                    s = minimumLines(s, blankLineStyle.getMinimum().getAroundFieldInInterface());
+                    s = minimumLines(s, style.getMinimum().getAroundFieldInInterface());
                 } else {
-                    s = minimumLines(s, blankLineStyle.getMinimum().getAroundField());
+                    s = minimumLines(s, style.getMinimum().getAroundField());
                 }
             } else if (s.getElem() instanceof J.MethodDecl) {
                 if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
-                    s = minimumLines(s, blankLineStyle.getMinimum().getAroundMethodInInterface());
+                    s = minimumLines(s, style.getMinimum().getAroundMethodInInterface());
                 } else {
-                    s = minimumLines(s, blankLineStyle.getMinimum().getAroundMethod());
+                    s = minimumLines(s, style.getMinimum().getAroundMethod());
                 }
             } else if (s.getElem() instanceof J.Block) {
-                s = minimumLines(s, blankLineStyle.getMinimum().getAroundInitializer());
+                s = minimumLines(s, style.getMinimum().getAroundInitializer());
             }
 
             if(i > 0 && statements.get(i - 1).getElem() instanceof J.Block) {
-                s = minimumLines(s, blankLineStyle.getMinimum().getAroundInitializer());
+                s = minimumLines(s, style.getMinimum().getAroundInitializer());
             }
 
             return s;
         })));
 
         j = j.withBody(j.getBody().withEnd(minimumLines(j.getBody().getEnd(),
-                blankLineStyle.getMinimum().getBeforeClassEnd())));
+                style.getMinimum().getBeforeClassEnd())));
 
         return j;
     }
@@ -131,14 +131,14 @@ public class BlankLines extends JavaEvalVisitor {
         if (j.getBody() != null) {
             if (j.getBody().getStatements().isEmpty()) {
                 Space end = minimumLines(j.getBody().getEnd(),
-                        blankLineStyle.getMinimum().getBeforeMethodBody());
-                if (end.getIndent().isEmpty() && blankLineStyle.getMinimum().getBeforeMethodBody() > 0) {
+                        style.getMinimum().getBeforeMethodBody());
+                if (end.getIndent().isEmpty() && style.getMinimum().getBeforeMethodBody() > 0) {
                     end = end.withWhitespace(end.getWhitespace() + method.getPrefix().getIndent());
                 }
                 j = j.withBody(j.getBody().withEnd(end));
             } else {
                 j = j.withBody(j.getBody().withStatements(ListUtils.mapFirst(j.getBody().getStatements(), s ->
-                        minimumLines(s, blankLineStyle.getMinimum().getBeforeMethodBody()))));
+                        minimumLines(s, style.getMinimum().getBeforeMethodBody()))));
             }
         }
 
@@ -151,7 +151,7 @@ public class BlankLines extends JavaEvalVisitor {
 
         if (j.getBody() != null) {
             j = j.withBody(j.getBody().withStatements(ListUtils.mapFirst(j.getBody().getStatements(), s ->
-                    minimumLines(s, blankLineStyle.getMinimum().getAfterAnonymousClassHeader()))));
+                    minimumLines(s, style.getMinimum().getAfterAnonymousClassHeader()))));
         }
 
         return j;
@@ -162,7 +162,7 @@ public class BlankLines extends JavaEvalVisitor {
         J j = eval(statement, ctx, super::visitStatement);
         Cursor parent = getCursor().getParentOrThrow();
         if (parent.getParent() != null && !(parent.getParentOrThrow().getTree() instanceof J.ClassDecl)) {
-            return keepMaximumLines(j, blankLineStyle.getKeepMaximum().getInCode());
+            return keepMaximumLines(j, style.getKeepMaximum().getInCode());
         }
         return j;
     }
@@ -170,7 +170,7 @@ public class BlankLines extends JavaEvalVisitor {
     @Override
     public J visitBlock(J.Block block, EvalContext ctx) {
         J.Block j = eval(block, ctx, super::visitBlock);
-        j = j.withEnd(keepMaximumLines(j.getEnd(), blankLineStyle.getKeepMaximum().getBeforeEndOfBlock()));
+        j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
         return j;
     }
 
