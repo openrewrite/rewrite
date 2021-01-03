@@ -25,6 +25,9 @@ interface TabsAndIndentsTest : EvalVisitorTest {
     override val visitors: Iterable<EvalVisitor<*>>
         get() = listOf(TabsAndIndents())
 
+    /**
+     * Slight renaming but structurally the same as IntelliJ's code style view.
+     */
     @Test
     fun tabsAndIndents(jp: JavaParser) = assertRefactored(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
@@ -287,6 +290,67 @@ interface TabsAndIndentsTest : EvalVisitorTest {
                 public void test2(
                   int a,
                   int b) {}
+            }
+        """
+    )
+
+    @Test
+    fun expressions(jp: JavaParser) = assertRefactored(
+        jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+            continuationIndent = 2
+        })),
+        before = """
+            public class Test {
+            int X[];
+            public void test(int a, int x, int y) {
+            if (x
+            >
+            0) {
+            int someVariable = a ?
+            x :
+            y;
+            int anotherVariable = a
+            ?
+            x
+            :
+            y;
+            }
+            x
+            ++;
+            X
+            [
+            1
+            ]
+            =
+            0;
+            }
+            }
+        """,
+        after = """
+            public class Test {
+                int X[];
+                public void test(int a, int x, int y) {
+                    if (x
+                      >
+                      0) {
+                        int someVariable = a ?
+                          x :
+                          y;
+                        int anotherVariable = a
+                          ?
+                          x
+                          :
+                          y;
+                    }
+                    x
+                      ++;
+                    X
+                      [
+                      1
+                      ]
+                      =
+                      0;
+                }
             }
         """
     )

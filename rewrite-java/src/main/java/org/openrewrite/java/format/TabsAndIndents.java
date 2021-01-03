@@ -74,6 +74,35 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
+    public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, EvalContext ctx) {
+        J.ArrayDimension a = continuationIndent(super.visitArrayDimension(arrayDimension, ctx), enclosingStatement());
+        a = a.withIndex(continuationIndent(a.getIndex(), enclosingStatement()));
+        a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
+        return a;
+    }
+
+    @Override
+    public J.Assign visitAssign(J.Assign assign, EvalContext ctx) {
+        J.Assign a = super.visitAssign(assign, ctx);
+        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
+        return a;
+    }
+
+    @Override
+    public J.AssignOp visitAssignOp(J.AssignOp assignOp, EvalContext ctx) {
+        J.AssignOp a = super.visitAssignOp(assignOp, ctx);
+        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
+        return a;
+    }
+
+    @Override
+    public J.Binary visitBinary(J.Binary binary, EvalContext ctx) {
+        J.Binary b = super.visitBinary(binary, ctx);
+        b = b.withOperator(continuationIndent(b.getOperator(), enclosingStatement()));
+        return b;
+    }
+
+    @Override
     public J.Block visitBlock(J.Block block, EvalContext ctx) {
         J.Block j = super.visitBlock(block, ctx);
         if (j.getEnd().getWhitespace().contains("\n")) {
@@ -99,6 +128,17 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
                     alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
         }
         return d;
+    }
+
+    @Override
+    public Expression visitExpression(Expression expression, EvalContext ctx) {
+        Expression e = super.visitExpression(expression, ctx);
+        if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
+                !(getCursor().getParentOrThrow().getTree() instanceof J.Case) &&
+                e.getPrefix().getWhitespace().contains("\n")) {
+            e = continuationIndent(e, enclosingStatement());
+        }
+        return e;
     }
 
     @Override
@@ -157,6 +197,13 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
+    public J.MemberReference visitMemberReference(J.MemberReference memberRef, EvalContext ctx) {
+        J.MemberReference m = super.visitMemberReference(memberRef, ctx);
+//        m = m.with
+        return m;
+    }
+
+    @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, EvalContext ctx) {
         J.MethodDecl m = (J.MethodDecl) visitStatement(method, ctx);
         m = m.withBody(eval(method.getBody(), ctx));
@@ -190,6 +237,21 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
         return m;
     }
 
+    @Override
+    public J.Ternary visitTernary(J.Ternary ternary, EvalContext ctx) {
+        J.Ternary t = super.visitTernary(ternary, ctx);
+        t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
+        t = t.withFalsePart(continuationIndent(t.getFalsePart(), enclosingStatement()));
+        return t;
+    }
+
+    @Override
+    public J.Unary visitUnary(J.Unary unary, EvalContext ctx) {
+        J.Unary u = super.visitUnary(unary, ctx);
+        u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
+        return u;
+    }
+
     private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Tree parent) {
         return ListUtils.map(js, (i, j) -> {
             if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
@@ -209,6 +271,13 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
                 parent, style.getContinuationIndent())));
     }
 
+    private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, Tree parent) {
+        if (t.getBefore().getWhitespace().contains("\n")) {
+            return t.withBefore(continuationIndent(t.getBefore(), parent));
+        }
+        return t;
+    }
+
     private <J2 extends J> J2 continuationIndent(J2 j, Tree parent) {
         return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
     }
@@ -220,6 +289,15 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
 
     private <J2 extends J> J2 indent(J2 j, Tree parent) {
         return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
+    }
+
+    private Statement enclosingStatement() {
+        Cursor cursor = getCursor();
+        //noinspection StatementWithEmptyBody
+        for (; !(cursor.getTree() instanceof Statement);
+             cursor = cursor.getParentOrThrow())
+            ;
+        return cursor.getTree();
     }
 
     private Space continuationIndent(Space space, Tree parent) {

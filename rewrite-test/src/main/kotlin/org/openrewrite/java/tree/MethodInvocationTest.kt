@@ -61,7 +61,7 @@ interface MethodInvocationTest {
         val a = jp.parse("""
             public class A {
                 Integer o = generic ( 0, 1, 2 );
-                Integer p = this. < Integer > generic ( 0, 1, 2 );
+                Integer p = this . < Integer > generic ( 0, 1, 2 );
     
                 public <T> T generic(T n, T... ns) { return n; }
             }
@@ -87,7 +87,7 @@ interface MethodInvocationTest {
             assertTrue(methType.paramTypes[1].hasElementType("T"))
         }
 
-        assertEquals("this. < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
+        assertEquals("this . < Integer > generic ( 0, 1, 2 )", explicitGenericInv.printTrimmed())
     }
 
     @Test

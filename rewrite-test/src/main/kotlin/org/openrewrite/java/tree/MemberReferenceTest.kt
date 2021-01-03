@@ -44,7 +44,7 @@ interface MemberReferenceTest : JavaParserTest {
     fun constructorMethodReference(jp: JavaParser) = assertParseAndPrint(
         jp, Block, """
             Stream<Integer> n = Stream.of(1, 2);
-            Set<Integer> n2 = n.collect(HashSet<Integer>::new, HashSet::add);
+            Set<Integer> n2 = n.collect(HashSet < Integer > :: new, HashSet :: add);
         """, "java.util.*", "java.util.stream.*"
     )
 }

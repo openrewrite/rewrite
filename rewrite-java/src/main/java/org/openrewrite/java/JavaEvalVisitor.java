@@ -56,8 +56,14 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
         J.ArrayAccess a = eval(arrayAccess, ctx, this::visitEach);
         a = eval(a, ctx, this::visitExpression);
         a = a.withIndexed(eval(a.getIndexed(), ctx));
-        // FIXME implement me!
-//        a = a.withDimension(eval(a.getDimension(), ctx));
+        a = a.withDimension(eval(a.getDimension(), ctx));
+        return a;
+    }
+
+    @Override
+    public J visitArrayDimension(J.ArrayDimension arrayDimension, EvalContext ctx) {
+        J.ArrayDimension a = eval(arrayDimension, ctx, this::visitEach);
+        a = a.withIndex(eval(a.getIndex(), ctx));
         return a;
     }
 
@@ -120,7 +126,7 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
         J.Case c = eval(caze, ctx, this::visitEach);
         c = eval(c, ctx, this::visitStatement);
         c = c.withPattern(eval(c.getPattern(), ctx));
-        return c.withStatements(evalMany(c.getStatements(), ctx));
+        return c.withStatements(c.getStatements().withElem(evalMany(c.getStatements().getElem(), ctx)));
     }
 
     @Override
@@ -268,7 +274,8 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
 
     @Override
     public J visitLiteral(J.Literal literal, EvalContext ctx) {
-        return eval(literal, ctx, this::visitExpression);
+        J.Literal l = eval(literal, ctx, this::visitEach);
+        return eval(l, ctx, this::visitExpression);
     }
 
     @Override
@@ -326,6 +333,7 @@ public class JavaEvalVisitor extends EvalVisitor<J> implements JavaVisitor<J, Ev
         J.NewArray n = eval(newArray, ctx, this::visitEach);
         n = eval(n, ctx, this::visitExpression);
         n = n.withTypeExpr(eval(n.getTypeExpr(), ctx));
+        n = n.withDimensions(eval(n.getDimensions(), ctx));
         return n.withInitializer(eval(n.getInitializer(), ctx));
     }
 

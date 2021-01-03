@@ -55,6 +55,11 @@ public class JavaIsoEvalVisitor extends JavaEvalVisitor {
     }
 
     @Override
+    public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, EvalContext ctx) {
+        return (J.ArrayDimension) super.visitArrayDimension(arrayDimension, ctx);
+    }
+
+    @Override
     public J.ArrayType visitArrayType(J.ArrayType arrayType, EvalContext ctx) {
         return (J.ArrayType) super.visitArrayType(arrayType, ctx);
     }

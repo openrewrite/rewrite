@@ -125,10 +125,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 fmt,
                 Markers.EMPTY,
                 convert(node.getExpression()),
-                padLeft(
-                        sourceBefore("["),
-                        convert(node.getIndex(), t -> sourceBefore("]"))
-                ),
+                new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY,
+                        convert(node.getIndex(), t -> sourceBefore("]"))),
                 type(node)
         );
     }
@@ -168,8 +166,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitAssignment(AssignmentTree node, Space fmt) {
         return new J.Assign(randomId(), fmt, Markers.EMPTY,
-                convert(node.getVariable(), t -> sourceBefore("=")),
-                convert(node.getExpression()), type(node));
+                convert(node.getVariable()),
+                padLeft(sourceBefore("="), convert(node.getExpression())),
+                type(node));
     }
 
     @Override
@@ -301,15 +300,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-        JRightPadded<Expression> pattern;
+        Expression pattern;
         if (node.getExpression() == null) {
-            pattern = padRight(J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null),
-                    sourceBefore(":"));
+            pattern = J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null);
         } else {
             skip("case");
-            pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
+            pattern = convertOrNull(node.getExpression());
         }
-        return new J.Case(randomId(), fmt, Markers.EMPTY, pattern, convertStatements(node.getStatements()));
+        return new J.Case(randomId(), fmt, Markers.EMPTY,
+                pattern,
+                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements())));
     }
 
     @Override
@@ -503,9 +503,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitConditionalExpression(ConditionalExpressionTree node, Space fmt) {
         return new J.Ternary(randomId(), fmt, Markers.EMPTY,
-                convert(node.getCondition(), t -> sourceBefore("?")),
-                convert(node.getTrueExpression(), t -> sourceBefore(":")),
-                convert(node.getFalseExpression()),
+                convert(node.getCondition()),
+                padLeft(sourceBefore("?"), convert(node.getTrueExpression())),
+                padLeft(sourceBefore(":"), convert(node.getFalseExpression())),
                 type(node));
     }
 
@@ -666,7 +666,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitMemberReference(MemberReferenceTree node, Space fmt) {
         JCMemberReference ref = (JCMemberReference) node;
-        JRightPadded<Expression> expr = convert(ref.expr, t -> sourceBefore("::"));
 
         String referenceName;
         switch (ref.getMode()) {
@@ -679,18 +678,28 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 break;
         }
 
-        JContainer<Expression> typeParams = convertTypeParameters(node.getTypeArguments());
-        J.Ident reference = J.Ident.build(randomId(), sourceBefore(referenceName), Markers.EMPTY, referenceName, null);
-
-        return new J.MemberReference(randomId(), fmt, Markers.EMPTY, expr, typeParams, reference, type(node));
+        return new J.MemberReference(randomId(),
+                fmt,
+                Markers.EMPTY,
+                convert(ref.expr),
+                convertTypeParameters(node.getTypeArguments()),
+                padLeft(sourceBefore("::"), J.Ident.build(randomId(),
+                        sourceBefore(referenceName),
+                        Markers.EMPTY,
+                        referenceName,
+                        null)),
+                type(node));
     }
 
     @Override
     public J visitMemberSelect(MemberSelectTree node, Space fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
-        JRightPadded<Expression> target = convert(fieldAccess.selected, t -> sourceBefore("."));
-        J.Ident name = J.Ident.build(randomId(), sourceBefore(fieldAccess.name.toString()), Markers.EMPTY, fieldAccess.name.toString(), null);
-        return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, name, type(node));
+        return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
+                convert(fieldAccess.selected),
+                padLeft(sourceBefore("."), J.Ident.build(randomId(),
+                        sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
+                        fieldAccess.name.toString(), null)),
+                type(node));
     }
 
     @Override
@@ -845,18 +854,24 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
 
-        List<JLeftPadded<JRightPadded<Expression>>> dimensions = new ArrayList<>();
+        List<J.ArrayDimension> dimensions = new ArrayList<>();
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
         for (ExpressionTree dim : nodeDimensions) {
-            Space dimensionPrefix = sourceBefore("[");
-            dimensions.add(padLeft(dimensionPrefix, convert(dim, t -> sourceBefore("]"))));
+            dimensions.add(new J.ArrayDimension(
+                    randomId(),
+                    sourceBefore("["),
+                    Markers.EMPTY,
+                    convert(dim, t -> sourceBefore("]"))));
         }
 
         Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
-            dimensions.add(padLeft(format(matcher.group(1)), padRight(new J.Empty(randomId(), format(matcher.group(2)),
-                    Markers.EMPTY), EMPTY)));
+            dimensions.add(new J.ArrayDimension(
+                    randomId(),
+                    format(matcher.group(1)),
+                    Markers.EMPTY,
+                    padRight(new J.Empty(randomId(), format(matcher.group(2)), Markers.EMPTY), EMPTY)));
         }
 
         JContainer<Expression> initializer = node.getInitializers() == null ? null :
@@ -864,7 +879,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
                         convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")));
 
-        return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions, initializer, type(node));
+        return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
+                initializer, type(node));
     }
 
     @Override
@@ -1080,14 +1096,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
                 whitespaceSuffix.matches();
-                Space partSuffix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
+                Space namePrefix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
 
                 expr = new J.FieldAccess(
                         randomId(),
                         EMPTY,
                         Markers.EMPTY,
-                        padRight(expr, partSuffix),
-                        J.Ident.build(randomId(), identFmt, Markers.EMPTY, part.trim(), null),
+                        expr,
+                        padLeft(namePrefix, J.Ident.build(randomId(), identFmt, Markers.EMPTY, part.trim(), null)),
                         (Character.isUpperCase(part.charAt(0)) || i == parts.length - 1) ?
                                 JavaType.Class.build(fullName) :
                                 null

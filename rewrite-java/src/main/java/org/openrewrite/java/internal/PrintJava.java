@@ -183,10 +183,13 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitArrayAccess(ArrayAccess arrayAccess, P p) {
-        String dimension = visit(arrayAccess.getDimension().getBefore()) + '[' +
-                visit(arrayAccess.getDimension().getElem().getElem(), p) +
-                visit(arrayAccess.getDimension().getElem().getAfter()) + ']';
-        return fmt(arrayAccess, visit(arrayAccess.getIndexed(), p) + dimension);
+        return fmt(arrayAccess, visit(arrayAccess.getIndexed(), p) +
+                visit(arrayAccess.getDimension(), p));
+    }
+
+    @Override
+    public String visitArrayDimension(ArrayDimension arrayDimension, P p) {
+        return fmt(arrayDimension, "[" + visit(arrayDimension.getIndex(), "]", p));
     }
 
     @Override
@@ -208,8 +211,8 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitAssign(Assign assign, P p) {
-        return fmt(assign, visit(assign.getVariable().getElem(), p) +
-                visit(assign.getVariable().getAfter()) + "=" + visit(assign.getAssignment(), p));
+        return fmt(assign, visit(assign.getVariable(), p) +
+                visit("=", assign.getAssignment(), p));
     }
 
     @Override
@@ -392,7 +395,7 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     @Override
     public String visitCase(Case caze, P p) {
         String pattern;
-        Expression elem = caze.getPattern().getElem();
+        Expression elem = caze.getPattern();
         if (elem instanceof Ident && ((Ident) elem).getSimpleName().equals("default")) {
             pattern = "default";
         } else {
@@ -400,8 +403,8 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
         }
 
         return fmt(caze, pattern +
-                visit(caze.getPattern().getAfter()) + ":" +
-                visitStatements(caze.getStatements(), p));
+                visit(caze.getStatements().getBefore()) + ":" +
+                visitStatements(caze.getStatements().getElem(), p));
     }
 
     @Override
@@ -493,8 +496,8 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitFieldAccess(FieldAccess fieldAccess, P p) {
-        return fmt(fieldAccess, visit(fieldAccess.getTarget(), ".", p) +
-                visit(fieldAccess.getName(), p));
+        return fmt(fieldAccess, visit(fieldAccess.getTarget(), p) +
+                visit(".", fieldAccess.getName(), p));
     }
 
     @Override
@@ -563,9 +566,9 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitMemberReference(MemberReference memberRef, P p) {
-        return fmt(memberRef, visit(memberRef.getContaining(), "::", p) +
+        return fmt(memberRef, visit(memberRef.getContaining(), p) +
                 visit("<", memberRef.getTypeParameters(), ",", ">", p) +
-                visit(memberRef.getReference(), p));
+                visit("::", memberRef.getReference(), p));
     }
 
     @Override
@@ -618,20 +621,10 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitNewArray(NewArray newArray, P p) {
-        StringBuilder acc = new StringBuilder();
-        if (newArray.getTypeExpr() != null) {
-            acc.append("new").append(visit(newArray.getTypeExpr(), p));
-        }
-
-        for (JLeftPadded<JRightPadded<Expression>> dimension : newArray.getDimensions()) {
-            acc.append(visit(dimension.getBefore())).append('[')
-                    .append(visit(dimension.getElem().getElem(), p))
-                    .append(visit(dimension.getElem().getAfter())).append(']');
-        }
-
-        acc.append(visit("{", newArray.getInitializer(), ",", "}", p));
-
-        return fmt(newArray, acc.toString());
+        return fmt(newArray, (newArray.getTypeExpr() != null ? "new" : "") +
+                visit(newArray.getTypeExpr(), p) +
+                visit(newArray.getDimensions(), p) +
+                visit("{", newArray.getInitializer(), ",", "}", p));
     }
 
     @Override
@@ -726,9 +719,9 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
 
     @Override
     public String visitTernary(Ternary ternary, P p) {
-        return fmt(ternary, visit(ternary.getCondition(), "?", p) +
-                visit(ternary.getTruePart(), ":", p) +
-                visit(ternary.getFalsePart(), p));
+        return fmt(ternary, visit(ternary.getCondition(), p) +
+                visit("?", ternary.getTruePart(), p) +
+                visit(":", ternary.getFalsePart(), p));
     }
 
     @Override

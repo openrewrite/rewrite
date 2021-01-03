@@ -20,6 +20,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 
 import java.util.*;
 import java.util.regex.Pattern;
@@ -198,9 +199,11 @@ public class ImportLayoutStyle implements JavaStyle {
                                 boolean statik1 = toStar.isStatic();
                                 int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
                                 boolean starImportExists = importGroup.stream().anyMatch(it -> it.getQualid().getSimpleName().equals("*"));
-                                if(importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
-                                    return Stream.of(toStar.withQualid(toStar.getQualid().withName(toStar.getQualid()
-                                            .getName().withName("*"))));
+                                if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
+                                    J.FieldAccess qualid = toStar.getQualid();
+                                    JLeftPadded<J.Ident> name = qualid.getName();
+                                    return Stream.of(toStar.withQualid(qualid.withName(name.withElem(
+                                            name.getElem().withName("*")))));
                                 } else {
                                     return importGroup.stream()
                                             .filter(distinctBy(Tree::printTrimmed));

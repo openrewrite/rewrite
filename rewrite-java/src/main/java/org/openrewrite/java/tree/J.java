@@ -168,7 +168,7 @@ public interface J extends Serializable, Tree {
         Expression indexed;
 
         @With
-        JLeftPadded<JRightPadded<Expression>> dimension;
+        ArrayDimension dimension;
 
         @With
         @Nullable
@@ -252,10 +252,10 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        JRightPadded<Expression> variable;
+        Expression variable;
 
         @With
-        Expression assignment;
+        JLeftPadded<Expression> assignment;
 
         @With
         @Nullable
@@ -471,14 +471,11 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-        /**
-         * Right padded before the ':'
-         */
         @With
-        JRightPadded<Expression> pattern;
+        Expression pattern;
 
         @With
-        List<JRightPadded<Statement>> statements;
+        JContainer<Statement> statements;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
@@ -879,10 +876,10 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        JRightPadded<Expression> target;
+        Expression target;
 
         @With
-        Ident name;
+        JLeftPadded<Ident> name;
 
         @With
         @Nullable
@@ -895,13 +892,13 @@ public interface J extends Serializable, Tree {
 
         @JsonIgnore
         public String getSimpleName() {
-            return name.getSimpleName();
+            return name.getElem().getSimpleName();
         }
 
         @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
-            return target.getElem().getSideEffects();
+            return target.getSideEffects();
         }
 
         /**
@@ -951,14 +948,14 @@ public interface J extends Serializable, Tree {
             if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            if (!fieldAccess.getName().getElem().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
                 return false;
             }
-            if (fieldAccess.getTarget().getElem() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget().getElem(), className.substring(0, className.lastIndexOf('.')));
+            if (fieldAccess.getTarget() instanceof J.FieldAccess) {
+                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget(), className.substring(0, className.lastIndexOf('.')));
             }
-            if (fieldAccess.getTarget().getElem() instanceof J.Ident) {
-                return ((J.Ident) fieldAccess.getTarget().getElem()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
+            if (fieldAccess.getTarget() instanceof J.Ident) {
+                return ((J.Ident) fieldAccess.getTarget()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
             }
             return false;
         }
@@ -1239,16 +1236,16 @@ public interface J extends Serializable, Tree {
         @JsonIgnore
         public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
-                return qualid.target.getElem().printTrimmed().equals(Arrays.stream(clazz.split("\\."))
+                return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
                         .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
                         .collect(Collectors.joining("."))
                 );
             }
-            return (isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed()).equals(clazz);
+            return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
         }
 
         public String getTypeName() {
-            return isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed();
+            return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
         }
 
         /**
@@ -1266,7 +1263,7 @@ public interface J extends Serializable, Tree {
             }
 
             AtomicBoolean takeWhile = new AtomicBoolean(true);
-            return stream(qualid.getTarget().getElem().printTrimmed().split("\\."))
+            return stream(qualid.getTarget().printTrimmed().split("\\."))
                     .filter(pkg -> {
                         takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
                         return takeWhile.get();
@@ -1479,18 +1476,15 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-        /**
-         * Right padded before the '::'
-         */
         @With
-        JRightPadded<Expression> containing;
+        Expression containing;
 
         @With
         @Nullable
         JContainer<Expression> typeParameters;
 
         @With
-        Ident reference;
+        JLeftPadded<Ident> reference;
 
         @With
         @Nullable
@@ -1785,7 +1779,7 @@ public interface J extends Serializable, Tree {
         TypeTree typeExpr;
 
         @With
-        List<JLeftPadded<JRightPadded<Expression>>> dimensions;
+        List<ArrayDimension> dimensions;
 
         @With
         @Nullable
@@ -1798,6 +1792,28 @@ public interface J extends Serializable, Tree {
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitNewArray(this, p);
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class ArrayDimension implements J {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JRightPadded<Expression> index;
+
+        @Override
+        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+            return v.visitArrayDimension(this, p);
         }
     }
 
@@ -1818,6 +1834,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         /**
+         * For situations like <code>this.new A()</code>.
          * Right padded before the '.'
          */
         @Nullable
@@ -2096,13 +2113,13 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        JRightPadded<Expression> condition;
+        Expression condition;
 
         @With
-        JRightPadded<Expression> truePart;
+        JLeftPadded<Expression> truePart;
 
         @With
-        Expression falsePart;
+        JLeftPadded<Expression> falsePart;
 
         @With
         @Nullable

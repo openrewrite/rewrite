@@ -22,6 +22,7 @@ public interface JavaVisitor<R, P> extends TreeVisitor<R, P> {
     R visitAnnotatedType(J.AnnotatedType annotatedType, P p);
     R visitAnnotation(J.Annotation annotation, P p);
     R visitArrayAccess(J.ArrayAccess arrayAccess, P p);
+    R visitArrayDimension(J.ArrayDimension arrayDimension, P p);
     R visitArrayType(J.ArrayType arrayType, P p);
     R visitAssert(J.Assert azzert, P p);
     R visitAssign(J.Assign assign, P p);
