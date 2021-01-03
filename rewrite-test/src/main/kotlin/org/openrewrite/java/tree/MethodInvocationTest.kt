@@ -24,7 +24,7 @@ import org.openrewrite.java.hasElementType
 
 interface MethodInvocationTest {
     private fun J.CompilationUnit.allInvs() = classes[0].fields
-            .map { it.vars[0].elem?.initializer?.elem as J.MethodInvocation }
+        .map { it.vars[0].elem?.initializer?.elem as J.MethodInvocation }
 
     @Test
     fun methodInvocation(jp: JavaParser) {
@@ -42,7 +42,7 @@ interface MethodInvocationTest {
         assertEquals("foo", inv.name.printTrimmed())
         assertEquals("java.lang.Integer", inv.returnType.asClass()?.fullyQualifiedName)
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
-                inv.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
+            inv.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
 
         val effectParams = inv.type!!.resolvedSignature!!.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
@@ -73,7 +73,7 @@ interface MethodInvocationTest {
             // check assumptions about the call site
             assertEquals("java.lang.Integer", test.returnType.asClass()?.fullyQualifiedName)
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
-                    test.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
+                test.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
 
             val effectiveParams = test.type!!.resolvedSignature!!.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)

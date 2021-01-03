@@ -65,10 +65,6 @@ class Java11ContinueTest: Java11Test(), ContinueTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11CyclicTypeTest: Java11Test(), CyclicTypeTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11DoWhileLoopTest: Java11Test(), DoWhileLoopTest
 
 @DebugOnly
@@ -102,10 +98,6 @@ class Java11ImportTest: Java11Test(), ImportTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11InstanceOfTest: Java11Test(), InstanceOfTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11JavaTypeTest: Java11Test(), JavaTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

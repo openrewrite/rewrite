@@ -18,27 +18,13 @@ package org.openrewrite.java.tree;
 import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.Cursor;
-import org.openrewrite.SourceFile;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-<<<<<<< HEAD
-=======
-import org.openrewrite.java.JavaSourceVisitor;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
-<<<<<<< HEAD
 import org.openrewrite.java.internal.*;
-=======
-import org.openrewrite.java.internal.ClassDeclToString;
-import org.openrewrite.java.internal.MethodDeclToString;
-import org.openrewrite.java.internal.PrintJava;
-import org.openrewrite.java.internal.VariableDeclsToString;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -72,13 +58,10 @@ public interface J extends Serializable, Tree {
 
     @Override
     default String print() {
-        TreePrinter<J, Void> treePrinter = new TreePrinter<J, Void>() {
-        };
-        return new PrintJava<>(treePrinter).visit(this, null);
+        return new PrintJava<>(TreePrinter.identity()).visit(this, null);
     }
 
     <J2 extends J> J2 withPrefix(Space space);
-<<<<<<< HEAD
 
     Space getPrefix();
 
@@ -90,10 +73,6 @@ public interface J extends Serializable, Tree {
     default <J2 extends J> J2 withComments(List<Comment> comments) {
         return withPrefix(getPrefix().withComments(comments));
     }
-=======
-
-    Space getPrefix();
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -164,13 +143,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitAnnotation(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitAnnotation(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -191,24 +165,15 @@ public interface J extends Serializable, Tree {
         Expression indexed;
 
         @With
-<<<<<<< HEAD
         ArrayDimension dimension;
-=======
-        JLeftPadded<JRightPadded<? extends Expression>> dimension;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JavaType type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitArrayAccess(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitArrayAccess(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -246,7 +211,6 @@ public interface J extends Serializable, Tree {
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitArrayType(this, p);
         }
-<<<<<<< HEAD
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -269,8 +233,6 @@ public interface J extends Serializable, Tree {
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitAssert(this, p);
         }
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -282,7 +244,6 @@ public interface J extends Serializable, Tree {
 
         @With
         Space prefix;
-<<<<<<< HEAD
 
         @With
         Markers markers;
@@ -296,28 +257,17 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         JavaType type;
-=======
-
-        @With
-        Markers markers;
-
-        @With
-        Expression condition;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitAssign(this, p);
         }
-<<<<<<< HEAD
 
         @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -329,7 +279,6 @@ public interface J extends Serializable, Tree {
 
         @With
         Space prefix;
-<<<<<<< HEAD
 
         @With
         Markers markers;
@@ -339,14 +288,6 @@ public interface J extends Serializable, Tree {
 
         @With
         JLeftPadded<Type> operator;
-=======
-
-        @With
-        Markers markers;
-
-        @With
-        JRightPadded<? extends Expression> variable;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         Expression assignment;
@@ -365,7 +306,6 @@ public interface J extends Serializable, Tree {
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
-<<<<<<< HEAD
 
         public enum Type {
             Addition,
@@ -380,8 +320,6 @@ public interface J extends Serializable, Tree {
             RightShift,
             UnsignedRightShift
         }
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -398,21 +336,13 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-<<<<<<< HEAD
         Expression left;
-=======
-        Expression variable;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         JLeftPadded<Type> operator;
 
         @With
-<<<<<<< HEAD
         Expression right;
-=======
-        Expression assignment;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
@@ -438,21 +368,17 @@ public interface J extends Serializable, Tree {
             Multiplication,
             Division,
             Modulo,
-<<<<<<< HEAD
             LessThan,
             GreaterThan,
             LessThanOrEqual,
             GreaterThanOrEqual,
             Equal,
             NotEqual,
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
             BitAnd,
             BitOr,
             BitXor,
             LeftShift,
             RightShift,
-<<<<<<< HEAD
             UnsignedRightShift,
             Or,
             And
@@ -551,201 +477,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitCase(this, p);
-=======
-            UnsignedRightShift
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    final class ClassDecl implements J, Statement {
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-<<<<<<< HEAD
-        @Getter
-        Space prefix;
-
-        @With
-        @Getter
-        Markers markers;
-
-        @With
-        @Getter
-        List<Annotation> annotations;
-
-        @With
-        @Getter
-        List<Modifier> modifiers;
-
-        @With
-        @Getter
-        JLeftPadded<Kind> kind;
-
-        @With
-        @Getter
-        Ident name;
-
-        @With
-        @Getter
-        @Nullable
-        JContainer<TypeParameter> typeParameters;
-=======
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        Expression left;
-
-        @With
-        JLeftPadded<Type> operator;
-
-        @With
-        Expression right;
-
-        @With
-        @Nullable
-        JavaType type;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
-
-        @Nullable
-        JLeftPadded<TypeTree> extendings;
-
-<<<<<<< HEAD
-=======
-        @JsonIgnore
-        @Override
-        public List<Tree> getSideEffects() {
-            List<Tree> sideEffects = new ArrayList<>(2);
-            sideEffects.addAll(left.getSideEffects());
-            sideEffects.addAll(right.getSideEffects());
-            return sideEffects;
-        }
-
-        public enum Type {
-            Addition,
-            Subtraction,
-            Multiplication,
-            Division,
-            Modulo,
-            LessThan,
-            GreaterThan,
-            LessThanOrEqual,
-            GreaterThanOrEqual,
-            Equal,
-            NotEqual,
-            BitAnd,
-            BitOr,
-            BitXor,
-            LeftShift,
-            RightShift,
-            UnsignedRightShift,
-            Or,
-            And
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
-    final class Block implements J, Statement {
-        @Getter
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @Getter
-        @With
-        Space prefix;
-
-        @Getter
-        @With
-        Markers markers;
-
-        /**
-         * These comments and whitespace are AFTER the static keyword
-         */
-        @Nullable
-        @With
-        Space statik;
-
-        @Nullable
-        public Space getStatic() {
-            return statik;
-        }
-
-        public Block withStatic(@Nullable Space statik) {
-            return new Block(id, prefix, markers, statik, statements, end);
-        }
-
-        @Getter
-        @With
-        List<JRightPadded<Statement>> statements;
-
-        @Getter
-        @With
-        Space end;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitBlock(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Break implements J, Statement {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        @Nullable
-        Ident label;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitBreak(this);
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Case implements J, Statement {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        /**
-         * Right padded before the ':'
-         */
-        @With
-        @Nullable
-        JRightPadded<? extends Expression> pattern;
-
-        @With
-        List<JRightPadded<Statement>> statements;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitCase(this);
         }
     }
 
@@ -789,7 +520,6 @@ public interface J extends Serializable, Tree {
         @Nullable
         JLeftPadded<TypeTree> extendings;
 
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         public ClassDecl withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
             if (extendings == this.extendings) {
                 return this;
@@ -831,13 +561,8 @@ public interface J extends Serializable, Tree {
         JavaType.Class type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitClassDecl(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitClassDecl(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @JsonIgnore
@@ -924,7 +649,6 @@ public interface J extends Serializable, Tree {
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
-<<<<<<< HEAD
 
         @Override
         public String toString() {
@@ -974,57 +698,6 @@ public interface J extends Serializable, Tree {
             return v.visitCompilationUnit(this, p);
         }
 
-=======
-
-        @Override
-        public String toString() {
-            return "ClassDecl{" + ClassDeclToString.toString(this) + "}";
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class CompilationUnit implements J, SourceFile {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        Path sourcePath;
-
-        @With
-        @Nullable
-        Package packageDecl;
-
-        @With
-        List<JRightPadded<Import>> imports;
-
-        @With
-        List<ClassDecl> classes;
-
-        @With
-        Space eof;
-
-        @With
-        Collection<JavaStyle> styles;
-
-        @Override
-        public Collection<JavaStyle> getStyles() {
-            return styles;
-        }
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitCompilationUnit(this);
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 //        public boolean hasImport(String clazz) {
 //            return new HasImport(clazz).visit(this);
 //        }
@@ -1050,19 +723,11 @@ public interface J extends Serializable, Tree {
         @JsonIgnore
         public Path getSourceSet() {
             int packageLevelsUp = getPackageDecl() == null ? 0 :
-<<<<<<< HEAD
                     (int) getPackageDecl().getElem().printTrimmed().chars().filter(c -> c == '.').count();
             // Jump over Java file name
             return sourcePath.getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
                     .mapToObj(n -> "../")
                     .collect(joining(""))).normalize();
-=======
-                    (int) getPackageDecl().printTrimmed().chars().filter(c -> c == '.').count();
-            // Jump over Java file name
-            return sourcePath.getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
-                .mapToObj(n -> "../")
-                .collect(joining(""))).normalize();
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1084,13 +749,8 @@ public interface J extends Serializable, Tree {
         Ident label;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitContinue(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitContinue(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1108,23 +768,14 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-<<<<<<< HEAD
         JRightPadded<Statement> body;
-=======
-        Statement body;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         JLeftPadded<Parentheses<Expression>> whileCondition;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitDoWhileLoop(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitDoWhileLoop(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1153,13 +804,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitEmpty(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitEmpty(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1184,13 +830,8 @@ public interface J extends Serializable, Tree {
         NewClass initializer;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitEnumValue(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitEnumValue(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1213,13 +854,8 @@ public interface J extends Serializable, Tree {
         boolean terminatedWithSemicolon;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitEnumValueSet(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitEnumValueSet(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1237,22 +873,14 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-<<<<<<< HEAD
         Expression target;
 
         @With
         JLeftPadded<Ident> name;
-=======
-        JRightPadded<Expression> target;
-
-        @With
-        Ident name;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JavaType type;
-<<<<<<< HEAD
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
@@ -1379,89 +1007,6 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class ForLoop implements J, Statement {
-=======
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitFieldAccess(this);
-        }
-
-        @JsonIgnore
-        public String getSimpleName() {
-            return name.getSimpleName();
-        }
-
-        @JsonIgnore
-        @Override
-        public List<Tree> getSideEffects() {
-            return target.getElem().getSideEffects();
-        }
-
-        /**
-         * Make debugging a bit easier
-         */
-        public String toString() {
-            return "FieldAccess(" + printTrimmed() + ")";
-        }
-
-        /**
-         * @return For expressions like {@code String.class}, this casts target expression to a {@link NameTree}.
-         * If the field access is not a reference to a class type, returns null.
-         */
-        @Nullable
-        public NameTree asClassReference() {
-            if (target instanceof NameTree) {
-                String fqn = null;
-                if (type instanceof JavaType.Class) {
-                    fqn = ((JavaType.Class) type).getFullyQualifiedName();
-                } else if (type instanceof JavaType.ShallowClass) {
-                    fqn = ((JavaType.ShallowClass) type).getFullyQualifiedName();
-                }
-
-                return "java.lang.Class".equals(fqn) ? (NameTree) target : null;
-            }
-            return null;
-        }
-
-        public boolean isFullyQualifiedClassReference(String className) {
-            return isFullyQualifiedClassReference(this, className);
-        }
-
-        /**
-         * Evaluate whether the specified MethodMatcher and this FieldAccess are describing the same type or not.
-         * Known limitation/bug: MethodMatchers can have patterns/wildcards like "com.*.Bar" instead of something
-         * concrete like "com.foo.Bar". This limitation is not desirable or intentional and should be fixed.
-         * If a methodMatcher is passed that includes wildcards the result will always be "false"
-         *
-         * @param methodMatcher a methodMatcher whose internal pattern is fully concrete (no wildcards)
-         */
-        public boolean isFullyQualifiedClassReference(MethodMatcher methodMatcher) {
-            String hopefullyFullyQualifiedMethod = methodMatcher.getTargetTypePattern().pattern() + "." + methodMatcher.getMethodNamePattern().pattern();
-            return isFullyQualifiedClassReference(this, hopefullyFullyQualifiedMethod);
-        }
-
-        private boolean isFullyQualifiedClassReference(J.FieldAccess fieldAccess, String className) {
-            if (!className.contains(".")) {
-                return false;
-            }
-            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
-                return false;
-            }
-            if (fieldAccess.getTarget().getElem() instanceof J.FieldAccess) {
-                return isFullyQualifiedClassReference((J.FieldAccess) fieldAccess.getTarget().getElem(), className.substring(0, className.lastIndexOf('.')));
-            }
-            if (fieldAccess.getTarget().getElem() instanceof J.Ident) {
-                return ((J.Ident) fieldAccess.getTarget().getElem()).getSimpleName().equals(className.substring(0, className.lastIndexOf('.')));
-            }
-            return false;
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class ForEachLoop implements J, Statement {
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1475,19 +1020,11 @@ public interface J extends Serializable, Tree {
         Control control;
 
         @With
-<<<<<<< HEAD
         JRightPadded<Statement> body;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitForLoop(this, p);
-=======
-        Statement body;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitForEachLoop(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1504,7 +1041,6 @@ public interface J extends Serializable, Tree {
             Markers markers;
 
             @With
-<<<<<<< HEAD
             JRightPadded<Statement> init;
 
             @With
@@ -1596,139 +1132,6 @@ public interface J extends Serializable, Tree {
             JavaType type;
         }
 
-=======
-            JRightPadded<VariableDecls> variable;
-
-            @With
-            JRightPadded<Expression> iterable;
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class ForLoop implements J, Statement {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        @With
-        Control control;
-
-        @With
-        Statement body;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitForLoop(this);
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
-        public static final class Control implements J {
-            @EqualsAndHashCode.Include
-            UUID id;
-
-            @With
-            Space prefix;
-
-            @With
-            Markers markers;
-
-            @With
-            JRightPadded<Statement> init;
-
-            @With
-            JRightPadded<Expression> condition;
-
-            @With
-            List<JRightPadded<Statement>> update;
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Getter
-    final class Ident implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new HashMap<>();
-
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Space prefix;
-
-        @With
-        Markers markers;
-
-        IdentFlyweight ident;
-
-        private Ident(UUID id, IdentFlyweight ident, Space prefix, Markers markers) {
-            this.id = id;
-            this.ident = ident;
-            this.prefix = prefix;
-            this.markers = markers;
-        }
-
-        @Override
-        public JavaType getType() {
-            return ident.getType();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public Ident withType(JavaType type) {
-            return build(id, prefix, markers, getSimpleName(), type);
-        }
-
-        @JsonIgnore
-        public String getSimpleName() {
-            return ident.getSimpleName();
-        }
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitIdentifier(this);
-        }
-
-        public Ident withName(String name) {
-            return build(id, prefix, markers, name, getType());
-        }
-
-        @JsonCreator
-        public static Ident build(@JsonProperty("id") UUID id,
-                                  @JsonProperty("prefix") Space prefix,
-                                  @JsonProperty("metadata") Markers markers,
-                                  @JsonProperty("simpleName") String simpleName,
-                                  @JsonProperty("type") @Nullable JavaType type) {
-            synchronized (flyweights) {
-                return new Ident(
-                        id,
-                        flyweights
-                                .computeIfAbsent(simpleName, n -> new HashMap<>())
-                                .computeIfAbsent(type, t -> new IdentFlyweight(simpleName, t)),
-                        prefix,
-                        markers
-                );
-            }
-        }
-
-        @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-        @Data
-        public static final class IdentFlyweight implements Serializable {
-            String simpleName;
-
-            @Nullable
-            JavaType type;
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         /**
          * Making debugging a bit easier
          */
@@ -1746,7 +1149,6 @@ public interface J extends Serializable, Tree {
 
         @With
         Space prefix;
-<<<<<<< HEAD
 
         @With
         Markers markers;
@@ -1786,25 +1188,6 @@ public interface J extends Serializable, Tree {
             public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
                 return v.visitElse(this, p);
             }
-=======
-
-        @With
-        Markers markers;
-
-        @With
-        JLeftPadded<Expression> ifCondition;
-
-        @With
-        Statement thenPart;
-
-        @With
-        @Nullable
-        JLeftPadded<Statement> elsePart;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitIf(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1819,30 +1202,9 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         Space prefix;
-<<<<<<< HEAD
 
         @Getter
         @With
-        Markers markers;
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
-
-        @Getter
-        @With
-<<<<<<< HEAD
-        @Nullable
-        Space statik;
-
-        @With
-        @Getter
-        FieldAccess qualid;
-
-        public boolean isStatic() {
-            return statik != null;
-        }
-
-        @JsonProperty("statik")
-=======
         Markers markers;
 
         @With
@@ -1857,47 +1219,30 @@ public interface J extends Serializable, Tree {
             return statik != null;
         }
 
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
+        @JsonProperty("statik")
         @Nullable
         public Space getStatic() {
             return statik;
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitImport(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitImport(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @JsonIgnore
         public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
-<<<<<<< HEAD
                 return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
-=======
-                return qualid.target.getElem().printTrimmed().equals(Arrays.stream(clazz.split("\\."))
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                         .filter(pkgOrNam -> Character.isLowerCase(pkgOrNam.charAt(0)))
                         .collect(Collectors.joining("."))
                 );
             }
-<<<<<<< HEAD
             return (isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed()).equals(clazz);
         }
 
         public String getTypeName() {
             return isStatic() ? qualid.getTarget().printTrimmed() : qualid.printTrimmed();
-=======
-            return (isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed()).equals(clazz);
-        }
-
-        public String getTypeName() {
-            return isStatic() ? qualid.getTarget().getElem().printTrimmed() : qualid.printTrimmed();
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         /**
@@ -1915,11 +1260,7 @@ public interface J extends Serializable, Tree {
             }
 
             AtomicBoolean takeWhile = new AtomicBoolean(true);
-<<<<<<< HEAD
             return stream(qualid.getTarget().printTrimmed().split("\\."))
-=======
-            return stream(qualid.getTarget().getElem().printTrimmed().split("\\."))
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                     .filter(pkg -> {
                         takeWhile.set(takeWhile.get() && !pkg.isEmpty() && Character.isLowerCase(pkg.charAt(0)));
                         return takeWhile.get();
@@ -1934,7 +1275,6 @@ public interface J extends Serializable, Tree {
 
             String[] p1s = p1.split("\\.");
             String[] p2s = p2.split("\\.");
-<<<<<<< HEAD
 
             for (int i = 0; i < p1s.length; i++) {
                 String s = p1s[i];
@@ -1955,21 +1295,6 @@ public interface J extends Serializable, Tree {
          */
         public String toString() {
             return "Import(" + ImportToString.toString(this) + ")";
-=======
-
-            for (int i = 0; i < p1s.length; i++) {
-                String s = p1s[i];
-                if (p2s.length < i + 1) {
-                    return 1;
-                }
-                if (!s.equals(p2s[i])) {
-                    return s.compareTo(p2s[i]);
-                }
-            }
-
-            return p1s.length < p2s.length ? -1 :
-                    this.getQualid().getSimpleName().compareTo(o.getQualid().getSimpleName());
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -1990,24 +1315,15 @@ public interface J extends Serializable, Tree {
         JRightPadded<Expression> expr;
 
         @With
-<<<<<<< HEAD
         J clazz;
-=======
-        Tree clazz;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JavaType type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitInstanceOf(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitInstanceOf(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2034,13 +1350,8 @@ public interface J extends Serializable, Tree {
         Statement statement;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitLabel(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitLabel(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2064,24 +1375,15 @@ public interface J extends Serializable, Tree {
         Space arrow;
 
         @With
-<<<<<<< HEAD
         J body;
-=======
-        Tree body;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JavaType type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitLambda(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitLambda(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2140,13 +1442,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitLiteral(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitLiteral(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         public <T> String transformValue(Function<T, Object> transform) {
@@ -2176,40 +1473,23 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-<<<<<<< HEAD
         @With
         Expression containing;
-=======
-        /**
-         * Right padded before the '::'
-         */
-        @With
-        JRightPadded<Expression> containing;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JContainer<Expression> typeParameters;
 
         @With
-<<<<<<< HEAD
         JLeftPadded<Ident> reference;
-=======
-        Ident reference;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
         JavaType type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitMemberReference(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitMemberReference(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2268,7 +1548,6 @@ public interface J extends Serializable, Tree {
             return new MethodDecl(id, prefix, markers, annotations, modifiers, typeParameters, returnTypeExpr,
                     name, params, throwz, body, defaultValue);
         }
-<<<<<<< HEAD
 
         @JsonProperty("throwz")
         @Nullable
@@ -2276,15 +1555,6 @@ public interface J extends Serializable, Tree {
             return throwz;
         }
 
-=======
-
-        @JsonProperty("throwz")
-        @Nullable
-        public JContainer<NameTree> getThrows() {
-            return throwz;
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         /**
          * Null for abstract method declarations and interface method declarations.
          */
@@ -2302,7 +1572,6 @@ public interface J extends Serializable, Tree {
         JLeftPadded<Expression> defaultValue;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitMethod(this, p);
         }
@@ -2323,30 +1592,6 @@ public interface J extends Serializable, Tree {
         @JsonIgnore
         public boolean isConstructor() {
             return getReturnTypeExpr() == null;
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitMethod(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
-        }
-
-        @JsonIgnore
-        public boolean isAbstract() {
-            return body == null;
-        }
-
-<<<<<<< HEAD
-=======
-//        public boolean hasType(String clazz) {
-//            return new HasType(clazz).visit(this);
-//        }
-//
-//        public List<Annotation> findAnnotations(String signature) {
-//            return new FindAnnotations(signature).visit(this);
-//        }
-
-        @JsonIgnore
-        public boolean isConstructor() {
-            return getReturnTypeExpr() == null;
         }
 
         @JsonIgnore
@@ -2354,18 +1599,13 @@ public interface J extends Serializable, Tree {
             return name.getSimpleName();
         }
 
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
         @Override
         public String toString() {
-<<<<<<< HEAD
             return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
-=======
-            return "MethodDecl{" + MethodDeclToString.toString(this) + "}";
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2420,13 +1660,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitMethodInvocation(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitMethodInvocation(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @JsonIgnore
@@ -2541,11 +1776,7 @@ public interface J extends Serializable, Tree {
         TypeTree typeExpr;
 
         @With
-<<<<<<< HEAD
         List<ArrayDimension> dimensions;
-=======
-        List<JLeftPadded<JRightPadded<Expression>>> dimensions;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
@@ -2556,7 +1787,6 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitNewArray(this, p);
         }
@@ -2581,10 +1811,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitArrayDimension(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitNewArray(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2605,10 +1831,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         /**
-<<<<<<< HEAD
          * For situations like <code>this.new A()</code>.
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
          * Right padded before the '.'
          */
         @Nullable
@@ -2617,19 +1840,11 @@ public interface J extends Serializable, Tree {
         JRightPadded<Expression> encl;
 
         Space nooh;
-<<<<<<< HEAD
 
         public NewClass withNew(Space nooh) {
             return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
         }
 
-=======
-
-        public NewClass withNew(Space nooh) {
-            return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         @JsonProperty("nooh")
         public Space getNew() {
             return nooh;
@@ -2681,11 +1896,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-<<<<<<< HEAD
         Expression expr;
-=======
-        JRightPadded<Expression> expr;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
@@ -2725,13 +1936,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitParameterizedType(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitParameterizedType(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2826,18 +2032,10 @@ public interface J extends Serializable, Tree {
 
         @With
         Space prefix;
-<<<<<<< HEAD
-=======
 
         @With
         Markers markers;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
-        @With
-        @Nullable
-        JRightPadded<Expression> expr;
-
-<<<<<<< HEAD
         @With
         @Nullable
         Expression expr;
@@ -2845,11 +2043,6 @@ public interface J extends Serializable, Tree {
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitReturn(this, p);
-=======
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitReturn(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -2917,7 +2110,6 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-<<<<<<< HEAD
         Expression condition;
 
         @With
@@ -2925,15 +2117,6 @@ public interface J extends Serializable, Tree {
 
         @With
         JLeftPadded<Expression> falsePart;
-=======
-        JRightPadded<Expression> condition;
-
-        @With
-        JRightPadded<Expression> truePart;
-
-        @With
-        Expression falsePart;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @With
         @Nullable
@@ -2954,28 +2137,16 @@ public interface J extends Serializable, Tree {
 
         @With
         Space prefix;
-<<<<<<< HEAD
-=======
 
         @With
         Markers markers;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
-        @With
-        Expression exception;
-
-<<<<<<< HEAD
         @With
         Expression exception;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitThrow(this, p);
-=======
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitThrow(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -3025,13 +2196,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitTry(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitTry(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3077,13 +2243,8 @@ public interface J extends Serializable, Tree {
             Block body;
 
             @Override
-<<<<<<< HEAD
             public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
                 return v.visitCatch(this, p);
-=======
-            public <R> R acceptJava(JavaSourceVisitor<R> v) {
-                return v.visitCatch(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
             }
         }
     }
@@ -3152,13 +2313,8 @@ public interface J extends Serializable, Tree {
         JContainer<TypeTree> bounds;
 
         @Override
-<<<<<<< HEAD
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitTypeParameter(this, p);
-=======
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitTypeParameter(this);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
     }
 
@@ -3241,7 +2397,6 @@ public interface J extends Serializable, Tree {
         @With
         @Nullable
         Space varargs;
-<<<<<<< HEAD
 
         @With
         List<JLeftPadded<Space>> dimensionsBeforeName;
@@ -3254,20 +2409,6 @@ public interface J extends Serializable, Tree {
             return v.visitMultiVariable(this, p);
         }
 
-=======
-
-        @With
-        List<JLeftPadded<Space>> dimensionsBeforeName;
-
-        @With
-        List<JRightPadded<NamedVar>> vars;
-
-        @Override
-        public <R> R acceptJava(JavaSourceVisitor<R> v) {
-            return v.visitMultiVariable(this);
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 //        public List<Annotation> findAnnotations(String signature) {
 //            return new FindAnnotations(signature).visit(this);
 //        }
@@ -3351,11 +2492,7 @@ public interface J extends Serializable, Tree {
         Parentheses<Expression> condition;
 
         @With
-<<<<<<< HEAD
         JRightPadded<Statement> body;
-=======
-        Statement body;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {

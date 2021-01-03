@@ -75,17 +75,12 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
         return acc.toString();
     }
 
-<<<<<<< HEAD
     protected String visit(String before, @Nullable JContainer<? extends J> container, String suffixBetween, @Nullable String after, P p) {
         if (container == null) {
             return "";
         }
         return visit(container.getBefore()) + before + visit(container.getElem(), suffixBetween, p) +
                 (after == null ? "" : after);
-=======
-    private String fmt(@Nullable Tree tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code;
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     protected String visit(@Nullable Space space) {
@@ -558,17 +553,10 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     }
 
     @Override
-<<<<<<< HEAD
     public String visitLambda(Lambda lambda, P p) {
         String params = visit(lambda.getParameters().getParams(), ",", p);
         String paramSet = fmt(lambda.getParameters(), lambda.getParameters().isParenthesized() ? "(" + params + ")" : params);
         return fmt(lambda, paramSet + visit(lambda.getArrow()) + "->") + visit(lambda.getBody(), p);
-=======
-    public String visitLambda(Lambda lambda) {
-        String params = visit(lambda.getParameters().getParams(), ",");
-        String paramSet = fmt(lambda.getParameters(), lambda.getParameters().isParenthesized() ? "(" + params + ")" : params);
-        return fmt(lambda, paramSet + fmt(lambda.getArrow(), "->") + visit(lambda.getBody()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -640,7 +628,6 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
     }
 
     @Override
-<<<<<<< HEAD
     public String visitNewClass(NewClass newClass, P p) {
         return fmt(newClass,
                 visit(newClass.getEncl(), ".", p) +
@@ -648,14 +635,6 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
                         visit(newClass.getClazz(), p) +
                         visit("(", newClass.getArgs(), ",", ")", p) +
                         visit(newClass.getBody(), p));
-=======
-    public String visitNewClass(NewClass newClass) {
-        String encl = newClass.getEncl() == null ? "" : visit(newClass.getEncl()) + visit(newClass.getAfterEncl()) + ".";
-        String nooh = newClass.getNooh() == null ? "" : fmt(newClass.getNooh(), "");
-        String args = newClass.getArgs() == null ? "" :
-                fmt(newClass.getArgs(), "(" + visit(newClass.getArgs().getArgs(), ",") + ")");
-        return fmt(newClass, encl + nooh + "new" + visit(newClass.getClazz()) + args + visit(newClass.getBody()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -822,20 +801,9 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
                     .append(dimension.getElem().getWhitespace()).append(']');
         }
 
-<<<<<<< HEAD
         return fmt(variable, visit(variable.getName(), p) +
                 dimensions.toString() +
                 visit("=", variable.getInitializer(), p));
-=======
-    @Override
-    public String visitVariable(VariableDecls.NamedVar variable) {
-        return fmt(variable, visit(variable.getName()) +
-                visit(variable.getAfterName()) +
-                visitDims(variable.getDimensionsAfterName()) +
-                visit(variable.getAfterDimensions()) +
-                (variable.getInitializer() == null ? "" : "=" + visit(variable.getInitializer())) +
-                visit(variable.getBeforeComma()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override

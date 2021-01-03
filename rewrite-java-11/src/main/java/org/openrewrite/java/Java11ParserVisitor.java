@@ -55,7 +55,7 @@ import static org.openrewrite.java.tree.Space.format;
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
-    private final Path path;
+    private final Path sourcePath;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<JavaStyle> styles;
@@ -67,9 +67,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public Java11ParserVisitor(Path path, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
+    public Java11ParserVisitor(Path sourcePath, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
                                Map<String, JavaType.Class> sharedClassTypes) {
-        this.path = path;
+        this.sourcePath = sourcePath;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
@@ -125,15 +125,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 fmt,
                 Markers.EMPTY,
                 convert(node.getExpression()),
-<<<<<<< HEAD
                 new J.ArrayDimension(randomId(), sourceBefore("["), Markers.EMPTY,
                         convert(node.getIndex(), t -> sourceBefore("]"))),
-=======
-                padLeft(
-                        sourceBefore("["),
-                        convert(node.getIndex(), t -> sourceBefore("]"))
-                ),
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 type(node)
         );
     }
@@ -173,14 +166,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitAssignment(AssignmentTree node, Space fmt) {
         return new J.Assign(randomId(), fmt, Markers.EMPTY,
-<<<<<<< HEAD
                 convert(node.getVariable()),
                 padLeft(sourceBefore("="), convert(node.getExpression())),
                 type(node));
-=======
-                convert(node.getVariable(), t -> sourceBefore("=")),
-                convert(node.getExpression()), type(node));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -312,7 +300,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCase(CaseTree node, Space fmt) {
-<<<<<<< HEAD
         Expression pattern;
         if (node.getExpression() == null) {
             pattern = J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null);
@@ -323,14 +310,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return new J.Case(randomId(), fmt, Markers.EMPTY,
                 pattern,
                 JContainer.build(sourceBefore(":"), convertStatements(node.getStatements())));
-=======
-        JRightPadded<Expression> pattern = convertOrNull(node.getExpression(), t -> sourceBefore(":"));
-        if (pattern == null) {
-            pattern = padRight(J.Ident.build(randomId(), Space.EMPTY, Markers.EMPTY, skip("default"), null),
-                    sourceBefore(":"));
-        }
-        return new J.Case(randomId(), fmt, Markers.EMPTY, pattern, convertStatements(node.getStatements()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -361,21 +340,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         } else if (hasFlag(node.getModifiers(), Flags.INTERFACE)) {
             kind = padLeft(sourceBefore("interface"), J.ClassDecl.Kind.Interface);
         } else {
-<<<<<<< HEAD
             kind = padLeft(sourceBefore("class"), J.ClassDecl.Kind.Class);
-=======
-            kind = padLeft(sourceBefore("class"), J.ClassDecl.Kind.Enum);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         J.Ident name = J.Ident.build(randomId(), sourceBefore(node.getSimpleName().toString()),
                 Markers.EMPTY, ((JCClassDecl) node).getSimpleName().toString(), type(node));
 
-<<<<<<< HEAD
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
-=======
-        JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : new JContainer<>(
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 sourceBefore("<"),
                 convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")));
 
@@ -387,11 +358,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             Space implementsPrefix = sourceBefore(kind.getElem() == J.ClassDecl.Kind.Interface ?
                     "extends" : "implements");
 
-<<<<<<< HEAD
             implementings = JContainer.build(implementsPrefix, convertAll(node.getImplementsClause(), commaDelim, noDelim));
-=======
-            implementings = new JContainer<>(implementsPrefix, convertAll(node.getImplementsClause(), commaDelim, noDelim));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         Space bodyPrefix = sourceBefore("{");
@@ -446,7 +413,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Space fmt) {
-        logger.debug("Building AST for: " + path);
+        logger.debug("Building AST for: " + sourcePath);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         fmt = format(source.substring(0, cu.getStartPosition()));
@@ -458,23 +425,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         if (cu.getPackageName() != null) {
             Space packagePrefix = sourceBefore("package");
             packageDecl = new J.Package(randomId(), packagePrefix, Markers.EMPTY,
-<<<<<<< HEAD
                     convert(cu.getPackageName()));
-=======
-                    convert(cu.getPackageName(), t -> sourceBefore(";")));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         return new J.CompilationUnit(
                 randomId(),
                 fmt,
                 Markers.EMPTY,
-                path,
-<<<<<<< HEAD
+                sourcePath,
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
-=======
-                packageDecl,
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
                 format(source.substring(cursor)),
@@ -544,15 +503,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitConditionalExpression(ConditionalExpressionTree node, Space fmt) {
         return new J.Ternary(randomId(), fmt, Markers.EMPTY,
-<<<<<<< HEAD
                 convert(node.getCondition()),
                 padLeft(sourceBefore("?"), convert(node.getTrueExpression())),
                 padLeft(sourceBefore(":"), convert(node.getFalseExpression())),
-=======
-                convert(node.getCondition(), t -> sourceBefore("?")),
-                convert(node.getTrueExpression(), t -> sourceBefore(":")),
-                convert(node.getFalseExpression()),
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 type(node));
     }
 
@@ -569,11 +522,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitDoWhileLoop(DoWhileLoopTree node, Space fmt) {
         skip("do");
         return new J.DoWhileLoop(randomId(), fmt, Markers.EMPTY,
-<<<<<<< HEAD
                 convert(node.getStatement(), this::statementDelim),
-=======
-                convert(node.getStatement()),
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 padLeft(sourceBefore("while"), convert(node.getCondition())));
     }
 
@@ -589,11 +538,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 new J.ForEachLoop.Control(randomId(), sourceBefore("("), Markers.EMPTY,
                         convert(node.getVariable(), t -> sourceBefore(":")),
                         convert(node.getExpression(), t -> sourceBefore(")"))),
-<<<<<<< HEAD
                 convert(node.getStatement(), this::statementDelim));
-=======
-                convert(node.getStatement()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     private J visitEnumVariable(VariableTree node, Space fmt) {
@@ -637,11 +582,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         return new J.ForLoop(randomId(), fmt, Markers.EMPTY,
                 new J.ForLoop.Control(randomId(), ctrlPrefix, Markers.EMPTY, init, condition, update),
-<<<<<<< HEAD
                 convert(node.getStatement(), this::statementDelim));
-=======
-                convert(node.getStatement()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -655,27 +596,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("if");
         return new J.If(randomId(), fmt, Markers.EMPTY,
                 convert(node.getCondition()),
-<<<<<<< HEAD
                 convert(node.getThenStatement(), this::statementDelim),
                 node.getElseStatement() instanceof JCTree.JCStatement ?
                         new J.If.Else(randomId(), sourceBefore("else"), Markers.EMPTY, convert(node.getElseStatement(), this::statementDelim)) :
                         null);
-=======
-                convert(node.getThenStatement()),
-                node.getElseStatement() instanceof JCTree.JCStatement ?
-                        padLeft(sourceBefore("else"), convert(node.getElseStatement())) : null);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
     public J visitImport(ImportTree node, Space fmt) {
         skip("import");
         return new J.Import(randomId(), fmt, Markers.EMPTY,
-<<<<<<< HEAD
                 node.isStatic() ? sourceBefore("static") : null,
-=======
-                node.isStatic() ? sourceBefore("static") : Space.EMPTY,
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 convert(node.getQualifiedIdentifier()));
     }
 
@@ -735,10 +666,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitMemberReference(MemberReferenceTree node, Space fmt) {
         JCMemberReference ref = (JCMemberReference) node;
-<<<<<<< HEAD
-=======
-        JRightPadded<Expression> expr = convert(ref.expr, t -> sourceBefore("::"));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         String referenceName;
         switch (ref.getMode()) {
@@ -751,7 +678,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 break;
         }
 
-<<<<<<< HEAD
         return new J.MemberReference(randomId(),
                 fmt,
                 Markers.EMPTY,
@@ -763,29 +689,17 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         referenceName,
                         null)),
                 type(node));
-=======
-        JContainer<Expression> typeParams = convertTypeParameters(node.getTypeArguments());
-        J.Ident reference = J.Ident.build(randomId(), sourceBefore(referenceName), Markers.EMPTY, referenceName, null);
-
-        return new J.MemberReference(randomId(), fmt, Markers.EMPTY, expr, typeParams, reference, type(node));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
     public J visitMemberSelect(MemberSelectTree node, Space fmt) {
         JCFieldAccess fieldAccess = (JCFieldAccess) node;
-<<<<<<< HEAD
         return new J.FieldAccess(randomId(), fmt, Markers.EMPTY,
                 convert(fieldAccess.selected),
                 padLeft(sourceBefore("."), J.Ident.build(randomId(),
                         sourceBefore(fieldAccess.name.toString()), Markers.EMPTY,
                         fieldAccess.name.toString(), null)),
                 type(node));
-=======
-        JRightPadded<Expression> target = convert(fieldAccess.selected, t -> sourceBefore("."));
-        J.Ident name = J.Ident.build(randomId(), sourceBefore(fieldAccess.name.toString()), Markers.EMPTY, fieldAccess.name.toString(), null);
-        return new J.FieldAccess(randomId(), fmt, Markers.EMPTY, target, name, type(node));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -802,11 +716,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         // generic type parameters can only exist on qualified targets
         JContainer<J.TypeParameter> typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
-<<<<<<< HEAD
             typeParams = JContainer.build(sourceBefore("<"), convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">")));
-=======
-            typeParams = new JContainer<>(sourceBefore("<"), convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">")));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         J.Ident name;
@@ -817,11 +727,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             name = convert(jcSelect);
         }
 
-<<<<<<< HEAD
         JContainer<Expression> args = JContainer.build(sourceBefore("("), node.getArguments().isEmpty() ?
-=======
-        JContainer<Expression> args = new JContainer<>(sourceBefore("("), node.getArguments().isEmpty() ?
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")));
 
@@ -884,11 +790,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         // see https://docs.oracle.com/javase/tutorial/java/generics/methods.html
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null :
-<<<<<<< HEAD
                 JContainer.build(sourceBefore("<"),
-=======
-                new JContainer<>(sourceBefore("<"),
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                         convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")));
 
         TypeTree returnType = convertOrNull(node.getReturnType());
@@ -919,28 +821,16 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         Space paramFmt = sourceBefore("(");
         JContainer<Statement> params = !node.getParameters().isEmpty() ?
-<<<<<<< HEAD
                 JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")"))) :
                 JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)));
 
         JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
                 JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim));
-=======
-                new JContainer<>(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")"))) :
-                new JContainer<>(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)));
-
-        JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
-                new JContainer<>(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         J.Block body = convertOrNull(node.getBody());
 
         JLeftPadded<Expression> defaultValue = node.getDefaultValue() == null ? null :
-<<<<<<< HEAD
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
-=======
-            padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
 
         return new J.MethodDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeParams,
                 returnType, name, params, throwss, body, defaultValue);
@@ -964,7 +854,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
 
-<<<<<<< HEAD
         List<J.ArrayDimension> dimensions = new ArrayList<>();
         List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
         for (ExpressionTree dim : nodeDimensions) {
@@ -973,19 +862,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     sourceBefore("["),
                     Markers.EMPTY,
                     convert(dim, t -> sourceBefore("]"))));
-=======
-        List<JLeftPadded<JRightPadded<Expression>>> dimensions = new ArrayList<>();
-        List<? extends ExpressionTree> nodeDimensions = node.getDimensions();
-        for (ExpressionTree dim : nodeDimensions) {
-            Space dimensionPrefix = sourceBefore("[");
-            dimensions.add(padLeft(dimensionPrefix, convert(dim, t -> sourceBefore("]"))));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         }
 
         Matcher matcher = Pattern.compile("\\G(\\s*)\\[(\\s*)]").matcher(source);
         while (matcher.find(cursor)) {
             cursor(matcher.end());
-<<<<<<< HEAD
             dimensions.add(new J.ArrayDimension(
                     randomId(),
                     format(matcher.group(1)),
@@ -1000,18 +881,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
                 initializer, type(node));
-=======
-            dimensions.add(padLeft(format(matcher.group(2)), padRight(new J.Empty(randomId(), EMPTY,
-                    Markers.EMPTY), EMPTY)));
-        }
-
-        JContainer<Expression> initializer = node.getInitializers() == null ? null :
-                new JContainer<>(sourceBefore("{"), node.getInitializers().isEmpty() ?
-                        singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
-                        convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")));
-
-        return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions, initializer, type(node));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -1031,11 +900,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<Expression> args = null;
         if (positionOfNext("(", '{') > -1) {
-<<<<<<< HEAD
             args = JContainer.build(sourceBefore("("),
-=======
-            args = new JContainer<>(sourceBefore("("),
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                     node.getArguments().isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                             convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")));
@@ -1145,7 +1010,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitTry(TryTree node, Space fmt) {
         skip("try");
-<<<<<<< HEAD
         JContainer<J.Try.Resource> resources;
         if (node.getResources().isEmpty()) {
             resources = null;
@@ -1178,14 +1042,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.Block block = convert(node.getBlock());
         List<J.Try.Catch> catches = convertAll(node.getCatches());
 
-=======
-        JContainer<J.Try.Resource> resources = node.getResources().isEmpty() ? null :
-                new JContainer<>(sourceBefore("("), convertAll(node.getResources(), semiDelim, t -> sourceBefore(")")));
-
-        J.Block block = convert(node.getBlock());
-        List<J.Try.Catch> catches = convertAll(node.getCatches());
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         JLeftPadded<J.Block> finallyy = node.getFinallyBlock() == null ? null :
                 padLeft(sourceBefore("finally"), convert(node.getFinallyBlock()));
 
@@ -1211,7 +1067,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitTypeParameter(TypeParameterTree node, Space fmt) {
         List<J.Annotation> annotations = convertAll(node.getAnnotations());
 
-<<<<<<< HEAD
         Expression name = buildName(node.getName().toString())
                 .withPrefix(sourceBefore(node.getName().toString()));
 
@@ -1240,6 +1095,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 Space identFmt = whitespacePrefix.matches() ? format(whitespacePrefix.group(0)) : Space.EMPTY;
 
                 Matcher whitespaceSuffix = whitespaceSuffixPattern.matcher(part);
+                //noinspection ResultOfMethodCallIgnored
                 whitespaceSuffix.matches();
                 Space namePrefix = i == parts.length - 1 ? Space.EMPTY : format(whitespaceSuffix.group(1));
 
@@ -1258,17 +1114,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         //noinspection unchecked
         return (T) expr;
-=======
-        Expression name = TreeBuilder.buildName(node.getName().toString())
-                .withPrefix(sourceBefore(node.getName().toString()));
-
-        // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
-        JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
-                new JContainer<>(sourceBefore("extends"),
-                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim));
-
-        return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -1395,16 +1240,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             Space namedVarPrefix = sourceBefore(n.getName().toString());
             JCVariableDecl vd = (JCVariableDecl) n;
 
-<<<<<<< HEAD
             J.Ident name = J.Ident.build(randomId(), EMPTY, Markers.EMPTY, n.getName().toString(), type(node));
-=======
-            J.Ident name = J.Ident.build(randomId(), sourceBefore(n.getName().toString()), Markers.EMPTY, n.getName().toString(), type(node));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
             List<JLeftPadded<Space>> dimensionsAfterName = dimensions.get();
 
             vars.add(
                     padRight(
-<<<<<<< HEAD
                             new J.VariableDecls.NamedVar(randomId(), namedVarPrefix, Markers.EMPTY,
                                     name,
                                     dimensionsAfterName,
@@ -1412,15 +1252,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                                     type(n)
                             ),
                             i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
-=======
-                        new J.VariableDecls.NamedVar(randomId(), namedVarPrefix, Markers.EMPTY,
-                                name,
-                                dimensionsAfterName,
-                                vd.init != null ? padLeft(sourceBefore("="), convertOrNull(vd.init)) : null,
-                                type(n)
-                        ),
-                        i == nodes.size() - 1 ? EMPTY : sourceBefore(",")
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
                     )
             );
         }
@@ -1433,11 +1264,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("while");
         return new J.WhileLoop(randomId(), fmt, Markers.EMPTY,
                 convert(node.getCondition()),
-<<<<<<< HEAD
                 convert(node.getStatement(), this::statementDelim));
-=======
-                convert(node.getStatement()));
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     @Override
@@ -1555,11 +1382,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             params = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }
 
-<<<<<<< HEAD
         return JContainer.build(typeArgPrefix, params);
-=======
-        return new JContainer<>(typeArgPrefix, params);
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
     }
 
     private Space statementDelim(@Nullable Tree t) {
@@ -1579,21 +1402,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             return sourceBefore(";");
         }
 
-<<<<<<< HEAD
         if (t instanceof JCLabeledStatement) {
             return statementDelim(((JCLabeledStatement) t).getStatement());
         }
 
-=======
-        if (t instanceof JCWhileLoop) {
-            return ((JCWhileLoop) t).body instanceof JCBlock ? EMPTY : sourceBefore(";");
-        }
-
-        if (t instanceof JCLabeledStatement) {
-            return statementDelim(((JCLabeledStatement) t).getStatement());
-        }
-
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         if (t instanceof JCMethodDecl) {
             JCMethodDecl m = (JCMethodDecl) t;
             return sourceBefore(m.body == null || m.defaultValue != null ? ";" : "");
@@ -1847,18 +1659,12 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
-<<<<<<< HEAD
         assert tree != null;
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         return new JRightPadded<>(tree, right);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
-<<<<<<< HEAD
         assert tree != null;
-=======
->>>>>>> First pass at Java AST, temporarily disable all other modules and all Java search/refactoring
         return new JLeftPadded<>(left, tree);
     }
 

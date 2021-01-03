@@ -57,12 +57,6 @@ abstract class JavaParserCompatibilityKit {
     inner class ContinueTck : ContinueTest
 
     @Nested
-    inner class CursorTck : CursorTest
-
-    @Nested
-    inner class CyclicTypeTck : CyclicTypeTest
-
-    @Nested
     inner class DoWhileLoopTck : DoWhileLoopTest
 
     @Nested
@@ -88,9 +82,6 @@ abstract class JavaParserCompatibilityKit {
 
     @Nested
     inner class InstanceofTck : InstanceOfTest
-
-    @Nested
-    inner class JavaTypeTck : JavaTypeTest
 
     @Nested
     inner class LabelTck : LabelTest
