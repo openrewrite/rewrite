@@ -31,7 +31,7 @@ interface BlankLinesTest : EvalVisitorTest {
             keepMaximum.inDeclarations = 0
         })),
         before = """
-            public class Foo {
+            public class Test {
             
             
                 private int field1;
@@ -41,7 +41,7 @@ interface BlankLinesTest : EvalVisitorTest {
                     field1 = 2;
                 }
             
-                public void foo1() {
+                public void test1() {
                     new Runnable() {
                         public void run() {
                         }
@@ -53,13 +53,13 @@ interface BlankLinesTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 private int field2;
                 {
                     field1 = 2;
                 }
-                public void foo1() {
+                public void test1() {
                     new Runnable() {
                         public void run() {
                         }
@@ -77,7 +77,7 @@ interface BlankLinesTest : EvalVisitorTest {
             keepMaximum.inCode = 0
         })),
         before = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 {
                 
@@ -87,7 +87,7 @@ interface BlankLinesTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 {
                     field1 = 2;
@@ -102,7 +102,7 @@ interface BlankLinesTest : EvalVisitorTest {
             keepMaximum.beforeEndOfBlock = 0
         })),
         before = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 {
                     field1 = 2;
@@ -112,7 +112,7 @@ interface BlankLinesTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 {
                     field1 = 2;
@@ -133,7 +133,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -142,7 +142,7 @@ interface BlankLinesTest : EvalVisitorTest {
              */
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -159,7 +159,7 @@ interface BlankLinesTest : EvalVisitorTest {
              */
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -169,7 +169,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -183,13 +183,13 @@ interface BlankLinesTest : EvalVisitorTest {
             
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -204,7 +204,7 @@ interface BlankLinesTest : EvalVisitorTest {
             /** Comment */
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -212,7 +212,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -226,7 +226,7 @@ interface BlankLinesTest : EvalVisitorTest {
             package com.intellij.samples;
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -234,7 +234,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -248,13 +248,13 @@ interface BlankLinesTest : EvalVisitorTest {
             
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """.trimIndent()
     )
@@ -270,7 +270,7 @@ interface BlankLinesTest : EvalVisitorTest {
              */
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -280,7 +280,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -295,7 +295,7 @@ interface BlankLinesTest : EvalVisitorTest {
             package com.intellij.samples;
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
@@ -303,7 +303,7 @@ interface BlankLinesTest : EvalVisitorTest {
             
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -315,13 +315,13 @@ interface BlankLinesTest : EvalVisitorTest {
         })),
         before = """
             package com.intellij.samples;
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
             package com.intellij.samples;
             
-            public class Foo {
+            public class Test {
             }
         """
     )
@@ -333,13 +333,13 @@ interface BlankLinesTest : EvalVisitorTest {
         })),
         before = """
             import java.util.Vector;
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
         """.trimIndent()
     )
@@ -352,20 +352,20 @@ interface BlankLinesTest : EvalVisitorTest {
         before = """
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
             
-            class Bar {
+            class Test2 {
             }
         """,
         after = """
             import java.util.Vector;
             
-            public class Foo {
+            public class Test {
             }
             
             
-            class Bar {
+            class Test2 {
             }
         """.trimIndent()
     )
@@ -376,12 +376,12 @@ interface BlankLinesTest : EvalVisitorTest {
             minimum.afterClassHeader = 1
         })),
         before = """
-            public class Foo {
+            public class Test {
                 private int field1;
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
             
                 private int field1;
             }
@@ -394,11 +394,11 @@ interface BlankLinesTest : EvalVisitorTest {
             minimum.beforeClassEnd = 1
         })),
         before = """
-            public class Foo {
+            public class Test {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
             
             }
         """
@@ -410,8 +410,8 @@ interface BlankLinesTest : EvalVisitorTest {
             minimum.afterAnonymousClassHeader = 1
         })),
         before = """
-            public class Foo {
-                public void foo1() {
+            public class Test {
+                public void test1() {
                     new Runnable() {
                         public void run() {
                         }
@@ -420,8 +420,8 @@ interface BlankLinesTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
-                public void foo1() {
+            public class Test {
+                public void test1() {
                     new Runnable() {
             
                         public void run() {
@@ -546,7 +546,7 @@ interface BlankLinesTest : EvalVisitorTest {
             minimum.aroundInitializer = 1
         })),
         before = """
-            public class Foo {
+            public class Test {
                 private int field1;
                 {
                     field1 = 2;
@@ -555,7 +555,7 @@ interface BlankLinesTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
                 private int field1;
             
                 {

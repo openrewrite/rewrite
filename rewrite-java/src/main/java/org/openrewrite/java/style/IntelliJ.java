@@ -23,6 +23,7 @@ public class IntelliJ {
         style.setTabSize(4);
         style.setIndentSize(4);
         style.setContinuationIndent(8);
+        style.setIndentsRelativeToExpressionStart(false);
 
         return style;
     }

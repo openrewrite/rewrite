@@ -87,4 +87,10 @@ class SpaceTest {
 
         assertThat(cf.whitespace).isEqualTo("  \n")
     }
+
+    @Test
+    fun stringify() {
+        assertThat(Space.format("\n  \n\t \t").toString())
+            .isEqualTo("Space(comments=<0 comments>, whitespace='\\n·₁·₂\\n-₁·₂-₃')")
+    }
 }

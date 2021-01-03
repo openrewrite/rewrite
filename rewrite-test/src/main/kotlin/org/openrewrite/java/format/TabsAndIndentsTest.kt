@@ -29,10 +29,10 @@ interface TabsAndIndentsTest : EvalVisitorTest {
     fun tabsAndIndents(jp: JavaParser) = assertRefactored(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
-            public class Foo {
+            public class Test {
             public int[] X = new int[]{1, 3, 5, 7, 9, 11};
 
-            public void foo(boolean a, int x, int y, int z) {
+            public void test(boolean a, int x, int y, int z) {
             label1:
             do {
             try {
@@ -78,10 +78,10 @@ interface TabsAndIndentsTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
+            public class Test {
                 public int[] X = new int[]{1, 3, 5, 7, 9, 11};
 
-                public void foo(boolean a, int x, int y, int z) {
+                public void test(boolean a, int x, int y, int z) {
                     label1:
                     do {
                         try {
@@ -132,8 +132,8 @@ interface TabsAndIndentsTest : EvalVisitorTest {
     fun tryCatchFinally(jp: JavaParser) = assertRefactored(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
-            public class Foo {
-            public void foo(boolean a, int x, int y) {
+            public class Test {
+            public void test(boolean a, int x, int y) {
             try {
             int someVariable = a ? x : y;
             } catch (Exception e) {
@@ -145,8 +145,8 @@ interface TabsAndIndentsTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
-                public void foo(boolean a, int x, int y) {
+            public class Test {
+                public void test(boolean a, int x, int y) {
                     try {
                         int someVariable = a ? x : y;
                     } catch (Exception e) {
@@ -160,11 +160,42 @@ interface TabsAndIndentsTest : EvalVisitorTest {
     )
 
     @Test
+    fun doWhile(jp: JavaParser) = assertRefactored(
+        jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
+        before = """
+            public class Test {
+            public void test() {
+            do {
+            }
+            while(true);
+        
+            labeled: do {
+            }
+            while(false);
+            }
+            }
+        """,
+        after = """
+            public class Test {
+                public void test() {
+                    do {
+                    }
+                    while(true);
+            
+                    labeled: do {
+                    }
+                    while(false);
+                }
+            }
+        """
+    )
+
+    @Test
     fun elseBody(jp: JavaParser) = assertRefactored(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
-            public class Foo {
-            public void foo(boolean a, int x, int y, int z) {
+            public class Test {
+            public void test(boolean a, int x, int y, int z) {
             if (x > 0) {
             } else if (x < 0) {
             y += z;
@@ -173,13 +204,89 @@ interface TabsAndIndentsTest : EvalVisitorTest {
             }
         """,
         after = """
-            public class Foo {
-                public void foo(boolean a, int x, int y, int z) {
+            public class Test {
+                public void test(boolean a, int x, int y, int z) {
                     if (x > 0) {
                     } else if (x < 0) {
                         y += z;
                     }
                 }
+            }
+        """
+    )
+
+    @Test
+    fun forLoop(jp: JavaParser) = assertRefactored(
+        jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+            continuationIndent = 2
+        })),
+        before = """
+            public class Test {
+                public void test() {
+                int m = 0;
+                int n = 0;
+                for (
+                 int i = 0;
+                 i < 5;
+                 i++, m++,
+                 n++);
+                for (int i = 0;
+                 i < 5;
+                 i++, m++,
+                 n++);
+                labeled: for (int i = 0;
+                 i < 5;
+                 i++, m++,
+                 n++);
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                public void test() {
+                    int m = 0;
+                    int n = 0;
+                    for (
+                      int i = 0;
+                      i < 5;
+                      i++, m++,
+                        n++);
+                    for (int i = 0;
+                         i < 5;
+                         i++, m++,
+                           n++);
+                    labeled: for (int i = 0;
+                                  i < 5;
+                                  i++, m++,
+                                    n++);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun methodDeclaration(jp: JavaParser) = assertRefactored(
+        jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+            continuationIndent = 2
+        })),
+        before = """
+            public class Test {
+            public void test(int a,
+            int b) {}
+            
+            public void test2(
+            int a,
+            int b) {}
+            }
+        """,
+        after = """
+            public class Test {
+                public void test(int a,
+                                 int b) {}
+            
+                public void test2(
+                  int a,
+                  int b) {}
             }
         """
     )

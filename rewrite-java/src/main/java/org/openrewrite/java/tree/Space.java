@@ -202,16 +202,36 @@ public class Space {
         return trees;
     }
 
+    private static final String[] spaces = {
+            "·₁", "·₂", "·₃", "·₄", "·₅", "·₆", "·₇", "·₈", "·₉", "·₊"
+    };
+
+    private static final String[] tabs = {
+            "-₁", "-₂", "-₃", "-₄", "-₅", "-₆", "-₇", "-₈", "-₉", "-₊"
+    };
+
     @Override
     public String toString() {
+        StringBuilder printedWs = new StringBuilder();
+        int lastNewline = 0;
+        char[] charArray = whitespace.toCharArray();
+        for (int i = 0; i < charArray.length; i++) {
+            char c = charArray[i];
+            if (c == '\n') {
+                printedWs.append("\\n");
+                lastNewline = i + 1;
+            } else if (c == '\r') {
+                printedWs.append("\\r");
+                lastNewline = i + 1;
+            } else if (c == ' ') {
+                printedWs.append(spaces[(i - lastNewline) % 10]);
+            } else if (c == '\t') {
+                printedWs.append(tabs[(i - lastNewline) % 10]);
+            }
+        }
+
         return "Space(" +
                 "comments=<" + (comments.size() == 1 ? "1 comment" : comments.size() + " comments") +
-                ">, whitespace='" +
-                whitespace
-                        .replace("\n", "\\n")
-                        .replace("\r", "\\r")
-                        .replace('\t', '-')
-                        .replace(" ", "·") +
-                "')";
+                ">, whitespace='" + printedWs + "')";
     }
 }

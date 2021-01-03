@@ -175,11 +175,7 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     private <J2 extends J> JRightPadded<J2> keepMaximumLines(JRightPadded<J2> tree, int max) {
-        J2 elem = keepMaximumLines(tree.getElem(), max);
-        if (elem != tree.getElem()) {
-            return new JRightPadded<>(elem, tree.getAfter());
-        }
-        return tree;
+        return tree.withElem(keepMaximumLines(tree.getElem(), max));
     }
 
     private <J2 extends J> J2 keepMaximumLines(J2 tree, int max) {
@@ -204,11 +200,7 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     private <J2 extends J> JRightPadded<J2> minimumLines(JRightPadded<J2> tree, int min) {
-        J2 elem = minimumLines(tree.getElem(), min);
-        if (elem != tree.getElem()) {
-            return new JRightPadded<>(elem, tree.getAfter());
-        }
-        return tree;
+        return tree.withElem(minimumLines(tree.getElem(), min));
     }
 
     private <J2 extends J> J2 minimumLines(J2 tree, int min) {

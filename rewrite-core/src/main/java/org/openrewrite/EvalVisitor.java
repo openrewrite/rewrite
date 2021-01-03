@@ -45,8 +45,8 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
      *
      * @param visitor The visitor to run after this visitor.
      */
-    protected void doOnNext(EvalVisitor<T> visitor) {
-        doOnNext(visitor, null);
+    protected void doOnComplete(EvalVisitor<T> visitor) {
+        doOnComplete(visitor, null);
     }
 
     /**
@@ -55,7 +55,7 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
      * @param visitor The visitor to run after this visitor.
      * @param cursor The cursor to start the next visitor at.
      */
-    protected void doOnNext(EvalVisitor<T> visitor, @Nullable Cursor cursor) {
+    protected void doOnComplete(EvalVisitor<T> visitor, @Nullable Cursor cursor) {
         andThen.get().add(new Task<>(visitor, cursor));
     }
 

@@ -22,10 +22,10 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoEvalVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+
+import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class TabsAndIndents extends JavaIsoEvalVisitor {
     TabsAndIndentsStyle style;
@@ -86,7 +86,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
                 cursor = cursor.getParentOrThrow();
             }
 
-            j = j.withEnd(align(j.getEnd(), cursor.getTree()));
+            j = j.withEnd(alignToParentStatement(j.getEnd(), cursor));
         }
         return j;
     }
@@ -94,21 +94,148 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     @Override
     public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, EvalContext ctx) {
         J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, ctx);
-        d = d.withWhileCondition(d.getWhileCondition().withBefore(
-                align(d.getWhileCondition().getBefore(), d)));
+        if (d.getWhileCondition().getBefore().getWhitespace().contains("\n")) {
+            d = d.withWhileCondition(d.getWhileCondition().withBefore(
+                    alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
+        }
         return d;
     }
 
-    private <J2 extends J> J2 indent(J2 s, Tree parent) {
-        return s.withPrefix(indent(s.getPrefix(), parent));
+    @Override
+    public J.ForLoop visitForLoop(J.ForLoop forLoop, EvalContext ctx) {
+        J.ForLoop f = (J.ForLoop) visitStatement(forLoop, ctx);
+        f = f.withBody(eval(f.getBody(), ctx));
+
+        J.ForLoop.Control control = forLoop.getControl();
+        JRightPadded<Statement> init = control.getInit();
+        JRightPadded<Expression> condition = control.getCondition();
+        List<JRightPadded<Statement>> update = control.getUpdate();
+        if (init.getElem().getPrefix().getWhitespace().contains("\n")) {
+            f = f.withControl(control
+                    .withInit(continuationIndent(init, f))
+                    .withCondition(continuationIndent(condition, f))
+                    .withUpdate(continuationIndent(update, f)));
+        } else {
+            if (condition.getElem().getPrefix().getWhitespace().contains("\n")) {
+                f = f.withControl(f.getControl().withCondition(condition.withElem(
+                        alignTo(condition.getElem(), forInitColumn()))));
+            }
+
+            if (update.stream().anyMatch(u -> u.getElem().getPrefix().getWhitespace().contains("\n"))) {
+                int column = forInitColumn();
+                f = f.withControl(f.getControl().withUpdate(ListUtils.map(update, (i, j) -> {
+                    if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
+                        return j.withElem(alignTo(j.getElem(), i == 0 ? column :
+                                column + style.getContinuationIndent()));
+                    }
+                    return j;
+                })));
+            }
+        }
+
+        return f;
+    }
+
+    private int forInitColumn() {
+        J.ForLoop forLoop = getCursor().getTree();
+        J parent = getCursor().getParentOrThrow().getTree();
+        J alignTo = parent instanceof J.Label ?
+                ((J.Label) parent).withStatement(forLoop.withBody(null)) :
+                forLoop.withBody(null);
+
+        int column = 0;
+        boolean afterInitStart = false;
+        for (char c : alignTo.print().toCharArray()) {
+            if (c == '(') {
+                afterInitStart = true;
+            } else if (afterInitStart && !Character.isWhitespace(c)) {
+                return column - 1;
+            }
+            column++;
+        }
+        throw new IllegalStateException("For loops must have a control section");
+    }
+
+    @Override
+    public J.MethodDecl visitMethod(J.MethodDecl method, EvalContext ctx) {
+        J.MethodDecl m = (J.MethodDecl) visitStatement(method, ctx);
+        m = m.withBody(eval(method.getBody(), ctx));
+
+        List<JRightPadded<Statement>> params = m.getParams().getElem();
+        if (!params.isEmpty()) {
+            if (params.get(0).getElem().getPrefix().getWhitespace().contains("\n")) {
+                J.MethodDecl parent = m;
+                m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), j -> {
+                    if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
+                        return continuationIndent(j, parent);
+                    }
+                    return j;
+                })));
+            } else if (params.stream().anyMatch(p -> p.getElem().getPrefix().getWhitespace().contains("\n"))) {
+                AtomicInteger column = new AtomicInteger(0);
+                boolean afterParamsStart = false;
+                for (char c : m.withBody(null).print().toCharArray()) {
+                    if (c == '(') {
+                        afterParamsStart = true;
+                    } else if (afterParamsStart && !Character.isWhitespace(c)) {
+                        break;
+                    }
+                    column.incrementAndGet();
+                }
+                m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), (i, p) ->
+                        i == 0 ? p : p.withElem(alignTo(p.getElem(), column.get() - 1)))));
+            }
+        }
+
+        return m;
+    }
+
+    private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Tree parent) {
+        return ListUtils.map(js, (i, j) -> {
+            if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
+                if (i == 0) {
+                    return continuationIndent(j, parent);
+                } else {
+                    return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
+                            parent, style.getContinuationIndent() * 2)));
+                }
+            }
+            return j;
+        });
+    }
+
+    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, Tree parent) {
+        return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
+                parent, style.getContinuationIndent())));
+    }
+
+    private <J2 extends J> J2 continuationIndent(J2 j, Tree parent) {
+        return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
+    }
+
+    private <J2 extends J> JRightPadded<J2> indent(JRightPadded<J2> j, Tree parent) {
+        return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
+                parent, style.getIndentSize())));
+    }
+
+    private <J2 extends J> J2 indent(J2 j, Tree parent) {
+        return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
+    }
+
+    private Space continuationIndent(Space space, Tree parent) {
+        return indent(space, parent, style.getContinuationIndent());
     }
 
     private Space indent(Space space, Tree parent) {
+        return indent(space, parent, style.getIndentSize());
+    }
+
+    private Space indent(Space space, Tree parent, int indentSize) {
         int parentIndent = indent(((J) parent).getPrefix());
         int indent = indent(space);
 
-        if (indent - parentIndent < style.getContinuationIndent()) {
-            int shiftRight = style.getIndentSize() + parentIndent - indent;
+        if (indent - parentIndent < indentSize) {
+            int shiftRight = indentSize + parentIndent - indent;
             space = space.withComments(ListUtils.map(space.getComments(), c ->
                     indentComment(c, shiftRight)));
             space = space.withWhitespace(indent(space.getWhitespace(), shiftRight));
@@ -117,12 +244,23 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
         return space;
     }
 
-    private Space align(Space space, Tree parent) {
-        int parentIndent = indent(((J) parent).getPrefix());
+    private Space alignToParentStatement(Space space, Cursor parent) {
+        J alignTo = parent.getParentOrThrow().getTree() instanceof J.Label ?
+                parent.getParentOrThrow().getTree() :
+                parent.getTree();
+
+        return alignTo(space, indent(alignTo.getPrefix()));
+    }
+
+    private <J2 extends J> J2 alignTo(J2 j, int column) {
+        return j.withPrefix(alignTo(j.getPrefix(), column));
+    }
+
+    private Space alignTo(Space space, int column) {
         int indent = indent(space);
 
-        if (indent - parentIndent < 0) {
-            int shiftRight = parentIndent - indent;
+        if (indent - column < 0) {
+            int shiftRight = column - indent;
             space = space.withComments(ListUtils.map(space.getComments(), c ->
                     indentComment(c, shiftRight)));
             space = space.withWhitespace(indent(space.getWhitespace(), shiftRight));

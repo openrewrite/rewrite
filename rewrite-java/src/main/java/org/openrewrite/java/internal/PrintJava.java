@@ -346,7 +346,11 @@ public class PrintJava<P> implements JavaVisitor<String, P> {
         return acc.toString();
     }
 
-    private String visitStatement(JRightPadded<Statement> paddedStat, P p) {
+    private String visitStatement(@Nullable JRightPadded<Statement> paddedStat, P p) {
+        if (paddedStat == null) {
+            return "";
+        }
+
         String acc = visit(paddedStat.getElem(), p) + visit(paddedStat.getAfter());
 
         Statement s = paddedStat.getElem();
