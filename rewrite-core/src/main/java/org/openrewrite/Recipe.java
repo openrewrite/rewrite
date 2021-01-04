@@ -1,3 +1,18 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite;
 
 import org.openrewrite.internal.ListUtils;
@@ -43,7 +58,14 @@ public abstract class Recipe {
         for (int i = 0; i < execution.getMaxCycles(); i++) {
             // if this recipe isn't valid we just skip it and proceed to next
             if (validate().isValid()) {
-                temp = ListUtils.map(temp, s -> (SourceFile) processor.get().visit(s, execution));
+                temp = ListUtils.map(temp, s -> {
+                    try {
+                        return (SourceFile) processor.get().visit(s, execution);
+                    } catch(Throwable t) {
+                        execution.getOnError().accept(t);
+                        return s;
+                    }
+                });
             }
             if (next != null) {
                 temp = next.visit(temp, execution);
@@ -57,7 +79,7 @@ public abstract class Recipe {
     }
 
     public final List<Result> run(List<SourceFile> sourceFiles) {
-        return run(sourceFiles, new ExecutionContext(3, false));
+        return run(sourceFiles, ExecutionContext.builder().build());
     }
 
     public final List<Result> run(List<SourceFile> sourceFiles, ExecutionContext context) {

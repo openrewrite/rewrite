@@ -19,16 +19,21 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 
-public class ExecutionContext {
+public final class ExecutionContext {
     private final int maxCycles;
-    private final boolean eagerlyThrow;
+    private final Consumer<Throwable> onError;
 
     Map<String, Object> messages = new HashMap<>();
 
-    public ExecutionContext(int maxCycles, boolean eagerlyThrow) {
+    private ExecutionContext(int maxCycles, Consumer<Throwable> onError) {
         this.maxCycles = maxCycles;
-        this.eagerlyThrow = eagerlyThrow;
+        this.onError = onError;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Nullable
@@ -43,11 +48,30 @@ public class ExecutionContext {
         return (T) messages.remove(key);
     }
 
-    public int getMaxCycles() {
+    int getMaxCycles() {
         return maxCycles;
     }
 
-    public boolean isEagerlyThrow() {
-        return eagerlyThrow;
+    Consumer<Throwable> getOnError() {
+        return onError;
+    }
+
+    public static class Builder {
+        private int maxCycles = 3;
+        private Consumer<Throwable> onError;
+
+        public Builder maxCycles(int maxCycles) {
+            this.maxCycles = maxCycles;
+            return this;
+        }
+
+        public Builder doOnError(Consumer<Throwable> onError) {
+            this.onError = onError;
+            return this;
+        }
+
+        public ExecutionContext build() {
+            return new ExecutionContext(maxCycles, onError);
+        }
     }
 }

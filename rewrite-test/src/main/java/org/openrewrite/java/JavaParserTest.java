@@ -25,7 +25,8 @@ import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
 public interface JavaParserTest {
-    default void assertParseAndPrint(JavaParser parser, NestingLevel nestingLevel, String code, String... imports) {
+    default void assertParseAndPrint(JavaParser parser, NestingLevel nestingLevel, String code,
+                                     String... imports) {
         String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
         switch(nestingLevel) {

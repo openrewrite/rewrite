@@ -25,7 +25,7 @@ abstract class JavaEvalCompatibilityKit {
     abstract fun javaParser(): JavaParser
 
     @Nested
-    inner class BlankLinesTck : BlankLinesTest
+    inner class BlankLinesTck : BlankLinesTest()
 
     @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest

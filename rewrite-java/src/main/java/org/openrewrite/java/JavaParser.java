@@ -123,7 +123,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
     JavaParser reset();
 
     @SuppressWarnings("unchecked")
-    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> {
+    abstract class Builder<P extends JavaParser, B extends Builder<P, B>> implements Parser.Builder<J.CompilationUnit> {
         @Nullable
         protected Collection<Path> classpath;
 

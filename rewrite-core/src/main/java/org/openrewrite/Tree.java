@@ -41,11 +41,19 @@ public interface Tree {
         return v.defaultValue(this, p);
     }
 
-    default String printTrimmed() {
-        return StringUtils.trimIndent(print().trim());
+    String print(TreePrinter<?, ?> printer);
+
+    default String print() {
+        return print(TreePrinter.identity());
     }
 
-    String print();
+    default String printTrimmed(TreePrinter<?, ?> printer) {
+        return StringUtils.trimIndent(print(printer).trim());
+    }
+
+    default String printTrimmed() {
+        return printTrimmed(TreePrinter.identity());
+    }
 
     default boolean isScope(@Nullable Tree tree) {
         return tree != null && tree.getId().equals(getId());

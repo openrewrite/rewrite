@@ -86,6 +86,11 @@ subprojects {
         options.compilerArgs.addAll(listOf("--release", "8"))
     }
 
+    tasks.named<JavaCompile>("compileTestJava") {
+        sourceCompatibility = JavaVersion.VERSION_15.toString()
+        targetCompatibility = JavaVersion.VERSION_15.toString()
+    }
+
     configure<ContactsExtension> {
         val j = Contact("jkschneider@gmail.com")
         j.moniker("Jonathan Schneider")

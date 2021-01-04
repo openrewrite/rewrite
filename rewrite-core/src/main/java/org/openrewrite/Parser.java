@@ -152,4 +152,8 @@ public interface Parser<S extends SourceFile> {
             return Objects.hash(path);
         }
     }
+
+    interface Builder<S extends SourceFile> {
+        Parser<S> build();
+    }
 }

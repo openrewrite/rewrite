@@ -29,7 +29,7 @@ interface TabsAndIndentsTest : RecipeTest {
      * Slight renaming but structurally the same as IntelliJ's code style view.
      */
     @Test
-    fun tabsAndIndents(jp: JavaParser) = assertRefactored(
+    fun tabsAndIndents(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class Test {
@@ -132,7 +132,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun tryCatchFinally(jp: JavaParser) = assertRefactored(
+    fun tryCatchFinally(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class Test {
@@ -163,7 +163,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun doWhile(jp: JavaParser) = assertRefactored(
+    fun doWhile(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class Test {
@@ -194,7 +194,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun elseBody(jp: JavaParser) = assertRefactored(
+    fun elseBody(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class Test {
@@ -219,7 +219,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun forLoop(jp: JavaParser) = assertRefactored(
+    fun forLoop(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
             continuationIndent = 2
         })),
@@ -268,7 +268,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodDeclaration(jp: JavaParser) = assertRefactored(
+    fun methodDeclaration(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
             continuationIndent = 2
         })),
@@ -295,7 +295,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun expressions(jp: JavaParser) = assertRefactored(
+    fun expressions(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
             continuationIndent = 2
         })),
@@ -356,7 +356,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun lineComment(jp: JavaParser) = assertRefactored(
+    fun lineComment(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class A {
@@ -373,7 +373,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun blockComment(jp: JavaParser) = assertRefactored(
+    fun blockComment(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class A {
@@ -392,7 +392,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun javadoc(jp: JavaParser) = assertRefactored(
+    fun javadoc(jp: JavaParser) = assertRecipe(
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents())),
         before = """
             public class A {
@@ -413,7 +413,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun tabs(jp: JavaParser) = assertRefactored(
+    fun tabs(jp: JavaParser) = assertRecipe(
         // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
         jp.withStyles(listOf(IntelliJ.defaultTabsAndIndents().apply {
             isUseTabCharacter = true
