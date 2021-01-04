@@ -16,9 +16,8 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.TreeProcessor;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
@@ -26,469 +25,469 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public class JavaProcessor extends TreeProcessor<J> implements JavaVisitor<J, ExecutionContext> {
-    public J visitExpression(Expression expression, ExecutionContext ctx) {
+public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor<J, P> {
+    public J visitExpression(Expression expression, P p) {
         return expression;
     }
 
-    public J visitStatement(Statement statement, ExecutionContext ctx) {
+    public J visitStatement(Statement statement, P p) {
         return statement;
     }
 
     @Override
-    public J visitAnnotatedType(J.AnnotatedType annotatedType, ExecutionContext ctx) {
-        J.AnnotatedType a = call(annotatedType, ctx, this::visitEach);
-        a = call(a, ctx, this::visitExpression);
-        a = a.withAnnotations(call(a.getAnnotations(), ctx));
-        return a.withTypeExpr(call(a.getTypeExpr(), ctx));
+    public J visitAnnotatedType(J.AnnotatedType annotatedType, P p) {
+        J.AnnotatedType a = call(annotatedType, p, this::visitEach);
+        a = call(a, p, this::visitExpression);
+        a = a.withAnnotations(call(a.getAnnotations(), p));
+        return a.withTypeExpr(call(a.getTypeExpr(), p));
     }
 
     @Override
-    public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-        J.Annotation a = call(annotation, ctx, this::visitEach);
-        a = call(a, ctx, this::visitExpression);
-        a = a.withArgs(eval(a.getArgs(), ctx));
-        return a.withAnnotationType(call(a.getAnnotationType(), ctx));
+    public J visitAnnotation(J.Annotation annotation, P p) {
+        J.Annotation a = call(annotation, p, this::visitEach);
+        a = call(a, p, this::visitExpression);
+        a = a.withArgs(eval(a.getArgs(), p));
+        return a.withAnnotationType(call(a.getAnnotationType(), p));
     }
 
     @Override
-    public J visitArrayAccess(J.ArrayAccess arrayAccess, ExecutionContext ctx) {
-        J.ArrayAccess a = call(arrayAccess, ctx, this::visitEach);
-        a = call(a, ctx, this::visitExpression);
-        a = a.withIndexed(call(a.getIndexed(), ctx));
-        a = a.withDimension(call(a.getDimension(), ctx));
+    public J visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
+        J.ArrayAccess a = call(arrayAccess, p, this::visitEach);
+        a = call(a, p, this::visitExpression);
+        a = a.withIndexed(call(a.getIndexed(), p));
+        a = a.withDimension(call(a.getDimension(), p));
         return a;
     }
 
     @Override
-    public J visitArrayDimension(J.ArrayDimension arrayDimension, ExecutionContext ctx) {
-        J.ArrayDimension a = call(arrayDimension, ctx, this::visitEach);
-        a = a.withIndex(eval(a.getIndex(), ctx));
+    public J visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
+        J.ArrayDimension a = call(arrayDimension, p, this::visitEach);
+        a = a.withIndex(eval(a.getIndex(), p));
         return a;
     }
 
     @Override
-    public J visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-        J.ArrayType a = call(arrayType, ctx, this::visitEach);
-        a = call(a, ctx, this::visitExpression);
-        return a.withElementType(call(a.getElementType(), ctx));
+    public J visitArrayType(J.ArrayType arrayType, P p) {
+        J.ArrayType a = call(arrayType, p, this::visitEach);
+        a = call(a, p, this::visitExpression);
+        return a.withElementType(call(a.getElementType(), p));
     }
 
     @Override
-    public J visitAssert(J.Assert azzert, ExecutionContext ctx) {
-        J.Assert a = call(azzert, ctx, this::visitEach);
-        a = call(a, ctx, this::visitStatement);
-        return a.withCondition(call(a.getCondition(), ctx));
+    public J visitAssert(J.Assert azzert, P p) {
+        J.Assert a = call(azzert, p, this::visitEach);
+        a = call(a, p, this::visitStatement);
+        return a.withCondition(call(a.getCondition(), p));
     }
 
     @Override
-    public J visitAssign(J.Assign assign, ExecutionContext ctx) {
-        J.Assign a = call(assign, ctx, this::visitEach);
-        a = call(a, ctx, this::visitStatement);
-        a = call(a, ctx, this::visitExpression);
-        a = a.withVariable(call(a.getVariable(), ctx));
-        return a.withAssignment(eval(a.getAssignment(), ctx));
+    public J visitAssign(J.Assign assign, P p) {
+        J.Assign a = call(assign, p, this::visitEach);
+        a = call(a, p, this::visitStatement);
+        a = call(a, p, this::visitExpression);
+        a = a.withVariable(call(a.getVariable(), p));
+        return a.withAssignment(eval(a.getAssignment(), p));
     }
 
     @Override
-    public J visitAssignOp(J.AssignOp assignOp, ExecutionContext ctx) {
-        J.AssignOp a = call(assignOp, ctx, this::visitEach);
-        a = call(a, ctx, this::visitStatement);
-        a = call(a, ctx, this::visitExpression);
-        a = a.withVariable(call(a.getVariable(), ctx));
-        return a.withAssignment(call(a.getAssignment(), ctx));
+    public J visitAssignOp(J.AssignOp assignOp, P p) {
+        J.AssignOp a = call(assignOp, p, this::visitEach);
+        a = call(a, p, this::visitStatement);
+        a = call(a, p, this::visitExpression);
+        a = a.withVariable(call(a.getVariable(), p));
+        return a.withAssignment(call(a.getAssignment(), p));
     }
 
     @Override
-    public J visitBinary(J.Binary binary, ExecutionContext ctx) {
-        J.Binary b = call(binary, ctx, this::visitEach);
-        b = call(b, ctx, this::visitExpression);
-        b = b.withLeft(call(b.getLeft(), ctx));
-        return b.withRight(call(b.getRight(), ctx));
+    public J visitBinary(J.Binary binary, P p) {
+        J.Binary b = call(binary, p, this::visitEach);
+        b = call(b, p, this::visitExpression);
+        b = b.withLeft(call(b.getLeft(), p));
+        return b.withRight(call(b.getRight(), p));
     }
 
     @Override
-    public J visitBlock(J.Block block, ExecutionContext ctx) {
-        J.Block b = call(block, ctx, this::visitEach);
-        b = call(b, ctx, this::visitStatement);
-        return b.withStatements(evalMany(b.getStatements(), ctx));
+    public J visitBlock(J.Block block, P p) {
+        J.Block b = call(block, p, this::visitEach);
+        b = call(b, p, this::visitStatement);
+        return b.withStatements(evalMany(b.getStatements(), p));
     }
 
     @Override
-    public J visitBreak(J.Break breakStatement, ExecutionContext ctx) {
-        J.Break b = call(breakStatement, ctx, this::visitEach);
-        b = call(b, ctx, this::visitStatement);
-        return b.withLabel(call(b.getLabel(), ctx));
+    public J visitBreak(J.Break breakStatement, P p) {
+        J.Break b = call(breakStatement, p, this::visitEach);
+        b = call(b, p, this::visitStatement);
+        return b.withLabel(call(b.getLabel(), p));
     }
 
     @Override
-    public J visitCase(J.Case caze, ExecutionContext ctx) {
-        J.Case c = call(caze, ctx, this::visitEach);
-        c = call(c, ctx, this::visitStatement);
-        c = c.withPattern(call(c.getPattern(), ctx));
-        return c.withStatements(c.getStatements().withElem(evalMany(c.getStatements().getElem(), ctx)));
+    public J visitCase(J.Case caze, P p) {
+        J.Case c = call(caze, p, this::visitEach);
+        c = call(c, p, this::visitStatement);
+        c = c.withPattern(call(c.getPattern(), p));
+        return c.withStatements(c.getStatements().withElem(evalMany(c.getStatements().getElem(), p)));
     }
 
     @Override
-    public J visitCatch(J.Try.Catch catzh, ExecutionContext ctx) {
-        J.Try.Catch c = call(catzh, ctx, this::visitEach);
-        c = c.withParam(call(c.getParam(), ctx));
-        return c.withBody(call(c.getBody(), ctx));
+    public J visitCatch(J.Try.Catch catzh, P p) {
+        J.Try.Catch c = call(catzh, p, this::visitEach);
+        c = c.withParam(call(c.getParam(), p));
+        return c.withBody(call(c.getBody(), p));
     }
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
-        J.ClassDecl c = call(classDecl, ctx, this::visitEach);
-        c = call(c, ctx, this::visitStatement);
-        c = c.withAnnotations(call(c.getAnnotations(), ctx));
-        c = c.withModifiers(call(c.getModifiers(), ctx));
-        c = c.withTypeParameters(eval(c.getTypeParameters(), ctx));
-        c = c.withName(call(c.getName(), ctx));
-        c = c.withExtends(eval(c.getExtends(), ctx));
-        c = c.withImplements(eval(c.getImplements(), ctx));
-        return c.withBody(call(c.getBody(), ctx));
+    public J visitClassDecl(J.ClassDecl classDecl, P p) {
+        J.ClassDecl c = call(classDecl, p, this::visitEach);
+        c = call(c, p, this::visitStatement);
+        c = c.withAnnotations(call(c.getAnnotations(), p));
+        c = c.withModifiers(call(c.getModifiers(), p));
+        c = c.withTypeParameters(eval(c.getTypeParameters(), p));
+        c = c.withName(call(c.getName(), p));
+        c = c.withExtends(eval(c.getExtends(), p));
+        c = c.withImplements(eval(c.getImplements(), p));
+        return c.withBody(call(c.getBody(), p));
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-        J.CompilationUnit c = call(cu, ctx, this::visitEach);
-        c = c.withPackageDecl(eval(c.getPackageDecl(), ctx));
-        c = c.withImports(evalMany(c.getImports(), ctx));
-        return c.withClasses(call(c.getClasses(), ctx));
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
+        J.CompilationUnit c = call(cu, p, this::visitEach);
+        c = c.withPackageDecl(eval(c.getPackageDecl(), p));
+        c = c.withImports(evalMany(c.getImports(), p));
+        return c.withClasses(call(c.getClasses(), p));
     }
 
     @Override
-    public J visitContinue(J.Continue continueStatement, ExecutionContext ctx) {
-        J.Continue c = call(continueStatement, ctx, this::visitEach);
-        c = call(c, ctx, this::visitStatement);
-        return c.withLabel(call(c.getLabel(), ctx));
+    public J visitContinue(J.Continue continueStatement, P p) {
+        J.Continue c = call(continueStatement, p, this::visitEach);
+        c = call(c, p, this::visitStatement);
+        return c.withLabel(call(c.getLabel(), p));
     }
 
     @Override
-    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
-        J.DoWhileLoop d = call(doWhileLoop, ctx, this::visitEach);
-        d = call(d, ctx, this::visitStatement);
-        d = d.withWhileCondition(eval(d.getWhileCondition(), ctx));
-        return d.withBody(eval(d.getBody(), ctx));
+    public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
+        J.DoWhileLoop d = call(doWhileLoop, p, this::visitEach);
+        d = call(d, p, this::visitStatement);
+        d = d.withWhileCondition(eval(d.getWhileCondition(), p));
+        return d.withBody(eval(d.getBody(), p));
     }
 
     @Override
-    public J visitEmpty(J.Empty empty, ExecutionContext ctx) {
-        J.Empty e = call(empty, ctx, this::visitEach);
-        e = call(e, ctx, this::visitStatement);
-        e = call(e, ctx, this::visitExpression);
+    public J visitEmpty(J.Empty empty, P p) {
+        J.Empty e = call(empty, p, this::visitEach);
+        e = call(e, p, this::visitStatement);
+        e = call(e, p, this::visitExpression);
         return e;
     }
 
     @Override
-    public J visitEnumValue(J.EnumValue enoom, ExecutionContext ctx) {
-        J.EnumValue e = call(enoom, ctx, this::visitEach);
-        e = e.withName(call(e.getName(), ctx));
-        return e.withInitializer(call(e.getInitializer(), ctx));
+    public J visitEnumValue(J.EnumValue enoom, P p) {
+        J.EnumValue e = call(enoom, p, this::visitEach);
+        e = e.withName(call(e.getName(), p));
+        return e.withInitializer(call(e.getInitializer(), p));
     }
 
     @Override
-    public J visitEnumValueSet(J.EnumValueSet enums, ExecutionContext ctx) {
-        J.EnumValueSet e = call(enums, ctx, this::visitEach);
-        e = call(e, ctx, this::visitStatement);
-        return e.withEnums(evalMany(e.getEnums(), ctx));
+    public J visitEnumValueSet(J.EnumValueSet enums, P p) {
+        J.EnumValueSet e = call(enums, p, this::visitEach);
+        e = call(e, p, this::visitStatement);
+        return e.withEnums(evalMany(e.getEnums(), p));
     }
 
     @Override
-    public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-        J.FieldAccess f = call(fieldAccess, ctx, this::visitEach);
-        f = call(f, ctx, this::visitExpression);
-        f = f.withTarget(call(f.getTarget(), ctx));
-        return f.withName(eval(f.getName(), ctx));
+    public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
+        J.FieldAccess f = call(fieldAccess, p, this::visitEach);
+        f = call(f, p, this::visitExpression);
+        f = f.withTarget(call(f.getTarget(), p));
+        return f.withName(eval(f.getName(), p));
     }
 
     @Override
-    public J visitForEachLoop(J.ForEachLoop forLoop, ExecutionContext ctx) {
-        J.ForEachLoop f = call(forLoop, ctx, this::visitEach);
-        f = call(f, ctx, this::visitStatement);
-        f = f.withControl(f.getControl().withVariable(eval(f.getControl().getVariable(), ctx)));
-        f = f.withControl(f.getControl().withIterable(eval(f.getControl().getIterable(), ctx)));
-        return f.withBody(eval(f.getBody(), ctx));
+    public J visitForEachLoop(J.ForEachLoop forLoop, P p) {
+        J.ForEachLoop f = call(forLoop, p, this::visitEach);
+        f = call(f, p, this::visitStatement);
+        f = f.withControl(f.getControl().withVariable(eval(f.getControl().getVariable(), p)));
+        f = f.withControl(f.getControl().withIterable(eval(f.getControl().getIterable(), p)));
+        return f.withBody(eval(f.getBody(), p));
     }
 
     @Override
-    public J visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
-        J.ForLoop f = call(forLoop, ctx, this::visitEach);
-        f = call(f, ctx, this::visitStatement);
-        f = f.withControl(f.getControl().withInit(eval(f.getControl().getInit(), ctx)));
-        f = f.withControl(f.getControl().withCondition(eval(f.getControl().getCondition(), ctx)));
-        f = f.withControl(f.getControl().withUpdate(evalMany(f.getControl().getUpdate(), ctx)));
-        return f.withBody(eval(f.getBody(), ctx));
+    public J visitForLoop(J.ForLoop forLoop, P p) {
+        J.ForLoop f = call(forLoop, p, this::visitEach);
+        f = call(f, p, this::visitStatement);
+        f = f.withControl(f.getControl().withInit(eval(f.getControl().getInit(), p)));
+        f = f.withControl(f.getControl().withCondition(eval(f.getControl().getCondition(), p)));
+        f = f.withControl(f.getControl().withUpdate(evalMany(f.getControl().getUpdate(), p)));
+        return f.withBody(eval(f.getBody(), p));
     }
 
     @Override
-    public J visitIdentifier(J.Ident ident, ExecutionContext ctx) {
-        J.Ident i = call(ident, ctx, this::visitEach);
-        return call(i, ctx, this::visitExpression);
+    public J visitIdentifier(J.Ident ident, P p) {
+        J.Ident i = call(ident, p, this::visitEach);
+        return call(i, p, this::visitExpression);
     }
 
     @Override
-    public J visitElse(J.If.Else elze, ExecutionContext ctx) {
-        J.If.Else e = call(elze, ctx, this::visitEach);
-        return e.withBody(eval(e.getBody(), ctx));
+    public J visitElse(J.If.Else elze, P p) {
+        J.If.Else e = call(elze, p, this::visitEach);
+        return e.withBody(eval(e.getBody(), p));
     }
 
     @Override
-    public J visitIf(J.If iff, ExecutionContext ctx) {
-        J.If i = call(iff, ctx, this::visitEach);
-        i = call(i, ctx, this::visitStatement);
-        i = i.withIfCondition(call(i.getIfCondition(), ctx));
-        i = i.withThenPart(eval(i.getThenPart(), ctx));
-        i = i.withElsePart(call(i.getElsePart(), ctx));
+    public J visitIf(J.If iff, P p) {
+        J.If i = call(iff, p, this::visitEach);
+        i = call(i, p, this::visitStatement);
+        i = i.withIfCondition(call(i.getIfCondition(), p));
+        i = i.withThenPart(eval(i.getThenPart(), p));
+        i = i.withElsePart(call(i.getElsePart(), p));
         return i;
     }
 
     @Override
-    public J visitImport(J.Import impoort, ExecutionContext ctx) {
-        J.Import i = call(impoort, ctx, this::visitEach);
-        return i.withQualid(call(i.getQualid(), ctx));
+    public J visitImport(J.Import impoort, P p) {
+        J.Import i = call(impoort, p, this::visitEach);
+        return i.withQualid(call(i.getQualid(), p));
     }
 
     @Override
-    public J visitInstanceOf(J.InstanceOf instanceOf, ExecutionContext ctx) {
-        J.InstanceOf i = call(instanceOf, ctx, this::visitEach);
-        i = call(i, ctx, this::visitExpression);
-        i = i.withExpr(eval(i.getExpr(), ctx));
-        return i.withClazz(call(i.getClazz(), ctx));
+    public J visitInstanceOf(J.InstanceOf instanceOf, P p) {
+        J.InstanceOf i = call(instanceOf, p, this::visitEach);
+        i = call(i, p, this::visitExpression);
+        i = i.withExpr(eval(i.getExpr(), p));
+        return i.withClazz(call(i.getClazz(), p));
     }
 
     @Override
-    public J visitLabel(J.Label label, ExecutionContext ctx) {
-        J.Label l = call(label, ctx, this::visitEach);
-        l = call(l, ctx, this::visitStatement);
-        return l.withStatement(call(l.getStatement(), ctx));
+    public J visitLabel(J.Label label, P p) {
+        J.Label l = call(label, p, this::visitEach);
+        l = call(l, p, this::visitStatement);
+        return l.withStatement(call(l.getStatement(), p));
     }
 
     @Override
-    public J visitLambda(J.Lambda lambda, ExecutionContext ctx) {
-        J.Lambda l = call(lambda, ctx, this::visitEach);
-        l = call(l, ctx, this::visitExpression);
-        l = l.withParameters(call(l.getParameters(), ctx));
-        return l.withBody(call(l.getBody(), ctx));
+    public J visitLambda(J.Lambda lambda, P p) {
+        J.Lambda l = call(lambda, p, this::visitEach);
+        l = call(l, p, this::visitExpression);
+        l = l.withParameters(call(l.getParameters(), p));
+        return l.withBody(call(l.getBody(), p));
     }
 
     @Override
-    public J visitLiteral(J.Literal literal, ExecutionContext ctx) {
-        J.Literal l = call(literal, ctx, this::visitEach);
-        return call(l, ctx, this::visitExpression);
+    public J visitLiteral(J.Literal literal, P p) {
+        J.Literal l = call(literal, p, this::visitEach);
+        return call(l, p, this::visitExpression);
     }
 
     @Override
-    public J visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
-        J.MemberReference m = call(memberRef, ctx, this::visitEach);
-        m = m.withContaining(call(m.getContaining(), ctx));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), ctx));
-        return m.withReference(eval(m.getReference(), ctx));
+    public J visitMemberReference(J.MemberReference memberRef, P p) {
+        J.MemberReference m = call(memberRef, p, this::visitEach);
+        m = m.withContaining(call(m.getContaining(), p));
+        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
+        return m.withReference(eval(m.getReference(), p));
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
-        J.MethodDecl m = call(method, ctx, this::visitEach);
-        m = call(m, ctx, this::visitStatement);
-        m = m.withAnnotations(call(m.getAnnotations(), ctx));
-        m = m.withModifiers(call(m.getModifiers(), ctx));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), ctx));
-        m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), ctx));
-        m = m.withName(call(m.getName(), ctx));
-        m = m.withParams(eval(m.getParams(), ctx));
-        m = m.withParams(eval(m.getParams(), ctx));
-        m = m.withThrows(eval(m.getThrows(), ctx));
-        return m.withBody(call(m.getBody(), ctx));
+    public J visitMethod(J.MethodDecl method, P p) {
+        J.MethodDecl m = call(method, p, this::visitEach);
+        m = call(m, p, this::visitStatement);
+        m = m.withAnnotations(call(m.getAnnotations(), p));
+        m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
+        m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
+        m = m.withName(call(m.getName(), p));
+        m = m.withParams(eval(m.getParams(), p));
+        m = m.withParams(eval(m.getParams(), p));
+        m = m.withThrows(eval(m.getThrows(), p));
+        return m.withBody(call(m.getBody(), p));
     }
 
     @Override
-    public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-        J.MethodInvocation m = call(method, ctx, this::visitEach);
-        m = call(m, ctx, this::visitStatement);
-        m = call(m, ctx, this::visitExpression);
-        m = m.withSelect(eval(m.getSelect(), ctx));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), ctx));
-        m = m.withName(call(m.getName(), ctx));
-        return m.withArgs(eval(m.getArgs(), ctx));
+    public J visitMethodInvocation(J.MethodInvocation method, P p) {
+        J.MethodInvocation m = call(method, p, this::visitEach);
+        m = call(m, p, this::visitStatement);
+        m = call(m, p, this::visitExpression);
+        m = m.withSelect(eval(m.getSelect(), p));
+        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
+        m = m.withName(call(m.getName(), p));
+        return m.withArgs(eval(m.getArgs(), p));
     }
 
     @Override
-    public J visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
-        J.MultiCatch m = call(multiCatch, ctx, this::visitEach);
-        return m.withAlternatives(evalMany(m.getAlternatives(), ctx));
+    public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
+        J.MultiCatch m = call(multiCatch, p, this::visitEach);
+        return m.withAlternatives(evalMany(m.getAlternatives(), p));
     }
 
     @Override
-    public J visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-        J.VariableDecls m = call(multiVariable, ctx, this::visitEach);
-        m = call(m, ctx, this::visitStatement);
-        m = m.withModifiers(call(m.getModifiers(), ctx));
-        m = m.withAnnotations(call(m.getAnnotations(), ctx));
-        m = m.withTypeExpr(call(m.getTypeExpr(), ctx));
-        return m.withVars(evalMany(m.getVars(), ctx));
+    public J visitMultiVariable(J.VariableDecls multiVariable, P p) {
+        J.VariableDecls m = call(multiVariable, p, this::visitEach);
+        m = call(m, p, this::visitStatement);
+        m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withAnnotations(call(m.getAnnotations(), p));
+        m = m.withTypeExpr(call(m.getTypeExpr(), p));
+        return m.withVars(evalMany(m.getVars(), p));
     }
 
     @Override
-    public J visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
-        J.NewArray n = call(newArray, ctx, this::visitEach);
-        n = call(n, ctx, this::visitExpression);
-        n = n.withTypeExpr(call(n.getTypeExpr(), ctx));
-        n = n.withDimensions(call(n.getDimensions(), ctx));
-        return n.withInitializer(eval(n.getInitializer(), ctx));
+    public J visitNewArray(J.NewArray newArray, P p) {
+        J.NewArray n = call(newArray, p, this::visitEach);
+        n = call(n, p, this::visitExpression);
+        n = n.withTypeExpr(call(n.getTypeExpr(), p));
+        n = n.withDimensions(call(n.getDimensions(), p));
+        return n.withInitializer(eval(n.getInitializer(), p));
     }
 
     @Override
-    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-        J.NewClass n = call(newClass, ctx, this::visitEach);
-        n = call(n, ctx, this::visitStatement);
-        n = call(n, ctx, this::visitExpression);
-        n = n.withClazz(call(n.getClazz(), ctx));
-        n = n.withArgs(eval(n.getArgs(), ctx));
-        return n.withBody(call(n.getBody(), ctx));
+    public J visitNewClass(J.NewClass newClass, P p) {
+        J.NewClass n = call(newClass, p, this::visitEach);
+        n = call(n, p, this::visitStatement);
+        n = call(n, p, this::visitExpression);
+        n = n.withClazz(call(n.getClazz(), p));
+        n = n.withArgs(eval(n.getArgs(), p));
+        return n.withBody(call(n.getBody(), p));
     }
 
     @Override
-    public J visitPackage(J.Package pkg, ExecutionContext ctx) {
-        J.Package p = call(pkg, ctx, this::visitEach);
-        return p.withExpr(call(p.getExpr(), ctx));
+    public J visitPackage(J.Package pkg, P p) {
+        J.Package pa = call(pkg, p, this::visitEach);
+        return pa.withExpr(call(pa.getExpr(), p));
     }
 
     @Override
-    public J visitParameterizedType(J.ParameterizedType type, ExecutionContext ctx) {
-        J.ParameterizedType p = call(type, ctx, this::visitEach);
-        p = call(p, ctx, this::visitExpression);
-        p = p.withClazz(call(p.getClazz(), ctx));
-        return p.withTypeParameters(eval(p.getTypeParameters(), ctx));
+    public J visitParameterizedType(J.ParameterizedType type, P p) {
+        J.ParameterizedType pt = call(type, p, this::visitEach);
+        pt = call(pt, p, this::visitExpression);
+        pt = pt.withClazz(call(pt.getClazz(), p));
+        return pt.withTypeParameters(eval(pt.getTypeParameters(), p));
     }
 
     @Override
-    public <T extends J> J visitParentheses(J.Parentheses<T> parens, ExecutionContext ctx) {
-        J.Parentheses<T> p = call(parens, ctx, this::visitEach);
-        p = call(p, ctx, this::visitExpression);
-        return p.withTree(eval(p.getTree(), ctx));
+    public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
+        J.Parentheses<T> pa = call(parens, p, this::visitEach);
+        pa = call(pa, p, this::visitExpression);
+        return pa.withTree(eval(pa.getTree(), p));
     }
 
     @Override
-    public J visitPrimitive(J.Primitive primitive, ExecutionContext ctx) {
-        J.Primitive p = call(primitive, ctx, this::visitEach);
-        return call(p, ctx, this::visitExpression);
+    public J visitPrimitive(J.Primitive primitive, P p) {
+        J.Primitive pr = call(primitive, p, this::visitEach);
+        return call(pr, p, this::visitExpression);
     }
 
     @Override
-    public J visitReturn(J.Return retrn, ExecutionContext ctx) {
-        J.Return r = call(retrn, ctx, this::visitEach);
-        r = call(r, ctx, this::visitStatement);
-        return r.withExpr(call(r.getExpr(), ctx));
+    public J visitReturn(J.Return retrn, P p) {
+        J.Return r = call(retrn, p, this::visitEach);
+        r = call(r, p, this::visitStatement);
+        return r.withExpr(call(r.getExpr(), p));
     }
 
     @Override
-    public J visitSwitch(J.Switch switzh, ExecutionContext ctx) {
-        J.Switch s = call(switzh, ctx, this::visitEach);
-        s = call(s, ctx, this::visitStatement);
-        s = s.withSelector(call(s.getSelector(), ctx));
-        return s.withCases(call(s.getCases(), ctx));
+    public J visitSwitch(J.Switch switzh, P p) {
+        J.Switch s = call(switzh, p, this::visitEach);
+        s = call(s, p, this::visitStatement);
+        s = s.withSelector(call(s.getSelector(), p));
+        return s.withCases(call(s.getCases(), p));
     }
 
     @Override
-    public J visitSynchronized(J.Synchronized synch, ExecutionContext ctx) {
-        J.Synchronized s = call(synch, ctx, this::visitEach);
-        s = call(s, ctx, this::visitStatement);
-        s = s.withLock(call(s.getLock(), ctx));
-        return s.withBody(call(s.getBody(), ctx));
+    public J visitSynchronized(J.Synchronized synch, P p) {
+        J.Synchronized s = call(synch, p, this::visitEach);
+        s = call(s, p, this::visitStatement);
+        s = s.withLock(call(s.getLock(), p));
+        return s.withBody(call(s.getBody(), p));
     }
 
     @Override
-    public J visitTernary(J.Ternary ternary, ExecutionContext ctx) {
-        J.Ternary t = call(ternary, ctx, this::visitEach);
-        t = call(t, ctx, this::visitExpression);
-        t = t.withCondition(call(t.getCondition(), ctx));
-        t = t.withTruePart(eval(t.getTruePart(), ctx));
-        return t.withFalsePart(eval(t.getFalsePart(), ctx));
+    public J visitTernary(J.Ternary ternary, P p) {
+        J.Ternary t = call(ternary, p, this::visitEach);
+        t = call(t, p, this::visitExpression);
+        t = t.withCondition(call(t.getCondition(), p));
+        t = t.withTruePart(eval(t.getTruePart(), p));
+        return t.withFalsePart(eval(t.getFalsePart(), p));
     }
 
     @Override
-    public J visitThrow(J.Throw thrown, ExecutionContext ctx) {
-        J.Throw t = call(thrown, ctx, this::visitEach);
-        t = call(t, ctx, this::visitStatement);
-        return t.withException(call(t.getException(), ctx));
+    public J visitThrow(J.Throw thrown, P p) {
+        J.Throw t = call(thrown, p, this::visitEach);
+        t = call(t, p, this::visitStatement);
+        return t.withException(call(t.getException(), p));
     }
 
     @Override
-    public J visitTry(J.Try tryable, ExecutionContext ctx) {
-        J.Try t = call(tryable, ctx, this::visitEach);
-        t = call(t, ctx, this::visitStatement);
-        t = t.withResources(eval(t.getResources(), ctx));
-        t = t.withBody(call(t.getBody(), ctx));
-        t = t.withCatches(call(t.getCatches(), ctx));
-        return t.withFinally(eval(t.getFinally(), ctx));
+    public J visitTry(J.Try tryable, P p) {
+        J.Try t = call(tryable, p, this::visitEach);
+        t = call(t, p, this::visitStatement);
+        t = t.withResources(eval(t.getResources(), p));
+        t = t.withBody(call(t.getBody(), p));
+        t = t.withCatches(call(t.getCatches(), p));
+        return t.withFinally(eval(t.getFinally(), p));
     }
 
     @Override
-    public J visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
-        J.TypeCast t = call(typeCast, ctx, this::visitEach);
-        t = call(t, ctx, this::visitExpression);
-        t = t.withClazz(call(t.getClazz(), ctx));
-        return t.withExpr(call(t.getExpr(), ctx));
+    public J visitTypeCast(J.TypeCast typeCast, P p) {
+        J.TypeCast t = call(typeCast, p, this::visitEach);
+        t = call(t, p, this::visitExpression);
+        t = t.withClazz(call(t.getClazz(), p));
+        return t.withExpr(call(t.getExpr(), p));
     }
 
     @Override
-    public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
-        J.TypeParameter t = call(typeParam, ctx, this::visitEach);
-        t = t.withAnnotations(call(t.getAnnotations(), ctx));
-        t = t.withName(call(t.getName(), ctx));
-        return t.withBounds(eval(t.getBounds(), ctx));
+    public J visitTypeParameter(J.TypeParameter typeParam, P p) {
+        J.TypeParameter t = call(typeParam, p, this::visitEach);
+        t = t.withAnnotations(call(t.getAnnotations(), p));
+        t = t.withName(call(t.getName(), p));
+        return t.withBounds(eval(t.getBounds(), p));
     }
 
     @Override
-    public J visitUnary(J.Unary unary, ExecutionContext ctx) {
-        J.Unary u = call(unary, ctx, this::visitEach);
-        u = call(u, ctx, this::visitStatement);
-        u = call(u, ctx, this::visitExpression);
-        return u.withExpr(call(u.getExpr(), ctx));
+    public J visitUnary(J.Unary unary, P p) {
+        J.Unary u = call(unary, p, this::visitEach);
+        u = call(u, p, this::visitStatement);
+        u = call(u, p, this::visitExpression);
+        return u.withExpr(call(u.getExpr(), p));
     }
 
     @Override
-    public J visitVariable(J.VariableDecls.NamedVar variable, ExecutionContext ctx) {
-        J.VariableDecls.NamedVar v = call(variable, ctx, this::visitEach);
-        v = v.withName(call(v.getName(), ctx));
-        return v.withInitializer(eval(v.getInitializer(), ctx));
+    public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
+        J.VariableDecls.NamedVar v = call(variable, p, this::visitEach);
+        v = v.withName(call(v.getName(), p));
+        return v.withInitializer(eval(v.getInitializer(), p));
     }
 
     @Override
-    public J visitWhileLoop(J.WhileLoop whileLoop, ExecutionContext ctx) {
-        J.WhileLoop w = call(whileLoop, ctx, this::visitEach);
-        w = call(w, ctx, this::visitStatement);
-        w = w.withCondition(call(w.getCondition(), ctx));
-        return w.withBody(eval(w.getBody(), ctx));
+    public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
+        J.WhileLoop w = call(whileLoop, p, this::visitEach);
+        w = call(w, p, this::visitStatement);
+        w = w.withCondition(call(w.getCondition(), p));
+        return w.withBody(eval(w.getBody(), p));
     }
 
     @Override
-    public J visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
-        J.Wildcard w = call(wildcard, ctx, this::visitEach);
-        w = call(w, ctx, this::visitExpression);
-        return w.withBoundedType(call(w.getBoundedType(), ctx));
+    public J visitWildcard(J.Wildcard wildcard, P p) {
+        J.Wildcard w = call(wildcard, p, this::visitEach);
+        w = call(w, p, this::visitExpression);
+        return w.withBoundedType(call(w.getBoundedType(), p));
     }
 
     @Nullable
-    protected <J2 extends J> JRightPadded<J2> eval(@Nullable JRightPadded<J2> right, ExecutionContext ctx) {
+    protected <J2 extends J> JRightPadded<J2> eval(@Nullable JRightPadded<J2> right, P p) {
         if (right == null) {
             return null;
         }
-        J2 j = call(right.getElem(), ctx);
+        J2 j = call(right.getElem(), p);
         return j == right.getElem() ? right : new JRightPadded<>(j, right.getAfter());
     }
 
     @Nullable
-    protected <J2 extends J> JLeftPadded<J2> eval(@Nullable JLeftPadded<J2> left, ExecutionContext ctx) {
+    protected <J2 extends J> JLeftPadded<J2> eval(@Nullable JLeftPadded<J2> left, P p) {
         if (left == null) {
             return null;
         }
-        J2 j = call(left.getElem(), ctx);
+        J2 j = call(left.getElem(), p);
         return j == left.getElem() ? left : new JLeftPadded<>(left.getBefore(), j);
     }
 
     @Nullable
-    protected <J2 extends J> List<JRightPadded<J2>> evalMany(@Nullable List<JRightPadded<J2>> trees, ExecutionContext ctx) {
+    protected <J2 extends J> List<JRightPadded<J2>> evalMany(@Nullable List<JRightPadded<J2>> trees, P p) {
         if (trees == null) {
             return null;
         }
@@ -496,7 +495,7 @@ public class JavaProcessor extends TreeProcessor<J> implements JavaVisitor<J, Ex
         List<JRightPadded<J2>> mutatedTrees = new ArrayList<>(trees.size());
         boolean changed = false;
         for (JRightPadded<J2> tree : trees) {
-            JRightPadded<J2> mutated = eval(tree, ctx);
+            JRightPadded<J2> mutated = eval(tree, p);
             if (mutated != tree) {
                 changed = true;
             }
@@ -507,11 +506,11 @@ public class JavaProcessor extends TreeProcessor<J> implements JavaVisitor<J, Ex
     }
 
     @Nullable
-    protected <J2 extends J> JContainer<J2> eval(@Nullable JContainer<J2> container, ExecutionContext ctx) {
+    protected <J2 extends J> JContainer<J2> eval(@Nullable JContainer<J2> container, P p) {
         if (container == null) {
             return null;
         }
-        List<JRightPadded<J2>> js = evalMany(container.getElem(), ctx);
+        List<JRightPadded<J2>> js = evalMany(container.getElem(), p);
         return js == container.getElem() ? container : JContainer.build(container.getBefore(), js);
     }
 

@@ -4,6 +4,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 import static java.util.Collections.emptyList;
 
@@ -17,14 +18,15 @@ public abstract class Recipe {
 
     @Nullable
     private Recipe next;
-    private final TreeProcessor<?, ExecutionContext> processor;
 
-    protected Recipe(TreeProcessor<?, ExecutionContext> processor) {
+    private final Supplier<TreeProcessor<?, ExecutionContext>> processor;
+
+    protected Recipe(Supplier<TreeProcessor<?, ExecutionContext>> processor) {
         this.processor = processor;
     }
 
     protected Recipe() {
-        this.processor = NOOP;
+        this.processor = () -> NOOP;
     }
 
     protected void doNext(Recipe recipe) {
@@ -41,7 +43,7 @@ public abstract class Recipe {
         for (int i = 0; i < execution.getMaxCycles(); i++) {
             // if this recipe isn't valid we just skip it and proceed to next
             if (validate().isValid()) {
-                temp = ListUtils.map(temp, s -> (SourceFile) processor.visit(s, execution));
+                temp = ListUtils.map(temp, s -> (SourceFile) processor.get().visit(s, execution));
             }
             if (next != null) {
                 temp = next.visit(temp, execution);

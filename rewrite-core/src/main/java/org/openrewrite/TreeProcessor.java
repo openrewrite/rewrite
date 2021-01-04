@@ -29,7 +29,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     private boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
-    private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();
+    private final ThreadLocal<List<TreeProcessor<T, P>>> next = new ThreadLocal<>();
 
     protected final void setCursoringOn() {
         this.cursored = true;
@@ -40,7 +40,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     }
 
     protected void doAfterVisit(TreeProcessor<T, P> visitor) {
-        afterVisit.get().add(visitor);
+        next.get().add(visitor);
     }
 
     public boolean isIdempotent() {
@@ -72,9 +72,9 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         }
 
         boolean topLevel = false;
-        if(afterVisit.get() == null) {
+        if(next.get() == null) {
             topLevel = true;
-            afterVisit.set(new ArrayList<>());
+            next.set(new ArrayList<>());
         }
 
         if (cursored) {
@@ -83,7 +83,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
 
         @SuppressWarnings("unchecked") T t = visitEach((T) tree, p);
         if(t == null) {
-            afterVisit.remove();
+            next.remove();
             return defaultValue(null, p);
         }
 
@@ -94,10 +94,10 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         }
 
         if(topLevel) {
-            for (TreeProcessor<T, P> v : afterVisit.get()) {
+            for (TreeProcessor<T, P> v : next.get()) {
                 t = v.visit(tree, p);
             }
-            afterVisit.remove();
+            next.remove();
         }
 
         return t;
