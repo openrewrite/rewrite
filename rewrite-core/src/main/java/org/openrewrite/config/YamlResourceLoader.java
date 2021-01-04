@@ -152,21 +152,21 @@ public class YamlResourceLoader implements ResourceLoader {
             throw new ValidationException(validation, source);
         }
 
-        List<EvalVisitor<? extends Tree>> subVisitors = new ArrayList<>();
+        List<TreeProcessor<? extends Tree>> subVisitors = new ArrayList<>();
 
         //noinspection unchecked
         for (Object subVisitorNameAndConfig : (List<Object>) visitorMap.get("visitors")) {
             try {
                 if (subVisitorNameAndConfig instanceof String) {
                     //noinspection unchecked
-                    subVisitors.add((EvalVisitor<Tree>) visitorClass((String) subVisitorNameAndConfig)
+                    subVisitors.add((TreeProcessor<Tree>) visitorClass((String) subVisitorNameAndConfig)
                             .getDeclaredConstructor().newInstance());
                 } else if (subVisitorNameAndConfig instanceof Map) {
                     //noinspection unchecked
                     for (Map.Entry<String, Object> subVisitorEntry : ((Map<String, Object>) subVisitorNameAndConfig)
                             .entrySet()) {
-                        @SuppressWarnings("unchecked") EvalVisitor<Tree> subVisitor =
-                                (EvalVisitor<Tree>) visitorClass(subVisitorEntry.getKey())
+                        @SuppressWarnings("unchecked") TreeProcessor<Tree> subVisitor =
+                                (TreeProcessor<Tree>) visitorClass(subVisitorEntry.getKey())
                                         .getDeclaredConstructor().newInstance();
 
                         propertyConverter.updateValue(subVisitor, subVisitorEntry.getValue());
@@ -254,7 +254,7 @@ public class YamlResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<? extends EvalVisitor<?>> loadVisitors() {
+    public Collection<? extends TreeProcessor<?>> loadVisitors() {
         return visitors;
     }
 
@@ -266,7 +266,7 @@ public class YamlResourceLoader implements ResourceLoader {
     private static class ResourceLoadedVisitor extends CompositeEvalVisitor {
         private final String name;
 
-        public ResourceLoadedVisitor(String name, List<EvalVisitor<? extends Tree>> delegates) {
+        public ResourceLoadedVisitor(String name, List<TreeProcessor<? extends Tree>> delegates) {
             this.name = name;
             delegates.forEach(this::addVisitor);
         }

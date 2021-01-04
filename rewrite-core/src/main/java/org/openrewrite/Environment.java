@@ -34,21 +34,21 @@ public class Environment {
     private static final Logger logger = LoggerFactory.getLogger(Environment.class);
 
     private final Map<String, Recipe> recipesByName;
-    private final Collection<EvalVisitor<?>> visitors;
+    private final Collection<TreeProcessor<?>> visitors;
     private final Map<String, Collection<Style>> stylesByName;
 
-    private Environment(Collection<Recipe> recipes, Collection<EvalVisitor<?>> visitors,
+    private Environment(Collection<Recipe> recipes, Collection<TreeProcessor<?>> visitors,
                         Map<String, Collection<Style>> stylesByName) {
         this.recipesByName = recipes.stream().collect(toMap(Recipe::getName, identity()));
         this.visitors = visitors;
         this.stylesByName = stylesByName;
     }
 
-    public <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor, String... recipes) {
+    public <T extends Tree, R extends TreeProcessor<T>> R configure(R visitor, String... recipes) {
         return configure(visitor, Arrays.asList(recipes));
     }
 
-    public <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor, Iterable<String> recipes) {
+    public <T extends Tree, R extends TreeProcessor<T>> R configure(R visitor, Iterable<String> recipes) {
         return loadedRecipes(recipes).stream()
                 .reduce(visitor, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1);
     }
@@ -57,11 +57,11 @@ public class Environment {
         return new HashMap<>(recipesByName);
     }
 
-    public Collection<EvalVisitor<?>> visitors(String... recipes) {
+    public Collection<TreeProcessor<?>> visitors(String... recipes) {
         return visitors(Arrays.asList(recipes));
     }
 
-    public Collection<EvalVisitor<?>> visitors(Iterable<String> recipes) {
+    public Collection<TreeProcessor<?>> visitors(Iterable<String> recipes) {
         List<Recipe> loadedRecipes = loadedRecipes(recipes);
         return visitors.stream()
                 .map(v -> loadedRecipes.stream().reduce(v, (v2, recipe) -> recipe.configure(v2), (v1, v2) -> v1))
@@ -98,7 +98,7 @@ public class Environment {
     public static class Builder {
         private final Properties properties;
         private final Map<String, RecipeConfiguration> recipesConfigurations = new HashMap<>();
-        private final Collection<EvalVisitor<?>> visitors = new ArrayList<>();
+        private final Collection<TreeProcessor<?>> visitors = new ArrayList<>();
         private final Map<String, Collection<Style>> stylesByName = new HashMap<>();
 
         public Builder(Properties properties) {
@@ -127,7 +127,7 @@ public class Environment {
             return this;
         }
 
-        public Builder loadVisitors(Collection<? extends EvalVisitor<?>> visitors) {
+        public Builder loadVisitors(Collection<? extends TreeProcessor<?>> visitors) {
             this.visitors.addAll(visitors);
             return this;
         }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.config;
 
-import org.openrewrite.EvalVisitor;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Style;
 
 import java.util.Collection;
@@ -24,7 +24,7 @@ import java.util.Map;
 public interface ResourceLoader {
     Collection<RecipeConfiguration> loadRecipes();
 
-    Collection<? extends EvalVisitor<?>> loadVisitors();
+    Collection<? extends TreeProcessor<?>> loadVisitors();
 
     Map<String, Collection<Style>> loadStyles();
 }

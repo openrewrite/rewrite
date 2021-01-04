@@ -24,7 +24,7 @@ public class ImportToString {
         return IMPORT_PRINTER.visit(impoort, null);
     }
 
-    private static final PrintJava<Void> IMPORT_PRINTER = new PrintJava<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> IMPORT_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public String visitImport(J.Import impoort, Void unused) {
             J.Import i = impoort.withPrefix(Space.EMPTY);

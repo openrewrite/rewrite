@@ -58,7 +58,7 @@ public interface J extends Serializable, Tree {
 
     @Override
     default String print() {
-        return new PrintJava<>(TreePrinter.identity()).visit(this, null);
+        return new JavaPrinter<>(TreePrinter.identity()).visit(this, null);
     }
 
     <J2 extends J> J2 withPrefix(Space space);

@@ -23,7 +23,7 @@ public class MethodDeclToString {
         return METHOD_PRINTER.visit(method, null);
     }
 
-    private static final PrintJava<Void> METHOD_PRINTER = new PrintJava<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public String visitMethod(J.MethodDecl method, Void unused) {
             return visitModifiers(method.getModifiers()).trim() +

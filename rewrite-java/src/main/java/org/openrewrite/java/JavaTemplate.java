@@ -16,12 +16,12 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.EvalContext;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.java.internal.PrintJava;
+import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -40,7 +40,7 @@ public class JavaTemplate {
     private final boolean autoFormat;
     private final String parameterMarker;
 
-    private final PrintJava<String> printer = new PrintJava<String>(new TreePrinter<J, String>() {
+    private final JavaPrinter<String> printer = new JavaPrinter<String>(new TreePrinter<J, String>() {
         @Override
         public String doLast(Tree tree, String printed, String acc) {
             if (tree instanceof Statement) {
@@ -126,7 +126,7 @@ public class JavaTemplate {
         return codeInstance;
     }
 
-    private static class ExtractTemplatedCode extends JavaEvalVisitor {
+    private static class ExtractTemplatedCode extends JavaProcessor {
         private long templateDepth = -1;
         private final List<J> templated = new ArrayList<>();
 
@@ -135,7 +135,7 @@ public class JavaTemplate {
         }
 
         @Override
-        public J visitEach(J tree, EvalContext ctx) {
+        public J visitEach(J tree, ExecutionContext ctx) {
             Comment startToken = findMarker(tree, "<<<<START>>>>");
             if (startToken != null) {
                 templateDepth = getCursor().getPathAsStream().count();

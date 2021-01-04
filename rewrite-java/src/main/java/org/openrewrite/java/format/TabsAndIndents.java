@@ -16,10 +16,10 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.EvalContext;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaIsoEvalVisitor;
+import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class TabsAndIndents extends JavaIsoEvalVisitor {
+public class TabsAndIndents extends JavaIsoProcessor {
     TabsAndIndentsStyle style;
 
     public TabsAndIndents() {
@@ -35,7 +35,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, EvalContext ctx) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
         style = cu.getStyle(TabsAndIndentsStyle.class);
         if (style == null) {
             style = IntelliJ.defaultTabsAndIndents();
@@ -44,7 +44,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public Statement visitStatement(Statement statement, EvalContext ctx) {
+    public Statement visitStatement(Statement statement, ExecutionContext ctx) {
         Statement s = statement;
 
         if (s.getPrefix().getWhitespace().contains("\n")) {
@@ -74,7 +74,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, EvalContext ctx) {
+    public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, ExecutionContext ctx) {
         J.ArrayDimension a = continuationIndent(super.visitArrayDimension(arrayDimension, ctx), enclosingStatement());
         a = a.withIndex(continuationIndent(a.getIndex(), enclosingStatement()));
         a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
@@ -82,28 +82,28 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.Assign visitAssign(J.Assign assign, EvalContext ctx) {
+    public J.Assign visitAssign(J.Assign assign, ExecutionContext ctx) {
         J.Assign a = super.visitAssign(assign, ctx);
         a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
         return a;
     }
 
     @Override
-    public J.AssignOp visitAssignOp(J.AssignOp assignOp, EvalContext ctx) {
+    public J.AssignOp visitAssignOp(J.AssignOp assignOp, ExecutionContext ctx) {
         J.AssignOp a = super.visitAssignOp(assignOp, ctx);
         a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
         return a;
     }
 
     @Override
-    public J.Binary visitBinary(J.Binary binary, EvalContext ctx) {
+    public J.Binary visitBinary(J.Binary binary, ExecutionContext ctx) {
         J.Binary b = super.visitBinary(binary, ctx);
         b = b.withOperator(continuationIndent(b.getOperator(), enclosingStatement()));
         return b;
     }
 
     @Override
-    public J.Block visitBlock(J.Block block, EvalContext ctx) {
+    public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
         J.Block j = super.visitBlock(block, ctx);
         if (j.getEnd().getWhitespace().contains("\n")) {
             Cursor cursor = getCursor().getParentOrThrow();
@@ -121,7 +121,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, EvalContext ctx) {
+    public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
         J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, ctx);
         if (d.getWhileCondition().getBefore().getWhitespace().contains("\n")) {
             d = d.withWhileCondition(d.getWhileCondition().withBefore(
@@ -131,7 +131,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public Expression visitExpression(Expression expression, EvalContext ctx) {
+    public Expression visitExpression(Expression expression, ExecutionContext ctx) {
         Expression e = super.visitExpression(expression, ctx);
         if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
                 !(getCursor().getParentOrThrow().getTree() instanceof J.Case) &&
@@ -142,7 +142,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.ForLoop visitForLoop(J.ForLoop forLoop, EvalContext ctx) {
+    public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
         J.ForLoop f = (J.ForLoop) visitStatement(forLoop, ctx);
         f = f.withBody(eval(f.getBody(), ctx));
 
@@ -197,16 +197,16 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.MemberReference visitMemberReference(J.MemberReference memberRef, EvalContext ctx) {
+    public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
         J.MemberReference m = super.visitMemberReference(memberRef, ctx);
 //        m = m.with
         return m;
     }
 
     @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, EvalContext ctx) {
+    public J.MethodDecl visitMethod(J.MethodDecl method, ExecutionContext ctx) {
         J.MethodDecl m = (J.MethodDecl) visitStatement(method, ctx);
-        m = m.withBody(eval(method.getBody(), ctx));
+        m = m.withBody(call(method.getBody(), ctx));
 
         List<JRightPadded<Statement>> params = m.getParams().getElem();
         if (!params.isEmpty()) {
@@ -238,7 +238,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.Ternary visitTernary(J.Ternary ternary, EvalContext ctx) {
+    public J.Ternary visitTernary(J.Ternary ternary, ExecutionContext ctx) {
         J.Ternary t = super.visitTernary(ternary, ctx);
         t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
         t = t.withFalsePart(continuationIndent(t.getFalsePart(), enclosingStatement()));
@@ -246,7 +246,7 @@ public class TabsAndIndents extends JavaIsoEvalVisitor {
     }
 
     @Override
-    public J.Unary visitUnary(J.Unary unary, EvalContext ctx) {
+    public J.Unary visitUnary(J.Unary unary, ExecutionContext ctx) {
         J.Unary u = super.visitUnary(unary, ctx);
         u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
         return u;

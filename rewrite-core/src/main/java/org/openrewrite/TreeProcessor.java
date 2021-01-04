@@ -15,8 +15,6 @@
  */
 package org.openrewrite;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.management.ManagementFactory;
@@ -24,40 +22,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
-public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, EvalContext> {
+public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, ExecutionContext> {
+    public static final TreeProcessor<?> NOOP = new TreeProcessor<Tree>() {
+        @Override
+        Tree visitInternal(Tree tree, ExecutionContext ctx) {
+            return tree;
+        }
+    };
+
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
     private boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
-    private final ThreadLocal<List<Task<? extends T>>> andThen = new ThreadLocal<>();
-
-    /**
-     * @return Other visitors that are run after this one.
-     */
-    public List<Task<? extends T>> onNext() {
-        return andThen.get();
-    }
-
-    /**
-     * Used to build up pipelines of visitors.
-     *
-     * @param visitor The visitor to run after this visitor.
-     */
-    protected void doOnComplete(EvalVisitor<T> visitor) {
-        doOnComplete(visitor, null);
-    }
-
-    /**
-     * Used to build up pipelines of visitors.
-     *
-     * @param visitor The visitor to run after this visitor.
-     * @param cursor The cursor to start the next visitor at.
-     */
-    protected void doOnComplete(EvalVisitor<T> visitor, @Nullable Cursor cursor) {
-        andThen.get().add(new Task<>(visitor, cursor));
-    }
+    private final ThreadLocal<List<TreeProcessor<T>>> afterVisit = new ThreadLocal<>();
 
     protected final void setCursoringOn() {
         this.cursored = true;
@@ -67,14 +46,8 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
         this.cursor.set(new Cursor(getCursor().getParent(), t));
     }
 
-    public void next() {
-        synchronized (this) {
-            if (andThen.get() != null) {
-                andThen.get().clear();
-            } else {
-                andThen.set(new ArrayList<>());
-            }
-        }
+    protected void doAfterVisit(TreeProcessor<T> visitor) {
+        afterVisit.get().add(visitor);
     }
 
     public boolean isIdempotent() {
@@ -90,19 +63,25 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
     }
 
     @Nullable
-    public T visitEach(T tree, EvalContext ctx) {
+    public T visitEach(T tree, ExecutionContext ctx) {
         return defaultValue(tree, ctx);
     }
 
-    public final T scan(Tree tree, EvalContext ctx, Cursor cursor) {
-        this.cursor.set(cursor);
-        return visit(tree, ctx);
+    @Nullable
+    public final T visit(@Nullable Tree tree, ExecutionContext ctx) {
+        return visitInternal(tree, ctx);
     }
 
     @Nullable
-    public T visit(@Nullable Tree tree, EvalContext ctx) {
+    T visitInternal(Tree tree, ExecutionContext ctx) {
         if (tree == null) {
             return defaultValue(null, ctx);
+        }
+
+        boolean topLevel = false;
+        if(afterVisit.get() == null) {
+            topLevel = true;
+            afterVisit.set(new ArrayList<>());
         }
 
         if (cursored) {
@@ -111,6 +90,7 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
 
         @SuppressWarnings("unchecked") T t = visitEach((T) tree, ctx);
         if(t == null) {
+            afterVisit.remove();
             return defaultValue(null, ctx);
         }
 
@@ -120,39 +100,34 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
             cursor.set(cursor.get().getParent());
         }
 
+        if(topLevel) {
+            for (TreeProcessor<T> v : afterVisit.get()) {
+                t = v.visit(tree, ctx);
+            }
+            afterVisit.remove();
+        }
+
         return t;
     }
 
     @Nullable
     @Override
-    public T defaultValue(@Nullable Tree tree, EvalContext ctx) {
+    public T defaultValue(@Nullable Tree tree, ExecutionContext ctx) {
         //noinspection unchecked
         return (T) tree;
     }
 
-    public Iterable<Tag> getTags() {
-        return Tags.empty();
-    }
-
-    public Validated validate() {
-        return Validated.none();
-    }
-
-    public String getName() {
-        return getClass().getName();
-    }
-
-    protected <T2 extends Tree> T2 eval(T2 t, EvalContext ctx, BiFunction<T2, EvalContext, Tree> callSuper) {
+    protected <T2 extends Tree> T2 call(T2 t, ExecutionContext ctx, BiFunction<T2, ExecutionContext, Tree> callSuper) {
         //noinspection unchecked
         return (T2) callSuper.apply(t, ctx);
     }
 
-    protected <T2 extends T> T2 eval(@Nullable Tree tree, EvalContext ctx) {
+    protected <T2 extends T> T2 call(@Nullable Tree tree, ExecutionContext ctx) {
         //noinspection unchecked
         return (T2) visit(tree, ctx);
     }
 
-    protected <T2 extends T> List<T2> eval(@Nullable List<T2> trees, EvalContext ctx) {
+    protected <T2 extends T> List<T2> call(@Nullable List<T2> trees, ExecutionContext ctx) {
         if (trees == null) {
             return null;
         }
@@ -170,26 +145,5 @@ public abstract class EvalVisitor<T extends Tree> implements TreeVisitor<T, Eval
         }
 
         return changed ? mutatedTrees : trees;
-    }
-
-    public static class Task<T> {
-        private final EvalVisitor<? extends T> next;
-
-        @Nullable
-        private final Cursor startingCursor;
-
-        public Task(EvalVisitor<? extends T> next, @Nullable Cursor startingCursor) {
-            this.next = next;
-            this.startingCursor = startingCursor;
-        }
-
-        public EvalVisitor<? extends T> getNext() {
-            return next;
-        }
-
-        @Nullable
-        public Cursor getStartingCursor() {
-            return startingCursor;
-        }
     }
 }

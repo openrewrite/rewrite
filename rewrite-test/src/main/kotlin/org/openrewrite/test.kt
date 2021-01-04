@@ -31,7 +31,7 @@ fun <S : SourceFile> Path.whenParsedBy(parser: Parser<S>): Assertions.PathSource
  * Intended to be used for testing, not guaranteed to replicate how build plugins or other rewrite consumers
  * may construct environments.
  */
-fun loadVisitorsForTest(vararg recipeNames: String): Collection<EvalVisitor<*>> {
+fun loadVisitorsForTest(vararg recipeNames: String): Collection<TreeProcessor<*>> {
     val classpath = ClassGraph()
             .classpathURIs.map { Paths.get(it) }
     return Environment.builder()

@@ -1,38 +1,67 @@
-/*
- * Copyright 2020 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.openrewrite;
 
-import java.util.Set;
-import java.util.regex.Pattern;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 
-public interface Recipe {
-    String getName();
+import java.util.List;
 
-    default FilterReply accept(EvalVisitor<?> visitor) {
-        return visitor.validate().isValid() ? FilterReply.ACCEPT : FilterReply.DENY;
+import static java.util.Collections.emptyList;
+
+public abstract class Recipe {
+    @Nullable
+    private Recipe next;
+    private final TreeProcessor<?> processor;
+
+    protected Recipe(TreeProcessor<?> processor) {
+        this.processor = processor;
     }
 
-    default <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor) {
-        return visitor;
+    protected Recipe() {
+        this.processor = TreeProcessor.NOOP;
     }
 
-    Set<Pattern> getInclude();
-    Set<Pattern> getExclude();
+    protected void doNext(Recipe recipe) {
+        Recipe head = this;
+        for (Recipe tail = next; tail != null; tail = tail.next) {
 
-    enum FilterReply {
-        ACCEPT, DENY, NEUTRAL
+        }
+        head.next = recipe;
+    }
+
+    protected List<SourceFile> visit(List<SourceFile> sourceFiles, ExecutionContext execution) {
+        List<SourceFile> after = emptyList();
+        for (int i = 0; i < execution.getMaxCycles() && after != sourceFiles; i++) {
+            // if this recipe isn't valid we just skip it and proceed to next
+            if (validate().isValid()) {
+                after = ListUtils.map(sourceFiles, s -> (SourceFile) processor.visit(s, execution));
+            }
+            if (next != null) {
+                after = next.visit(after, execution);
+            }
+        }
+        return after;
+    }
+
+    public final List<Result> run(List<SourceFile> sourceFiles) {
+        return run(sourceFiles, new ExecutionContext(3, false));
+    }
+
+    public final List<Result> run(List<SourceFile> sourceFiles, ExecutionContext context) {
+        List<SourceFile> after = visit(sourceFiles, context);
+
+        if (after == sourceFiles) {
+            return emptyList();
+        }
+
+        // FIXME compute list difference between sourceFiles and after and generate Result
+        return emptyList();
+    }
+
+    public Validated validate() {
+        return Validated.none();
+    }
+
+    public String getName() {
+        return getClass().getName();
     }
 }

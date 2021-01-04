@@ -40,7 +40,7 @@ public class RecipeConfiguration {
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     @SuppressWarnings("rawtypes")
-    private final Map<Class<? extends EvalVisitor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
+    private final Map<Class<? extends TreeProcessor>, Map<String, Object>> propertiesByVisitor = new IdentityHashMap<>();
 
     private String name = null;
     private Set<Pattern> include = emptySet();
@@ -105,14 +105,14 @@ public class RecipeConfiguration {
         if(validated.isInvalid()) {
             throw new ValidationException(validated);
         }
-        return new Recipe() {
+        return new Recipe(processor) {
             @Override
             public String getName() {
                 return name;
             }
 
             @Override
-            public FilterReply accept(EvalVisitor<?> visitor) {
+            public FilterReply accept(TreeProcessor<?> visitor) {
                 return inOrderConfigurations.stream().reduce(
                         NEUTRAL,
                         (reply, config) -> reply.equals(NEUTRAL) ? config.accept(visitor) : reply,
@@ -121,7 +121,7 @@ public class RecipeConfiguration {
             }
 
             @Override
-            public <T extends Tree, R extends EvalVisitor<T>> R configure(R visitor) {
+            public <T extends Tree, R extends TreeProcessor<T>> R configure(R visitor) {
                 Iterator<RecipeConfiguration> configs = inOrderConfigurations.descendingIterator();
                 while (configs.hasNext()) {
                     configs.next().configure(visitor);
@@ -137,7 +137,7 @@ public class RecipeConfiguration {
         };
     }
 
-    private void configure(EvalVisitor<?> visitor) {
+    private void configure(TreeProcessor<?> visitor) {
         try {
             propertyConverter.updateValue(visitor, propertyMap(visitor));
         } catch (JsonMappingException e) {
@@ -145,7 +145,7 @@ public class RecipeConfiguration {
         }
     }
 
-    protected Map<String, Object> propertyMap(EvalVisitor<?> visitor) {
+    protected Map<String, Object> propertyMap(TreeProcessor<?> visitor) {
         return propertiesByVisitor.computeIfAbsent(visitor.getClass(),
                 clazz -> propertyMap(clazz.getName(), configure));
     }
@@ -200,7 +200,7 @@ public class RecipeConfiguration {
         return properties;
     }
 
-    private Recipe.FilterReply accept(EvalVisitor<?> visitor) {
+    private Recipe.FilterReply accept(TreeProcessor<?> visitor) {
         if (visitor.validate().isInvalid() || exclude.stream().anyMatch(i -> i.matcher(visitor.getName()).matches())) {
             return Recipe.FilterReply.DENY;
         }

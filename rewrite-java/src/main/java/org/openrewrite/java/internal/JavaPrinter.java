@@ -25,10 +25,10 @@ import java.util.List;
 
 import static org.openrewrite.java.tree.J.Modifier.*;
 
-public class PrintJava<P> implements JavaVisitor<String, P> {
+public class JavaPrinter<P> implements JavaVisitor<String, P> {
     private final TreePrinter<J, P> treePrinter;
 
-    public PrintJava(TreePrinter<J, P> treePrinter) {
+    public JavaPrinter(TreePrinter<J, P> treePrinter) {
         this.treePrinter = treePrinter;
     }
 

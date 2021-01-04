@@ -21,6 +21,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
+import org.openrewrite.TreeProcessor;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -52,7 +53,7 @@ public class Markers {
     }
 
     /**
-     * {@link org.openrewrite.EvalVisitor} may respond to a marker to determine whether to act on
+     * {@link TreeProcessor} may respond to a marker to determine whether to act on
      * a source file or not.
      *
      * @return A marker collection containing any additional context about the containing {@link Tree} element.

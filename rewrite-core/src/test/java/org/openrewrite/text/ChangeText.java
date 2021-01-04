@@ -18,7 +18,7 @@ package org.openrewrite.text;
 import org.openrewrite.*;
 
 @AutoConfigure
-public class ChangeText extends EvalVisitor<PlainText> {
+public class ChangeText extends TreeProcessor<PlainText> {
     private String toText;
 
     public ChangeText() {
@@ -38,7 +38,7 @@ public class ChangeText extends EvalVisitor<PlainText> {
     }
 
     @Override
-    public PlainText visitEach(PlainText tree, EvalContext ctx) {
+    public PlainText visitEach(PlainText tree, ExecutionContext ctx) {
         return tree.withText(toText);
     }
 }

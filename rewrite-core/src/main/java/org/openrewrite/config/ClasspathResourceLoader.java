@@ -17,7 +17,7 @@ package org.openrewrite.config;
 
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
-import org.openrewrite.EvalVisitor;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Style;
 
 import java.net.URI;
@@ -58,7 +58,7 @@ public class ClasspathResourceLoader implements ResourceLoader {
     }
 
     @Override
-    public Collection<? extends EvalVisitor<?>> loadVisitors() {
+    public Collection<? extends TreeProcessor<?>> loadVisitors() {
         return resourceLoaderByOrigin.values().stream().flatMap(loader -> loader.loadVisitors().stream()).collect(toList());
     }
 

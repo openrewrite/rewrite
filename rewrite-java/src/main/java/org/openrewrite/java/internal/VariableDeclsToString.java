@@ -26,7 +26,7 @@ public class VariableDeclsToString {
         return VARIABLE_PRINTER.visit(v, null);
     }
 
-    private static final PrintJava<Void> VARIABLE_PRINTER = new PrintJava<Void>(TreePrinter.identity()) {
+    private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public String visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
             return visitModifiers(multiVariable.getModifiers()).trim() +

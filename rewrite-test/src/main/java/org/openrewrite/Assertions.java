@@ -57,34 +57,34 @@ public class Assertions {
             return this;
         }
 
-        public EvalAssert<S> whenVisitedBy(EvalVisitor<?> visitor) {
-            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
-            return new EvalAssert<>(primary(sources), sources).whenVisitedBy(visitor);
+        public RecipeAssert whenVisitedBy(Recipe visitor) {
+            List<SourceFile> sources = parser.parse(sourceFiles.toArray(new String[0]));
+            return new RecipeAssert(primary(sources), sources).whenVisitedBy(visitor);
         }
 
-        public EvalAssert<S> whenVisitedBy(Iterable<EvalVisitor<?>> visitors) {
-            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
-            return new EvalAssert<>(primary(sources), sources).whenVisitedBy(visitors);
+        public RecipeAssert whenVisitedBy(Iterable<Recipe> visitors) {
+            List<SourceFile> sources = parser.parse(sourceFiles.toArray(new String[0]));
+            return new RecipeAssert(primary(sources), sources).whenVisitedBy(visitors);
         }
 
-        public EvalAssert<S> whenVisitedByMapped(Function<S, EvalVisitor<? super S>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
-            return new EvalAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
+        public RecipeAssert whenVisitedByMapped(Function<SourceFile, Recipe> visitorFunction) {
+            List<SourceFile> sources = parser.parse(sourceFiles.toArray(new String[0]));
+            return new RecipeAssert(primary(sources), sources).whenVisitedByMapped(visitorFunction);
         }
 
-        public EvalAssert<S> whenVisitedByMany(Function<S, Iterable<EvalVisitor<? super S>>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles.toArray(new String[0]));
-            return new EvalAssert<>(primary(sources), sources).whenVisitedByMany(visitorFunction);
+        public RecipeAssert whenVisitedByMany(Function<SourceFile, Iterable<Recipe>> visitorFunction) {
+            List<SourceFile> sources = parser.parse(sourceFiles.toArray(new String[0]));
+            return new RecipeAssert(primary(sources), sources).whenVisitedByMany(visitorFunction);
         }
 
-        private S primary(List<S> sources) {
+        private S primary(List<SourceFile> sources) {
             return sources.stream().filter(s -> s.print().trim().equals(primarySource)).findAny()
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
         }
     }
 
     public static class PathSourceFileAssert<S extends SourceFile> {
-        private final Parser<S> parser;
+        private final Parser<SourceFile> parser;
 
         private final Path primarySource;
         private final List<Path> sourceFiles = new ArrayList<>();
@@ -108,66 +108,64 @@ public class Assertions {
             return this;
         }
 
-        public EvalAssert<S> whenVisitedBy(EvalVisitor<?> visitor) {
-            List<S> sources = parser.parse(sourceFiles, relativeTo);
-            return new EvalAssert<>(primary(sources), sources).whenVisitedBy(visitor);
+        public RecipeAssert whenVisitedBy(Recipe visitor) {
+            List<SourceFile> sources = parser.parse(sourceFiles, relativeTo);
+            return new RecipeAssert(primary(sources), sources).whenVisitedBy(visitor);
         }
 
-        public EvalAssert<S> whenVisitedBy(Iterable<EvalVisitor<?>> visitors) {
-            List<S> sources = parser.parse(sourceFiles, relativeTo);
-            return new EvalAssert<>(primary(sources), sources).whenVisitedBy(visitors);
+        public RecipeAssert whenVisitedBy(Iterable<Recipe> visitors) {
+            List<SourceFile> sources = parser.parse(sourceFiles, relativeTo);
+            return new RecipeAssert(primary(sources), sources).whenVisitedBy(visitors);
         }
 
-        public EvalAssert<S> whenVisitedByMapped(Function<S, EvalVisitor<? super S>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles, relativeTo);
-            return new EvalAssert<>(primary(sources), sources).whenVisitedByMapped(visitorFunction);
+        public RecipeAssert whenVisitedByMapped(Function<SourceFile, Recipe> visitorFunction) {
+            List<SourceFile> sources = parser.parse(sourceFiles, relativeTo);
+            return new RecipeAssert(primary(sources), sources).whenVisitedByMapped(visitorFunction);
         }
 
-        public EvalAssert<S> whenVisitedByMany(Function<S, Iterable<EvalVisitor<? super S>>> visitorFunction) {
-            List<S> sources = parser.parse(sourceFiles, relativeTo);
-            return new EvalAssert<>(primary(sources), sources).whenVisitedByMany(visitorFunction);
+        public RecipeAssert whenVisitedByMany(Function<SourceFile, Iterable<Recipe>> visitorFunction) {
+            List<SourceFile> sources = parser.parse(sourceFiles, relativeTo);
+            return new RecipeAssert(primary(sources), sources).whenVisitedByMany(visitorFunction);
         }
 
-        private S primary(List<S> sources) {
+        private S primary(List<SourceFile> sources) {
             return sources.stream().filter(s -> s.getSourcePath().equals(primarySource)).findAny()
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
         }
     }
 
-    public static class EvalAssert<S extends SourceFile> {
-        private final Eval.Builder eval = Eval.builder().eagerlyThrow(true);
+    public static class RecipeAssert extends Recipe {
+        private final SourceFile primarySource;
+        private final List<SourceFile> sources;
 
-        private final S primarySource;
-        private final List<S> sources;
-
-        public EvalAssert(S primarySource, List<S> sources) {
+        public RecipeAssert(SourceFile primarySource, List<SourceFile> sources) {
             this.primarySource = primarySource;
             this.sources = sources;
         }
 
-        public EvalAssert<S> whenVisitedBy(EvalVisitor<?> visitor) {
-            eval.visit(visitor);
+        public RecipeAssert whenVisitedBy(Recipe visitor) {
+            doNext(visitor);
             return this;
         }
 
-        public EvalAssert<S> whenVisitedBy(Iterable<EvalVisitor<?>> visitors) {
-            eval.visit(visitors);
+        public RecipeAssert whenVisitedBy(Iterable<Recipe> visitors) {
+            visitors.forEach(this::doNext);
             return this;
         }
 
-        public EvalAssert<S> whenVisitedByMapped(Function<S, EvalVisitor<? super S>> visitorFunction) {
+        public RecipeAssert whenVisitedByMapped(Function<SourceFile, Recipe> visitorFunction) {
             assertThat(sources).withFailMessage("Expected sources to be provided, but none were.").isNotEmpty();
             return whenVisitedBy(visitorFunction.apply(sources.iterator().next()));
         }
 
-        public EvalAssert<S> whenVisitedByMany(Function<S, Iterable<EvalVisitor<? super S>>> visitorFunction) {
+        public RecipeAssert whenVisitedByMany(Function<SourceFile, Iterable<Recipe>> visitorFunction) {
             assertThat(sources).withFailMessage("Expected sources to be provided, but none were.").isNotEmpty();
-            visitorFunction.apply(sources.iterator().next()).forEach(eval::visit);
+            visitorFunction.apply(sources.iterator().next()).forEach(this::doNext);
             return this;
         }
 
         private SourceFile doEval() {
-            Collection<Result> fixes = eval.build().visit(sources);
+            Collection<Result> fixes = run(sources, new ExecutionContext(2, true));
             assertThat(fixes).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotEmpty();
 
             return fixes.stream().filter(f -> primarySource.equals(f.getBefore())).findAny()
@@ -175,36 +173,34 @@ public class Assertions {
                     .orElseThrow(() -> new IllegalStateException("unable to find primary source"));
         }
 
-        public EvalAssert<S> isRefactoredTo(String expected) {
+        public RecipeAssert isRefactoredTo(String expected) {
             return isRefactoredTo(expected, s -> {
             });
         }
 
-        @SuppressWarnings("unchecked")
-        public EvalAssert<S> isRefactoredTo(String expected, Consumer<S> conditions) {
-            S fixed = (S) doEval();
+        public RecipeAssert isRefactoredTo(String expected, Consumer<SourceFile> conditions) {
+            SourceFile fixed = doEval();
             assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected));
             conditions.accept(fixed);
             return this;
         }
 
-        public EvalAssert<S> isRefactoredTo(Supplier<String> expected) {
+        public RecipeAssert isRefactoredTo(Supplier<String> expected) {
             return isRefactoredTo(expected, s -> {});
         }
 
-        @SuppressWarnings("unchecked")
-        public EvalAssert<S> isRefactoredTo(Supplier<String> expected, Consumer<S> conditions) {
-            S fixed = (S) doEval();
+        public RecipeAssert isRefactoredTo(Supplier<String> expected, Consumer<SourceFile> conditions) {
+            SourceFile fixed = doEval();
             assertThat(fixed).withFailMessage("Expecting refactoring visitor to make changes to source file, but none were made.").isNotNull();
             assertThat(fixed.printTrimmed()).isEqualTo(StringUtils.trimIndent(expected.get()));
 
             return this;
         }
 
-        public EvalAssert<S> isUnchanged() {
+        public RecipeAssert isUnchanged() {
             List<String> results = new ArrayList<>();
-            for (Result result : eval.build().visit(sources)) {
+            for (Result result : run(sources, new ExecutionContext(2, true))) {
                 if (result.getAfter() != null) {
                     results.add(result.getAfter().printTrimmed());
                 } else {
@@ -217,11 +213,9 @@ public class Assertions {
             return this;
         }
 
-        @SuppressWarnings("unchecked")
-        public List<S> results() {
-            return eval.build().visit(sources).stream()
+        public List<SourceFile> results() {
+            return run(sources, new ExecutionContext(2, true)).stream()
                     .map(Result::getAfter)
-                    .map(s -> (S) s)
                     .collect(toList());
         }
     }

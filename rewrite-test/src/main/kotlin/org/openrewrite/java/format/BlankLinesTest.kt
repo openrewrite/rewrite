@@ -16,13 +16,13 @@
 package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.EvalVisitor
-import org.openrewrite.EvalVisitorTest
+import org.openrewrite.TreeProcessor
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
 
-interface BlankLinesTest : EvalVisitorTest {
-    override val visitors: Iterable<EvalVisitor<*>>
+interface BlankLinesTest : RecipeTest {
+    override val visitors: Iterable<TreeProcessor<*>>
         get() = listOf(BlankLines())
 
     @Test

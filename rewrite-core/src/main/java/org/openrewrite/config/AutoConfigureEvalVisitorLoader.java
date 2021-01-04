@@ -19,7 +19,7 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ScanResult;
 import org.jetbrains.annotations.NotNull;
 import org.openrewrite.AutoConfigure;
-import org.openrewrite.EvalVisitor;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Style;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,8 +51,8 @@ public class AutoConfigureEvalVisitorLoader implements ResourceLoader {
         this.acceptVisitorPackages = acceptVisitorPackages;
     }
 
-    public Collection<? extends EvalVisitor<?>> loadVisitors() {
-        List<EvalVisitor<?>> visitors = new ArrayList<>(loadVisitors(new ClassGraph()));
+    public Collection<? extends TreeProcessor<?>> loadVisitors() {
+        List<TreeProcessor<?>> visitors = new ArrayList<>(loadVisitors(new ClassGraph()));
 
         if (compileClasspath.iterator().hasNext()) {
             URLClassLoader classpathLoader = new URLClassLoader(
@@ -80,7 +80,7 @@ public class AutoConfigureEvalVisitorLoader implements ResourceLoader {
     }
 
     @NotNull
-    private List<EvalVisitor<?>> loadVisitors(ClassGraph classGraph) {
+    private List<TreeProcessor<?>> loadVisitors(ClassGraph classGraph) {
         if (acceptVisitorPackages != null && acceptVisitorPackages.length > 0) {
             classGraph = classGraph.acceptPackages(acceptVisitorPackages);
         }
@@ -96,7 +96,7 @@ public class AutoConfigureEvalVisitorLoader implements ResourceLoader {
                         try {
                             Constructor<?> constructor = visitorClass.getConstructor();
                             constructor.setAccessible(true);
-                            return (EvalVisitor<?>) constructor.newInstance();
+                            return (TreeProcessor<?>) constructor.newInstance();
                         } catch (Exception e) {
                             logger.warn("Unable to configure {}", visitorClass.getName(), e);
                         }

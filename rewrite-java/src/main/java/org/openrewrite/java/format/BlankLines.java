@@ -16,9 +16,9 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.EvalContext;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.java.JavaEvalVisitor;
+import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.style.BlankLineStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
@@ -28,7 +28,7 @@ import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
 
-public class BlankLines extends JavaEvalVisitor {
+public class BlankLines extends JavaProcessor {
     BlankLineStyle style;
 
     public BlankLines() {
@@ -36,13 +36,13 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitCompilationUnit(J.CompilationUnit cu, EvalContext ctx) {
+    public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
         style = cu.getStyle(BlankLineStyle.class);
         if (style == null) {
             style = IntelliJ.defaultBlankLine();
         }
 
-        J.CompilationUnit j = eval(cu, ctx, super::visitCompilationUnit);
+        J.CompilationUnit j = call(cu, ctx, super::visitCompilationUnit);
 
         if (j.getPackageDecl() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
@@ -87,8 +87,8 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitClassDecl(J.ClassDecl classDecl, EvalContext ctx) {
-        J.ClassDecl j = eval(classDecl, ctx, super::visitClassDecl);
+    public J visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
+        J.ClassDecl j = call(classDecl, ctx, super::visitClassDecl);
 
         List<JRightPadded<Statement>> statements = j.getBody().getStatements();
         j = j.withBody(j.getBody().withStatements(ListUtils.map(statements, (i, s) -> {
@@ -125,8 +125,8 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitMethod(J.MethodDecl method, EvalContext ctx) {
-        J.MethodDecl j = eval(method, ctx, super::visitMethod);
+    public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
+        J.MethodDecl j = call(method, ctx, super::visitMethod);
 
         if (j.getBody() != null) {
             if (j.getBody().getStatements().isEmpty()) {
@@ -146,8 +146,8 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitNewClass(J.NewClass newClass, EvalContext ctx) {
-        J.NewClass j = eval(newClass, ctx, super::visitNewClass);
+    public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+        J.NewClass j = call(newClass, ctx, super::visitNewClass);
 
         if (j.getBody() != null) {
             j = j.withBody(j.getBody().withStatements(ListUtils.mapFirst(j.getBody().getStatements(), s ->
@@ -158,8 +158,8 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitStatement(Statement statement, EvalContext ctx) {
-        J j = eval(statement, ctx, super::visitStatement);
+    public J visitStatement(Statement statement, ExecutionContext ctx) {
+        J j = call(statement, ctx, super::visitStatement);
         Cursor parent = getCursor().getParentOrThrow();
         if (parent.getParent() != null && !(parent.getParentOrThrow().getTree() instanceof J.ClassDecl)) {
             return keepMaximumLines(j, style.getKeepMaximum().getInCode());
@@ -168,8 +168,8 @@ public class BlankLines extends JavaEvalVisitor {
     }
 
     @Override
-    public J visitBlock(J.Block block, EvalContext ctx) {
-        J.Block j = eval(block, ctx, super::visitBlock);
+    public J visitBlock(J.Block block, ExecutionContext ctx) {
+        J.Block j = call(block, ctx, super::visitBlock);
         j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
         return j;
     }
