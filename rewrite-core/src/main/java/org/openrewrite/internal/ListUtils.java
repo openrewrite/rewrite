@@ -67,6 +67,12 @@ public final class ListUtils {
                 newLs.set(i, newTree);
             }
         }
+
+        if(newLs != ls) {
+            //noinspection StatementWithEmptyBody
+            while(newLs.remove(null));
+        }
+
         return newLs;
     }
 

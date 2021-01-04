@@ -8,38 +8,50 @@ import java.util.List;
 import static java.util.Collections.emptyList;
 
 public abstract class Recipe {
+    public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
+        @Override
+        Tree visitInternal(Tree tree, ExecutionContext ctx) {
+            return tree;
+        }
+    };
+
     @Nullable
     private Recipe next;
-    private final TreeProcessor<?> processor;
+    private final TreeProcessor<?, ExecutionContext> processor;
 
-    protected Recipe(TreeProcessor<?> processor) {
+    protected Recipe(TreeProcessor<?, ExecutionContext> processor) {
         this.processor = processor;
     }
 
     protected Recipe() {
-        this.processor = TreeProcessor.NOOP;
+        this.processor = NOOP;
     }
 
     protected void doNext(Recipe recipe) {
         Recipe head = this;
         for (Recipe tail = next; tail != null; tail = tail.next) {
-
+            // FIXME implement me!
         }
         head.next = recipe;
     }
 
     protected List<SourceFile> visit(List<SourceFile> sourceFiles, ExecutionContext execution) {
-        List<SourceFile> after = emptyList();
-        for (int i = 0; i < execution.getMaxCycles() && after != sourceFiles; i++) {
+        List<SourceFile> acc = sourceFiles;
+        List<SourceFile> temp = acc;
+        for (int i = 0; i < execution.getMaxCycles(); i++) {
             // if this recipe isn't valid we just skip it and proceed to next
             if (validate().isValid()) {
-                after = ListUtils.map(sourceFiles, s -> (SourceFile) processor.visit(s, execution));
+                temp = ListUtils.map(temp, s -> (SourceFile) processor.visit(s, execution));
             }
             if (next != null) {
-                after = next.visit(after, execution);
+                temp = next.visit(temp, execution);
             }
+            if (temp == acc) {
+                break;
+            }
+            acc = temp;
         }
-        return after;
+        return acc;
     }
 
     public final List<Result> run(List<SourceFile> sourceFiles) {

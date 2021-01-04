@@ -22,21 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
-public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, ExecutionContext> {
-    public static final TreeProcessor<?> NOOP = new TreeProcessor<Tree>() {
-        @Override
-        Tree visitInternal(Tree tree, ExecutionContext ctx) {
-            return tree;
-        }
-    };
-
+public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T, P> {
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
     private boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
-    private final ThreadLocal<List<TreeProcessor<T>>> afterVisit = new ThreadLocal<>();
+    private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();
 
     protected final void setCursoringOn() {
         this.cursored = true;
@@ -46,7 +39,7 @@ public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, Ex
         this.cursor.set(new Cursor(getCursor().getParent(), t));
     }
 
-    protected void doAfterVisit(TreeProcessor<T> visitor) {
+    protected void doAfterVisit(TreeProcessor<T, P> visitor) {
         afterVisit.get().add(visitor);
     }
 
@@ -63,19 +56,19 @@ public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, Ex
     }
 
     @Nullable
-    public T visitEach(T tree, ExecutionContext ctx) {
-        return defaultValue(tree, ctx);
+    public T visitEach(T tree, P p) {
+        return defaultValue(tree, p);
     }
 
     @Nullable
-    public final T visit(@Nullable Tree tree, ExecutionContext ctx) {
-        return visitInternal(tree, ctx);
+    public final T visit(@Nullable Tree tree, P p) {
+        return visitInternal(tree, p);
     }
 
     @Nullable
-    T visitInternal(Tree tree, ExecutionContext ctx) {
+    T visitInternal(Tree tree, P p) {
         if (tree == null) {
-            return defaultValue(null, ctx);
+            return defaultValue(null, p);
         }
 
         boolean topLevel = false;
@@ -88,21 +81,21 @@ public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, Ex
             cursor.set(new Cursor(cursor.get(), tree));
         }
 
-        @SuppressWarnings("unchecked") T t = visitEach((T) tree, ctx);
+        @SuppressWarnings("unchecked") T t = visitEach((T) tree, p);
         if(t == null) {
             afterVisit.remove();
-            return defaultValue(null, ctx);
+            return defaultValue(null, p);
         }
 
-        t = t.accept(this, ctx);
+        t = t.accept(this, p);
 
         if (cursored) {
             cursor.set(cursor.get().getParent());
         }
 
         if(topLevel) {
-            for (TreeProcessor<T> v : afterVisit.get()) {
-                t = v.visit(tree, ctx);
+            for (TreeProcessor<T, P> v : afterVisit.get()) {
+                t = v.visit(tree, p);
             }
             afterVisit.remove();
         }
@@ -112,22 +105,22 @@ public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, Ex
 
     @Nullable
     @Override
-    public T defaultValue(@Nullable Tree tree, ExecutionContext ctx) {
+    public T defaultValue(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T) tree;
     }
 
-    protected <T2 extends Tree> T2 call(T2 t, ExecutionContext ctx, BiFunction<T2, ExecutionContext, Tree> callSuper) {
+    protected <T2 extends Tree> T2 call(T2 t, P p, BiFunction<T2, P, Tree> callSuper) {
         //noinspection unchecked
-        return (T2) callSuper.apply(t, ctx);
+        return (T2) callSuper.apply(t, p);
     }
 
-    protected <T2 extends T> T2 call(@Nullable Tree tree, ExecutionContext ctx) {
+    protected <T2 extends T> T2 call(@Nullable Tree tree, P p) {
         //noinspection unchecked
-        return (T2) visit(tree, ctx);
+        return (T2) visit(tree, p);
     }
 
-    protected <T2 extends T> List<T2> call(@Nullable List<T2> trees, ExecutionContext ctx) {
+    protected <T2 extends T> List<T2> call(@Nullable List<T2> trees, P p) {
         if (trees == null) {
             return null;
         }
@@ -135,7 +128,7 @@ public abstract class TreeProcessor<T extends Tree> implements TreeVisitor<T, Ex
         List<T2> mutatedTrees = new ArrayList<>(trees.size());
         boolean changed = false;
         for (T2 tree : trees) {
-            @SuppressWarnings("unchecked") T2 mutated = (T2) visit(tree, ctx);
+            @SuppressWarnings("unchecked") T2 mutated = (T2) visit(tree, p);
             if (mutated != tree || mutated == null) {
                 changed = true;
             }
