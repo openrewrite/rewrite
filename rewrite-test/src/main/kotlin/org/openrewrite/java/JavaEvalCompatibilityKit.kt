@@ -28,5 +28,5 @@ abstract class JavaEvalCompatibilityKit {
     inner class BlankLinesTck : BlankLinesTest()
 
     @Nested
-    inner class TabsAndIndentsTck : TabsAndIndentsTest
+    inner class TabsAndIndentsTck : TabsAndIndentsTest()
 }

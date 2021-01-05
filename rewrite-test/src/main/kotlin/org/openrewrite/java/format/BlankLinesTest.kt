@@ -20,7 +20,7 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
 
-class BlankLinesTest : RecipeTest {
+open class BlankLinesTest : RecipeTest {
     private val style = IntelliJ.defaultBlankLine()
 
     constructor() {
