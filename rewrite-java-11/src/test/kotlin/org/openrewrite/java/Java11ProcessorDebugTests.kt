@@ -15,6 +15,15 @@
  */
 package org.openrewrite.java
 
-class Java11EvalCompatibilityTest: JavaEvalCompatibilityKit() {
-    override fun javaParser(): Java11Parser = Java11Parser.builder().build()
-}
+import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.DebugOnly
+import org.openrewrite.java.format.BlankLinesTest
+import org.openrewrite.java.format.TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11BlankLinesTest: Java11Test, BlankLinesTest()
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest()

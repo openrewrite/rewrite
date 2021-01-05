@@ -21,8 +21,8 @@ import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 
 @ExtendWith(JavaParserResolver::class)
-abstract class JavaEvalCompatibilityKit {
-    abstract fun javaParser(): JavaParser
+abstract class JavaProcessorCompatibilityKit {
+    abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested
     inner class BlankLinesTck : BlankLinesTest()

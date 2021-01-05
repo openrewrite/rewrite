@@ -28,7 +28,8 @@ import static org.assertj.core.api.Assertions.fail;
 public class JavaParserResolver implements ParameterResolver {
     @Override
     public boolean supportsParameter(ParameterContext parameterContext, ExtensionContext extensionContext) throws ParameterResolutionException {
-        return parameterContext.getParameter().getType().equals(JavaParser.class);
+        Class<?> paramType = parameterContext.getParameter().getType();
+        return paramType.equals(JavaParser.class) || paramType.equals(JavaParser.Builder.class);
     }
 
     @Override
@@ -42,7 +43,15 @@ public class JavaParserResolver implements ParameterResolver {
                 try {
                     Method javaParser = clazz.getMethod("javaParser");
                     javaParser.setAccessible(true); // because JUnit 5 test classes don't have to be public
-                    return javaParser.invoke(target);
+
+                    Class<?> paramType = parameterContext.getParameter().getType();
+                    Object param = javaParser.invoke(target);
+                    if(paramType.equals(JavaParser.Builder.class)) {
+                        return param;
+                    }
+                    else if(paramType.equals(JavaParser.class)) {
+                        return ((JavaParser.Builder<?, ?>) param).build();
+                    }
                 } catch (NoSuchMethodException ignored) {
                 }
 

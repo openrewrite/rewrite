@@ -20,10 +20,10 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
 
-open class BlankLinesTest : RecipeTest {
+open class BlankLinesTest : RecipeTest() {
     private val style = IntelliJ.defaultBlankLine()
 
-    constructor() {
+    init {
         this.recipe = BlankLines()
     }
 
