@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
-import org.openrewrite.Incubating;
 import org.openrewrite.Parser;
 import org.openrewrite.Style;
 import org.openrewrite.internal.lang.Nullable;
@@ -25,7 +24,6 @@ import org.openrewrite.java.tree.J;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.net.URI;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -84,9 +82,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         return javaParser;
     }
 
-    @Incubating(since = "7.0.0")
-    JavaParser withStyles(Collection<JavaStyle> styles);
-
     @Override
     default List<J.CompilationUnit> parse(String... sources) {
         Pattern classPattern = Pattern.compile("(class|interface|enum)\\s*(<[^>]*>)?\\s+(\\w+)");
@@ -136,11 +131,6 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
-            return (B) this;
-        }
-
-        public B meterRegistry(MeterRegistry registry) {
-            this.meterRegistry = registry;
             return (B) this;
         }
 

@@ -82,35 +82,6 @@ public class Java11Parser implements JavaParser {
 
     private final Duration attributionAlertThreshold;
 
-    @Override
-    public JavaParser withStyles(Collection<JavaStyle> styles) {
-        return new Java11Parser(classpath, context, compiler, pfm, compilerLog,
-                relaxedClassTypeMatching, suppressMappingErrors, meterRegistry, styles,
-                attributionAlertThreshold);
-    }
-
-    private Java11Parser(@Nullable Collection<Path> classpath,
-                         Context context,
-                         JavaCompiler compiler,
-                         JavacFileManager pfm,
-                         ResettableLog compilerLog,
-                         boolean relaxedClassTypeMatching,
-                         boolean suppressMappingErrors,
-                         MeterRegistry meterRegistry,
-                         Collection<JavaStyle> styles,
-                         Duration attributionAlertThreshold) {
-        this.classpath = classpath;
-        this.context = context;
-        this.compiler = compiler;
-        this.pfm = pfm;
-        this.compilerLog = compilerLog;
-        this.relaxedClassTypeMatching = relaxedClassTypeMatching;
-        this.suppressMappingErrors = suppressMappingErrors;
-        this.meterRegistry = meterRegistry;
-        this.styles = styles;
-        this.attributionAlertThreshold = attributionAlertThreshold;
-    }
-
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,

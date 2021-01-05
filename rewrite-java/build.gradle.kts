@@ -14,6 +14,8 @@ tasks.register<JavaExec>("generateAntlrSources") {
 dependencies {
     api(project(":rewrite-core"))
 
+    api("io.micrometer:micrometer-core:latest.release")
+
     implementation("org.antlr:antlr4:4.8-1")
 
     implementation("org.slf4j:slf4j-api:1.7.+")

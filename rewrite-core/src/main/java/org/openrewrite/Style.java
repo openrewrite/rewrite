@@ -26,7 +26,6 @@ import com.fasterxml.jackson.annotation.ObjectIdGenerators;
  * {@link SourceFile} instances so that any modifications to those source files can conform
  * to the source's expected styles.
  */
-@Incubating(since = "2.1.0")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
 public interface Style {

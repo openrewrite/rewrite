@@ -13,27 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.format;
+package org.openrewrite.java.format
 
-import org.junit.jupiter.api.Test;
-import org.openrewrite.RecipeTest;
-import org.openrewrite.java.JavaParser;
-import org.openrewrite.java.style.BlankLineStyle;
-import org.openrewrite.java.style.IntelliJ;
+import org.junit.jupiter.api.Test
+import org.openrewrite.RecipeTest
+import org.openrewrite.java.JavaParser
+import org.openrewrite.java.style.IntelliJ
 
-import java.util.List;
+class BlankLinesTest : RecipeTest {
+    private val style = IntelliJ.defaultBlankLine()
 
-public class BlankLinesTest extends RecipeTest {
-    BlankLineStyle style = IntelliJ.defaultBlankLine();
-
-    public BlankLinesTest() {
-        this.recipe = new BlankLines();
+    constructor() {
+        this.recipe = BlankLines()
     }
 
     @Test
-    void keepMaximumInDeclarations(JavaParser.Builder<?, ?> parser) {
-        style.getKeepMaximum().setInDeclarations(0);
-        assertChanged(parser.styles(List.of(style)).build(),
+    fun keepMaximumInDeclarations(parser: JavaParser.Builder<*, *>) {
+        style.keepMaximum.inDeclarations = 0
+        assertChanged(parser.styles(listOf(style)).build(),
                 """
                         public class Test {
 
@@ -72,7 +69,7 @@ public class BlankLinesTest extends RecipeTest {
                             public class InnerClass {
                             }
                         }
-                        """);
+                        """)
     }
 
 //    @Test

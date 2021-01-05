@@ -37,7 +37,6 @@ import static org.openrewrite.internal.StringUtils.splitCStyleComments;
  * <p>
  * TODO when complete, this should replace {@link ShiftFormatRightVisitor}.
  */
-@Incubating(since = "2.1.0")
 public class AutoFormat extends JavaIsoRefactorVisitor {
     private final J[] scope;
 
