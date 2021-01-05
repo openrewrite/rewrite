@@ -17,14 +17,14 @@ package org.openrewrite.text;
 
 import org.openrewrite.*;
 
-@AutoConfigure
-public class ChangeText extends TreeProcessor<PlainText> {
+//@AutoConfigure
+public class ChangeText extends TreeProcessor<PlainText, ExecutionContext> {
     private String toText;
 
     public ChangeText() {
     }
 
-    @Override
+    //@Override
     public Validated validate() {
         return Validated.required("toText", toText);
     }

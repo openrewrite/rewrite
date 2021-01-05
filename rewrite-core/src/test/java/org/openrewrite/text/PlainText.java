@@ -17,9 +17,7 @@ package org.openrewrite.text;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.SourceFile;
-import org.openrewrite.Style;
-import org.openrewrite.Tree;
+import org.openrewrite.*;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
@@ -60,6 +58,11 @@ public class PlainText implements SourceFile, Tree {
         return id;
     }
 
+    @Override
+    public String print(TreePrinter<?, ?> printer) {
+        return print();
+    }
+
     public PlainText withText(String toText) {
         return new PlainText(id, toText, styles);
     }
@@ -68,4 +71,6 @@ public class PlainText implements SourceFile, Tree {
     public String print() {
         return text;
     }
+
+
 }

@@ -56,6 +56,11 @@ public interface J extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
+    @SuppressWarnings("unchecked")
+    default String print(TreePrinter<?, ?> printer) {
+        return new JavaPrinter<>((TreePrinter<J, ?>)printer).visit(this, null);
+    }
+
     @Override
     default String print() {
         return new JavaPrinter<>(TreePrinter.identity()).visit(this, null);

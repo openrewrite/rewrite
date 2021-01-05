@@ -134,24 +134,24 @@ public class JavaTemplate {
             setCursoringOn();
         }
 
-        @Override
-        public J visitEach(J tree, ExecutionContext ctx) {
-            Comment startToken = findMarker(tree, "<<<<START>>>>");
-            if (startToken != null) {
-                templateDepth = getCursor().getPathAsStream().count();
-
-                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
-                comments.remove(startToken);
-
-                templated.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
-            } else if (!templated.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
-                templated.add(tree);
-            } else if (findMarker(tree, "<<<<STOP>>>>") != null) {
-                return tree;
-            }
-
-            return super.visitEach(tree, ctx);
-        }
+//        @Override
+//        public J visitEach(J tree, ExecutionContext ctx) {
+//            Comment startToken = findMarker(tree, "<<<<START>>>>");
+//            if (startToken != null) {
+//                templateDepth = getCursor().getPathAsStream().count();
+//
+//                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
+//                comments.remove(startToken);
+//
+//                templated.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
+//            } else if (!templated.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
+//                templated.add(tree);
+//            } else if (findMarker(tree, "<<<<STOP>>>>") != null) {
+//                return tree;
+//            }
+//
+//            return super.visitEach(tree, ctx);
+//        }
 
         private Comment findMarker(J tree, String marker) {
             return tree.getPrefix().getComments().stream()
