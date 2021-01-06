@@ -291,23 +291,24 @@ public class JavaTemplate {
         }
 
         private String visitStatements(List<JRightPadded<Statement>> statements, String context) {
-            if (statements == null || !statements.stream().filter(s -> pathIds.contains(s.getElem().getId())).findFirst().isPresent()) {
+            if (statements != null && statements.stream().anyMatch(s -> pathIds.contains(s.getElem().getId()))) {
+                StringBuilder acc = new StringBuilder();
+                for (JRightPadded<Statement> paddedStat : statements) {
+                    if (paddedStat.getElem() instanceof J.MethodDecl || paddedStat.getElem() instanceof J.ClassDecl) {
+                        //Method declarations only happen at the class level blocks. Rather than generating the existing
+                        //code, any references methods will be stubbed out.
+                        continue;
+                    }
+                    if (pathIds.contains(paddedStat.getElem().getId())) {
+                        break;
+                    }
+                    acc.append(visitStatement(paddedStat, context));
+                }
+                acc.append(context);
+                return acc.toString();
+            } else {
                 return context;
             }
-            StringBuilder acc = new StringBuilder();
-            for (JRightPadded<Statement> paddedStat : statements) {
-                if (paddedStat.getElem() instanceof J.MethodDecl || paddedStat.getElem() instanceof J.ClassDecl) {
-                    //Method declarations only happen at the class level blocks. Rather than generating the existing
-                    //code, any references methods will be stubbed out.
-                    continue;
-                }
-                if (pathIds.contains(paddedStat.getElem().getId())) {
-                    break;
-                }
-                acc.append(visitStatement(paddedStat, context));
-            }
-            acc.append(context);
-            return acc.toString();
         }
 
         private String visitStatement(JRightPadded<Statement> paddedStat, String context) {
@@ -495,7 +496,7 @@ public class JavaTemplate {
         private JavaParser javaParser = JavaParser.fromJavaVersion()
                 .logCompilationWarningsAndErrors(false)
                 .build();
-        private Set<String> imports = new HashSet<>();
+        private final Set<String> imports = new HashSet<>();
 
         private boolean autoFormat = true;
         private String parameterMarker = "#{}";
