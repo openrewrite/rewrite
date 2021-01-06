@@ -27,3 +27,7 @@ class Java11BlankLinesTest: Java11Test, BlankLinesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
