@@ -39,15 +39,7 @@ public abstract class Recipe {
     @Nullable
     private Recipe next;
 
-    private final Supplier<TreeProcessor<?, ExecutionContext>> processor;
-
-    protected Recipe(Supplier<TreeProcessor<?, ExecutionContext>> processor) {
-        this.processor = processor;
-    }
-
-    protected Recipe() {
-        this.processor = () -> NOOP;
-    }
+    protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
 
     protected void doNext(Recipe recipe) {
         Recipe head = this;

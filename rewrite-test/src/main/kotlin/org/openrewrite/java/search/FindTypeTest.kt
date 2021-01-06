@@ -17,9 +17,19 @@ package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
+import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
+import org.openrewrite.marker.SearchResult
 
-interface FindTypeTest {
+interface FindTypeTest : RecipeTest {
+    override val recipe: Recipe?
+        get() = FindType().apply { setClass("a.A1") }
+
+    override val treePrinter: TreePrinter<*>?
+        get() = SearchResult.PRINTER
+
     companion object {
         private const val a1 = """
             package a;
@@ -30,15 +40,18 @@ interface FindTypeTest {
     }
 
     @Test
-    fun simpleName(jp: JavaParser) {
-        val b = jp.parse("""
+    fun simpleName(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
-            
             public class B extends A1 {}
-        """, a1)[0]
-
-        assertEquals(1, b.findType("a.A1").size)
-    }
+        """,
+        dependsOn = arrayOf(a1),
+        after = """
+            import a.A1;
+            public class B extends ≪A1≫ {}
+        """
+    )
 
     @Test
     fun fullyQualifiedName(jp: JavaParser) {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.abego.treelayout.internal.util.java.util.ListUtil;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeProcessor;
@@ -35,25 +36,20 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     }
 
     @Nullable
-    public <N extends NameTree> N visitTypeName(@Nullable N nameTree, P p) {
+    public <N extends NameTree> N visitTypeName(N nameTree, P p) {
         return nameTree;
     }
 
-    public <N extends NameTree> JLeftPadded<N> visitTypeName(JLeftPadded<N> nameTree, P p) {
-        return nameTree;
+    private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
-    public <N extends NameTree> JRightPadded<N> visitTypeName(JRightPadded<N> nameTree, P p) {
-        return nameTree;
+    private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
-    public <N extends NameTree> JContainer<N> visitTypeNames(JContainer<N> nameTree, P p) {
-        return nameTree;
-    }
-
-    @Nullable
-    public <N extends NameTree> List<N> visitTypeNames(@Nullable List<N> nameTrees, P p) {
-        return nameTrees;
+    private <N extends NameTree> JContainer<N> visitTypeNames(@Nullable JContainer<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(ListUtils.map(nameTree.getElem(), t -> visitTypeName(t, p)));
     }
 
     @Override

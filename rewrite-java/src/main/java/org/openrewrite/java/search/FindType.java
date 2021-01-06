@@ -15,29 +15,37 @@
  */
 package org.openrewrite.java.search;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
+import org.openrewrite.marker.SearchResult;
 
-import java.util.HashSet;
 import java.util.Set;
 
 /**
  * Find places where a type is mentioned explicitly, excluding imports.
  */
-public final class FindType {
-    private FindType() {
+public final class FindType extends Recipe {
+    private String clazz;
+
+    public FindType() {
+        this.processor = () -> new FindTypeProcessor(clazz);
+    }
+
+    public void setClass(String clazz) {
+        this.clazz = clazz;
     }
 
     public static Set<NameTree> find(J j, String clazz) {
-        Set<NameTree> nameTrees = new HashSet<>();
-        new FindTypeProcessor(clazz).visit(j, nameTrees);
-        return nameTrees;
+        return SearchResult.find(new FindTypeProcessor(clazz).visit(j,
+                ExecutionContext.builder().build()));
     }
 
-    private static class FindTypeProcessor extends JavaProcessor<Set<NameTree>> {
+    private static class FindTypeProcessor extends JavaProcessor<ExecutionContext> {
         private final String clazz;
 
         public FindTypeProcessor(String clazz) {
@@ -46,11 +54,11 @@ public final class FindType {
         }
 
         @Override
-        public <N extends NameTree> N visitTypeName(N name, Set<NameTree> ctx) {
+        public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             JavaType.Class asClass = TypeUtils.asClass(name.getType());
             if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
-                ctx.add(name);
+                return name.withMarkers(name.getMarkers().add(new SearchResult()));
             }
             return super.visitTypeName(name, ctx);
         }

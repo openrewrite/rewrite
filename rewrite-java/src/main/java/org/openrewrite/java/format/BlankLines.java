@@ -31,7 +31,7 @@ import java.util.List;
 
 public class BlankLines extends Recipe {
     public BlankLines() {
-        super(BlankLinesProcessor::new);
+        this.processor = BlankLinesProcessor::new;
     }
 
     private static class BlankLinesProcessor extends JavaIsoProcessor<ExecutionContext> {

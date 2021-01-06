@@ -43,13 +43,13 @@ public interface Tree {
         return v.defaultValue(this, p);
     }
 
-    String print(TreePrinter<?, ?> printer);
+    String print(TreePrinter<?> printer);
 
     default String print() {
         return print(TreePrinter.identity());
     }
 
-    default String printTrimmed(TreePrinter<?, ?> printer) {
+    default String printTrimmed(TreePrinter<?> printer) {
         return StringUtils.trimIndent(print(printer).trim());
     }
 

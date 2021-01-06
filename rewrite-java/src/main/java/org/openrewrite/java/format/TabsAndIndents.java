@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class TabsAndIndents extends Recipe {
     public TabsAndIndents() {
-        super(TabsAndIndentsProcessor::new);
+        this.processor = TabsAndIndentsProcessor::new;
     }
 
     private static class TabsAndIndentsProcessor extends JavaIsoProcessor<ExecutionContext> {

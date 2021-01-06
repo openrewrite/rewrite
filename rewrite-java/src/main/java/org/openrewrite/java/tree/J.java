@@ -58,8 +58,8 @@ public interface J extends Serializable, Tree {
     }
 
     @SuppressWarnings("unchecked")
-    default String print(TreePrinter<?, ?> printer) {
-        return new JavaPrinter<>((TreePrinter<J, ?>)printer).visit(this, null);
+    default String print(TreePrinter<?> printer) {
+        return new JavaPrinter<>((TreePrinter<?>)printer).visit(this, null);
     }
 
     @Override
@@ -721,10 +721,10 @@ public interface J extends Serializable, Tree {
 //        public List<MethodInvocation> findMethodCalls(String signature) {
 //            return new FindMethods(signature).visit(this);
 //        }
-//
-//        public Set<NameTree> findType(String clazz) {
-//            return new FindType(clazz).visit(this);
-//        }
+
+        public Set<NameTree> findType(String clazz) {
+            return FindType.find(this, clazz);
+        }
 
         @JsonIgnore
         public Path getSourceSet() {
