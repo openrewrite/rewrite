@@ -144,19 +144,15 @@ public class JavaTemplate {
      * @return A list of all classes declared in the compilation unit.
      */
     private static Set<J.ClassDecl> extractClassesFromCompilationUnit(J.CompilationUnit cu) {
-
-        return new JavaTreeExtractor<Set<J.ClassDecl>>() {
+        HashSet<J.ClassDecl> extracted = new HashSet<>();
+        new JavaIsoProcessor<Set<J.ClassDecl>>() {
             @Override
-            protected Set<J.ClassDecl> defaultExtractedValue() {
-                return new HashSet<>();
+            public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, Set<J.ClassDecl> ctx) {
+                ctx.add(classDecl);
+                return super.visitClassDecl(classDecl, ctx);
             }
-
-            @Override
-            public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, ValueContext context) {
-                context.getValue().add(classDecl);
-                return super.visitClassDecl(classDecl, context);
-            }
-        }.extractFromTree(cu);
+        }.visit(cu, extracted);
+        return extracted;
     }
 
     /**
@@ -167,18 +163,14 @@ public class JavaTemplate {
      * @return A list of JavaTypes found within the parameters.
      */
     private static Set<JavaType> extractTypesFromParameters(Object[] parameters) {
+        Set<JavaType> extracted = new HashSet<>();
 
-        JavaTreeExtractor<Set<JavaType>> typeExtractor = new JavaTreeExtractor<Set<JavaType>>() {
+        JavaIsoProcessor<Set<JavaType>> typeExtractor = new JavaIsoProcessor<Set<JavaType>>() {
             @Override
-            public Set<JavaType> defaultExtractedValue() {
-                return new HashSet<>();
-            }
-
-            @Override
-            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ValueContext ctx) {
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Set<JavaType> ctx) {
                 if (method.getType() != null) {
-                    ctx.getValue().add(method.getType());
-                } else  {
+                    ctx.add(method.getType());
+                } else {
                     logger.warn("There is an invocation to a method [" + method.getSimpleName()
                             + "] within the original insertion scope that does not have type information.");
                 }
@@ -186,28 +178,30 @@ public class JavaTemplate {
             }
 
             @Override
-            public J.NewClass visitNewClass(J.NewClass newClass, ValueContext ctx) {
+            public J.NewClass visitNewClass(J.NewClass newClass, Set<JavaType> ctx) {
                 if (newClass.getType() != null) {
-                    ctx.getValue().add(newClass.getType());
+                    ctx.add(newClass.getType());
                 }
                 return super.visitNewClass(newClass, ctx);
             }
 
             @Override
-            public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, ValueContext ctx) {
+            public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, Set<JavaType> ctx) {
                 if (variable.getType() != null) {
-                    ctx.getValue().add(variable.getType());
+                    ctx.add(variable.getType());
                 }
                 return super.visitVariable(variable, ctx);
             }
         };
 
-        return Arrays.stream(parameters)
-                .filter(p -> p instanceof J)
-                .map(p -> (J) p)
-                .flatMap(j -> typeExtractor.extractFromTree(j).stream()).collect(Collectors.toSet());
-    }
+        for (Object parameter : parameters) {
+            if (parameter instanceof J) {
+                typeExtractor.visit((J) parameter, extracted);
+            }
+        }
 
+        return extracted;
+    }
 
     /**
      * A custom JavaPrinter that will print the snippet from the template and then insert that snippet into the
@@ -222,10 +216,9 @@ public class JavaTemplate {
         private final Map<UUID, List<JavaType.Method>> localMethodStubs;
 
         /**
-         *
-         * @param imports Additional imports that should be added to the generated source.
-         * @param pathIds A list of path ID from the insertion point back to the compilation unit.
-         * @param insertionPoint The ID of element that IS the insertion point.
+         * @param imports          Additional imports that should be added to the generated source.
+         * @param pathIds          A list of path ID from the insertion point back to the compilation unit.
+         * @param insertionPoint   The ID of element that IS the insertion point.
          * @param localMethodStubs A Map of element IDs (J.Block) to a list of method stubs that should be generated in that block
          */
         PrintSnippet(Set<String> imports, List<UUID> pathIds, UUID insertionPoint, Map<UUID, List<JavaType.Method>> localMethodStubs) {
@@ -287,7 +280,7 @@ public class JavaTemplate {
             //Process any nested classes.
             for (JRightPadded<Statement> paddedStat : block.getStatements()) {
                 if (paddedStat.getElem() instanceof J.ClassDecl) {
-                    acc.append(visitClassDecl((J.ClassDecl)paddedStat.getElem(), context));
+                    acc.append(visitClassDecl((J.ClassDecl) paddedStat.getElem(), context));
                 }
             }
 
@@ -389,7 +382,7 @@ public class JavaTemplate {
             methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" "))).append(" ");
         }
 
-        JavaType returnType = method.getResolvedSignature() == null?null:method.getResolvedSignature().getReturnType();
+        JavaType returnType = method.getResolvedSignature() == null ? null : method.getResolvedSignature().getReturnType();
 
         if (returnType instanceof JavaType.FullyQualified
                 || returnType instanceof JavaType.Array
@@ -402,7 +395,7 @@ public class JavaTemplate {
 
         methodStub.append(method.getName()).append("(");
         int argIndex = 0;
-        for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
+        for (JavaType parameter : method.getResolvedSignature().getParamTypes()) {
             if (argIndex > 0) {
                 methodStub.append(", ");
             }
@@ -419,6 +412,7 @@ public class JavaTemplate {
         methodStub.append("}\n");
         return methodStub.toString();
     }
+
     /**
      * Given a JaveType, generate the code declaration for that type. This method supports full-qualified, array, and
      * primitive declarations.
@@ -442,18 +436,18 @@ public class JavaTemplate {
 
         }
         if (type instanceof JavaType.FullyQualified) {
-            return ((JavaType.FullyQualified)type).getFullyQualifiedName();
+            return ((JavaType.FullyQualified) type).getFullyQualifiedName();
         } else if (type instanceof JavaType.Array) {
             JavaType elementType = ((JavaType.Array) type).getElemType();
             if (elementType instanceof JavaType.FullyQualified) {
-                return ((JavaType.FullyQualified)elementType).getFullyQualifiedName() + "[]";
+                return ((JavaType.FullyQualified) elementType).getFullyQualifiedName() + "[]";
             } else if (elementType instanceof JavaType.Primitive) {
-                return ((JavaType.Primitive)elementType).getKeyword() + "[]";
+                return ((JavaType.Primitive) elementType).getKeyword() + "[]";
             } else {
                 throw new IllegalArgumentException("Cannot resolve the array type declaration.");
             }
         } else if (type instanceof JavaType.Primitive) {
-            return ((JavaType.Primitive)type).getKeyword();
+            return ((JavaType.Primitive) type).getKeyword();
         } else {
             throw new IllegalArgumentException("Cannot resolve type declaration.");
         }
@@ -506,16 +500,18 @@ public class JavaTemplate {
         private boolean autoFormat = true;
         private String parameterMarker = "#{}";
 
-        Builder(String code) { this.code = code; }
+        Builder(String code) {
+            this.code = code;
+        }
 
         /**
          * A list of fully-qualified types that will be added when generating/compiling snippets
          *
          * <PRE>
-         *     Examples:
-         *
-         *     java.util.Collections
-         *     java.util.Date
+         * Examples:
+         * <p>
+         * java.util.Collections
+         * java.util.Date
          * </PRE>
          */
         public Builder imports(@NotNull String... fullyQualifiedTypeNames) {
@@ -534,10 +530,10 @@ public class JavaTemplate {
          * A list of fully-qualified member type names that will be statically imported when generating/compiling snippets.
          *
          * <PRE>
-         *     Examples:
-         *
-         *     java.util.Collections.emptyList
-         *     java.util.Collections.*
+         * Examples:
+         * <p>
+         * java.util.Collections.emptyList
+         * java.util.Collections.*
          * </PRE>
          */
         public Builder staticImports(@NotNull String... fullyQualifiedMemberTypeNames) {
