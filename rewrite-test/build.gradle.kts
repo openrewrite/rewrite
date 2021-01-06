@@ -14,7 +14,7 @@ dependencies {
 }
 
 tasks.named<JavaCompile>("compileJava") {
-    sourceCompatibility = JavaVersion.VERSION_15.toString()
+    sourceCompatibility = JavaVersion.VERSION_1_8.toString()
     targetCompatibility = JavaVersion.VERSION_1_8.toString()
 
     options.isFork = true

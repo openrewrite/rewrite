@@ -15,13 +15,14 @@
  */
 package org.openrewrite.java;
 
+import org.abego.treelayout.internal.util.java.util.ListUtil;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeProcessor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
@@ -34,20 +35,39 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return statement;
     }
 
+    @Nullable
+    public <N extends NameTree> N visitTypeName(N nameTree, P p) {
+        return nameTree;
+    }
+
+    private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
+    }
+
+    private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
+    }
+
+    private <N extends NameTree> JContainer<N> visitTypeNames(@Nullable JContainer<N> nameTree, P p) {
+        return nameTree == null ? null : nameTree.withElem(ListUtils.map(nameTree.getElem(), t -> visitTypeName(t, p)));
+    }
+
     @Override
     public J visitAnnotatedType(J.AnnotatedType annotatedType, P p) {
         J.AnnotatedType a = call(annotatedType, p, this::visitEach);
         a = call(a, p, this::visitExpression);
         a = a.withAnnotations(call(a.getAnnotations(), p));
-        return a.withTypeExpr(call(a.getTypeExpr(), p));
+        a = a.withTypeExpr(call(a.getTypeExpr(), p));
+        return a.withTypeExpr(visitTypeName(a.getTypeExpr(), p));
     }
 
     @Override
     public J visitAnnotation(J.Annotation annotation, P p) {
         J.Annotation a = call(annotation, p, this::visitEach);
         a = call(a, p, this::visitExpression);
-        a = a.withArgs(eval(a.getArgs(), p));
-        return a.withAnnotationType(call(a.getAnnotationType(), p));
+        a = a.withArgs(call(a.getArgs(), p));
+        a = a.withAnnotationType(call(a.getAnnotationType(), p));
+        return a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
     }
 
     @Override
@@ -62,7 +82,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     @Override
     public J visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension a = call(arrayDimension, p, this::visitEach);
-        a = a.withIndex(eval(a.getIndex(), p));
+        a = a.withIndex(call(a.getIndex(), p));
         return a;
     }
 
@@ -70,7 +90,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitArrayType(J.ArrayType arrayType, P p) {
         J.ArrayType a = call(arrayType, p, this::visitEach);
         a = call(a, p, this::visitExpression);
-        return a.withElementType(call(a.getElementType(), p));
+        a.withElementType(call(a.getElementType(), p));
+        return a.withElementType(visitTypeName(a.getElementType(), p));
     }
 
     @Override
@@ -86,7 +107,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         a = call(a, p, this::visitStatement);
         a = call(a, p, this::visitExpression);
         a = a.withVariable(call(a.getVariable(), p));
-        return a.withAssignment(eval(a.getAssignment(), p));
+        return a.withAssignment(call(a.getAssignment(), p));
     }
 
     @Override
@@ -110,7 +131,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitBlock(J.Block block, P p) {
         J.Block b = call(block, p, this::visitEach);
         b = call(b, p, this::visitStatement);
-        return b.withStatements(evalMany(b.getStatements(), p));
+        return b.withStatements(ListUtils.map(b.getStatements(), t -> call(t, p)));
     }
 
     @Override
@@ -125,7 +146,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.Case c = call(caze, p, this::visitEach);
         c = call(c, p, this::visitStatement);
         c = c.withPattern(call(c.getPattern(), p));
-        return c.withStatements(c.getStatements().withElem(evalMany(c.getStatements().getElem(), p)));
+        return c.withStatements(c.getStatements().withElem(ListUtils.map(c.getStatements().getElem(), t -> call(t, p))));
     }
 
     @Override
@@ -141,18 +162,20 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = call(c, p, this::visitStatement);
         c = c.withAnnotations(call(c.getAnnotations(), p));
         c = c.withModifiers(call(c.getModifiers(), p));
-        c = c.withTypeParameters(eval(c.getTypeParameters(), p));
+        c = c.withTypeParameters(call(c.getTypeParameters(), p));
         c = c.withName(call(c.getName(), p));
-        c = c.withExtends(eval(c.getExtends(), p));
-        c = c.withImplements(eval(c.getImplements(), p));
+        c = c.withExtends(call(c.getExtends(), p));
+        c = c.withExtends(visitTypeName(c.getExtends(), p));
+        c = c.withImplements(call(c.getImplements(), p));
+        c = c.withImplements(visitTypeNames(c.getImplements(), p));
         return c.withBody(call(c.getBody(), p));
     }
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = call(cu, p, this::visitEach);
-        c = c.withPackageDecl(eval(c.getPackageDecl(), p));
-        c = c.withImports(evalMany(c.getImports(), p));
+        c = c.withPackageDecl(call(c.getPackageDecl(), p));
+        c = c.withImports(ListUtils.map(c.getImports(), t -> call(t, p)));
         return c.withClasses(call(c.getClasses(), p));
     }
 
@@ -167,8 +190,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
         J.DoWhileLoop d = call(doWhileLoop, p, this::visitEach);
         d = call(d, p, this::visitStatement);
-        d = d.withWhileCondition(eval(d.getWhileCondition(), p));
-        return d.withBody(eval(d.getBody(), p));
+        d = d.withWhileCondition(call(d.getWhileCondition(), p));
+        return d.withBody(call(d.getBody(), p));
     }
 
     @Override
@@ -190,34 +213,35 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitEnumValueSet(J.EnumValueSet enums, P p) {
         J.EnumValueSet e = call(enums, p, this::visitEach);
         e = call(e, p, this::visitStatement);
-        return e.withEnums(evalMany(e.getEnums(), p));
+        return e.withEnums(ListUtils.map(e.getEnums(), t -> call(t, p)));
     }
 
     @Override
     public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
         J.FieldAccess f = call(fieldAccess, p, this::visitEach);
+        f = visitTypeName(f, p);
         f = call(f, p, this::visitExpression);
         f = f.withTarget(call(f.getTarget(), p));
-        return f.withName(eval(f.getName(), p));
+        return f.withName(call(f.getName(), p));
     }
 
     @Override
     public J visitForEachLoop(J.ForEachLoop forLoop, P p) {
         J.ForEachLoop f = call(forLoop, p, this::visitEach);
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withVariable(eval(f.getControl().getVariable(), p)));
-        f = f.withControl(f.getControl().withIterable(eval(f.getControl().getIterable(), p)));
-        return f.withBody(eval(f.getBody(), p));
+        f = f.withControl(f.getControl().withVariable(call(f.getControl().getVariable(), p)));
+        f = f.withControl(f.getControl().withIterable(call(f.getControl().getIterable(), p)));
+        return f.withBody(call(f.getBody(), p));
     }
 
     @Override
     public J visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = call(forLoop, p, this::visitEach);
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withInit(eval(f.getControl().getInit(), p)));
-        f = f.withControl(f.getControl().withCondition(eval(f.getControl().getCondition(), p)));
-        f = f.withControl(f.getControl().withUpdate(evalMany(f.getControl().getUpdate(), p)));
-        return f.withBody(eval(f.getBody(), p));
+        f = f.withControl(f.getControl().withInit(call(f.getControl().getInit(), p)));
+        f = f.withControl(f.getControl().withCondition(call(f.getControl().getCondition(), p)));
+        f = f.withControl(f.getControl().withUpdate(ListUtils.map(f.getControl().getUpdate(), t -> call(t, p))));
+        return f.withBody(call(f.getBody(), p));
     }
 
     @Override
@@ -229,7 +253,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     @Override
     public J visitElse(J.If.Else elze, P p) {
         J.If.Else e = call(elze, p, this::visitEach);
-        return e.withBody(eval(e.getBody(), p));
+        return e.withBody(call(e.getBody(), p));
     }
 
     @Override
@@ -237,7 +261,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.If i = call(iff, p, this::visitEach);
         i = call(i, p, this::visitStatement);
         i = i.withIfCondition(call(i.getIfCondition(), p));
-        i = i.withThenPart(eval(i.getThenPart(), p));
+        i = i.withThenPart(call(i.getThenPart(), p));
         i = i.withElsePart(call(i.getElsePart(), p));
         return i;
     }
@@ -252,7 +276,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitInstanceOf(J.InstanceOf instanceOf, P p) {
         J.InstanceOf i = call(instanceOf, p, this::visitEach);
         i = call(i, p, this::visitExpression);
-        i = i.withExpr(eval(i.getExpr(), p));
+        i = i.withExpr(call(i.getExpr(), p));
         return i.withClazz(call(i.getClazz(), p));
     }
 
@@ -281,8 +305,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = call(memberRef, p, this::visitEach);
         m = m.withContaining(call(m.getContaining(), p));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
-        return m.withReference(eval(m.getReference(), p));
+        m = m.withTypeParameters(call(m.getTypeParameters(), p));
+        return m.withReference(call(m.getReference(), p));
     }
 
     @Override
@@ -291,12 +315,14 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = call(m, p, this::visitStatement);
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withModifiers(call(m.getModifiers(), p));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
+        m = m.withTypeParameters(call(m.getTypeParameters(), p));
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
+        m = m.withReturnTypeExpr(visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(call(m.getName(), p));
-        m = m.withParams(eval(m.getParams(), p));
-        m = m.withParams(eval(m.getParams(), p));
-        m = m.withThrows(eval(m.getThrows(), p));
+        m = m.withParams(call(m.getParams(), p));
+        m = m.withParams(call(m.getParams(), p));
+        m = m.withThrows(call(m.getThrows(), p));
+        m = m.withThrows(visitTypeNames(m.getThrows(), p));
         return m.withBody(call(m.getBody(), p));
     }
 
@@ -305,26 +331,35 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.MethodInvocation m = call(method, p, this::visitEach);
         m = call(m, p, this::visitStatement);
         m = call(m, p, this::visitExpression);
-        m = m.withSelect(eval(m.getSelect(), p));
-        m = m.withTypeParameters(eval(m.getTypeParameters(), p));
+        if(m.getSelect() != null && m.getSelect().getElem() instanceof NameTree &&
+                method.getType() != null && method.getType().hasFlags(Flag.Static)) {
+            //noinspection unchecked
+            m = m.withSelect(
+                    (JRightPadded<Expression>) (JRightPadded<?>)
+                    visitTypeName((JRightPadded<NameTree>) (JRightPadded<?>) m.getSelect(), p));
+        }
+        m = m.withSelect(call(m.getSelect(), p));
+        m = m.withTypeParameters(call(m.getTypeParameters(), p));
         m = m.withName(call(m.getName(), p));
-        return m.withArgs(eval(m.getArgs(), p));
+        return m.withArgs(call(m.getArgs(), p));
     }
 
     @Override
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
         J.MultiCatch m = call(multiCatch, p, this::visitEach);
-        return m.withAlternatives(evalMany(m.getAlternatives(), p));
+        return m.withAlternatives(ListUtils.map(m.getAlternatives(), t -> call(t, p)));
     }
 
     @Override
     public J visitMultiVariable(J.VariableDecls multiVariable, P p) {
         J.VariableDecls m = call(multiVariable, p, this::visitEach);
-        m = call(m, p, this::visitStatement);
+        m = call(m,
+                p, this::visitStatement);
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
-        return m.withVars(evalMany(m.getVars(), p));
+        m = m.withTypeExpr(visitTypeName(m.getTypeExpr(), p));
+        return m.withVars(ListUtils.map(m.getVars(), t -> call(t, p)));
     }
 
     @Override
@@ -332,8 +367,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.NewArray n = call(newArray, p, this::visitEach);
         n = call(n, p, this::visitExpression);
         n = n.withTypeExpr(call(n.getTypeExpr(), p));
+        n = n.withTypeExpr(visitTypeName(n.getTypeExpr(), p));
         n = n.withDimensions(call(n.getDimensions(), p));
-        return n.withInitializer(eval(n.getInitializer(), p));
+        return n.withInitializer(call(n.getInitializer(), p));
     }
 
     @Override
@@ -342,7 +378,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = call(n, p, this::visitStatement);
         n = call(n, p, this::visitExpression);
         n = n.withClazz(call(n.getClazz(), p));
-        n = n.withArgs(eval(n.getArgs(), p));
+        n = n.withClazz(visitTypeName(n.getClazz(), p));
+        n = n.withArgs(call(n.getArgs(), p));
         return n.withBody(call(n.getBody(), p));
     }
 
@@ -357,14 +394,15 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.ParameterizedType pt = call(type, p, this::visitEach);
         pt = call(pt, p, this::visitExpression);
         pt = pt.withClazz(call(pt.getClazz(), p));
-        return pt.withTypeParameters(eval(pt.getTypeParameters(), p));
+        pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
+        return pt.withTypeParameters(call(pt.getTypeParameters(), p));
     }
 
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J.Parentheses<T> pa = call(parens, p, this::visitEach);
         pa = call(pa, p, this::visitExpression);
-        return pa.withTree(eval(pa.getTree(), p));
+        return pa.withTree(call(pa.getTree(), p));
     }
 
     @Override
@@ -401,8 +439,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.Ternary t = call(ternary, p, this::visitEach);
         t = call(t, p, this::visitExpression);
         t = t.withCondition(call(t.getCondition(), p));
-        t = t.withTruePart(eval(t.getTruePart(), p));
-        return t.withFalsePart(eval(t.getFalsePart(), p));
+        t = t.withTruePart(call(t.getTruePart(), p));
+        return t.withFalsePart(call(t.getFalsePart(), p));
     }
 
     @Override
@@ -416,10 +454,10 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitTry(J.Try tryable, P p) {
         J.Try t = call(tryable, p, this::visitEach);
         t = call(t, p, this::visitStatement);
-        t = t.withResources(eval(t.getResources(), p));
+        t = t.withResources(call(t.getResources(), p));
         t = t.withBody(call(t.getBody(), p));
         t = t.withCatches(call(t.getCatches(), p));
-        return t.withFinally(eval(t.getFinally(), p));
+        return t.withFinally(call(t.getFinally(), p));
     }
 
     @Override
@@ -427,6 +465,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.TypeCast t = call(typeCast, p, this::visitEach);
         t = call(t, p, this::visitExpression);
         t = t.withClazz(call(t.getClazz(), p));
+        t = t.withClazz(t.getClazz().withTree(visitTypeName(t.getClazz().getTree(), p)));
         return t.withExpr(call(t.getExpr(), p));
     }
 
@@ -435,7 +474,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.TypeParameter t = call(typeParam, p, this::visitEach);
         t = t.withAnnotations(call(t.getAnnotations(), p));
         t = t.withName(call(t.getName(), p));
-        return t.withBounds(eval(t.getBounds(), p));
+        if(t.getName() instanceof NameTree) {
+            t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));
+        }
+        t = t.withBounds(call(t.getBounds(), p));
+        return t.withBounds(visitTypeNames(t.getBounds(), p));
     }
 
     @Override
@@ -450,7 +493,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
         J.VariableDecls.NamedVar v = call(variable, p, this::visitEach);
         v = v.withName(call(v.getName(), p));
-        return v.withInitializer(eval(v.getInitializer(), p));
+        return v.withInitializer(call(v.getInitializer(), p));
     }
 
     @Override
@@ -458,18 +501,19 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.WhileLoop w = call(whileLoop, p, this::visitEach);
         w = call(w, p, this::visitStatement);
         w = w.withCondition(call(w.getCondition(), p));
-        return w.withBody(eval(w.getBody(), p));
+        return w.withBody(call(w.getBody(), p));
     }
 
     @Override
     public J visitWildcard(J.Wildcard wildcard, P p) {
         J.Wildcard w = call(wildcard, p, this::visitEach);
         w = call(w, p, this::visitExpression);
-        return w.withBoundedType(call(w.getBoundedType(), p));
+        w = w.withBoundedType(call(w.getBoundedType(), p));
+        return w.withBoundedType(visitTypeName(w.getBoundedType(), p));
     }
 
     @Nullable
-    protected <J2 extends J> JRightPadded<J2> eval(@Nullable JRightPadded<J2> right, P p) {
+    protected <J2 extends J> JRightPadded<J2> call(@Nullable JRightPadded<J2> right, P p) {
         if (right == null) {
             return null;
         }
@@ -478,7 +522,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     }
 
     @Nullable
-    protected <J2 extends J> JLeftPadded<J2> eval(@Nullable JLeftPadded<J2> left, P p) {
+    protected <J2 extends J> JLeftPadded<J2> call(@Nullable JLeftPadded<J2> left, P p) {
         if (left == null) {
             return null;
         }
@@ -487,30 +531,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     }
 
     @Nullable
-    protected <J2 extends J> List<JRightPadded<J2>> evalMany(@Nullable List<JRightPadded<J2>> trees, P p) {
-        if (trees == null) {
-            return null;
-        }
-
-        List<JRightPadded<J2>> mutatedTrees = new ArrayList<>(trees.size());
-        boolean changed = false;
-        for (JRightPadded<J2> tree : trees) {
-            JRightPadded<J2> mutated = eval(tree, p);
-            if (mutated != tree) {
-                changed = true;
-            }
-            mutatedTrees.add(mutated);
-        }
-
-        return changed ? mutatedTrees : trees;
-    }
-
-    @Nullable
-    protected <J2 extends J> JContainer<J2> eval(@Nullable JContainer<J2> container, P p) {
+    protected <J2 extends J> JContainer<J2> call(@Nullable JContainer<J2> container, P p) {
         if (container == null) {
             return null;
         }
-        List<JRightPadded<J2>> js = evalMany(container.getElem(), p);
+        List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> call(t, p));
         return js == container.getElem() ? container : JContainer.build(container.getBefore(), js);
     }
 

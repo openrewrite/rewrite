@@ -244,7 +244,7 @@ public class JavaTemplate {
          */
         PrintSnippet(Set<String> imports, List<UUID> pathIds, UUID insertionPoint, Map<UUID, List<JavaType.Method>> localMethodStubs) {
             super(
-                    new TreePrinter<J, String>() {
+                    new TreePrinter<String>() {
                         @Override
                         public String doLast(Tree tree, String printed, String s) {
                             if (tree.getId().equals(insertionPoint)) {

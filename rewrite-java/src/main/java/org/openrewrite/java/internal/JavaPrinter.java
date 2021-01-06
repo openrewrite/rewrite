@@ -26,9 +26,9 @@ import java.util.List;
 import static org.openrewrite.java.tree.J.Modifier.*;
 
 public class JavaPrinter<P> implements JavaVisitor<String, P> {
-    private final TreePrinter<J, P> treePrinter;
+    private final TreePrinter<P> treePrinter;
 
-    public JavaPrinter(TreePrinter<J, P> treePrinter) {
+    public JavaPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
     }
 

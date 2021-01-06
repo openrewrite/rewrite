@@ -17,9 +17,9 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-public interface TreePrinter<T extends Tree, P> {
-    static <T extends Tree, P> TreePrinter<T, P> identity() {
-        return new TreePrinter<T, P>() {
+public interface TreePrinter<P> {
+    static <P> TreePrinter<P> identity() {
+        return new TreePrinter<P>() {
         };
     }
 
@@ -31,7 +31,7 @@ public interface TreePrinter<T extends Tree, P> {
      * is discarded after printing.
      */
     @Nullable
-    default <T2 extends T> T2 doFirst(T2 tree, P p) {
+    default <T2 extends Tree> T2 doFirst(T2 tree, P p) {
         return tree;
     }
 

@@ -22,18 +22,19 @@ interface RecipeTest {
     val recipe: Recipe?
         get() = null
 
-    val treePrinter: TreePrinter<*, *>?
+    val treePrinter: TreePrinter<*>?
         get() = null
 
     fun assertChanged(
         parser: Parser<*>,
         recipe: Recipe? = this.recipe,
         before: String,
+        dependsOn: Array<String> = emptyArray(),
         after: String
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
-        val source = parser.parse(before.trimIndent()).first()
+        val source = parser.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
 
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
@@ -49,14 +50,17 @@ interface RecipeTest {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull()
         assertThat(result!!.after).isNotNull()
-        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Tree, Any>()))
+        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
             .isEqualTo(after.trimIndent())
     }
 
-    fun assertUnchanged(parser: Parser<*>, recipe: Recipe? = this.recipe, before: String) {
+    fun assertUnchanged(parser: Parser<*>,
+                        recipe: Recipe? = this.recipe,
+                        before: String,
+                        dependsOn: Array<String> = emptyArray()) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
-        val source = parser.parse(before.trimIndent()).iterator().next()
+        val source = parser.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
         val results = recipe!!.run(listOf(source))
 
         assertThat(results).`as`("The recipe must not make changes").isEmpty()

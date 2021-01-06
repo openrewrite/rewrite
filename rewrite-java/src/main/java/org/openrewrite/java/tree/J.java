@@ -25,6 +25,7 @@ import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
+import org.openrewrite.java.search.FindType;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -57,8 +58,8 @@ public interface J extends Serializable, Tree {
     }
 
     @SuppressWarnings("unchecked")
-    default String print(TreePrinter<?, ?> printer) {
-        return new JavaPrinter<>((TreePrinter<J, ?>)printer).visit(this, null);
+    default String print(TreePrinter<?> printer) {
+        return new JavaPrinter<>((TreePrinter<?>)printer).visit(this, null);
     }
 
     @Override
@@ -634,9 +635,9 @@ public interface J extends Serializable, Tree {
 //            return new FindMethods(signature).visit(this);
 //        }
 //
-//        public Set<NameTree> findType(String clazz) {
-//            return new FindType(clazz).visit(this);
-//        }
+        public Set<NameTree> findType(String clazz) {
+            return FindType.find(this, clazz);
+        }
 //
 //        public List<Annotation> findAnnotations(String signature) {
 //            return new FindAnnotations(signature).visit(this);
@@ -720,10 +721,10 @@ public interface J extends Serializable, Tree {
 //        public List<MethodInvocation> findMethodCalls(String signature) {
 //            return new FindMethods(signature).visit(this);
 //        }
-//
-//        public Set<NameTree> findType(String clazz) {
-//            return new FindType(clazz).visit(this);
-//        }
+
+        public Set<NameTree> findType(String clazz) {
+            return FindType.find(this, clazz);
+        }
 
         @JsonIgnore
         public Path getSourceSet() {
