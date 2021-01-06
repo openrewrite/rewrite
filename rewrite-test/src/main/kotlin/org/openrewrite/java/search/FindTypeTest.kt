@@ -104,8 +104,9 @@ interface FindTypeTest : RecipeTest {
     }
 
     @Test
-    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) {
-        val b = jp.parse("""
+    fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             import java.util.List;
             public class B {
@@ -115,10 +116,20 @@ interface FindTypeTest : RecipeTest {
                    this.<A1>generic(null, null);
                }
             }
-        """, a1)[0]
-
-        assertEquals(4, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            import java.util.List;
+            public class B {
+               public <T extends ≪A1≫> T generic(T n, List<? super ≪A1≫> in) { return null; }
+               public void test() {
+                   ≪A1≫.stat();
+                   this.<≪A1≫>generic(null, null);
+               }
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
     fun multiCatch(jp: JavaParser) {

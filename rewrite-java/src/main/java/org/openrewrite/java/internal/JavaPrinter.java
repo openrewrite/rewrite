@@ -374,7 +374,7 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                 return acc + ';';
             }
 
-            if (s instanceof MethodDecl && ((MethodDecl) s).isAbstract()) {
+            if (s instanceof MethodDecl && ((MethodDecl) s).getBody() == null) {
                 return acc + ';';
             }
 
