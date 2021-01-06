@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java;
 
-import org.jetbrains.annotations.NotNull;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
@@ -106,15 +105,9 @@ public class JavaTemplate {
             index = index.getParent();
         }
 
-        //This logic currently walks backwards up the insertion path, printing the snippet as it goes.
-        for (Cursor scope = insertionScope; scope != null; scope = scope.getParent()) {
-            //Because this walks backward up the tree, a block will be visited...then its parent (which then traverses
-            //the block again) Same thing for class declarations.
-            if (scope.getTree() instanceof J.Block || scope.getTree() instanceof J.ClassDecl) {
-                continue;
-            }
-            printedInsertionScope = new PrintSnippet(allImports, pathIds, insertionScope.getTree().getId(), localMethods).visit((J) scope.getTree(), printedInsertionScope);
-        }
+        printedInsertionScope = new PrintSnippet(allImports, pathIds, insertionScope.getTree().getId(), localMethods)
+                .visit(compilationUnit, printedInsertionScope);
+
         if (logger.isDebugEnabled()) {
             logger.debug("Building code snippet using synthetic class:\n=============\n{}\n=============", printedInsertionScope);
         }
@@ -138,21 +131,27 @@ public class JavaTemplate {
     }
 
     /**
-     * This method extracts ALL classes from a compilation unit, even if they are nested within an inner class.
+     * This method extracts ALL classes (and nested classes) from a compilation unit
      *
      * @param cu The original compilation unit
-     * @return A list of all classes declared in the compilation unit.
+     * @return A set of classes declared in the compilation unit.
      */
     private static Set<J.ClassDecl> extractClassesFromCompilationUnit(J.CompilationUnit cu) {
         HashSet<J.ClassDecl> extracted = new HashSet<>();
-        new JavaIsoProcessor<Set<J.ClassDecl>>() {
-            @Override
-            public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, Set<J.ClassDecl> ctx) {
-                ctx.add(classDecl);
-                return super.visitClassDecl(classDecl, ctx);
-            }
-        }.visit(cu, extracted);
+        for (J.ClassDecl classDecl : cu.getClasses()) {
+            extracted.add(classDecl);
+            collectClasses(classDecl, extracted);
+        }
         return extracted;
+    }
+    private static void collectClasses(J.ClassDecl classDecl, HashSet<J.ClassDecl> extracted) {
+        extracted.add(classDecl);
+        if (classDecl.getBody().getStatements() != null) {
+            classDecl.getBody().getStatements().stream()
+                    .filter(s -> s.getElem() instanceof J.ClassDecl)
+                    .map(s -> (J.ClassDecl) s.getElem())
+                    .forEach(nested -> collectClasses(nested, extracted));
+        }
     }
 
     /**
@@ -283,8 +282,6 @@ public class JavaTemplate {
                     acc.append(visitClassDecl((J.ClassDecl) paddedStat.getElem(), context));
                 }
             }
-
-
             acc.append(visit(block.getEnd())).append("}\n");
 
             return fmt(block, acc.toString());
@@ -294,17 +291,11 @@ public class JavaTemplate {
             if (statements != null && statements.stream().anyMatch(s -> pathIds.contains(s.getElem().getId()))) {
                 StringBuilder acc = new StringBuilder();
                 for (JRightPadded<Statement> paddedStat : statements) {
-                    if (paddedStat.getElem() instanceof J.MethodDecl || paddedStat.getElem() instanceof J.ClassDecl) {
-                        //Method declarations only happen at the class level blocks. Rather than generating the existing
-                        //code, any references methods will be stubbed out.
-                        continue;
-                    }
+                    acc.append(visitStatement(paddedStat, context));
                     if (pathIds.contains(paddedStat.getElem().getId())) {
                         break;
                     }
-                    acc.append(visitStatement(paddedStat, context));
                 }
-                acc.append(context);
                 return acc.toString();
             } else {
                 return context;
@@ -312,36 +303,47 @@ public class JavaTemplate {
         }
 
         private String visitStatement(JRightPadded<Statement> paddedStat, String context) {
-            String acc = visit(paddedStat.getElem(), context) + visit(paddedStat.getAfter());
+            Statement statement = paddedStat.getElem();
+            StringBuilder output = new StringBuilder();
+            if (pathIds.contains(statement.getId())) {
+                output.append(visit(paddedStat.getElem(), context) + visit(paddedStat.getAfter()));
+            } else if (statement instanceof J.VariableDecls) {
+                J.VariableDecls variableDecls = (J.VariableDecls) statement;
+                output
+                        .append(variableDecls.getTypeExpr().printTrimmed())
+                        .append(variableDecls.getDimensionsBeforeName().stream().map(d -> "[]").reduce("", (r1,r2) -> r1+r2))
+                        .append(" ")
+                        .append(variableDecls.getVars().stream().map(v -> v.getElem().getSimpleName()).collect(Collectors.joining(",")));
+            } else {
+                return "";
+            }
 
-            Statement s = paddedStat.getElem();
             while (true) {
-                if (s instanceof J.Assert ||
-                        s instanceof J.Assign ||
-                        s instanceof J.AssignOp ||
-                        s instanceof J.Break ||
-                        s instanceof J.Continue ||
-                        s instanceof J.DoWhileLoop ||
-                        s instanceof J.Empty ||
-                        s instanceof J.MethodInvocation ||
-                        s instanceof J.NewClass ||
-                        s instanceof J.Return ||
-                        s instanceof J.Throw ||
-                        s instanceof J.Unary ||
-                        s instanceof J.VariableDecls) {
-                    return acc + ';';
+                if (statement instanceof J.Assert ||
+                        statement instanceof J.Assign ||
+                        statement instanceof J.AssignOp ||
+                        statement instanceof J.Break ||
+                        statement instanceof J.Continue ||
+                        statement instanceof J.DoWhileLoop ||
+                        statement instanceof J.Empty ||
+                        statement instanceof J.MethodInvocation ||
+                        statement instanceof J.NewClass ||
+                        statement instanceof J.Return ||
+                        statement instanceof J.Throw ||
+                        statement instanceof J.Unary ||
+                        statement instanceof J.VariableDecls ||
+                        statement instanceof J.MethodDecl && ((J.MethodDecl) statement).isAbstract()
+                ) {
+
+                    return output.append(";").toString();
                 }
 
-                if (s instanceof J.MethodDecl && ((J.MethodDecl) s).isAbstract()) {
-                    return acc + ';';
-                }
-
-                if (s instanceof J.Label) {
-                    s = ((J.Label) s).getStatement();
+                if (statement instanceof J.Label) {
+                    statement = ((J.Label) statement).getStatement();
                     continue;
                 }
 
-                return acc;
+                return output.toString();
             }
         }
     }
@@ -515,7 +517,7 @@ public class JavaTemplate {
          * java.util.Date
          * </PRE>
          */
-        public Builder imports(@NotNull String... fullyQualifiedTypeNames) {
+        public Builder imports(@NonNull String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -537,7 +539,7 @@ public class JavaTemplate {
          * java.util.Collections.*
          * </PRE>
          */
-        public Builder staticImports(@NotNull String... fullyQualifiedMemberTypeNames) {
+        public Builder staticImports(@NonNull String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -554,7 +556,7 @@ public class JavaTemplate {
          * <P><P>
          * FullyQualified types will be added as an import and Method types will be statically imported
          */
-        public Builder imports(@NotNull JavaType... types) {
+        public Builder imports(@NonNull JavaType... types) {
             for (JavaType type : types) {
                 imports.add(javaTypeToImport(type));
             }
