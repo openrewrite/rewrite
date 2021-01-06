@@ -20,6 +20,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
@@ -53,29 +54,28 @@ public class TabsAndIndents extends Recipe {
         public Statement visitStatement(Statement statement, ExecutionContext ctx) {
             Statement s = statement;
 
-            if (s.getPrefix().getWhitespace().contains("\n")) {
-                Cursor parentCursor = getCursor().getParentOrThrow();
-                J parent = parentCursor.getTree();
-                if (s instanceof J.Block) {
-                    s = indent(s, parent);
-                } else {
-                    Tree p = parentCursor.getTree();
-                    Cursor cursor = parentCursor;
+            Cursor parentCursor = getCursor().getParentOrThrow();
+            J parent = parentCursor.getTree();
+            if (s instanceof J.Block) {
+                s = indent(s, parent);
+            } else {
+                Tree p = parentCursor.getTree();
+                Cursor cursor = parentCursor;
 
-                    // find the first cursor element that is indented further to the left
-                    for (;
-                         p instanceof J.Block || p instanceof J.Label || p instanceof J.Try.Catch ||
-                                 p instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
-                                 p instanceof J.If.Else;
-                         p = cursor.getTree()) {
-                        cursor = cursor.getParentOrThrow();
-                    }
-
-                    s = indent(s, p);
+                // find the first cursor element that is indented further to the left
+                for (;
+                     p instanceof J.Block || p instanceof J.Label || p instanceof J.Try.Catch ||
+                             p instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
+                             p instanceof J.If.Else;
+                     p = cursor.getTree()) {
+                    cursor = cursor.getParentOrThrow();
                 }
 
-                rebaseCursor(s);
+                s = indent(s, p);
             }
+
+            rebaseCursor(s);
+
             return super.visitStatement(s, ctx);
         }
 
@@ -111,37 +111,30 @@ public class TabsAndIndents extends Recipe {
         @Override
         public J.Block visitBlock(J.Block block, ExecutionContext ctx) {
             J.Block j = super.visitBlock(block, ctx);
-            if (j.getEnd().getWhitespace().contains("\n")) {
-                Cursor cursor = getCursor().getParentOrThrow();
-                Tree p = cursor.getTree();
+            Cursor cursor = getCursor().getParentOrThrow();
+            Tree p = cursor.getTree();
 
-                for (; p instanceof J.Try.Catch ||
-                        p instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
-                        p instanceof J.If.Else; p = cursor.getTree()) {
-                    cursor = cursor.getParentOrThrow();
-                }
-
-                j = j.withEnd(alignToParentStatement(j.getEnd(), cursor));
+            for (; p instanceof J.Try.Catch ||
+                    p instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
+                    p instanceof J.If.Else; p = cursor.getTree()) {
+                cursor = cursor.getParentOrThrow();
             }
-            return j;
+
+            return j.withEnd(alignToParentStatement(j.getEnd(), cursor));
         }
 
         @Override
         public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, ExecutionContext ctx) {
             J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, ctx);
-            if (d.getWhileCondition().getBefore().getWhitespace().contains("\n")) {
-                d = d.withWhileCondition(d.getWhileCondition().withBefore(
-                        alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
-            }
-            return d;
+            return d.withWhileCondition(d.getWhileCondition().withBefore(
+                    alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
         }
 
         @Override
         public Expression visitExpression(Expression expression, ExecutionContext ctx) {
             Expression e = super.visitExpression(expression, ctx);
             if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
-                    !(getCursor().getParentOrThrow().getTree() instanceof J.Case) &&
-                    e.getPrefix().getWhitespace().contains("\n")) {
+                    !(getCursor().getParentOrThrow().getTree() instanceof J.Case)) {
                 e = continuationIndent(e, enclosingStatement());
             }
             return e;
@@ -162,21 +155,13 @@ public class TabsAndIndents extends Recipe {
                         .withCondition(continuationIndent(condition, f))
                         .withUpdate(continuationIndent(update, f)));
             } else {
-                if (condition.getElem().getPrefix().getWhitespace().contains("\n")) {
-                    f = f.withControl(f.getControl().withCondition(condition.withElem(
-                            alignTo(condition.getElem(), forInitColumn()))));
-                }
+                f = f.withControl(f.getControl().withCondition(condition.withElem(
+                        alignTo(condition.getElem(), forInitColumn()))));
 
-                if (update.stream().anyMatch(u -> u.getElem().getPrefix().getWhitespace().contains("\n"))) {
-                    int column = forInitColumn();
-                    f = f.withControl(f.getControl().withUpdate(ListUtils.map(update, (i, j) -> {
-                        if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
-                            return j.withElem(alignTo(j.getElem(), i == 0 ? column :
-                                    column + style.getContinuationIndent()));
-                        }
-                        return j;
-                    })));
-                }
+                int column = forInitColumn();
+                f = f.withControl(f.getControl().withUpdate(ListUtils.map(update, (i, j) ->
+                        j.withElem(alignTo(j.getElem(), i == 0 ? column :
+                                column + style.getContinuationIndent())))));
             }
 
             return f;
@@ -205,7 +190,7 @@ public class TabsAndIndents extends Recipe {
         @Override
         public J.MemberReference visitMemberReference(J.MemberReference memberRef, ExecutionContext ctx) {
             J.MemberReference m = super.visitMemberReference(memberRef, ctx);
-//        m = m.with
+            m = m.withReference(continuationIndent(m.getReference(), enclosingStatement()));
             return m;
         }
 
@@ -218,12 +203,8 @@ public class TabsAndIndents extends Recipe {
             if (!params.isEmpty()) {
                 if (params.get(0).getElem().getPrefix().getWhitespace().contains("\n")) {
                     J.MethodDecl parent = m;
-                    m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), j -> {
-                        if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
-                            return continuationIndent(j, parent);
-                        }
-                        return j;
-                    })));
+                    m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(),
+                            j -> continuationIndent(j, parent))));
                 } else if (params.stream().anyMatch(p -> p.getElem().getPrefix().getWhitespace().contains("\n"))) {
                     AtomicInteger column = new AtomicInteger(0);
                     boolean afterParamsStart = false;
@@ -260,31 +241,25 @@ public class TabsAndIndents extends Recipe {
 
         private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Tree parent) {
             return ListUtils.map(js, (i, j) -> {
-                if (j.getElem().getPrefix().getWhitespace().contains("\n")) {
-                    if (i == 0) {
-                        return continuationIndent(j, parent);
-                    } else {
-                        return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
-                                parent, style.getContinuationIndent() * 2)));
-                    }
+                if (i == 0) {
+                    return continuationIndent(j, parent);
+                } else {
+                    return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
+                            parent, style.getContinuationIndent() * 2)));
                 }
-                return j;
             });
         }
 
-        private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, Tree parent) {
+        private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Tree parent) {
             return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
                     parent, style.getContinuationIndent())));
         }
 
         private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, Tree parent) {
-            if (t.getBefore().getWhitespace().contains("\n")) {
-                return t.withBefore(continuationIndent(t.getBefore(), parent));
-            }
-            return t;
+            return t.withBefore(continuationIndent(t.getBefore(), parent));
         }
 
-        private <J2 extends J> J2 continuationIndent(J2 j, Tree parent) {
+        private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Tree parent) {
             return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
         }
 
@@ -297,24 +272,29 @@ public class TabsAndIndents extends Recipe {
             return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
         }
 
+        @Nullable
         private Statement enclosingStatement() {
             Cursor cursor = getCursor();
             //noinspection StatementWithEmptyBody
-            for (; !(cursor.getTree() instanceof Statement);
-                 cursor = cursor.getParentOrThrow())
+            for (; cursor != null && !(cursor.getTree() instanceof Statement);
+                 cursor = cursor.getParent())
                 ;
-            return cursor.getTree();
+            return cursor == null ? null : cursor.getTree();
         }
 
-        private Space continuationIndent(Space space, Tree parent) {
+        private Space continuationIndent(Space space, @Nullable Tree parent) {
             return indent(space, parent, style.getContinuationIndent());
         }
 
-        private Space indent(Space space, Tree parent) {
+        private Space indent(Space space, @Nullable Tree parent) {
             return indent(space, parent, style.getIndentSize());
         }
 
-        private Space indent(Space space, Tree parent, int indentSize) {
+        private Space indent(Space space, @Nullable Tree parent, int indentSize) {
+            if (parent == null || !space.getWhitespace().contains("\n")) {
+                return space;
+            }
+
             int parentIndent = indent(((J) parent).getPrefix());
             int indent = indent(space);
 
@@ -341,6 +321,10 @@ public class TabsAndIndents extends Recipe {
         }
 
         private Space alignTo(Space space, int column) {
+            if (!space.getWhitespace().contains("\n")) {
+                return space;
+            }
+
             int indent = indent(space);
 
             if (indent - column < 0) {
@@ -398,6 +382,9 @@ public class TabsAndIndents extends Recipe {
             int size = 0;
             for (char c : indent.toCharArray()) {
                 size += c == '\t' ? style.getTabSize() : 1;
+                if (c == '\n' || c == '\r') {
+                    size = 0;
+                }
             }
             return size;
         }

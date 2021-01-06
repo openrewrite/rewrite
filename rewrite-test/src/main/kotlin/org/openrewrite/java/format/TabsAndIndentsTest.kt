@@ -301,9 +301,16 @@ interface TabsAndIndentsTest : RecipeTest {
             continuationIndent = 2
         })).build(),
         before = """
+            import java.util.function.Function;
             public class Test {
             int X[];
-            public void test(int a, int x, int y) {
+            public int plus(int x) {
+                return 0;
+            }
+            public void test(boolean a, int x, int y) {
+            Function<Integer, Integer> op = this
+            ::
+            plus;
             if (x
             >
             0) {
@@ -328,9 +335,16 @@ interface TabsAndIndentsTest : RecipeTest {
             }
         """,
         after = """
+            import java.util.function.Function;
             public class Test {
                 int X[];
-                public void test(int a, int x, int y) {
+                public int plus(int x) {
+                    return 0;
+                }
+                public void test(boolean a, int x, int y) {
+                    Function<Integer, Integer> op = this
+                      ::
+                      plus;
                     if (x
                       >
                       0) {
@@ -432,7 +446,6 @@ interface TabsAndIndentsTest : RecipeTest {
                 	int n = 0;
                 }
             }
-
         """
     )
 }

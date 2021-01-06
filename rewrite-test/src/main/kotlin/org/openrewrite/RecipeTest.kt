@@ -15,10 +15,8 @@
  */
 package org.openrewrite
 
-import org.assertj.core.api.Assertions
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
-import org.openrewrite.internal.StringUtils
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -40,7 +38,7 @@ interface RecipeTest {
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
                 .maxCycles(2)
-                .doOnError { t: Throwable? -> Assertions.fail<Any>("Recipe threw an exception", t) }
+                .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
                 .build())
 
         if (results.isEmpty()) {
@@ -55,10 +53,10 @@ interface RecipeTest {
             .isEqualTo(after.trimIndent())
     }
 
-    fun assertUnchanged(parser: Parser<*>, recipe: Recipe? = this.recipe, before: String?) {
+    fun assertUnchanged(parser: Parser<*>, recipe: Recipe? = this.recipe, before: String) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
-        val source = parser.parse(StringUtils.trimIndent(before)).iterator().next()
+        val source = parser.parse(before.trimIndent()).iterator().next()
         val results = recipe!!.run(listOf(source))
 
         assertThat(results).`as`("The recipe must not make changes").isEmpty()
