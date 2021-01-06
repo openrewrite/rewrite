@@ -24,6 +24,7 @@ import org.openrewrite.java.search.FindReferencedTypes;
 import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
 
 import java.util.*;
 
@@ -269,32 +270,31 @@ public class JavaTemplate {
 
     private static class ExtractTemplatedCode extends JavaProcessor<List<J>> {
         private long templateDepth = -1;
+        private boolean snippetEnd = false;
 
         public ExtractTemplatedCode() {
             setCursoringOn();
         }
 
         @Override
-        public J visitEach(J tree, List<J> context) {
-            Comment startToken = findMarker(tree, SNIPPET_MARKER_START);
+        public Space visitSpace(Space space, List<J> context) {
+            Comment startToken = findMarker(space, SNIPPET_MARKER_START);
             if (startToken != null) {
                 templateDepth = getCursor().getPathAsStream().count();
-
-                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
+                List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
-
-                context.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
-            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
-                context.add(tree);
-            } else if (findMarker(tree, SNIPPET_MARKER_END) != null) {
-                return tree;
+                context.add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
+            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth && !snippetEnd) {
+                context.add(getCursor().getTree());
+            } else if (findMarker(space, SNIPPET_MARKER_END) != null) {
+                snippetEnd = true;
             }
 
-            return super.visitEach(tree, context);
+            return space;
         }
 
-        private Comment findMarker(J tree, String marker) {
-            return tree.getPrefix().getComments().stream()
+        private Comment findMarker(Space space, String marker) {
+            return space.getComments().stream()
                     .filter(c -> Comment.Style.BLOCK.equals(c.getStyle()))
                     .filter(c -> c.getText().equals(marker))
                     .findAny()
