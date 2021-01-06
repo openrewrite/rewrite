@@ -32,6 +32,8 @@ import static java.util.stream.Collectors.joining;
 public class JavaTemplate {
 
     private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
+    private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
+    private static final String SNIPPET_MARKER_END = "<<<<END>>>>";
 
     private final JavaParser parser;
     private final String code;
@@ -121,13 +123,10 @@ public class JavaTemplate {
 //            // TODO format the new tree
 //        }
 
-//        //TODO extract just the desired snippet elements
-//        ExtractTemplatedCode extractTemplatedCode = new ExtractTemplatedCode();
-//        extractTemplatedCode.visit(cu, null);
-//
-//        //noinspection unchecked
-//        return (List<J2>) extractTemplatedCode.templated;
-        return null;
+        //Extract the snippet elements from the tree.
+        List<J> snippetElements = new ArrayList<>();
+        new ExtractTemplatedCode().visit(cu, snippetElements);
+        return (List<J2>) snippetElements;
     }
 
     /**
@@ -203,6 +202,29 @@ public class JavaTemplate {
     }
 
     /**
+     * Replace the parameter markers in the template with the parameters passed into the generate method.
+     * Parameters that are Java Tree's will be correctly printed into the string. The parameters are not named and
+     * this relies purely on ordinal position of the parameter.
+     *
+     * @param parameters A list of parameters
+     * @return The final snippet to be generated.
+     */
+    private String substituteParameters(Object... parameters) {
+
+        String codeInstance = code;
+        for (Object parameter : parameters) {
+            String value;
+            if (parameter instanceof Tree) {
+                value = ((Tree) parameter).printTrimmed();
+            } else {
+                value = parameter.toString();
+            }
+            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker, value);
+        }
+        return codeInstance;
+    }
+
+    /**
      * A custom JavaPrinter that will print the snippet from the template and then insert that snippet into the
      * insertion point from the original AST. This printer will only navigate the tree along the insertion scope's
      * path. It also prints any class declarations that are reachable from the compiliation unit (including nested
@@ -226,7 +248,7 @@ public class JavaTemplate {
                         @Override
                         public String doLast(Tree tree, String printed, String s) {
                             if (tree.getId().equals(insertionPoint)) {
-                                return s;
+                                return "/*" + SNIPPET_MARKER_START + "*/" + s + "/*" + SNIPPET_MARKER_END + "*/";
                             }
                             return printed;
                         }
@@ -342,33 +364,44 @@ public class JavaTemplate {
                     statement = ((J.Label) statement).getStatement();
                     continue;
                 }
-
                 return output.toString();
             }
         }
     }
 
-    /**
-     * Replace the parameter markers in the template with the parameters passed into the generate method.
-     * Parameters that are Java Tree's will be correctly printed into the string. The parameters are not named and
-     * this relies purely on ordinal position of the parameter.
-     *
-     * @param parameters A list of parameters
-     * @return The final snippet to be generated.
-     */
-    private String substituteParameters(Object... parameters) {
+    private static class ExtractTemplatedCode extends JavaProcessor<List<J>> {
+        private long templateDepth = -1;
 
-        String codeInstance = code;
-        for (Object parameter : parameters) {
-            String value;
-            if (parameter instanceof Tree) {
-                value = ((Tree) parameter).printTrimmed();
-            } else {
-                value = parameter.toString();
-            }
-            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker, value);
+        public ExtractTemplatedCode() {
+            setCursoringOn();
         }
-        return codeInstance;
+
+        @Override
+        public J visitEach(J tree, List<J> context) {
+            Comment startToken = findMarker(tree, SNIPPET_MARKER_START);
+            if (startToken != null) {
+                templateDepth = getCursor().getPathAsStream().count();
+
+                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
+                comments.remove(startToken);
+
+                context.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
+            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
+                context.add(tree);
+            } else if (findMarker(tree, SNIPPET_MARKER_END) != null) {
+                return tree;
+            }
+
+            return super.visitEach(tree, context);
+        }
+
+        private Comment findMarker(J tree, String marker) {
+            return tree.getPrefix().getComments().stream()
+                    .filter(c -> Comment.Style.BLOCK.equals(c.getStyle()))
+                    .filter(c -> c.getText().equals(marker))
+                    .findAny()
+                    .orElse(null);
+        }
     }
 
     /**
@@ -453,42 +486,6 @@ public class JavaTemplate {
             return ((JavaType.Primitive) type).getKeyword();
         } else {
             throw new IllegalArgumentException("Cannot resolve type declaration.");
-        }
-    }
-
-    private static class ExtractTemplatedCode extends JavaProcessor<ExecutionContext> {
-        private long templateDepth = -1;
-        private final List<J> templated = new ArrayList<>();
-
-        public ExtractTemplatedCode() {
-            setCursoringOn();
-        }
-
-        @Override
-        public J visitEach(J tree, ExecutionContext context) {
-            Comment startToken = findMarker(tree, "<<<<START>>>>");
-            if (startToken != null) {
-                templateDepth = getCursor().getPathAsStream().count();
-
-                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
-                comments.remove(startToken);
-
-                templated.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
-            } else if (!templated.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
-                templated.add(tree);
-            } else if (findMarker(tree, "<<<<STOP>>>>") != null) {
-                return tree;
-            }
-
-            return super.visitEach(tree, context);
-        }
-
-        private Comment findMarker(J tree, String marker) {
-            return tree.getPrefix().getComments().stream()
-                    .filter(c -> Comment.Style.BLOCK.equals(c.getStyle()))
-                    .filter(c -> c.getText().equals(marker))
-                    .findAny()
-                    .orElse(null);
         }
     }
 
