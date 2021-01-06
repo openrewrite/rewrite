@@ -143,7 +143,7 @@ public class TabsAndIndents extends Recipe {
         @Override
         public J.ForLoop visitForLoop(J.ForLoop forLoop, ExecutionContext ctx) {
             J.ForLoop f = (J.ForLoop) visitStatement(forLoop, ctx);
-            f = f.withBody(eval(f.getBody(), ctx));
+            f = f.withBody(call(f.getBody(), ctx));
 
             J.ForLoop.Control control = forLoop.getControl();
             JRightPadded<Statement> init = control.getInit();

@@ -15,14 +15,12 @@
  */
 package org.openrewrite.java;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.Formatting;
-import org.openrewrite.Validated;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindType;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TreeBuilder;
 import org.openrewrite.marker.Markers;
@@ -33,7 +31,6 @@ import java.util.regex.Pattern;
 
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 /**
  * A Java refactoring visitor that can be used to add an import (or static import) to a given compilation unit.
@@ -49,40 +46,24 @@ import static org.openrewrite.Validated.required;
  * if there is a reference to the imported class/method.
  */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class AddImport extends JavaIsoRefactorVisitor {
+public class AddImport extends JavaIsoProcessor<ExecutionContext> {
     @EqualsAndHashCode.Include
-    private String type;
+    private final String type;
 
     @EqualsAndHashCode.Include
     @Nullable
-    private String statik;
+    private final String statik;
 
     @EqualsAndHashCode.Include
-    private boolean onlyIfReferenced = true;
+    private final boolean onlyIfReferenced;
 
     private JavaType.Class classType;
 
-    public void setType(String type) {
+    public AddImport(String type, @Nullable String statik, boolean onlyIfReferenced) {
         this.type = type;
         this.classType = JavaType.Class.build(type);
-    }
-
-    public void setStatic(@Nullable String statik) {
         this.statik = statik;
-    }
-
-    public void setOnlyIfReferenced(boolean onlyIfReferenced) {
         this.onlyIfReferenced = onlyIfReferenced;
-    }
-
-    @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("class", type, "static.method", statik == null ? "none" : statik);
-    }
-
-    @Override
-    public Validated validate() {
-        return required("type", type);
     }
 
     /**
@@ -96,7 +77,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
     private static final Pattern prefixedByTwoNewlines = Pattern.compile("[ \t\r]*\n[ \t\r]*\n[ \t\n]*.*", Pattern.DOTALL);
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
         if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }
@@ -109,7 +90,7 @@ public class AddImport extends JavaIsoRefactorVisitor {
             return cu;
         }
 
-        if (cu.getImports().stream().anyMatch(i -> {
+        if (cu.getImports().stream().map(JRightPadded::getElem).anyMatch(i -> {
             String ending = i.getQualid().getSimpleName();
             if (statik == null) {
                 return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
@@ -169,11 +150,11 @@ public class AddImport extends JavaIsoRefactorVisitor {
 
     //Note that using anyMatch when a stream is empty ends up returning true, which is not the behavior needed here!
     @SuppressWarnings("SimplifyStreamApiCallChains")
-    private boolean hasReference(J.CompilationUnit compilationUnit) {
+    private boolean hasReference(J.CompilationUnit compilationUnit, ExecutionContext ctx) {
 
         if (statik == null) {
             //Non-static imports, we just look for field accesses.
-            return new FindType(type).visit(compilationUnit).stream()
+            return FindType.find(compilationUnit, type).stream()
                     .filter(t -> !(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type))
                     .findAny()
                     .isPresent();
@@ -189,3 +170,4 @@ public class AddImport extends JavaIsoRefactorVisitor {
                 .isPresent();
     }
 }
+d

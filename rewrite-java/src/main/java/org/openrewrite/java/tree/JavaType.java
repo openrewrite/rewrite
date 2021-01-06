@@ -260,9 +260,11 @@ public interface JavaType extends Serializable {
         public List<JavaType.Var> getVisibleSupertypeMembers() {
             List<JavaType.Var> members = new ArrayList<>();
             if (supertype != null) {
-                supertype.getMembers().stream()
-                        .filter(member -> !member.hasFlags(Flag.Private))
-                        .forEach(members::add);
+                for (Var member : supertype.getMembers()) {
+                    if (!member.hasFlags(Flag.Private)) {
+                        members.add(member);
+                    }
+                }
                 members.addAll(supertype.getVisibleSupertypeMembers());
             }
             return members;
@@ -315,7 +317,12 @@ public interface JavaType extends Serializable {
         private final Set<Flag> flags;
 
         public boolean hasFlags(Flag... test) {
-            return Arrays.stream(test).allMatch(flags::contains);
+            for (Flag flag : test) {
+                if (!flags.contains(flag)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
@@ -394,7 +401,12 @@ public interface JavaType extends Serializable {
         }
 
         public boolean hasFlags(Flag... test) {
-            return Arrays.stream(test).allMatch(flags::contains);
+            for (Flag flag : test) {
+                if (!flags.contains(flag)) {
+                    return false;
+                }
+            }
+            return true;
         }
 
         @Override
