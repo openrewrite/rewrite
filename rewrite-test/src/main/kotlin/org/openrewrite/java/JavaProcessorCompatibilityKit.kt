@@ -25,8 +25,8 @@ abstract class JavaProcessorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested
-    inner class BlankLinesTck : BlankLinesTest()
+    inner class BlankLinesTck : BlankLinesTest
 
     @Nested
-    inner class TabsAndIndentsTck : TabsAndIndentsTest()
+    inner class TabsAndIndentsTck : TabsAndIndentsTest
 }

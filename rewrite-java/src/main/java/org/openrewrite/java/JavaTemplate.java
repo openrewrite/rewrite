@@ -15,23 +15,24 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.jetbrains.annotations.NotNull;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.JavaPrinter;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Statement;
+import org.openrewrite.java.tree.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.joining;
 
 public class JavaTemplate {
+
+    private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
 
     private final JavaParser parser;
     private final String code;
@@ -39,34 +40,6 @@ public class JavaTemplate {
     private final Set<String> imports;
     private final boolean autoFormat;
     private final String parameterMarker;
-
-    private final JavaPrinter<String> printer = new JavaPrinter<String>(new TreePrinter<J, String>() {
-        @Override
-        public String doLast(Tree tree, String printed, String acc) {
-            if (tree instanceof Statement) {
-                return acc + printed;
-            }
-            return printed;
-        }
-    }) {
-        @Override
-        public String visitBlock(J.Block block, String context) {
-            StringBuilder acc = new StringBuilder();
-
-            if (block.getStatic() != null) {
-                acc.append("static").append(visit(block.getStatic()));
-            }
-
-            acc.append('{').append(context).append(visit(block.getEnd())).append('}');
-
-            return fmt(block, acc.toString());
-        }
-
-        @Override
-        public String visitCompilationUnit(J.CompilationUnit cu, String acc) {
-            return super.visit(cu.getImports(), ";", acc) + acc;
-        }
-    };
 
     private JavaTemplate(JavaParser parser, String code, Set<String> imports, boolean autoFormat, String parameterMarker) {
         this.parser = parser;
@@ -81,18 +54,69 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-    public <J2 extends J> List<J2> generate(Cursor insertionScope, Object... params) {
+    public <J2 extends J> List<J2> generate(@NonNull Cursor insertionScope, Object... parameters) {
 
-        if (params.length != parameterCount) {
+        if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
-        // flat map params to list of method declaration and variable, i.e. JavaType.Method and JavaType
+        J.CompilationUnit compilationUnit = insertionScope.firstEnclosing(J.CompilationUnit.class);
+        //Collect any class declarations in the compilation unit, we must also collect any arbitrary nested classes
+        Set<J.ClassDecl> localClasses = extractClassesFromCompilationUnit(compilationUnit);
+        //Collect types references in any parameters that are Trees.
+        Set<JavaType> parameterTypes = extractTypesFromParameters(parameters);
 
-        String printedInsertionScope = substituteParameters(params);
+        //TODO Can possibly scope "extractTypesFromParameters to JUST method types, as that is the only type
+        //that is acted upon below. Leaving this for now, because if a parameter is from some other AST (not
+        //related to the current compilation unit) we may want to add some additional imports.
+        Set<String> allImports = new HashSet<>(imports);
 
+        //Compute any local methods that need to be stubbed from the extracted types. This maps the ID of the class's
+        //body elements to a list of methods that need to be stubbed.
+        Map<UUID, List<JavaType.Method>> localMethods = new HashMap<>();
+        for (JavaType type : parameterTypes) {
+            if (type instanceof JavaType.Method) {
+                JavaType.Method method = (JavaType.Method) type;
+                if (method.getDeclaringType() == null) {
+                    continue;
+                }
+                //Keep track of any methods that are declared on a local class (those will need to have a stub
+                //generated for them)
+                localClasses.stream()
+                        .filter(c -> c.getType() != null && c.getType().equals(method.getDeclaringType()))
+                        .findFirst()
+                        .ifPresent(
+                                classDeclaration -> localMethods.computeIfAbsent(
+                                        classDeclaration.getBody().getId(), c -> new ArrayList<>()).add(method)
+                        );
+            }
+        }
+
+        //TODO Extract any variables that need to be defined in scope. Might be able to do some of this work in PrintSnippet.
+
+        //Substitute parameters into the template.
+        String printedInsertionScope = substituteParameters(parameters);
+
+        //Collect a list of IDs that represent the path from the insertion point back to the compiliation unit. This
+        //list is used in the PrintSnippet to figure out where to traverse the tree as it prints.
+        List<UUID> pathIds = new ArrayList<>();
+        Cursor index = insertionScope;
+        while (index != null && !(index.getTree() instanceof J.CompilationUnit)) {
+            pathIds.add(index.getTree().getId());
+            index = index.getParent();
+        }
+
+        //This logic currently walks backwards up the insertion path, printing the snippet as it goes.
         for (Cursor scope = insertionScope; scope != null; scope = scope.getParent()) {
-            printedInsertionScope = printer.visit((J) scope.getTree(), printedInsertionScope);
+            //Because this walks backward up the tree, a block will be visited...then its parent (which then traverses
+            //the block again) Same thing for class declarations.
+            if (scope.getTree() instanceof J.Block || scope.getTree() instanceof J.ClassDecl) {
+                continue;
+            }
+            printedInsertionScope = new PrintSnippet(allImports, pathIds, insertionScope.getTree().getId(), localMethods).visit((J) scope.getTree(), printedInsertionScope);
+        }
+        if (logger.isDebugEnabled()) {
+            logger.debug("Building code snippet using synthetic class:\n=============\n{}\n=============", printedInsertionScope);
         }
 
         parser.reset();
@@ -100,17 +124,242 @@ public class JavaTemplate {
                 .parse(printedInsertionScope)
                 .iterator().next();
 
-        if (autoFormat) {
-            // TODO format the new tree
-        }
+//        if (autoFormat) {
+//            // TODO format the new tree
+//        }
 
-        ExtractTemplatedCode extractTemplatedCode = new ExtractTemplatedCode();
-        extractTemplatedCode.visit(cu, null);
-
-        //noinspection unchecked
-        return (List<J2>) extractTemplatedCode.templated;
+//        //TODO extract just the desired snippet elements
+//        ExtractTemplatedCode extractTemplatedCode = new ExtractTemplatedCode();
+//        extractTemplatedCode.visit(cu, null);
+//
+//        //noinspection unchecked
+//        return (List<J2>) extractTemplatedCode.templated;
+        return null;
     }
 
+    /**
+     * This method extracts ALL classes from a compilation unit, even if they are nested within an inner class.
+     *
+     * @param cu The original compilation unit
+     * @return A list of all classes declared in the compilation unit.
+     */
+    private static Set<J.ClassDecl> extractClassesFromCompilationUnit(J.CompilationUnit cu) {
+
+        return new JavaTreeExtractor<Set<J.ClassDecl>>() {
+            @Override
+            protected Set<J.ClassDecl> defaultExtractedValue() {
+                return new HashSet<>();
+            }
+
+            @Override
+            public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, ValueContext context) {
+                context.getValue().add(classDecl);
+                return super.visitClassDecl(classDecl, context);
+            }
+        }.extractFromTree(cu);
+    }
+
+    /**
+     * This method extracts JavaTypes from any parameters that are themselves Trees. This extracts both
+     * JavaType.FullyQualified and JavaType.Method from the parameters.
+     *
+     * @param parameters Parameters passed into the template.
+     * @return A list of JavaTypes found within the parameters.
+     */
+    private static Set<JavaType> extractTypesFromParameters(Object[] parameters) {
+
+        JavaTreeExtractor<Set<JavaType>> typeExtractor = new JavaTreeExtractor<Set<JavaType>>() {
+            @Override
+            public Set<JavaType> defaultExtractedValue() {
+                return new HashSet<>();
+            }
+
+            @Override
+            public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ValueContext ctx) {
+                if (method.getType() != null) {
+                    ctx.getValue().add(method.getType());
+                } else  {
+                    logger.warn("There is an invocation to a method [" + method.getSimpleName()
+                            + "] within the original insertion scope that does not have type information.");
+                }
+                return super.visitMethodInvocation(method, ctx);
+            }
+
+            @Override
+            public J.NewClass visitNewClass(J.NewClass newClass, ValueContext ctx) {
+                if (newClass.getType() != null) {
+                    ctx.getValue().add(newClass.getType());
+                }
+                return super.visitNewClass(newClass, ctx);
+            }
+
+            @Override
+            public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, ValueContext ctx) {
+                if (variable.getType() != null) {
+                    ctx.getValue().add(variable.getType());
+                }
+                return super.visitVariable(variable, ctx);
+            }
+        };
+
+        return Arrays.stream(parameters)
+                .filter(p -> p instanceof J)
+                .map(p -> (J) p)
+                .flatMap(j -> typeExtractor.extractFromTree(j).stream()).collect(Collectors.toSet());
+    }
+
+
+    /**
+     * A custom JavaPrinter that will print the snippet from the template and then insert that snippet into the
+     * insertion point from the original AST. This printer will only navigate the tree along the insertion scope's
+     * path. It also prints any class declarations that are reachable from the compiliation unit (including nested
+     * classes) and generate method stubs for any methods that are referenced from parameters passed into the generate
+     * method.
+     */
+    private static class PrintSnippet extends JavaPrinter<String> {
+        private final Set<String> imports;
+        private final List<UUID> pathIds;
+        private final Map<UUID, List<JavaType.Method>> localMethodStubs;
+
+        /**
+         *
+         * @param imports Additional imports that should be added to the generated source.
+         * @param pathIds A list of path ID from the insertion point back to the compilation unit.
+         * @param insertionPoint The ID of element that IS the insertion point.
+         * @param localMethodStubs A Map of element IDs (J.Block) to a list of method stubs that should be generated in that block
+         */
+        PrintSnippet(Set<String> imports, List<UUID> pathIds, UUID insertionPoint, Map<UUID, List<JavaType.Method>> localMethodStubs) {
+            super(
+                    new TreePrinter<J, String>() {
+                        @Override
+                        public String doLast(Tree tree, String printed, String s) {
+                            if (tree.getId().equals(insertionPoint)) {
+                                return s;
+                            }
+                            return printed;
+                        }
+                    }
+            );
+            this.imports = imports;
+            this.pathIds = pathIds;
+            this.localMethodStubs = localMethodStubs;
+        }
+
+        @Override
+        public String visitCompilationUnit(J.CompilationUnit cu, String acc) {
+
+            //Print all original imports from the compliation unit
+            String originalImports = super.visit(cu.getImports(), ";", acc);
+
+            StringBuilder output = new StringBuilder(originalImports.length() + acc.length() + 1024);
+            output.append(originalImports);
+            if (!cu.getImports().isEmpty()) {
+                output.append(";");
+            }
+
+            output.append("\n\n//Additional Imports\n");
+            for (String _import : imports) {
+                output.append(_import);
+            }
+
+            //Visit the classes of the compilation unit.
+            return output.append(visit(cu.getClasses(), acc)).append(visit(cu.getEof())).toString();
+        }
+
+        @Override
+        public String visitBlock(J.Block block, String context) {
+            StringBuilder acc = new StringBuilder();
+
+            if (block.getStatic() != null) {
+                acc.append("static ").append(visit(block.getStatic()));
+            }
+            acc.append("{\n");
+            if (pathIds.contains(block.getId())) {
+                acc.append(visitStatements(block.getStatements(), context));
+            }
+
+            //For Class blocks, generate any stubbed out methods
+            List<JavaType.Method> methods = localMethodStubs.get(block.getId());
+            if (methods != null) {
+                acc.append("\n\n//Stubbed Methods\n").append(methods.stream().map(JavaTemplate::stubMethod)
+                        .collect(Collectors.joining("\n", "", "\n")));
+            }
+            //Process any nested classes.
+            for (JRightPadded<Statement> paddedStat : block.getStatements()) {
+                if (paddedStat.getElem() instanceof J.ClassDecl) {
+                    acc.append(visitClassDecl((J.ClassDecl)paddedStat.getElem(), context));
+                }
+            }
+
+
+            acc.append(visit(block.getEnd())).append("}\n");
+
+            return fmt(block, acc.toString());
+        }
+
+        private String visitStatements(List<JRightPadded<Statement>> statements, String context) {
+            if (statements == null || !statements.stream().filter(s -> pathIds.contains(s.getElem().getId())).findFirst().isPresent()) {
+                return context;
+            }
+            StringBuilder acc = new StringBuilder();
+            for (JRightPadded<Statement> paddedStat : statements) {
+                if (paddedStat.getElem() instanceof J.MethodDecl || paddedStat.getElem() instanceof J.ClassDecl) {
+                    //Method declarations only happen at the class level blocks. Rather than generating the existing
+                    //code, any references methods will be stubbed out.
+                    continue;
+                }
+                if (pathIds.contains(paddedStat.getElem().getId())) {
+                    break;
+                }
+                acc.append(visitStatement(paddedStat, context));
+            }
+            acc.append(context);
+            return acc.toString();
+        }
+
+        private String visitStatement(JRightPadded<Statement> paddedStat, String context) {
+            String acc = visit(paddedStat.getElem(), context) + visit(paddedStat.getAfter());
+
+            Statement s = paddedStat.getElem();
+            while (true) {
+                if (s instanceof J.Assert ||
+                        s instanceof J.Assign ||
+                        s instanceof J.AssignOp ||
+                        s instanceof J.Break ||
+                        s instanceof J.Continue ||
+                        s instanceof J.DoWhileLoop ||
+                        s instanceof J.Empty ||
+                        s instanceof J.MethodInvocation ||
+                        s instanceof J.NewClass ||
+                        s instanceof J.Return ||
+                        s instanceof J.Throw ||
+                        s instanceof J.Unary ||
+                        s instanceof J.VariableDecls) {
+                    return acc + ';';
+                }
+
+                if (s instanceof J.MethodDecl && ((J.MethodDecl) s).isAbstract()) {
+                    return acc + ';';
+                }
+
+                if (s instanceof J.Label) {
+                    s = ((J.Label) s).getStatement();
+                    continue;
+                }
+
+                return acc;
+            }
+        }
+    }
+
+    /**
+     * Replace the parameter markers in the template with the parameters passed into the generate method.
+     * Parameters that are Java Tree's will be correctly printed into the string. The parameters are not named and
+     * this relies purely on ordinal position of the parameter.
+     *
+     * @param parameters A list of parameters
+     * @return The final snippet to be generated.
+     */
     private String substituteParameters(Object... parameters) {
 
         String codeInstance = code;
@@ -126,7 +375,91 @@ public class JavaTemplate {
         return codeInstance;
     }
 
-    private static class ExtractTemplatedCode extends JavaProcessor {
+    /**
+     * This generates a String representation of a method declaration with an empty body based on the supplied JavaType.Method.
+     * These stubs can be used to ensure that type attribution succeeds for methods included in snippets built into AST elements.
+     *
+     * @param method The method type for which a stub will be generated.
+     * @return A snippet representing as method declaration of code that can be included as source in a synthetically generated class.
+     */
+    private static String stubMethod(JavaType.Method method) {
+        StringBuilder methodStub = new StringBuilder(128);
+
+        if (!method.getFlags().isEmpty()) {
+            methodStub.append(method.getFlags().stream().map(Flag::getKeyword).collect(joining(" "))).append(" ");
+        }
+
+        JavaType returnType = method.getResolvedSignature() == null?null:method.getResolvedSignature().getReturnType();
+
+        if (returnType instanceof JavaType.FullyQualified
+                || returnType instanceof JavaType.Array
+                || returnType instanceof JavaType.Primitive) {
+
+            methodStub.append(getTypeDeclaration(returnType)).append(" ");
+        } else {
+            methodStub.append("void ");
+        }
+
+        methodStub.append(method.getName()).append("(");
+        int argIndex = 0;
+        for (JavaType parameter: method.getResolvedSignature().getParamTypes()) {
+            if (argIndex > 0) {
+                methodStub.append(", ");
+            }
+            methodStub.append(getTypeDeclaration(parameter));
+            methodStub.append(" arg").append(argIndex);
+            argIndex++;
+        }
+        methodStub.append(") {\n");
+        if (returnType instanceof JavaType.FullyQualified || returnType instanceof JavaType.Array) {
+            methodStub.append("  return null;\n");
+        } else if (returnType instanceof JavaType.Primitive) {
+            methodStub.append("  return ").append(((JavaType.Primitive) returnType).getDefaultValue()).append(";\n");
+        }
+        methodStub.append("}\n");
+        return methodStub.toString();
+    }
+    /**
+     * Given a JaveType, generate the code declaration for that type. This method supports full-qualified, array, and
+     * primitive declarations.
+     *
+     * @param type The JavaType that will be converted to a type declaration code snippet
+     * @return code declaration for the type.
+     */
+    private static String getTypeDeclaration(@Nullable JavaType type) {
+
+        if (type instanceof JavaType.Class) {
+            JavaType.Class clazz = (JavaType.Class) type;
+            StringBuilder typeDeclaration = new StringBuilder(50);
+            typeDeclaration.append(clazz.getFullyQualifiedName());
+            if (clazz.getTypeParameters() != null && !clazz.getTypeParameters().isEmpty()) {
+                typeDeclaration
+                        .append("<")
+                        .append(clazz.getTypeParameters().stream().map(JavaTemplate::getTypeDeclaration).collect(joining(",")))
+                        .append(">");
+            }
+            return typeDeclaration.toString();
+
+        }
+        if (type instanceof JavaType.FullyQualified) {
+            return ((JavaType.FullyQualified)type).getFullyQualifiedName();
+        } else if (type instanceof JavaType.Array) {
+            JavaType elementType = ((JavaType.Array) type).getElemType();
+            if (elementType instanceof JavaType.FullyQualified) {
+                return ((JavaType.FullyQualified)elementType).getFullyQualifiedName() + "[]";
+            } else if (elementType instanceof JavaType.Primitive) {
+                return ((JavaType.Primitive)elementType).getKeyword() + "[]";
+            } else {
+                throw new IllegalArgumentException("Cannot resolve the array type declaration.");
+            }
+        } else if (type instanceof JavaType.Primitive) {
+            return ((JavaType.Primitive)type).getKeyword();
+        } else {
+            throw new IllegalArgumentException("Cannot resolve type declaration.");
+        }
+    }
+
+    private static class ExtractTemplatedCode extends JavaProcessor<ExecutionContext> {
         private long templateDepth = -1;
         private final List<J> templated = new ArrayList<>();
 
@@ -134,24 +467,24 @@ public class JavaTemplate {
             setCursoringOn();
         }
 
-//        @Override
-//        public J visitEach(J tree, ExecutionContext ctx) {
-//            Comment startToken = findMarker(tree, "<<<<START>>>>");
-//            if (startToken != null) {
-//                templateDepth = getCursor().getPathAsStream().count();
-//
-//                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
-//                comments.remove(startToken);
-//
-//                templated.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
-//            } else if (!templated.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
-//                templated.add(tree);
-//            } else if (findMarker(tree, "<<<<STOP>>>>") != null) {
-//                return tree;
-//            }
-//
-//            return super.visitEach(tree, ctx);
-//        }
+        @Override
+        public J visitEach(J tree, ExecutionContext context) {
+            Comment startToken = findMarker(tree, "<<<<START>>>>");
+            if (startToken != null) {
+                templateDepth = getCursor().getPathAsStream().count();
+
+                List<Comment> comments = new ArrayList<>(tree.getPrefix().getComments());
+                comments.remove(startToken);
+
+                templated.add(tree.withPrefix(tree.getPrefix().withComments(comments)));
+            } else if (!templated.isEmpty() && getCursor().getPathAsStream().count() == templateDepth) {
+                templated.add(tree);
+            } else if (findMarker(tree, "<<<<STOP>>>>") != null) {
+                return tree;
+            }
+
+            return super.visitEach(tree, context);
+        }
 
         private Comment findMarker(J tree, String marker) {
             return tree.getPrefix().getComments().stream()
@@ -162,40 +495,18 @@ public class JavaTemplate {
         }
     }
 
-
-    /**
-     * Convert a JavaType into a string import statement of the form:
-     * <P><PRE>
-     * FullyQualfied Types : import {}fully-qualified-name};
-     * Method Types        : static import {fully-qualified-name}.{methodName};
-     * </PRE>
-     */
-    private static String javaTypeToImport(JavaType type) {
-        StringBuilder anImport = new StringBuilder(256);
-        if (type instanceof JavaType.FullyQualified) {
-            anImport.append("import ").append(((JavaType.FullyQualified) type).getFullyQualifiedName()).append(";\n");
-        } else if (type instanceof JavaType.Method) {
-            JavaType.Method method = (JavaType.Method) type;
-            anImport.append("static import ").append(method.getDeclaringType().getFullyQualifiedName())
-                    .append(".").append(method.getName()).append(";\n");
-        } else {
-            throw new IllegalArgumentException("Unsupported import type.");
-        }
-        return anImport.toString();
-    }
-
     public static class Builder {
 
         private final String code;
-        private JavaParser javaParser;
-        private Set<String> imports;
+        private JavaParser javaParser = JavaParser.fromJavaVersion()
+                .logCompilationWarningsAndErrors(false)
+                .build();
+        private Set<String> imports = new HashSet<>();
 
         private boolean autoFormat = true;
         private String parameterMarker = "#{}";
 
-        Builder(String code) {
-            this.code = code;
-        }
+        Builder(String code) { this.code = code; }
 
         /**
          * A list of fully-qualified types that will be added when generating/compiling snippets
@@ -207,7 +518,7 @@ public class JavaTemplate {
          *     java.util.Date
          * </PRE>
          */
-        public Builder imports(String... fullyQualifiedTypeNames) {
+        public Builder imports(@NotNull String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -229,7 +540,7 @@ public class JavaTemplate {
          *     java.util.Collections.*
          * </PRE>
          */
-        public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
+        public Builder staticImports(@NotNull String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -246,7 +557,7 @@ public class JavaTemplate {
          * <P><P>
          * FullyQualified types will be added as an import and Method types will be statically imported
          */
-        public Builder imports(JavaType... types) {
+        public Builder imports(@NotNull JavaType... types) {
             for (JavaType type : types) {
                 imports.add(javaTypeToImport(type));
             }
@@ -281,5 +592,27 @@ public class JavaTemplate {
             return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
         }
     }
+
+    /**
+     * Convert a JavaType into a string import statement of the form:
+     * <P><PRE>
+     * FullyQualfied Types : import {}fully-qualified-name};
+     * Method Types        : static import {fully-qualified-name}.{methodName};
+     * </PRE>
+     */
+    private static String javaTypeToImport(JavaType type) {
+        StringBuilder anImport = new StringBuilder(256);
+        if (type instanceof JavaType.FullyQualified) {
+            anImport.append("import ").append(((JavaType.FullyQualified) type).getFullyQualifiedName()).append(";\n");
+        } else if (type instanceof JavaType.Method) {
+            JavaType.Method method = (JavaType.Method) type;
+            anImport.append("static import ").append(method.getDeclaringType().getFullyQualifiedName())
+                    .append(".").append(method.getName()).append(";\n");
+        } else {
+            throw new IllegalArgumentException("Unsupported import type.");
+        }
+        return anImport.toString();
+    }
+
 
 }
