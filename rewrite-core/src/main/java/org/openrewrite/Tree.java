@@ -30,6 +30,8 @@ public interface Tree {
 
     Markers getMarkers();
 
+    <T extends Tree> T withMarkers(Markers markers);
+
     /**
      * An id that can be used to identify a particular AST element, even after transformations have taken place on it
      *

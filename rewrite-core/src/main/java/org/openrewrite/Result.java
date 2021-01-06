@@ -51,12 +51,12 @@ public class Result {
     private final SourceFile after;
 
     @Getter
-    private final Set<String> visitorsThatMadeChanges;
+    private final Set<String> recipesThatMadeChanges;
 
-    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<String> visitorsThatMadeChanges) {
+    public Result(@Nullable SourceFile before, @Nullable SourceFile after, Set<String> recipesThatMadeChanges) {
         this.before = before;
         this.after = after;
-        this.visitorsThatMadeChanges = visitorsThatMadeChanges;
+        this.recipesThatMadeChanges = recipesThatMadeChanges;
     }
 
     /**
@@ -79,7 +79,7 @@ public class Result {
         return new InMemoryDiffEntry(sourcePath, relativeTo,
                 before == null ? "" : before.print(),
                 after == null ? "" : after.print(),
-                visitorsThatMadeChanges).getDiff();
+                recipesThatMadeChanges).getDiff();
     }
 
     public Class<? extends Tree> getTreeType() {
@@ -90,11 +90,11 @@ public class Result {
 
     static class InMemoryDiffEntry extends DiffEntry {
         InMemoryRepository repo;
-        Set<String> rulesThatMadeChanges;
+        Set<String> recipesThatMadeChanges;
 
-        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<String> rulesThatMadeChanges) {
+        InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<String> recipesThatMadeChanges) {
             this.changeType = ChangeType.MODIFY;
-            this.rulesThatMadeChanges = rulesThatMadeChanges;
+            this.recipesThatMadeChanges = recipesThatMadeChanges;
 
             Path relativePath = relativeTo == null ? filePath : relativeTo.relativize(filePath);
             this.oldPath = relativePath.toString();
@@ -140,7 +140,7 @@ public class Result {
                     .map(l -> {
                         if (!addedComment.get() && l.startsWith("@@") && l.endsWith("@@")) {
                             addedComment.set(true);
-                            return l + rulesThatMadeChanges.stream()
+                            return l + recipesThatMadeChanges.stream()
                                     .sorted()
                                     .collect(Collectors.joining(", ", " ", ""));
                         }

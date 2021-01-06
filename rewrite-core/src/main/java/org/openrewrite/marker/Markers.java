@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiFunction;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -77,22 +80,25 @@ public class Markers {
 
     /**
      * Add a new marker or update some existing marker with the same type (equality not assignability).
-     * @param marker The marker to add.
+     *
+     * @param identity          A new marker to add if none of this type already exist.
+     * @param remappingFunction The function that merges an existing marker with identity.
      * @return A new {@link Markers} with an added or updated marker.
      */
-    public Markers addOrUpdate(Marker marker) {
+    public <M extends Marker> Markers compute(M identity, BinaryOperator<M> remappingFunction) {
         List<Marker> updatedmarker = new ArrayList<>(markers.size() + 1);
         boolean updated = false;
         for (Marker m : this.markers) {
-            if (m.getClass().equals(marker.getClass())) {
-                updatedmarker.add(marker);
+            if (m.getClass().equals(identity.getClass())) {
+                //noinspection unchecked
+                updatedmarker.add(remappingFunction.apply((M) m, identity));
                 updated = true;
             } else {
                 updatedmarker.add(m);
             }
         }
         if (!updated) {
-            updatedmarker.add(marker);
+            updatedmarker.add(identity);
         }
         return new Markers(updatedmarker);
     }
