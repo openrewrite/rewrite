@@ -17,7 +17,6 @@ package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.xml.search.FindTag
 import org.openrewrite.xml.tree.Xml
 
 class AutoFormatTest : RefactorVisitorTestForParser<Xml.Document> {

@@ -18,7 +18,7 @@ package org.openrewrite.xml.search;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.refactor.FindIndent;
-import org.openrewrite.xml.AbstractXmlSourceVisitor;
+import org.openrewrite.xml.XmlProcessor;
 
 import java.util.Map;
 import java.util.SortedMap;
@@ -32,7 +32,7 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
-public class FindIndentXml extends AbstractXmlSourceVisitor<Void> implements FindIndent {
+public class FindIndentXml extends XmlProcessor<Void> implements FindIndent {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 

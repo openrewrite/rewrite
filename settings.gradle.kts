@@ -4,7 +4,7 @@ include(
         "rewrite-java-11",
 //        "rewrite-maven",
 //        "rewrite-properties",
-//        "rewrite-xml",
+        "rewrite-xml",
 //        "rewrite-yaml",
         "rewrite-test"
 )

@@ -15,8 +15,6 @@
  */
 package org.openrewrite.xml;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
 import org.openrewrite.Formatting;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.tree.Xml;

@@ -15,20 +15,19 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public interface XmlSourceVisitor<R> extends SourceVisitor<R> {
+public interface XmlVisitor<R, P> extends TreeVisitor<R, P> {
 
-    Xml.Tag enclosingTag();
-    R visitDocument(Xml.Document document);
-    R visitProcessingInstruction(Xml.ProcessingInstruction pi);
-    R visitTag(Xml.Tag tag);
-    R visitAttribute(Xml.Attribute attribute);
-    R visitCharData(Xml.CharData charData);
-    R visitComment(Xml.Comment comment);
-    R visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl);
-    R visitProlog(Xml.Prolog prolog);
-    R visitIdent(Xml.Ident ident);
-    R visitElement(Xml.DocTypeDecl.Element element);
+    R visitDocument(Xml.Document document, P p);
+    R visitProcessingInstruction(Xml.ProcessingInstruction pi, P p);
+    R visitTag(Xml.Tag tag, P p);
+    R visitAttribute(Xml.Attribute attribute, P p);
+    R visitCharData(Xml.CharData charData, P p);
+    R visitComment(Xml.Comment comment, P p);
+    R visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p);
+    R visitProlog(Xml.Prolog prolog, P p);
+    R visitIdent(Xml.Ident ident, P p);
+    R visitElement(Xml.DocTypeDecl.Element element, P p);
 }
