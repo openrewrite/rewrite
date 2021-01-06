@@ -20,6 +20,7 @@ import com.sun.source.util.TreePathScanner;
 import com.sun.tools.javac.code.Flags;
 import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.Type;
+import com.sun.tools.javac.code.Type.*;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.tree.EndPosTable;
 import com.sun.tools.javac.tree.JCTree;
@@ -731,59 +732,15 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
                 convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")));
 
-        Symbol genericSymbolAny = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
+        Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
-        // if the symbol is not a method symbol, there is a parser error in play
-        Symbol.MethodSymbol genericSymbol = genericSymbolAny instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) genericSymbolAny : null;
-
-        JavaType.Method type = null;
-        if (genericSymbol != null && jcSelect.type != null) {
-            Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
-                if (t instanceof com.sun.tools.javac.code.Type.MethodType) {
-                    com.sun.tools.javac.code.Type.MethodType mt = (com.sun.tools.javac.code.Type.MethodType) t;
-
-                    List<JavaType> paramTypes = new ArrayList<>();
-                    for (Type argtype : mt.argtypes) {
-                        if (argtype != null) {
-                            JavaType javaType = type(argtype);
-                            paramTypes.add(javaType);
-                        }
-                    }
-
-                    return new JavaType.Method.Signature(type(mt.restype), paramTypes);
-                }
-                return null;
-            };
-
-            JavaType.Method.Signature genericSignature;
-            if (genericSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
-                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) genericSymbol.type).qtype);
-            } else {
-                genericSignature = signature.apply(genericSymbol.type);
-            }
-
-            List<String> paramNames = new ArrayList<>();
-            for (Symbol.VarSymbol p : genericSymbol.params()) {
-                String s = p.name.toString();
-                paramNames.add(s);
-            }
-
-            type = JavaType.Method.build(
-                    TypeUtils.asClass(type(genericSymbol.owner)),
-                    name.getSimpleName(),
-                    genericSignature,
-                    signature.apply(jcSelect.type),
-                    paramNames,
-                    filteredFlags(genericSymbol)
-            );
-        }
-
-        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args, type);
+        return new J.MethodInvocation(randomId(), fmt, Markers.EMPTY, select, typeParams, name, args,
+                methodType(jcSelect.type, genericSymbol, name.getSimpleName()));
     }
 
     @Override
     public J visitMethod(MethodTree node, Space fmt) {
-        logger.trace("Visiting method {}", node.getName());
+        JCMethodDecl jcMethod = (JCMethodDecl) node;
 
         List<J.Annotation> annotations = convertAll(node.getModifiers().getAnnotations());
         List<J.Modifier> modifiers = sortedFlags(node.getModifiers());
@@ -795,9 +752,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         TypeTree returnType = convertOrNull(node.getReturnType());
 
+        Symbol.MethodSymbol nodeSym = jcMethod.sym;
+
         J.Ident name;
         if ("<init>".equals(node.getName().toString())) {
-            Symbol.MethodSymbol nodeSym = ((JCMethodDecl) node).sym;
             String owner = null;
             if (nodeSym == null) {
                 for (Tree tree : getCurrentPath()) {
@@ -811,7 +769,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     throw new IllegalStateException("Should have been able to locate an owner");
                 }
             } else {
-                owner = ((JCMethodDecl) node).sym.owner.name.toString();
+                owner = jcMethod.sym.owner.name.toString();
             }
             name = J.Ident.build(randomId(), sourceBefore(owner), Markers.EMPTY, owner, null);
         } else {
@@ -833,7 +791,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 padLeft(sourceBefore("default"), convert(node.getDefaultValue()));
 
         return new J.MethodDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, typeParams,
-                returnType, name, params, throwss, body, defaultValue);
+                returnType, name, params, throwss, body, defaultValue,
+                methodType(jcMethod.type, jcMethod.sym, name.getSimpleName()));
     }
 
     @Override
@@ -1476,6 +1435,56 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Nullable
+    private JavaType.Method methodType(Type selectType, @Nullable Symbol symbol, String methodName) {
+        // if the symbol is not a method symbol, there is a parser error in play
+        Symbol.MethodSymbol genericSymbol = symbol instanceof Symbol.MethodSymbol ? (Symbol.MethodSymbol) symbol : null;
+
+        JavaType.Method type = null;
+        if (genericSymbol != null && selectType != null) {
+            Function<com.sun.tools.javac.code.Type, JavaType.Method.Signature> signature = t -> {
+                if (t instanceof MethodType) {
+                    MethodType mt = (MethodType) t;
+
+                    List<JavaType> paramTypes = new ArrayList<>();
+                    for (Type argtype : mt.argtypes) {
+                        if (argtype != null) {
+                            JavaType javaType = type(argtype);
+                            paramTypes.add(javaType);
+                        }
+                    }
+
+                    return new JavaType.Method.Signature(type(mt.restype), paramTypes);
+                }
+                return null;
+            };
+
+            JavaType.Method.Signature genericSignature;
+            if (genericSymbol.type instanceof com.sun.tools.javac.code.Type.ForAll) {
+                genericSignature = signature.apply(((com.sun.tools.javac.code.Type.ForAll) genericSymbol.type).qtype);
+            } else {
+                genericSignature = signature.apply(genericSymbol.type);
+            }
+
+            List<String> paramNames = new ArrayList<>();
+            for (Symbol.VarSymbol p : genericSymbol.params()) {
+                String s = p.name.toString();
+                paramNames.add(s);
+            }
+
+            return JavaType.Method.build(
+                    TypeUtils.asClass(type(genericSymbol.owner)),
+                    methodName,
+                    genericSignature,
+                    signature.apply(selectType),
+                    paramNames,
+                    filteredFlags(genericSymbol)
+            );
+        }
+
+        return null;
+    }
+
+    @Nullable
     private JavaType type(@Nullable Symbol symbol) {
         if (symbol instanceof Symbol.ClassSymbol || symbol instanceof Symbol.TypeVariableSymbol) {
             return type(symbol.type);
@@ -1486,19 +1495,18 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     @Nullable
-    private JavaType type(@Nullable com.sun.tools.javac.code.Type type) {
+    private JavaType type(@Nullable Type type) {
         return type(type, emptyList());
     }
 
     @Nullable
-    private JavaType type(@Nullable com.sun.tools.javac.code.Type type, List<Symbol> stack) {
+    private JavaType type(@Nullable Type type, List<Symbol> stack) {
         return type(type, stack, false);
     }
 
     @Nullable
-    private JavaType type(@Nullable com.sun.tools.javac.code.Type type,
-                          List<Symbol> stack, boolean shallow) {
-        if (type instanceof com.sun.tools.javac.code.Type.ClassType) {
+    private JavaType type(@Nullable Type type, List<Symbol> stack, boolean shallow) {
+        if (type instanceof ClassType) {
             if (type instanceof Type.ErrorType) {
                 return null;
             }
@@ -1535,8 +1543,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         }
                     }
 
-                    Type.ClassType classType = (com.sun.tools.javac.code.Type.ClassType) type;
-                    Type.ClassType symType = (com.sun.tools.javac.code.Type.ClassType) sym.type;
+                    ClassType classType = (ClassType) type;
+                    ClassType symType = (ClassType) sym.type;
 
                     List<JavaType> typeParameters;
                     if (classType.typarams_field == null) {
@@ -1578,13 +1586,13 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     return clazz;
                 }
             }
-        } else if (type instanceof com.sun.tools.javac.code.Type.TypeVar) {
+        } else if (type instanceof TypeVar) {
             return new JavaType.GenericTypeVariable(type.tsym.name.toString(),
                     TypeUtils.asClass(type(type.getUpperBound(), stack)));
-        } else if (type instanceof com.sun.tools.javac.code.Type.JCPrimitiveType) {
+        } else if (type instanceof JCPrimitiveType) {
             return primitive(type.getTag());
-        } else if (type instanceof com.sun.tools.javac.code.Type.ArrayType) {
-            return new JavaType.Array(type(((com.sun.tools.javac.code.Type.ArrayType) type).elemtype, stack));
+        } else if (type instanceof ArrayType) {
+            return new JavaType.Array(type(((ArrayType) type).elemtype, stack));
         } else if (com.sun.tools.javac.code.Type.noType.equals(type)) {
             return null;
         } else {

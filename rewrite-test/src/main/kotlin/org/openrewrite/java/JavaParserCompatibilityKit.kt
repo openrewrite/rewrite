@@ -21,7 +21,7 @@ import org.openrewrite.java.tree.*
 
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaParserCompatibilityKit {
-    abstract fun javaParser(): JavaParser?
+    abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested
     inner class AnnotationTck : AnnotationTest

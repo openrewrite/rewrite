@@ -617,41 +617,6 @@ public interface J extends Serializable, Tree {
             return list;
         }
 
-//        /**
-//         * Find fields is defined on this class, but does not include inherited fields up the type hierarchy
-//         */
-//        public List<VariableDecls> findFields(String clazz) {
-//            return new FindFields(clazz).visit(this);
-//        }
-//
-//        /**
-//         * Find fields is defined up the type hierarchy, but does not include fields defined directly on this class
-//         */
-//        public List<JavaType.Var> findInheritedFields(String clazz) {
-//            return new FindInheritedFields(clazz).visit(this);
-//        }
-//
-//        public List<MethodInvocation> findMethodCalls(String signature) {
-//            return new FindMethods(signature).visit(this);
-//        }
-//
-        public Set<NameTree> findType(String clazz) {
-            return FindType.find(this, clazz);
-        }
-//
-//        public List<Annotation> findAnnotations(String signature) {
-//            return new FindAnnotations(signature).visit(this);
-//        }
-//
-//        public List<Annotation> findAnnotationsOnClass(String signature) {
-//            FindAnnotations findAnnotations = new FindAnnotations(signature);
-//            return getAnnotations().stream().flatMap(a -> findAnnotations.visitAnnotation(a).stream()).collect(toList());
-//        }
-//
-//        public boolean hasType(String clazz) {
-//            return new HasType(clazz).visit(this);
-//        }
-
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
@@ -703,24 +668,6 @@ public interface J extends Serializable, Tree {
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }
-
-//        public boolean hasImport(String clazz) {
-//            return new HasImport(clazz).visit(this);
-//        }
-//
-//        public boolean hasType(String clazz) {
-//            return new HasType(clazz).visit(this);
-//        }
-//
-//        /**
-//         * This finds method invocations matching the specified pointcut expression within the compilation unit.
-//         * See {@link org.openrewrite.java.search.FindMethods} for pointcut expression examples.
-//         *
-//         * @param signature A pointcut expression that scopes the method invocation search.
-//         */
-//        public List<MethodInvocation> findMethodCalls(String signature) {
-//            return new FindMethods(signature).visit(this);
-//        }
 
         public Set<NameTree> findType(String clazz) {
             return FindType.find(this, clazz);
@@ -1552,7 +1499,7 @@ public interface J extends Serializable, Tree {
                 return this;
             }
             return new MethodDecl(id, prefix, markers, annotations, modifiers, typeParameters, returnTypeExpr,
-                    name, params, throwz, body, defaultValue);
+                    name, params, throwz, body, defaultValue, type);
         }
 
         @JsonProperty("throwz")
@@ -1577,6 +1524,11 @@ public interface J extends Serializable, Tree {
         @Nullable
         JLeftPadded<Expression> defaultValue;
 
+        @With
+        @Getter
+        @Nullable
+        JavaType.Method type;
+
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitMethod(this, p);
@@ -1586,14 +1538,6 @@ public interface J extends Serializable, Tree {
         public boolean isAbstract() {
             return body == null;
         }
-
-//        public boolean hasType(String clazz) {
-//            return new HasType(clazz).visit(this);
-//        }
-//
-//        public List<Annotation> findAnnotations(String signature) {
-//            return new FindAnnotations(signature).visit(this);
-//        }
 
         @JsonIgnore
         public boolean isConstructor() {
@@ -2414,10 +2358,6 @@ public interface J extends Serializable, Tree {
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitMultiVariable(this, p);
         }
-
-//        public List<Annotation> findAnnotations(String signature) {
-//            return new FindAnnotations(signature).visit(this);
-//        }
 
         @JsonIgnore
         public JavaType.Class getTypeAsClass() {
