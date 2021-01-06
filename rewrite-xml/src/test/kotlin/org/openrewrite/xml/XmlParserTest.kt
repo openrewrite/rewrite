@@ -15,12 +15,23 @@
  */
 package org.openrewrite.xml
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.ExecutionContext
+import org.openrewrite.TreePrinter
+import org.openrewrite.internal.StringUtils
+import org.openrewrite.xml.internal.XmlPrinter
 import org.openrewrite.xml.tree.Xml
 
-class XmlParserTest: XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
-    override val parser: XmlParser = XmlParser()
+class XmlParserTest {
+    val parser: XmlParser = XmlParser()
+
+    private fun assertUnchanged(before: String) {
+        val xmlDocument = parser.parse(StringUtils.trimIndent(before)).iterator().next()
+        val xmlPrinter = XmlPrinter<ExecutionContext>(TreePrinter.identity())
+        val after = xmlPrinter.visit(xmlDocument, ExecutionContext.builder().build())
+        assertThat(after).`as`("Source should not be changed").isEqualTo(before)
+    }
 
     @Test
     fun parseXmlDocument() = assertUnchanged(
@@ -33,7 +44,7 @@ class XmlParserTest: XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
                 <beans >
                     <bean id="myBean"/>
                 </beans>
-            """
+            """.trimIndent()
     )
 
     @Test
@@ -53,6 +64,6 @@ class XmlParserTest: XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
               <packaging>bundle</packaging>
               <name>Guava: Google Core Libraries for Java</name>
             </project>
-        """
+        """.trimIndent()
     )
 }

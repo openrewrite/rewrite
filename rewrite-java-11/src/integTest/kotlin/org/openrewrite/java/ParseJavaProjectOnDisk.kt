@@ -55,7 +55,6 @@ object ParseJavaProjectOnDisk {
         var start = System.nanoTime()
         val parser: JavaParser = JavaParser.fromJavaVersion()
             .logCompilationWarningsAndErrors(false) // optional, for quiet parsing
-            .meterRegistry(meterRegistry)
             .build()
 
         println("Loaded ${paths.size} files in ${(System.nanoTime() - start) * 1e-6}ms")
