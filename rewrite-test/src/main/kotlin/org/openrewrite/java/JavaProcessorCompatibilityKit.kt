@@ -20,6 +20,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.FindAnnotationTest
+import org.openrewrite.java.search.FindFieldTest
 import org.openrewrite.java.search.FindMethodTest
 import org.openrewrite.java.search.FindTypeTest
 
@@ -35,6 +36,9 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class FindAnnotationTck : FindAnnotationTest
+
+    @Nested
+    inner class FindFieldTck : FindFieldTest
 
     @Nested
     inner class FindMethodTck : FindMethodTest

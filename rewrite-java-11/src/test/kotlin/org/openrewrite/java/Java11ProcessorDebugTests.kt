@@ -20,6 +20,7 @@ import org.openrewrite.DebugOnly
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.FindAnnotationTest
+import org.openrewrite.java.search.FindFieldTest
 import org.openrewrite.java.search.FindMethodTest
 import org.openrewrite.java.search.FindTypeTest
 
@@ -38,6 +39,10 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationTest: Java11Test, FindAnnotationTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindFieldTest : Java11Test, FindFieldTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
