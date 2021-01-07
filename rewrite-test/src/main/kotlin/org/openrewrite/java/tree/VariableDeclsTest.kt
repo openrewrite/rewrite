@@ -17,35 +17,35 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.Class
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 
-interface VariableDeclsTest : JavaParserTest {
+interface VariableDeclsTest : JavaTreeTest {
 
     @Test
-    fun fieldDefinition(jp: JavaParser) = assertParseAndPrint(
+    fun fieldDefinition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public String a = "";
         """
     )
 
     @Test
-    fun localVariableDefinition(jp: JavaParser) = assertParseAndPrint(
+    fun localVariableDefinition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String a = "";
         """
     )
 
     @Test
-    fun fieldWithNoInitializer(jp: JavaParser) = assertParseAndPrint(
+    fun fieldWithNoInitializer(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public String a;
         """
     )
 
     @Test
-    fun arrayVariables(jp: JavaParser) = assertParseAndPrint(
+    fun arrayVariables(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
            int n [ ];
            String s [ ] [ ];
@@ -55,14 +55,14 @@ interface VariableDeclsTest : JavaParserTest {
     )
 
     @Test
-    fun multipleDeclarationOneAssignment(jp: JavaParser) = assertParseAndPrint(
+    fun multipleDeclarationOneAssignment(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int i , j = 0;
         """
     )
 
     @Test
-    fun multipleDeclaration(jp: JavaParser) = assertParseAndPrint(
+    fun multipleDeclaration(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Integer[] m = { 0 }, n[] = { { 0 } };
         """
@@ -72,7 +72,7 @@ interface VariableDeclsTest : JavaParserTest {
      * OpenJDK does NOT preserve the order of modifiers in its AST representation
      */
     @Test
-    fun modifierOrdering(jp: JavaParser) = assertParseAndPrint(
+    fun modifierOrdering(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public /* static */ final static Integer n = 0;
         """

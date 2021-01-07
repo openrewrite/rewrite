@@ -17,14 +17,14 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface NewClassTest : JavaParserTest {
+interface NewClassTest : JavaTreeTest {
 
     @Test
-    fun anonymousInnerClass(jp: JavaParser) = assertParseAndPrint(
+    fun anonymousInnerClass(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             class A { static class B {} }
             class C {
@@ -34,7 +34,7 @@ interface NewClassTest : JavaParserTest {
     )
 
     @Test
-    fun concreteInnerClass(jp: JavaParser) = assertParseAndPrint(
+    fun concreteInnerClass(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             class A { static class B {} }
             class C {
@@ -44,14 +44,14 @@ interface NewClassTest : JavaParserTest {
     )
 
     @Test
-    fun concreteClassWithParams(jp: JavaParser) = assertParseAndPrint(
+    fun concreteClassWithParams(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Object l = new ArrayList < String > ( 0 ) { };
         """, "java.util.*"
     )
 
     @Test
-    fun rawType(jp: JavaParser) = assertParseAndPrint(
+    fun rawType(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             List<String> l = new ArrayList < > ();
         """, "java.util.*"

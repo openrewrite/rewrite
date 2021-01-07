@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface ForLoopTest : JavaParserTest {
+interface ForLoopTest : JavaTreeTest {
 
     @Test
-    fun forLoop(jp: JavaParser) = assertParseAndPrint(
+    fun forLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(int i = 0; i < 10; i++) {
             }
@@ -31,7 +31,7 @@ interface ForLoopTest : JavaParserTest {
     )
 
     @Test
-    fun infiniteLoop(jp: JavaParser) = assertParseAndPrint(
+    fun infiniteLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(;;) {
             }
@@ -39,7 +39,7 @@ interface ForLoopTest : JavaParserTest {
     )
 
     @Test
-    fun format(jp: JavaParser) = assertParseAndPrint(
+    fun format(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for ( int i = 0 ; i < 10 ; i++ ) {
             }
@@ -47,21 +47,21 @@ interface ForLoopTest : JavaParserTest {
     )
 
     @Test
-    fun formatInfiniteLoop(jp: JavaParser) = assertParseAndPrint(
+    fun formatInfiniteLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for ( ; ; ) {}
         """
     )
 
     @Test
-    fun formatLoopNoInit(jp: JavaParser) = assertParseAndPrint(
+    fun formatLoopNoInit(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for ( ; i < 10 ; i++ ) {}
         """
     )
 
     @Test
-    fun formatLoopNoCondition(jp: JavaParser) = assertParseAndPrint(
+    fun formatLoopNoCondition(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int i = 0;
             for(; i < 10; i++) {}
@@ -69,14 +69,14 @@ interface ForLoopTest : JavaParserTest {
     )
 
     @Test
-    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) = assertParseAndPrint(
+    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(;;) test();
         """
     )
 
     @Test
-    fun initializerIsAnAssignment(jp: JavaParser) = assertParseAndPrint(
+    fun initializerIsAnAssignment(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
                 int[] a;
                 int i=0;
@@ -85,7 +85,7 @@ interface ForLoopTest : JavaParserTest {
     )
 
     @Test
-    fun multiVariableInitialization(jp: JavaParser) = assertParseAndPrint(
+    fun multiVariableInitialization(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(int i, j = 0;;) {}
         """

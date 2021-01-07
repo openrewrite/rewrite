@@ -17,20 +17,20 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface UnaryTest : JavaParserTest {
+interface UnaryTest : JavaTreeTest {
 
     @Test
-    fun negation(jp: JavaParser) = assertParseAndPrint(
+    fun negation(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             boolean b = !(1 == 2);
         """
     )
 
     @Test
-    fun format(jp: JavaParser) = assertParseAndPrint(
+    fun format(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int i = 0;
             int j = ++i;

@@ -165,10 +165,6 @@ class Java11ThrowTest: Java11Test, ThrowTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11CompilationUnitSerializerTest: Java11Test, CompilationUnitSerializerTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
 class Java11TryCatchTest: Java11Test, TryCatchTest
 
 @DebugOnly

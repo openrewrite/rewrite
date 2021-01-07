@@ -17,14 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.Class
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 
-interface ReturnTest : JavaParserTest {
+interface ReturnTest : JavaTreeTest {
 
     @Test
-    fun returnValue(jp: JavaParser) = assertParseAndPrint(
+    fun returnValue(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public String string() {
                 return "";
@@ -33,7 +32,7 @@ interface ReturnTest : JavaParserTest {
     )
 
     @Test
-    fun returnVoid(jp: JavaParser) = assertParseAndPrint(
+    fun returnVoid(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public void nothing() {
                 return ;

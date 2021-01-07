@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface TypeCastTest : JavaParserTest {
+interface TypeCastTest : JavaTreeTest {
 
     @Test
-    fun cast(jp: JavaParser) = assertParseAndPrint(
+    fun cast(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Object o = (Class<String>) Class.forName("java.lang.String");
         """

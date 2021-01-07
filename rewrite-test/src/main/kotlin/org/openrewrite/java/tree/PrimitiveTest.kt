@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface PrimitiveTest : JavaParserTest {
+interface PrimitiveTest : JavaTreeTest {
 
     @Test
-    fun primitiveField(jp: JavaParser) = assertParseAndPrint(
+    fun primitiveField(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
                 int n = 0;
                 char c = 'a';

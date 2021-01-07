@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface TryCatchTest : JavaParserTest {
+interface TryCatchTest : JavaTreeTest {
 
     @Test
-    fun tryFinally(jp: JavaParser) = assertParseAndPrint(
+    fun tryFinally(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             try {
             }
@@ -33,7 +33,7 @@ interface TryCatchTest : JavaParserTest {
     )
 
     @Test
-    fun tryCatchNoFinally(jp: JavaParser) = assertParseAndPrint(
+    fun tryCatchNoFinally(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             try {
             }
@@ -43,7 +43,7 @@ interface TryCatchTest : JavaParserTest {
     )
 
     @Test
-    fun tryWithResources(jp: JavaParser) = assertParseAndPrint(
+    fun tryWithResources(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             File f = new File("file.txt");
             try (FileInputStream fis = new FileInputStream(f)) {
@@ -54,7 +54,7 @@ interface TryCatchTest : JavaParserTest {
     )
 
     @Test
-    fun tryWithResourcesSemiTerminated(jp: JavaParser) = assertParseAndPrint(
+    fun tryWithResourcesSemiTerminated(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             File f = new File("file.txt");
             try (FileInputStream fis = new FileInputStream(f) ; ) {
@@ -65,7 +65,7 @@ interface TryCatchTest : JavaParserTest {
     )
 
     @Test
-    fun multiCatch(jp: JavaParser) = assertParseAndPrint(
+    fun multiCatch(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             File f = new File("file.txt");
             try(FileInputStream fis = new FileInputStream(f)) {}
@@ -74,7 +74,7 @@ interface TryCatchTest : JavaParserTest {
     )
 
     @Test
-    fun tryCatchFinally(jp: JavaParser) = assertParseAndPrint(
+    fun tryCatchFinally(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             try {}
             catch(Exception e) {}

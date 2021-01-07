@@ -18,14 +18,14 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface ClassDeclTest : JavaParserTest {
+interface ClassDeclTest : JavaTreeTest {
 
     @Issue("#70")
     @Test
-    fun singleLineCommentBeforeModifier(jp: JavaParser) = assertParseAndPrint(
+    fun singleLineCommentBeforeModifier(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             @Deprecated
             // Some comment
@@ -34,7 +34,7 @@ interface ClassDeclTest : JavaParserTest {
     )
 
     @Test
-    fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) = assertParseAndPrint(
+    fun multipleClassDeclarationsInOneCompilationUnit(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class A {}
             class B {}
@@ -42,7 +42,7 @@ interface ClassDeclTest : JavaParserTest {
     )
 
     @Test
-    fun implements(jp: JavaParser) = assertParseAndPrint(
+    fun implements(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public interface B {}
             class A implements B {}
@@ -50,7 +50,7 @@ interface ClassDeclTest : JavaParserTest {
     )
 
     @Test
-    fun extends(jp: JavaParser) = assertParseAndPrint(
+    fun extends(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public interface B {}
             class A extends B {}
@@ -58,7 +58,7 @@ interface ClassDeclTest : JavaParserTest {
     )
 
     @Test
-    fun typeArgumentsAndAnnotation(jp: JavaParser) = assertParseAndPrint(
+    fun typeArgumentsAndAnnotation(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class B<T> {}
             @Deprecated public class A < T > extends B < T > {}
@@ -69,14 +69,14 @@ interface ClassDeclTest : JavaParserTest {
      * OpenJDK does NOT preserve the order of modifiers in its AST representation
      */
     @Test
-    fun modifierOrdering(jp: JavaParser) = assertParseAndPrint(
+    fun modifierOrdering(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public /* abstract */ final abstract class A {}
         """
     )
 
     @Test
-    fun innerClass(jp: JavaParser) = assertParseAndPrint(
+    fun innerClass(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class A {
                 public enum B {
@@ -90,7 +90,7 @@ interface ClassDeclTest : JavaParserTest {
     )
 
     @Test
-    fun strictfp(jp: JavaParser) = assertParseAndPrint(
+    fun strictfp(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public strictfp class A {}
         """

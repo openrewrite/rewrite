@@ -57,9 +57,8 @@ public interface J extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    @SuppressWarnings("unchecked")
     default String print(TreePrinter<?> printer) {
-        return new JavaPrinter<>((TreePrinter<?>)printer).visit(this, null);
+        return new JavaPrinter<>((TreePrinter<?>) printer).visit(this, null);
     }
 
     @Override
@@ -210,6 +209,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public ArrayType withType(JavaType type) {
+            if (type == getType()) {
+                return this;
+            }
             return withElementType(elementType.withType(type));
         }
 
@@ -1034,6 +1036,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Ident withType(JavaType type) {
+            if (type == getType()) {
+                return this;
+            }
             return build(id, prefix, markers, getSimpleName(), type);
         }
 
@@ -1048,13 +1053,25 @@ public interface J extends Serializable, Tree {
         }
 
         public Ident withName(String name) {
+            if (name.equals(ident.getSimpleName())) {
+                return this;
+            }
             return build(id, prefix, markers, name, getType());
         }
 
-        public Ident withMarkers(Markers markers) { return build(id, prefix, markers, ident.getSimpleName(), getType()); }
+        @SuppressWarnings("unchecked")
+        public Ident withMarkers(Markers markers) {
+            if (markers == this.markers) {
+                return this;
+            }
+            return build(id, prefix, markers, ident.getSimpleName(), getType());
+        }
 
         @SuppressWarnings("unchecked")
         public Ident withPrefix(Space prefix) {
+            if (prefix == this.prefix) {
+                return this;
+            }
             return build(id, prefix, markers, ident.getSimpleName(), getType());
         }
 
@@ -1388,6 +1405,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Literal withType(JavaType type) {
+            if (type == this.type) {
+                return this;
+            }
             if (type instanceof JavaType.Primitive) {
                 return new Literal(id, prefix, markers, value, valueSource, (JavaType.Primitive) type);
             }
@@ -1595,6 +1615,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public MethodInvocation withType(JavaType type) {
+            if (type == this.type) {
+                return this;
+            }
             if (type instanceof JavaType.Method) {
                 return new MethodInvocation(id, prefix, markers, select, typeParameters, name, args, (JavaType.Method) type);
             }
@@ -1792,6 +1815,9 @@ public interface J extends Serializable, Tree {
         Space nooh;
 
         public NewClass withNew(Space nooh) {
+            if (nooh == this.nooh) {
+                return this;
+            }
             return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
         }
 
@@ -1882,6 +1908,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public ParameterizedType withType(JavaType type) {
+            if (type == clazz.getType()) {
+                return this;
+            }
             return withClazz(clazz.withType(type));
         }
 
@@ -1955,6 +1984,9 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Primitive withType(JavaType type) {
+            if (type == this.type) {
+                return this;
+            }
             if (!(type instanceof JavaType.Primitive)) {
                 throw new IllegalArgumentException("Cannot apply a non-primitive type to Primitive");
             }

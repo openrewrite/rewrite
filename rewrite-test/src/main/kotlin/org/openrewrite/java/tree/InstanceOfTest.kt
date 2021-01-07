@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface InstanceOfTest : JavaParserTest {
+interface InstanceOfTest : JavaTreeTest {
 
     @Test
-    fun instanceOf(jp: JavaParser) = assertParseAndPrint(
+    fun instanceOf(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             boolean b = o instanceof String;
         """

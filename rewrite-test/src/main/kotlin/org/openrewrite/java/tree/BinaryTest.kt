@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface BinaryTest : JavaParserTest {
+interface BinaryTest : JavaTreeTest {
 
     @Test
-    fun arithmetic(jp: JavaParser) = assertParseAndPrint(
+    fun arithmetic(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0 + 1;
         """
@@ -34,14 +34,14 @@ interface BinaryTest : JavaParserTest {
      * @see com.sun.tools.javac.parser.JavacParser.allowStringFolding
      */
     @Test
-    fun formatFoldableStrings(jp: JavaParser) = assertParseAndPrint(
+    fun formatFoldableStrings(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String n = "a" + "b";
         """
     )
 
     @Test
-    fun endOfLineBreaks(jp: JavaParser) = assertParseAndPrint(
+    fun endOfLineBreaks(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             boolean b = Objects.equals(1, 2) //
                         && Objects.equals(3, 4) //
