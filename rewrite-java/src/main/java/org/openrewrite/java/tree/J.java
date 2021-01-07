@@ -1601,7 +1601,7 @@ public interface J extends Serializable, Tree {
 
         @With
         @Nullable
-        JContainer<TypeParameter> typeParameters;
+        JContainer<Expression> typeParameters;
 
         @With
         Ident name;

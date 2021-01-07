@@ -42,7 +42,7 @@ public class SearchResult implements Marker {
                 for (char c : printed.toCharArray()) {
                     if(prefixWhitespace) {
                         if(!Character.isWhitespace(c)) {
-                            print.append('≪').append(c);
+                            print.append("~~>").append(c);
                             prefixWhitespace = false;
                             continue;
                         }
@@ -50,7 +50,6 @@ public class SearchResult implements Marker {
                     print.append(c);
                 }
 
-                print.append('≫');
                 return print.toString();
             }
             return printed;

@@ -41,12 +41,12 @@ public abstract class Recipe {
 
     protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
 
-    protected void doNext(Recipe recipe) {
-        Recipe head = this;
-        for (Recipe tail = next; tail != null; tail = tail.next) {
-            // FIXME implement me!
-        }
-        head.next = recipe;
+    public Recipe doNext(Recipe recipe) {
+        Recipe tail = recipe;
+        //noinspection StatementWithEmptyBody
+        for(; tail.next != null; tail = tail.next);
+        tail.next = recipe;
+        return this;
     }
 
     private List<SourceFile> visit(List<SourceFile> before, ExecutionContext execution) {

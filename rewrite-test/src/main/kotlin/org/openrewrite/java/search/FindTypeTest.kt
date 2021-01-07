@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.search
 
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -24,7 +23,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.SearchResult
 
 interface FindTypeTest : RecipeTest {
-    override val recipe: Recipe?
+    override val recipe: FindType
         get() = FindType().apply { setClass("a.A1") }
 
     override val treePrinter: TreePrinter<*>?
@@ -46,62 +45,81 @@ interface FindTypeTest : RecipeTest {
             import a.A1;
             public class B extends A1 {}
         """,
-        dependsOn = arrayOf(a1),
         after = """
             import a.A1;
-            public class B extends ≪A1≫ {}
-        """
+            public class B extends ~~>A1 {}
+        """,
+        dependsOn = arrayOf(a1)
     )
 
     @Test
-    fun fullyQualifiedName(jp: JavaParser) {
-        val b = jp.parse("public class B extends a.A1 {}", a1)[0]
-        assertEquals(1, b.findType("a.A1").size)
-    }
+    fun fullyQualifiedName(jp: JavaParser) = assertChanged(
+        jp,
+        before = "public class B extends a.A1 {}",
+        after = "public class B extends ~~>a.A1 {}",
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
-    fun annotation(jp: JavaParser) {
-        val a1 = "public @interface A1 {}"
-        val b = jp.parse("@A1 public class B {}", a1)[0]
-        assertEquals(1, b.findType("A1").size)
-    }
+    fun annotation(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipe.apply { setClass("A1") },
+        before = "@A1 public class B {}",
+        after = "@~~>A1 public class B {}",
+        dependsOn = arrayOf("public @interface A1 {}")
+    )
 
     @Test
-    fun array(jp: JavaParser) { // array types and new arrays
-        val b = jp.parse("""
+    fun array(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipe.doNext(FindType().apply { setClass("I1") }),
+        before = """
             import a.A1;
             public class B {
                A1[] a = new A1[0];
             }
-        """, a1)[0]
-
-        assertEquals(2, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               ~~>A1[] a = new ~~>A1[0];
+            }
+        """,
+        dependsOn = arrayOf(a1, "public interface I1 {}")
+    )
 
     @Test
-    fun classDecl(jp: JavaParser) {
-        val i1 = "public interface I1 {}"
-
-        val b = jp.parse("""
+    fun classDecl(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = recipe!!.doNext(FindType().apply { setClass("I1") }),
+        before = """
             import a.A1;
             public class B extends A1 implements I1 {}
-        """, a1, i1)[0]
-
-        assertEquals(1, b.findType("a.A1").size)
-        assertEquals(1, b.findType("I1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B extends ~~>A1 implements I1 {}
+        """,
+        dependsOn = arrayOf(a1, "public interface I1 {}")
+    )
 
     @Test
-    fun method(jp: JavaParser) {
-        val b = jp.parse("""
+    fun method(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             public class B {
                public A1 foo() throws A1 { return null; }
             }
-        """, a1)[0]
-
-        assertEquals(2, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               public ~~>A1 foo() throws ~~>A1 { return null; }
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
     fun methodInvocationTypeParametersAndWildcard(jp: JavaParser) = assertChanged(
@@ -121,10 +139,10 @@ interface FindTypeTest : RecipeTest {
             import a.A1;
             import java.util.List;
             public class B {
-               public <T extends ≪A1≫> T generic(T n, List<? super ≪A1≫> in) { return null; }
+               public <T extends ~~>A1> T generic(T n, List<? super ~~>A1> in) { return null; }
                public void test() {
-                   ≪A1≫.stat();
-                   this.<≪A1≫>generic(null, null);
+                   ~~>A1.stat();
+                   this.<~~>A1>generic(null, null);
                }
             }
         """,
@@ -132,8 +150,9 @@ interface FindTypeTest : RecipeTest {
     )
 
     @Test
-    fun multiCatch(jp: JavaParser) {
-        val b = jp.parse("""
+    fun multiCatch(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             public class B {
                public void test() {
@@ -141,56 +160,90 @@ interface FindTypeTest : RecipeTest {
                    catch(A1 | RuntimeException e) {}
                }
             }
-        """, a1)[0]
-
-        assertEquals(1, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               public void test() {
+                   try {}
+                   catch(~~>A1 | RuntimeException e) {}
+               }
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
-    fun multiVariable(jp: JavaParser) {
-        val b = jp.parse("""
+    fun multiVariable(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             public class B {
                A1 f1, f2;
             }
-        """, a1)[0]
-
-        assertEquals(1, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               ~~>A1 f1, f2;
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
-    fun newClass(jp: JavaParser) {
-        val b = jp.parse("""
+    fun newClass(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             public class B {
                A1 a = new A1();
             }
-        """, a1)[0]
-
-        assertEquals(2, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               ~~>A1 a = new ~~>A1();
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
-    fun paramaterizedType(jp: JavaParser) {
-        val b = jp.parse("""
+    fun parameterizedType(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
+            import java.util.Map;
             public class B {
                Map<A1, A1> m;
             }
-        """, a1)[0]
-
-        assertEquals(2, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            import java.util.Map;
+            public class B {
+               Map<~~>A1, ~~>A1> m;
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 
     @Test
-    fun typeCast(jp: JavaParser) {
-        val b = jp.parse("""
+    fun typeCast(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
             import a.A1;
             public class B {
                A1 a = (A1) null;
             }
-        """, a1)[0]
-
-        assertEquals(2, b.findType("a.A1").size)
-    }
+        """,
+        after = """
+            import a.A1;
+            public class B {
+               ~~>A1 a = (~~>A1) null;
+            }
+        """,
+        dependsOn = arrayOf(a1)
+    )
 }

@@ -43,9 +43,9 @@ class FindTagTest : RecipeTest {
             after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
-                    ≪<dependency>
+                    ~~><dependency>
                         <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>≫
+                    </dependency>
                 </dependency>
             """
     )
@@ -65,9 +65,9 @@ class FindTagTest : RecipeTest {
             after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
-                    ≪<dependency>
+                    ~~><dependency>
                         <artifactId scope="compile">org.openrewrite</artifactId>
-                    </dependency>≫
+                    </dependency>
                 </dependency>
             """
     )
