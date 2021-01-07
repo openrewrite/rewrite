@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
+import org.openrewrite.java.search.FindMethodTest
 import org.openrewrite.java.search.FindTypeTest
 
 @ExtendWith(JavaParserResolver::class)
@@ -33,4 +34,7 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class FindTypeTck : FindTypeTest
+
+    @Nested
+    inner class FindMethodTck : FindMethodTest
 }

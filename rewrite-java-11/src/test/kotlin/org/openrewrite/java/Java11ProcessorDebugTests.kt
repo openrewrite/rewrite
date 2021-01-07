@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
+import org.openrewrite.java.search.FindMethodTest
 import org.openrewrite.java.search.FindTypeTest
 
 @DebugOnly
@@ -36,3 +37,7 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindTypeTest : Java11Test, FindTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11FindMethodTest : Java11Test, FindMethodTest

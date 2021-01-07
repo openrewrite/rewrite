@@ -38,7 +38,6 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return space;
     }
 
-    @Nullable
     public <N extends NameTree> N visitTypeName(N nameTree, P p) {
         return nameTree;
     }

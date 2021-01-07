@@ -16,7 +16,6 @@
 package org.openrewrite.java.search
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
@@ -91,7 +90,7 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe!!.doNext(FindType().apply { setClass("I1") }),
+        recipe = recipe.doNext(FindType().apply { setClass("I1") }),
         before = """
             import a.A1;
             public class B extends A1 implements I1 {}

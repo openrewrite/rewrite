@@ -15,15 +15,17 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.Tree;
-import org.openrewrite.java.AbstractJavaSourceVisitor;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
+import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.SearchResult;
 
-import java.util.List;
+import java.util.Set;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.singletonList;
+import static org.openrewrite.Validated.required;
 
 /**
  * A Java search visitor that will return a list of matching method invocations within the abstract syntax tree.
@@ -48,25 +50,47 @@ import static java.util.Collections.singletonList;
  *      my.org.MyClass *(boolean, ..)           - All method invocations where the first arg is a boolean in my.org.MyClass
  * </PRE>
  */
-public class FindMethods extends AbstractJavaSourceVisitor<List<J.MethodInvocation>> {
-    private final MethodMatcher matcher;
+public final class FindMethod extends Recipe {
 
-    /**
-     * See {@link FindMethods} for details on how the signature should be formatted.
-     *
-     * @param signature Pointcut expression for matching methods.
-     */
-    public FindMethods(String signature) {
-        this.matcher = new MethodMatcher(signature);
+    private String signature;
+
+    public FindMethod() {
+        this.processor = () -> new FindMethodsProcessor(signature);
+    }
+
+    public void setSignature(String signature) {
+        this.signature = signature;
     }
 
     @Override
-    public List<J.MethodInvocation> defaultTo(Tree t) {
-        return emptyList();
+    public Validated validate() {
+        return required("signature", signature);
     }
 
-    @Override
-    public List<J.MethodInvocation> visitMethodInvocation(J.MethodInvocation method) {
-        return matcher.matches(method) ? singletonList(method) : super.visitMethodInvocation(method);
+    public static Set<J.MethodInvocation> find(J j, String clazz) {
+        return SearchResult.find(new FindMethodsProcessor(clazz).visit(j,
+                ExecutionContext.builder().build()));
+    }
+
+    private static class FindMethodsProcessor extends JavaIsoProcessor<ExecutionContext> {
+        private final MethodMatcher matcher;
+
+        /**
+         * See {@link FindMethod} for details on how the signature should be formatted.
+         *
+         * @param signature Pointcut expression for matching methods.
+         */
+        public FindMethodsProcessor(String signature) {
+            this.matcher = new MethodMatcher(signature);
+        }
+
+        @Override
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if (matcher.matches(method)) {
+                return m.withMarkers(m.getMarkers().add(new SearchResult()));
+            }
+            return super.visitMethodInvocation(m, ctx);
+        }
     }
 }
