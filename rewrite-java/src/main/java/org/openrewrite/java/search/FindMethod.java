@@ -51,11 +51,10 @@ import static org.openrewrite.Validated.required;
  * </PRE>
  */
 public final class FindMethod extends Recipe {
-
     private String signature;
 
     public FindMethod() {
-        this.processor = () -> new FindMethodsProcessor(signature);
+        this.processor = () -> new FindMethodProcessor(signature);
     }
 
     public void setSignature(String signature) {
@@ -68,11 +67,11 @@ public final class FindMethod extends Recipe {
     }
 
     public static Set<J.MethodInvocation> find(J j, String clazz) {
-        return SearchResult.find(new FindMethodsProcessor(clazz).visit(j,
+        return SearchResult.find(new FindMethodProcessor(clazz).visit(j,
                 ExecutionContext.builder().build()));
     }
 
-    private static class FindMethodsProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private static class FindMethodProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher matcher;
 
         /**
@@ -80,7 +79,7 @@ public final class FindMethod extends Recipe {
          *
          * @param signature Pointcut expression for matching methods.
          */
-        public FindMethodsProcessor(String signature) {
+        public FindMethodProcessor(String signature) {
             this.matcher = new MethodMatcher(signature);
         }
 
