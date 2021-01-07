@@ -581,18 +581,4 @@ public interface Xml extends Serializable, Tree {
             return "Ident{" + name + "}";
         }
     }
-
-//    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-//    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-//    @Data
-//    final class Empty implements Xml {
-//        @EqualsAndHashCode.Include
-//        UUID id;
-//
-//        @With
-//        Formatting formatting;
-//
-//        @With
-//        Markers markers;
-//    }
 }
