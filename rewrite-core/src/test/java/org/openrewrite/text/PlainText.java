@@ -54,6 +54,11 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
+    public PlainText withMarkers(Markers markers) {
+        return this;
+    }
+
+    @Override
     public UUID getId() {
         return id;
     }

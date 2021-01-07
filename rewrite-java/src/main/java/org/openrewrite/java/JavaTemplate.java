@@ -25,6 +25,8 @@ import org.openrewrite.java.tree.Comment;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -32,6 +34,9 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
 
 public class JavaTemplate {
+
+    private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
+
     private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
     private static final String SNIPPET_MARKER_END = "<<<<END>>>>";
 
@@ -71,9 +76,10 @@ public class JavaTemplate {
         J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
+        String generatedSource = cu.print(new TemplatePrinter(printedInsertionScope, insertionScope, parameterTypes));
+        logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
         parser.reset();
-        cu = parser.parse(cu.print(new TemplatePrinter(printedInsertionScope,
-                insertionScope, parameterTypes))).iterator().next();
+        cu = parser.parse(generatedSource).iterator().next();
 
 //        if (autoFormat) {
 //            // TODO format the new tree
@@ -107,64 +113,70 @@ public class JavaTemplate {
         return codeInstance;
     }
 
-    private static class TemplatePrinter implements TreePrinter<Cursor> {
+    private static class TemplatePrinter implements TreePrinter<Void> {
         private final String template;
-        private final Cursor scope;
+        private final Cursor insertionPoint;
         private final Set<JavaType> referencedTypes;
 
-        private TemplatePrinter(String template, Cursor scope, Set<JavaType> referencedTypes) {
+        private TemplatePrinter(String template, Cursor insertionPoint, Set<JavaType> referencedTypes) {
             this.template = "/*" + SNIPPET_MARKER_START + "*/" + template +
                     "/*" + SNIPPET_MARKER_END + "*/";
-            this.scope = scope;
+            this.insertionPoint = insertionPoint;
             this.referencedTypes = referencedTypes;
         }
 
         @Override
-        public <T2 extends Tree> T2 doFirst(T2 tree, Cursor cursor) {
+        public <T2 extends Tree> T2 doFirst(T2 tree, Void unused) {
             //noinspection unchecked
-            return (T2) new JavaProcessor<Void>() {
+            return (T2) new JavaProcessor<Cursor>() {
                 {
                     setCursoringOn();
                 }
 
                 @Override
-                public J visitMethod(J.MethodDecl method, Void unused) {
+                public J visitMethod(J.MethodDecl method, Cursor insertionPoint) {
                     if (referencedTypes.contains(method.getType())) {
                         return method.withBody(null).withAnnotations(emptyList());
                     }
-                    if (cursor.isScopeInPath(method)) {
-                        return super.visitMethod(method, unused);
+                    if (insertionPoint.isScopeInPath(method)) {
+                        return super.visitMethod(method, insertionPoint);
                     }
                     return null;
                 }
 
                 @Override
-                public J visitVariable(J.VariableDecls.NamedVar variable, Void unused) {
+                public J visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionPoint) {
                     if (referencedTypes.contains(variable.getType())) {
                         return variable.withInitializer(null);
                     }
+                    J.MethodDecl method = getCursor().firstEnclosing(J.MethodDecl.class);
+                    if (method != null && insertionPoint.isScopeInPath(method)) {
+                        return super.visitVariable(variable, insertionPoint);
+                    }
+
                     return null;
                 }
 
                 @Override
-                public J visitBlock(J.Block block, Void unused) {
-                    if (getCursor().getParentOrThrow().getParentOrThrow().getTree() instanceof J.ClassDecl ||
-                            cursor.isScopeInPath(block)) {
-                        return super.visitBlock(block, unused);
+                public J visitBlock(J.Block block, Cursor insertionPoint) {
+                    Cursor parent = getCursor().getParent();
+                    if ((parent != null && parent.getTree() instanceof J.ClassDecl) ||
+                            insertionPoint.isScopeInPath(block)) {
+                        return super.visitBlock(block, insertionPoint);
                     }
                     return null;
                 }
-            }.visit(tree, null);
+            }.visit(tree, insertionPoint);
         }
 
         @Override
-        public String doLast(Tree tree, String printed, Cursor cursor) {
+        public String doLast(Tree tree, String printed, Void unused) {
             StringBuilder print = new StringBuilder();
 
             new JavaProcessor<StringBuilder>() {
                 @Override
                 public J visitEach(J tree, StringBuilder acc) {
-                    if (cursor.getTree().isScope(tree)) {
+                    if (insertionPoint.getTree().getId().equals(tree.getId())) {
                         // if before
                         acc.append(template).append(printed);
                         // if after

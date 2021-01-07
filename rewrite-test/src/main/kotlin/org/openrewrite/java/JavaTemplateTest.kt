@@ -124,22 +124,22 @@ interface JavaTemplateTest {
         val snippets = template.generate<J>(methodBodyCursor, param, then.statements[0].elem)
 
         val methodInv1 : Expression = snippets[0] as Expression
-        Assertions.assertThat(methodInv1.type).`as`("The type information should be populated").isNotNull()
+        Assertions.assertThat(methodInv1.type).`as`("The type information should be populated").isNotNull
         val variableDeclarations : J.VariableDecls = snippets[1] as J.VariableDecls
         @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
         (Assertions.assertThat("List<String>").isEqualTo(variableDeclarations.typeExpr.printTrimmed()))
     }
 
-    class CursorExtractor(val scope: J) : JavaIsoProcessor<CursorHolder>() {
+    class CursorExtractor(private val scope: J) : JavaIsoProcessor<CursorHolder>() {
 
         init {
             setCursoringOn()
         }
 
-        fun visit(tree : J?) : Cursor? {
+        fun visit(tree : J?) : Cursor {
             val cursorHolder = CursorHolder()
             super.visit(tree, cursorHolder)
-            return cursorHolder.c;
+            return cursorHolder.c!!
         }
 
         override fun visitEach(tree: J?, cursorHolder: CursorHolder) : J?  {
@@ -149,7 +149,7 @@ interface JavaTemplateTest {
             return tree
         }
     }
-    class CursorHolder() {
+    class CursorHolder {
         var c : Cursor? = null
     }
 }
