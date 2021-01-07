@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface TypeParameterAndWildcardTest : JavaParserTest {
+interface TypeParameterAndWildcardTest : JavaTreeTest {
 
     @Test
-    fun annotatedTypeParametersOnWildcardBounds(jp: JavaParser) = assertParseAndPrint(
+    fun annotatedTypeParametersOnWildcardBounds(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.List;
             interface B {}
@@ -34,7 +34,7 @@ interface TypeParameterAndWildcardTest : JavaParserTest {
     )
 
     @Test
-    fun annotatedTypeParametersOnReturnTypeExpression(jp: JavaParser) = assertParseAndPrint(
+    fun annotatedTypeParametersOnReturnTypeExpression(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.List;
             interface B {}
@@ -50,7 +50,7 @@ interface TypeParameterAndWildcardTest : JavaParserTest {
     )
 
     @Test
-    fun extendsAndSuper(jp: JavaParser) = assertParseAndPrint(
+    fun extendsAndSuper(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.List;
             interface B {}
@@ -62,7 +62,7 @@ interface TypeParameterAndWildcardTest : JavaParserTest {
     )
 
     @Test
-    fun multipleExtends(jp: JavaParser) = assertParseAndPrint(
+    fun multipleExtends(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             interface B {}
             interface C {}
@@ -71,7 +71,7 @@ interface TypeParameterAndWildcardTest : JavaParserTest {
     )
 
     @Test
-    fun wildcardExtends(jp: JavaParser) = assertParseAndPrint(
+    fun wildcardExtends(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.*;
             interface B {}
@@ -82,7 +82,7 @@ interface TypeParameterAndWildcardTest : JavaParserTest {
     )
 
     @Test
-    fun emptyWildcard(jp: JavaParser) = assertParseAndPrint(
+    fun emptyWildcard(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.*;
             public class A {

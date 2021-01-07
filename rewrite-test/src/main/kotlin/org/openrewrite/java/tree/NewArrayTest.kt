@@ -17,42 +17,42 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface NewArrayTest : JavaParserTest {
+interface NewArrayTest : JavaTreeTest {
 
     @Test
-    fun newArray(jp: JavaParser) = assertParseAndPrint(
+    fun newArray(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int[] n = new int[0];
         """
     )
 
     @Test
-    fun initializers(jp: JavaParser) = assertParseAndPrint(
+    fun initializers(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int[] n = new int[] { 0, 1, 2 };    
         """
     )
 
     @Test
-    fun dimensions(jp: JavaParser) = assertParseAndPrint(
+    fun dimensions(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int[][] n = new int [ 0 ] [ 1 ];
         """
     )
 
     @Test
-    fun emptyDimension(jp: JavaParser) = assertParseAndPrint(
+    fun emptyDimension(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
                 int[][] n = new int [ 0 ] [ ];
         """
     )
 
     @Test
-    fun newArrayShortcut(jp: JavaParser) = assertParseAndPrint(
+    fun newArrayShortcut(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.lang.annotation.*;
             @Target({ElementType.TYPE})

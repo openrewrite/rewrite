@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface LabelTest : JavaParserTest {
+interface LabelTest : JavaTreeTest {
 
     @Test
-    fun labeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+    fun labeledWhileLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             labeled : while(true) {
             }
@@ -31,7 +31,7 @@ interface LabelTest : JavaParserTest {
     )
 
     @Test
-    fun nonEmptyLabeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+    fun nonEmptyLabeledWhileLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             outer : while(true) {
                 while(true) {

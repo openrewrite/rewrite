@@ -51,8 +51,12 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
-    private <N extends NameTree> JContainer<N> visitTypeNames(@Nullable JContainer<N> nameTree, P p) {
-        return nameTree == null ? null : nameTree.withElem(ListUtils.map(nameTree.getElem(), t -> visitTypeName(t, p)));
+    private <N extends NameTree> JContainer<N> visitTypeNames(@Nullable JContainer<N> nameTrees, P p) {
+        if (nameTrees == null) {
+            return null;
+        }
+        List<JRightPadded<N>> js = ListUtils.map(nameTrees.getElem(), t -> visitTypeName(t, p));
+        return js == nameTrees.getElem() ? nameTrees : JContainer.build(nameTrees.getBefore(), js);
     }
 
     @Override
@@ -163,7 +167,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = call(c, p, this::visitStatement);
         c = c.withPattern(call(c.getPattern(), p));
-        return c.withStatements(c.getStatements().withElem(ListUtils.map(c.getStatements().getElem(), t -> call(t, p))));
+        return c.withStatements(call(c.getStatements(), p));
     }
 
     @Override

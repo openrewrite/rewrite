@@ -17,20 +17,20 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface ContinueTest : JavaParserTest {
+interface ContinueTest : JavaTreeTest {
     
     @Test
-    fun continueFromWhileLoop(jp: JavaParser) = assertParseAndPrint(
+    fun continueFromWhileLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             while(true) continue;
         """
     )
 
     @Test
-    fun continueFromLabeledWhileLoop(jp: JavaParser) = assertParseAndPrint(
+    fun continueFromLabeledWhileLoop(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             labeled: while(true)
                 continue labeled;

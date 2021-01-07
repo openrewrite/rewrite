@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface IfTest : JavaParserTest {
+interface IfTest : JavaTreeTest {
 
     @Test
-    fun ifElse(jp: JavaParser) = assertParseAndPrint(
+    fun ifElse(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0;
             if(n == 0) {
@@ -36,7 +36,7 @@ interface IfTest : JavaParserTest {
     )
 
     @Test
-    fun noElse(jp: JavaParser) = assertParseAndPrint(
+    fun noElse(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0;
             if (n == 0) {
@@ -45,7 +45,7 @@ interface IfTest : JavaParserTest {
     )
 
     @Test
-    fun singleLineIfElseStatements(jp: JavaParser) = assertParseAndPrint(
+    fun singleLineIfElseStatements(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0;
             if (n == 0) n++;

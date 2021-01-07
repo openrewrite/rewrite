@@ -18,13 +18,13 @@ package org.openrewrite.java.tree
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface ImportTest : JavaParserTest {
+interface ImportTest : JavaTreeTest {
 
     @Test
-    fun classImport(jp: JavaParser) = assertParseAndPrint(
+    fun classImport(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.List;
             public class A {}
@@ -32,7 +32,7 @@ interface ImportTest : JavaParserTest {
     )
 
     @Test
-    fun starImport(jp: JavaParser) = assertParseAndPrint(
+    fun starImport(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.*;
             public class A {}

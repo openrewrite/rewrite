@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface FieldAccessTest : JavaParserTest {
+interface FieldAccessTest : JavaTreeTest {
 
     @Test
-    fun fieldAccess(jp: JavaParser) = assertParseAndPrint(
+    fun fieldAccess(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class B {
                 public B field = new B();

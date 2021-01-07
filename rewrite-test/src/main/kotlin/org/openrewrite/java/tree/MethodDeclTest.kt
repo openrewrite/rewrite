@@ -17,14 +17,14 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Class
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface MethodDeclTest : JavaParserTest {
+interface MethodDeclTest : JavaTreeTest {
 
     @Test
-    fun default(jp: JavaParser) = assertParseAndPrint(
+    fun default(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public @interface A {
                 String foo() default "foo";
@@ -33,7 +33,7 @@ interface MethodDeclTest : JavaParserTest {
     )
 
     @Test
-    fun constructor(jp: JavaParser) = assertParseAndPrint(
+    fun constructor(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class A {
                 public A() { }
@@ -42,7 +42,7 @@ interface MethodDeclTest : JavaParserTest {
     )
 
     @Test
-    fun typeArguments(jp: JavaParser) = assertParseAndPrint(
+    fun typeArguments(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public <P, R> R foo(P p, String s, String... args) {
                 return null;
@@ -51,7 +51,7 @@ interface MethodDeclTest : JavaParserTest {
     )
 
     @Test
-    fun interfaceMethodDecl(jp: JavaParser) = assertParseAndPrint(
+    fun interfaceMethodDecl(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public interface A {
                 String getName() ;
@@ -60,14 +60,14 @@ interface MethodDeclTest : JavaParserTest {
     )
 
     @Test
-    fun throws(jp: JavaParser) = assertParseAndPrint(
+    fun throws(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public void foo()  throws Exception { }
         """
     )
 
     @Test
-    fun nativeModifier(jp: JavaParser) = assertParseAndPrint(
+    fun nativeModifier(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public native void foo();
         """

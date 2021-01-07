@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface SynchronizedTest : JavaParserTest {
+interface SynchronizedTest : JavaTreeTest {
 
     @Test
-    fun synchronized(jp: JavaParser) = assertParseAndPrint(
+    fun synchronized(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
                 Integer n = 0;
                 synchronized(n) {

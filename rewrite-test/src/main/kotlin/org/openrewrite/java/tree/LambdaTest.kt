@@ -17,21 +17,21 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface LambdaTest : JavaParserTest {
+interface LambdaTest : JavaTreeTest {
 
     @Test
-    fun lambda(jp: JavaParser) = assertParseAndPrint(
+    fun lambda(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Function<String, String> func = (String s) -> "";
         """, "java.util.function.Function"
     )
 
     @Test
-    fun untypedLambdaParameter(jp: JavaParser) = assertParseAndPrint(
+    fun untypedLambdaParameter(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             List<String> list = new ArrayList<>();
             list.stream().filter(s -> s.isEmpty());
@@ -39,7 +39,7 @@ interface LambdaTest : JavaParserTest {
     )
 
     @Test
-    fun optionalSingleParameterParentheses(jp: JavaParser) = assertParseAndPrint(
+    fun optionalSingleParameterParentheses(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             List<String> list = new ArrayList<>();
             list.stream().filter((s) -> s.isEmpty());
@@ -47,7 +47,7 @@ interface LambdaTest : JavaParserTest {
     )
 
     @Test
-    fun rightSideBlock(jp: JavaParser) = assertParseAndPrint(
+    fun rightSideBlock(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class A {
                 Action a = ( ) -> { };
@@ -60,7 +60,7 @@ interface LambdaTest : JavaParserTest {
     )
 
     @Test
-    fun multipleParameters(jp: JavaParser) = assertParseAndPrint(
+    fun multipleParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             BiConsumer<String, String> a = (s1, s2) -> { };
         """, "java.util.function.BiConsumer"

@@ -15,6 +15,6 @@
  */
 package org.openrewrite.java
 
-class Java11ParserCompatibilityTest: JavaParserCompatibilityKit() {
+class Java11TreeCompatibilityTest: JavaTreeCompatibilityKit() {
     override fun javaParser(): Java11Parser.Builder = Java11Parser.builder()
 }

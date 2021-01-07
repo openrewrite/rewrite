@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Class
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 
-interface ThrowTest : JavaParserTest {
+interface ThrowTest : JavaTreeTest {
 
     @Test
-    fun throwException(jp: JavaParser) = assertParseAndPrint(
+    fun throwException(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Class, """
             public void test() throws Exception {
                 throw new UnsupportedOperationException();

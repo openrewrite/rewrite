@@ -53,6 +53,12 @@ public class PlainText implements SourceFile, Tree {
         return Markers.EMPTY;
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public PlainText withMarkers(Markers markers) {
+        return this;
+    }
+
     @Override
     public PlainText withMarkers(Markers markers) {
         return this;

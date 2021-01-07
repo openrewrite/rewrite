@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface ArrayAccessTest : JavaParserTest {
+interface ArrayAccessTest : JavaTreeTest {
 
     @Test
-    fun arrayAccess(jp: JavaParser) = assertParseAndPrint(
+    fun arrayAccess(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n[] = new int[] { 0 };
             int m = n [ 0 ];

@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface ForEachLoopTest : JavaParserTest {
+interface ForEachLoopTest : JavaTreeTest {
 
     @Test
-    fun format(jp: JavaParser) = assertParseAndPrint(
+    fun format(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(Integer n: new Integer[] { 0, 1 }) {
             }
@@ -31,7 +31,7 @@ interface ForEachLoopTest : JavaParserTest {
     )
 
     @Test
-    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) = assertParseAndPrint(
+    fun statementTerminatorForSingleLineForLoops(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             for(Integer i : n) test();
         """

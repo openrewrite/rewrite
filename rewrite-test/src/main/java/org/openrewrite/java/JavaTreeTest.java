@@ -24,9 +24,9 @@ import java.util.Arrays;
 import static java.util.stream.Collectors.joining;
 import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 
-public interface JavaParserTest {
-    default void assertParseAndPrint(JavaParser parser, NestingLevel nestingLevel, String code,
-                                     String... imports) {
+public interface JavaTreeTest {
+    default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,
+                                            String... imports) {
         String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
         switch(nestingLevel) {
@@ -42,6 +42,9 @@ public interface JavaParserTest {
         }
 
         J.CompilationUnit cu = parser.parse(source).iterator().next();
+
+        J processed = new JavaProcessor<Void>().visit(cu, null);
+        assertThat(processed).as("Processing is idempotent").isSameAs(cu);
 
         TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>();
         J.CompilationUnit roundTripCu = treeSerializer.read(treeSerializer.write(cu));
@@ -63,7 +66,7 @@ public interface JavaParserTest {
 }
 
 class JavaParserTestUtil {
-    static String print(JavaParserTest.NestingLevel nestingLevel, J.CompilationUnit cu) {
+    static String print(JavaTreeTest.NestingLevel nestingLevel, J.CompilationUnit cu) {
         String printed;
         switch(nestingLevel) {
             case Block:

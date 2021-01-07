@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface TernaryTest : JavaParserTest {
+interface TernaryTest : JavaTreeTest {
 
     @Test
-    fun ternary(jp: JavaParser) = assertParseAndPrint(
+    fun ternary(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n;
             String evenOrOdd = n % 2 == 0 ? "even" : "odd";

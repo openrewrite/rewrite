@@ -17,14 +17,14 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface MemberReferenceTest : JavaParserTest {
+interface MemberReferenceTest : JavaTreeTest {
 
     @Test
-    fun staticFunctionReference(jp: JavaParser) = assertParseAndPrint(
+    fun staticFunctionReference(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.util.stream.Stream;
 
@@ -41,7 +41,7 @@ interface MemberReferenceTest : JavaParserTest {
     )
 
     @Test
-    fun constructorMethodReference(jp: JavaParser) = assertParseAndPrint(
+    fun constructorMethodReference(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Stream<Integer> n = Stream.of(1, 2);
             Set<Integer> n2 = n.collect(HashSet < Integer > :: new, HashSet :: add);

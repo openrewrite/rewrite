@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface EnumTest : JavaParserTest {
+interface EnumTest : JavaTreeTest {
 
     @Test
-    fun anonymousClassInitializer(jp: JavaParser) = assertParseAndPrint(
+    fun anonymousClassInitializer(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public enum A {
                 A1(1) {
@@ -45,7 +45,7 @@ interface EnumTest : JavaParserTest {
     )
 
     @Test
-    fun enumConstructor(jp: JavaParser) = assertParseAndPrint(
+    fun enumConstructor(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public class Outer {
                 public enum A {
@@ -64,7 +64,7 @@ interface EnumTest : JavaParserTest {
     )
 
     @Test
-    fun noArguments(jp: JavaParser) = assertParseAndPrint(
+    fun noArguments(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public enum A {
                 A1, A2();
@@ -73,7 +73,7 @@ interface EnumTest : JavaParserTest {
     )
 
     @Test
-    fun enumWithParameters(jp: JavaParser) = assertParseAndPrint(
+    fun enumWithParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             public enum A {
                 ONE(1),
@@ -85,17 +85,17 @@ interface EnumTest : JavaParserTest {
     )
 
     @Test
-    fun enumWithoutParameters(jp: JavaParser) = assertParseAndPrint(
+    fun enumWithoutParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, "public enum A { ONE, TWO }"
     )
 
     @Test
-    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) = assertParseAndPrint(
+    fun enumUnnecessarilyTerminatedWithSemicolon(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, "public enum A { ONE ; }"
     )
 
     @Test
-    fun enumWithEmptyParameters(jp: JavaParser) = assertParseAndPrint(
+    fun enumWithEmptyParameters(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, "public enum A { ONE ( ), TWO ( ) }"
     )
 }

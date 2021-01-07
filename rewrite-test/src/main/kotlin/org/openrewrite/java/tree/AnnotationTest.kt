@@ -17,13 +17,13 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.CompilationUnit
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
 
-interface AnnotationTest : JavaParserTest {
+interface AnnotationTest : JavaTreeTest {
 
     @Test
-    fun annotationWithDefaultArgument(jp: JavaParser) = assertParseAndPrint(
+    fun annotationWithDefaultArgument(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
            @SuppressWarnings("ALL")
            public class A {}
@@ -31,7 +31,7 @@ interface AnnotationTest : JavaParserTest {
     )
 
     @Test
-    fun annotationWithArgument(jp: JavaParser) = assertParseAndPrint(
+    fun annotationWithArgument(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
            @SuppressWarnings(value = "ALL")
            public class A {}
@@ -39,7 +39,7 @@ interface AnnotationTest : JavaParserTest {
     )
 
     @Test
-    fun preserveOptionalEmptyParentheses(jp: JavaParser) = assertParseAndPrint(
+    fun preserveOptionalEmptyParentheses(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
            @Deprecated ( )
            public class A {}
@@ -47,7 +47,7 @@ interface AnnotationTest : JavaParserTest {
     )
 
     @Test
-    fun newArrayArgument(jp: JavaParser) = assertParseAndPrint(
+    fun newArrayArgument(jp: JavaParser) = assertParsePrintAndProcess(
         jp, CompilationUnit, """
             import java.lang.annotation.Target;
             import static java.lang.annotation.ElementType.*;

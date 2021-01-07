@@ -17,27 +17,27 @@ package org.openrewrite.java.tree
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaParserTest
-import org.openrewrite.java.JavaParserTest.NestingLevel.Block
+import org.openrewrite.java.JavaTreeTest
+import org.openrewrite.java.JavaTreeTest.NestingLevel.Block
 
-interface LiteralTest : JavaParserTest {
+interface LiteralTest : JavaTreeTest {
 
     @Test
-    fun literalField(jp: JavaParser) = assertParseAndPrint(
+    fun literalField(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             int n = 0;
         """
     )
 
     @Test
-    fun literalCharacter(jp: JavaParser) = assertParseAndPrint(
+    fun literalCharacter(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             char c = 'a';
         """
     )
 
     @Test
-    fun literalNumerics(jp: JavaParser) = assertParseAndPrint(
+    fun literalNumerics(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             double d1 = 1.0d;
             double d2 = 1.0;
@@ -47,7 +47,7 @@ interface LiteralTest : JavaParserTest {
     )
 
     @Test
-    fun literalOctal(jp: JavaParser) = assertParseAndPrint(
+    fun literalOctal(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             long l = 01L;
             byte b = 01;
@@ -59,7 +59,7 @@ interface LiteralTest : JavaParserTest {
     )
 
     @Test
-    fun literalBinary(jp: JavaParser) = assertParseAndPrint(
+    fun literalBinary(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             long l = 0b10L;
             byte b = 0b10;
@@ -69,7 +69,7 @@ interface LiteralTest : JavaParserTest {
     )
 
     @Test
-    fun literalHex(jp: JavaParser) = assertParseAndPrint(
+    fun literalHex(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             long l = 0xA0L;
             byte b = 0xA0;
@@ -79,28 +79,28 @@ interface LiteralTest : JavaParserTest {
     )
 
     @Test
-    fun transformString(jp: JavaParser) = assertParseAndPrint(
+    fun transformString(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String s = "foo ''";
         """
     )
 
     @Test
-    fun nullLiteral(jp: JavaParser) = assertParseAndPrint(
+    fun nullLiteral(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String s = null;
         """
     )
 
     @Test
-    fun transformLong(jp: JavaParser) = assertParseAndPrint(
+    fun transformLong(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Long l = 2L;
         """
     )
 
     @Test
-    fun variationInSuffixCasing(jp: JavaParser) = assertParseAndPrint(
+    fun variationInSuffixCasing(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             Long l = 0l;
             Long m = 0L;
@@ -108,14 +108,14 @@ interface LiteralTest : JavaParserTest {
     )
 
     @Test
-    fun escapedString(jp: JavaParser) = assertParseAndPrint(
+    fun escapedString(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             String s = "\"";
         """
     )
 
     @Test
-    fun escapedCharacter(jp: JavaParser) = assertParseAndPrint(
+    fun escapedCharacter(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             char c = '\'';
         """
