@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -25,6 +26,8 @@ import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
+
+import static org.openrewrite.Validated.required;
 
 /**
  * Find places where a type is mentioned explicitly, excluding imports.
@@ -38,6 +41,11 @@ public final class FindType extends Recipe {
 
     public void setClass(String clazz) {
         this.clazz = clazz;
+    }
+
+    @Override
+    public Validated validate() {
+        return required("class", clazz);
     }
 
     public static Set<NameTree> find(J j, String clazz) {
@@ -55,12 +63,13 @@ public final class FindType extends Recipe {
 
         @Override
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
-            JavaType.Class asClass = TypeUtils.asClass(name.getType());
+            N n = super.visitTypeName(name, ctx);
+            JavaType.Class asClass = TypeUtils.asClass(n.getType());
             if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
-                return name.withMarkers(name.getMarkers().add(new SearchResult()));
+                return n.withMarkers(n.getMarkers().add(new SearchResult()));
             }
-            return super.visitTypeName(name, ctx);
+            return n;
         }
     }
 }

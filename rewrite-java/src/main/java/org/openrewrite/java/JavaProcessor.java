@@ -38,7 +38,6 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return space;
     }
 
-    @Nullable
     public <N extends NameTree> N visitTypeName(N nameTree, P p) {
         return nameTree;
     }
@@ -51,11 +50,12 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
-    private <N extends NameTree> JContainer<N> visitTypeNames(@Nullable JContainer<N> nameTrees, P p) {
+    private <J2 extends J> JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
         if (nameTrees == null) {
             return null;
         }
-        List<JRightPadded<N>> js = ListUtils.map(nameTrees.getElem(), t -> visitTypeName(t, p));
+        @SuppressWarnings("unchecked") List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getElem(),
+                t -> t.getElem() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
         return js == nameTrees.getElem() ? nameTrees : JContainer.build(nameTrees.getBefore(), js);
     }
 
@@ -386,6 +386,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         }
         m = m.withSelect(call(m.getSelect(), p));
         m = m.withTypeParameters(call(m.getTypeParameters(), p));
+        m = m.withTypeParameters(visitTypeNames(m.getTypeParameters(), p));
         m = m.withName(call(m.getName(), p));
         return m.withArgs(call(m.getArgs(), p));
     }
@@ -394,15 +395,14 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
         J.MultiCatch m = call(multiCatch, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        return m.withAlternatives(ListUtils.map(m.getAlternatives(), t -> call(t, p)));
+        return m.withAlternatives(ListUtils.map(m.getAlternatives(), t -> visitTypeName(call(t, p), p)));
     }
 
     @Override
     public J visitMultiVariable(J.VariableDecls multiVariable, P p) {
         J.VariableDecls m = call(multiVariable, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        m = call(m,
-                p, this::visitStatement);
+        m = call(m, p, this::visitStatement);
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
@@ -449,7 +449,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         pt = call(pt, p, this::visitExpression);
         pt = pt.withClazz(call(pt.getClazz(), p));
         pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
-        return pt.withTypeParameters(call(pt.getTypeParameters(), p));
+        pt = pt.withTypeParameters(call(pt.getTypeParameters(), p));
+        return pt.withTypeParameters(visitTypeNames(pt.getTypeParameters(), p));
     }
 
     @Override

@@ -715,9 +715,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
 
         // generic type parameters can only exist on qualified targets
-        JContainer<J.TypeParameter> typeParams = null;
+        JContainer<Expression> typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
-            typeParams = JContainer.build(sourceBefore("<"), convertAll(node.getTypeArguments(), commaDelim, t -> sourceBefore(">")));
+            typeParams = JContainer.build(sourceBefore("<"), convertAll(node.getTypeArguments(), commaDelim,
+                    t -> sourceBefore(">")));
         }
 
         J.Ident name;
