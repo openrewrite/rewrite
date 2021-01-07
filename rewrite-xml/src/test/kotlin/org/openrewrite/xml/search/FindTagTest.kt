@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.search
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
@@ -85,5 +86,20 @@ class FindTagTest : RecipeTest {
                 </dependency>
             """
     )
+
+    @Test
+    fun staticFind() {
+        val before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependencies>
+                    <dependency>
+                        <artifactId scope="compile">org.openrewrite</artifactId>
+                    </dependency>
+                </dependency>
+            """
+        val source = parser.parse(*(arrayOf(before.trimIndent()))).iterator().next()
+        val matchingTags = FindTag.find(source, "/dependencies/dependency")
+        assertThat(matchingTags).isNotNull.isNotEmpty
+    }
 
 }
