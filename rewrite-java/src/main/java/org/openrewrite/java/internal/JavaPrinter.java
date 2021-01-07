@@ -47,7 +47,6 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
         if (t == null) {
             return defaultValue(null, p);
         }
-
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 
@@ -117,8 +116,8 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                 visit(leftPadded.getElem(), p);
     }
 
-    protected String visit(@Nullable JRightPadded<? extends J> leftPadded, @Nullable String suffix, P p) {
-        return leftPadded == null ? "" : visit(leftPadded.getElem(), p) + visit(leftPadded.getAfter()) +
+    protected String visit(@Nullable JRightPadded<? extends J> rightPadded, @Nullable String suffix, P p) {
+        return rightPadded == null ? "" : visit(rightPadded.getElem(), p) + visit(rightPadded.getAfter()) +
                 (suffix == null ? "" : suffix);
     }
 

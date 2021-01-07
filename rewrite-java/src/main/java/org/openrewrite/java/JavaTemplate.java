@@ -18,17 +18,16 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.search.FindReferencedTypes;
-import org.openrewrite.java.tree.Comment;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
@@ -65,19 +64,38 @@ public class JavaTemplate {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
+        //Extract any types from parameters that will be inserted into the template.
         Set<JavaType> parameterTypes = Arrays.stream(parameters)
                 .filter(J.class::isInstance)
                 .map(J.class::cast)
                 .flatMap(p -> FindReferencedTypes.find(p).stream())
                 .collect(toSet());
 
-        String printedInsertionScope = substituteParameters(parameters);
+        //Substitute parameter markers with the string reprenetation of each parameter.
+        final String printedTemplate = substituteParameters(parameters);
 
         J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
-        String generatedSource = cu.print(new TemplatePrinter(printedInsertionScope, insertionScope, parameterTypes));
+        //Prune down the original AST to just the elements in scope at the insertion point.
+        cu = new TemplateProcessor(parameterTypes).visitCompilationUnit(cu, insertionScope);
+
+        //Insert the template into the AST and print to a string.
+        final UUID insertionPoint = insertionScope.getTree().getId();
+        String generatedSource = cu.print(new TreePrinter<Void>() {
+            @Override
+            public String doLast(Tree tree, String printed, Void unused) {
+
+                if (insertionPoint.equals(tree.getId())) {
+                    return "/*" + SNIPPET_MARKER_START + "*/" + printedTemplate + "/*" + SNIPPET_MARKER_END + "*/";
+                } else {
+                    return printed;
+                }
+            }
+        });
+
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
+
         parser.reset();
         cu = parser.parse(generatedSource).iterator().next();
 
@@ -85,8 +103,10 @@ public class JavaTemplate {
 //            // TODO format the new tree
 //        }
 
+        //Extract the compiled template tree elements.
         List<J> snippetElements = new ArrayList<>();
         new ExtractTemplatedCode().visit(cu, snippetElements);
+        //noinspection unchecked
         return (List<J2>) snippetElements;
     }
 
@@ -113,82 +133,137 @@ public class JavaTemplate {
         return codeInstance;
     }
 
-    private static class TemplatePrinter implements TreePrinter<Void> {
-        private final String template;
-        private final Cursor insertionPoint;
+    /**
+     * A java processor that prunes the original AST down to just the things needed to compile the template code.
+     * The passed in cursor represents the insertion point within the original AST.
+     */
+    private class TemplateProcessor extends JavaIsoProcessor<Cursor> {
+
         private final Set<JavaType> referencedTypes;
 
-        private TemplatePrinter(String template, Cursor insertionPoint, Set<JavaType> referencedTypes) {
-            this.template = "/*" + SNIPPET_MARKER_START + "*/" + template +
-                    "/*" + SNIPPET_MARKER_END + "*/";
-            this.insertionPoint = insertionPoint;
+        TemplateProcessor(Set<JavaType> referencedTypes) {
             this.referencedTypes = referencedTypes;
+            setCursoringOn();
         }
 
         @Override
-        public <T2 extends Tree> T2 doFirst(T2 tree, Void unused) {
-            //noinspection unchecked
-            return (T2) new JavaProcessor<Cursor>() {
-                {
-                    setCursoringOn();
-                }
+        public J.MethodDecl visitMethod(J.MethodDecl method, Cursor insertionScope) {
+            //If the method is referenced, it needs to be stubbed out (for compiling only)
+            if (referencedTypes.contains(method.getType())) {
+                return method.withBody(null)
+                        .withAnnotations(emptyList())
+                        ;
+            }
+            //If the method is within insertion scope, then we must traverse the method.
+            if (insertionScope.isScopeInPath(method)) {
+                return super.visitMethod(method, insertionScope);
+            }
+            //Otherwise, prune the method declaration.
+            return null;
+        }
 
-                @Override
-                public J visitMethod(J.MethodDecl method, Cursor insertionPoint) {
-                    if (referencedTypes.contains(method.getType())) {
-                        return method.withBody(null).withAnnotations(emptyList());
-                    }
-                    if (insertionPoint.isScopeInPath(method)) {
-                        return super.visitMethod(method, insertionPoint);
-                    }
-                    return null;
-                }
+//        @Override
+//        public J.VariableDecls visitMultiVariable(J.VariableDecls variableDeclaration, Cursor insertionScope) {
+//
+//            J.MethodDecl method = getCursor().firstEnclosing(J.MethodDecl.class);
+//            if (method != null && insertionScope.isScopeInPath(method)) {
+//                //If the variable belongs to a method that is in insertion scope, need to render its tree.
+//                return super.visitMultiVariable(variableDeclaration, insertionScope);
+//            }
+//
+//            //Filter the list of variables to those that are referenced.
+//            List<JRightPadded<J.VariableDecls.NamedVar>> referencedVariables = variableDeclaration.getVars().stream()
+//                    .filter(v -> referencedTypes.contains(v.getElem().getType()))
+//                    .collect(Collectors.toList());
+//
+//            if (referencedVariables.isEmpty()) {
+//                //No variables left, remove the declaration.
+//                return null;
+//            } else if (referencedVariables.size() != variableDeclaration.getVars().size()) {
+//                //Removed one, but not all variables.
+//                return variableDeclaration.withVars(referencedVariables);
+//            } else {
+//                return variableDeclaration;
+//            }
+//        }
 
-                @Override
-                public J visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionPoint) {
-                    if (referencedTypes.contains(variable.getType())) {
-                        return variable.withInitializer(null);
-                    }
-                    J.MethodDecl method = getCursor().firstEnclosing(J.MethodDecl.class);
-                    if (method != null && insertionPoint.isScopeInPath(method)) {
-                        return super.visitVariable(variable, insertionPoint);
-                    }
-
-                    return null;
-                }
-
-                @Override
-                public J visitBlock(J.Block block, Cursor insertionPoint) {
-                    Cursor parent = getCursor().getParent();
-                    if ((parent != null && parent.getTree() instanceof J.ClassDecl) ||
-                            insertionPoint.isScopeInPath(block)) {
-                        return super.visitBlock(block, insertionPoint);
-                    }
-                    return null;
-                }
-            }.visit(tree, insertionPoint);
+        @Override
+        public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionScope) {
+            J.VariableDecls.NamedVar var = super.visitVariable(variable, insertionScope);
+            //Variables in the original AST only need to be declared, this nulls out the initializers.
+            return var.withInitializer(null);
         }
 
         @Override
-        public String doLast(Tree tree, String printed, Void unused) {
-            StringBuilder print = new StringBuilder();
+        public J.Block visitBlock(J.Block block, Cursor insertionScope) {
 
-            new JavaProcessor<StringBuilder>() {
-                @Override
-                public J visitEach(J tree, StringBuilder acc) {
-                    if (insertionPoint.getTree().getId().equals(tree.getId())) {
-                        // if before
-                        acc.append(template).append(printed);
-                        // if after
-                        acc.append(printed).append(template);
-                    } else {
-                        acc.append(printed);
+            Cursor parent = getCursor().getParent();
+
+            if (parent != null && parent.getTree() instanceof J.ClassDecl ) {
+                return super.visitBlock(block, insertionScope);
+            } else if (insertionScope.isScopeInPath(block)) {
+
+                J.Block b = call(block, insertionScope, this::visitEach);
+                b = b.withStatik(visitSpace(b.getStatic(), insertionScope));
+                b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
+                b = call(b, insertionScope, this::visitStatement);
+
+
+                if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
+                    //If a statement in the block is in insertion scope, then this will render each statement
+                    //up to the statement that is in insertion scope.
+                    List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
+                    for (JRightPadded<Statement> statement : b.getStatements()) {
+                        statementsInScope.add(statement);
+                        if (insertionScope.isScopeInPath(statement.getElem())) {
+                            break;
+                        }
                     }
-                    return super.visitEach(tree, acc);
+                    b = b.withStatements(ListUtils.map(statementsInScope, t -> call(t, insertionScope)));
+                    return b.withEnd(visitSpace(b.getEnd(), insertionScope));
                 }
-            }.visit(tree, print);
+            }
+            return null;
+        }
+    }
 
-            return print.toString();
+    private static class ExtractTemplatedCode extends JavaProcessor<List<J>> {
+        private long templateDepth = -1;
+        private boolean snippetEnd = false;
+
+        public ExtractTemplatedCode() {
+            setCursoringOn();
+        }
+
+        @Override
+        public Space visitSpace(Space space, List<J> context) {
+            Comment startToken = findMarker(space, SNIPPET_MARKER_START);
+            if (startToken != null) {
+                templateDepth = getCursor().getPathAsStream().count();
+                List<Comment> comments = new ArrayList<>(space.getComments());
+                comments.remove(startToken);
+                context.add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
+            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth && !snippetEnd) {
+                if (!context.contains(getCursor().getTree())) {
+                    context.add(getCursor().getTree());
+                }
+            } else if (findMarker(space, SNIPPET_MARKER_END) != null) {
+
+                snippetEnd = true;
+            }
+
+            return space;
+        }
+
+        private Comment findMarker(Space space, String marker) {
+            if (space == null) {
+                return null;
+            }
+            return space.getComments().stream()
+                    .filter(c -> Comment.Style.BLOCK.equals(c.getStyle()))
+                    .filter(c -> c.getText().equals(marker))
+                    .findAny()
+                    .orElse(null);
         }
     }
 
@@ -277,40 +352,6 @@ public class JavaTemplate {
                         .build();
             }
             return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
-        }
-    }
-
-    private static class ExtractTemplatedCode extends JavaProcessor<List<J>> {
-        private long templateDepth = -1;
-        private boolean snippetEnd = false;
-
-        public ExtractTemplatedCode() {
-            setCursoringOn();
-        }
-
-        @Override
-        public Space visitSpace(Space space, List<J> context) {
-            Comment startToken = findMarker(space, SNIPPET_MARKER_START);
-            if (startToken != null) {
-                templateDepth = getCursor().getPathAsStream().count();
-                List<Comment> comments = new ArrayList<>(space.getComments());
-                comments.remove(startToken);
-                context.add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
-            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth && !snippetEnd) {
-                context.add(getCursor().getTree());
-            } else if (findMarker(space, SNIPPET_MARKER_END) != null) {
-                snippetEnd = true;
-            }
-
-            return space;
-        }
-
-        private Comment findMarker(Space space, String marker) {
-            return space.getComments().stream()
-                    .filter(c -> Comment.Style.BLOCK.equals(c.getStyle()))
-                    .filter(c -> c.getText().equals(marker))
-                    .findAny()
-                    .orElse(null);
         }
     }
 }

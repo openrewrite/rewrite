@@ -586,7 +586,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
             return null;
         }
         J2 j = call(right.getElem(), p);
-        return j == right.getElem() ? right : new JRightPadded<>(j, visitSpace(right.getAfter(), p));
+        Space space = visitSpace(right.getAfter(), p);
+        return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space);
     }
 
     @Nullable
@@ -594,8 +595,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         if (left == null) {
             return null;
         }
+        Space space = visitSpace(left.getBefore(), p);
         J2 j = call(left.getElem(), p);
-        return j == left.getElem() ? left : new JLeftPadded<>(visitSpace(left.getBefore(), p), j);
+        return (space == left.getBefore() && j == left.getElem()) ? left : new JLeftPadded<>(space, j);
     }
 
     @Nullable
