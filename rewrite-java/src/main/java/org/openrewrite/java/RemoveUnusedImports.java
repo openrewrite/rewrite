@@ -72,7 +72,7 @@ public class RemoveUnusedImports extends Recipe {
                         if (methods.size() < layoutStyle.getNameCountToUseStarImport()) {
                             methods.stream().sorted().forEach(method ->
                                     importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withElem(name.getElem()
-                                            .withName(method))).withPrefix(Space.format("\n")))))
+                                            .withName(method)))).withPrefix(Space.format("\n"))))
                             );
                             changed = true;
                         } else {
@@ -91,7 +91,7 @@ public class RemoveUnusedImports extends Recipe {
                         if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                             types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
                                     importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withElem(name.getElem()
-                                            .withName(typeClassName))).withPrefix(Space.format("\n")))))
+                                            .withName(typeClassName)))).withPrefix(Space.format("\n"))))
                             );
                             changed = true;
                         } else {
