@@ -19,16 +19,16 @@ import org.openrewrite.maven.internal.MavenMetadata;
 import org.openrewrite.maven.internal.RawMaven;
 import org.openrewrite.maven.internal.RawRepositories;
 
-import java.net.URL;
+import java.net.URI;
 import java.util.concurrent.Callable;
 
 public interface MavenCache extends AutoCloseable {
-    CacheResult<MavenMetadata> computeMavenMetadata(URL repo,
+    CacheResult<MavenMetadata> computeMavenMetadata(URI repo,
                                                     String groupId,
                                                     String artifactId,
                                                     Callable<MavenMetadata> orElseGet) throws Exception;
 
-    CacheResult<RawMaven> computeMaven(URL repo,
+    CacheResult<RawMaven> computeMaven(URI repo,
                                        String groupId,
                                        String artifactId,
                                        String version,

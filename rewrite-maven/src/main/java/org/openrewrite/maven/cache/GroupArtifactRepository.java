@@ -20,11 +20,11 @@ import lombok.Data;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.maven.tree.GroupArtifact;
 
-import java.net.URL;
+import java.net.URI;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 class GroupArtifactRepository {
-    URL repository;
+    URI repository;
     GroupArtifact groupArtifact;
 }

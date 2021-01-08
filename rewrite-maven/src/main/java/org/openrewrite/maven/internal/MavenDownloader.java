@@ -83,7 +83,7 @@ public class MavenDownloader {
                             .tag("type", "metadata");
 
                     try {
-                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()), groupId, artifactId,
                                 () -> forceDownloadMetadata(groupId, artifactId, null, repo));
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
@@ -207,7 +207,7 @@ public class MavenDownloader {
                             .tag("type", "pom");
 
                     try {
-                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
                                 versionMaybeDatedSnapshot, () -> {
                             String uri = repo.getUrl() + "/" +
                                     groupId.replace('.', '/') + '/' +
