@@ -15,56 +15,48 @@
  */
 package org.openrewrite.xml
 
-import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.TreePrinter
-import org.openrewrite.internal.StringUtils
-import org.openrewrite.xml.internal.XmlPrinter
+import org.openrewrite.RecipeTest
 
-class AutoFormatTest {
-
-    private val parser: XmlParser = XmlParser()
+class AutoFormatTest : RecipeTest {
 
     @Test
-    fun autoFormatTag() {
-        val xml = """
-            <project>
-              <dependencies>
-                <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-test</artifactId>
-                  <scope>test</scope>
-                  <exclusions>
-                    <exclusion>
-              <groupId>org.junit.vintage</groupId>
-              <artifactId>junit-vintage-engine</artifactId>
-            </exclusion>
-                  </exclusions>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent()
-        val xmlDocument = parser.parse(StringUtils.trimIndent(xml)).iterator().next()
-        val processed = AutoFormat<ExecutionContext>(xmlDocument.root).visit(xmlDocument, ExecutionContext.builder().build())
-        val xmlPrinter = XmlPrinter<ExecutionContext>(TreePrinter.identity())
-        val after = xmlPrinter.visit(processed, ExecutionContext.builder().build())
-        assertThat(after).isEqualTo("""
-            <project>
-              <dependencies>
-                <dependency>
-                  <groupId>org.springframework.boot</groupId>
-                  <artifactId>spring-boot-starter-test</artifactId>
-                  <scope>test</scope>
-                  <exclusions>
-                    <exclusion>
-                      <groupId>org.junit.vintage</groupId>
-                      <artifactId>junit-vintage-engine</artifactId>
-                    </exclusion>
-                  </exclusions>
-                </dependency>
-              </dependencies>
-            </project>
-        """.trimIndent())
-    }
+    fun autoFormatTag() = assertChanged(
+            XmlParser(),
+            recipe = AutoFormat(),
+            before = """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-test</artifactId>
+                      <scope>test</scope>
+                      <exclusions>
+                        <exclusion>
+                  <groupId>org.junit.vintage</groupId>
+                  <artifactId>junit-vintage-engine</artifactId>
+                </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """,
+            after = """
+                <project>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.springframework.boot</groupId>
+                      <artifactId>spring-boot-starter-test</artifactId>
+                      <scope>test</scope>
+                      <exclusions>
+                        <exclusion>
+                          <groupId>org.junit.vintage</groupId>
+                          <artifactId>junit-vintage-engine</artifactId>
+                        </exclusion>
+                      </exclusions>
+                    </dependency>
+                  </dependencies>
+                </project>
+            """
+    )
 }

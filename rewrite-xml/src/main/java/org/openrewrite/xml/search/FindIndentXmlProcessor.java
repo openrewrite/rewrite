@@ -31,14 +31,14 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
-public class FindIndentXml<P> extends XmlProcessor<P> {
+public class FindIndentXmlProcessor<P> extends XmlProcessor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 
     private int linesWithSpaceIndents = 0;
     private int linesWithTabIndents = 0;
 
-    public FindIndentXml(int enclosingIndent) {
+    public FindIndentXmlProcessor(int enclosingIndent) {
         this.enclosingIndent = enclosingIndent;
     }
 

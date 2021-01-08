@@ -50,7 +50,7 @@ public class AddToTagProcessor<P> extends XmlProcessor<P> {
                 t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), t.getName(), "", "\n",
                         Markers.EMPTY))
                         .withBeforeTagDelimiterPrefix("");
-                doAfterVisit(new AutoFormat<>(t));
+                doAfterVisit(new AutoFormatProcessor<>(t));
                 formatRequested = true;
             }
 
@@ -74,7 +74,7 @@ public class AddToTagProcessor<P> extends XmlProcessor<P> {
             t = t.withContent(content);
 
             if (!formatRequested) {
-                doAfterVisit(new AutoFormat<>(formattedTagToAdd));
+                doAfterVisit(new AutoFormatProcessor<>(formattedTagToAdd));
             }
         }
         return super.visitTag(t, p);

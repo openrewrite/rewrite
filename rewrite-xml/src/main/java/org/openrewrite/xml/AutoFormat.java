@@ -15,48 +15,11 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.xml.search.FindIndentXml;
-import org.openrewrite.xml.tree.Xml;
+import org.openrewrite.Recipe;
 
-import java.util.stream.Collectors;
+public class AutoFormat extends Recipe {
 
-import static java.util.Arrays.stream;
-import static java.util.stream.IntStream.range;
-
-public class AutoFormat<P> extends XmlProcessor<P> {
-    private final Xml.Tag[] scope;
-
-    public AutoFormat(Xml.Tag... scope) {
-        this.scope = scope;
-        setCursoringOn();
-    }
-
-    private final FindIndentXml<P> findIndent = new FindIndentXml<>(0);
-
-    @Override
-    public Xml visitDocument(Xml.Document document, P p) {
-        findIndent.visit(document, p);
-        return super.visitDocument(document, p);
-    }
-
-    @Override
-    public Xml visitEach(Xml tree, P p) {
-        Xml x = super.visitEach(tree, p);
-        if (x != null) {
-            String prefix = x.getPrefix();
-            if (prefix.contains("\n") && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
-                int indentToUse = findIndent.getMostCommonIndent() > 0 ?
-                        findIndent.getMostCommonIndent() : 4; /* default to 4 spaces */
-                String shiftedPrefix = prefix.substring(0, prefix.lastIndexOf('\n') + 1) + range(0, indentMultiple * indentToUse)
-                        .mapToObj(n -> findIndent.isIndentedWithSpaces() ? " " : "\t")
-                        .collect(Collectors.joining(""));
-
-                if (!shiftedPrefix.equals(prefix)) {
-                    return x.withPrefix(shiftedPrefix);
-                }
-            }
-        }
-        return x;
+    public AutoFormat() {
+        this.processor = AutoFormatProcessor::new;
     }
 }
