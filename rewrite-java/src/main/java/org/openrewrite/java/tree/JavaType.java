@@ -37,6 +37,11 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
+    @JsonProperty("@c")
+    default String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
+
     boolean deepEquals(@Nullable JavaType type);
 
     /**
