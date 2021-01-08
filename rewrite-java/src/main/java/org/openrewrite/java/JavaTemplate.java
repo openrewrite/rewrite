@@ -22,7 +22,7 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
-import org.openrewrite.java.search.FindReferencedTypes;
+import org.openrewrite.java.search.FindTypesInNameScope;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,7 +84,7 @@ public class JavaTemplate {
         Set<JavaType> parameterTypes = Arrays.stream(parameters)
                 .filter(J.class::isInstance)
                 .map(J.class::cast)
-                .flatMap(p -> FindReferencedTypes.find(p).stream())
+                .flatMap(p -> FindTypesInNameScope.find(p).stream())
                 .collect(toSet());
 
         //Substitute parameter markers with the string reprenetation of each parameter.

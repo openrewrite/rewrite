@@ -44,9 +44,13 @@ public abstract class Recipe {
     public Recipe doNext(Recipe recipe) {
         Recipe tail = recipe;
         //noinspection StatementWithEmptyBody
-        for(; tail.next != null; tail = tail.next);
+        for (; tail.next != null; tail = tail.next) ;
         tail.next = recipe;
         return this;
+    }
+
+    Supplier<TreeProcessor<?, ExecutionContext>> getProcessor() {
+        return processor;
     }
 
     private List<SourceFile> visit(List<SourceFile> before, ExecutionContext execution) {
@@ -68,7 +72,9 @@ public abstract class Recipe {
                         }
                         return after;
                     } catch (Throwable t) {
-                        execution.getOnError().accept(t);
+                        if (execution.getOnError() != null) {
+                            execution.getOnError().accept(t);
+                        }
                         return s;
                     }
                 });
@@ -117,7 +123,7 @@ public abstract class Recipe {
 
         // removed files
         for (SourceFile s : before) {
-            if(!afterIds.contains(s.getId())) {
+            if (!afterIds.contains(s.getId())) {
                 // FIXME fix how we track which recipes are deleting files
                 results.add(new Result(s, null, emptySet()));
             }
