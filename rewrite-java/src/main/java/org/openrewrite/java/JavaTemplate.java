@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
 
+@Incubating(since="7.0.0")
 public class JavaTemplate {
 
     private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
@@ -59,7 +61,21 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
+    public <J2 extends J> List<J2> generateBefore(@NonNull Cursor insertionScope, Object... parameters) {
+        return generate(InsertionStrategy.INSERT_BEFORE, insertionScope, parameters);
+    }
+
     public <J2 extends J> List<J2> generate(@NonNull Cursor insertionScope, Object... parameters) {
+        return generate(InsertionStrategy.REPLACE, insertionScope, parameters);
+    }
+
+    public <J2 extends J> List<J2> generateAfter(@NonNull Cursor insertionScope, Object... parameters) {
+        return generate(InsertionStrategy.INSERT_AFTER, insertionScope, parameters);
+    }
+
+    private <J2 extends J> List<J2> generate(final InsertionStrategy insertionStrategy,
+                                             final @NonNull Cursor insertionScope, final Object... parameters) {
+
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
@@ -85,9 +101,19 @@ public class JavaTemplate {
         String generatedSource = cu.print(new TreePrinter<Void>() {
             @Override
             public String doLast(Tree tree, String printed, Void unused) {
-
                 if (insertionPoint.equals(tree.getId())) {
-                    return "/*" + SNIPPET_MARKER_START + "*/" + printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + printed;
+                    StringBuilder templateCode = new StringBuilder()
+                            .append("/*").append(SNIPPET_MARKER_START).append("*/")
+                            .append(printedTemplate)
+                            .append("/*").append(SNIPPET_MARKER_END).append("*/");
+
+                    if (insertionStrategy == InsertionStrategy.REPLACE) {
+                        return templateCode.toString();
+                    } else if (insertionStrategy == InsertionStrategy.INSERT_BEFORE) {
+                        return templateCode.append(printed).toString();
+                    } else {
+                        return printed + templateCode.toString();
+                    }
                 } else {
                     return printed;
                 }
@@ -355,5 +381,14 @@ public class JavaTemplate {
             }
             return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
         }
+    }
+
+    /**
+     * The insertion strategy determines where the template's code will be inserted into an the AST relative to the insertion point.
+     */
+    private enum InsertionStrategy {
+        INSERT_BEFORE,
+        REPLACE,
+        INSERT_AFTER
     }
 }
