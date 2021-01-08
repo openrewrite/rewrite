@@ -69,6 +69,7 @@ public interface Xml extends Serializable, Tree {
 
     String getPrefix();
 
+    Xml withPrefix(String prefix);
 
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

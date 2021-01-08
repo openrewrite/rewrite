@@ -37,7 +37,8 @@ public class XmlProcessor<P> extends TreeProcessor<Xml, P> implements XmlVisitor
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = call(tag, p, this::visitEach);
         t = t.withAttributes(call(t.getAttributes(), p));
-        return t.withContent(call(t.getContent(), p));
+        t = t.withContent(call(t.getContent(), p));
+        return t.withClosing(call(t.getClosing(), p));
     }
 
     @Override
