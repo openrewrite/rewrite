@@ -87,7 +87,7 @@ public class JavaTemplate {
             public String doLast(Tree tree, String printed, Void unused) {
 
                 if (insertionPoint.equals(tree.getId())) {
-                    return "/*" + SNIPPET_MARKER_START + "*/" + printedTemplate + "/*" + SNIPPET_MARKER_END + "*/";
+                    return "/*" + SNIPPET_MARKER_START + "*/" + printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + printed;
                 } else {
                     return printed;
                 }
@@ -113,7 +113,7 @@ public class JavaTemplate {
     /**
      * Replace the parameter markers in the template with the parameters passed into the generate method.
      * Parameters that are Java Tree's will be correctly printed into the string. The parameters are not named and
-     * this relies purely on ordinal position of the parameter.
+     * rely purely on ordinal position.
      *
      * @param parameters A list of parameters
      * @return The final snippet to be generated.
@@ -135,7 +135,7 @@ public class JavaTemplate {
 
     /**
      * A java processor that prunes the original AST down to just the things needed to compile the template code.
-     * The passed in cursor represents the insertion point within the original AST.
+     * The typed Cursor represents the insertion point within the original AST.
      */
     private class TemplateProcessor extends JavaIsoProcessor<Cursor> {
 
@@ -149,6 +149,8 @@ public class JavaTemplate {
         @Override
         public J.MethodDecl visitMethod(J.MethodDecl method, Cursor insertionScope) {
             //If the method is referenced, it needs to be stubbed out (for compiling only)
+            //Currently, no body is generated which appears to be enough to get type attribution for references.
+            //It *might* be worthwhile
             if (referencedTypes.contains(method.getType())) {
                 return method.withBody(null)
                         .withAnnotations(emptyList())

@@ -121,7 +121,7 @@ interface JavaTemplateTest {
 
         val template = JavaTemplate.builder(
             """others.add(#{});
-                    #{}""").build()
+                    #{};""").build()
         val snippets = template.generate<J>(methodBodyCursor, param, then.statements[0].elem)
 
         val methodInv1 : Expression = snippets[0] as Expression
