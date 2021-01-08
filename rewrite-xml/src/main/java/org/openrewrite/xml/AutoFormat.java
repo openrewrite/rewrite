@@ -15,18 +15,15 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.xml.search.FindIndentXml;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.List;
 import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.stream.IntStream.range;
 
-public class AutoFormat extends XmlProcessor<ExecutionContext> {
+public class AutoFormat<P> extends XmlProcessor<P> {
     private final Xml.Tag[] scope;
 
     public AutoFormat(Xml.Tag... scope) {
@@ -34,22 +31,20 @@ public class AutoFormat extends XmlProcessor<ExecutionContext> {
         setCursoringOn();
     }
 
-    private FindIndentXml findIndent;
+    private final FindIndentXml<P> findIndent = new FindIndentXml<>(0);
 
     @Override
-    public Xml visitDocument(Xml.Document document, ExecutionContext executionContext) {
-        findIndent = new FindIndentXml(0);
-        findIndent.visit(document, executionContext);
-        return super.visitDocument(document, executionContext);
+    public Xml visitDocument(Xml.Document document, P p) {
+        findIndent.visit(document, p);
+        return super.visitDocument(document, p);
     }
 
     @Override
-    public Xml visitEach(Xml tree, ExecutionContext ctx) {
-        Xml x = super.visitEach(tree, ctx);
+    public Xml visitEach(Xml tree, P p) {
+        Xml x = super.visitEach(tree, p);
         if (x != null) {
             String prefix = x.getPrefix();
             if (prefix.contains("\n") && stream(scope).anyMatch(s -> getCursor().isScopeInPath(s))) {
-                List<Tree> path = getCursor().getPathAsStream().collect(Collectors.toList());
                 int indentMultiple = (int) getCursor().getPathAsStream().filter(Xml.Tag.class::isInstance).count() - 1;
                 int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                         findIndent.getMostCommonIndent() : 4; /* default to 4 spaces */
