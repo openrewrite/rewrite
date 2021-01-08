@@ -15,11 +15,12 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.java.tree.Expression
 import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JRightPadded
 
 interface JavaTemplateTest {
 
@@ -82,7 +83,7 @@ interface JavaTemplateTest {
 //    }
 //
     @Test
-    fun buildSnippetMethodReferenceGenerics(jp: JavaParser) {
+    fun buildSnippetMethodReferenceSiblingClass(jp: JavaParser) {
         val a = jp.parse("""
             import java.util.List;
             import java.util.ArrayList;
@@ -123,12 +124,14 @@ interface JavaTemplateTest {
             """others.add(#{});
                     #{};""").build()
         val snippets = template.generate<J>(methodBodyCursor, param, then.statements[0].elem)
+        assertThat(snippets).hasSize(2);
 
         val methodInv1 : Expression = snippets[0] as Expression
-        Assertions.assertThat(methodInv1.type).`as`("The type information should be populated").isNotNull
-        val variableDeclarations : J.VariableDecls = snippets[1] as J.VariableDecls
-        @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-        (Assertions.assertThat("List<String>").isEqualTo(variableDeclarations.typeExpr.printTrimmed()))
+        assertThat(methodInv1.type).`as`("The type information should be populated").isNotNull
+        val variableDeclarations = snippets[1] as J.VariableDecls
+        val variable = variableDeclarations.vars[0];
+        assertThat(variable.elem.type)
+        assertThat("List<String>").isEqualTo(variableDeclarations.typeExpr.printTrimmed())
     }
 
     class CursorExtractor(private val scope: J) : JavaIsoProcessor<CursorHolder>() {

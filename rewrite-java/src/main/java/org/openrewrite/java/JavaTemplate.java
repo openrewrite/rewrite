@@ -103,9 +103,16 @@ public class JavaTemplate {
             public String doLast(Tree tree, String printed, Void unused) {
                 if (insertionPoint.equals(tree.getId())) {
                     StringBuilder templateCode = new StringBuilder()
-                            .append("/*").append(SNIPPET_MARKER_START).append("*/")
-                            .append(printedTemplate)
-                            .append("/*").append(SNIPPET_MARKER_END).append("*/");
+                            .append("/*").append(SNIPPET_MARKER_START).append("*/");
+
+                    if (printedTemplate.endsWith(";")) {
+                        //If the printed template ends with a ;, we want to make sure the ending marker is BEFORE
+                        //the semi-colon.
+                        templateCode.append(printedTemplate.substring(0, printedTemplate.length() -1))
+                                .append("/*").append(SNIPPET_MARKER_END).append("*/;");
+                    } else {
+                        templateCode.append(printedTemplate).append("/*").append(SNIPPET_MARKER_END).append("*/");
+                    }
 
                     if (insertionStrategy == InsertionStrategy.REPLACE) {
                         return templateCode.toString();
@@ -275,8 +282,8 @@ public class JavaTemplate {
                 if (!context.contains(getCursor().getTree())) {
                     context.add(getCursor().getTree());
                 }
-            } else if (findMarker(space, SNIPPET_MARKER_END) != null) {
-
+            }
+            if (findMarker(space, SNIPPET_MARKER_END) != null) {
                 snippetEnd = true;
             }
 
