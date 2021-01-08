@@ -1698,7 +1698,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex++;
+                            delimIndex = delimIndex + 2;
                             break;
                     }
                 }
