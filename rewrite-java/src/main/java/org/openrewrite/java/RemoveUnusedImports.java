@@ -17,16 +17,10 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.Tree;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
-import java.util.stream.Stream;
-
-import static java.util.Collections.emptyMap;
-import static java.util.Collections.singleton;
-import static java.util.stream.Collectors.toSet;
 
 /**
  * This recipe will remove any imports for types that are not referenced within the compilation unit. This recipe
@@ -115,7 +109,7 @@ public class RemoveUnusedImports extends Recipe {
                 if (getCursor().firstEnclosing(J.Import.class) == null) {
                     JavaType.Class clazz = TypeUtils.asClass(name.getType());
                     if (clazz != null) {
-                        ctx.put(clazz.getPackageName(), singleton(clazz));
+                        ctx.computeIfAbsent(clazz.getPackageName(), t -> new HashSet<>()).add(clazz);
                     }
                 }
                 return super.visitTypeName(name, ctx);
@@ -129,7 +123,8 @@ public class RemoveUnusedImports extends Recipe {
                 if (method.getSelect() == null) {
                     JavaType.Method type = method.getType();
                     if (type != null && type.hasFlags(Flag.Static)) {
-                        ctx.put(type.getDeclaringType().getFullyQualifiedName(), singleton(type.getName()));
+                        ctx.computeIfAbsent(type.getDeclaringType().getFullyQualifiedName(), t -> new HashSet<>())
+                                .add(type.getName());
                     }
                 }
                 return m;

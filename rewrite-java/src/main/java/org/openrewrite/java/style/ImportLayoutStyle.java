@@ -202,7 +202,7 @@ public class ImportLayoutStyle implements JavaStyle {
             } else {
                 for (JRightPadded<J.Import> orderedImport : block.orderedImports()) {
                     Space prefix = importIndex == 0 ? originalImports.get(0).getElem().getPrefix() :
-                            Space.format(extraLineSpace + "\n");
+                            orderedImport.getElem().getPrefix().withWhitespace(extraLineSpace + "\n");
 
                     if (!orderedImport.getElem().getPrefix().equals(prefix)) {
                         orderedImports.add(orderedImport.withElem(orderedImport.getElem()

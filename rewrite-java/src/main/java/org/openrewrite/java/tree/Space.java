@@ -18,6 +18,7 @@ package org.openrewrite.java.tree;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang.StringEscapeUtils;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -29,6 +30,7 @@ import java.util.List;
  * Wherever whitespace can occur in Java, so can comments (at least block and javadoc style comments).
  * So whitespace and comments are like peanut butter and jelly.
  */
+@EqualsAndHashCode
 public class Space {
     public static Space EMPTY = new Space("", Collections.emptyList());
 

@@ -25,10 +25,10 @@ import java.util.*;
 
 
 /**
- * This visitor will group and order the imports for a compilation unit using the rules defined by a {@link ImportLayoutStyle}.
- * If a style has not been defined, this visitor will use the default import layout style that is modelled after
+ * This recipe will group and order the imports for a compilation unit using the rules defined by a {@link ImportLayoutStyle}.
+ * If a style has not been defined, this recipe will use the default import layout style that is modelled after
  * IntelliJ's default import settings.
- * <P><P>
+ *
  * The @{link {@link OrderImports#setRemoveUnused}} flag (which is defaulted to true) can be used to also remove any
  * imports that are not referenced within the compilation unit.
  */
