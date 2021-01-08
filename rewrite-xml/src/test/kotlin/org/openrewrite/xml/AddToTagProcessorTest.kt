@@ -16,18 +16,13 @@
 package org.openrewrite.xml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
-import java.util.Comparator
 
-class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
-    override val parser: XmlParser = XmlParser()
+class AddToTagProcessorTest : XmlProcessorTest() {
 
     @Test
-    fun addElement() = assertRefactored(
-            visitorsMapped = listOf { x ->
-                AddToTag.Scoped(x.root, Xml.Tag.build("""<bean id="myBean2"/>"""))
-            },
+    fun addElement() = assertChanged(
+            processorMapped = { x -> AddToTagProcessor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans >
@@ -40,15 +35,11 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
                     <bean id="myBean"/>
                     <bean id="myBean2"/>
                 </beans>
-            """
-    )
+            """)
 
     @Test
-    fun addElementToSlashClosedTag() = assertRefactored(
-            visitorsMapped = listOf { x ->
-                AddToTag.Scoped(x.root.content[0] as Xml.Tag,
-                        Xml.Tag.build("""<property name="myprop" ref="collaborator"/>"""))
-            },
+    fun addElementToSlashClosedTag() = assertChanged(
+            processorMapped = { x -> AddToTagProcessor(x.root.content[0] as Xml.Tag, Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans >
@@ -66,10 +57,8 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
     )
 
     @Test
-    fun addElementToEmptyTagOnSameLine() = assertRefactored(
-            visitorsMapped = listOf { x ->
-                AddToTag.Scoped(x.root, Xml.Tag.build("""<bean id="myBean"/>"""))
-            },
+    fun addElementToEmptyTagOnSameLine() = assertChanged(
+            processorMapped = { x -> AddToTagProcessor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans></beans>
@@ -83,9 +72,9 @@ class AddToTagTest : RefactorVisitorTestForParser<Xml.Document> {
     )
 
     @Test
-    fun addElementInOrder() = assertRefactored(
-            visitorsMapped = listOf { x ->
-                AddToTag.Scoped(x.root, Xml.Tag.build("""<apple/>"""),
+    fun addElementInOrder() = assertChanged(
+            processorMapped = { x ->
+                AddToTagProcessor(x.root, Xml.Tag.build("""<apple/>"""),
                     Comparator.comparing(Xml.Tag::getName))
             },
             before = """

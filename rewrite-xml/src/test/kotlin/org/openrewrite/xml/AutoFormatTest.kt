@@ -17,10 +17,10 @@ package org.openrewrite.xml
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.TreePrinter
 import org.openrewrite.internal.StringUtils
 import org.openrewrite.xml.internal.XmlPrinter
-import org.openrewrite.xml.tree.Xml
 
 class AutoFormatTest {
 
@@ -46,7 +46,7 @@ class AutoFormatTest {
             </project>
         """.trimIndent()
         val xmlDocument = parser.parse(StringUtils.trimIndent(xml)).iterator().next()
-        val processed = AutoFormat(xmlDocument.root).visit(xmlDocument, ExecutionContext.builder().build())
+        val processed = AutoFormat<ExecutionContext>(xmlDocument.root).visit(xmlDocument, ExecutionContext.builder().build())
         val xmlPrinter = XmlPrinter<ExecutionContext>(TreePrinter.identity())
         val after = xmlPrinter.visit(processed, ExecutionContext.builder().build())
         assertThat(after).isEqualTo("""

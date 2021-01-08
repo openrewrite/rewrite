@@ -95,7 +95,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
 
         if(topLevel) {
             for (TreeProcessor<T, P> v : next.get()) {
-                t = v.visit(tree, p);
+                t = v.visit(t, p);
             }
             next.remove();
         }

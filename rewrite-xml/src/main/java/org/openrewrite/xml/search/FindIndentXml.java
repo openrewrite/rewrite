@@ -15,8 +15,6 @@
  */
 package org.openrewrite.xml.search;
 
-import org.openrewrite.ExecutionContext;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.xml.XmlProcessor;
 import org.openrewrite.xml.tree.Xml;
@@ -33,7 +31,7 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
-public class FindIndentXml extends XmlProcessor<ExecutionContext> {
+public class FindIndentXml<P> extends XmlProcessor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 
@@ -45,7 +43,7 @@ public class FindIndentXml extends XmlProcessor<ExecutionContext> {
     }
 
     @Override
-    public Xml visitEach(Xml tree, ExecutionContext ctx) {
+    public Xml visitEach(Xml tree, P p) {
         String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);
@@ -90,7 +88,7 @@ public class FindIndentXml extends XmlProcessor<ExecutionContext> {
             }
         }
 
-        return super.visitEach(tree, ctx);
+        return super.visitEach(tree, p);
     }
 
     public boolean isIndentedWithSpaces() {
