@@ -25,6 +25,7 @@ import org.openrewrite.maven.tree.GroupArtifact;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -56,7 +57,7 @@ public class InMemoryCache implements MavenCache {
     }
 
     @Override
-    public CacheResult<MavenMetadata> computeMavenMetadata(URL repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
+    public CacheResult<MavenMetadata> computeMavenMetadata(URI repo, String groupId, String artifactId, Callable<MavenMetadata> orElseGet) throws Exception {
         GroupArtifactRepository gar = new GroupArtifactRepository(repo, new GroupArtifact(groupId, artifactId));
         Optional<MavenMetadata> rawMavenMetadata = mavenMetadataCache.get(gar);
 
@@ -78,7 +79,7 @@ public class InMemoryCache implements MavenCache {
     }
 
     @Override
-    public CacheResult<RawMaven> computeMaven(URL repo, String groupId, String artifactId, String version,
+    public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
                                               Callable<RawMaven> orElseGet) throws Exception {
         // FIXME key be repo as well, because different repos may have different versions of the same POM
         String cacheKey = groupId + ':' + artifactId + ':' + version;
