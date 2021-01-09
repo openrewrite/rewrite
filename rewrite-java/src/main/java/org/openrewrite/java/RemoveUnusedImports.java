@@ -66,7 +66,7 @@ public class RemoveUnusedImports extends Recipe {
                         if (methods.size() < layoutStyle.getNameCountToUseStarImport()) {
                             methods.stream().sorted().forEach(method ->
                                     importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withElem(name.getElem()
-                                            .withName(method)))).withPrefix(Space.format("\n"))))
+                                            .withName(method))))))
                             );
                             changed = true;
                         } else {
