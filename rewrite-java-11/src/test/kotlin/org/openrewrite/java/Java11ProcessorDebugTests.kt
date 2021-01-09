@@ -36,6 +36,10 @@ class Java11ChangeFieldNameTest: Java11Test, ChangeFieldNameTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeFieldTypeTest: Java11Test, ChangeFieldTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationTest: Java11Test, FindAnnotationTest
 
 @DebugOnly
@@ -61,6 +65,10 @@ class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11OrderImportsTest : Java11Test, OrderImportsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11RemoveImportTest : Java11Test, RemoveImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

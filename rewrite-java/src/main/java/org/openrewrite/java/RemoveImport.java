@@ -15,14 +15,10 @@
  */
 package org.openrewrite.java;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
 import lombok.EqualsAndHashCode;
-import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.Collections;
 import java.util.HashSet;
@@ -33,13 +29,12 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class RemoveImport extends JavaIsoRefactorVisitor {
+public class RemoveImport<P> extends JavaIsoProcessor<P> {
     @EqualsAndHashCode.Include
-    private String type;
+    private final String type;
 
-    private JavaType.Class classType;
-
-    private MethodMatcher methodMatcher;
+    private final JavaType.Class classType;
+    private final MethodMatcher methodMatcher;
 
     private J.Import namedImport;
     private J.Import starImport;
@@ -50,28 +45,15 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
     private final Set<String> referencedFields = new HashSet<>();
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    public RemoveImport() {
+    public RemoveImport(String type) {
+        this.type = type;
+        this.methodMatcher = new MethodMatcher(type + " *(..)");
+        this.classType = JavaType.Class.build(type);
         setCursoringOn();
     }
 
     @Override
-    public Iterable<Tag> getTags() {
-        return Tags.of("type", type);
-    }
-
-    @Override
-    public Validated validate() {
-        return Validated.required("type", type);
-    }
-
-    public void setType(String type) {
-        this.type = type;
-        this.methodMatcher = new MethodMatcher(type + " *(..)");
-        this.classType = JavaType.Class.build(type);
-    }
-
-    @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         namedImport = null;
         starImport = null;
         staticStarImport = null;
@@ -80,12 +62,12 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
         referencedFields.clear();
         staticNamedImports.clear();
 
-        J.CompilationUnit c = super.visitCompilationUnit(cu);
+        J.CompilationUnit c = super.visitCompilationUnit(cu, p);
         return staticImportDeletions(classImportDeletions(c));
     }
 
     @Override
-    public J.Import visitImport(J.Import impoort) {
+    public J.Import visitImport(J.Import impoort, P p) {
         if (impoort.isStatic()) {
             if (impoort.getQualid().getTarget().printTrimmed().equals(type)) {
                 if ("*".equals(impoort.getQualid().getSimpleName())) {
@@ -102,34 +84,34 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
             }
         }
 
-        return super.visitImport(impoort);
+        return super.visitImport(impoort, p);
     }
 
     @Override
-    public NameTree visitTypeName(NameTree name) {
+    public <N extends NameTree> N visitTypeName(N name, P p) {
         JavaType.Class asClass = TypeUtils.asClass(name.getType());
         if (asClass != null && asClass.getPackageName().equals(classType.getPackageName()) &&
                 getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
             referencedTypes.add(asClass.getFullyQualifiedName());
         }
-        return super.visitTypeName(name);
+        return super.visitTypeName(name, p);
     }
 
     @Override
-    public J.Ident visitIdentifier(J.Ident ident) {
+    public J.Ident visitIdentifier(J.Ident ident, P p) {
         if (getCursor().getPathAsStream().noneMatch(J.Import.class::isInstance)) {
             referencedFields.add(ident.getSimpleName());
         }
-        return super.visitIdentifier(ident);
+        return super.visitIdentifier(ident, p);
     }
 
     @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         if (methodMatcher.matches(method) && method.getType() != null &&
                 method.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
             referencedMethods.add(method.getName());
         }
-        return super.visitMethodInvocation(method);
+        return super.visitMethodInvocation(method, p);
     }
 
     private J.CompilationUnit classImportDeletions(J.CompilationUnit cu) {
@@ -138,16 +120,15 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
         } else if (starImport != null && referencedTypes.isEmpty()) {
             return delete(cu, starImport);
         } else if (starImport != null && referencedTypes.size() == 1) {
-            return cu.withImports(cu.getImports().stream().map(i -> i == starImport ?
+            return cu.withImports(cu.getImports().stream().map(i -> i.withElem(i.getElem() == starImport ?
                     new J.Import(randomId(),
-                            TreeBuilder.buildName(referencedTypes.iterator().next())
-                                    .withFormatting(Formatting.format(" ")),
-                            false,
-                            i.getComments(),
-                            i.getFormatting(),
-                            Markers.EMPTY) :
-                    i
-            ).collect(toList()));
+                            i.getElem().getPrefix(),
+                            Markers.EMPTY,
+                            null,
+                            TypeTree.build(referencedTypes.iterator().next())
+                                    .withPrefix(Space.format(" "))) :
+                    i.getElem()
+            )).collect(toList()));
         } else {
             return cu;
         }
@@ -183,7 +164,7 @@ public class RemoveImport extends JavaIsoRefactorVisitor {
 
     private J.CompilationUnit delete(J.CompilationUnit cu, J.Import impoort) {
         return cu.withImports(cu.getImports().stream()
-                .filter(i -> i != impoort)
+                .filter(i -> i.getElem() != impoort)
                 .collect(toList()));
     }
 }

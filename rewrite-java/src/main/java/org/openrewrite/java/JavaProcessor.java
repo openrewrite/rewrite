@@ -26,6 +26,62 @@ import java.util.Iterator;
 import java.util.List;
 
 public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor<J, P> {
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param clazz The class that will be imported into the compilation unit.
+     */
+    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+        if (clazz != null) {
+            maybeAddImport(clazz.getFullyQualifiedName());
+        }
+    }
+
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     */
+    public void maybeAddImport(String fullyQualifiedName) {
+        AddImport<P> op = new AddImport<>(fullyQualifiedName, null, true);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+    /**
+     * This method will add a static import to the compilation unit if there is a reference to the type/method. It adds
+     * an additional visitor which means the "add import" is deferred and does not complete immediately. This operation
+     * is idempotent and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     * @param statik The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
+     */
+    public void maybeAddImport(String fullyQualifiedName, String statik) {
+        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, true);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
+        if (clazz != null) {
+            maybeRemoveImport(clazz.getFullyQualifiedName());
+        }
+    }
+
+    public void maybeRemoveImport(String fullyQualifiedName) {
+        RemoveImport<P> op = new RemoveImport<>(fullyQualifiedName);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+
     public J visitExpression(Expression expression, P p) {
         return expression;
     }

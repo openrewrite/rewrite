@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMethod;
 import org.openrewrite.java.search.FindType;
@@ -42,7 +41,7 @@ import static org.openrewrite.Tree.randomId;
  * if there is a reference to the imported class/method.
  */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class AddImport extends JavaIsoProcessor<ExecutionContext> {
+public class AddImport<P> extends JavaIsoProcessor<P> {
     @EqualsAndHashCode.Include
     private final String type;
 
@@ -63,7 +62,7 @@ public class AddImport extends JavaIsoProcessor<ExecutionContext> {
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         if (JavaType.Primitive.fromKeyword(classType.getFullyQualifiedName()) != null) {
             return cu;
         }

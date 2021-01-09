@@ -36,6 +36,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class ChangeFieldNameTck : ChangeFieldNameTest
 
     @Nested
+    inner class ChangeFieldTypeTck : ChangeFieldTypeTest
+
+    @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested
@@ -55,6 +58,9 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class OrderImportsTck : OrderImportsTest
+
+    @Nested
+    inner class RemoveImportTck : RemoveImportTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest

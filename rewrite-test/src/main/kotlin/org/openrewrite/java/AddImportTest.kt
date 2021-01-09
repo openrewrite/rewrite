@@ -16,13 +16,15 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.parallel.Execution
-import org.openrewrite.*
+import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import java.util.function.Supplier
 
 interface AddImportTest : RecipeTest {
-    fun addImports(vararg adds: AddImport): Recipe = adds
+    fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
         .map { add ->
             object : Recipe() {
                 init {

@@ -48,6 +48,10 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         next.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
     }
 
+    protected List<TreeProcessor<T, P>> getAfterVisit() {
+        return next.get();
+    }
+
     public boolean isIdempotent() {
         return true;
     }
