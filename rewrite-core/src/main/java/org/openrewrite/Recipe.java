@@ -42,7 +42,7 @@ public abstract class Recipe {
     protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
 
     public Recipe doNext(Recipe recipe) {
-        Recipe tail = recipe;
+        Recipe tail = this;
         //noinspection StatementWithEmptyBody
         for (; tail.next != null; tail = tail.next) ;
         tail.next = recipe;

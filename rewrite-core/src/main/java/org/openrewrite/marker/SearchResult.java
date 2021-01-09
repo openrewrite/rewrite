@@ -20,8 +20,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.Set;
-
 /**
  * Mark any AST element with "paint". Used by search visitors to mark AST elements that
  * match the search criteria. By painting AST elements in a tree, search results can be
@@ -29,10 +27,6 @@ import java.util.Set;
  */
 @Incubating(since = "7.0.0")
 public class SearchResult implements Marker {
-    public static <T extends Tree> Set<T> find(Tree t) {
-        return HasMarker.find(t, SearchResult.class);
-    }
-
     public static TreePrinter<?> PRINTER = new TreePrinter<Object>() {
         @Override
         public String doLast(Tree tree, String printed, Object o) {

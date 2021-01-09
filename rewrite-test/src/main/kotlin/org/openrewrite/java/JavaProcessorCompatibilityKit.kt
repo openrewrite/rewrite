@@ -20,10 +20,14 @@ import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.*
+import org.openrewrite.java.tree.TypeTreeTest
 
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaProcessorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
+
+    @Nested
+    inner class AddImportTck : AddImportTest
 
     @Nested
     inner class BlankLinesTck : BlankLinesTest
@@ -48,4 +52,7 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class OrderImportsTck : OrderImportsTest
+
+    @Nested
+    inner class TypeTreeTck : TypeTreeTest
 }

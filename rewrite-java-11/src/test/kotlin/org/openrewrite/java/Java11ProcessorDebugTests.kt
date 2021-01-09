@@ -20,18 +20,15 @@ import org.openrewrite.DebugOnly
 import org.openrewrite.java.format.BlankLinesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.*
+import org.openrewrite.java.tree.TypeTreeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11AddImportTest: Java11Test, AddImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11BlankLinesTest: Java11Test, BlankLinesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
@@ -55,4 +52,16 @@ class Java11FindTypeTest : Java11Test, FindTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11OrderImportsTest : Java11Test, OrderImportsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11TypeTreeTest :  Java11Test, TypeTreeTest

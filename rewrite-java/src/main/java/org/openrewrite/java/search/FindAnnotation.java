@@ -53,8 +53,10 @@ public class FindAnnotation extends Recipe {
     }
 
     public static Set<J.Annotation> find(J j, String clazz) {
-        return SearchResult.find(new FindAnnotationProcessor(clazz).visit(j,
-                ExecutionContext.builder().build()));
+        //noinspection ConstantConditions
+        return new FindAnnotationProcessor(clazz)
+                .visit(j, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static class FindAnnotationProcessor extends JavaIsoProcessor<ExecutionContext> {
