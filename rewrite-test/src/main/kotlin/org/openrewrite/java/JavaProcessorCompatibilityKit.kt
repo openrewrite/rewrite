@@ -33,6 +33,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class BlankLinesTck : BlankLinesTest
 
     @Nested
+    inner class ChangeFieldNameTck : ChangeFieldNameTest
+
+    @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested

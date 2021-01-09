@@ -32,6 +32,10 @@ class Java11BlankLinesTest: Java11Test, BlankLinesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeFieldNameTest: Java11Test, ChangeFieldNameTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationTest: Java11Test, FindAnnotationTest
 
 @DebugOnly
