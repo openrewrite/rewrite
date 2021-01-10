@@ -40,6 +40,10 @@ class Java11ChangeFieldTypeTest: Java11Test, ChangeFieldTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ChangeLiteralTest: Java11Test, ChangeLiteralTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11FindAnnotationTest: Java11Test, FindAnnotationTest
 
 @DebugOnly
