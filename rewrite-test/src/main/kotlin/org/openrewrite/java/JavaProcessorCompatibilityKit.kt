@@ -79,4 +79,7 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest
+
+    @Nested
+    inner class UnwrapParenthesesTck : UnwrapParenthesesTest
 }

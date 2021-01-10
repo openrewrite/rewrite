@@ -47,15 +47,15 @@ interface ImplementInterfaceTest : RecipeTest {
         jp,
         dependsOn = arrayOf(b),
         before = """
-                class A {
-                }
-            """,
+            class A {
+            }
+        """,
         after = """
-                import b.B;
-                
-                class A implements B {
-                }
-            """
+            import b.B;
+            
+            class A implements B {
+            }
+        """
     )
 
     @Test
@@ -63,17 +63,17 @@ interface ImplementInterfaceTest : RecipeTest {
         jp,
         dependsOn = arrayOf(b, c),
         before = """
-                import c.C;
-                
-                class A implements C {
-                }
-            """,
+            import c.C;
+            
+            class A implements C {
+            }
+        """,
         after = """
-                import b.B;
-                import c.C;
-                
-                class A implements B, C {
-                }
-            """
+            import b.B;
+            import c.C;
+            
+            class A implements B, C {
+            }
+        """
     )
 }
