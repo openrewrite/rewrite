@@ -76,6 +76,10 @@ class Java11FindTypeTest : Java11Test, FindTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
 
 @DebugOnly

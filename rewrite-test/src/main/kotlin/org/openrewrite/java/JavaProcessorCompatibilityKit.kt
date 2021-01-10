@@ -69,6 +69,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class FindTypeTck : FindTypeTest
 
     @Nested
+    inner class ImplementInterfaceTck : ImplementInterfaceTest
+
+    @Nested
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
