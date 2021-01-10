@@ -57,7 +57,7 @@ public abstract class Recipe {
         List<SourceFile> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate().isValid()) {
-            after = ListUtils.map(after, s -> {
+            after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
                 try {
                     SourceFile afterFile = (SourceFile) processor.get().visit(s, execution);
                     if (afterFile != null && afterFile != s) {
@@ -147,10 +147,6 @@ public abstract class Recipe {
         private RecipeThatMadeChanges(String name) {
             this.names = new HashSet<>();
             this.names.add(name);
-        }
-
-        private RecipeThatMadeChanges(Set<String> names) {
-            this.names = names;
         }
     }
 }

@@ -17,6 +17,10 @@ package org.openrewrite.internal;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
@@ -68,9 +72,9 @@ public final class ListUtils {
             }
         }
 
-        if(newLs != ls) {
+        if (newLs != ls) {
             //noinspection StatementWithEmptyBody
-            while(newLs.remove(null));
+            while (newLs.remove(null)) ;
         }
 
         return newLs;
@@ -78,5 +82,39 @@ public final class ListUtils {
 
     public static <T> List<T> map(List<T> ls, Function<T, T> map) {
         return map(ls, (i, t) -> map.apply(t));
+    }
+
+    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, Function<T, T> map) {
+        return map(ls, pool, (i, t) -> map.apply(t));
+    }
+
+    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
+        if (ls.isEmpty()) {
+            return ls;
+        }
+
+        AtomicReference<List<T>> newLs = new AtomicReference<>(ls);
+        for (int i = 0; i < ls.size(); i++) {
+            int index = i;
+
+            ForkJoinTask<?> task = ForkJoinTask.adapt(() -> {
+                T tree = ls.get(index);
+                T newTree = map.apply(index, tree);
+                if (newTree != tree) {
+                    newLs.updateAndGet(l -> l == ls ? new ArrayList<>(ls) : l)
+                            .set(index, newTree);
+                }
+            });
+
+            task.invoke();
+            task.join();
+        }
+
+        if (newLs.get() != ls) {
+            //noinspection StatementWithEmptyBody
+            while (newLs.get().remove(null)) ;
+        }
+
+        return newLs.get();
     }
 }

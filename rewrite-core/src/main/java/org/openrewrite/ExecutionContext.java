@@ -19,17 +19,20 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 public final class ExecutionContext {
     private final int maxCycles;
     private final Consumer<Throwable> onError;
+    private final ForkJoinPool forkJoinPool;
 
     Map<String, Object> messages = new HashMap<>();
 
-    private ExecutionContext(int maxCycles, Consumer<Throwable> onError) {
+    private ExecutionContext(int maxCycles, Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
         this.onError = onError;
+        this.forkJoinPool = forkJoinPool;
     }
 
     public static Builder builder() {
@@ -56,9 +59,14 @@ public final class ExecutionContext {
         return onError;
     }
 
+    ForkJoinPool getForkJoinPool() {
+        return forkJoinPool;
+    }
+
     public static class Builder {
         private int maxCycles = 3;
         private Consumer<Throwable> onError;
+        private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
 
         public Builder maxCycles(int maxCycles) {
             this.maxCycles = maxCycles;
@@ -70,8 +78,13 @@ public final class ExecutionContext {
             return this;
         }
 
+        public Builder forkJoinPool(ForkJoinPool forkJoinPool) {
+            this.forkJoinPool = forkJoinPool;
+            return this;
+        }
+
         public ExecutionContext build() {
-            return new ExecutionContext(maxCycles, onError);
+            return new ExecutionContext(maxCycles, onError, forkJoinPool);
         }
     }
 }
