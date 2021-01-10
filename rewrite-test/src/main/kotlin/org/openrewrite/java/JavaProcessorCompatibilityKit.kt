@@ -39,7 +39,16 @@ abstract class JavaProcessorCompatibilityKit {
     inner class ChangeFieldTypeTck : ChangeFieldTypeTest
 
     @Nested
-    inner class ChangeLiteral : ChangeLiteralTest
+    inner class ChangeLiteralTck : ChangeLiteralTest
+
+    @Nested
+    inner class ChangeMethodNameTck : ChangeMethodNameTest
+
+    @Nested
+    inner class ChangeMethodTargetToStaticTck : ChangeMethodTargetToStaticTest
+
+    @Nested
+    inner class ChangeMethodTargetToVariableTck : ChangeMethodTargetToVariableTest
 
     @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest

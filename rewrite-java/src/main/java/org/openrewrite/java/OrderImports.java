@@ -23,7 +23,6 @@ import org.openrewrite.java.tree.JRightPadded;
 
 import java.util.*;
 
-
 /**
  * This recipe will group and order the imports for a compilation unit using the rules defined by a {@link ImportLayoutStyle}.
  * If a style has not been defined, this recipe will use the default import layout style that is modelled after
@@ -59,12 +58,12 @@ public class OrderImports extends Recipe {
             List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getImports());
 
             if (orderedImports.size() != cu.getImports().size()) {
-                return cu.withImports(orderedImports);
+                cu = cu.withImports(orderedImports);
             }
 
             for (int i = 0; i < orderedImports.size(); i++) {
                 if (orderedImports.get(i) != cu.getImports().get(i)) {
-                    return cu.withImports(orderedImports);
+                    cu = cu.withImports(orderedImports);
                 }
             }
 

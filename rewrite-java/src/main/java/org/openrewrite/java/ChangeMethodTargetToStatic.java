@@ -15,28 +15,28 @@
  */
 package org.openrewrite.java;
 
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.Tags;
-import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
-import org.openrewrite.java.tree.Flag;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
-import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
-    private MethodMatcher methodMatcher;
+public class ChangeMethodTargetToStatic extends Recipe {
+    private String method;
     private String targetType;
 
+    public ChangeMethodTargetToStatic() {
+        this.processor = () -> new ChangeMethodTargetToStaticProcessor(new MethodMatcher(method), targetType);
+    }
+
     public void setMethod(String method) {
-        this.methodMatcher = new MethodMatcher(method);
+        this.method = method;
     }
 
     public void setTargetType(String targetType) {
@@ -45,41 +45,35 @@ public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
 
     @Override
     public Validated validate() {
-        return required("method", methodMatcher)
+        return required("method", method)
                 .and(required("target.type", targetType));
     }
 
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
-        if(methodMatcher.matches(method)) {
-            andThen(new Scoped(method, targetType));
-        }
-        return super.visitMethodInvocation(method);
-    }
-
-    public static class Scoped extends JavaIsoRefactorVisitor {
-        private final J.MethodInvocation scope;
+    private static class ChangeMethodTargetToStaticProcessor extends JavaIsoProcessor<ExecutionContext> {
+        private final MethodMatcher methodMatcher;
         private final String targetType;
 
-        public Scoped(J.MethodInvocation scope, String clazz) {
-            this.scope = scope;
-            this.targetType = clazz;
+        public ChangeMethodTargetToStaticProcessor(MethodMatcher methodMatcher, String targetType) {
+            this.methodMatcher = methodMatcher;
+            this.targetType = targetType;
         }
 
         @Override
-        public Iterable<Tag> getTags() {
-            return Tags.of("to", targetType);
-        }
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
-            if (scope.isScope(method)) {
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            if (methodMatcher.matches(method)) {
                 JavaType.FullyQualified classType = JavaType.Class.build(targetType);
-                J.MethodInvocation m = method.withSelect(
-                        J.Ident.build(randomId(), classType.getClassName(), classType,
-                                method.getSelect() == null ? Collections.emptyList() : method.getSelect().getComments(),
-                                method.getSelect() == null ? Formatting.EMPTY : method.getSelect().getFormatting(),
-                                Markers.EMPTY));
+
+                m = method.withSelect(
+                        new JRightPadded<>(
+                                J.Ident.build(randomId(),
+                                        method.getSelect() == null ? Space.EMPTY : method.getSelect().getElem().getPrefix(),
+                                        Markers.EMPTY,
+                                        classType.getClassName(),
+                                        classType),
+                                Space.EMPTY
+                        )
+                );
 
                 maybeAddImport(targetType);
 
@@ -94,10 +88,9 @@ public class ChangeMethodTargetToStatic extends JavaIsoRefactorVisitor {
                     }
                 }
 
-                return m.withType(transformedType);
+                m = m.withType(transformedType);
             }
-
-            return super.visitMethodInvocation(method);
+            return m;
         }
     }
 }
