@@ -101,3 +101,7 @@ class Java11TypeTreeTest :  Java11Test, TypeTreeTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11UnwrapParenthesesTest :  Java11Test, UnwrapParenthesesTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UseStaticImportTest :  Java11Test, UseStaticImportTest
