@@ -82,10 +82,8 @@ subprojects {
     // The kotlin plugin adds kotlin-stdlib dependencies to the main sourceSet, even if it doesn't use any kotlin
     // To avoid shipping dependencies we don't actually need, exclude them from the main sourceSet classpath but add them _back_ in for the test source sets
     configurations.all {
-        configurations.all {
-            if (project.name != "rewrite-test" && (name == "compileClasspath" || name == "runtimeClasspath")) {
-                exclude(group = "org.jetbrains.kotlin")
-            }
+        if (project.name != "rewrite-test" && (name == "compileClasspath" || name == "runtimeClasspath")) {
+            exclude(group = "org.jetbrains.kotlin")
         }
     }
 
