@@ -206,7 +206,7 @@ public class MavenDownloader {
                     try {
                         CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
                                 versionMaybeDatedSnapshot, () -> {
-                            String uri = repo.getUrl() + "/" +
+                            String uri = URI.create(repo.getUrl()) + "/" +
                                     groupId.replace('.', '/') + '/' +
                                     artifactId + '/' +
                                     version + '/' +

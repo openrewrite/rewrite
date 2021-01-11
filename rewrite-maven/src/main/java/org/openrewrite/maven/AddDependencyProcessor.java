@@ -190,7 +190,7 @@ public class AddDependencyProcessor<P> extends MavenProcessor<P> {
             return version;
         }
 
-        MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
+        MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
                 .downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);

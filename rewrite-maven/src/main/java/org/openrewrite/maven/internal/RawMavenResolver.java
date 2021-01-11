@@ -49,6 +49,7 @@ public class RawMavenResolver {
 
     private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
+    private final Map<RawPom.Parent, RawMaven> parentLookupCache = new HashMap<>();
 
     private final MavenDownloader downloader;
 
@@ -326,11 +327,13 @@ public class RawMavenResolver {
         RawPom pom = rawMaven.getPom();
         Pom parent = null;
         if (pom.getParent() != null) {
-            // TODO would it help to limit lookups of parents here by pre-caching RawMaven by RawPom.Parent?
             RawPom.Parent rawParent = pom.getParent();
-            RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
-                    rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
-                    partialMaven.getRepositories());
+            RawMaven rawParentModel = parentLookupCache.computeIfAbsent(rawParent, (it) -> {
+                logger.debug("Downloading parent POM " + rawParent.getGroupId() + ":" + rawParent.getArtifactId() + ":" + rawParent.getVersion() + " with relativePath: " + rawParent.getRelativePath());
+                return downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
+                        rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
+                        partialMaven.getRepositories());
+            });
             if (rawParentModel != null) {
                 PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
                 Optional<Pom> maybeParent = resolved.get(parentKey);
@@ -345,7 +348,6 @@ public class RawMavenResolver {
                 }
             }
         }
-
         partialMaven.setParent(parent);
     }
 
