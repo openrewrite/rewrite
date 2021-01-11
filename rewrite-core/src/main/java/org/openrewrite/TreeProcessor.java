@@ -71,7 +71,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     }
 
     @Nullable
-    private T visitInternal(Tree tree, P p) {
+    protected T visitInternal(Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
