@@ -16,9 +16,9 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 
-interface InsertMethodArgumentTest : RefactorVisitorTest {
+interface InsertMethodArgumentTest : RecipeTest {
     companion object {
         const val b = """
             class B {
@@ -44,9 +44,9 @@ interface InsertMethodArgumentTest : RefactorVisitorTest {
     }
 
     @Test
-    fun insertArgumentDeclarative(jp: JavaParser) = assertRefactored(
+    fun insertArgumentDeclarative(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(b),
+            dependsOn = arrayOf(b),
             visitors = listOf(
                 InsertMethodArgument().apply {
                     setMethod("B foo(String)")
@@ -67,9 +67,9 @@ interface InsertMethodArgumentTest : RefactorVisitorTest {
     )
 
     @Test
-    fun insertArgument(jp: JavaParser) = assertRefactored(
+    fun insertArgument(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(b),
+            dependsOn = arrayOf(b),
             visitors = listOf(
                 InsertMethodArgument().apply {
                     setMethod("B foo(String)")

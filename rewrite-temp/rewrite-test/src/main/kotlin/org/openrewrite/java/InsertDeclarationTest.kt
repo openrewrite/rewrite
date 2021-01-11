@@ -16,12 +16,12 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.TreeBuilder
 
-interface InsertDeclarationTest : RefactorVisitorTest {
+interface InsertDeclarationTest : RecipeTest {
     @Test
-    fun insertFirst(jp: JavaParser) = assertRefactored(
+    fun insertFirst(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(
@@ -45,7 +45,7 @@ interface InsertDeclarationTest : RefactorVisitorTest {
     )
 
     @Test
-    fun insertLast(jp: JavaParser) = assertRefactored(
+    fun insertLast(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(
@@ -75,7 +75,7 @@ interface InsertDeclarationTest : RefactorVisitorTest {
     )
 
     @Test
-    fun insertMiddle(jp: JavaParser) = assertRefactored(
+    fun insertMiddle(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { cu ->
                 InsertDeclaration.Scoped(

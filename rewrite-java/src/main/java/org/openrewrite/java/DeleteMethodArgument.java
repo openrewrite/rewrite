@@ -15,27 +15,28 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Formatting;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-public class DeleteMethodArgument extends JavaIsoRefactorVisitor {
+public class DeleteMethodArgument extends Recipe {
     private MethodMatcher methodMatcher;
     private Integer index;
 
-    @Override
-    public boolean isIdempotent() {
-        return false;
+    public DeleteMethodArgument() {
+        this.processor = () -> new DeleteMethodArgumentProcessor(methodMatcher, index);
     }
 
     public void setMethod(String method) {
@@ -52,45 +53,32 @@ public class DeleteMethodArgument extends JavaIsoRefactorVisitor {
                 .and(required("index", index));
     }
 
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
-        if(methodMatcher.matches(method)) {
-            andThen(new Scoped(method, index));
-        }
-        return super.visitMethodInvocation(method);
-    }
+    private static class DeleteMethodArgumentProcessor extends JavaIsoProcessor<ExecutionContext> {
+        private final MethodMatcher methodMatcher;
+        private final Integer index;
 
-    public static class Scoped extends JavaIsoRefactorVisitor {
-        private final J.MethodInvocation scope;
-        private final int index;
-
-        public Scoped(J.MethodInvocation scope, int index) {
-            this.scope = scope;
+        public DeleteMethodArgumentProcessor(MethodMatcher methodMatcher, Integer index) {
+            this.methodMatcher = methodMatcher;
             this.index = index;
         }
 
         @Override
-        public boolean isIdempotent() {
-            return false;
-        }
-
-        @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method) {
-            List<Expression> originalArgs = method.getArgs().getArgs();
-            if (scope.isScope(method) && originalArgs.stream()
-                    .filter(a -> !(a instanceof J.Empty))
+        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+            List<JRightPadded<Expression>> originalArgs = m.getArgs().getElem();
+            if (methodMatcher.matches(m) && originalArgs.stream()
+                    .filter(a -> !(a.getElem() instanceof J.Empty))
                     .count() >= index + 1) {
-                List<Expression> args = new ArrayList<>(method.getArgs().getArgs());
+                List<JRightPadded<Expression>> args = new ArrayList<>(m.getArgs().getElem());
 
-                args.remove(index);
+                args.remove((int) index);
                 if (args.isEmpty()) {
-                    args = singletonList(new J.Empty(randomId(), emptyList(), Formatting.EMPTY, Markers.EMPTY));
+                    args = singletonList(new JRightPadded<>(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY));
                 }
 
-                return method.withArgs(method.getArgs().withArgs(args));
+                m = m.withArgs(m.getArgs().withElem(args));
             }
-
-            return super.visitMethodInvocation(method);
+            return m;
         }
     }
 }

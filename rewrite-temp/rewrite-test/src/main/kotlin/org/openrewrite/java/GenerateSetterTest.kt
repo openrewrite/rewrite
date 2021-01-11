@@ -17,14 +17,14 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 
 @ExtendWith(JavaParserResolver::class)
-interface GenerateSetterTest : RefactorVisitorTest {
+interface GenerateSetterTest : RecipeTest {
 
     @Test
-    fun generatesBasicSetter(jp: JavaParser) = assertRefactored(jp,
+    fun generatesBasicSetter(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
@@ -51,7 +51,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun generatesInnerClassSetter(jp: JavaParser) = assertRefactored( jp,
+    fun generatesInnerClassSetter(jp: JavaParser) = assertChanged( jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0].body.statements[0] as J.ClassDecl, "foo") },
             before = """ 
                 package org.example;
@@ -78,7 +78,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun setterToInnerClass(jp: JavaParser) = assertRefactored(jp,
+    fun setterToInnerClass(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
             before = """
                 package org.example;
@@ -125,7 +125,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun doesNotInterefereWithOverload(jp: JavaParser) = assertRefactored(jp,
+    fun doesNotInterefereWithOverload(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
@@ -156,7 +156,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun worksForFieldNamedValue(jp: JavaParser) = assertRefactored(jp,
+    fun worksForFieldNamedValue(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "value") },
             before = """ 
                 package org.example;
@@ -179,7 +179,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun handlesGenerics(jp:JavaParser) = assertRefactored(jp,
+    fun handlesGenerics(jp:JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
@@ -206,7 +206,7 @@ interface GenerateSetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun setterForPrimitive(jp: JavaParser) = assertRefactored(
+    fun setterForPrimitive(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { a -> GenerateSetter.Scoped(a.classes[0], "foo") },
             before = """ 

@@ -16,11 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 
-interface GenerateConstructorUsingFieldsTest : RefactorVisitorTest {
+interface GenerateConstructorUsingFieldsTest : RecipeTest {
     @Test
-    fun generateConstructorUsingFields(jp: JavaParser) = assertRefactored(
+    fun generateConstructorUsingFields(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { cu ->
                 GenerateConstructorUsingFields.Scoped(cu.classes[0], cu.classes[0].fields)
@@ -51,7 +51,7 @@ interface GenerateConstructorUsingFieldsTest : RefactorVisitorTest {
     )
 
     @Test
-    fun emptyListOfFields(jp: JavaParser) = assertRefactored(
+    fun emptyListOfFields(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { cu ->
                 GenerateConstructorUsingFields.Scoped(cu.classes[0], emptyList())

@@ -54,6 +54,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class ChangeTypeTck : ChangeTypeTest
 
     @Nested
+    inner class DeleteMethodArgumentTck : DeleteMethodArgumentTest
+
+    @Nested
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested

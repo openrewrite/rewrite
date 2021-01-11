@@ -16,14 +16,14 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 
-interface GenerateNewBeanUsingPropertiesTest: RefactorVisitorTest {
+interface GenerateNewBeanUsingPropertiesTest: RecipeTest {
     @Test
-    fun generateNewBeanWithProperties(jp: JavaParser) = assertRefactored(
+    fun generateNewBeanWithProperties(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf("""
+            dependsOn = arrayOf("""
                 package bean;
                 public class Address {
                     private String street;

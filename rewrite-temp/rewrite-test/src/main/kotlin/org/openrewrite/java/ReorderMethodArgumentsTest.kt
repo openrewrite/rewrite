@@ -16,14 +16,14 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 
-interface ReorderMethodArgumentsTest : RefactorVisitorTest {
+interface ReorderMethodArgumentsTest : RecipeTest {
 
     @Test
-    fun refactorReorderArguments(jp: JavaParser) = assertRefactored(
+    fun refactorReorderArguments(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(
+            dependsOn = arrayOf(
                 """
                     package a;
                     public class A {
@@ -68,9 +68,9 @@ interface ReorderMethodArgumentsTest : RefactorVisitorTest {
     )
 
     @Test
-    fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertRefactored(
+    fun refactorReorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(
+            dependsOn = arrayOf(
                 """
                     package a;
                     public class A {
@@ -107,9 +107,9 @@ interface ReorderMethodArgumentsTest : RefactorVisitorTest {
     )
 
     @Test
-    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertRefactored(
+    fun refactorReorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(
+            dependsOn = arrayOf(
                 """
                     package a;
                     public class A {
@@ -147,7 +147,7 @@ interface ReorderMethodArgumentsTest : RefactorVisitorTest {
     @Test
     fun refactorReorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
             jp,
-            dependencies = listOf(
+            dependsOn = arrayOf(
                 """
                     package a;
                     public class A {

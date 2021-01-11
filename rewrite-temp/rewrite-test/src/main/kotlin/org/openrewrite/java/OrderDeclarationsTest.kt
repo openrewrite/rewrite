@@ -16,11 +16,11 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 
-interface OrderDeclarationsTest : RefactorVisitorTest {
+interface OrderDeclarationsTest : RecipeTest {
     @Test
-    fun orderDeclarations(jp: JavaParser) = assertRefactored(
+    fun orderDeclarations(jp: JavaParser) = assertChanged(
             jp,
             visitors = listOf(OrderDeclarations()),
             before = """

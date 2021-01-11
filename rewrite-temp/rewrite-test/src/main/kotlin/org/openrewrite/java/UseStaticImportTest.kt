@@ -16,13 +16,13 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 
-interface UseStaticImportTest : RefactorVisitorTest {
+interface UseStaticImportTest : RecipeTest {
     @Test
-    fun replaceWithStaticImports(jp: JavaParser) = assertRefactored(
+    fun replaceWithStaticImports(jp: JavaParser) = assertChanged(
             jp,
-            dependencies = listOf(
+            dependsOn = arrayOf(
                 """
                     package asserts;
                     
@@ -65,7 +65,7 @@ interface UseStaticImportTest : RefactorVisitorTest {
     )
 
     @Test
-    fun junit5Assertions(jp: JavaParser) = assertRefactored(
+    fun junit5Assertions(jp: JavaParser) = assertChanged(
             parser = JavaParser.fromJavaVersion()
                     .classpath(JavaParser.dependenciesFromClasspath("junit-jupiter-api"))
                     .build(),

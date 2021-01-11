@@ -17,15 +17,15 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
-import org.openrewrite.RefactorVisitorTest
+import org.openrewrite.RecipeTest
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 @ExtendWith(JavaParserResolver::class)
-interface GenerateGetterTest : RefactorVisitorTest {
+interface GenerateGetterTest : RecipeTest {
 
     @Test
-    fun generatesBasicGetter(jp: JavaParser) = assertRefactored(jp,
+    fun generatesBasicGetter(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
@@ -52,7 +52,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun generatesInnerClassGetter(jp: JavaParser) = assertRefactored(jp,
+    fun generatesInnerClassGetter(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0].body.statements[0] as J.ClassDecl, "foo") },
             before = """ 
                 package org.example;
@@ -79,7 +79,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun getterToInnerClass(jp: JavaParser) = assertRefactored(jp,
+    fun getterToInnerClass(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """
                 package org.example;
@@ -126,7 +126,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun handlesGenerics(jp: JavaParser) = assertRefactored(jp,
+    fun handlesGenerics(jp: JavaParser) = assertChanged(jp,
             visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 
                 package org.example;
@@ -153,7 +153,7 @@ interface GenerateGetterTest : RefactorVisitorTest {
     )
 
     @Test
-    fun getterForPrimitive(jp: JavaParser) = assertRefactored(
+    fun getterForPrimitive(jp: JavaParser) = assertChanged(
             jp,
             visitorsMapped = listOf { a -> GenerateGetter.Scoped(a.classes[0], "foo") },
             before = """ 

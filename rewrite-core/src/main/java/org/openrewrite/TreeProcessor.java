@@ -52,10 +52,6 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         return next.get();
     }
 
-    public boolean isIdempotent() {
-        return true;
-    }
-
     public final Cursor getCursor() {
         if (cursor.get() == null) {
             throw new IllegalStateException("Cursoring is not enabled for this visitor. " +

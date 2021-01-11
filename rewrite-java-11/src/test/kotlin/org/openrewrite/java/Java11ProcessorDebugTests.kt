@@ -60,6 +60,10 @@ class Java11ChangeTypeTest: Java11Test, ChangeTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11DeleteMethodArgumentTest: Java11Test, DeleteMethodArgumentTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11DeleteStatementTest: Java11Test, DeleteStatementTest
 
 @DebugOnly
