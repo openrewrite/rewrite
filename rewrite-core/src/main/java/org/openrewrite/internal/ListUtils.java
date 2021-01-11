@@ -17,7 +17,6 @@ package org.openrewrite.internal;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.atomic.AtomicReference;
@@ -106,7 +105,7 @@ public final class ListUtils {
                 }
             });
 
-            task.invoke();
+            pool.invoke(task);
             task.join();
         }
 

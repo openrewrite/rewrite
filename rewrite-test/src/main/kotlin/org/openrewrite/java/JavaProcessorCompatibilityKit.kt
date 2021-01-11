@@ -51,6 +51,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class ChangeMethodTargetToVariableTck : ChangeMethodTargetToVariableTest
 
     @Nested
+    inner class ChangeTypeTck : ChangeTypeTest
+
+    @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested

@@ -634,7 +634,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
         w = call(w, p, this::visitExpression);
         w = w.withBoundedType(call(w.getBoundedType(), p));
-        return w.withBoundedType(visitTypeName(w.getBoundedType(), p));
+        if(w.getBoundedType() != null) {
+            // i.e. not a "wildcard" type
+            w = w.withBoundedType(visitTypeName(w.getBoundedType(), p));
+        }
+        return w;
     }
 
     @Nullable
