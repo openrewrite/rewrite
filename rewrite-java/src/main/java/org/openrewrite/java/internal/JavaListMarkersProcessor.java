@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.internal;
 
-import org.openrewrite.Tree;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.Marker;

@@ -15,8 +15,8 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.*;
-import org.openrewrite.Tree;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
@@ -183,7 +183,6 @@ public class ImportLayoutStyle implements JavaStyle {
             if(!accepted) {
                 for(Layout.Block block : blocksOnlyCatchalls) {
                     if(block.accept(anImport)) {
-                        accepted = true;
                         break;
                     }
                 }

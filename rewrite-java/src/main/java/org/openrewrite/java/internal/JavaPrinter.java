@@ -38,7 +38,7 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
     }
 
     @Override
-    public String visit(Tree tree, P p) {
+    public String visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }

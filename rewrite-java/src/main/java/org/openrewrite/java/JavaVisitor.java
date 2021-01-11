@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.NameTree;
 
 public interface JavaVisitor<R, P> extends TreeVisitor<R, P> {
     R visitAnnotatedType(J.AnnotatedType annotatedType, P p);

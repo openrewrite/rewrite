@@ -20,6 +20,7 @@ import org.openrewrite.java.tree.J;
 
 public class ClassDeclToString {
     public static String toString(J.ClassDecl clazz) {
+        //noinspection ConstantConditions
         return CLASS_DECL_PRINTER.visit(clazz, null);
     }
 

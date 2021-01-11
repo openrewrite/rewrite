@@ -59,7 +59,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
      * is idempotent and calling this method multiple times with the same arguments will only add an import once.
      *
      * @param fullyQualifiedName Fully-qualified name of the class.
-     * @param statik The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
+     * @param statik             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
      */
     public void maybeAddImport(String fullyQualifiedName, String statik) {
         AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, true);
@@ -98,14 +98,17 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return nameTree;
     }
 
+    @Nullable
     private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
+    @Nullable
     private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
+    @Nullable
     private <J2 extends J> JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
         if (nameTrees == null) {
             return null;
@@ -202,7 +205,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     @Override
     public J visitBlock(J.Block block, P p) {
         J.Block b = call(block, p, this::visitEach);
-        b = b.withStatik(visitSpace(b.getStatic(), p));
+        b = b.withStatik(b.getStatic() == null ?
+                null :
+                visitSpace(b.getStatic(), p));
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
         b = call(b, p, this::visitStatement);
         b = b.withStatements(ListUtils.map(b.getStatements(), t -> call(t, p)));
@@ -362,7 +367,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitImport(J.Import impoort, P p) {
         J.Import i = call(impoort, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = i.withStatik(visitSpace(i.getStatic(), p));
+        i = i.withStatik(i.getStatic() == null ? null :
+                visitSpace(i.getStatic(), p));
         return i.withQualid(call(i.getQualid(), p));
     }
 
@@ -418,7 +424,10 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withTypeParameters(call(m.getTypeParameters(), p));
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
-        m = m.withReturnTypeExpr(visitTypeName(m.getReturnTypeExpr(), p));
+        m = m.withReturnTypeExpr(
+                m.getReturnTypeExpr() == null ?
+                        null :
+                        visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(call(m.getName(), p));
         m = m.withParams(call(m.getParams(), p));
         m = m.withParams(call(m.getParams(), p));
@@ -462,8 +471,12 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
-        m = m.withTypeExpr(visitTypeName(m.getTypeExpr(), p));
-        m = m.withVarargs(visitSpace(m.getVarargs(), p));
+        m = m.withTypeExpr(m.getTypeExpr() == null ?
+                null :
+                visitTypeName(m.getTypeExpr(), p));
+        m = m.withVarargs(m.getVarargs() == null ?
+                null :
+                visitSpace(m.getVarargs(), p));
         return m.withVars(ListUtils.map(m.getVars(), t -> call(t, p)));
     }
 
@@ -473,7 +486,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = n.withPrefix(visitSpace(n.getPrefix(), p));
         n = call(n, p, this::visitExpression);
         n = n.withTypeExpr(call(n.getTypeExpr(), p));
-        n = n.withTypeExpr(visitTypeName(n.getTypeExpr(), p));
+        n = n.withTypeExpr(n.getTypeExpr() == null ?
+                null :
+                visitTypeName(n.getTypeExpr(), p));
         n = n.withDimensions(call(n.getDimensions(), p));
         return n.withInitializer(call(n.getInitializer(), p));
     }
@@ -486,7 +501,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = call(n, p, this::visitExpression);
         n = n.withNew(visitSpace(n.getNew(), p));
         n = n.withClazz(call(n.getClazz(), p));
-        n = n.withClazz(visitTypeName(n.getClazz(), p));
+        n = n.withClazz(n.getClazz() == null ?
+                null :
+                visitTypeName(n.getClazz(), p));
         n = n.withArgs(call(n.getArgs(), p));
         return n.withBody(call(n.getBody(), p));
     }
@@ -634,7 +651,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
         w = call(w, p, this::visitExpression);
         w = w.withBoundedType(call(w.getBoundedType(), p));
-        if(w.getBoundedType() != null) {
+        if (w.getBoundedType() != null) {
             // i.e. not a "wildcard" type
             w = w.withBoundedType(visitTypeName(w.getBoundedType(), p));
         }

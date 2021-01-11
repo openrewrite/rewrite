@@ -116,6 +116,7 @@ public class MethodMatcher {
                 .map(args -> args.getElem().stream()
                         .map(JRightPadded::getElem)
                         .map(Expression::getType)
+                        .filter(Objects::nonNull)
                         .map(this::typePattern)
                         .filter(Objects::nonNull)
                         .collect(joining(","))
