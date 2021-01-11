@@ -15,14 +15,21 @@
  */
 package org.openrewrite.properties;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.properties.tree.Properties;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangePropertyKey extends PropertiesRefactorVisitor {
+public class ChangePropertyKey extends Recipe {
+
     private String property;
     private String toProperty;
+
+    public ChangePropertyKey() {
+        this.processor = () -> new ChangePropertyKeyProcessor<>(property, toProperty);
+    }
 
     public void setProperty(String property) {
         this.property = property;
@@ -36,14 +43,5 @@ public class ChangePropertyKey extends PropertiesRefactorVisitor {
     public Validated validate() {
         return required("property", property)
                 .and(required("toProperty", toProperty));
-    }
-
-    @Override
-    public Properties visitEntry(Properties.Entry entry) {
-        Properties.Entry e = refactor(entry, super::visitEntry);
-        if (e.getKey().equals(property)) {
-            e = e.withKey(toProperty);
-        }
-        return e;
     }
 }
