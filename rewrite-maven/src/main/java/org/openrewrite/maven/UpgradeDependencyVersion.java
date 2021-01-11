@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.NoopCache;
@@ -40,10 +42,7 @@ import static org.openrewrite.Validated.required;
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
  * more precise control over version updates to patch or minor releases.
  */
-public class UpgradeDependencyVersion extends MavenRefactorVisitor {
-    @Nullable
-    private Collection<String> availableVersions;
-
+public class UpgradeDependencyVersion extends Recipe {
     private String groupId;
 
     @Nullable
@@ -57,10 +56,9 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
     @Nullable
     private String metadataPattern;
 
-    private VersionComparator versionComparator;
-
     public UpgradeDependencyVersion() {
-        setCursoringOn();
+        this.processor = () -> new UpgradeDependencyVersionProcessor(groupId, artifactId,
+                toVersion, metadataPattern);
     }
 
     public void setGroupId(String groupId) {
@@ -93,62 +91,86 @@ public class UpgradeDependencyVersion extends MavenRefactorVisitor {
                 .and(Semver.validate(toVersion, metadataPattern));
     }
 
-    @Override
-    public boolean isIdempotent() {
-        return false;
-    }
+    private static class UpgradeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
+        private final String groupId;
 
-    @Override
-    public Maven visitMaven(Maven maven) {
-        versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
+        @Nullable
+        private final String artifactId;
 
-        maybeChangeDependencyVersion(maven.getModel());
+        /**
+         * Node Semver range syntax.
+         */
+        private final String toVersion;
 
-        for (Pom module : maven.getModules()) {
-            maybeChangeDependencyVersion(module);
+        @Nullable
+        private final String metadataPattern;
+
+        @Nullable
+        private Collection<String> availableVersions;
+
+        private VersionComparator versionComparator;
+
+        public UpgradeDependencyVersionProcessor(String groupId,  @Nullable String artifactId,
+                                                 String toVersion, @Nullable String metadataPattern) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.toVersion = toVersion;
+            this.metadataPattern = metadataPattern;
+            setCursoringOn();
         }
 
-        return super.visitMaven(maven);
-    }
+        @Override
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
 
-    private void maybeChangeDependencyVersion(Pom model) {
-        for (Pom.Dependency dependency : model.getDependencies()) {
-            if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
-                    ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                    changeDependencyVersion.setGroupId(groupId);
-                    changeDependencyVersion.setArtifactId(dependency.getArtifactId());
-                    changeDependencyVersion.setToVersion(newer);
-                    andThen(changeDependencyVersion);
-                });
+            maybeChangeDependencyVersion(maven.getModel());
+
+            for (Pom module : maven.getModules()) {
+                maybeChangeDependencyVersion(module);
+            }
+
+            return super.visitMaven(maven, ctx);
+        }
+
+        private void maybeChangeDependencyVersion(Pom model) {
+            for (Pom.Dependency dependency : model.getDependencies()) {
+                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
+                        changeDependencyVersion.setGroupId(groupId);
+                        changeDependencyVersion.setArtifactId(dependency.getArtifactId());
+                        changeDependencyVersion.setToVersion(newer);
+                        doAfterVisit(changeDependencyVersion);
+                    });
+                }
+            }
+
+            for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
+                if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
+                    findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
+                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
+                        changeDependencyVersion.setGroupId(groupId);
+                        changeDependencyVersion.setArtifactId(dependency.getArtifactId());
+                        changeDependencyVersion.setToVersion(newer);
+                        doAfterVisit(changeDependencyVersion);
+                    });
+                }
             }
         }
 
-        for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
-            if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
-                findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
-                    ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                    changeDependencyVersion.setGroupId(groupId);
-                    changeDependencyVersion.setArtifactId(dependency.getArtifactId());
-                    changeDependencyVersion.setToVersion(newer);
-                    andThen(changeDependencyVersion);
-                });
+        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+            if (availableVersions == null) {
+                MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
+                        .downloadMetadata(groupId, artifactId, emptyList());
+                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                        .filter(versionComparator::isValid)
+                        .collect(Collectors.toList());
             }
-        }
-    }
 
-    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
-        if (availableVersions == null) {
-            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                    .downloadMetadata(groupId, artifactId, emptyList());
-            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                    .filter(versionComparator::isValid)
-                    .collect(Collectors.toList());
+            LatestRelease latestRelease = new LatestRelease(metadataPattern);
+            return availableVersions.stream()
+                    .filter(v -> latestRelease.compare(currentVersion, v) < 0)
+                    .max(versionComparator);
         }
-
-        LatestRelease latestRelease = new LatestRelease(metadataPattern);
-        return availableVersions.stream()
-                .filter(v -> latestRelease.compare(currentVersion, v) < 0)
-                .max(versionComparator);
     }
 }

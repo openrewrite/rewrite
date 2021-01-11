@@ -15,19 +15,17 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
-import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangePropertyValue extends MavenRefactorVisitor {
+public class ChangePropertyValue extends Recipe {
     private String key;
     private String toValue;
-
-    public ChangePropertyValue() {
-        setCursoringOn();
-    }
 
     public void setKey(String key) {
         this.key = key.replace("${", "").replace("}", "");
@@ -43,12 +41,23 @@ public class ChangePropertyValue extends MavenRefactorVisitor {
                 .and(required("toValue", toValue));
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isPropertyTag() && key.equals(tag.getName()) &&
-                !toValue.equals(tag.getValue().orElse(null))) {
-            andThen(new ChangeTagValue.Scoped(tag, toValue));
+    private static class ChangePropertyValueProcessor extends MavenProcessor<ExecutionContext> {
+        private final String key;
+        private final String toValue;
+
+        public ChangePropertyValueProcessor(String key, String toValue) {
+            this.key = key;
+            this.toValue = toValue;
+            setCursoringOn();
         }
-        return super.visitTag(tag);
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isPropertyTag() && key.equals(tag.getName()) &&
+                    !toValue.equals(tag.getValue().orElse(null))) {
+                doAfterVisit(new ChangeTagValueProcessor<>(tag, toValue));
+            }
+            return super.visitTag(tag, ctx);
+        }
     }
 }

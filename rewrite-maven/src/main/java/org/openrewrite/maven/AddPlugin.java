@@ -15,23 +15,26 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
+import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.AddToTag;
-import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.AddToTagProcessor;
+import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-public class AddPlugin extends MavenRefactorVisitor {
-    private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
+import static org.openrewrite.Validated.required;
 
+public class AddPlugin extends Recipe {
     private String groupId;
     private String artifactId;
     private String version;
 
     public AddPlugin() {
-        setCursoringOn();
+        this.processor = () -> new AddPluginProcessor(groupId, artifactId, version);
     }
 
     public void setGroupId(String groupId) {
@@ -47,51 +50,73 @@ public class AddPlugin extends MavenRefactorVisitor {
     }
 
     @Override
-    public Maven visitMaven(Maven maven) {
-        Xml.Tag root = maven.getRoot();
-        if (!root.getChild("build").isPresent()) {
-            andThen(new AddToTag.Scoped(root, Xml.Tag.build("<build/>"),
-                    new MavenTagInsertionComparator(root.getChildren())));
-        }
-
-        return super.visitMaven(maven);
+    public Validated validate() {
+        return required("groupId", groupId)
+                .and(required("artifactId", artifactId)
+                .and(required("version", version)));
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (BUILD_MATCHER.matches(getCursor())) {
-            Optional<Xml.Tag> maybePlugins = tag.getChild("plugins");
-            if (!maybePlugins.isPresent()) {
-                andThen(new AddToTag.Scoped(tag, Xml.Tag.build("<plugins/>")));
-            } else {
-                Xml.Tag plugins = maybePlugins.get();
+    private static class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
+        private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
 
-                Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
-                        .filter(plugin ->
-                                plugin.getName().equals("plugin") &&
-                                        groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
-                                        artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
-                        )
-                        .findAny();
+        private final String groupId;
+        private final String artifactId;
+        private final String version;
 
-                if (maybePlugin.isPresent()) {
-                    Xml.Tag plugin = maybePlugin.get();
-                    if (!version.equals(plugin.getChildValue("version").orElse(null))) {
-                        //noinspection OptionalGetWithoutIsPresent
-                        andThen(new ChangeTagValue.Scoped(plugin.getChild("version").get(), version));
-                    }
-                } else {
-                    andThen(new AddToTag.Scoped(plugins, Xml.Tag.build("<plugin>\n" +
-                            "<groupId>" + groupId + "</groupId>\n" +
-                            "<artifactId>" + artifactId + "</artifactId>\n" +
-                            "<version>" + version + "</version>\n" +
-                            "</plugin>")));
-                }
-            }
-
-            return tag;
+        public AddPluginProcessor(String groupId, String artifactId, String version) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.version = version;
+            setCursoringOn();
         }
 
-        return super.visitTag(tag);
+        @Override
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            Xml.Tag root = maven.getRoot();
+            if (!root.getChild("build").isPresent()) {
+                doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<build/>"),
+                        new MavenTagInsertionComparator(root.getChildren())));
+            }
+
+            return super.visitMaven(maven, ctx);
+        }
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (BUILD_MATCHER.matches(getCursor())) {
+                Optional<Xml.Tag> maybePlugins = tag.getChild("plugins");
+                if (!maybePlugins.isPresent()) {
+                    doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<plugins/>")));
+                } else {
+                    Xml.Tag plugins = maybePlugins.get();
+
+                    Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
+                            .filter(plugin ->
+                                    plugin.getName().equals("plugin") &&
+                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                            )
+                            .findAny();
+
+                    if (maybePlugin.isPresent()) {
+                        Xml.Tag plugin = maybePlugin.get();
+                        if (!version.equals(plugin.getChildValue("version").orElse(null))) {
+                            //noinspection OptionalGetWithoutIsPresent
+                            doAfterVisit(new ChangeTagValueProcessor<>(plugin.getChild("version").get(), version));
+                        }
+                    } else {
+                        doAfterVisit(new AddToTagProcessor<>(plugins, Xml.Tag.build("<plugin>\n" +
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
+                                "<version>" + version + "</version>\n" +
+                                "</plugin>")));
+                    }
+                }
+
+                return tag;
+            }
+
+            return super.visitTag(tag, ctx);
+        }
     }
 }

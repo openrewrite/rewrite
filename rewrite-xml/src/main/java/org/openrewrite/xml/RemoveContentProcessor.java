@@ -34,25 +34,27 @@ public class RemoveContentProcessor<P> extends XmlProcessor<P> {
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
-        if (tag.getContent() != null) {
-            for (Content content : tag.getContent()) {
+        Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
+
+        if (t.getContent() != null) {
+            for (Content content : t.getContent()) {
                 if (scope.isScope(content)) {
-                    List<Content> contents = new ArrayList<>(tag.getContent());
+                    List<Content> contents = new ArrayList<>(t.getContent());
                     contents.remove(content);
 
                     if (removeEmptyAncestors && contents.isEmpty()) {
                         if (getCursor().getParentOrThrow().getTree() instanceof Xml.Document) {
-                            return tag.withContent(null).withClosing(null);
+                            return t.withContent(null).withClosing(null);
                         } else {
-                            doAfterVisit(new RemoveContentProcessor<>(tag, true));
+                            doAfterVisit(new RemoveContentProcessor<>(t, true));
                         }
                     } else {
-                        return tag.withContent(contents);
+                        return t.withContent(contents);
                     }
                 }
             }
         }
 
-        return super.visitTag(tag, p);
+        return t;
     }
 }

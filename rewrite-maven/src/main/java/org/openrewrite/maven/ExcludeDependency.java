@@ -15,9 +15,11 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.AddToTag;
+import org.openrewrite.xml.AddToTagProcessor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -25,9 +27,13 @@ import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
-public class ExcludeDependency extends MavenRefactorVisitor {
+public class ExcludeDependency extends Recipe {
     private String groupId;
     private String artifactId;
+
+    public ExcludeDependency() {
+        this.processor = () -> new ExcludeDependencyProcessor(groupId, artifactId);
+    }
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
@@ -43,35 +49,42 @@ public class ExcludeDependency extends MavenRefactorVisitor {
                 .and(required("artifactId", artifactId));
     }
 
-    public ExcludeDependency() {
-        setCursoringOn();
-    }
+    private static class ExcludeDependencyProcessor extends MavenProcessor<ExecutionContext> {
+        private final String groupId;
+        private final String artifactId;
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isDependencyTag()) {
-            Pom.Dependency dependency = findDependency(tag);
-            if (dependency != null && !dependency.findDependencies(groupId, artifactId).isEmpty()) {
-                Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
-                if (maybeExclusions.isPresent()) {
-                    Xml.Tag exclusions = maybeExclusions.get();
-
-                    List<Xml.Tag> individualExclusions = exclusions.getChildren("exclusion");
-                    if (individualExclusions.stream().noneMatch(exclusion ->
-                            groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
-                                    artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
-                        andThen(new AddToTag.Scoped(exclusions, Xml.Tag.build("<exclusion>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                "</exclusion>")));
-                    }
-
-                } else {
-                    andThen(new AddToTag.Scoped(tag, Xml.Tag.build("<exclusions/>")));
-                }
-            }
+        public ExcludeDependencyProcessor(String groupId, String artifactId) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            setCursoringOn();
         }
 
-        return super.visitTag(tag);
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isDependencyTag()) {
+                Pom.Dependency dependency = findDependency(tag);
+                if (dependency != null && !dependency.findDependencies(groupId, artifactId).isEmpty()) {
+                    Optional<Xml.Tag> maybeExclusions = tag.getChild("exclusions");
+                    if (maybeExclusions.isPresent()) {
+                        Xml.Tag exclusions = maybeExclusions.get();
+
+                        List<Xml.Tag> individualExclusions = exclusions.getChildren("exclusion");
+                        if (individualExclusions.stream().noneMatch(exclusion ->
+                                groupId.equals(exclusion.getChildValue("groupId").orElse(null)) &&
+                                        artifactId.equals(exclusion.getChildValue("artifactId").orElse(null)))) {
+                            doAfterVisit(new AddToTagProcessor<>(exclusions, Xml.Tag.build("<exclusion>\n" +
+                                    "<groupId>" + groupId + "</groupId>\n" +
+                                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                                    "</exclusion>")));
+                        }
+
+                    } else {
+                        doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<exclusions/>")));
+                    }
+                }
+            }
+
+            return super.visitTag(tag, ctx);
+        }
     }
 }

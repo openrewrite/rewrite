@@ -34,12 +34,12 @@ public class ChangeTagValueProcessor<P> extends XmlProcessor<P> {
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
-
-        if (scope.isScope(tag)) {
+        Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
+        if (scope.isScope(t)) {
             String prefix = "";
             String afterText = "";
-            if (tag.getContent() != null && tag.getContent().size() == 1 && tag.getContent().get(0) instanceof Xml.CharData) {
-                Xml.CharData existingValue = (Xml.CharData) tag.getContent().get(0);
+            if (t.getContent() != null && t.getContent().size() == 1 && t.getContent().get(0) instanceof Xml.CharData) {
+                Xml.CharData existingValue = (Xml.CharData) t.getContent().get(0);
 
                 if (existingValue.getText().equals(value)) {
                     return tag;
@@ -49,10 +49,10 @@ public class ChangeTagValueProcessor<P> extends XmlProcessor<P> {
                 prefix = existingValue.getPrefix();
                 afterText = existingValue.getAfterText();
             }
-            tag = tag.withContent(singletonList(new Xml.CharData(randomId(), false, value,
-                    afterText, prefix, Markers.EMPTY)));
+            t = t.withContent(singletonList(new Xml.CharData(randomId(),
+                    prefix, Markers.EMPTY, false, value, afterText)));
         }
 
-        return super.visitTag(tag, p);
+        return t;
     }
 }

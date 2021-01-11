@@ -16,11 +16,11 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openrewrite.Formatting;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.SourceVisitor;
-import org.openrewrite.maven.MavenSourceVisitor;
-import org.openrewrite.xml.XmlSourceVisitor;
+import org.openrewrite.maven.MavenVisitor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
@@ -34,12 +34,12 @@ public class Maven extends Xml.Document {
     public Maven(Xml.Document document) {
         super(
                 document.getId(),
+                document.getPrefix(),
+                document.getMarkers(),
                 document.getSourcePath(),
                 document.getProlog(),
                 document.getRoot(),
-                document.getEof(),
-                document.getFormatting(),
-                document.getMarkers()
+                document.getEof()
         );
 
         model = document.getMarkers().findFirst(Pom.class).orElse(null);
@@ -61,13 +61,14 @@ public class Maven extends Xml.Document {
     }
 
     @Override
-    public <R> R accept(SourceVisitor<R> v) {
-        if (v instanceof MavenSourceVisitor) {
-            return ((MavenSourceVisitor<R>) v).visitMaven(this);
-        } else if (v instanceof XmlSourceVisitor) {
-            return super.accept(v);
+    @Nullable
+    public <R, P> R accept(TreeVisitor<R, P> v, P p) {
+        if (v instanceof MavenVisitor) {
+            return ((MavenVisitor<R, P>) v).visitMaven(this, p);
+        } else if (v instanceof XmlVisitor) {
+            return super.accept(v, p);
         }
-        return v.defaultTo(null);
+        return v.defaultValue(null, p);
     }
 
     @Override
@@ -89,8 +90,8 @@ public class Maven extends Xml.Document {
     }
 
     @Override
-    public Maven withFormatting(Formatting formatting) {
-        Document m = super.withFormatting(formatting);
+    public Maven withPrefix(String prefix) {
+        Document m = super.withPrefix(prefix);
         if (m instanceof Maven) {
             return (Maven) m;
         }
@@ -107,6 +108,6 @@ public class Maven extends Xml.Document {
     }
 
     public Maven withModel(Pom model) {
-        return withMarkers(getMarkers().addOrUpdate(model));
+        return withMarkers(getMarkers().compute(model, (old, n) -> n));
     }
 }

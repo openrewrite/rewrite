@@ -19,7 +19,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlRefactorVisitor;
+import org.openrewrite.xml.XmlProcessor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Collection;
@@ -28,8 +28,8 @@ import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
 
-public class MavenRefactorVisitor extends XmlRefactorVisitor
-        implements MavenSourceVisitor<Xml> {
+public class MavenProcessor<P> extends XmlProcessor<P>
+        implements MavenVisitor<Xml, P> {
     private static final XPathMatcher DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencies/dependency");
     private static final XPathMatcher MANAGED_DEPENDENCY_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies/dependency");
     private static final XPathMatcher PROPERTY_MATCHER = new XPathMatcher("/project/properties/*");
@@ -39,15 +39,15 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
     protected Collection<Pom> modules;
 
     @Override
-    public Maven visitMaven(Maven maven) {
+    public Maven visitMaven(Maven maven, P p) {
         this.model = maven.getModel();
         this.modules = maven.getModules();
-        return (Maven) visitDocument(maven);
+        return (Maven) visitDocument(maven, p);
     }
 
     @Override
-    public final Xml visitDocument(Xml.Document document) {
-        Xml.Document refactored = refactor(document, super::visitDocument);
+    public final Xml visitDocument(Xml.Document document, P p) {
+        Xml.Document refactored = (Xml.Document) super.visitDocument(document, p);
         if (refactored != document) {
             return new Maven(refactored);
         }
@@ -120,18 +120,21 @@ public class MavenRefactorVisitor extends XmlRefactorVisitor
         ).collect(toList());
     }
 
-    public void maybeAddDependency(String groupId, String artifactId, @Nullable String version,
+    public void maybeAddDependency(String groupId, String artifactId, String version,
                                    @Nullable String classifier, @Nullable String scope) {
-        AddDependency op = new AddDependency();
-        op.setGroupId(groupId);
-        op.setArtifactId(artifactId);
-        op.setClassifier(classifier);
-        op.setScope(scope);
-        op.setVersion(version);
-        op.setSkipIfPresent(true);
+        AddDependencyProcessor<P> op = new AddDependencyProcessor<>(
+                groupId,
+                artifactId,
+                version,
+                null,
+                true,
+                classifier,
+                scope,
+                true,
+                null);
 
-        if (!andThen().contains(op)) {
-            andThen(op);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
         }
     }
 }

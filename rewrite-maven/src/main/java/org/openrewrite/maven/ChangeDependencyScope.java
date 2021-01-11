@@ -15,23 +15,25 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTag;
-import org.openrewrite.xml.ChangeTagValue;
-import org.openrewrite.xml.RemoveContent;
+import org.openrewrite.xml.AddToTagProcessor;
+import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.RemoveContentProcessor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangeDependencyScope extends MavenRefactorVisitor {
+public class ChangeDependencyScope extends Recipe {
     private String groupId;
     private String artifactId;
 
     public ChangeDependencyScope() {
-        setCursoringOn();
+        this.processor = () -> new ChangeDependencyScopeProcessor(groupId, artifactId, toScope);
     }
 
     /**
@@ -58,24 +60,38 @@ public class ChangeDependencyScope extends MavenRefactorVisitor {
                 .and(required("artifactId", artifactId));
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isDependencyTag()) {
-            if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
-                    artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
-                Optional<Xml.Tag> scope = tag.getChild("scope");
-                if (scope.isPresent()) {
-                    if (toScope == null) {
-                        andThen(new RemoveContent.Scoped(scope.get(), false));
-                    } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
-                        andThen(new ChangeTagValue.Scoped(scope.get(), toScope));
-                    }
-                } else {
-                    andThen(new AddToTag.Scoped(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
-                }
-            }
+    private static class ChangeDependencyScopeProcessor extends MavenProcessor<ExecutionContext> {
+        private final String groupId;
+        private final String artifactId;
+
+        @Nullable
+        private final String toScope;
+
+        private ChangeDependencyScopeProcessor(String groupId, String artifactId, @Nullable String toScope) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.toScope = toScope;
         }
 
-        return super.visitTag(tag);
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isDependencyTag()) {
+                if (groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
+                        artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
+                    Optional<Xml.Tag> scope = tag.getChild("scope");
+                    if (scope.isPresent()) {
+                        if (toScope == null) {
+                            doAfterVisit(new RemoveContentProcessor<>(scope.get(), false));
+                        } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueProcessor<>(scope.get(), toScope));
+                        }
+                    } else {
+                        doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
+                    }
+                }
+            }
+
+            return super.visitTag(tag, ctx);
+        }
     }
 }

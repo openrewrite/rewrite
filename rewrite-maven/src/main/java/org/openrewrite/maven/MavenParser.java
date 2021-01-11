@@ -86,7 +86,7 @@ public class MavenParser implements Parser<Maven> {
             }
 
             if (!modules.isEmpty()) {
-                parsed.set(i, maven.withMarkers(maven.getMarkers().addOrUpdate(new Modules(modules))));
+                parsed.set(i, maven.withMarkers(maven.getMarkers().compute(new Modules(modules), (old, n) -> n)));
             }
         }
 

@@ -20,8 +20,7 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 
-public class ChangeTagContentProcessor <P> extends XmlProcessor<P> {
-
+public class ChangeTagContentProcessor<P> extends XmlProcessor<P> {
     private final Xml.Tag scope;
     private final List<Content> content;
 
@@ -32,9 +31,10 @@ public class ChangeTagContentProcessor <P> extends XmlProcessor<P> {
 
     @Override
     public Xml visitTag(Xml.Tag tag, P p) {
+        Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
         if (scope.isScope(tag)) {
-            tag = tag.withContent(content);
+            t = t.withContent(content);
         }
-        return super.visitTag(tag, p);
+        return t;
     }
 }

@@ -15,9 +15,10 @@
  */
 package org.openrewrite
 
-import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.fail
+import org.assertj.core.api.Assertions.*
 import org.openrewrite.java.JavaProcessor
+import java.io.File
+import java.util.function.Consumer
 import java.util.function.Supplier
 
 interface RecipeTest {
@@ -27,16 +28,72 @@ interface RecipeTest {
     val treePrinter: TreePrinter<*>?
         get() = null
 
+    val parser: Parser<*>?
+        get() = null
+
     fun assertChanged(
-        parser: Parser<*>,
+        parser: Parser<*>? = this.parser,
         recipe: Recipe? = this.recipe,
         before: String,
         dependsOn: Array<String> = emptyArray(),
         after: String
     ) {
+        assertChanged(parser, recipe, before, dependsOn, after)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T : SourceFile> assertChanged(
+        parser: Parser<T>? = this.parser as Parser<T>?,
+        recipe: Recipe? = this.recipe,
+        before: String,
+        dependsOn: Array<String> = emptyArray(),
+        after: String,
+        afterConditions: (T) -> Unit = { }
+    ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
-        val source = parser.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
+        val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
+
+        val results = recipe!!.run(listOf(source),
+            ExecutionContext.builder()
+                .maxCycles(2)
+                .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
+                .build())
+
+        if (results.isEmpty()) {
+            fail<Any>("The recipe must make changes")
+        }
+
+        val result = results.find { s -> source === s.before }
+
+        assertThat(result).`as`("The recipe must make changes").isNotNull()
+        assertThat(result!!.after).isNotNull()
+        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
+            .isEqualTo(after.trimIndent())
+    }
+
+    fun assertChanged(
+        parser: Parser<*>? = this.parser,
+        recipe: Recipe? = this.recipe,
+        before: File,
+        dependsOn: Array<File> = emptyArray(),
+        after: String
+    ) {
+        assertChanged(parser, recipe, before, dependsOn, after)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T : SourceFile> assertChanged(
+        parser: Parser<T>? = this.parser as Parser<T>?,
+        recipe: Recipe? = this.recipe,
+        before: File,
+        dependsOn: Array<File> = emptyArray(),
+        after: String,
+        afterConditions: (T) -> Unit = { }
+    ) {
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull()
+
+        val source = parser!!.parse((listOf(before) + dependsOn).map { it.toPath() }, null).first()
 
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
@@ -57,14 +114,14 @@ interface RecipeTest {
     }
 
     fun assertUnchanged(
-        parser: Parser<*>,
+        parser: Parser<*>? = this.parser,
         recipe: Recipe? = this.recipe,
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
-        val source = parser.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
+        val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
         val results = recipe!!.run(listOf(source))
 
         assertThat(results).`as`("The recipe must not make changes").isEmpty()

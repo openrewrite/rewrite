@@ -16,8 +16,8 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.XmlSourceVisitor;
+import org.openrewrite.xml.XmlVisitor;
 
-public interface MavenSourceVisitor<R> extends XmlSourceVisitor<R> {
-    R visitMaven(Maven maven);
+public interface MavenVisitor<R, P> extends XmlVisitor<R, P> {
+    R visitMaven(Maven maven, P p);
 }

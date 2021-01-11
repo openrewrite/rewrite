@@ -16,138 +16,134 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.maven.tree.Maven
+import org.openrewrite.RecipeTest
 
-class ChangeDependencyScopeTest : RefactorVisitorTestForParser<Maven> {
+class ChangeDependencyScopeTest : RecipeTest {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
-    private val guavaToTest = ChangeDependencyScope().apply {
-        setGroupId("com.google.guava")
-        setArtifactId("guava")
-        setToScope("test")
-    }
+    override val recipe: ChangeDependencyScope
+        get() = ChangeDependencyScope().apply {
+            setGroupId("com.google.guava")
+            setArtifactId("guava")
+            setToScope("test")
+        }
 
     @Test
-    fun noScopeToScope() = assertRefactored(
-            visitors = listOf(guavaToTest),
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+    fun noScopeToScope() = assertChanged(
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+            
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Test
-    fun scopeToScope() = assertRefactored(
-            visitors = listOf(guavaToTest),
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                      <scope>compile</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+    fun scopeToScope() = assertChanged(
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                  <scope>compile</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Test
-    fun scopeToNoScope() = assertRefactored(
-            visitors = listOf(
-                    guavaToTest.apply { setToScope(null) }
-            ),
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>28.2-jre</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+    fun scopeToNoScope() = assertChanged(
+        recipe = recipe.apply { setToScope(null) },
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>28.2-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 }

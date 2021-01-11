@@ -16,45 +16,44 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.maven.tree.Maven
+import org.openrewrite.Parser
+import org.openrewrite.RecipeTest
 
-class ChangePropertyValueTest : RefactorVisitorTestForParser<Maven> {
-    override val parser: MavenParser = MavenParser.builder().build()
+class ChangePropertyValueTest : RecipeTest {
+    override val parser: Parser<*>?
+        get() = MavenParser.builder().build()
 
     @Test
-    fun property() = assertRefactored(
-            visitors = listOf(
-                    ChangePropertyValue().apply {
-                        setKey("guava.version")
-                        setToValue("29.0-jre")
-                    }
-            ),
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                   
-                  <properties>
-                    <guava.version>28.2-jre</guava.version>
-                  </properties>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                   
-                  <properties>
-                    <guava.version>29.0-jre</guava.version>
-                  </properties>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
-            """
+    fun property() = assertChanged(
+        recipe = ChangePropertyValue().apply {
+            setKey("guava.version")
+            setToValue("29.0-jre")
+        },
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+               
+              <properties>
+                <guava.version>28.2-jre</guava.version>
+              </properties>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+               
+              <properties>
+                <guava.version>29.0-jre</guava.version>
+              </properties>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """
     )
 }

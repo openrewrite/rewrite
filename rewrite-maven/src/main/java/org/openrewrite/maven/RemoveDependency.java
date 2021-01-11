@@ -15,24 +15,23 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.RemoveContent;
+import org.openrewrite.xml.RemoveContentProcessor;
 import org.openrewrite.xml.tree.Xml;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.stream.Collectors.toList;
 
-public class RemoveDependency extends MavenRefactorVisitor {
+public class RemoveDependency extends Recipe {
     private String groupId;
     private String artifactId;
 
     public RemoveDependency() {
-        setCursoringOn();
+        this.processor = () -> new RemoveDependencyProcessor(groupId, artifactId);
     }
 
     public void setGroupId(String groupId) {
@@ -43,26 +42,37 @@ public class RemoveDependency extends MavenRefactorVisitor {
         this.artifactId = artifactId;
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isDependencyTag(groupId, artifactId)) {
-            andThen(new RemoveContent.Scoped(tag, true));
+    private static class RemoveDependencyProcessor extends MavenProcessor<ExecutionContext> {
+        private final String groupId;
+        private final String artifactId;
+
+        public RemoveDependencyProcessor(String groupId, String artifactId) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            setCursoringOn();
         }
 
-        return super.visitTag(tag);
-    }
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isDependencyTag(groupId, artifactId)) {
+                doAfterVisit(new RemoveContentProcessor<>(tag, true));
+            }
 
-    @Override
-    public Maven visitMaven(Maven maven) {
-        model = maven.getModel();
-        if(findDependencies(groupId, artifactId).size() == 0) {
-            return maven;
+            return super.visitTag(tag, ctx);
         }
-        Maven m = super.visitMaven(maven);
-        List<Pom.Dependency> dependencies = model.getDependencies().stream()
-                .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
-                .collect(toList());
 
-        return m.withModel(model.withDependencies(dependencies));
+        @Override
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            model = maven.getModel();
+            if (findDependencies(groupId, artifactId).size() == 0) {
+                return maven;
+            }
+            Maven m = super.visitMaven(maven, ctx);
+            List<Pom.Dependency> dependencies = model.getDependencies().stream()
+                    .filter(dep -> !(dep.getArtifactId().equals(artifactId) && dep.getGroupId().equals(groupId)))
+                    .collect(toList());
+
+            return m.withModel(model.withDependencies(dependencies));
+        }
     }
 }

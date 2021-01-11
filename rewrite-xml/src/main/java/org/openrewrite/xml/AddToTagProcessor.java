@@ -47,8 +47,8 @@ public class AddToTagProcessor<P> extends XmlProcessor<P> {
         if (scope.isScope(t)) {
             boolean formatRequested = false;
             if (t.getClosing() == null) {
-                t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), t.getName(), "", "\n",
-                        Markers.EMPTY))
+                t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), "\n",
+                        Markers.EMPTY, t.getName(), ""))
                         .withBeforeTagDelimiterPrefix("");
                 doAfterVisit(new AutoFormatProcessor<>(t));
                 formatRequested = true;

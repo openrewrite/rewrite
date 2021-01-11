@@ -16,82 +16,84 @@
 package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.Parser
+import org.openrewrite.Recipe
+import org.openrewrite.RecipeTest
 import org.openrewrite.maven.tree.Maven
 
-class AddPluginTest : RefactorVisitorTestForParser<Maven> {
-    override val parser: MavenParser = MavenParser.builder()
+class AddPluginTest : RecipeTest {
+    override val parser: Parser<Maven>
+        get() = MavenParser.builder()
             .resolveOptional(false)
             .build()
 
-    private val addPlugin = AddPlugin().apply {
-        setGroupId("org.openrewrite.maven")
-        setArtifactId("rewrite-maven-plugin")
-        setVersion("100.0")
-    }
+    override val recipe: Recipe
+        get() = AddPlugin().apply {
+            setGroupId("org.openrewrite.maven")
+            setArtifactId("rewrite-maven-plugin")
+            setVersion("100.0")
+        }
 
     @Test
-    fun addPlugin() = assertRefactored(
-            visitors = listOf(addPlugin),
-            before = """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
-            """,
-            after = """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <build>
-                    <plugins>
-                      <plugin>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>rewrite-maven-plugin</artifactId>
-                        <version>100.0</version>
-                      </plugin>
-                    </plugins>
-                  </build>
-                </project>
-            """
+    fun addPlugin() = assertChanged(
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>100.0</version>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+        """
     )
 
     @Test
-    fun updatePluginVersion() = assertRefactored(
-            visitors = listOf(addPlugin),
-            before = """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <build>
-                    <plugins>
-                      <plugin>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>rewrite-maven-plugin</artifactId>
-                        <version>99.0</version>
-                      </plugin>
-                    </plugins>
-                  </build>
-                </project>
-            """,
-            after = """
-                <project>
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  <build>
-                    <plugins>
-                      <plugin>
-                        <groupId>org.openrewrite.maven</groupId>
-                        <artifactId>rewrite-maven-plugin</artifactId>
-                        <version>100.0</version>
-                      </plugin>
-                    </plugins>
-                  </build>
-                </project>
-            """
+    fun updatePluginVersion() = assertChanged(
+        before = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>99.0</version>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+        """,
+        after = """
+            <project>
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              <build>
+                <plugins>
+                  <plugin>
+                    <groupId>org.openrewrite.maven</groupId>
+                    <artifactId>rewrite-maven-plugin</artifactId>
+                    <version>100.0</version>
+                  </plugin>
+                </plugins>
+              </build>
+            </project>
+        """
     )
 }

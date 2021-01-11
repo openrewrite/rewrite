@@ -16,8 +16,6 @@
 package org.openrewrite.maven.tree;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.maven.tree.GroupArtifact;
-import org.openrewrite.maven.tree.Scope;
 
 import java.util.Set;
 
