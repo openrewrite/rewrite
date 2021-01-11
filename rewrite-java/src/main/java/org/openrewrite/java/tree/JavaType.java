@@ -213,7 +213,12 @@ public interface JavaType extends Serializable {
                     if (test.supertype == null) {
 
                         return variants.stream().filter(v -> v.supertype != null).findFirst().orElseGet(() -> {
-                            variants.add(test);
+                            if (!fullyQualifiedName.equals("java.lang.String")) {
+                                //A String literal and String object have the same fully qualified name but the literal
+                                //version does not have a super class. Mixing both forms of the String class in a single
+                                //serializing/de-serializing operation can result in serialization errors.
+                                variants.add(test);
+                            }
                             return test;
                         });
                     }
@@ -236,6 +241,10 @@ public interface JavaType extends Serializable {
             }
 
             synchronized (flyweights) {
+                //Double checked locking.
+                if (constructors != null) {
+                    return constructors;
+                }
                 List<Method> reflectedConstructors = new ArrayList<>();
                 try {
                     java.lang.Class<?> reflectionClass = java.lang.Class.forName(fullyQualifiedName, false, JavaType.class.getClassLoader());
@@ -255,6 +264,7 @@ public interface JavaType extends Serializable {
                         reflectedConstructors.add(Method.build(selfType, "<reflection_constructor>", resolvedSignature, resolvedSignature,
                                 parameterNames, singleton(Flag.Public)));
                     }
+                    constructors = reflectedConstructors;
                 } catch (ClassNotFoundException ignored) {
                     // oh well, we tried
                 }
