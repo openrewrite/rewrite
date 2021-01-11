@@ -348,7 +348,6 @@ interface ChangeTypeTest : RecipeTest {
         """
     )
 
-    @Disabled("https://github.com/openrewrite/rewrite/issues/62")
     @Test
     fun classToPrimitive(jp: JavaParser) = assertChanged(
         jp,

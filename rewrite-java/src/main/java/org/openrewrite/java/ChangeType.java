@@ -35,7 +35,7 @@ import static org.openrewrite.Validated.required;
  */
 public class ChangeType extends Recipe {
     private String type;
-    private JavaType.Class targetType;
+    private JavaType targetType;
 
     public ChangeType() {
         this.processor = () -> new ChangeTypeProcessor(type, targetType);
@@ -46,7 +46,10 @@ public class ChangeType extends Recipe {
     }
 
     public void setTargetType(String targetType) {
-        this.targetType = JavaType.Class.build(targetType);
+        this.targetType = JavaType.Primitive.fromKeyword(targetType);
+        if (this.targetType == null) {
+            this.targetType = JavaType.Class.build(targetType);
+        }
     }
 
     public void setTargetType(JavaType.Class targetType) {
@@ -56,21 +59,23 @@ public class ChangeType extends Recipe {
     @Override
     public Validated validate() {
         return required("type", type)
-                .and(required("target.type", targetType.getFullyQualifiedName()));
+                .and(required("targetType", targetType));
     }
 
-    private static class ChangeTypeProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private static class ChangeTypeProcessor extends JavaProcessor<ExecutionContext> {
         private final String type;
-        private final JavaType.Class targetType;
+        private final JavaType targetType;
 
-        private ChangeTypeProcessor(String type, JavaType.Class targetType) {
+        private ChangeTypeProcessor(String type, JavaType targetType) {
             this.type = type;
             this.targetType = targetType;
         }
 
         @Override
-        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            maybeAddImport(targetType);
+        public J visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
+            if (targetType instanceof JavaType.FullyQualified) {
+                maybeAddImport((JavaType.FullyQualified) targetType);
+            }
             maybeRemoveImport(type);
             return super.visitCompilationUnit(cu, ctx);
         }
@@ -78,7 +83,7 @@ public class ChangeType extends Recipe {
         @Override
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
-            N n = super.visitTypeName(name, ctx);
+            N n = call(name, ctx, super::visitTypeName);
             if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(type)) {
                 n = n.withType(targetType);
             }
@@ -86,20 +91,20 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.Annotation visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            J.Annotation a = super.visitAnnotation(annotation, ctx);
+        public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
+            J.Annotation a = call(annotation, ctx, super::visitAnnotation);
             return a.withAnnotationType(transformName(a.getAnnotationType()));
         }
 
         @Override
-        public J.ArrayType visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-            J.ArrayType a = super.visitArrayType(arrayType, ctx);
+        public J visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
+            J.ArrayType a = call(arrayType, ctx, super::visitArrayType);
             return a.withElementType(transformName(a.getElementType()));
         }
 
         @Override
-        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
-            J.ClassDecl c = super.visitClassDecl(classDecl, ctx);
+        public J visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
+            J.ClassDecl c = call(classDecl, ctx, super::visitClassDecl);
 
             if (c.getExtends() != null) {
                 c = c.withExtends(c.getExtends().map(this::transformName));
@@ -113,24 +118,37 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.FieldAccess visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-            J.FieldAccess f = super.visitFieldAccess(fieldAccess, ctx);
+        public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
+            J.FieldAccess f = call(fieldAccess, ctx, super::visitFieldAccess);
             if (f.isFullyQualifiedClassReference(type)) {
-                return TypeTree.build(targetType.getFullyQualifiedName())
-                        .withPrefix(f.getPrefix());
+                if (targetType instanceof JavaType.FullyQualified) {
+                    return TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
+                            .withPrefix(f.getPrefix());
+                } else if (targetType instanceof JavaType.Primitive) {
+                    return new J.Primitive(
+                            f.getId(),
+                            f.getPrefix(),
+                            Markers.EMPTY,
+                            (JavaType.Primitive) targetType
+                    );
+                }
             }
             return f;
         }
 
         @Override
-        public J.Ident visitIdentifier(J.Ident ident, ExecutionContext ctx) {
+        public J visitIdentifier(J.Ident ident, ExecutionContext ctx) {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
-            J.Ident i = super.visitIdentifier(ident, ctx);
+            J.Ident i = call(ident, ctx, super::visitIdentifier);
             JavaType.Class originalType = JavaType.Class.build(type);
 
             if (TypeUtils.isOfClassType(i.getType(), type) && i.getSimpleName().equals(originalType.getClassName())) {
-                i = i.withName(targetType.getClassName());
+                if (targetType instanceof JavaType.FullyQualified) {
+                    i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
+                } else if (targetType instanceof JavaType.Primitive) {
+                    i = i.withName(((JavaType.Primitive) targetType).getKeyword());
+                }
                 i = i.withType(targetType);
             }
 
@@ -138,15 +156,15 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.MethodDecl visitMethod(J.MethodDecl method, ExecutionContext ctx) {
-            J.MethodDecl m = super.visitMethod(method, ctx);
+        public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
+            J.MethodDecl m = call(method, ctx, super::visitMethod);
             m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
             return m.withThrows(m.getThrows() == null ? null : m.getThrows().map(this::transformName));
         }
 
         @Override
-        public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
+        public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
+            J.MethodInvocation m = call(method, ctx, super::visitMethodInvocation);
 
             if (m.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
                 m = m.withSelect(m.getSelect().map(this::transformName));
@@ -160,8 +178,9 @@ public class ChangeType extends Recipe {
             }
 
             if (m.getType() != null) {
-                if (m.getType().getDeclaringType().getFullyQualifiedName().equals(type)) {
-                    m = m.withDeclaringType(targetType);
+                if (m.getType().getDeclaringType().getFullyQualifiedName().equals(type) &&
+                        targetType instanceof JavaType.FullyQualified) {
+                    m = m.withDeclaringType((JavaType.FullyQualified) targetType);
                 }
             }
 
@@ -169,14 +188,14 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.MultiCatch visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
-            J.MultiCatch m = super.visitMultiCatch(multiCatch, ctx);
+        public J visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
+            J.MultiCatch m = call(multiCatch, ctx, super::visitMultiCatch);
             return m.withAlternatives(ListUtils.map(m.getAlternatives(), a -> a.map(this::transformName)));
         }
 
         @Override
-        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-            J.VariableDecls m = super.visitMultiVariable(multiVariable, ctx);
+        public J visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
+            J.VariableDecls m = call(multiVariable, ctx, super::visitMultiVariable);
             if (!(multiVariable.getTypeExpr() instanceof J.MultiCatch)) {
                 m = m.withTypeExpr(transformName(m.getTypeExpr()));
             }
@@ -185,7 +204,7 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, ExecutionContext ctx) {
-            J.VariableDecls.NamedVar v = super.visitVariable(variable, ctx);
+            J.VariableDecls.NamedVar v = call(variable, ctx, super::visitVariable);
 
             JavaType.Class varType = TypeUtils.asClass(variable.getType());
             if (varType != null && varType.getFullyQualifiedName().equals(type)) {
@@ -196,33 +215,33 @@ public class ChangeType extends Recipe {
         }
 
         @Override
-        public J.NewArray visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
-            J.NewArray n = super.visitNewArray(newArray, ctx);
+        public J visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
+            J.NewArray n = call(newArray, ctx, super::visitNewArray);
             return n.withTypeExpr(transformName(n.getTypeExpr()));
         }
 
         @Override
-        public J.NewClass visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-            J.NewClass n = super.visitNewClass(newClass, ctx);
+        public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
+            J.NewClass n = call(newClass, ctx, super::visitNewClass);
             return n.withClazz(transformName(n.getClazz()));
         }
 
         @Override
-        public J.TypeCast visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
-            J.TypeCast t = super.visitTypeCast(typeCast, ctx);
+        public J visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
+            J.TypeCast t = call(typeCast, ctx, super::visitTypeCast);
             return t.withClazz(t.getClazz().withTree(t.getClazz().getTree().map(this::transformName)));
         }
 
         @Override
-        public J.TypeParameter visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
-            J.TypeParameter t = super.visitTypeParameter(typeParam, ctx);
+        public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
+            J.TypeParameter t = call(typeParam, ctx, super::visitTypeParameter);
             t = t.withBounds(t.getBounds() == null ? null : t.getBounds().map(this::transformName));
             return t.withName(transformName(t.getName()));
         }
 
         @Override
-        public J.Wildcard visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
-            J.Wildcard w = super.visitWildcard(wildcard, ctx);
+        public J visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
+            J.Wildcard w = call(wildcard, ctx, super::visitWildcard);
             return w.withBoundedType(transformName(w.getBoundedType()));
         }
 
@@ -230,11 +249,17 @@ public class ChangeType extends Recipe {
         private <T extends J> T transformName(@Nullable T nameField) {
             if (nameField instanceof NameTree) {
                 JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());
+                String name;
+                if (targetType instanceof JavaType.FullyQualified) {
+                    name = ((JavaType.FullyQualified) targetType).getClassName();
+                } else {
+                    name = ((JavaType.Primitive) targetType).getKeyword();
+                }
                 if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(type)) {
                     return (T) J.Ident.build(randomId(),
                             nameField.getPrefix(),
                             Markers.EMPTY,
-                            targetType.getClassName(),
+                            name,
                             targetType
                     );
                 }
