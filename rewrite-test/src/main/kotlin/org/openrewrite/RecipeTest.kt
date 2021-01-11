@@ -17,6 +17,8 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.fail
+import org.openrewrite.java.JavaProcessor
+import java.util.function.Supplier
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -54,15 +56,25 @@ interface RecipeTest {
             .isEqualTo(after.trimIndent())
     }
 
-    fun assertUnchanged(parser: Parser<*>,
-                        recipe: Recipe? = this.recipe,
-                        before: String,
-                        dependsOn: Array<String> = emptyArray()) {
+    fun assertUnchanged(
+        parser: Parser<*>,
+        recipe: Recipe? = this.recipe,
+        before: String,
+        dependsOn: Array<String> = emptyArray()
+    ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull()
 
         val source = parser.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
         val results = recipe!!.run(listOf(source))
 
         assertThat(results).`as`("The recipe must not make changes").isEmpty()
+    }
+
+    fun JavaProcessor<ExecutionContext>.toRecipe() = object : Recipe() {
+        init {
+            this.processor = Supplier {
+                this@toRecipe
+            }
+        }
     }
 }

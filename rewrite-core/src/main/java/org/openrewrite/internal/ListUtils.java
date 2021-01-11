@@ -116,4 +116,17 @@ public final class ListUtils {
 
         return newLs.get();
     }
+
+    public static <T> List<T> concat(List<T> ls, T t) {
+        List<T> newLs = new ArrayList<>(ls);
+        newLs.add(t);
+        return newLs;
+    }
+
+    public static <T> List<T> concat(T t, List<T> ls) {
+        List<T> newLs = new ArrayList<>(ls.size() + 1);
+        newLs.add(t);
+        newLs.addAll(ls);
+        return newLs;
+    }
 }
