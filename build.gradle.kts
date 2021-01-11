@@ -26,7 +26,7 @@ buildscript {
 
 plugins {
     id("io.spring.release") version "0.20.1"
-    id("org.jetbrains.kotlin.jvm") version "1.4.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.4.21" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 }
@@ -59,6 +59,7 @@ subprojects {
 
         "testImplementation"("org.jetbrains.kotlin:kotlin-reflect")
         "testImplementation"("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+        "testImplementation"("org.jetbrains.kotlin:kotlin-stdlib-common")
 
         "testImplementation"("org.assertj:assertj-core:latest.release")
 
@@ -75,6 +76,15 @@ subprojects {
         }
 
         destinationDir.mkdirs()
+    }
+
+    // We use kotlin exclusively for tests
+    // The kotlin plugin adds kotlin-stdlib dependencies to the main sourceSet, even if it doesn't use any kotlin
+    // To avoid shipping dependencies we don't actually need, exclude them from the main sourceSet classpath but add them _back_ in for the test source sets
+    configurations.all {
+        if (name == "compileClasspath" || name == "runtimeClasspath") {
+            exclude(group = "org.jetbrains.kotlin")
+        }
     }
 
     tasks.named<JavaCompile>("compileJava") {
