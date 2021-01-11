@@ -67,7 +67,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
                 m = method.withSelect(
                         new JRightPadded<>(
                                 J.Ident.build(randomId(),
-                                        method.getSelect() == null ? Space.EMPTY : method.getSelect().getElem().getPrefix(),
+                                        method.getSelect() == null ?
+                                                Space.EMPTY :
+                                                method.getSelect().getElem().getPrefix(),
                                         Markers.EMPTY,
                                         classType.getClassName(),
                                         classType),

@@ -79,7 +79,9 @@ public class ChangeMethodTargetToVariable extends Recipe {
 
                 m = m.withSelect(
                         new JRightPadded<>(J.Ident.build(randomId(),
-                                m.getSelect() == null ? Space.EMPTY : m.getSelect().getElem().getPrefix(),
+                                m.getSelect() == null ?
+                                        Space.EMPTY :
+                                        m.getSelect().getElem().getPrefix(),
                                 Markers.EMPTY,
                                 variable,
                                 variableType),

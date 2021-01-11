@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -25,7 +26,6 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Set;
 
-import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -120,15 +120,17 @@ public class RemoveImport<P> extends JavaIsoProcessor<P> {
         } else if (starImport != null && referencedTypes.isEmpty()) {
             return delete(cu, starImport);
         } else if (starImport != null && referencedTypes.size() == 1) {
-            return cu.withImports(cu.getImports().stream().map(i -> i.withElem(i.getElem() == starImport ?
-                    new J.Import(randomId(),
-                            i.getElem().getPrefix(),
-                            Markers.EMPTY,
-                            null,
-                            TypeTree.build(referencedTypes.iterator().next())
-                                    .withPrefix(Space.format(" "))) :
-                    i.getElem()
-            )).collect(toList()));
+            return cu.withImports(
+                    ListUtils.map(cu.getImports(), im -> im.map(i -> i == starImport ?
+                            new J.Import(randomId(),
+                                    i.getPrefix(),
+                                    Markers.EMPTY,
+                                    null,
+                                    TypeTree.build(referencedTypes.iterator().next())
+                                            .withPrefix(Space.format(" "))) :
+                            i)
+                    )
+            );
         } else {
             return cu;
         }
@@ -163,8 +165,6 @@ public class RemoveImport<P> extends JavaIsoProcessor<P> {
     }
 
     private J.CompilationUnit delete(J.CompilationUnit cu, J.Import impoort) {
-        return cu.withImports(cu.getImports().stream()
-                .filter(i -> i.getElem() != impoort)
-                .collect(toList()));
+        return cu.withImports(ListUtils.map(cu.getImports(), i -> i.getElem() == impoort ? null : i));
     }
 }

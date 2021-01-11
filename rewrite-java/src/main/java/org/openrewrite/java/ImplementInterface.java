@@ -42,8 +42,7 @@ public class ImplementInterface<P> extends JavaIsoProcessor<P> {
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl c = super.visitClassDecl(classDecl, p);
         if (c.isScope(scope) && (c.getImplements() == null ||
-                c.getImplements().getElem().stream()
-                        .noneMatch(f -> interfaceType.equals(f.getElem().getType())))) {
+                c.getImplements().getElem().stream().noneMatch(f -> interfaceType.equals(f.getElem().getType())))) {
             maybeAddImport(interfaceType);
 
             JRightPadded<TypeTree> lifeCycle = new JRightPadded<>(

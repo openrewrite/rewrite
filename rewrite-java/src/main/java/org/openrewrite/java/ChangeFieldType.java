@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
@@ -50,18 +51,13 @@ public class ChangeFieldType<P> extends JavaIsoProcessor<P> {
                             type)
             );
 
-            mv = mv.withVars(mv.getVars().stream().map(var -> {
-                J.VariableDecls.NamedVar elem = var.getElem();
-                JavaType.Class varType = TypeUtils.asClass(elem.getType());
+            mv = mv.withVars(ListUtils.map(mv.getVars(), var -> {
+                JavaType.Class varType = TypeUtils.asClass(var.getElem().getType());
                 if (varType != null && !varType.equals(type)) {
-                    return var.withElem(
-                            var.getElem()
-                                    .withType(type)
-                                    .withName(elem.getName().withType(type))
-                    );
+                    return var.map(v -> v.withType(type).withName(v.getName().withType(type)));
                 }
                 return var;
-            }).collect(toList()));
+            }));
         }
 
         return mv;

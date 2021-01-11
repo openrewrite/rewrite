@@ -102,7 +102,7 @@ public class ChangeType extends Recipe {
             J.ClassDecl c = super.visitClassDecl(classDecl, ctx);
 
             if (c.getExtends() != null) {
-                c = c.withExtends(c.getExtends().withElem(transformName(c.getExtends().getElem())));
+                c = c.withExtends(c.getExtends().map(this::transformName));
             }
 
             if (c.getImplements() != null) {
