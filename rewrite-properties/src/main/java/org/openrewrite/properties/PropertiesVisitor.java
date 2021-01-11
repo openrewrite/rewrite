@@ -13,22 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties
+package org.openrewrite.properties;
 
-import org.junit.jupiter.api.Test
-import org.openrewrite.RecipeTest
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.properties.tree.Properties;
 
-class ChangePropertyValueTest : RecipeTest {
-
-    override val recipe = ChangePropertyValue().apply {
-        setKey("management.metrics.binders.files.enabled")
-        setToValue("false")
-    }
-
-    @Test
-    fun changeValue() = assertChanged(
-            parser = PropertiesParser(),
-            before = "management.metrics.binders.files.enabled=true",
-            after = "management.metrics.binders.files.enabled=false"
-    )
+public interface PropertiesVisitor<R, P> extends TreeVisitor<R, P> {
+    R visitFile(Properties.File file, P p);
+    R visitEntry(Properties.Entry entry, P p);
+    R visitComment(Properties.Comment comment, P p);
 }

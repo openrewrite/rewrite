@@ -26,31 +26,83 @@ class PropertiesParserTest: PropertiesParser() {
             key=value
         """.trimIndent())[0]
 
-        assertThat(props.content.map { it as Properties.Entry }.map { it.key })
-                .hasSize(1).containsExactly("key")
+        val entries = props.content.map { it as Properties.Entry }
+        assertThat(entries).hasSize(1)
+        val entry = entries[0]
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+        assertThat(props.eof).isEqualTo("")
     }
 
     @Test
     fun endOfLine() {
-        val props = parse("""
-            key=value
-            
-        """.trimIndent())[0]
+        val props = parse("key=value\n")[0]
 
         val entries = props.content.map { it as Properties.Entry }
-        assertThat(entries.map { it.key }).containsExactly("key")
-        assertThat(props.eof.prefix).isEqualTo("\n")
+        assertThat(entries).hasSize(1)
+        val entry = entries[0]
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+        assertThat(props.eof).isEqualTo("\n")
     }
 
     @Test
-    fun comment() {
+    fun endOfFile() {
+        val props = parse("key=value\n\n")[0]
+        val entries = props.content.map { it as Properties.Entry }
+        assertThat(entries).hasSize(1)
+        val entry = entries[0]
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+        assertThat(props.eof).isEqualTo("\n\n")
+    }
+
+    @Test
+    fun garbageEndOfFile() {
+        val props = parse("key=value\nasdf\n")[0]
+        val entries = props.content.map { it as Properties.Entry }
+        assertThat(entries).hasSize(1)
+        val entry = entries[0]
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+        assertThat(props.eof).isEqualTo("\nasdf\n")
+    }
+
+    @Test
+    fun commentThenEntry() {
         val props = parse("""
             # this is a comment
             key=value
         """.trimIndent())[0]
 
-        assertThat(props.content[0].let { it as Properties.Comment }.message).isEqualTo(" this is a comment")
-        assertThat(props.content[1].let { it as Properties.Entry }.key).isEqualTo("key")
+        val comment = props.content[0] as Properties.Comment
+        assertThat(comment.message).isEqualTo(" this is a comment")
+        val entry = props.content[1] as Properties.Entry
+        assertThat(entry.prefix).isEqualTo("\n")
+        assertThat(entry.key).isEqualTo("key")
+        assertThat(entry.value.text).isEqualTo("value")
+    }
+
+    @Test
+    fun entryCommentEntry() {
+        val props = parse("""
+            key1=value1
+            # comment
+            key2=value2
+        """.trimIndent())[0]
+
+        assertThat(props.content).hasSize(3)
+        val entry1 = props.content[0] as Properties.Entry
+        assertThat(entry1.key).isEqualTo("key1")
+        assertThat(entry1.value.text).isEqualTo("value1")
+        assertThat(entry1.prefix).isEqualTo("")
+        val comment = props.content[1] as Properties.Comment
+        assertThat(comment.prefix).isEqualTo("\n")
+        assertThat(comment.message).isEqualTo(" comment")
+        val entry2 = props.content[2] as Properties.Entry
+        assertThat(entry2.prefix).isEqualTo("\n")
+        assertThat(entry2.key).isEqualTo("key2")
+        assertThat(entry2.value.text).isEqualTo("value2")
     }
 
     @Test
