@@ -212,7 +212,6 @@ public interface JavaType extends Serializable {
 
                     if (test.supertype == null) {
                         return variants.stream().findFirst().orElseGet(() -> {
-                            variants.add(test);
                             return test;
                         });
                     }
