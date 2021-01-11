@@ -100,6 +100,10 @@ class Java11RemoveImportTest : Java11Test, RemoveImportTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11RenameVariableTest : Java11Test, RenameVariableTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest
 
 @DebugOnly
