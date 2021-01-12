@@ -27,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
@@ -37,10 +38,6 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
-    @JsonProperty("@c")
-    default String getJacksonPolymorphicTypeTag() {
-        return getClass().getName();
-    }
 
     boolean deepEquals(@Nullable JavaType type);
 
@@ -190,7 +187,16 @@ public interface JavaType extends Serializable {
             // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
             // name, where equality is determined by whether the supertype hierarchy and members through the entire
             // supertype hierarchy are equal
-            List<Var> sortedMembers = new ArrayList<>(members);
+
+            List<Var> sortedMembers;
+            if (fullyQualifiedName.equals("java.lang.String")) {
+                //There is a "serialPersistentFields" member within the String class which is used in normal Java
+                //serialization to customize how the String field is serialized. This field is tripping up Jackson
+                //serialization and is intentionally filtered to prevent errors.
+                sortedMembers = members.stream().filter(m -> !m.getName().equals("serialPersistentFields")).collect(Collectors.toList());
+            } else {
+                sortedMembers = new ArrayList<>(members);
+            }
             sortedMembers.sort(comparing(Var::getName));
             JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
@@ -213,12 +219,7 @@ public interface JavaType extends Serializable {
                     if (test.supertype == null) {
 
                         return variants.stream().filter(v -> v.supertype != null).findFirst().orElseGet(() -> {
-                            if (!fullyQualifiedName.equals("java.lang.String")) {
-                                //A String literal and String object have the same fully qualified name but the literal
-                                //version does not have a super class. Mixing both forms of the String class in a single
-                                //serializing/de-serializing operation can result in serialization errors.
-                                variants.add(test);
-                            }
+                            variants.add(test);
                             return test;
                         });
                     }
@@ -253,7 +254,7 @@ public interface JavaType extends Serializable {
 
                         // TODO can we generate a generic signature as well?
                         Method.Signature resolvedSignature = new Method.Signature(selfType, Arrays.stream(constructor.getParameterTypes())
-                                .map(pt -> Class.build(pt.getName()))
+                                .map(Class::resolveTypeFromClass)
                                 .collect(toList()));
 
                         List<String> parameterNames = Arrays.stream(constructor.getParameters()).map(Parameter::getName).collect(toList());
@@ -269,6 +270,36 @@ public interface JavaType extends Serializable {
                     // oh well, we tried
                 }
                 return reflectedConstructors;
+            }
+        }
+        private static JavaType resolveTypeFromClass(java.lang.Class<?> _class) {
+
+            if (!_class.isPrimitive() && !_class.isArray()) {
+                return Class.build(_class.getName());
+            } else if (_class.isPrimitive()) {
+                if (_class ==  boolean.class) {
+                    return Primitive.Boolean;
+                } else if (_class == String.class) {
+                    return Primitive.String;
+                } else if (_class == int.class) {
+                    return Primitive.Int;
+                } else if (_class == long.class) {
+                    return Primitive.Long;
+                } else if (_class == double.class) {
+                    return Primitive.Double;
+                } else if (_class == char.class) {
+                    return Primitive.Char;
+                } else if (_class == byte.class) {
+                    return Primitive.Byte;
+                } else if (_class == float.class) {
+                    return Primitive.Float;
+                } else if (_class == short.class) {
+                    return Primitive.Short;
+                } else {
+                    throw new IllegalArgumentException("Unknown primitive argument");
+                }
+            } else {
+                return new JavaType.Array(resolveTypeFromClass(_class.getComponentType()));
             }
         }
 
