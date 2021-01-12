@@ -23,6 +23,7 @@ import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
 import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.Space.format
 import org.openrewrite.java.tree.Statement
 
 interface JavaTemplateTest : RecipeTest {
@@ -70,6 +71,88 @@ interface JavaTemplateTest : RecipeTest {
                 void foo(String m, List<String> others) {
                     others.add(m);
                     n++;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun afterMethodBodyStatement(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if(parent is J.MethodDecl) {
+                    return block.withStatements(
+                        ListUtils.concat(
+                            block.statements,
+                            JRightPadded(
+                                JavaTemplate.builder("others.add(#{});").build()
+                                    .generateAfter<Statement>(
+                                        Cursor(cursor, block.statements[0].elem),
+                                        (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                                    )[0],
+                                Space.EMPTY
+                            )
+                        )
+                    )
+                }
+                return super.visitBlock(block, p)
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    n++;
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    n++;
+                    others.add(m);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addAnnotationToMethod(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
+                var m = super.visitMethod(method, p)
+                m = m.withAnnotations(ListUtils.concat(
+                    m.annotations,
+                    JavaTemplate.builder("@Deprecated").build()
+                        .generateBefore<J.Annotation>(Cursor(cursor, method))[0]
+                ))
+                m = m.withReturnTypeExpr(m.returnTypeExpr!!.withPrefix(format(" ")));
+                return m
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            public class A {
+                @Deprecated void foo() {
                 }
             }
         """

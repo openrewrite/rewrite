@@ -95,7 +95,7 @@ public class JavaTemplate {
         //Prune down the original AST to just the elements in scope at the insertion point.
         cu = new TemplateProcessor(parameterTypes).visitCompilationUnit(cu, insertionScope);
 
-        String generatedSource = new TemplatePrinter(after, insertionScope.getTree().getId(), imports)
+        String generatedSource = new TemplatePrinter(after, insertionScope, imports)
                 .visit(cu, printedTemplate);
 
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
@@ -104,16 +104,23 @@ public class JavaTemplate {
         cu = parser.parse(generatedSource).iterator().next();
 
         //Extract the compiled template tree elements.
-        List<J> snippetElements = new ArrayList<>();
-        new ExtractTemplatedCode().visit(cu, snippetElements);
+        Extraction extraction = new Extraction();
+        new ExtractTemplatedCode().visit(cu, extraction);
 
         @SuppressWarnings("ConstantConditions") Collection<? extends Style> styles = insertionScope
                 .firstEnclosing(J.CompilationUnit.class).getStyles();
 
-        //noinspection unchecked
-        return snippetElements.stream()
-                .map(t -> (J2) new AutoFormatProcessor<Void>(styles).visit(t, null,
-                        insertionScope.getParentOrThrow()))
+        List<J> snippets = extraction.getSnippets();
+        return snippets.stream()
+                .map(t -> {
+                    if (autoFormat) {
+                        //noinspection unchecked
+                        return (J2) new AutoFormatProcessor<Void>(styles).visit(t, null,
+                                insertionScope.getParentOrThrow());
+                    }
+                    //noinspection unchecked
+                    return (J2) t;
+                })
                 .collect(Collectors.toList());
     }
 
@@ -216,16 +223,24 @@ public class JavaTemplate {
 
         private final Set<String> imports;
 
-        TemplatePrinter(boolean after, UUID insertionPoint, Set<String> imports) {
+        TemplatePrinter(boolean after, Cursor insertionScope, Set<String> imports) {
             super(new TreePrinter<String>() {
                 @Override
                 public String doLast(Tree tree, String printed, String printedTemplate) {
-                    if (insertionPoint.equals(tree.getId())) {
+                    // individual statement, but block doLast which is invoking this adds the ;
+                    if (insertionScope.getTree().getId().equals(tree.getId())) {
                         String templateCode = "/*" + SNIPPET_MARKER_START + "*/" +
                                 printedTemplate + "/*" + SNIPPET_MARKER_END + "*/";
-                        return after ?
-                                printed + "\n" + templateCode :
-                                "\n" + templateCode + "\n" + printed;
+                        if (after) {
+                            // since the visit method on J.Block is responsible for adding the ';', we
+                            // add it pre-emptively here before concatenating the template.
+                            return printed +
+                                    ((insertionScope.getParentOrThrow().getTree() instanceof J.Block) ?
+                                            ";" : "") +
+                                    "\n" + templateCode;
+                        } else {
+                            return "\n" + templateCode + "\n" + printed;
+                        }
                     } else {
                         return printed;
                     }
@@ -255,30 +270,36 @@ public class JavaTemplate {
         }
     }
 
-    private static class ExtractTemplatedCode extends JavaProcessor<List<J>> {
-        private long templateDepth = -1;
-        private boolean snippetEnd = false;
+    private static class Extraction {
+        Map<Long, List<J>> snippetsByDepth = new TreeMap<>();
+        Long endDepth;
 
+        public List<J> getSnippets() {
+            return snippetsByDepth.get(endDepth);
+        }
+    }
+
+    private static class ExtractTemplatedCode extends JavaProcessor<Extraction> {
         public ExtractTemplatedCode() {
             setCursoringOn();
         }
 
         @Override
-        public Space visitSpace(Space space, List<J> context) {
+        public Space visitSpace(Space space, Extraction context) {
+            long templateDepth = getCursor().getPathAsStream().count();
             Comment startToken = findMarker(space, SNIPPET_MARKER_START);
+            if (findMarker(space, SNIPPET_MARKER_END) != null) {
+                context.endDepth = templateDepth;
+            }
+
             if (startToken != null) {
-                templateDepth = getCursor().getPathAsStream().count();
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
-                context.add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
-            } else if (!context.isEmpty() && getCursor().getPathAsStream().count() == templateDepth && !snippetEnd) {
-                //noinspection SuspiciousMethodCalls
-                if (!context.contains(getCursor().getTree())) {
-                    context.add(getCursor().getTree());
-                }
-            }
-            if (findMarker(space, SNIPPET_MARKER_END) != null) {
-                snippetEnd = true;
+                context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
+                        .add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
+            } else if (context.endDepth == null) {
+                context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
+                        .add(getCursor().getTree());
             }
 
             return space;

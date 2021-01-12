@@ -246,6 +246,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = call(c, p, this::visitStatement);
         c = c.withAnnotations(call(c.getAnnotations(), p));
         c = c.withModifiers(call(c.getModifiers(), p));
+        c = c.withModifiers(ListUtils.map(c.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         c = c.withTypeParameters(call(c.getTypeParameters(), p));
         c = c.withName(call(c.getName(), p));
         c = c.withExtends(call(c.getExtends(), p));
@@ -422,6 +424,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = call(m, p, this::visitStatement);
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withModifiers(ListUtils.map(m.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         m = m.withTypeParameters(call(m.getTypeParameters(), p));
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
         m = m.withReturnTypeExpr(
@@ -469,6 +473,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = call(m, p, this::visitStatement);
         m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withModifiers(ListUtils.map(m.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
         m = m.withTypeExpr(m.getTypeExpr() == null ?
