@@ -154,6 +154,10 @@ public interface JavaType extends Serializable {
             this.constructors = constructors;
             this.supertype = supertype;
 
+
+            //The flyweight ID is used to group class variants by their class names. The one execption to this rule
+            //are classes that include generic types, their IDs need to be a function of the class name plus the generic
+            //parameter types.
             StringBuilder tag = new StringBuilder(fullyQualifiedName);
             if (!typeParameters.isEmpty()) {
                 tag.append("<").append(typeParameters.stream().map(JavaType::toString).collect(Collectors.joining(","))).append(">");
@@ -192,10 +196,6 @@ public interface JavaType extends Serializable {
                                   @Nullable Class supertype,
                                   boolean relaxedClassTypeMatching) {
 
-            // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
-            // name, where equality is determined by whether the supertype hierarchy and members through the entire
-            // supertype hierarchy are equal
-
             List<Var> sortedMembers;
             if (fullyQualifiedName.equals("java.lang.String")) {
                 //There is a "serialPersistentFields" member within the String class which is used in normal Java
@@ -206,33 +206,40 @@ public interface JavaType extends Serializable {
                 sortedMembers = new ArrayList<>(members);
             }
             sortedMembers.sort(comparing(Var::getName));
-            JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
+
+            JavaType.Class candidate = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
+
+            // This logic will attempt to match the candidate against a candidate in the flyweights. If a match is found,
+            // that instance is used over the new candidate to prevent a large memory footprint. If relaxed class type
+            // matching is "true" any variant with the same ID will be used. If the relaxed class type matching is "false",
+            // equality is determined by comparing the immediate structure of the class and also comparing the supertype
+            // hierarchies.
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(test.flyweightId, fqn -> new HashSet<>());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(candidate.flyweightId, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
-                        variants.add(test);
-                        return test;
+                        variants.add(candidate);
+                        return candidate;
                     }
                     return variants.iterator().next();
                 } else {
                     for (Class v : variants) {
-                        if (v.deepEquals(test)) {
+                        if (v.deepEquals(candidate)) {
                             return v;
                         }
                     }
 
-                    if (test.supertype == null) {
+                    if (candidate.supertype == null) {
 
                         return variants.stream().filter(v -> v.supertype != null).findFirst().orElseGet(() -> {
-                            variants.add(test);
-                            return test;
+                            variants.add(candidate);
+                            return candidate;
                         });
                     }
-                    variants.add(test);
-                    return test;
+                    variants.add(candidate);
+                    return candidate;
                 }
             }
         }
