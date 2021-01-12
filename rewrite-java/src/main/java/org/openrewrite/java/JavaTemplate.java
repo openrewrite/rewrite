@@ -15,13 +15,12 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.search.FindTypesInNameScope;
 import org.openrewrite.java.tree.*;
@@ -30,14 +29,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
+import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
 import static org.openrewrite.Tree.randomId;
 
-@Incubating(since="7.0.0")
+@Incubating(since = "7.0.0")
 public class JavaTemplate {
-
     private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
 
     private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
@@ -64,26 +64,23 @@ public class JavaTemplate {
     }
 
     public <J2 extends J> List<J2> generateBefore(@NonNull Cursor insertionScope, Object... parameters) {
-        return generate(InsertionStrategy.INSERT_BEFORE, insertionScope, parameters);
-    }
-
-    public <J2 extends J> List<J2> generate(@NonNull Cursor insertionScope, Object... parameters) {
-        return generate(InsertionStrategy.REPLACE, insertionScope, parameters);
+        return generate(false, insertionScope, parameters);
     }
 
     public <J2 extends J> List<J2> generateAfter(@NonNull Cursor insertionScope, Object... parameters) {
-        return generate(InsertionStrategy.INSERT_AFTER, insertionScope, parameters);
+        return generate(true, insertionScope, parameters);
     }
 
-    private <J2 extends J> List<J2> generate(final InsertionStrategy insertionStrategy,
-                                             final @NonNull Cursor insertionScope, final Object... parameters) {
+    private <J2 extends J> List<J2> generate(boolean after,
+                                             @NonNull Cursor insertionScope,
+                                             Object... parameters) {
 
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
         //Extract any types from parameters that will be inserted into the template.
-        Set<JavaType> parameterTypes = Arrays.stream(parameters)
+        Set<JavaType> parameterTypes = stream(parameters)
                 .filter(J.class::isInstance)
                 .map(J.class::cast)
                 .flatMap(p -> FindTypesInNameScope.find(p).stream())
@@ -98,7 +95,7 @@ public class JavaTemplate {
         //Prune down the original AST to just the elements in scope at the insertion point.
         cu = new TemplateProcessor(parameterTypes).visitCompilationUnit(cu, insertionScope);
 
-        String generatedSource = new TemplatePrinter(insertionStrategy, insertionScope.getTree().getId(), imports)
+        String generatedSource = new TemplatePrinter(after, insertionScope.getTree().getId(), imports)
                 .visit(cu, printedTemplate);
 
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
@@ -106,15 +103,18 @@ public class JavaTemplate {
         parser.reset();
         cu = parser.parse(generatedSource).iterator().next();
 
-//        if (autoFormat) {
-//            // TODO format the new tree
-//        }
-
         //Extract the compiled template tree elements.
         List<J> snippetElements = new ArrayList<>();
         new ExtractTemplatedCode().visit(cu, snippetElements);
+
+        @SuppressWarnings("ConstantConditions") Collection<? extends Style> styles = insertionScope
+                .firstEnclosing(J.CompilationUnit.class).getStyles();
+
         //noinspection unchecked
-        return (List<J2>) snippetElements;
+        return snippetElements.stream()
+                .map(t -> (J2) new AutoFormatProcessor<Void>(styles).visit(t, null,
+                        insertionScope.getParentOrThrow()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -126,18 +126,23 @@ public class JavaTemplate {
      * @return The final snippet to be generated.
      */
     private String substituteParameters(Object... parameters) {
-
         String codeInstance = code;
         for (Object parameter : parameters) {
-            String value;
-            if (parameter instanceof Tree) {
-                value = ((Tree) parameter).printTrimmed();
-            } else {
-                value = parameter.toString();
-            }
-            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker, value);
+            codeInstance = StringUtils.replaceFirst(codeInstance, parameterMarker,
+                    substituteParameter(parameter));
         }
         return codeInstance;
+    }
+
+    private String substituteParameter(Object parameter) {
+        if (parameter instanceof Tree) {
+            return ((Tree) parameter).printTrimmed();
+        } else if (parameter instanceof JRightPadded) {
+            return substituteParameter(((JRightPadded<?>) parameter).getElem());
+        } else if (parameter instanceof JLeftPadded) {
+            return substituteParameter(((JLeftPadded<?>) parameter).getElem());
+        }
+        return parameter.toString();
     }
 
     /**
@@ -145,14 +150,39 @@ public class JavaTemplate {
      * The typed Cursor represents the insertion point within the original AST.
      */
     private static class TemplateProcessor extends JavaIsoProcessor<Cursor> {
-
         private final Set<JavaType> referencedTypes;
-        private final J.Return nullReturn = new J.Return(randomId(), null, Markers.EMPTY,
-                        new J.Literal(randomId(), new Space(" ", emptyList()), Markers.EMPTY,  null, "null", JavaType.Primitive.Null)
-                );
+
         TemplateProcessor(Set<JavaType> referencedTypes) {
             this.referencedTypes = referencedTypes;
             setCursoringOn();
+        }
+
+        @Override
+        public J.Block visitBlock(J.Block block, Cursor insertionScope) {
+            Cursor parent = getCursor().getParent();
+
+            if (parent != null && !(parent.getTree() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
+                J.Block b = call(block, insertionScope, this::visitEach);
+                b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), insertionScope) : null);
+                b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
+                b = call(b, insertionScope, this::visitStatement);
+
+                if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
+                    //If a statement in the block is in insertion scope, then this will render each statement
+                    //up to the statement that is in insertion scope.
+                    List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
+                    for (JRightPadded<Statement> statement : b.getStatements()) {
+                        statementsInScope.add(call(statement, insertionScope));
+                        if (insertionScope.isScopeInPath(statement.getElem())) {
+                            break;
+                        }
+                    }
+                    return b.withStatements(statementsInScope);
+                }
+            } else if (parent != null && parent.getTree() instanceof J.ClassDecl) {
+                return super.visitBlock(block, insertionScope);
+            }
+            return block.withStatements(emptyList());
         }
 
         @Override
@@ -163,31 +193,10 @@ public class JavaTemplate {
             }
 
             if (referencedTypes.contains(method.getType())) {
-                if (method.getBody() == null) {
-                    //Abstract method will have no body.
-                    return method.withAnnotations(emptyList());
-                }
-                //If the method is referenced, they method body is replaced with a stubbed return statement.
-                TypeTree returnType = method.getReturnTypeExpr();
-                List<JRightPadded<Statement>>  statements = new ArrayList<>();
-                if (returnType instanceof J.Primitive) {
-                    J.Primitive primitive = (J.Primitive) returnType;
-                    //Note void primitive will result in an empty body.
-                    if (primitive.getType() != JavaType.Primitive.Void) {
-                        //For all other primitive types, return the default value for that primitive
-                        statements.add(new JRightPadded<>(
-                                new J.Return(randomId(), null, Markers.EMPTY,
-                                    new J.Literal(randomId(), new Space(" ", emptyList()), Markers.EMPTY,
-                                            null, primitive.getType().getDefaultValue(), primitive.getType()
-                                    )
-                                ), null));
-                    }
-                } else {
-                    //All fully-qualified types/arrays will return null.
-                    statements.add(new JRightPadded<>(nullReturn, null));
-                }
-                return method.withBody(method.getBody().withStatements(statements)).withAnnotations(emptyList());
+                return method.withAnnotations(emptyList())
+                        .withBody(null);
             }
+
             //Otherwise, prune the method declaration.
             return null;
         }
@@ -198,38 +207,6 @@ public class JavaTemplate {
             //Variables in the original AST only need to be declared, this nulls out the initializers.
             return var.withInitializer(null);
         }
-
-        @Override
-        public J.Block visitBlock(J.Block block, Cursor insertionScope) {
-
-            Cursor parent = getCursor().getParent();
-
-            if (parent != null && !(parent.getTree() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
-
-                J.Block b = call(block, insertionScope, this::visitEach);
-                b = b.withStatik(visitSpace(b.getStatic(), insertionScope));
-                b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
-                b = call(b, insertionScope, this::visitStatement);
-
-
-                if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
-                    //If a statement in the block is in insertion scope, then this will render each statement
-                    //up to the statement that is in insertion scope.
-                    List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
-                    for (JRightPadded<Statement> statement : b.getStatements()) {
-                        statementsInScope.add(statement);
-                        if (insertionScope.isScopeInPath(statement.getElem())) {
-                            break;
-                        }
-                    }
-                    b = b.withStatements(ListUtils.map(statementsInScope, t -> call(t, insertionScope)));
-                    return b.withEnd(visitSpace(b.getEnd(), insertionScope));
-                }
-            } else if (parent != null && parent.getTree() instanceof J.ClassDecl) {
-                    return super.visitBlock(block, insertionScope);
-            }
-            return block.withStatements(Collections.emptyList());
-        }
     }
 
     /**
@@ -239,31 +216,16 @@ public class JavaTemplate {
 
         private final Set<String> imports;
 
-        TemplatePrinter(InsertionStrategy insertionStrategy, UUID insertionPoint, Set<String> imports) {
+        TemplatePrinter(boolean after, UUID insertionPoint, Set<String> imports) {
             super(new TreePrinter<String>() {
                 @Override
                 public String doLast(Tree tree, String printed, String printedTemplate) {
                     if (insertionPoint.equals(tree.getId())) {
-                        StringBuilder templateCode = new StringBuilder()
-                                .append("/*").append(SNIPPET_MARKER_START).append("*/");
-
-                        if (printedTemplate.endsWith(";")) {
-                            //If the printed template ends with a ;, we want to make sure the ending marker is BEFORE
-                            //the semi-colon.
-                            //noinspection StringOperationCanBeSimplified
-                            templateCode.append(printedTemplate.substring(0, printedTemplate.length() - 1))
-                                    .append("/*").append(SNIPPET_MARKER_END).append("*/;");
-                        } else {
-                            templateCode.append(printedTemplate).append("/*").append(SNIPPET_MARKER_END).append("*/");
-                        }
-
-                        if (insertionStrategy == InsertionStrategy.REPLACE) {
-                            return templateCode.toString();
-                        } else if (insertionStrategy == InsertionStrategy.INSERT_BEFORE) {
-                            return templateCode.append(printed).toString();
-                        } else {
-                            return printed + templateCode.toString();
-                        }
+                        String templateCode = "/*" + SNIPPET_MARKER_START + "*/" +
+                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/";
+                        return after ?
+                                printed + "\n" + templateCode :
+                                "\n" + templateCode + "\n" + printed;
                     } else {
                         return printed;
                     }
@@ -284,9 +246,8 @@ public class JavaTemplate {
                 output.append(";");
             }
 
-            output.append("\n\n//Additional Imports\n");
-            for (String _import : imports) {
-                output.append(_import);
+            for (String i : imports) {
+                output.append(i);
             }
 
             //Visit the classes of the compilation unit.
@@ -323,7 +284,8 @@ public class JavaTemplate {
             return space;
         }
 
-        private Comment findMarker(Space space, String marker) {
+        @Nullable
+        private Comment findMarker(@Nullable Space space, String marker) {
             if (space == null) {
                 return null;
             }
@@ -421,14 +383,5 @@ public class JavaTemplate {
             }
             return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
         }
-    }
-
-    /**
-     * The insertion strategy determines where the template's code will be inserted into an the AST relative to the insertion point.
-     */
-    private enum InsertionStrategy {
-        INSERT_BEFORE,
-        REPLACE,
-        INSERT_AFTER
     }
 }

@@ -30,21 +30,29 @@ interface JavaTemplateTest : RecipeTest {
     fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaProcessor<ExecutionContext>() {
-            override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J = method.withBody(
-                method.body!!.withStatements(
-                    ListUtils.concat(
-                        JRightPadded(
-                            JavaTemplate.builder("others.add(#{})").build()
-                                .generate<Statement>(
-                                    Cursor(cursor, method.body!!.statements[0].elem),
-                                    (method.params.elem[0].elem as J.VariableDecls).vars[0]
-                                )[0],
-                            Space.EMPTY
-                        ),
-                        method.body!!.statements
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if(parent is J.MethodDecl) {
+                    return block.withStatements(
+                        ListUtils.concat(
+                            JRightPadded(
+                                JavaTemplate.builder("others.add(#{});").build()
+                                    .generateBefore<Statement>(
+                                        Cursor(cursor, block.statements[0].elem),
+                                        (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                                    )[0],
+                                Space.EMPTY
+                            ),
+                            block.statements
+                        )
                     )
-                )
-            )
+                }
+                return super.visitBlock(block, p)
+            }
         }.toRecipe(),
         before = """
             import java.util.List;

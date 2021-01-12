@@ -66,6 +66,12 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     }
 
     @Nullable
+    public T visit(@Nullable Tree tree, P p, Cursor parent) {
+        this.cursor.set(parent);
+        return visit(tree, p);
+    }
+
+    @Nullable
     public T visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
