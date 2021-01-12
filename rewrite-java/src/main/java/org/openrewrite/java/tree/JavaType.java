@@ -139,6 +139,8 @@ public interface JavaType extends Serializable {
         @Nullable
         private final Class supertype;
 
+        private final String flyweightId;
+
         private Class(String fullyQualifiedName,
                       List<Var> members,
                       List<JavaType> typeParameters,
@@ -151,6 +153,12 @@ public interface JavaType extends Serializable {
             this.interfaces = interfaces;
             this.constructors = constructors;
             this.supertype = supertype;
+
+            StringBuilder tag = new StringBuilder(fullyQualifiedName);
+            if (!typeParameters.isEmpty()) {
+                tag.append("<").append(typeParameters.stream().map(JavaType::toString).collect(Collectors.joining(","))).append(">");
+            }
+            this.flyweightId = tag.toString();
         }
 
         /**
@@ -201,7 +209,7 @@ public interface JavaType extends Serializable {
             JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> new HashSet<>());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(test.flyweightId, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
