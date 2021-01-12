@@ -108,6 +108,10 @@ class Java11RenameVariableTest : Java11Test, RenameVariableTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11TabsAndIndentsTest: Java11Test, TabsAndIndentsTest
 
 @DebugOnly

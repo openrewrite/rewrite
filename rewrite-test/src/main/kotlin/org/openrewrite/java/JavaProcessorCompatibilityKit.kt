@@ -87,6 +87,12 @@ abstract class JavaProcessorCompatibilityKit {
     inner class RemoveImportTck : RemoveImportTest
 
     @Nested
+    inner class RenameVariableTck : RenameVariableTest
+
+    @Nested
+    inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
+
+    @Nested
     inner class TypeTreeTck : TypeTreeTest
 
     @Nested
