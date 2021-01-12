@@ -22,12 +22,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.SortedMap;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
@@ -155,6 +150,16 @@ public class StringUtils {
             }
         }
         return true;
+    }
+
+    /**
+     * Check if the String is empty string or null.
+     *
+     * @param string String to check
+     * @return {@code true} if the String is null or empty string
+     */
+    public static boolean isNullOrEmpty(@Nullable String string) {
+        return string == null || string.isEmpty();
     }
 
     public static String readFully(InputStream inputStream) {
