@@ -79,7 +79,12 @@ public class ExcludeDependency extends Recipe {
                         }
 
                     } else {
-                        doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<exclusions/>")));
+                        doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<exclusions>\n" +
+                                "<exclusion>\n" +
+                                "<groupId>" + groupId + "</groupId>\n" +
+                                "<artifactId>" + artifactId + "</artifactId>\n" +
+                                "</exclusion>\n" +
+                                "</exclusions>")));
                     }
                 }
             }

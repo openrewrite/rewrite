@@ -29,7 +29,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     private boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
-    private final ThreadLocal<List<TreeProcessor<T, P>>> next = new ThreadLocal<>();
+    private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();
 
     protected final void setCursoringOn() {
         this.cursored = true;
@@ -40,16 +40,16 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     }
 
     protected void doAfterVisit(TreeProcessor<T, P> visitor) {
-        next.get().add(visitor);
+        afterVisit.get().add(visitor);
     }
 
     protected void doAfterVisit(Recipe visitor) {
         //noinspection unchecked
-        next.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
+        afterVisit.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
     }
 
     protected List<TreeProcessor<T, P>> getAfterVisit() {
-        return next.get();
+        return afterVisit.get();
     }
 
     public final Cursor getCursor() {
@@ -66,20 +66,15 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     }
 
     @Nullable
-    public final T visit(@Nullable Tree tree, P p) {
-        return visitInternal(tree, p);
-    }
-
-    @Nullable
-    protected T visitInternal(Tree tree, P p) {
+    public T visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
 
         boolean topLevel = false;
-        if(next.get() == null) {
+        if (afterVisit.get() == null) {
             topLevel = true;
-            next.set(new ArrayList<>());
+            afterVisit.set(new ArrayList<>());
         }
 
         if (cursored) {
@@ -87,8 +82,8 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         }
 
         @SuppressWarnings("unchecked") T t = visitEach((T) tree, p);
-        if(t == null) {
-            next.remove();
+        if (t == null) {
+            afterVisit.remove();
             return defaultValue(null, p);
         }
 
@@ -98,11 +93,11 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
             cursor.set(cursor.get().getParent());
         }
 
-        if(topLevel) {
-            for (TreeProcessor<T, P> v : next.get()) {
+        if (topLevel) {
+            for (TreeProcessor<T, P> v : afterVisit.get()) {
                 t = v.visit(t, p);
             }
-            next.remove();
+            afterVisit.remove();
         }
 
         return t;

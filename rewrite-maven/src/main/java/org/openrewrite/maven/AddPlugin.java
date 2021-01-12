@@ -53,7 +53,7 @@ public class AddPlugin extends Recipe {
     public Validated validate() {
         return required("groupId", groupId)
                 .and(required("artifactId", artifactId)
-                .and(required("version", version)));
+                        .and(required("version", version)));
     }
 
     private static class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
@@ -74,7 +74,15 @@ public class AddPlugin extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Xml.Tag root = maven.getRoot();
             if (!root.getChild("build").isPresent()) {
-                doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<build/>"),
+                doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<build>\n" +
+                        "<plugins>\n" +
+                        "<plugin>\n" +
+                        "<groupId>" + groupId + "</groupId>\n" +
+                        "<artifactId>" + artifactId + "</artifactId>\n" +
+                        "<version>" + version + "</version>\n" +
+                        "</plugin>\n" +
+                        "</plugins>\n" +
+                        "</build>"),
                         new MavenTagInsertionComparator(root.getChildren())));
             }
 
@@ -83,10 +91,12 @@ public class AddPlugin extends Recipe {
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            Xml.Tag t = (Xml.Tag) super.visitTag(tag, ctx);
+
             if (BUILD_MATCHER.matches(getCursor())) {
-                Optional<Xml.Tag> maybePlugins = tag.getChild("plugins");
+                Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
                 if (!maybePlugins.isPresent()) {
-                    doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<plugins/>")));
+                    doAfterVisit(new AddToTagProcessor<>(t, Xml.Tag.build("<plugins/>")));
                 } else {
                     Xml.Tag plugins = maybePlugins.get();
 
@@ -112,11 +122,9 @@ public class AddPlugin extends Recipe {
                                 "</plugin>")));
                     }
                 }
-
-                return tag;
             }
 
-            return super.visitTag(tag, ctx);
+            return t;
         }
     }
 }

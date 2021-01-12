@@ -37,6 +37,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -332,6 +333,12 @@ public interface Xml extends Serializable, Tree {
         @Override
         public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
             return v.visitTag(this, p);
+        }
+
+        @Override
+        public String toString() {
+            return "<" + name + attributes.stream().map(a -> a.getKey() + "=...")
+                    .collect(Collectors.joining(" ")) + ">";
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

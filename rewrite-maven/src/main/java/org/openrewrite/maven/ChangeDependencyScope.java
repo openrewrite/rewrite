@@ -71,6 +71,7 @@ public class ChangeDependencyScope extends Recipe {
             this.groupId = groupId;
             this.artifactId = artifactId;
             this.toScope = toScope;
+            setCursoringOn();
         }
 
         @Override

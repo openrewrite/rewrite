@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toSet;
 public abstract class Recipe {
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
-        protected Tree visitInternal(Tree tree, ExecutionContext ctx) {
+        public Tree visit(Tree tree, ExecutionContext ctx) {
             return tree;
         }
     };

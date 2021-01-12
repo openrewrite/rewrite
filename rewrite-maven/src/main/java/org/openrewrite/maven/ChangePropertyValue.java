@@ -27,6 +27,10 @@ public class ChangePropertyValue extends Recipe {
     private String key;
     private String toValue;
 
+    public ChangePropertyValue() {
+        this.processor = () -> new ChangePropertyValueProcessor(key, toValue);
+    }
+
     public void setKey(String key) {
         this.key = key.replace("${", "").replace("}", "");
     }
