@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import org.jetbrains.annotations.NotNull;
 import org.mapdb.DataInput2;
 import org.mapdb.DataOutput2;
 import org.mapdb.Serializer;
@@ -31,7 +30,7 @@ public class OptionalJacksonMapdbSerializer<T> implements Serializer<Optional<T>
     }
 
     @Override
-    public void serialize(@NotNull DataOutput2 out, @NotNull Optional<T> value) throws IOException {
+    public void serialize(DataOutput2 out, Optional<T> value) throws IOException {
         if (value.isPresent()) {
             out.writeBoolean(true);
             jacksonMapdbSerializer.serialize(out, value.get());
@@ -41,7 +40,7 @@ public class OptionalJacksonMapdbSerializer<T> implements Serializer<Optional<T>
     }
 
     @Override
-    public Optional<T> deserialize(@NotNull DataInput2 input, int available) throws IOException {
+    public Optional<T> deserialize(DataInput2 input, int available) throws IOException {
         boolean present = input.readBoolean();
         return present ? Optional.of(jacksonMapdbSerializer.deserialize(input, available)) : Optional.empty();
     }

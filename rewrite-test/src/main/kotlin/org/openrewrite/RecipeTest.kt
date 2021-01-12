@@ -38,7 +38,7 @@ interface RecipeTest {
         dependsOn: Array<String> = emptyArray(),
         after: String
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after)
+        assertChanged(parser, recipe, before, dependsOn, after, {})
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -79,7 +79,7 @@ interface RecipeTest {
         dependsOn: Array<File> = emptyArray(),
         after: String
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after)
+        assertChanged(parser, recipe, before, dependsOn, after, {})
     }
 
     @Suppress("UNCHECKED_CAST")
