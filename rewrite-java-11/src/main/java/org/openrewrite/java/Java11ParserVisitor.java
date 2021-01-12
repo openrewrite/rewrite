@@ -992,8 +992,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     resourceVar = resourceVar.withVars(Space.formatLastSuffix(resourceVar.getVars(), sourceBefore(";")));
                 }
 
-                resourceList.add(padRight(new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
-                        resourceVar.withPrefix(EMPTY), semicolonPresent), sourceBefore(")")));
+                J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
+                        resourceVar.withPrefix(EMPTY), semicolonPresent);
+                resourceList.add(padRight(tryResource, i == node.getResources().size() - 1 ?
+                        sourceBefore(")") : EMPTY));
             }
 
             resources = JContainer.build(before, resourceList);
