@@ -27,6 +27,7 @@ import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -199,10 +200,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                         beforeTagDelimiterPrefix = format(ctx.CLOSE(0)).getPrefix();
                         cursor = ctx.CLOSE(0).getSymbol().getStopIndex() + 1;
 
-                        content = ctx.content().stream()
-                                .map(this::visit)
-                                .map(Content.class::cast)
-                                .collect(toList());
+                        List<Content> list = new ArrayList<>();
+                        for (XMLParser.ContentContext contentContext : ctx.content()) {
+                            Xml visit = visit(contentContext);
+                            Content content1 = (Content) visit;
+                            list.add(content1);
+                        }
+                        content = list;
 
                         Formatting closeTagFormat = format(ctx.OPEN(1));
                         cursor += 2;

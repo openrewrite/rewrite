@@ -15,7 +15,9 @@
  */
 package org.openrewrite.xml
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.RefactorVisitorTestForParser
 import org.openrewrite.xml.tree.Xml
 
@@ -54,5 +56,55 @@ class XmlParserTest: XmlParser(), RefactorVisitorTestForParser<Xml.Document> {
               <name>Guava: Google Core Libraries for Java</name>
             </project>
         """
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/145")
+    @Disabled
+    @Test
+    fun commentBeforeContent() = assertUnchanged(
+        before = """
+            <foo>
+                <a><!-- comment -->a</a>
+            </foo>
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/145")
+    @Disabled
+    @Test
+    fun commentBeforeContentNewline() = assertUnchanged(
+        before ="""
+            <foo>
+                <a>
+                    <!-- comment -->
+                    a
+                </a>
+            </foo>
+        """.trimIndent()
+    )
+
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/145")
+    @Disabled
+    @Test
+    fun commentAfterContent() = assertUnchanged(
+        before = """
+            <foo>
+                <a>a<!-- comment --></a>
+            </foo>
+        """.trimIndent()
+    )
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/145")
+    @Test
+    fun commentAfterContentNewline() = assertUnchanged(
+        before = """
+            <foo>
+                <a>
+                    a
+                    <!-- comment -->
+                </a>
+            </foo>
+        """.trimIndent()
     )
 }
