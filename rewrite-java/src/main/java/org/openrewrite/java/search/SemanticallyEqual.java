@@ -30,15 +30,12 @@ import java.util.Objects;
 @Incubating(since = "6.0.0")
 public class SemanticallyEqual {
 
-    protected SemanticallyEqualProcessor processor;
+    private SemanticallyEqual() {}
 
-    public SemanticallyEqual() {
-        this.processor = new SemanticallyEqualProcessor();
-    }
-
-    public boolean areEqual(J firstElem, J secondElem) {
-        this.processor.visit(firstElem, secondElem); // returns null, but changes value of class variable isEqual
-        return this.processor.isEqual;
+    public static boolean areEqual(J firstElem, J secondElem) {
+        SemanticallyEqualProcessor sep = new SemanticallyEqualProcessor();
+        sep.visit(firstElem, secondElem); // returns null, but changes value of class variable isEqual
+        return sep.isEqual;
     }
 
     /**
@@ -91,7 +88,7 @@ public class SemanticallyEqual {
             }
             J.Ident secondIdent = (J.Ident) second;
 
-            isEqual &= Objects.equals(firstIdent.getType(), secondIdent.getType()) &&
+            isEqual = isEqual && Objects.equals(firstIdent.getType(), secondIdent.getType()) &&
                     firstIdent.getSimpleName().equals(secondIdent.getSimpleName());
 
             return null;
@@ -113,7 +110,8 @@ public class SemanticallyEqual {
                     return null;
                 }
                 else {
-                    isEqual &= typeEquals(firstFieldAccess.getType(), secondFieldAccess.getType()) &&
+                    isEqual = isEqual &&
+                            typeEquals(firstFieldAccess.getType(), secondFieldAccess.getType()) &&
                             typeEquals(firstFieldAccess.getTarget().getType(), secondFieldAccess.getTarget().getType());
                 }
             }
@@ -129,9 +127,10 @@ public class SemanticallyEqual {
             }
             J.Assign secondAssign = (J.Assign) second;
 
-            isEqual &= Objects.equals(firstAssign.getType(), secondAssign.getType()) &&
-                    new SemanticallyEqual().areEqual(firstAssign.getVariable(), secondAssign.getVariable()) &&
-                    new SemanticallyEqual().areEqual(firstAssign.getAssignment().getElem(), secondAssign.getAssignment().getElem());
+            isEqual = isEqual &&
+                    Objects.equals(firstAssign.getType(), secondAssign.getType()) &&
+                    SemanticallyEqual.areEqual(firstAssign.getVariable(), secondAssign.getVariable()) &&
+                    SemanticallyEqual.areEqual(firstAssign.getAssignment().getElem(), secondAssign.getAssignment().getElem());
 
             return null;
         }
@@ -144,7 +143,7 @@ public class SemanticallyEqual {
             }
             J.Literal secondLiteral = (J.Literal) second;
 
-            isEqual &= Objects.equals(firstLiteral.getValue(), secondLiteral.getValue());
+            isEqual = isEqual && Objects.equals(firstLiteral.getValue(), secondLiteral.getValue());
 
             return null;
         }
@@ -157,7 +156,7 @@ public class SemanticallyEqual {
             }
             NameTree secondTypeName = (NameTree) second;
 
-            isEqual &= identEquals((J.Ident) firstTypeName, (J.Ident) secondTypeName);
+            isEqual = isEqual && identEquals((J.Ident) firstTypeName, (J.Ident) secondTypeName);
 
             return null;
         }

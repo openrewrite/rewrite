@@ -3,14 +3,12 @@ package org.openrewrite.java.search
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
-import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JLeftPadded
 import org.openrewrite.java.tree.JavaType
 import org.openrewrite.java.tree.Space
 import org.openrewrite.marker.Markers
-import org.openrewrite.marker.SearchResult
 
 interface SemanticallyEqualTest {
 
@@ -51,8 +49,8 @@ interface SemanticallyEqualTest {
         val fastTest2 = cu[0].classes[0].annotations[1]
         val slowTest = cu[0].classes[0].annotations[2]
 
-        assertThat(SemanticallyEqual().areEqual(fastTest, fastTest2)).isTrue()
-        assertThat(SemanticallyEqual().areEqual(fastTest, slowTest)).isFalse()
+        assertThat(SemanticallyEqual.areEqual(fastTest, fastTest2)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(fastTest, slowTest)).isFalse()
     }
 
     @Test
@@ -77,7 +75,7 @@ interface SemanticallyEqualTest {
             annotInterface
         )[0].classes[0].annotations[0]
 
-        assertThat(SemanticallyEqual().areEqual(firstAnnot, secondAnnot)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(firstAnnot, secondAnnot)).isTrue()
     }
 
     @Test
@@ -106,9 +104,9 @@ interface SemanticallyEqualTest {
             JavaType.buildType("YourAnnotation")
         )
 
-        assertThat(SemanticallyEqual().areEqual(firstIdent, secondIdent)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(firstIdent, secondIdent)).isTrue()
 
-        assertThat(SemanticallyEqual().areEqual(firstIdent, thirdIdent)).isFalse()
+        assertThat(SemanticallyEqual.areEqual(firstIdent, thirdIdent)).isFalse()
     }
 
     @Test
@@ -162,7 +160,7 @@ interface SemanticallyEqualTest {
         val thirdFieldAccess = cu[0].classes[0].annotations[1].args?.elem?.first()?.elem
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     firstFieldAccess,
                     secondFieldAccess
@@ -170,7 +168,7 @@ interface SemanticallyEqualTest {
         ).isTrue()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     firstFieldAccess,
                     thirdFieldAccess
@@ -223,7 +221,7 @@ interface SemanticallyEqualTest {
         )
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     firstAssign,
                     secondAssign
@@ -231,7 +229,7 @@ interface SemanticallyEqualTest {
         ).isTrue()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     firstAssign,
                     thirdAssign
@@ -239,7 +237,7 @@ interface SemanticallyEqualTest {
         ).isFalse()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     firstAssign,
                     fourthAssign
@@ -264,7 +262,7 @@ interface SemanticallyEqualTest {
         val nullLiteral = (cu[0].classes[0].body.statements[2].elem as J.VariableDecls).vars[0].elem.initializer.elem
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     intLiteral,
                     J.Literal(
@@ -279,7 +277,7 @@ interface SemanticallyEqualTest {
         ).isTrue()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     strLiteral,
                     J.Literal(
@@ -294,7 +292,7 @@ interface SemanticallyEqualTest {
         ).isTrue()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     nullLiteral,
                     J.Literal(
@@ -309,7 +307,7 @@ interface SemanticallyEqualTest {
         ).isTrue()
 
         assertThat(
-            SemanticallyEqual()
+            SemanticallyEqual
                 .areEqual(
                     strLiteral,
                     J.Literal(
@@ -348,6 +346,6 @@ interface SemanticallyEqualTest {
             )
         )
 
-        assertThat(SemanticallyEqual().areEqual(nameA, nameB)).isTrue()
+        assertThat(SemanticallyEqual.areEqual(nameA, nameB)).isTrue()
     }
 }
