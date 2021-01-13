@@ -37,6 +37,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -45,6 +46,7 @@ public class MavenDownloader {
     private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
 
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
+            .callTimeout(1, TimeUnit.MINUTES)
             .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
             .build();
 
