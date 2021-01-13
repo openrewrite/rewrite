@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
-import org.apache.commons.lang.StringEscapeUtils;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -75,7 +74,10 @@ public class Space {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        if(!whitespace.equals(this.whitespace)) {
+            return new Space(whitespace, comments);
+        }
+        return this;
     }
 
     public boolean isEmpty() {

@@ -24,7 +24,6 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     private final TabsAndIndentsStyle style;
@@ -115,7 +114,10 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         Expression e = super.visitExpression(expression, p);
-        if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
+        if (expression instanceof J.Annotation) {
+            e = e.withPrefix(alignTo(e.getPrefix(),
+                    indent(getCursor().getParentOrThrow().<J>getTree().getPrefix())));
+        } else if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
                 !(getCursor().getParentOrThrow().getTree() instanceof J.Case)) {
             e = continuationIndent(e, enclosingStatement());
         }
@@ -188,18 +190,19 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                 m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(),
                         j -> continuationIndent(j, parent))));
             } else if (params.stream().anyMatch(param -> param.getElem().getPrefix().getWhitespace().contains("\n"))) {
-                AtomicInteger column = new AtomicInteger(0);
-                boolean afterParamsStart = false;
-                for (char c : m.withBody(null).print().toCharArray()) {
-                    if (c == '(') {
-                        afterParamsStart = true;
-                    } else if (afterParamsStart && !Character.isWhitespace(c)) {
+                String print = m.withBody(null).print();
+                int nameStart = print.lastIndexOf(m.getSimpleName() + "(");
+                int lastNl = -1;
+                while (true) {
+                    int nl = print.indexOf('\n', ++lastNl);
+                    if (nl < 0 || nl > nameStart) {
                         break;
                     }
-                    column.incrementAndGet();
+                    lastNl = nl;
                 }
+                int column = nameStart - lastNl + m.getSimpleName().length() + 1;
                 m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), (i, param) ->
-                        i == 0 ? param : param.withElem(alignTo(param.getElem(), column.get() - 1)))));
+                        i == 0 ? param : param.withElem(alignTo(param.getElem(), column - 1)))));
             }
         }
 
@@ -246,6 +249,9 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     private <J2 extends J> J2 indent(J2 j, Tree parent) {
+        if (parent instanceof J.CompilationUnit) {
+            return j;
+        }
         return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
     }
 
@@ -253,7 +259,9 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     private Statement enclosingStatement() {
         Cursor cursor = getCursor();
         //noinspection StatementWithEmptyBody
-        for (; cursor != null && !(cursor.getTree() instanceof Statement);
+        for (; cursor != null &&
+                (!(cursor.getTree() instanceof Statement) ||
+                        !cursor.<J>getTree().getPrefix().getWhitespace().contains("\n"));
              cursor = cursor.getParent())
             ;
         return cursor == null ? null : cursor.getTree();

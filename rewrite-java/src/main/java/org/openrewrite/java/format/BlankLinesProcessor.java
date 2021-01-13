@@ -62,9 +62,7 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
             }
         } else {
             j = j.withImports(ListUtils.mapFirst(j.getImports(), i ->
-                    minimumLines(i, Math.max(
-                            style.getMinimum().getBeforeImports(),
-                            style.getMinimum().getAfterPackage()))));
+                    minimumLines(i, style.getMinimum().getAfterPackage())));
 
             if (j.getImports().isEmpty()) {
                 j = j.withClasses(ListUtils.mapFirst(j.getClasses(), c ->
