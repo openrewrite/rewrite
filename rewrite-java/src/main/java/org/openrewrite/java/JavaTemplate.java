@@ -101,13 +101,13 @@ public class JavaTemplate {
         cu = parser.parse(generatedSource).iterator().next();
 
         //Extract the compiled template tree elements.
-        Extraction extraction = new Extraction();
-        new ExtractTemplatedCode().visit(cu, extraction);
+        ExtractionContext extractionContext = new ExtractionContext();
+        new ExtractTemplatedCode().visit(cu, extractionContext);
 
         @SuppressWarnings("ConstantConditions") Collection<? extends Style> styles = insertionScope
                 .firstEnclosing(J.CompilationUnit.class).getStyles();
 
-        List<J> snippets = extraction.getSnippets();
+        List<J> snippets = extractionContext.getSnippets();
         return snippets.stream()
                 .map(t -> {
                     if (autoFormat) {
@@ -267,40 +267,54 @@ public class JavaTemplate {
         }
     }
 
-    private static class Extraction {
-
+    /**
+     * The template code is marked before/after with comments. The extraction code will grab cursor elements between
+     * those two markers. Depending on insertion scope, the starting/ending comment markers may end up in elements
+     * that do not belong to the template. The context is used to demarcate when elements should be collected, collect
+     * the elements of the template (and keeping track of the depth those elements appear in the tree), and finally
+     * keep track of element IDs that have already been collected (so they are not inadvertently added twice)
+     */
+    private static class ExtractionContext {
         boolean collectElements = false;
         Map<Long, List<J>> snippetsByDepth = new TreeMap<>();
+        Set<UUID> collectedIds = new HashSet<>();
         Long endDepth;
 
         public List<J> getSnippets() {
+            //The ending marker is always at the correct depth for the elements that should be extracted from the template.
             return snippetsByDepth.get(endDepth);
         }
     }
 
-    private static class ExtractTemplatedCode extends JavaProcessor<Extraction> {
+    private static class ExtractTemplatedCode extends JavaProcessor<ExtractionContext> {
         public ExtractTemplatedCode() {
             setCursoringOn();
         }
 
         @Override
-        public Space visitSpace(Space space, Extraction context) {
+        public Space visitSpace(Space space, ExtractionContext context) {
             long templateDepth = getCursor().getPathAsStream().count();
-            Comment startToken = findMarker(space, SNIPPET_MARKER_START);
             if (findMarker(space, SNIPPET_MARKER_END) != null) {
+                //End mark, record the ending depth and turn off element collection.
                 context.endDepth = templateDepth;
                 context.collectElements = false;
             }
 
+            Comment startToken = findMarker(space, SNIPPET_MARKER_START);
             if (startToken != null) {
+                //If the starting marker is found, collect the current cursor tree element, remove the marker comment,
+                //and flag the context to start collecting all elements until the end marker is found.
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
                 context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
                         .add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
+                context.collectedIds.add(getCursor().getTree().getId());
                 context.collectElements = true;
-            } else if (context.collectElements) {
+            } else if (context.collectElements && !context.collectedIds.contains(getCursor().getTree().getId())) {
+                //If collecting elements and the current cursor element has not already been colelcted, add it.
                 context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
                         .add(getCursor().getTree());
+                context.collectedIds.add(getCursor().getTree().getId());
             }
 
             return space;

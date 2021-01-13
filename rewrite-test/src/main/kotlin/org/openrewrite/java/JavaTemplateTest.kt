@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -38,6 +39,13 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 val parent = cursor.parentOrThrow.getTree<J>()
                 if(parent is J.MethodDecl) {
+
+                    val generatedStatements = JavaTemplate.builder("others.add(#{});").build()
+                        .generateBefore<Statement>(
+                            Cursor(cursor, block.statements[0].elem),
+                            (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                        )
+                    assertThat(generatedStatements).`as`("The list of generated statements should be 1.").hasSize(1)
                     return block.withStatements(
                         ListUtils.concat(
                             JRightPadded(
@@ -73,7 +81,9 @@ interface JavaTemplateTest : RecipeTest {
                     n++;
                 }
             }
-        """
+        """,
+        afterConditions = {cu -> cu.getClasses() }
+
     )
 
     @Test
@@ -140,7 +150,7 @@ interface JavaTemplateTest : RecipeTest {
                     JavaTemplate.builder("@Deprecated").build()
                         .generateBefore<J.Annotation>(Cursor(cursor, method))[0]
                 ))
-                m = m.withReturnTypeExpr(m.returnTypeExpr!!.withPrefix(format(" ")));
+                m = m.withReturnTypeExpr(m.returnTypeExpr!!.withPrefix(format(" ")))
                 return m
             }
         }.toRecipe(),
