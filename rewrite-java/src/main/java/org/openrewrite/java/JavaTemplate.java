@@ -269,20 +269,32 @@ public class JavaTemplate {
 
     /**
      * The template code is marked before/after with comments. The extraction code will grab cursor elements between
-     * those two markers. Depending on insertion scope, the starting/ending comment markers may end up in elements
-     * that do not belong to the template. The context is used to demarcate when elements should be collected, collect
+     * those two markers. Depending on insertion scope, the first element (the one that has the start marker comment)
+     * may not be part of the template. The context is used to demarcate when elements should be collected, collect
      * the elements of the template (and keeping track of the depth those elements appear in the tree), and finally
      * keep track of element IDs that have already been collected (so they are not inadvertently added twice)
      */
     private static class ExtractionContext {
         boolean collectElements = false;
-        Map<Long, List<J>> snippetsByDepth = new TreeMap<>();
+        List<CollectedElement> collectedElements = new ArrayList<>();
         Set<UUID> collectedIds = new HashSet<>();
-        Long endDepth;
+        long startDepth = 0;
 
         public List<J> getSnippets() {
-            //The ending marker is always at the correct depth for the elements that should be extracted from the template.
-            return snippetsByDepth.get(endDepth);
+            //This returns all elements that have the same depth as the starting element.
+            return collectedElements.stream().filter(e-> e.depth == startDepth).map(e -> e.element).collect(Collectors.toList());
+        }
+
+        /**
+         * The context captures each element and it's depth in the tree.
+         */
+        private static class CollectedElement {
+            final long depth;
+            final J element;
+            CollectedElement(long depth, J element) {
+                this.depth = depth;
+                this.element = element;
+            }
         }
     }
 
@@ -293,27 +305,43 @@ public class JavaTemplate {
 
         @Override
         public Space visitSpace(Space space, ExtractionContext context) {
+
             long templateDepth = getCursor().getPathAsStream().count();
             if (findMarker(space, SNIPPET_MARKER_END) != null) {
-                //End mark, record the ending depth and turn off element collection.
-                context.endDepth = templateDepth;
+                //Ending marker found, stop collecting elements. NOTE: if the space was part of a prefix of an element
+                //that element will not be collected.
                 context.collectElements = false;
+
+                if (context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
+                    //If we have collected more than one element and the ending element is on the path of the first element, then
+                    //the first element does not belong to the template, exclude it and move the start depth up.
+                    context.collectedElements.remove(0);
+                    context.startDepth++;
+                }
             }
 
             Comment startToken = findMarker(space, SNIPPET_MARKER_START);
             if (startToken != null) {
-                //If the starting marker is found, collect the current cursor tree element, remove the marker comment,
-                //and flag the context to start collecting all elements until the end marker is found.
+                //If the starting marker is found, record the starting depth, collect the current cursor tree element,
+                //remove the marker comment, and flag the extractor to start collecting all elements until the end marker
+                //is found.
+                context.collectElements = true;
+                context.collectedIds.add(getCursor().getTree().getId());
+                context.startDepth = templateDepth;
+
+                if (getCursor().getTree() instanceof J.CompilationUnit) {
+                    //Special case: The starting marker can exist at the compilation unit (when inserting before
+                    //the first class declaration (with no imports). Do not add the compilation unit to the collected
+                    //elements
+                    context.startDepth++;
+                    return space;
+                }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
-                context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
-                        .add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
-                context.collectedIds.add(getCursor().getTree().getId());
-                context.collectElements = true;
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getTree()).withPrefix(space.withComments(comments))));
             } else if (context.collectElements && !context.collectedIds.contains(getCursor().getTree().getId())) {
-                //If collecting elements and the current cursor element has not already been colelcted, add it.
-                context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
-                        .add(getCursor().getTree());
+                //If collecting elements and the current cursor element has not already been collected, add it.
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().getTree())));
                 context.collectedIds.add(getCursor().getTree().getId());
             }
 

@@ -21,6 +21,7 @@ import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
+import org.openrewrite.java.format.MinimumViableSpacingProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
 import org.openrewrite.java.tree.Space
@@ -39,21 +40,33 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 val parent = cursor.parentOrThrow.getTree<J>()
                 if(parent is J.MethodDecl) {
+                    val template = JavaTemplate.builder("others.add(#{});").build()
 
-                    val generatedStatements = JavaTemplate.builder("others.add(#{});").build()
-                        .generateBefore<Statement>(
+                    //Test to make sure the template extraction is working correctly. Both of these calls should return
+                    //a single template element and should have type attribution
+
+                    //Test when statement is the insertion scope is before the first statement in the block
+                    var generatedMethodInvocations = template
+                        .generateBefore<J.MethodInvocation>(
                             Cursor(cursor, block.statements[0].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedStatements).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
+                    //Test when insertion scope is between two statements in a block
+                    generatedMethodInvocations = template
+                        .generateBefore<J.MethodInvocation>(
+                            Cursor(cursor, block.statements[1].elem),
+                            (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                        )
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
                     return block.withStatements(
                         ListUtils.concat(
                             JRightPadded(
-                                JavaTemplate.builder("others.add(#{});").build()
-                                    .generateBefore<Statement>(
-                                        Cursor(cursor, block.statements[0].elem),
-                                        (parent.params.elem[0].elem as J.VariableDecls).vars[0]
-                                    )[0],
+                                generatedMethodInvocations[0],
                                 Space.EMPTY
                             ),
                             block.statements
@@ -69,6 +82,7 @@ interface JavaTemplateTest : RecipeTest {
                 int n = 0;
                 void foo(String m, List<String> others) {
                     n++;
+                    n++;
                 }
             }
         """,
@@ -79,11 +93,11 @@ interface JavaTemplateTest : RecipeTest {
                 void foo(String m, List<String> others) {
                     others.add(m);
                     n++;
+                    n++;
                 }
             }
         """,
         afterConditions = {cu -> cu.getClasses() }
-
     )
 
     @Test
@@ -97,15 +111,33 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 val parent = cursor.parentOrThrow.getTree<J>()
                 if(parent is J.MethodDecl) {
+                    val template = JavaTemplate.builder("others.add(#{});").build()
+
+                    //Test to make sure the template extraction is working correctly. Both of these calls should return
+                    //a single template element and should have type attribution
+
+                    //Test when insertion scope is between two statements in a block
+                    var generatedMethodInvocations = template
+                        .generateAfter<J.MethodInvocation>(
+                            Cursor(cursor, block.statements[0].elem),
+                            (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                        )
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
+                    //Test when insertion scope is after the last statements in a block
+                    generatedMethodInvocations = template
+                        .generateAfter<J.MethodInvocation>(
+                            Cursor(cursor, block.statements[1].elem),
+                            (parent.params.elem[0].elem as J.VariableDecls).vars[0]
+                        )
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
                     return block.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(
-                                JavaTemplate.builder("others.add(#{});").build()
-                                    .generateAfter<Statement>(
-                                        Cursor(cursor, block.statements[0].elem),
-                                        (parent.params.elem[0].elem as J.VariableDecls).vars[0]
-                                    )[0],
+                            JRightPadded(generatedMethodInvocations[0],
                                 Space.EMPTY
                             )
                         )
@@ -120,6 +152,7 @@ interface JavaTemplateTest : RecipeTest {
                 int n = 0;
                 void foo(String m, List<String> others) {
                     n++;
+                    n++;
                 }
             }
         """,
@@ -128,6 +161,7 @@ interface JavaTemplateTest : RecipeTest {
             public class A {
                 int n = 0;
                 void foo(String m, List<String> others) {
+                    n++;
                     n++;
                     others.add(m);
                 }
@@ -150,7 +184,7 @@ interface JavaTemplateTest : RecipeTest {
                     JavaTemplate.builder("@Deprecated").build()
                         .generateBefore<J.Annotation>(Cursor(cursor, method))[0]
                 ))
-                m = m.withReturnTypeExpr(m.returnTypeExpr!!.withPrefix(format(" ")))
+                m = MinimumViableSpacingProcessor<ExecutionContext>().visitMethod(m, ExecutionContext.builder().build())
                 return m
             }
         }.toRecipe(),
@@ -163,6 +197,42 @@ interface JavaTemplateTest : RecipeTest {
         after = """
             public class A {
                 @Deprecated void foo() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun addAnnotationToClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+                var c = super.visitClassDecl(clazz, p)
+
+                val generatedAnnotations = JavaTemplate.builder("@Deprecated").build()
+                    .generateBefore<J.Annotation>(Cursor(cursor, clazz))
+
+                assertThat(generatedAnnotations).`as`("The list of generated annotations should be 1.").hasSize(1)
+                assertThat(generatedAnnotations[0].type).isNotNull
+
+                c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
+                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(c, ExecutionContext.builder().build())
+                return c
+            }
+        }.toRecipe(),
+        before = """
+            public class A {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            @Deprecated public class A {
+                void foo() {
                 }
             }
         """
