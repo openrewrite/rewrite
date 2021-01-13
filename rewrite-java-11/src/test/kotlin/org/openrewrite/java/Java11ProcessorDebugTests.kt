@@ -52,3 +52,7 @@ class Java11FindMethodTest : Java11Test, FindMethodTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11FindTypeTest : Java11Test, FindTypeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11SemanticallyEqualTest : Java11Test, SemanticallyEqualTest
