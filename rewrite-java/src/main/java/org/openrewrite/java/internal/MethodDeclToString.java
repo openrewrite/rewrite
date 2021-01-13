@@ -20,6 +20,7 @@ import org.openrewrite.java.tree.J;
 
 public class MethodDeclToString {
     public static String toString(J.MethodDecl method) {
+        //noinspection ConstantConditions
         return METHOD_PRINTER.visit(method, null);
     }
 

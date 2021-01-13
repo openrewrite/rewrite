@@ -21,6 +21,7 @@ import org.openrewrite.java.tree.Space;
 
 public class ImportToString {
     public static String toString(J.Import impoort) {
+        //noinspection ConstantConditions
         return IMPORT_PRINTER.visit(impoort, null);
     }
 

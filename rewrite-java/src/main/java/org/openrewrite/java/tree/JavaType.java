@@ -27,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
@@ -37,6 +38,7 @@ import static java.util.stream.Collectors.toList;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @JsonTypeInfo(use = JsonTypeInfo.Id.MINIMAL_CLASS, property = "@c")
 public interface JavaType extends Serializable {
+
     boolean deepEquals(@Nullable JavaType type);
 
     /**
@@ -137,6 +139,8 @@ public interface JavaType extends Serializable {
         @Nullable
         private final Class supertype;
 
+        private final String flyweightId;
+
         private Class(String fullyQualifiedName,
                       List<Var> members,
                       List<JavaType> typeParameters,
@@ -149,6 +153,16 @@ public interface JavaType extends Serializable {
             this.interfaces = interfaces;
             this.constructors = constructors;
             this.supertype = supertype;
+
+
+            //The flyweight ID is used to group class variants by their class names. The one execption to this rule
+            //are classes that include generic types, their IDs need to be a function of the class name plus the generic
+            //parameter types.
+            StringBuilder tag = new StringBuilder(fullyQualifiedName);
+            if (!typeParameters.isEmpty()) {
+                tag.append("<").append(typeParameters.stream().map(JavaType::toString).collect(Collectors.joining(","))).append(">");
+            }
+            this.flyweightId = tag.toString();
         }
 
         /**
@@ -182,37 +196,50 @@ public interface JavaType extends Serializable {
                                   @Nullable Class supertype,
                                   boolean relaxedClassTypeMatching) {
 
-            // when class type matching is NOT relaxed, the variants are the various versions of this fully qualified
-            // name, where equality is determined by whether the supertype hierarchy and members through the entire
-            // supertype hierarchy are equal
-            List<Var> sortedMembers = new ArrayList<>(members);
+            List<Var> sortedMembers;
+            if (fullyQualifiedName.equals("java.lang.String")) {
+                //There is a "serialPersistentFields" member within the String class which is used in normal Java
+                //serialization to customize how the String field is serialized. This field is tripping up Jackson
+                //serialization and is intentionally filtered to prevent errors.
+                sortedMembers = members.stream().filter(m -> !m.getName().equals("serialPersistentFields")).collect(Collectors.toList());
+            } else {
+                sortedMembers = new ArrayList<>(members);
+            }
             sortedMembers.sort(comparing(Var::getName));
-            JavaType.Class test = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
+
+            JavaType.Class candidate = new Class(fullyQualifiedName, sortedMembers, typeParameters, interfaces, constructors, supertype);
+
+            // This logic will attempt to match the candidate against a candidate in the flyweights. If a match is found,
+            // that instance is used over the new candidate to prevent a large memory footprint. If relaxed class type
+            // matching is "true" any variant with the same ID will be used. If the relaxed class type matching is "false",
+            // equality is determined by comparing the immediate structure of the class and also comparing the supertype
+            // hierarchies.
 
             synchronized (flyweights) {
-                Set<JavaType.Class> variants = flyweights.computeIfAbsent(fullyQualifiedName, fqn -> new HashSet<>());
+                Set<JavaType.Class> variants = flyweights.computeIfAbsent(candidate.flyweightId, fqn -> new HashSet<>());
 
                 if (relaxedClassTypeMatching) {
                     if (variants.isEmpty()) {
-                        variants.add(test);
-                        return test;
+                        variants.add(candidate);
+                        return candidate;
                     }
                     return variants.iterator().next();
                 } else {
                     for (Class v : variants) {
-                        if (v.deepEquals(test)) {
+                        if (v.deepEquals(candidate)) {
                             return v;
                         }
                     }
 
-                    if (test.supertype == null) {
-                        return variants.stream().findFirst().orElseGet(() -> {
-                            variants.add(test);
-                            return test;
+                    if (candidate.supertype == null) {
+
+                        return variants.stream().filter(v -> v.supertype != null).findFirst().orElseGet(() -> {
+                            variants.add(candidate);
+                            return candidate;
                         });
                     }
-                    variants.add(test);
-                    return test;
+                    variants.add(candidate);
+                    return candidate;
                 }
             }
         }
@@ -230,6 +257,10 @@ public interface JavaType extends Serializable {
             }
 
             synchronized (flyweights) {
+                //Double checked locking.
+                if (constructors != null) {
+                    return constructors;
+                }
                 List<Method> reflectedConstructors = new ArrayList<>();
                 try {
                     java.lang.Class<?> reflectionClass = java.lang.Class.forName(fullyQualifiedName, false, JavaType.class.getClassLoader());
@@ -238,7 +269,7 @@ public interface JavaType extends Serializable {
 
                         // TODO can we generate a generic signature as well?
                         Method.Signature resolvedSignature = new Method.Signature(selfType, Arrays.stream(constructor.getParameterTypes())
-                                .map(pt -> Class.build(pt.getName()))
+                                .map(Class::resolveTypeFromClass)
                                 .collect(toList()));
 
                         List<String> parameterNames = Arrays.stream(constructor.getParameters()).map(Parameter::getName).collect(toList());
@@ -249,10 +280,41 @@ public interface JavaType extends Serializable {
                         reflectedConstructors.add(Method.build(selfType, "<reflection_constructor>", resolvedSignature, resolvedSignature,
                                 parameterNames, singleton(Flag.Public)));
                     }
+                    constructors = reflectedConstructors;
                 } catch (ClassNotFoundException ignored) {
                     // oh well, we tried
                 }
                 return reflectedConstructors;
+            }
+        }
+        private static JavaType resolveTypeFromClass(java.lang.Class<?> _class) {
+
+            if (!_class.isPrimitive() && !_class.isArray()) {
+                return Class.build(_class.getName());
+            } else if (_class.isPrimitive()) {
+                if (_class ==  boolean.class) {
+                    return Primitive.Boolean;
+                } else if (_class == String.class) {
+                    return Primitive.String;
+                } else if (_class == int.class) {
+                    return Primitive.Int;
+                } else if (_class == long.class) {
+                    return Primitive.Long;
+                } else if (_class == double.class) {
+                    return Primitive.Double;
+                } else if (_class == char.class) {
+                    return Primitive.Char;
+                } else if (_class == byte.class) {
+                    return Primitive.Byte;
+                } else if (_class == float.class) {
+                    return Primitive.Float;
+                } else if (_class == short.class) {
+                    return Primitive.Short;
+                } else {
+                    throw new IllegalArgumentException("Unknown primitive argument");
+                }
+            } else {
+                return new JavaType.Array(resolveTypeFromClass(_class.getComponentType()));
             }
         }
 

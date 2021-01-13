@@ -15,17 +15,19 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangeDependencyVersion extends MavenRefactorVisitor {
+public class ChangeDependencyVersion extends Recipe {
     private String groupId;
 
     @Nullable
@@ -34,7 +36,7 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
     private String toVersion;
 
     public ChangeDependencyVersion() {
-        setCursoringOn();
+        this.processor = () -> new ChangeDependencyVersionProcessor(groupId, artifactId, toVersion);
     }
 
     public void setGroupId(String groupId) {
@@ -56,39 +58,55 @@ public class ChangeDependencyVersion extends MavenRefactorVisitor {
                 .and(required("toVersion", toVersion));
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
-            Optional<Xml.Tag> versionTag = tag.getChild("version");
-            if (versionTag.isPresent()) {
-                String version = versionTag.get().getValue().orElse(null);
-                if (version != null) {
-                    if (version.trim().startsWith("${") &&
-                            !toVersion.equals(model.getProperty(version.trim()))) {
-                        ChangePropertyValue changePropertyValue = new ChangePropertyValue();
-                        changePropertyValue.setKey(version);
-                        changePropertyValue.setToValue(toVersion);
-                        andThen(changePropertyValue);
-                    } else if (!toVersion.equals(version)) {
-                        andThen(new ChangeTagValue.Scoped(versionTag.get(), toVersion));
-                    }
-                }
-            }
-        } else if (!modules.isEmpty() && isPropertyTag()) {
-            String propertyKeyRef = "${" + tag.getName() + "}";
+    private static class ChangeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
+        private final String groupId;
 
-            OUTER:
-            for (Pom module : modules) {
-                for (Pom.Dependency dependency : module.getDependencies()) {
-                    if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
-                        andThen(new ChangeTagValue.Scoped(tag, toVersion));
-                        break OUTER;
-                    }
-                }
+        @Nullable
+        private final String artifactId;
 
-            }
+        private final String toVersion;
+
+        public ChangeDependencyVersionProcessor(String groupId, @Nullable String artifactId, String toVersion) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.toVersion = toVersion;
+            setCursoringOn();
         }
 
-        return super.visitTag(tag);
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isDependencyTag(groupId, artifactId) || isManagedDependencyTag(groupId, artifactId)) {
+                Optional<Xml.Tag> versionTag = tag.getChild("version");
+                if (versionTag.isPresent()) {
+                    String version = versionTag.get().getValue().orElse(null);
+                    if (version != null) {
+                        if (version.trim().startsWith("${") &&
+                                !toVersion.equals(model.getProperty(version.trim()))) {
+                            ChangePropertyValue changePropertyValue = new ChangePropertyValue();
+                            changePropertyValue.setKey(version);
+                            changePropertyValue.setToValue(toVersion);
+                            doAfterVisit(changePropertyValue);
+                        } else if (!toVersion.equals(version)) {
+                            doAfterVisit(new ChangeTagValueProcessor<>(versionTag.get(), toVersion));
+                        }
+                    }
+                }
+            } else if (!modules.isEmpty() && isPropertyTag()) {
+                String propertyKeyRef = "${" + tag.getName() + "}";
+
+                OUTER:
+                for (Pom module : modules) {
+                    for (Pom.Dependency dependency : module.getDependencies()) {
+                        if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
+                            doAfterVisit(new ChangeTagValueProcessor<>(tag, toVersion));
+                            break OUTER;
+                        }
+                    }
+
+                }
+            }
+
+            return super.visitTag(tag, ctx);
+        }
     }
 }

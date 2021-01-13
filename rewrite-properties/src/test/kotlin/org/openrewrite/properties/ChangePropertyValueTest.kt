@@ -16,17 +16,19 @@
 package org.openrewrite.properties
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.whenParsedBy
+import org.openrewrite.RecipeTest
 
-class ChangePropertyValueTest {
-    @Test
-    fun changeValue() {
-        "management.metrics.binders.files.enabled=true"
-                .whenParsedBy(PropertiesParser())
-                .whenVisitedBy(ChangePropertyValue().apply {
-                    setKey("management.metrics.binders.files.enabled")
-                    setToValue("false")
-                })
-                .isRefactoredTo("management.metrics.binders.files.enabled=false")
+class ChangePropertyValueTest : RecipeTest {
+
+    override val recipe = ChangePropertyValue().apply {
+        setKey("management.metrics.binders.files.enabled")
+        setToValue("false")
     }
+
+    @Test
+    fun changeValue() = assertChanged(
+            parser = PropertiesParser(),
+            before = "management.metrics.binders.files.enabled=true",
+            after = "management.metrics.binders.files.enabled=false"
+    )
 }

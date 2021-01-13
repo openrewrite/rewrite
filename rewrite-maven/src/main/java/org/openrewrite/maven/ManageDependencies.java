@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
@@ -22,9 +24,9 @@ import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.AddToTag;
-import org.openrewrite.xml.ChangeTagValue;
-import org.openrewrite.xml.RemoveContent;
+import org.openrewrite.xml.AddToTagProcessor;
+import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.RemoveContentProcessor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -44,19 +46,17 @@ import static org.openrewrite.Validated.required;
  * align-able to the same version (either the version provided to this visitor or the maximum matching
  * version if none is provided).
  */
-public class ManageDependencies extends MavenRefactorVisitor {
-    Pattern groupPattern;
+public class ManageDependencies extends Recipe {
+    private Pattern groupPattern;
 
     @Nullable
-    Pattern artifactPattern;
+    private Pattern artifactPattern;
 
     @Nullable
-    String version;
-
-    String selectedVersion;
+    private String version;
 
     public ManageDependencies() {
-        setCursoringOn();
+        this.processor = () -> new ManageDependenciesProcessor(groupPattern, artifactPattern, version);
     }
 
     public void setGroupPattern(@Nullable String groupPattern) {
@@ -80,107 +80,119 @@ public class ManageDependencies extends MavenRefactorVisitor {
         return required("groupPattern", groupPattern);
     }
 
-    @Override
-    public boolean isIdempotent() {
-        return false;
-    }
+    private static class ManageDependenciesProcessor extends MavenProcessor<ExecutionContext> {
+        private final Pattern groupPattern;
 
-    @Override
-    public Maven visitMaven(Maven maven) {
-        model = maven.getModel();
+        @Nullable
+        private final Pattern artifactPattern;
 
-        Collection<Pom.Dependency> manageableDependencies = findDependencies(d ->
-                groupPattern.matcher(d.getGroupId()).matches() && (artifactPattern == null || artifactPattern.matcher(d.getArtifactId()).matches()));
-
-        selectedVersion = version;
-
-        if (!manageableDependencies.isEmpty()) {
-            if (version == null) {
-                selectedVersion = manageableDependencies.stream()
-                        .map(Pom.Dependency::getVersion)
-                        .max(Comparator.comparing(Version::new))
-                        .get();
-            }
-
-            List<GroupArtifact> requiresDependencyManagement = manageableDependencies.stream()
-                    .filter(d -> model.getManagedVersion(d.getGroupId(), d.getArtifactId()) == null)
-                    .map(d -> new GroupArtifact(d.getGroupId(), d.getArtifactId()))
-                    .distinct()
-                    .collect(toList());
-
-            if (!requiresDependencyManagement.isEmpty()) {
-                Xml.Tag root = maven.getRoot();
-                if (!root.getChild("dependencyManagement").isPresent()) {
-                    andThen(new AddToTag.Scoped(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
-                            new MavenTagInsertionComparator(root.getChildren())));
-                }
-
-                for (GroupArtifact ga : requiresDependencyManagement) {
-                    andThen(new InsertDependencyInOrder(ga.getGroupId(), ga.getArtifactId(), selectedVersion));
-                }
-            }
-        }
-
-        return super.visitMaven(maven);
-    }
-
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (isManagedDependencyTag() && hasMatchingGroupArtifact(tag)) {
-            andThen(
-                    new ChangeTagValue.Scoped(
-                            tag.getChild("version")
-                                    .orElseThrow(() -> new IllegalStateException("Version tag must exist")),
-                            selectedVersion
-                    )
-            );
-        } else if (isDependencyTag() && hasMatchingGroupArtifact(tag)) {
-            tag.getChild("version").ifPresent(version -> andThen(new RemoveContent.Scoped(version, false)));
-            return tag;
-        }
-
-        return super.visitTag(tag);
-    }
-
-    private boolean hasMatchingGroupArtifact(Xml.Tag tag) {
-        return groupPattern.matcher(tag.getChildValue("groupId").orElse(model.getGroupId())).matches() &&
-                (artifactPattern == null || artifactPattern.matcher(tag.getChildValue("artifactId")
-                        .orElse(model.getArtifactId())).matches());
-    }
-
-    private static class InsertDependencyInOrder extends MavenRefactorVisitor {
-        private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
-
-        private final String groupId;
-        private final String artifactId;
+        @Nullable
         private final String version;
 
-        private InsertDependencyInOrder(String groupId, String artifactId, String version) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
+        private String selectedVersion;
+
+        private ManageDependenciesProcessor(Pattern groupPattern, @Nullable Pattern artifactPattern, @Nullable String version) {
+            this.groupPattern = groupPattern;
+            this.artifactPattern = artifactPattern;
             this.version = version;
             setCursoringOn();
         }
 
         @Override
-        public Xml visitTag(Xml.Tag tag) {
-            if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
-                Xml.Tag dependencyTag = Xml.Tag.build(
-                        "\n<dependency>\n" +
-                                "<groupId>" + groupId + "</groupId>\n" +
-                                "<artifactId>" + artifactId + "</artifactId>\n" +
-                                (version == null ? "" :
-                                        "<version>" + version + "</version>\n") +
-                                "</dependency>"
-                );
+        public Maven visitMaven(Maven maven, ExecutionContext ctx) {
+            model = maven.getModel();
 
-                andThen(new AddToTag.Scoped(tag, dependencyTag,
-                        new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+            Collection<Pom.Dependency> manageableDependencies = findDependencies(d ->
+                    groupPattern.matcher(d.getGroupId()).matches() && (artifactPattern == null || artifactPattern.matcher(d.getArtifactId()).matches()));
 
+            selectedVersion = version;
+
+            if (!manageableDependencies.isEmpty()) {
+                if (version == null) {
+                    selectedVersion = manageableDependencies.stream()
+                            .map(Pom.Dependency::getVersion)
+                            .max(Comparator.comparing(Version::new))
+                            .get();
+                }
+
+                List<GroupArtifact> requiresDependencyManagement = manageableDependencies.stream()
+                        .filter(d -> model.getManagedVersion(d.getGroupId(), d.getArtifactId()) == null)
+                        .map(d -> new GroupArtifact(d.getGroupId(), d.getArtifactId()))
+                        .distinct()
+                        .collect(toList());
+
+                if (!requiresDependencyManagement.isEmpty()) {
+                    Xml.Tag root = maven.getRoot();
+                    if (!root.getChild("dependencyManagement").isPresent()) {
+                        doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
+                                new MavenTagInsertionComparator(root.getChildren())));
+                    }
+
+                    for (GroupArtifact ga : requiresDependencyManagement) {
+                        doAfterVisit(new InsertDependencyInOrder(ga.getGroupId(), ga.getArtifactId(), selectedVersion));
+                    }
+                }
+            }
+
+            return super.visitMaven(maven, ctx);
+        }
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (isManagedDependencyTag() && hasMatchingGroupArtifact(tag)) {
+                doAfterVisit(new ChangeTagValueProcessor<>(
+                        tag.getChild("version")
+                                .orElseThrow(() -> new IllegalStateException("Version tag must exist")),
+                        selectedVersion
+                ));
+            } else if (isDependencyTag() && hasMatchingGroupArtifact(tag)) {
+                tag.getChild("version").ifPresent(version -> doAfterVisit(new RemoveContentProcessor<>(version, false)));
                 return tag;
             }
 
-            return super.visitTag(tag);
+            return super.visitTag(tag, ctx);
+        }
+
+        private boolean hasMatchingGroupArtifact(Xml.Tag tag) {
+            return groupPattern.matcher(tag.getChildValue("groupId").orElse(model.getGroupId())).matches() &&
+                    (artifactPattern == null || artifactPattern.matcher(tag.getChildValue("artifactId")
+                            .orElse(model.getArtifactId())).matches());
+        }
+
+        private static class InsertDependencyInOrder extends MavenProcessor<ExecutionContext> {
+            private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
+
+            private final String groupId;
+            private final String artifactId;
+            private final String version;
+
+            private InsertDependencyInOrder(String groupId, String artifactId, String version) {
+                this.groupId = groupId;
+                this.artifactId = artifactId;
+                this.version = version;
+                setCursoringOn();
+            }
+
+            @Override
+            public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+                if (MANAGED_DEPENDENCIES_MATCHER.matches(getCursor())) {
+                    Xml.Tag dependencyTag = Xml.Tag.build(
+                            "\n<dependency>\n" +
+                                    "<groupId>" + groupId + "</groupId>\n" +
+                                    "<artifactId>" + artifactId + "</artifactId>\n" +
+                                    (version == null ? "" :
+                                            "<version>" + version + "</version>\n") +
+                                    "</dependency>"
+                    );
+
+                    doAfterVisit(new AddToTagProcessor<>(tag, dependencyTag,
+                            new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
+
+                    return tag;
+                }
+
+                return super.visitTag(tag, ctx);
+            }
         }
     }
 }

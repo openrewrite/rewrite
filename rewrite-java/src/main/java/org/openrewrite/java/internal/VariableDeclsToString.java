@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 
 public class VariableDeclsToString {
     public static String toString(J.VariableDecls v) {
+        //noinspection ConstantConditions
         return VARIABLE_PRINTER.visit(v, null);
     }
 

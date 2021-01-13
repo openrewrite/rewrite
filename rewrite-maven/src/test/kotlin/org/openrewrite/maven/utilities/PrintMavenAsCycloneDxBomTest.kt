@@ -48,7 +48,7 @@ class PrintMavenAsCycloneDxBomTest {
                     </project>
                 """)
 
-        assertThat(PrintMavenAsCycloneDxBom().visitMaven(pom[0])).isEqualTo("""
+        assertThat(PrintMavenAsCycloneDxBom.print(pom[0])).isEqualTo("""
             <?xml version="1.0" encoding="UTF-8"?>
             <bom xmlns="http://cyclonedx.org/schema/bom/1.2" serialNumber="urn:uuid:${pom[0].id}" version="1">
               <components>

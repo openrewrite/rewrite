@@ -15,22 +15,22 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
-import org.openrewrite.xml.ChangeTagValue;
+import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
 
-public class ChangeParentVersion extends MavenRefactorVisitor {
-    private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
-
+public class ChangeParentVersion extends Recipe {
     private String groupId;
     private String artifactId;
     private String toVersion;
 
     public ChangeParentVersion() {
-        setCursoringOn();
+        this.processor = () -> new ChangeParentVersionProcessor(groupId, artifactId, toVersion);
     }
 
     public void setGroupId(String groupId) {
@@ -52,16 +52,31 @@ public class ChangeParentVersion extends MavenRefactorVisitor {
                 .and(required("toVersion", toVersion));
     }
 
-    @Override
-    public Xml visitTag(Xml.Tag tag) {
-        if (PARENT_VERSION_MATCHER.matches(getCursor())) {
-            Xml.Tag parent = getCursor().getParentOrThrow().getTree();
-            if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
-                    artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
-                    !toVersion.equals(tag.getValue().orElse(null))) {
-                andThen(new ChangeTagValue.Scoped(tag, toVersion));
-            }
+    private static class ChangeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
+        private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
+
+        private final String groupId;
+        private final String artifactId;
+        private final String toVersion;
+
+        private ChangeParentVersionProcessor(String groupId, String artifactId, String toVersion) {
+            this.groupId = groupId;
+            this.artifactId = artifactId;
+            this.toVersion = toVersion;
+            setCursoringOn();
         }
-        return super.visitTag(tag);
+
+        @Override
+        public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
+            if (PARENT_VERSION_MATCHER.matches(getCursor())) {
+                Xml.Tag parent = getCursor().getParentOrThrow().getTree();
+                if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
+                        artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
+                        !toVersion.equals(tag.getValue().orElse(null))) {
+                    doAfterVisit(new ChangeTagValueProcessor<>(tag, toVersion));
+                }
+            }
+            return super.visitTag(tag, ctx);
+        }
     }
 }

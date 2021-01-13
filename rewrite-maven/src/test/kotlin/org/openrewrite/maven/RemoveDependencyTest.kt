@@ -17,90 +17,90 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
 
-class RemoveDependencyTest : RefactorVisitorTestForParser<Maven> {
+class RemoveDependencyTest : RecipeTest {
     companion object {
         private val mavenCache = InMemoryCache()
     }
 
     override val parser: MavenParser = MavenParser.builder()
-            .resolveOptional(false)
-            .cache(mavenCache)
-            .build()
+        .resolveOptional(false)
+        .cache(mavenCache)
+        .build()
 
-    override val visitors = listOf(RemoveDependency().apply {
+    override val recipe = RemoveDependency().apply {
         setGroupId("junit")
         setArtifactId("junit")
-    })
+    }
 
     @Test
-    fun removeDependency() = assertRefactored(
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>29.0-jre</version>
-                    </dependency>
-                    <dependency>
-                      <groupId>junit</groupId>
-                      <artifactId>junit</artifactId>
-                      <version>4.13.1</version>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>29.0-jre</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
-            afterConditions = { maven: Maven ->
-                assertEquals(1,  maven.model.dependencies.size)
-            }
+    fun removeDependency() = assertChanged(
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+                <dependency>
+                  <groupId>junit</groupId>
+                  <artifactId>junit</artifactId>
+                  <version>4.13.1</version>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
+        afterConditions = { maven: Maven ->
+            assertEquals(1, maven.model.dependencies.size)
+        }
     )
 
     @Test
     fun noDependencyToRemove() = assertUnchanged(
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                  
-                  <dependencies>
-                    <dependency>
-                      <groupId>com.google.guava</groupId>
-                      <artifactId>guava</artifactId>
-                      <version>29.0-jre</version>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+              
+              <dependencies>
+                <dependency>
+                  <groupId>com.google.guava</groupId>
+                  <artifactId>guava</artifactId>
+                  <version>29.0-jre</version>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 }

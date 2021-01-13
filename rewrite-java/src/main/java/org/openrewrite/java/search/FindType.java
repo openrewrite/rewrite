@@ -49,8 +49,10 @@ public final class FindType extends Recipe {
     }
 
     public static Set<NameTree> find(J j, String clazz) {
-        return SearchResult.find(new FindTypeProcessor(clazz).visit(j,
-                ExecutionContext.builder().build()));
+        //noinspection ConstantConditions
+        return new FindTypeProcessor(clazz)
+                .visit(j, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static class FindTypeProcessor extends JavaProcessor<ExecutionContext> {

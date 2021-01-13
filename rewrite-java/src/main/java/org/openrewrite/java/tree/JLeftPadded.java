@@ -21,6 +21,8 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 
+import java.util.function.Function;
+
 /**
  * A Java element that could have space preceding some delimiter.
  * For example an array dimension could have space before the opening
@@ -38,4 +40,8 @@ public class JLeftPadded<T> {
 
     @With
     T elem;
+
+    public JLeftPadded<T> map(Function<T, T> map) {
+        return withElem(map.apply(elem));
+    }
 }

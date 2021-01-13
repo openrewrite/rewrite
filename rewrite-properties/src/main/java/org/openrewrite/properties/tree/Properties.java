@@ -23,31 +23,44 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.*;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.properties.PropertiesSourceVisitor;
-import org.openrewrite.properties.internal.PrintProperties;
+import org.openrewrite.properties.PropertiesVisitor;
+import org.openrewrite.properties.internal.PropertiesPrinter;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Properties extends Serializable, Tree {
+
+    default String print(TreePrinter<?> printer) {
+        return new PropertiesPrinter<>((TreePrinter<?>)printer).visit(this, null);
+    }
+
     @Override
     default String print() {
-        return new PrintProperties().visit(this);
+        return new PropertiesPrinter<>(TreePrinter.identity()).visit(this, null);
     }
 
     @Override
-    default <R> R accept(SourceVisitor<R> v) {
-        return v instanceof PropertiesSourceVisitor ?
-                acceptProperties((PropertiesSourceVisitor<R>) v) : v.defaultTo(null);
+    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+        return v instanceof PropertiesVisitor ?
+                acceptProperties((PropertiesVisitor<R, P>) v, p) : v.defaultValue(null, p);
     }
 
-    default <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
-        return v.defaultTo(null);
+    default <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+        return v.defaultValue(this, p);
     }
+
+    String getPrefix();
+
+    Properties withPrefix(String prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -63,22 +76,17 @@ public interface Properties extends Serializable, Tree {
         List<Content> content;
 
         @With
-        Formatting eof;
+        String eof;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public Formatting getFormatting() {
-            return formatting;
-        }
-
-        @Override
-        public <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
-            return v.visitFile(this);
+        public <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+            return v.visitFile(this, p);
         }
     }
 
@@ -96,23 +104,20 @@ public interface Properties extends Serializable, Tree {
         String key;
 
         @With
-        Formatting beforeEquals;
+        String beforeEquals;
 
         @With
         Value value;
 
         @With
-        Formatting afterValue;
-
-        @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public <R> R acceptProperties(PropertiesSourceVisitor<R> v) {
-            return v.visitEntry(this);
+        public <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+            return v.visitEntry(this, p);
         }
     }
 
@@ -127,7 +132,7 @@ public interface Properties extends Serializable, Tree {
         String text;
 
         @With
-        Formatting formatting;
+        String prefix;
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -141,7 +146,7 @@ public interface Properties extends Serializable, Tree {
         String message;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;

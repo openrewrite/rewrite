@@ -26,6 +26,7 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindType;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
@@ -50,7 +51,8 @@ public interface J extends Serializable, Tree {
     @Override
     default <R, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof JavaVisitor ?
-                acceptJava((JavaVisitor<R, P>) v, p) : v.defaultValue(null, p);
+                acceptJava((JavaVisitor<R, P>) v, p) :
+                v.defaultValue(null, p);
     }
 
     default <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
@@ -77,6 +79,19 @@ public interface J extends Serializable, Tree {
 
     default <J2 extends J> J2 withComments(List<Comment> comments) {
         return withPrefix(getPrefix().withComments(comments));
+    }
+
+    /**
+     * Find all subtrees marked with a particular marker rooted at this tree.
+     *
+     * @param markerType The marker type to look for
+     * @param <J2>       The expected supertype common to all subtrees that could be found.
+     * @return The set of matching subtrees.
+     */
+    default <J2 extends J> Set<J2> findMarkedWith(Class<? extends Marker> markerType) {
+        Set<J2> trees = new HashSet<>();
+        new JavaListMarkersProcessor<J2>(markerType).visit(this, trees);
+        return trees;
     }
 
     @SuppressWarnings("unchecked")

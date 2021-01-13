@@ -560,4 +560,15 @@ interface BlankLinesTest : RecipeTest {
             }
         """
     )
+
+    @Test
+    fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(listOf(IntelliJ.defaultBlankLine())).build(),
+        before = """
+            package com.intellij.samples;
+
+            public class Test {
+            }
+        """
+    )
 }

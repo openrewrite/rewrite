@@ -55,4 +55,78 @@ public class IntelliJ {
 
         return style;
     }
+
+    public static SpacesStyle defaultSpaces() {
+        SpacesStyle style = new SpacesStyle();
+
+        SpacesStyle.BeforeParentheses beforeParentheses = new SpacesStyle.BeforeParentheses();
+        beforeParentheses.setIfParentheses(true);
+        beforeParentheses.setForParentheses(true);
+        beforeParentheses.setWhileParentheses(true);
+        beforeParentheses.setSwitchParentheses(true);
+        beforeParentheses.setTryParentheses(true);
+        beforeParentheses.setCatchParentheses(true);
+        beforeParentheses.setSynchronizedParentheses(true);
+        style.setBeforeParentheses(beforeParentheses);
+
+        SpacesStyle.AroundOperators aroundOperators = new SpacesStyle.AroundOperators();
+        aroundOperators.setAssignment(true);
+        aroundOperators.setLogical(true);
+        aroundOperators.setEquality(true);
+        aroundOperators.setRelational(true);
+        aroundOperators.setBitwise(true);
+        aroundOperators.setAdditive(true);
+        aroundOperators.setMultiplicative(true);
+        aroundOperators.setShift(true);
+        aroundOperators.setLambdaArrow(true);
+        style.setAroundOperators(aroundOperators);
+
+        SpacesStyle.BeforeLeftBrace beforeLeftBrace = new SpacesStyle.BeforeLeftBrace();
+        beforeLeftBrace.setClassLeftBrace(true);
+        beforeLeftBrace.setMethodLeftBrace(true);
+        beforeLeftBrace.setIfLeftBrace(true);
+        beforeLeftBrace.setElseLeftBrace(true);
+        beforeLeftBrace.setForLeftBrace(true);
+        beforeLeftBrace.setWhileLeftBrace(true);
+        beforeLeftBrace.setDoLeftBrace(true);
+        beforeLeftBrace.setSwitchLeftBrace(true);
+        beforeLeftBrace.setTryLeftBrace(true);
+        beforeLeftBrace.setCatchLeftBrace(true);
+        beforeLeftBrace.setFinallyLeftBrace(true);
+        beforeLeftBrace.setSynchronizedLeftBrace(true);
+        style.setBeforeLeftBrace(beforeLeftBrace);
+
+        SpacesStyle.BeforeKeywords beforeKeywords = new SpacesStyle.BeforeKeywords();
+        beforeKeywords.setElseKeyword(true);
+        beforeKeywords.setWhileKeyword(true);
+        beforeKeywords.setCatchKeyword(true);
+        beforeKeywords.setFinallyKeyword(true);
+        style.setBeforeKeywords(beforeKeywords);
+
+        style.setWithin(new SpacesStyle.Within());
+
+        SpacesStyle.TernaryOperator ternaryOperator = new SpacesStyle.TernaryOperator();
+        ternaryOperator.setBeforeQuestionMark(true);
+        ternaryOperator.setAfterQuestionMark(true);
+        ternaryOperator.setBeforeColon(true);
+        ternaryOperator.setAfterColon(true);
+        style.setTernaryOperator(ternaryOperator);
+
+        SpacesStyle.TypeArguments typeArguments = new SpacesStyle.TypeArguments();
+        typeArguments.setAfterComma(true);
+        style.setTypeArguments(typeArguments);
+
+        SpacesStyle.Other other = new SpacesStyle.Other();
+        other.setAfterComma(true);
+        other.setAfterForSemicolon(true);
+        other.setAfterTypeCast(true);
+        other.setBeforeColonInForEach(true);
+        style.setOther(other);
+
+        SpacesStyle.TypeParameters typeParameters = new SpacesStyle.TypeParameters();
+        typeParameters.setAroundTypeBounds(true);
+        style.setTypeParameters(typeParameters);
+
+        return style;
+    }
 }

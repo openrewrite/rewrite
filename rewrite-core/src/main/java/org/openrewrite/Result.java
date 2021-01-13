@@ -82,10 +82,9 @@ public class Result {
                 recipesThatMadeChanges).getDiff();
     }
 
-    public Class<? extends Tree> getTreeType() {
-        return before == null ?
-                (after == null ? null : after.getClass()) :
-                before.getClass();
+    @Override
+    public String toString() {
+        return diff();
     }
 
     static class InMemoryDiffEntry extends DiffEntry {

@@ -407,6 +407,31 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun annotations(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+        before = """
+            @Deprecated
+            @SuppressWarnings("ALL")
+            public class A {
+            @Deprecated
+            @SuppressWarnings("ALL")
+                class B {
+                }
+            }
+        """,
+        after = """
+            @Deprecated
+            @SuppressWarnings("ALL")
+            public class A {
+                @Deprecated
+                @SuppressWarnings("ALL")
+                class B {
+                }
+            }
+        """
+    )
+
+    @Test
     fun javadoc(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
         before = """

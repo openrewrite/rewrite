@@ -15,16 +15,12 @@
  */
 package org.openrewrite.maven.utilities;
 
-import org.openrewrite.Tree;
-import org.openrewrite.internal.StreamUtils;
-import org.openrewrite.maven.AbstractMavenSourceVisitor;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.maven.tree.Scope;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,14 +29,11 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
 /**
  * Print the dependency graph in the CycloneDX (https://cyclonedx.org/) bill of materials (BOM) format.
  */
-public class PrintMavenAsCycloneDxBom extends AbstractMavenSourceVisitor<String> {
-    @Override
-    public String defaultTo(Tree t) {
-        return "";
+public final class PrintMavenAsCycloneDxBom {
+    private PrintMavenAsCycloneDxBom() {
     }
 
-    @Override
-    public String visitMaven(Maven maven) {
+    public static String print(Maven maven) {
         Pom pom = maven.getModel();
         StringBuilder bom = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
 
@@ -66,7 +59,7 @@ public class PrintMavenAsCycloneDxBom extends AbstractMavenSourceVisitor<String>
         return bom.toString();
     }
 
-    private void writeLicenses(Maven maven, StringBuilder bom) {
+    private static void writeLicenses(Maven maven, StringBuilder bom) {
         if (!maven.getModel().getLicenses().isEmpty()) {
             bom.append("      <licenses>\n");
 
@@ -78,20 +71,20 @@ public class PrintMavenAsCycloneDxBom extends AbstractMavenSourceVisitor<String>
         }
     }
 
-    private void writeDependencies(Maven maven, StringBuilder bom) {
+    private static void writeDependencies(Maven maven, StringBuilder bom) {
         Pom pom = maven.getModel();
         if (!pom.getDependencies().isEmpty()) {
             bom.append("      <dependencies>\n");
             bom.append("        <dependency ref=\"").append(pom.getArtifactId()).append("\">\n");
 
             List<Pom.Dependency> bomDependencies = pom.getDependencies().stream()
-                    .filter(this::isCompileOrRuntime)
-                    .flatMap(this::enumerateTransitives)
+                    .filter(PrintMavenAsCycloneDxBom::isCompileOrRuntime)
+                    .flatMap(PrintMavenAsCycloneDxBom::enumerateTransitives)
                     .filter(distinctBy(dep -> dep.getGroupId() + ":" + dep.getArtifactId()))
                     .sorted(Comparator.comparing(Pom.Dependency::getGroupId).thenComparing(Pom.Dependency::getArtifactId))
                     .collect(Collectors.toList());
 
-            for(Pom.Dependency mvid : bomDependencies) {
+            for (Pom.Dependency mvid : bomDependencies) {
                 bom.append("          <dependency ref=\"pkg:maven/")
                         .append(mvid.getGroupId())
                         .append("/")
@@ -109,16 +102,16 @@ public class PrintMavenAsCycloneDxBom extends AbstractMavenSourceVisitor<String>
     /**
      * Return a stream of the dependency and all of its transitive dependencies
      */
-    private Stream<Pom.Dependency> enumerateTransitives(Pom.Dependency dependency) {
+    private static Stream<Pom.Dependency> enumerateTransitives(Pom.Dependency dependency) {
         return Stream.concat(
                 Stream.of(dependency),
                 dependency.getModel().getDependencies().stream()
-                        .filter(this::isCompileOrRuntime)
-                        .flatMap(this::enumerateTransitives)
+                        .filter(PrintMavenAsCycloneDxBom::isCompileOrRuntime)
+                        .flatMap(PrintMavenAsCycloneDxBom::enumerateTransitives)
         );
     }
 
-    private boolean isCompileOrRuntime(Pom.Dependency dependency) {
+    private static boolean isCompileOrRuntime(Pom.Dependency dependency) {
         return dependency.getScope().equals(Scope.Compile) || dependency.getScope().equals(Scope.Runtime);
     }
 }

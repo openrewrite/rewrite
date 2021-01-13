@@ -22,7 +22,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
-import org.jetbrains.annotations.NotNull;
 import org.mapdb.DataInput2;
 import org.mapdb.DataOutput2;
 import org.mapdb.Serializer;
@@ -53,14 +52,14 @@ public class JacksonMapdbSerializer<T> implements Serializer<T> {
     }
 
     @Override
-    public void serialize(@NotNull DataOutput2 out, @NotNull T value) throws IOException {
+    public void serialize(DataOutput2 out, T value) throws IOException {
         byte[] bytes = mapper.writeValueAsBytes(value);
         out.writeInt(bytes.length);
         out.write(bytes);
     }
 
     @Override
-    public T deserialize(@NotNull DataInput2 input, int available) throws IOException {
+    public T deserialize(DataInput2 input, int available) throws IOException {
         byte[] bytes = new byte[input.readInt()];
         input.readFully(bytes);
         return mapper.readValue(bytes, tClass);
