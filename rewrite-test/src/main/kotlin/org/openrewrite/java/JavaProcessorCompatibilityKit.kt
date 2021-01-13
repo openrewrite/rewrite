@@ -111,4 +111,7 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class UseStaticImportTck : UseStaticImportTest
+
+    @Nested
+    inner class SemanticallyEqualTck : SemanticallyEqualTest
 }

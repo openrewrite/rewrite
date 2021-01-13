@@ -90,6 +90,10 @@ class Java11FindTypeTest : Java11Test, FindTypeTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SemanticallyEqualTest : Java11Test, SemanticallyEqualTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 
 @DebugOnly
