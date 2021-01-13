@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -24,7 +23,6 @@ import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.search.FindTypesInNameScope;
 import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Markers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,7 +32,6 @@ import java.util.stream.Collectors;
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toSet;
-import static org.openrewrite.Tree.randomId;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -271,6 +268,8 @@ public class JavaTemplate {
     }
 
     private static class Extraction {
+
+        boolean collectElements = false;
         Map<Long, List<J>> snippetsByDepth = new TreeMap<>();
         Long endDepth;
 
@@ -290,6 +289,7 @@ public class JavaTemplate {
             Comment startToken = findMarker(space, SNIPPET_MARKER_START);
             if (findMarker(space, SNIPPET_MARKER_END) != null) {
                 context.endDepth = templateDepth;
+                context.collectElements = false;
             }
 
             if (startToken != null) {
@@ -297,7 +297,8 @@ public class JavaTemplate {
                 comments.remove(startToken);
                 context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
                         .add(((J) getCursor().getTree()).withPrefix(space.withComments(comments)));
-            } else if (context.endDepth == null) {
+                context.collectElements = true;
+            } else if (context.collectElements) {
                 context.snippetsByDepth.computeIfAbsent(templateDepth, n -> new ArrayList<>())
                         .add(getCursor().getTree());
             }
