@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.format.BlankLinesTest
+import org.openrewrite.java.format.MinimumViableSpacingTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
@@ -93,6 +94,10 @@ class Java11ImplementInterfaceTest : Java11Test, ImplementInterfaceTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11JavaTemplateTest : Java11Test, JavaTemplateTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11MinimumViableSpacingTest : Java11Test, MinimumViableSpacingTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
