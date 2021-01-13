@@ -19,6 +19,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
@@ -27,7 +28,7 @@ public final class ExecutionContext {
     private final Consumer<Throwable> onError;
     private final ForkJoinPool forkJoinPool;
 
-    Map<String, Object> messages = new HashMap<>();
+    Map<String, Object> messages = new ConcurrentHashMap<>();
 
     private ExecutionContext(int maxCycles, Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
