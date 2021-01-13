@@ -36,12 +36,21 @@ public class Space {
     private final List<Comment> comments;
     private final String whitespace;
 
-    @JsonCreator
-    public Space(
+    private Space(
             @JsonProperty("whitespace") String whitespace,
             @JsonProperty("comments") List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace;
+    }
+
+    @JsonCreator
+    public static Space build(
+            @JsonProperty("whitespace") String whitespace,
+            @JsonProperty("comments") List<Comment> comments) {
+        if (whitespace.isEmpty() && comments.isEmpty()) {
+            return Space.EMPTY;
+        }
+        return new Space(whitespace, comments);
     }
 
     @JsonIgnore
@@ -67,15 +76,15 @@ public class Space {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        return build(whitespace, comments);
     }
 
     public Space withWhitespace(String whitespace) {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        if(!whitespace.equals(this.whitespace)) {
-            return new Space(whitespace, comments);
+        if (!whitespace.equals(this.whitespace)) {
+            return build(whitespace, comments);
         }
         return this;
     }
@@ -171,7 +180,7 @@ public class Space {
             }
         }
 
-        return new Space(whitespace, comments);
+        return build(whitespace, comments);
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,

@@ -16,9 +16,11 @@
 package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
+import org.junit.jupiter.api.fail
+import org.openrewrite.java.JavaIsoProcessor
 import org.openrewrite.java.JavaProcessor
+import org.openrewrite.java.tree.J
 import java.io.File
-import java.util.function.Consumer
 import java.util.function.Supplier
 
 interface RecipeTest {
@@ -123,6 +125,12 @@ interface RecipeTest {
 
         val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
         val results = recipe!!.run(listOf(source))
+
+        results.forEach { result ->
+            if(result.diff().isEmpty()) {
+               fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+            }
+        }
 
         assertThat(results).`as`("The recipe must not make changes").isEmpty()
     }
