@@ -177,13 +177,9 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 String keyPrefix = key.getPrefix();
                 key = key.withPrefix("");
 
-                entries.add(new Yaml.Mapping.Entry(
-                        randomId(),
-                        key,
-                        keySuffix.substring(0, keySuffix.lastIndexOf(':')),
-                        block,
-                        keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1),
-                        Markers.EMPTY));
+                String beforeMappingValueIndicator = keySuffix.substring(0, keySuffix.lastIndexOf(':'));
+                String entryPrefix = keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1);
+                entries.add(new Yaml.Mapping.Entry(randomId(), key, beforeMappingValueIndicator, block, entryPrefix, Markers.EMPTY));
                 key = null;
             }
         }

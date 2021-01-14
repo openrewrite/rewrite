@@ -79,6 +79,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
 
     @Override
     public String visitSequence(Yaml.Sequence sequence, P p) {
+        // todo, something isn't right with just not accessing the element prefix
         return visit(sequence.getEntries(), p);
     }
 
@@ -89,6 +90,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
 
     @Override
     public String visitMapping(Yaml.Mapping mapping, P p) {
+        // todo, something isn't right with just not accessing the element prefix
         return visit(mapping.getEntries(), p);
     }
 
