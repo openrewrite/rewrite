@@ -15,6 +15,8 @@
  */
 package org.openrewrite;
 
+import org.openrewrite.internal.lang.Nullable;
+
 import java.net.URI;
 import java.util.stream.Collectors;
 
@@ -37,7 +39,7 @@ public class ValidationException extends RuntimeException {
         this(validation, null);
     }
 
-    public ValidationException(Validated validation, URI source) {
+    public ValidationException(Validated validation, @Nullable URI source) {
         super(validation.failures().stream()
                 .map(invalid -> invalid.getProperty() + " was '" +
                         (invalid.getValue() == null ? "null" : invalid.getValue()) +

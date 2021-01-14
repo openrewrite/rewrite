@@ -24,13 +24,18 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 public final class ExecutionContext {
+    private volatile boolean needAnotherCycle = false;
+
     private final int maxCycles;
+
+    @Nullable
     private final Consumer<Throwable> onError;
+
     private final ForkJoinPool forkJoinPool;
 
-    Map<String, Object> messages = new ConcurrentHashMap<>();
+    private final Map<String, Object> messages = new ConcurrentHashMap<>();
 
-    private ExecutionContext(int maxCycles, Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
+    private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
         this.onError = onError;
         this.forkJoinPool = forkJoinPool;
@@ -38,6 +43,11 @@ public final class ExecutionContext {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    public void putMessage(String key, Object value) {
+        needAnotherCycle = true;
+        messages.put(key, value);
     }
 
     @Nullable
@@ -52,10 +62,19 @@ public final class ExecutionContext {
         return (T) messages.remove(key);
     }
 
+    boolean isNeedAnotherCycle() {
+        return needAnotherCycle;
+    }
+
+    void nextCycle() {
+        needAnotherCycle = false;
+    }
+
     int getMaxCycles() {
         return maxCycles;
     }
 
+    @Nullable
     Consumer<Throwable> getOnError() {
         return onError;
     }
@@ -66,7 +85,10 @@ public final class ExecutionContext {
 
     public static class Builder {
         private int maxCycles = 3;
+
+        @Nullable
         private Consumer<Throwable> onError;
+
         private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
 
         public Builder maxCycles(int maxCycles) {
@@ -74,7 +96,7 @@ public final class ExecutionContext {
             return this;
         }
 
-        public Builder doOnError(Consumer<Throwable> onError) {
+        public Builder doOnError(@Nullable Consumer<Throwable> onError) {
             this.onError = onError;
             return this;
         }

@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toSet;
 public abstract class Recipe {
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
-        public Tree visit(Tree tree, ExecutionContext ctx) {
+        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             return tree;
         }
     };
@@ -92,10 +92,11 @@ public abstract class Recipe {
         List<SourceFile> after = acc;
         for (int i = 0; i < context.getMaxCycles(); i++) {
             after = visit(before, context);
-            if (after == acc) {
+            if (after == acc && !context.isNeedAnotherCycle()) {
                 break;
             }
             acc = after;
+            context.nextCycle();
         }
 
         if (after == before) {
