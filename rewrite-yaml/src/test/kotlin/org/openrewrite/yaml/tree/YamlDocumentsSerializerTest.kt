@@ -15,41 +15,49 @@
  */
 package org.openrewrite.yaml.tree
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Test
+import org.openrewrite.TreeSerializer
+import org.openrewrite.marker.Markers
+import org.openrewrite.marker.SearchResult
+import org.openrewrite.yaml.YamlParser
+
 class YamlDocumentsSerializerTest {
 
-//    @Test
-//    fun roundTripSerialization() {
-//        val serializer = TreeSerializer<Yaml.Documents>()
-//        val a = YamlParser().parse("key: value")[0].withMarkers(
-//            Markers(
-//                listOf(
-//                    Git().apply { headCommitId = "123" })
-//            )
-//        )
-//
-//        val aBytes = serializer.write(a)
-//        val aDeser = serializer.read(aBytes)
-//
-//        assertEquals(a, aDeser)
-//    }
+    @Test
+    fun roundTripSerialization() {
+        val serializer = TreeSerializer<Yaml.Documents>()
+        val a = YamlParser().parse("key: value")[0].withMarkers(
+            Markers(
+                listOf(
+                        SearchResult("test")
+                )
+            )
+        )
 
-//    @Test
-//    fun roundTripSerializationList() {
-//        val serializer = TreeSerializer<Yaml.Documents>()
-//        val y1 = YamlParser().parse("key: value")[0].withMarkers(
-//            Markers(
-//                listOf(Git().apply { headCommitId = "123" })
-//            )
-//        )
-//        val y2 = YamlParser().parse("key: value")[0].withMarkers(
-//            Markers(
-//                listOf(Git().apply { headCommitId = "123" })
-//            )
-//        )
-//
-//        val serialized = serializer.write(listOf(y1, y2))
-//        val deserialized = serializer.readList(serialized)
-//
-//        assertEquals(y1, deserialized[0])
-//    }
+        val aBytes = serializer.write(a)
+        val aDeser = serializer.read(aBytes)
+
+        assertEquals(a, aDeser)
+    }
+
+    @Test
+    fun roundTripSerializationList() {
+        val serializer = TreeSerializer<Yaml.Documents>()
+        val y1 = YamlParser().parse("key: value")[0].withMarkers(
+            Markers(
+                listOf(SearchResult("test1"))
+            )
+        )
+        val y2 = YamlParser().parse("key: value")[0].withMarkers(
+            Markers(
+                listOf(SearchResult("test2"))
+            )
+        )
+
+        val serialized = serializer.write(listOf(y1, y2))
+        val deserialized = serializer.readList(serialized)
+
+        assertEquals(y1, deserialized[0])
+    }
 }
