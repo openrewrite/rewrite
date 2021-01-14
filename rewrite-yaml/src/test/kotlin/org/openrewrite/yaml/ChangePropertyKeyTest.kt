@@ -16,10 +16,9 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.yaml.tree.Yaml
+import org.openrewrite.RecipeTest
 
-class ChangePropertyKeyTest : RefactorVisitorTestForParser<Yaml.Documents> {
+class ChangePropertyKeyTest : RecipeTest {
     override val parser = YamlParser()
 
     private val changeProp = ChangePropertyKey().apply {
@@ -28,15 +27,15 @@ class ChangePropertyKeyTest : RefactorVisitorTestForParser<Yaml.Documents> {
     }
 
     @Test
-    fun singleEntry() = assertRefactored(
-            visitors = listOf(changeProp),
+    fun singleEntry() = assertChanged(
+            recipe = changeProp,
             before = "management.metrics.binders.files.enabled: true",
             after = "management.metrics.enable.process.files: true"
     )
 
     @Test
-    fun nestedEntry() = assertRefactored(
-            visitors = listOf(changeProp),
+    fun nestedEntry() = assertChanged(
+            recipe = changeProp,
             before = """
                 unrelated.property: true
                 management.metrics:
@@ -53,8 +52,8 @@ class ChangePropertyKeyTest : RefactorVisitorTestForParser<Yaml.Documents> {
     )
 
     @Test
-    fun nestedEntryEmptyPartialPathRemoved() = assertRefactored(
-            visitors = listOf(changeProp),
+    fun nestedEntryEmptyPartialPathRemoved() = assertChanged(
+            recipe = changeProp,
             before = """
                 unrelated.property: true
                 management.metrics:

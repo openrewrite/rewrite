@@ -15,45 +15,56 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.Recipe;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public class CoalesceProperties extends YamlRefactorVisitor {
-    @Override
-    public Yaml visitMapping(Yaml.Mapping mapping) {
-        Yaml.Mapping m = refactor(mapping, super::visitMapping);
+public class CoalesceProperties extends Recipe {
+    public CoalesceProperties() {
+        this.processor = () -> new CoalescePropertiesProcessor<>();
+    }
 
-        boolean changed = false;
-        List<Yaml.Mapping.Entry> entries = new ArrayList<>();
+    private static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
+        public CoalescePropertiesProcessor() {
+        }
 
-        for (Yaml.Mapping.Entry entry : m.getEntries()) {
-            if (entry.getValue() instanceof Yaml.Mapping) {
-                Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
-                if (valueMapping.getEntries().size() == 1) {
-                    Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
-                    Yaml.Scalar coalescedKey = entry.getKey().withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
+        @Override
+        public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+            Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
 
-                    entries.add(entry.withKey(coalescedKey)
-                            .withValue(subEntry.getValue()));
+            boolean changed = false;
+            List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
-                    andThen(new ShiftFormatLeft(subEntry.getValue(),
-                            formatter.wholeSourceIndent().getIndentToUse()));
+            for (Yaml.Mapping.Entry entry : m.getEntries()) {
+                if (entry.getValue() instanceof Yaml.Mapping) {
+                    Yaml.Mapping valueMapping = (Yaml.Mapping) entry.getValue();
+                    if (valueMapping.getEntries().size() == 1) {
+                        Yaml.Mapping.Entry subEntry = valueMapping.getEntries().iterator().next();
+                        Yaml.Scalar coalescedKey = entry.getKey().withValue(entry.getKey().getValue() + "." + subEntry.getKey().getValue());
 
-                    changed = true;
+                        entries.add(entry.withKey(coalescedKey)
+                                .withValue(subEntry.getValue()));
+
+                        doAfterVisit(new ShiftFormatLeftProcessor(subEntry.getValue(), 0));
+//                        andThen(new ShiftFormatLeft(subEntry.getValue(), formatter.wholeSourceIndent().getIndentToUse())); // TODO
+
+                        changed = true;
+                    } else {
+                        entries.add(entry);
+                    }
                 } else {
                     entries.add(entry);
                 }
-            } else {
-                entries.add(entry);
             }
-        }
 
-        if (changed) {
-            m = m.withEntries(entries);
-        }
+            if (changed) {
+                m = m.withEntries(entries);
+            }
 
-        return m;
+            return m;
+        }
     }
+
 }
