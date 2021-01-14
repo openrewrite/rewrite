@@ -57,7 +57,6 @@ public class YamlProcessor<P> extends TreeProcessor<Yaml, P> implements YamlVisi
         return entry.withBlock(call(entry.getBlock(), p));
     }
 
-    // todo -- proper usage here? Feels like a matter of execution context?
     public void maybeCoalesceProperties() {
         if (getAfterVisit().stream().noneMatch(CoalesceProperties.class::isInstance)) {
             doAfterVisit(new CoalesceProperties());
