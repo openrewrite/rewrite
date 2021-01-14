@@ -79,7 +79,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
 
     @Override
     public String visitSequence(Yaml.Sequence sequence, P p) {
-        return fmt(sequence, visit(sequence.getEntries(), p));
+        return visit(sequence.getEntries(), p);
     }
 
     @Override
@@ -89,7 +89,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
 
     @Override
     public String visitMapping(Yaml.Mapping mapping, P p) {
-        return fmt(mapping, visit(mapping.getEntries(), p));
+        return visit(mapping.getEntries(), p);
     }
 
     @Override
