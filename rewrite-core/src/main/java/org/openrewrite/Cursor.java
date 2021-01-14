@@ -77,7 +77,7 @@ public class Cursor {
 
     public <T extends Tree> T firstEnclosingRequired(Class<T> tClass) {
         T firstEnclosing = firstEnclosing(tClass);
-        if(firstEnclosing == null) {
+        if (firstEnclosing == null) {
             throw new IllegalStateException("Expected to find enclosing " + tClass.getSimpleName());
         }
         return firstEnclosing;

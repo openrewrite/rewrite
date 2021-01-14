@@ -30,12 +30,12 @@ public class SearchResult implements Marker {
     public static TreePrinter<?> PRINTER = new TreePrinter<Object>() {
         @Override
         public String doLast(Tree tree, String printed, Object o) {
-            if(tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
+            if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
                 StringBuilder print = new StringBuilder();
                 boolean prefixWhitespace = true;
                 for (char c : printed.toCharArray()) {
-                    if(prefixWhitespace) {
-                        if(!Character.isWhitespace(c)) {
+                    if (prefixWhitespace) {
+                        if (!Character.isWhitespace(c)) {
                             print.append("~~>").append(c);
                             prefixWhitespace = false;
                             continue;

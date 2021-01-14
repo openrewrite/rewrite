@@ -39,6 +39,4 @@ public class Spaces extends Recipe {
             return super.visitCompilationUnit(cu, executionContext);
         }
     }
-
-
 }
