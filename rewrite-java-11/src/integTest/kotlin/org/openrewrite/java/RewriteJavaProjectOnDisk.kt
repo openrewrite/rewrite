@@ -22,16 +22,21 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.function.BiPredicate
+import kotlin.io.path.ExperimentalPathApi
+import kotlin.io.path.writeText
 import kotlin.streams.toList
 
 object RewriteJavaProjectOnDisk {
+    @ExperimentalPathApi
     @JvmStatic
     fun main(args: Array<String>) {
         val srcDir = Paths.get(args[0])
         val recipe: Recipe = Class.forName(args[1]).getDeclaredConstructor().newInstance() as Recipe
 
         val predicate = BiPredicate<Path, BasicFileAttributes> { p, bfa ->
-            bfa.isRegularFile && p.fileName.toString().endsWith(".java")
+            bfa.isRegularFile && p.fileName.toString().endsWith(".java") &&
+                    !p.toString().contains("/grammar/") &&
+                    !p.toString().contains("/gen/")
         }
 
         val paths = Files.find(srcDir, 999, predicate)
@@ -45,6 +50,9 @@ object RewriteJavaProjectOnDisk {
         val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir)
         recipe.run(sourceFiles).map {
             println(it.diff())
+            if(System.getProperty("rewrite.autofix")?.equals("true") == true) {
+                it.after!!.sourcePath.writeText(it.after!!.print())
+            }
         }
     }
 }
