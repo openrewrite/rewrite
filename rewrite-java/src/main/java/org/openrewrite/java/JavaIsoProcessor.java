@@ -113,6 +113,12 @@ public class JavaIsoProcessor<P> extends JavaProcessor<P> {
         return (J.CompilationUnit) super.visitCompilationUnit(cu, p);
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends J> J.ControlParentheses<T> visitControlParentheses(J.ControlParentheses<T> controlParens, P p) {
+        return (J.ControlParentheses<T>) super.visitControlParentheses(controlParens, p);
+    }
+
     @Override
     public J.Continue visitContinue(J.Continue continueStatement, P p) {
         return (J.Continue) super.visitContinue(continueStatement, p);

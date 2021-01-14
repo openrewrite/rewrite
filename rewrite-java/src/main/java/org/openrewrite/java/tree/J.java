@@ -741,7 +741,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         @With
-        JLeftPadded<Parentheses<Expression>> whileCondition;
+        JLeftPadded<ControlParentheses<Expression>> whileCondition;
 
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
@@ -1139,7 +1139,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Parentheses<Expression> ifCondition;
+        ControlParentheses<Expression> ifCondition;
 
         @With
         JRightPadded<Statement> thenPart;
@@ -1938,7 +1938,7 @@ public interface J extends Serializable, Tree {
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
-    final class Parentheses<J2 extends J> implements J, Expression {
+    class Parentheses<J2 extends J> implements J, Expression {
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -1972,6 +1972,49 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public Parentheses<J2> withType(JavaType type) {
+            return tree instanceof Expression ? ((Expression) tree).withType(type) :
+                    tree instanceof NameTree ? ((NameTree) tree).withType(type) :
+                            this;
+        }
+    }
+
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @Data
+    final class ControlParentheses<J2 extends J> implements J, Expression {
+        @EqualsAndHashCode.Include
+        UUID id;
+
+        @With
+        Space prefix;
+
+        @With
+        Markers markers;
+
+        @With
+        JRightPadded<J2> tree;
+
+        @Override
+        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+            return v.visitControlParentheses(this, p);
+        }
+
+        @JsonIgnore
+        @Override
+        public List<Tree> getSideEffects() {
+            return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
+        }
+
+        @Override
+        public JavaType getType() {
+            return tree instanceof Expression ? ((Expression) tree).getType() :
+                    tree instanceof NameTree ? ((NameTree) tree).getType() :
+                            null;
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public ControlParentheses<J2> withType(JavaType type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
@@ -2057,7 +2100,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Parentheses<Expression> selector;
+        ControlParentheses<Expression> selector;
 
         @With
         Block cases;
@@ -2082,7 +2125,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Parentheses<Expression> lock;
+        ControlParentheses<Expression> lock;
 
         @With
         Block body;
@@ -2234,7 +2277,7 @@ public interface J extends Serializable, Tree {
             Markers markers;
 
             @With
-            Parentheses<VariableDecls> param;
+            ControlParentheses<VariableDecls> param;
 
             @With
             Block body;
@@ -2260,7 +2303,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Parentheses<TypeTree> clazz;
+        ControlParentheses<TypeTree> clazz;
 
         @With
         Expression expr;
@@ -2482,7 +2525,7 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        Parentheses<Expression> condition;
+        ControlParentheses<Expression> condition;
 
         @With
         JRightPadded<Statement> body;

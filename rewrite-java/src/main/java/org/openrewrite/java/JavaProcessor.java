@@ -276,6 +276,14 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     }
 
     @Override
+    public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, P p) {
+        J.ControlParentheses<T> cpa = call(controlParens, p, this::visitEach);
+        cpa = cpa.withPrefix(visitSpace(cpa.getPrefix(), p));
+        cpa = call(cpa, p, this::visitExpression);
+        return cpa.withTree(call(cpa.getTree(), p));
+    }
+
+    @Override
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
         J.DoWhileLoop d = call(doWhileLoop, p, this::visitEach);
         d = d.withPrefix(visitSpace(d.getPrefix(), p));

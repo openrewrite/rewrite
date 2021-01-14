@@ -458,6 +458,11 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
     }
 
     @Override
+    public <T extends J> String visitControlParentheses(ControlParentheses<T> controlParens, P p) {
+        return fmt(controlParens, "(" + visit(controlParens.getTree(), ")", p));
+    }
+
+    @Override
     public String visitDoWhileLoop(DoWhileLoop doWhileLoop, P p) {
         return fmt(doWhileLoop, "do" + visitStatement(doWhileLoop.getBody(), p) +
                 visit("while", doWhileLoop.getWhileCondition(), p));
