@@ -282,7 +282,7 @@ public class JavaTemplate {
 
         public List<J> getSnippets() {
             //This returns all elements that have the same depth as the starting element.
-            return collectedElements.stream().filter(e-> e.depth == startDepth).map(e -> e.element).collect(Collectors.toList());
+            return collectedElements.stream().filter(e -> e.depth == startDepth).map(e -> e.element).collect(Collectors.toList());
         }
 
         /**

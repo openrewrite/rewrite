@@ -43,7 +43,7 @@ public class MinimumViableSpacingProcessor<P> extends JavaIsoProcessor<P> {
             first = false;
         }
 
-        if(!first) {
+        if (!first) {
             c = c.withName(c.getName().withPrefix(c.getName().getPrefix().withWhitespace(" ")));
         }
 
@@ -78,7 +78,7 @@ public class MinimumViableSpacingProcessor<P> extends JavaIsoProcessor<P> {
             }
             first = false;
         }
-        if(!first) {
+        if (!first) {
             m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(" ")));
         }
         return m;

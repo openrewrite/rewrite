@@ -31,7 +31,7 @@ public class ImportToString {
             J.Import i = impoort.withPrefix(Space.EMPTY);
             i = i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
 
-            if(i.getStatic() != null) {
+            if (i.getStatic() != null) {
                 i = i.withStatik(i.getStatic().withWhitespace(" "));
             }
 

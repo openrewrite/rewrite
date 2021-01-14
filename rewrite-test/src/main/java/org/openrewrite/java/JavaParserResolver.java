@@ -46,10 +46,10 @@ public class JavaParserResolver implements ParameterResolver {
 
                     Class<?> paramType = parameterContext.getParameter().getType();
                     Object param = javaParser.invoke(target);
-                    if(paramType.equals(JavaParser.Builder.class)) {
+                    if (paramType.equals(JavaParser.Builder.class)) {
                         return param;
                     }
-                    else if(paramType.equals(JavaParser.class)) {
+                    else if (paramType.equals(JavaParser.class)) {
                         return ((JavaParser.Builder<?, ?>) param).build();
                     }
                 } catch (NoSuchMethodException ignored) {

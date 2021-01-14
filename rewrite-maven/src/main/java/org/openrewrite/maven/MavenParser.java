@@ -143,11 +143,11 @@ public class MavenParser implements Parser<Maven> {
         }
 
         public Builder mavenConfig(@Nullable Path mavenConfig) {
-            if(mavenConfig != null && mavenConfig.toFile().exists()) {
+            if (mavenConfig != null && mavenConfig.toFile().exists()) {
                 try {
                     String mavenConfigText = new String(Files.readAllBytes(mavenConfig));
                     Matcher matcher = Pattern.compile("(?:$|\\s)-P\\s+([^\\s]+)").matcher(mavenConfigText);
-                    if(matcher.find()) {
+                    if (matcher.find()) {
                         String[] profiles = matcher.group(1).split(",");
                         return activeProfiles(profiles);
                     }

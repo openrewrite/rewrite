@@ -127,9 +127,9 @@ public class MavenSettings {
 
         @JsonIgnore
         public boolean isActive(Collection<String> activeProfiles) {
-            if(id != null) {
+            if (id != null) {
                 for (String activeProfile : activeProfiles) {
-                    if(activeProfile.trim().equals(id)) {
+                    if (activeProfile.trim().equals(id)) {
                         return true;
                     }
                 }

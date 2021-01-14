@@ -56,7 +56,7 @@ import java.util.stream.Collectors;
  *             .build();
  * </PRE>
  */
-@Incubating(since="6.1.0")
+@Incubating(since = "6.1.0")
 public class MethodTypeBuilder {
 
     JavaType.FullyQualified declaringType = null;

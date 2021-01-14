@@ -68,12 +68,12 @@ public class ParentModelResolver extends ProjectModelResolver {
     private static RemoteRepository httpsFallback(RemoteRepository repository) {
         RemoteRepository result = repository;
         try {
-            if(repository.getProtocol().equals("http")) {
+            if (repository.getProtocol().equals("http")) {
                 URLConnection connection = URI.create(repository.getUrl()).toURL().openConnection();
-                if(connection instanceof HttpURLConnection) {
+                if (connection instanceof HttpURLConnection) {
                     HttpURLConnection httpConnection = (HttpURLConnection) connection;
                     httpConnection.setRequestMethod("HEAD");
-                    if(httpConnection.getResponseCode() == 403) {
+                    if (httpConnection.getResponseCode() == 403) {
                       result = new RemoteRepository.Builder(repository)
                               .setUrl(repository.getUrl().replace("http:", "https:"))
                               .build();
@@ -89,7 +89,7 @@ public class ParentModelResolver extends ProjectModelResolver {
     @Override
     public void addRepository(Repository repository, boolean replace) throws InvalidRepositoryException {
         try {
-            if(repository.getUrl().contains("http:")) {
+            if (repository.getUrl().contains("http:")) {
                 URLConnection connection = URI.create(repository.getUrl()).toURL().openConnection();
                 if (connection instanceof HttpURLConnection) {
                     HttpURLConnection httpConnection = (HttpURLConnection) connection;

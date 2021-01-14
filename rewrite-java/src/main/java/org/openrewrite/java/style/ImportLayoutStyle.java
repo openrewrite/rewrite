@@ -172,17 +172,17 @@ public class ImportLayoutStyle implements JavaStyle {
         List<Layout.Block> blocksOnlyCatchalls = blockGroups.get(true);
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
-        for(JRightPadded<J.Import> anImport: originalImports) {
+        for (JRightPadded<J.Import> anImport: originalImports) {
             boolean accepted = false;
-            for(Layout.Block block : blocksNoCatchalls) {
-                if(block.accept(anImport)) {
+            for (Layout.Block block : blocksNoCatchalls) {
+                if (block.accept(anImport)) {
                     accepted = true;
                     break;
                 }
             }
-            if(!accepted) {
-                for(Layout.Block block : blocksOnlyCatchalls) {
-                    if(block.accept(anImport)) {
+            if (!accepted) {
+                for (Layout.Block block : blocksOnlyCatchalls) {
+                    if (block.accept(anImport)) {
                         break;
                     }
                 }
@@ -259,7 +259,7 @@ public class ImportLayoutStyle implements JavaStyle {
         private final List<Block> blocks;
 
         private Layout(List<Block> blocks) {
-            this.blocks = blocks==null?Collections.emptyList():blocks;
+            this.blocks = blocks == null?Collections.emptyList():blocks;
         }
 
         private List<Block> getBlocks() {
@@ -380,7 +380,7 @@ public class ImportLayoutStyle implements JavaStyle {
                                 int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
                                 boolean starImportExists = importGroup.stream()
                                         .anyMatch(it -> it.getElem().getQualid().getSimpleName().equals("*"));
-                                if(importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
+                                if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                     J.FieldAccess qualid = toStar.getElem().getQualid();
                                     JLeftPadded<J.Ident> name = qualid.getName();
                                     return Stream.of(toStar.withElem(toStar.getElem().withQualid(qualid.withName(

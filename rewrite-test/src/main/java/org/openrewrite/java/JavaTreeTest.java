@@ -29,7 +29,7 @@ public interface JavaTreeTest {
                                             String... imports) {
         String source = Arrays.stream(imports).map(i -> "import " + i + ";").collect(joining(""));
 
-        switch(nestingLevel) {
+        switch (nestingLevel) {
             case Block:
                 source = source + "class A" + System.nanoTime() + "{{\n" + code + "\n}}";
                 break;
@@ -68,7 +68,7 @@ public interface JavaTreeTest {
 class JavaParserTestUtil {
     static String print(JavaTreeTest.NestingLevel nestingLevel, J.CompilationUnit cu) {
         String printed;
-        switch(nestingLevel) {
+        switch (nestingLevel) {
             case Block:
                 printed = cu.getClasses().iterator().next().getBody().getStatements().iterator().next().getElem().printTrimmed();
                 printed = printed.substring(1, printed.length() - 1);

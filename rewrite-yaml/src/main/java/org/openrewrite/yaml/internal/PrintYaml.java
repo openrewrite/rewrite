@@ -50,7 +50,7 @@ public class PrintYaml extends AbstractYamlSourceVisitor<String> {
     @Override
     public String visitScalar(Yaml.Scalar scalar) {
         String value;
-        switch(scalar.getStyle()) {
+        switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
                 value = "\"" + scalar.getValue() + "\"";
                 break;

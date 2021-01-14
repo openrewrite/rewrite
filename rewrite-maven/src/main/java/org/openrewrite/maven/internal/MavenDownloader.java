@@ -170,14 +170,14 @@ public class MavenDownloader {
                 return projectPom;
             }
         }
-        if(containingPom != null && !StringUtils.isBlank(relativePath)) {
+        if (containingPom != null && !StringUtils.isBlank(relativePath)) {
             Path folderContainingPom = containingPom.getSourcePath()
                     .getParent();
-            if(folderContainingPom != null) {
+            if (folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize()
                         .toString());
-                if(maybeLocalPom != null
+                if (maybeLocalPom != null
                         && groupId.equals(maybeLocalPom.getPom().getGroupId())
                         && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
                         && version.equals(maybeLocalPom.getPom().getVersion()) ) {

@@ -52,21 +52,21 @@ public class SemanticallyEqual {
 
         @Override
         public J visitAnnotation(J.Annotation firstAnnotation, J second) {
-            if(!(second instanceof J.Annotation)) {
+            if (!(second instanceof J.Annotation)) {
                 isEqual = false;
                 return null;
             }
             J.Annotation secondAnnotation = (J.Annotation) second;
 
-            if(firstAnnotation.getArgs() != null && secondAnnotation.getArgs() != null) {
-                if(firstAnnotation.getArgs().getElem() != null &&
+            if (firstAnnotation.getArgs() != null && secondAnnotation.getArgs() != null) {
+                if (firstAnnotation.getArgs().getElem() != null &&
                         secondAnnotation.getArgs().getElem() != null &&
                         firstAnnotation.getArgs().getElem().size() == secondAnnotation.getArgs().getElem().size()) {
 
                     List<JRightPadded<Expression>> firstArgs = firstAnnotation.getArgs().getElem();
                     List<JRightPadded<Expression>> secondArgs = secondAnnotation.getArgs().getElem();
 
-                    for(int i = 0; i < firstArgs.size(); i++) {
+                    for (int i = 0; i < firstArgs.size(); i++) {
                         this.visit(firstArgs.get(i).getElem(), secondArgs.get(i).getElem());
                     }
                 }
@@ -82,7 +82,7 @@ public class SemanticallyEqual {
 
         @Override
         public J visitIdentifier(J.Ident firstIdent, J second) {
-            if(!(second instanceof J.Ident)) {
+            if (!(second instanceof J.Ident)) {
                 isEqual = false;
                 return null;
             }
@@ -96,7 +96,7 @@ public class SemanticallyEqual {
 
         @Override
         public J visitFieldAccess(J.FieldAccess firstFieldAccess, J second) {
-            if(!(second instanceof J.FieldAccess)) {
+            if (!(second instanceof J.FieldAccess)) {
                 isEqual = false;
                 return null;
             }
@@ -104,8 +104,8 @@ public class SemanticallyEqual {
 
             // Class literals are the only kind of FieldAccess which can appear within annotations
             // Functionality to correctly determine semantic equality of other kinds of field access will come later
-            if(firstFieldAccess.getSimpleName().equals("class")) {
-                if(!secondFieldAccess.getSimpleName().equals("class")) {
+            if (firstFieldAccess.getSimpleName().equals("class")) {
+                if (!secondFieldAccess.getSimpleName().equals("class")) {
                     isEqual = false;
                     return null;
                 }
@@ -121,7 +121,7 @@ public class SemanticallyEqual {
 
         @Override
         public J visitAssign(J.Assign firstAssign, J second) {
-            if(!(second instanceof J.Assign)) {
+            if (!(second instanceof J.Assign)) {
                 isEqual = false;
                 return null;
             }
@@ -137,7 +137,7 @@ public class SemanticallyEqual {
 
         @Override
         public J visitLiteral(J.Literal firstLiteral, J second) {
-            if(!(second instanceof J.Literal)) {
+            if (!(second instanceof J.Literal)) {
                 isEqual = false;
                 return null;
             }
@@ -150,7 +150,7 @@ public class SemanticallyEqual {
 
         @Override
         public NameTree visitTypeName(NameTree firstTypeName, J second) {
-            if(!(second instanceof NameTree)) {
+            if (!(second instanceof NameTree)) {
                 isEqual = false;
                 return null;
             }
@@ -166,10 +166,10 @@ public class SemanticallyEqual {
         }
 
         private static boolean typeEquals(JavaType thisType, JavaType otherType) {
-            if(thisType == null) {
+            if (thisType == null) {
                 return otherType == null;
             }
-            if(thisType instanceof JavaType.FullyQualified) {
+            if (thisType instanceof JavaType.FullyQualified) {
                 if (!(otherType instanceof JavaType.FullyQualified)) {
                     return false;
                 }
