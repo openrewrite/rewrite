@@ -16,6 +16,7 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.Recipe;
+import org.openrewrite.yaml.search.FindIndentYamlProcessor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -23,11 +24,19 @@ import java.util.List;
 
 public class CoalesceProperties extends Recipe {
     public CoalesceProperties() {
-        this.processor = () -> new CoalescePropertiesProcessor<>();
+        this.processor = () -> new org.openrewrite.yaml.CoalesceProperties.CoalescePropertiesProcessor<>();
     }
 
     private static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
         public CoalescePropertiesProcessor() {
+        }
+
+        private final FindIndentYamlProcessor<P> findIndent = new FindIndentYamlProcessor<>(0);
+
+        @Override
+        public Yaml visitDocument(Yaml.Document document, P p) {
+            findIndent.visit(document, p);
+            return super.visitDocument(document, p);
         }
 
         @Override
@@ -47,7 +56,9 @@ public class CoalesceProperties extends Recipe {
                         entries.add(entry.withKey(coalescedKey)
                                 .withValue(subEntry.getValue()));
 
-                        doAfterVisit(new ShiftFormatLeftProcessor(subEntry.getValue(), 0));
+                        int indentToUse = findIndent.getMostCommonIndent() > 0 ?
+                                findIndent.getMostCommonIndent() : 4;
+                        doAfterVisit(new ShiftFormatLeftProcessor(subEntry.getValue(), indentToUse));
 //                        andThen(new ShiftFormatLeft(subEntry.getValue(), formatter.wholeSourceIndent().getIndentToUse())); // TODO
 
                         changed = true;
