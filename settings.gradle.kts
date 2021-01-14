@@ -5,6 +5,6 @@ include(
         "rewrite-maven",
         "rewrite-properties",
         "rewrite-xml",
-//        "rewrite-yaml",
+        "rewrite-yaml",
         "rewrite-test"
 )

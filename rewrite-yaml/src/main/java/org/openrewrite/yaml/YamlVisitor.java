@@ -15,16 +15,16 @@
  */
 package org.openrewrite.yaml;
 
-import org.openrewrite.SourceVisitor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-public interface YamlSourceVisitor<R> extends SourceVisitor<R> {
+public interface YamlVisitor<R, P> extends TreeVisitor<R, P> {
 
-    R visitDocuments(Yaml.Documents documents);
-    R visitDocument(Yaml.Document document);
-    R visitSequence(Yaml.Sequence sequence);
-    R visitSequenceEntry(Yaml.Sequence.Entry entry);
-    R visitMapping(Yaml.Mapping mapping);
-    R visitMappingEntry(Yaml.Mapping.Entry entry);
-    R visitScalar(Yaml.Scalar scalar);
+    R visitDocuments(Yaml.Documents documents, P p);
+    R visitDocument(Yaml.Document document, P p);
+    R visitSequence(Yaml.Sequence sequence, P p);
+    R visitSequenceEntry(Yaml.Sequence.Entry entry, P p);
+    R visitMapping(Yaml.Mapping mapping, P p);
+    R visitMappingEntry(Yaml.Mapping.Entry entry, P p);
+    R visitScalar(Yaml.Scalar scalar, P p);
 }

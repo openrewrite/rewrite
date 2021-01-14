@@ -27,7 +27,7 @@ class FormatPreservingReaderTest {
 
         val charArray = CharArray(10)
         formatPreservingReader.read(charArray, 0, 10)
-        assertThat(formatPreservingReader.prefix(0, 3).prefix).isEqualTo("012")
+        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012")
     }
 
     @Test
@@ -41,7 +41,7 @@ class FormatPreservingReaderTest {
         formatPreservingReader.read(charArray, 0, 5)
         formatPreservingReader.read(charArray, 0, 5)
 
-        assertThat(formatPreservingReader.prefix(0, 3).prefix).isEqualTo("012")
+        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012")
     }
 
     @Test
@@ -55,6 +55,6 @@ class FormatPreservingReaderTest {
         formatPreservingReader.read(charArray, 0, 1)
         formatPreservingReader.read(charArray, 0, 9)
 
-        assertThat(formatPreservingReader.prefix(0, 3).prefix).isEqualTo("012")
+        assertThat(formatPreservingReader.prefix(0, 3)).isEqualTo("012")
     }
 }

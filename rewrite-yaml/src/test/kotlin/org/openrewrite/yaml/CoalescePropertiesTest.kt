@@ -16,16 +16,14 @@
 package org.openrewrite.yaml
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.whenParsedBy
-import org.openrewrite.yaml.tree.Yaml
+import org.openrewrite.RecipeTest
 
-class CoalescePropertiesTest : RefactorVisitorTestForParser<Yaml.Documents> {
+class CoalescePropertiesTest : RecipeTest {
     override val parser = YamlParser()
 
     @Test
-    fun fold() = assertRefactored(
-            visitors = listOf(CoalesceProperties()),
+    fun fold() = assertChanged(
+            recipe = CoalesceProperties().apply { },
             before = """
                 management:
                     metrics:

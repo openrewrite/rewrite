@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.NonNull;
 import org.yaml.snakeyaml.events.Event;
 
@@ -42,7 +41,7 @@ class FormatPreservingReader extends Reader {
     }
 
     // VisibleForTesting
-    Formatting prefix(int lastEnd, int startIndex) {
+    String prefix(int lastEnd, int startIndex) {
         assert lastEnd <= startIndex;
 
         int prefixLen = startIndex - lastEnd;
@@ -60,12 +59,12 @@ class FormatPreservingReader extends Reader {
                 System.arraycopy(currentBuffer, lastEnd - currentBufferIndex, prefix, 0, prefixLen);
             }
 
-            return Formatting.format(new String(prefix));
+            return new String(prefix);
         }
-        return Formatting.EMPTY;
+        return "";
     }
 
-    public Formatting prefix(int lastEnd, Event event) {
+    public String prefix(int lastEnd, Event event) {
         return prefix(lastEnd, event.getStartMark().getIndex());
     }
 

@@ -15,10 +15,9 @@
  */
 package org.openrewrite.yaml.search;
 
-import org.openrewrite.Tree;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.refactor.FindIndent;
-import org.openrewrite.yaml.AbstractYamlSourceVisitor;
+import org.openrewrite.yaml.YamlProcessor;
+import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.Map;
 import java.util.SortedMap;
@@ -32,24 +31,19 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
-public class FindIndentYaml extends AbstractYamlSourceVisitor<Void> implements FindIndent {
+public class FindIndentYamlProcessor<P> extends YamlProcessor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 
     private int linesWithSpaceIndents = 0;
     private int linesWithTabIndents = 0;
 
-    public FindIndentYaml(int enclosingIndent) {
+    public FindIndentYamlProcessor(int enclosingIndent) {
         this.enclosingIndent = enclosingIndent;
     }
 
     @Override
-    public Void defaultTo(Tree t) {
-        return null;
-    }
-
-    @Override
-    public Void visitTree(Tree tree) {
+    public Yaml visitEach(Yaml tree, P p) {
         String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);
@@ -94,7 +88,7 @@ public class FindIndentYaml extends AbstractYamlSourceVisitor<Void> implements F
             }
         }
 
-        return super.visitTree(tree);
+        return super.visitEach(tree, p);
     }
 
     public boolean isIndentedWithSpaces() {
