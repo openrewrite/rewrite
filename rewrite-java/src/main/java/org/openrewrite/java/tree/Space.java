@@ -112,7 +112,7 @@ public class Space {
         for (char c : charArray) {
             switch (c) {
                 case '/':
-                    if (last == '/' && !inSingleLineComment) {
+                    if (last == '/' && !inSingleLineComment && !inMultiLineComment && !inJavadoc) {
                         inSingleLineComment = true;
                         comment = new StringBuilder();
                     } else if (last == '*' && inMultiLineComment) {
