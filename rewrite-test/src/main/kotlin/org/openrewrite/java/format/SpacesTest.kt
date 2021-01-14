@@ -102,6 +102,7 @@ interface SpacesTest : RecipeTest {
                             ++x;
                             x--;
                             --x;
+                            x += (x + 1);
                         }
                     }
                     
@@ -166,6 +167,7 @@ interface SpacesTest : RecipeTest {
                     isBrackets = true
                     isArrayInitializerBraces = true
                     isEmptyArrayInitializerBraces = true
+                    isGroupingParentheses = true
                 }
             })).build(),
             dependsOn = dependsOn,
@@ -237,6 +239,7 @@ interface SpacesTest : RecipeTest {
                         ++ x;
                         x --;
                         -- x;
+                        x+=( x+1 );
                     }
                 }
  

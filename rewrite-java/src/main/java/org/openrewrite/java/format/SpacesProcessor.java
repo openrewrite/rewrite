@@ -524,4 +524,45 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
         }
         return arrayAccess1;
     }
+
+    @Override
+    public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
+        J.Parentheses<T> par = super.visitParentheses(parens, p);
+        if (style.getWithin().isGroupingParentheses()) {
+            if (StringUtils.isNullOrEmpty(par.getTree().getElem().getPrefix().getWhitespace())) {
+                par = par.withTree(
+                        par.getTree().withElem(
+                                par.getTree().getElem().withPrefix(
+                                        par.getTree().getElem().getPrefix().withWhitespace(" ")
+                                )
+                        )
+                );
+            }
+            if (StringUtils.isNullOrEmpty(par.getTree().getAfter().getWhitespace())) {
+                par = par.withTree(
+                        par.getTree().withAfter(
+                                par.getTree().getAfter().withWhitespace(" ")
+                        )
+                );
+            }
+        } else {
+            if (par.getTree().getElem().getPrefix().getWhitespace().equals(" ")) {
+                par = par.withTree(
+                        par.getTree().withElem(
+                                par.getTree().getElem().withPrefix(
+                                        par.getTree().getElem().getPrefix().withWhitespace("")
+                                )
+                        )
+                );
+            }
+            if (par.getTree().getAfter().getWhitespace().equals(" ")) {
+                par = par.withTree(
+                        par.getTree().withAfter(
+                                par.getTree().getAfter().withWhitespace("")
+                        )
+                );
+            }
+        }
+        return par;
+    }
 }
