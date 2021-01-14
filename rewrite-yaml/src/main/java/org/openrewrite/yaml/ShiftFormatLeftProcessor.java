@@ -18,7 +18,6 @@ package org.openrewrite.yaml;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class ShiftFormatLeftProcessor<P> extends YamlProcessor<P> {
-    // TODO execution context?
     private final Yaml scope;
     private final int shift;
 

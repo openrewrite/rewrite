@@ -102,7 +102,7 @@ public class ChangePropertyKey extends Recipe {
                         ));
                         doAfterVisit(new DeletePropertyProcessor<>(entry));
                         if (coalesce) {
-                             maybeCoalesceProperties();
+                            maybeCoalesceProperties();
                         }
                         break;
                     }
@@ -132,9 +132,9 @@ public class ChangePropertyKey extends Recipe {
             Yaml.Mapping m = (Yaml.Mapping) super.visitMapping(mapping, p);
 
             if (m.getEntries().contains(scope)) {
-                String newEntryFormatting = scope.getPrefix(); // todo, validate simple newEntryFormatting swapout
+                String newEntryFormatting = scope.getPrefix();
                 if (newEntryFormatting.isEmpty()) {
-                    newEntryFormatting = "\n"; // todo, gross?
+                    newEntryFormatting = "\n";
                 }
 
                 m = m.withEntries(Stream.concat(
@@ -143,7 +143,7 @@ public class ChangePropertyKey extends Recipe {
                                 new Yaml.Mapping.Entry(randomId(),
                                         new Yaml.Scalar(randomId(), Yaml.Scalar.Style.PLAIN, subproperty,
                                                 "", Markers.EMPTY),
-                                        scope.getBeforeMappingValueIndicator(), // todo, validate afterKey here
+                                        scope.getBeforeMappingValueIndicator(),
                                         value.copyPaste(),
                                         newEntryFormatting,
                                         Markers.EMPTY
@@ -184,7 +184,7 @@ public class ChangePropertyKey extends Recipe {
                 if (getCursor().getParentOrThrow().getTree() instanceof Yaml.Document) {
                     Yaml.Document document = getCursor().getParentOrThrow().getTree();
                     if (!document.isExplicit()) {
-                        m = m.withEntries(m.getEntries()); // todo, firstPrefixFormatting
+                        m = m.withEntries(m.getEntries());
                     }
                 }
             }
