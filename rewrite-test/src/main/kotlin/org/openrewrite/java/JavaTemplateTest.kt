@@ -16,6 +16,7 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -27,6 +28,8 @@ import org.openrewrite.java.tree.JRightPadded
 import org.openrewrite.java.tree.Space
 import org.openrewrite.java.tree.Space.format
 import org.openrewrite.java.tree.Statement
+import java.util.stream.Collector
+import kotlin.streams.toList
 
 interface JavaTemplateTest : RecipeTest {
     @Test
@@ -169,6 +172,54 @@ interface JavaTemplateTest : RecipeTest {
         """
     )
 
+    //TODO
+    @Test
+    @Disabled
+    fun addMethodToClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+        }.toRecipe(),
+        before = """
+        """,
+        after = """
+        """
+    )
+
+    //TODO
+    @Test
+    @Disabled
+    fun addStaticMethodToClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+        }.toRecipe(),
+        before = """
+        """,
+        after = """
+        """
+    )
+
+    //TODO - I still think we will need replacement insertion scope for this.
+    @Test
+    @Disabled
+    fun changeMethodInvocations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+        }.toRecipe(),
+        before = """
+        """,
+        after = """
+        """
+    )
+
     @Test
     fun addAnnotationToMethod(jp: JavaParser) = assertChanged(
         jp,
@@ -238,128 +289,205 @@ interface JavaTemplateTest : RecipeTest {
         """
     )
 
-//    @Test
-//    fun buildSnippetLocalMethodReference(jp: JavaParser) {
-//        val a = jp.parse(
-//            """
-//            import java.util.List;
-//            import static java.util.Collections.emptyList;
-//
-//            public class A {
-//                int n = 0;
-//                void foo(String m, List<String> others) {
-//                    incrementCounterByListSize(others);
-//                    others.add(m);
-//                }
-//                char incrementCounterByListSize(List<String> list) {
-//                    n =+ list.size();
-//                    return 'f';
-//                }
-//            }
-//        """.trimIndent()
-//        )[0]
-//
-//        val method = a.classes[0].methods[0]
-//        val methodBodyCursor = CursorExtractor(method.body!!).visit(a)
-//        val param1 = (method.params.elem[0].elem as J.VariableDecls).vars[0].elem.name
-//        val param2 = method.body!!.statements[0].elem
-//
-//        val template = JavaTemplate.builder(
-//            """{
-//                        others.add(#{});
-//                        #{};
-//                    }
-//                 """
-//        ).build()
-//        val snippets = template.generate<J>(methodBodyCursor, param1, param2)
-//        //Snippet should be the method block with the two statements in it.
-//        assertThat(snippets).hasSize(1);
-//        val block: J.Block = snippets[0] as J.Block
-//
-//        val methodInvocation1 = block.statements[0].elem as J.MethodInvocation // others.add(m)
-//        val methodInvocation2 = block.statements[0].elem as J.MethodInvocation // incrementCounterByListSize(others);
-//
-//        assertThat(methodInvocation1.type).`as`("The type information should be populated").isNotNull
-//        assertThat(methodInvocation2.type).`as`("The type information should be populated").isNotNull
-//    }
-//
-//    @Suppress("RECEIVER_NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
-//    @Test
-//    fun buildSnippetMethodReferenceSiblingClass(jp: JavaParser) {
-//        val a = jp.parse(
-//            """
-//            import java.util.List;
-//            import java.util.ArrayList;
-//            import static java.util.Collections.emptyList;
-//
-//            public class A {
-//                int n = 0;
-//                void foo(String m, List<String> others) {
-//                    boolean flag = true;
-//                    if (flag) {
-//                        List<String> clone = B.cloneList(others);
-//                        clone.add(m);
-//                    }
-//                    int fred = 8;
-//                }
-//
-//                public static class B {
-//                    public static List<String> cloneList(List<String> list) {
-//                        return new ArrayList<>(list);
-//                    }
-//                }
-//
-//                public static class C {
-//
-//                    private int hello = 0;
-//                    private String nope = "nothing here";
-//                }
-//
-//            }
-//        """.trimIndent()
-//        )[0]
-//
-//        val method = a.classes[0].methods[0]
-//        val then = (method.body!!.statements[1].elem as J.If).thenPart.elem as J.Block
-//        val methodBodyCursor = CursorExtractor(then.statements[0].elem).visit(a)
-//        val param = (method.params.elem[0].elem as J.VariableDecls).vars[0].elem.name
-//
-//        val template = JavaTemplate.builder(
-//            """others.add(#{});
-//                    #{};"""
-//        ).build()
-//        val snippets = template.generate<J>(methodBodyCursor, param, then.statements[0].elem)
-//        assertThat(snippets).hasSize(2)
-//
-//        val methodInv1: Expression = snippets[0] as Expression
-//        assertThat(methodInv1.type).`as`("The type information should be populated").isNotNull
-//        val variableDeclarations = snippets[1] as J.VariableDecls
-//        val methodInvocation = variableDeclarations.vars[0].elem.initializer.elem as J.MethodInvocation
-//        assertThat("Class{A.B}").isEqualTo((methodInvocation.select.elem as J.Ident).ident.type.toString())
-//        assertThat("List<String>").isEqualTo(variableDeclarations.typeExpr.printTrimmed())
-//    }
-//
-//    class CursorExtractor(private val scope: J) : JavaIsoProcessor<CursorHolder>() {
-//
-//        init {
-//            setCursoringOn()
-//        }
-//
-//        fun visit(tree: J?): Cursor {
-//            val cursorHolder = CursorHolder()
-//            super.visit(tree, cursorHolder)
-//            return cursorHolder.c!!
-//        }
-//
-//        override fun visitEach(tree: J?, cursorHolder: CursorHolder): J? {
-//            if (scope.isScope(tree)) {
-//                cursorHolder.c = this.cursor
-//            }
-//            return tree
-//        }
-//    }
-//
-//    class CursorHolder {
-//        var c: Cursor? = null
-//    }
+    @Test
+    fun addAnnotationToClassWithImports(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+                var c = super.visitClassDecl(clazz, p)
+
+                val generatedAnnotations = JavaTemplate.builder("@Deprecated").build()
+                    .generateBefore<J.Annotation>(Cursor(cursor, clazz))
+
+                assertThat(generatedAnnotations).`as`("The list of generated annotations should be 1.").hasSize(1)
+                assertThat(generatedAnnotations[0].type).isNotNull
+
+                c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
+                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(c, ExecutionContext.builder().build())
+                return c
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            
+            public class A {
+                void foo() {
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            
+            @Deprecated public class A {
+                void foo() {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun templateWithLocalMethodReference(jp: JavaParser) = assertChanged (
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, p)
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if (parent is J.MethodDecl && parent.name.ident.simpleName.equals("foo")) {
+
+                    val template = JavaTemplate.builder("\n#{};\n#{};").build()
+
+                    //Test when statement is the insertion scope is before the first statement in the block
+                    val generatedStatements = template
+                        .generateBefore<J.MethodInvocation>(
+                            Cursor(cursor, b.statements[0].elem),
+                            b.statements[1].elem as J,
+                            b.statements[0].elem as J
+                        )
+                    //Make sure type attribution is valid on the generated method invocations.
+                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
+                    assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
+                    assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
+                    b = b.withStatements(generatedStatements.stream().map ({ state -> JRightPadded<Statement>(state,Space.EMPTY)}).toList())
+                }
+                return b
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    incrementCounterByListSize(others);
+                    others.add(m);
+                }
+                char incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                    return 'f';
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                    incrementCounterByListSize(others);
+                }
+                char incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                    return 'f';
+                }
+            }
+        """
+    )
+
+    @Test
+    fun templateWithSiblingClassMethodReference(jp: JavaParser) = assertChanged (
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+
+            //This test ensures that the source generation is working when a parameter contains a method invocation
+            //to a method that exists in a sibling class. It
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, p)
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if (parent is J.If) {
+
+                    val template = JavaTemplate.builder("#{};\n#{}").build()
+
+                    //Test when statement is the insertion scope is before the first statement in the block
+                    val generatedStatements = template
+                        .generateAfter<J.MethodInvocation>(
+                            Cursor(cursor, b.statements[0].elem),
+                            b.statements[1].elem as J,
+                            b.statements[0].elem as J
+                        )
+                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
+                    //Make sure type attribution is valid on the generated method invocations.
+                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
+                    assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
+                    assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
+                    b = b.withStatements(generatedStatements.stream().map ({ state -> JRightPadded<Statement>(state,Space.EMPTY)}).toList())
+                }
+                return b
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            import java.util.ArrayList;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    boolean flag = true;
+                    List<String> clone;
+                    if (flag) {
+                        clone.add(m);
+                        B.cloneList(others);
+                    }
+                    int fred = 8;
+                }
+
+                public static class B {
+                    public static List<String> cloneList(List<String> list) {
+                        return new ArrayList<>(list);
+                    }
+                }
+
+                public static class C {
+
+                    private int hello = 0;
+                    private String nope = "nothing here";
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            import java.util.ArrayList;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    boolean flag = true;
+                    List<String> clone;
+                    if (flag) {
+                        B.cloneList(others);
+                        clone.add(m);
+                    }
+                    int fred = 8;
+                }
+
+                public static class B {
+                    public static List<String> cloneList(List<String> list) {
+                        return new ArrayList<>(list);
+                    }
+                }
+
+                public static class C {
+
+                    private int hello = 0;
+                    private String nope = "nothing here";
+                }
+            }
+        """
+    )
 }
