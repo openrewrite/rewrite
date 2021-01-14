@@ -23,7 +23,6 @@ import java.nio.file.Paths
 import java.nio.file.attribute.BasicFileAttributes
 import java.util.function.BiPredicate
 import kotlin.io.path.ExperimentalPathApi
-import kotlin.io.path.writeText
 import kotlin.streams.toList
 
 object RewriteJavaProjectOnDisk {
@@ -50,8 +49,8 @@ object RewriteJavaProjectOnDisk {
         val sourceFiles: List<SourceFile> = parser.parse(paths, srcDir)
         recipe.run(sourceFiles).map {
             println(it.diff())
-            if(System.getProperty("rewrite.autofix")?.equals("true") == true) {
-                it.after!!.sourcePath.writeText(it.after!!.print())
+            if(System.getenv("rewrite.autofix")?.equals("true") == true) {
+                it.after!!.sourcePath.toFile().writeText(it.after!!.print(), Charsets.UTF_8)
             }
         }
     }
