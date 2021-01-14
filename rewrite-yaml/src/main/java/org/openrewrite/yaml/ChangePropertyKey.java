@@ -102,7 +102,7 @@ public class ChangePropertyKey extends Recipe {
                         ));
                         doAfterVisit(new DeletePropertyProcessor<>(entry));
                         if (coalesce) {
-                            // maybeCoalesceProperties(); // todo
+                             maybeCoalesceProperties();
                         }
                         break;
                     }
