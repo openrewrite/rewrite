@@ -64,7 +64,9 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
 
     @Override
     public String visitDocument(Yaml.Document document, P p) {
-        return fmt(document, (document.isExplicit() ? "---" : "") + visit(document.getBlocks(), p));
+        return fmt(document, (document.isExplicit() ? "---" : "") + visit(document.getBlocks(), p) +
+                document.getEnd().getPrefix() +
+                (document.getEnd().isExplicit() ? "..." : ""));
     }
 
     @Override

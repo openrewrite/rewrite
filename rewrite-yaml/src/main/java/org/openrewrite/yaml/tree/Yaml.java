@@ -161,6 +161,9 @@ public interface Yaml extends Serializable, Tree {
             UUID id;
 
             @With
+            boolean explicit;
+
+            @With
             String prefix;
 
             @With
@@ -168,7 +171,7 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), prefix, Markers.EMPTY);
+                return new End(randomId(), explicit, prefix, Markers.EMPTY);
             }
         }
     }
