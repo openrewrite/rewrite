@@ -46,13 +46,21 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
                     return c.withSuffix(suffix);
                 }));
             } else {
-                j = j.withPrefix(j.getPrefix().withWhitespace(""));
+                /*
+                 if comments are empty and package is present, leading whitespace is on the compilation unit and
+                 should be removed
+                 */
+                j = j.withPrefix(Space.EMPTY);
             }
         }
 
         if (j.getPackageDecl() == null) {
             if (j.getComments().isEmpty()) {
-                j = j.withPrefix(j.getPrefix().withWhitespace(""));
+                /*
+                if package decl and comments are null/empty, leading whitespace is on the
+                compilation unit and should be removed
+                 */
+                j = j.withPrefix(Space.EMPTY);
             } else {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c ->
                         c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
