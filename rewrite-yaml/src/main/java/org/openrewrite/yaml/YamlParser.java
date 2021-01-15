@@ -18,6 +18,7 @@ package org.openrewrite.yaml;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
+import org.yaml.snakeyaml.events.DocumentEndEvent;
 import org.yaml.snakeyaml.events.Event;
 import org.yaml.snakeyaml.events.ScalarEvent;
 import org.yaml.snakeyaml.parser.Parser;
@@ -73,7 +74,13 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case Alias:
                         break;
                     case DocumentEnd:
-                        documents.add(document);
+                        documents.add(document.withEnd(new Yaml.Document.End(
+                                randomId(),
+                                ((DocumentEndEvent) event).getExplicit(),
+                                fmt,
+                                Markers.EMPTY
+                        )));
+                        lastEnd = event.getEndMark().getIndex();
                         break;
                     case DocumentStart:
                         document = new Yaml.Document(

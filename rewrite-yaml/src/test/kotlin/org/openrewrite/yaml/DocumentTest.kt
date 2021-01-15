@@ -18,13 +18,14 @@ package org.openrewrite.yaml
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
-class DocumentTest: YamlParser() {
+class DocumentTest : YamlParser() {
     @Test
-    fun explicit() {
+    fun explicitStart() {
         val yText = """
             ---
             type: specs.openrewrite.org/v1beta/visitor
             ---
+            
             type: specs.openrewrite.org/v1beta/recipe
         """.trimIndent()
 
@@ -36,12 +37,40 @@ class DocumentTest: YamlParser() {
     }
 
     @Test
-    fun implicit() {
+    fun explicitEnd() {
+        val yText = """
+            type: specs.openrewrite.org/v1beta/visitor
+            ...
+            ---
+            type: specs.openrewrite.org/v1beta/recipe
+            
+            ...
+        """.trimIndent()
+
+        val y = parse(yText)[0]
+
+        assertThat(y.documents).hasSize(2)
+        assertThat(y.documents[0].end.isExplicit).isTrue()
+        assertThat(y.printTrimmed()).isEqualTo(yText)
+    }
+
+    @Test
+    fun implicitStart() {
         val yText = "type: specs.openrewrite.org/v1beta/visitor"
         val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)
         assertThat(y.documents[0].isExplicit).isFalse()
+        assertThat(y.printTrimmed()).isEqualTo(yText)
+    }
+
+    @Test
+    fun implicitEnd() {
+        val yText = "type: specs.openrewrite.org/v1beta/visitor"
+        val y = parse(yText)[0]
+
+        assertThat(y.documents).hasSize(1)
+        assertThat(y.documents[0].end.isExplicit).isFalse()
         assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 }
