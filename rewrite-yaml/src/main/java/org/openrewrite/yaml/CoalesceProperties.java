@@ -24,7 +24,7 @@ import java.util.List;
 
 public class CoalesceProperties extends Recipe {
     public CoalesceProperties() {
-        this.processor = () -> new org.openrewrite.yaml.CoalesceProperties.CoalescePropertiesProcessor<>();
+        this.processor = CoalescePropertiesProcessor::new;
     }
 
     private static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
@@ -58,7 +58,7 @@ public class CoalesceProperties extends Recipe {
 
                         int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                                 findIndent.getMostCommonIndent() : 4;
-                        doAfterVisit(new ShiftFormatLeftProcessor(subEntry.getValue(), indentToUse));
+                        doAfterVisit(new ShiftFormatLeftProcessor<>(subEntry.getValue(), indentToUse));
 //                        andThen(new ShiftFormatLeft(subEntry.getValue(), formatter.wholeSourceIndent().getIndentToUse())); // TODO
 
                         changed = true;
