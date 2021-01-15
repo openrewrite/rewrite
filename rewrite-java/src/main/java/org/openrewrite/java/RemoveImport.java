@@ -63,7 +63,29 @@ public class RemoveImport<P> extends JavaIsoProcessor<P> {
         staticNamedImports.clear();
 
         J.CompilationUnit c = super.visitCompilationUnit(cu, p);
-        return staticImportDeletions(classImportDeletions(c));
+        c = staticImportDeletions(classImportDeletions(c));
+        if (c.getImports().isEmpty()) {
+            if (c.getClasses().iterator().next().getPrefix().getWhitespace().startsWith("\n")) {
+                c = c.withClasses(ListUtils.mapFirst(c.getClasses(), cl -> cl.withPrefix(cl.getPrefix().withWhitespace(
+                        cl.getPrefix().getWhitespace().replaceFirst("\n", "")))));
+            }
+        }
+        if (c.getImports().size() == 1) {
+            if (c.getPackageDecl() == null) {
+                c = c.withImports(
+                        ListUtils.mapFirst(c.getImports(),
+                                i -> i.withElem(
+                                        i.getElem().withPrefix(
+                                                i.getElem().getPrefix().withWhitespace(
+                                                        i.getElem().getPrefix().getWhitespace().replace("\n", "")
+                                                )
+                                        )
+                                )
+                        )
+                );
+            }
+        }
+        return c;
     }
 
     @Override

@@ -202,7 +202,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                 }
                 int column = nameStart - lastNl + m.getSimpleName().length() + 1;
                 m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), (i, param) ->
-                        i == 0 ? param : param.withElem(alignTo(param.getElem(), column - 1)))));
+                        i == 0 ? param : param.withElem(alignTo(param.getElem(), column)))));
             }
         }
 

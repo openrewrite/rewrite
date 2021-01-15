@@ -46,16 +46,13 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
                     return c.withSuffix(suffix);
                 }));
             } else {
-                j = minimumLines(j, style.getMinimum().getBeforePackage());
+                j = j.withPrefix(j.getPrefix().withWhitespace(""));
             }
         }
 
         if (j.getPackageDecl() == null) {
             if (j.getComments().isEmpty()) {
-                j = j.withImports(ListUtils.mapFirst(cu.getImports(), i -> {
-                    J.Import anImport = i.getElem();
-                    return i.withElem(anImport.withPrefix(anImport.getPrefix().withWhitespace("")));
-                }));
+                j = j.withPrefix(j.getPrefix().withWhitespace(""));
             } else {
                 j = j.withComments(ListUtils.mapLast(j.getComments(), c ->
                         c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
@@ -69,9 +66,9 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
                         minimumLines(c, style.getMinimum().getAfterPackage())));
             }
         }
-
+        boolean hasImports = !j.getImports().isEmpty();
         j = j.withClasses(ListUtils.map(j.getClasses(), (i, c) -> i == 0 ?
-                minimumLines(c, style.getMinimum().getAfterImports()) :
+                (hasImports ? minimumLines(c, style.getMinimum().getAfterImports()) : c) :
                 minimumLines(c, style.getMinimum().getAroundClass())
         ));
 
