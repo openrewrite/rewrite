@@ -75,7 +75,7 @@ public class JavaTemplate {
         //Substitute parameter markers with the string representation of each parameter.
         String printedTemplate = substituteParameters(parameters);
 
-        J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
+        final J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
         //Walk up the insertion scope and find the first element that is an immediate child of a J.Block. The template
@@ -104,22 +104,19 @@ public class JavaTemplate {
         }
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        cu = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
+        J.CompilationUnit synthetic = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
 
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
-                .visit(cu, printedTemplate);
+                .visit(synthetic, printedTemplate);
 
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
         parser.reset();
-        cu = parser.parse(generatedSource).iterator().next();
+        synthetic = parser.parse(generatedSource).iterator().next();
 
         //Extract the compiled template tree elements.
         ExtractionContext extractionContext = new ExtractionContext();
-        new ExtractTemplatedCode().visit(cu, extractionContext);
-
-        @SuppressWarnings("ConstantConditions") Collection<? extends Style> styles = insertionScope
-                .firstEnclosing(J.CompilationUnit.class).getStyles();
+        new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
         List<J> snippets = extractionContext.getSnippets();
         final Cursor finalInsertionScope = insertionScope;
@@ -127,7 +124,7 @@ public class JavaTemplate {
                 .map(t -> {
                     if (autoFormat) {
                         //noinspection unchecked
-                        return (J2) new AutoFormatProcessor<Void>(styles).visit(t, null,
+                        return (J2) new AutoFormatProcessor<Void>(cu.getStyles()).visit(t, null,
                                 finalInsertionScope.getParentOrThrow());
                     }
                     //noinspection unchecked

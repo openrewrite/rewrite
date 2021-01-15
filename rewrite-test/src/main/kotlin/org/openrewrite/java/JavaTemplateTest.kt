@@ -329,13 +329,13 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 val m =  super.visitMethodInvocation(method, p)
-                if (method.name.ident.simpleName != "countLetters") return m
+                if (m.name.ident.simpleName != "countLetters") return m
                 val argument = m.args.elem[0].elem
                 val generatedMethodInvocations = template.generateBefore<J.MethodInvocation>(cursor, argument)
                 assertThat(generatedMethodInvocations).`as`("The list of generated invocations should be 1.")
                     .hasSize(1)
                 assertThat(generatedMethodInvocations[0].type).isNotNull
-                return generatedMethodInvocations[0]
+                return generatedMethodInvocations[0].withPrefix(m.prefix)
             }
         }.toRecipe(),
         before = """
@@ -350,7 +350,6 @@ interface JavaTemplateTest : RecipeTest {
                 }
                 int n = countLetters(name);
                 void foo() {
-                    
                     if (countLetters("fred") == 4) {
                         System.out.println("Letter Count :" + countLetters(name));
                     }
@@ -390,7 +389,7 @@ interface JavaTemplateTest : RecipeTest {
            }
         """,
         after = """
-            import java.util.List;
+           import java.util.List;
             import java.util.stream.Collectors;
             import java.util.Arrays;
 
