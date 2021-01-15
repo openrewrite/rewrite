@@ -17,6 +17,8 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -57,6 +59,7 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
+    @NonNull
     public Validated validate() {
         return required("property", property)
                 .and(required("toProperty", toProperty));
@@ -176,6 +179,10 @@ public class ChangePropertyKey extends Recipe {
                 } else {
                     entries.add(entry);
                 }
+            }
+
+            if (entries.size() == 1) {
+                entries = ListUtils.map(entries, e -> e.withPrefix(""));
             }
 
             if (changed) {

@@ -70,7 +70,7 @@ interface RecipeTest {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull()
         assertThat(result!!.after).isNotNull()
-        assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
+        assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>()))
             .isEqualTo(after.trimIndent())
     }
 

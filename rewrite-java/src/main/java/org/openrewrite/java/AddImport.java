@@ -100,7 +100,7 @@ public class AddImport<P> extends JavaIsoProcessor<P> {
 
         if (imports.isEmpty()) {
             importToAdd = cu.getPackageDecl() == null ?
-                    importToAdd.withPrefix(cu.getClasses().get(0).getPrefix().withWhitespace("\n\n")) :
+                    importToAdd.withPrefix(cu.getClasses().get(0).getPrefix()) :
                     importToAdd.withPrefix(Space.format("\n\n"));
         }
 

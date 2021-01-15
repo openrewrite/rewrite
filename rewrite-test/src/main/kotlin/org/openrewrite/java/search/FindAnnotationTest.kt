@@ -106,7 +106,7 @@ interface FindAnnotationTest: RecipeTest {
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
-            public class A {} 
+            public class A {}
         """,
         after = """
             import com.netflix.foo.Foo;
@@ -135,7 +135,7 @@ interface FindAnnotationTest: RecipeTest {
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
-            public class A {} 
+            public class A {}
         """,
         after = """
             import com.netflix.foo.Foo;

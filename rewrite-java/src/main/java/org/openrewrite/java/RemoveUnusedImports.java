@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.tree.*;
 
@@ -96,7 +97,23 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 }
             }
-            return changed ? cu.withImports(importsWithUsage) : cu;
+            cu = changed ? cu.withImports(importsWithUsage) : cu;
+            if (cu.getImports().isEmpty()) {
+                cu = cu.withClasses(
+                        ListUtils.mapFirst(cu.getClasses(),
+                                cl -> cl.withPrefix(
+                                        cl.getPrefix().withWhitespace(
+                                            cl.getPrefix().getWhitespace().replace("\n\n", "")
+                                        )
+                                )
+                        )
+                );
+            } else {
+                if (cu.getPackageDecl() == null) {
+                    cu = cu.withImports(ListUtils.mapFirst(cu.getImports(), i -> i.withElem(i.getElem().withPrefix(Space.EMPTY))));
+                }
+            }
+            return cu;
         }
 
         private static class TypesByPackage extends JavaIsoProcessor<Map<String, Set<JavaType.Class>>> {
