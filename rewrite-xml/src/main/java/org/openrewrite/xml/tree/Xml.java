@@ -26,17 +26,16 @@ import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.internal.XmlListMarkersProcessor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
 import java.io.Serializable;
 import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -71,6 +70,19 @@ public interface Xml extends Serializable, Tree {
     String getPrefix();
 
     Xml withPrefix(String prefix);
+
+    /**
+     * Find all subtrees marked with a particular marker rooted at this tree.
+     *
+     * @param markerType The marker type to look for
+     * @param <Xml2>       The expected supertype common to all subtrees that could be found.
+     * @return The set of matching subtrees.
+     */
+    default <Xml2 extends Xml> Set<Xml2> findMarkedWith(Class<? extends Marker> markerType) {
+        Set<Xml2> trees = new HashSet<>();
+        new XmlListMarkersProcessor<Xml2>(markerType).visit(this, trees);
+        return trees;
+    }
 
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)

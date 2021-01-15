@@ -22,6 +22,8 @@ import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlProcessor;
 import org.openrewrite.xml.tree.Xml;
 
+import java.util.Set;
+
 public class FindTag extends Recipe {
 
     private XPathMatcher xPathMatcher;
@@ -32,6 +34,12 @@ public class FindTag extends Recipe {
 
     public void setXPath(String xpath) {
         this.xPathMatcher = new XPathMatcher(xpath);
+    }
+
+    public static Set<Xml.Tag> find(Xml x, String xpath) {
+        //noinspection ConstantConditions
+        return new FindTagProcessor(new XPathMatcher(xpath)).visit(x, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static class FindTagProcessor extends XmlProcessor<ExecutionContext> {

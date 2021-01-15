@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.search
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
@@ -29,9 +30,9 @@ class FindTagTest : RecipeTest {
 
     @Test
     fun simpleElement() = assertChanged(
-        parser,
-        FindTag().apply { setXPath("/dependencies/dependency") },
-        before = """
+            parser,
+            FindTag().apply { setXPath("/dependencies/dependency") },
+            before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>
@@ -39,7 +40,7 @@ class FindTagTest : RecipeTest {
                     </dependency>
                 </dependency>
             """,
-        after = """
+            after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     ~~><dependency>
@@ -51,9 +52,9 @@ class FindTagTest : RecipeTest {
 
     @Test
     fun wildcard() = assertChanged(
-        parser,
-        FindTag().apply { setXPath("/dependencies/*") },
-        before = """
+            parser,
+            FindTag().apply { setXPath("/dependencies/*") },
+            before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>
@@ -61,7 +62,7 @@ class FindTagTest : RecipeTest {
                     </dependency>
                 </dependency>
             """,
-        after = """
+            after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     ~~><dependency>
@@ -73,9 +74,9 @@ class FindTagTest : RecipeTest {
 
     @Test
     fun noMatch() = assertUnchanged(
-        parser,
-        FindTag().apply { setXPath("/dependencies/dne") },
-        before = """
+            parser,
+            FindTag().apply { setXPath("/dependencies/dne") },
+            before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>
@@ -84,4 +85,20 @@ class FindTagTest : RecipeTest {
                 </dependency>
             """
     )
+
+    @Test
+    fun staticFind() {
+        val before = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <dependencies>
+                    <dependency>
+                        <artifactId scope="compile">org.openrewrite</artifactId>
+                    </dependency>
+                </dependency>
+            """
+        val source = parser.parse(*(arrayOf(before.trimIndent()))).iterator().next()
+        val matchingTags = FindTag.find(source, "/dependencies/dependency")
+        assertThat(matchingTags).isNotNull.isNotEmpty
+    }
+
 }
