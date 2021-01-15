@@ -16,19 +16,13 @@
 package org.openrewrite.java
 
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingProcessor
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JRightPadded
-import org.openrewrite.java.tree.Space
-import org.openrewrite.java.tree.Space.format
-import org.openrewrite.java.tree.Statement
-import java.util.stream.Collector
+import org.openrewrite.java.tree.*
 import kotlin.streams.toList
 
 interface JavaTemplateTest : RecipeTest {
@@ -59,7 +53,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test when insertion scope is between two statements in a block
                     generatedMethodInvocations = template
-                        .generateBefore<J.MethodInvocation>(
+                        .generateBefore(
                             Cursor(cursor, block.statements[1].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
@@ -100,7 +94,7 @@ interface JavaTemplateTest : RecipeTest {
                 }
             }
         """,
-        afterConditions = {cu -> cu.getClasses() }
+        afterConditions = {cu -> cu.classes }
     )
 
     @Test
@@ -130,7 +124,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test when insertion scope is after the last statements in a block
                     generatedMethodInvocations = template
-                        .generateAfter<J.MethodInvocation>(
+                        .generateAfter(
                             Cursor(cursor, block.statements[1].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
@@ -172,51 +166,277 @@ interface JavaTemplateTest : RecipeTest {
         """
     )
 
-    //TODO
     @Test
-    @Disabled
     fun addMethodToClass(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoProcessor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, p)
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if (parent is J.ClassDecl) {
+                    val template = JavaTemplate.builder("""
+                            char incrementCounterByListSize(List<String> list) {
+                                n =+ list.size();
+                                return 'f';
+                            }
+                        """).build()
+
+                    //Test generating the method using generateAfter and make sure the extraction is correct and has
+                    //type attribution.
+                    var generatedMethodDeclarations = template.generateAfter<J.MethodDecl>(
+                        Cursor(cursor, block.statements[0].elem))
+                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodDeclarations[0].type).isNotNull
+
+                    //Test generating the method using generateBefore and make sure the extraction is correct and has
+                    //type attribution.
+                    generatedMethodDeclarations = template.generateBefore(
+                        Cursor(cursor, block.statements[0].elem))
+                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodDeclarations[0].type).isNotNull
+
+                    b = b.withStatements(
+                        ListUtils.concat(
+                            block.statements,
+                            JRightPadded(generatedMethodDeclarations[0],
+                                Space.EMPTY
+                            )
+                        )
+                    )
+                }
+                return b
+            }
         }.toRecipe(),
         before = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                }
+            }
         """,
         after = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                }
+                char incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                    return 'f';
+                }
+            }
         """
     )
 
-    //TODO
     @Test
-    @Disabled
     fun addStaticMethodToClass(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoProcessor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
-        }.toRecipe(),
-        before = """
-        """,
-        after = """
-        """
-    )
 
-    //TODO - I still think we will need replacement insertion scope for this.
-    @Test
-    @Disabled
-    fun changeMethodInvocations(jp: JavaParser) = assertChanged(
-        jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
-            init {
-                setCursoringOn()
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
+                var b = super.visitBlock(block, p)
+                val parent = cursor.parentOrThrow.getTree<J>()
+                if (parent is J.ClassDecl) {
+                    val template = JavaTemplate.builder("""
+                            static char incrementCounterByListSize(List<String> list) {
+                                n =+ list.size();
+                                return 'f';
+                            }
+                        """).build()
+
+                    //Test generating the method using generateAfter and make sure the extraction is correct and has
+                    //type attribution.
+                    var generatedMethodDeclarations = template.generateAfter<J.MethodDecl>(
+                        Cursor(cursor, block.statements[0].elem))
+                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodDeclarations[0].type).isNotNull
+
+                    //Test generating the method using generateBefore and make sure the extraction is correct and has
+                    //type attribution.
+                    generatedMethodDeclarations = template.generateBefore(
+                        Cursor(cursor, block.statements[0].elem))
+                    assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodDeclarations[0].type).isNotNull
+
+                    b = b.withStatements(
+                        ListUtils.concat(
+                            block.statements,
+                            JRightPadded(generatedMethodDeclarations[0],
+                                Space.EMPTY
+                            )
+                        )
+                    )
+                }
+                return b
             }
         }.toRecipe(),
         before = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                }
+            }
         """,
         after = """
+            import java.util.List;
+            import static java.util.Collections.emptyList;
+
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                }
+                static char incrementCounterByListSize(List<String> list) {
+                    n =+ list.size();
+                    return 'f';
+                }
+            }
+        """
+    )
+
+    @Test
+    fun changeMethodInvocations(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+
+            val template: JavaTemplate = JavaTemplate.builder("withString(#{}).length();")
+                .build()
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                val m =  super.visitMethodInvocation(method, p)
+                if (m.name.ident.simpleName != "countLetters") return m
+                val argument = m.args.elem[0].elem
+                val generatedMethodInvocations = template.generateBefore<J.MethodInvocation>(cursor, argument)
+                assertThat(generatedMethodInvocations).`as`("The list of generated invocations should be 1.")
+                    .hasSize(1)
+                assertThat(generatedMethodInvocations[0].type).isNotNull
+                return generatedMethodInvocations[0].withPrefix(m.prefix)
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            import java.util.stream.Collectors;
+            import java.util.Arrays;
+
+            public class A {
+                String name = "Jill";
+                {
+                    countLetters("fred");
+                }
+                int n = countLetters(name);
+                void foo() {
+                    if (countLetters("fred") == 4) {
+                        System.out.println("Letter Count :" + countLetters(name));
+                    }
+                    int letterCount = countLetters("fred") == 4 ? countLetters("fred") : 0;
+                    letterCount = countLetters(name) != 3 ? 0 : countLetters(name);
+                    String sub = "Fred".substring(0, countLetters("fred"));
+                    Integer count = Integer.valueOf(countLetters("fred"));
+                    for (int index = 0; index < countLetters(name); index++) {
+                    }
+                    int index = 0;
+                    while (index < countLetters(name)) {
+                        index++;
+                    }
+                    switch (countLetters(name)) {
+                        case 4:
+                        default:
+                            break;
+                    }
+                    List<String> names = Arrays.asList("fred", "joe", "jill");
+                    List<Integer> counts = names.stream().map(this::countLetters).collect(Collectors.toList());
+                }
+                public int countLetters(String sourceString) {
+                    return sourceString.length();
+                }
+                public StringStub withString(String source) {
+                    return new StringStub(source);
+                }
+                public class StringStub {
+                    String source;
+                    private StringStub(String source) {
+                        this.source = source;
+                    }
+                    public int length() {
+                        return source.length();
+                    }
+                }
+           }
+        """,
+        after = """
+           import java.util.List;
+            import java.util.stream.Collectors;
+            import java.util.Arrays;
+
+            public class A {
+                String name = "Jill";
+                {
+                    withString("fred").length();
+                }
+                int n = withString(name).length();
+                void foo() {
+                    if (withString("fred").length() == 4) {
+                        System.out.println("Letter Count :" + withString(name).length());
+                    }
+                    int letterCount = withString("fred").length() == 4 ? withString("fred").length() : 0;
+                    letterCount = withString(name).length() != 3 ? 0 : withString(name).length();
+                    String sub = "Fred".substring(0, withString("fred").length());
+                    Integer count = Integer.valueOf(withString("fred").length());
+                    for (int index = 0; index < withString(name).length(); index++) {
+                    }
+                    int index = 0;
+                    while (index < withString(name).length()) {
+                        index++;
+                    }
+                    switch (withString(name).length()) {
+                        case 4:
+                        default:
+                            break;
+                    }
+                    List<String> names = Arrays.asList("fred", "joe", "jill");
+                    List<Integer> counts = names.stream().map(this::countLetters).collect(Collectors.toList());
+                }
+                public int countLetters(String sourceString) {
+                    return sourceString.length();
+                }
+                public StringStub withString(String source) {
+                    return new StringStub(source);
+                }
+                public class StringStub {
+                    String source;
+                    private StringStub(String source) {
+                        this.source = source;
+                    }
+                    public int length() {
+                        return source.length();
+                    }
+                }
+           }
         """
     )
 
@@ -340,7 +560,7 @@ interface JavaTemplateTest : RecipeTest {
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.parentOrThrow.getTree<J>()
-                if (parent is J.MethodDecl && parent.name.ident.simpleName.equals("foo")) {
+                if (parent is J.MethodDecl && parent.name.ident.simpleName == "foo") {
 
                     val template = JavaTemplate.builder("\n#{};\n#{};").build()
 
@@ -355,7 +575,10 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
-                    b = b.withStatements(generatedStatements.stream().map ({ state -> JRightPadded<Statement>(state,Space.EMPTY)}).toList())
+                    b = b.withStatements(generatedStatements.stream().map { state ->
+                        JRightPadded<Statement>(state,
+                            Space.EMPTY)
+                    }.toList())
                 }
                 return b
             }
@@ -424,7 +647,10 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
-                    b = b.withStatements(generatedStatements.stream().map ({ state -> JRightPadded<Statement>(state,Space.EMPTY)}).toList())
+                    b = b.withStatements(generatedStatements.stream().map { state ->
+                        JRightPadded<Statement>(state,
+                            Space.EMPTY)
+                    }.toList())
                 }
                 return b
             }

@@ -21,17 +21,13 @@ import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
-import org.openrewrite.java.search.FindTypesInNameScope;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
-import static java.util.stream.Collectors.toSet;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -76,44 +72,60 @@ public class JavaTemplate {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
         }
 
-        //Extract any types from parameters that will be inserted into the template.
-        Set<JavaType> parameterTypes = stream(parameters)
-                .filter(J.class::isInstance)
-                .map(J.class::cast)
-                .flatMap(p -> FindTypesInNameScope.find(p).stream())
-                .collect(toSet());
-
         //Substitute parameter markers with the string representation of each parameter.
-        final String printedTemplate = substituteParameters(parameters);
+        String printedTemplate = substituteParameters(parameters);
 
-        J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
+        final J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
-        //Prune down the original AST to just the elements in scope at the insertion point.
-        cu = new TemplateProcessor(parameterTypes).visitCompilationUnit(cu, insertionScope);
+        //Walk up the insertion scope and find the first element that is an immediate child of a J.Block. The template
+        //will always be inserted into a block.
+        boolean memberVariableInitializer = false;
 
-        String generatedSource = new TemplatePrinter(after, insertionScope, imports)
-                .visit(cu, printedTemplate);
+        while(insertionScope.getParent() != null &&
+                !(insertionScope.getParent().getTree() instanceof J.CompilationUnit) &&
+                !(insertionScope.getParent().getTree() instanceof J.Block)
+            ) {
+
+            if (insertionScope.getParent().getTree() instanceof J.VariableDecls.NamedVar) {
+                //There is one edge case that can trip up compilation: If the insertion scope is the initializer
+                //of a member variable and that scope is not itself in a nested block. In this case, a class block
+                //must be created to correctly compile the template
+
+                //Find the first block's parent and if that parent is a class declaration, account for the edge case.
+                Iterator<Tree> index =  insertionScope.getPath();
+                while (index.hasNext()) {
+                    if (index.next() instanceof J.Block && index.hasNext() && index.next() instanceof J.ClassDecl) {
+                        memberVariableInitializer = true;
+                    }
+                }
+            }
+            insertionScope = insertionScope.getParent();
+        }
+
+        //Prune down the original AST to just the elements in scope at the insertion point.
+        J.CompilationUnit synthetic = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
+
+        String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
+                .visit(synthetic, printedTemplate);
 
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
         parser.reset();
-        cu = parser.parse(generatedSource).iterator().next();
+        synthetic = parser.parse(generatedSource).iterator().next();
 
         //Extract the compiled template tree elements.
         ExtractionContext extractionContext = new ExtractionContext();
-        new ExtractTemplatedCode().visit(cu, extractionContext);
-
-        @SuppressWarnings("ConstantConditions") Collection<? extends Style> styles = insertionScope
-                .firstEnclosing(J.CompilationUnit.class).getStyles();
+        new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
         List<J> snippets = extractionContext.getSnippets();
+        final Cursor finalInsertionScope = insertionScope;
         return snippets.stream()
                 .map(t -> {
                     if (autoFormat) {
                         //noinspection unchecked
-                        return (J2) new AutoFormatProcessor<Void>(styles).visit(t, null,
-                                insertionScope.getParentOrThrow());
+                        return (J2) new AutoFormatProcessor<Void>(cu.getStyles()).visit(t, null,
+                                finalInsertionScope.getParentOrThrow());
                     }
                     //noinspection unchecked
                     return (J2) t;
@@ -154,10 +166,8 @@ public class JavaTemplate {
      * The typed Cursor represents the insertion point within the original AST.
      */
     private static class TemplateProcessor extends JavaIsoProcessor<Cursor> {
-        private final Set<JavaType> referencedTypes;
 
-        TemplateProcessor(Set<JavaType> referencedTypes) {
-            this.referencedTypes = referencedTypes;
+        TemplateProcessor() {
             setCursoringOn();
         }
 
@@ -196,20 +206,20 @@ public class JavaTemplate {
                 return super.visitMethod(method, insertionScope);
             }
 
-            if (referencedTypes.contains(method.getType())) {
-                return method.withAnnotations(emptyList())
-                        .withBody(null);
-            }
-
-            //Otherwise, prune the method declaration.
-            return null;
+            return method.withAnnotations(emptyList())
+                    .withBody(null);
         }
 
         @Override
         public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionScope) {
-            J.VariableDecls.NamedVar var = super.visitVariable(variable, insertionScope);
-            //Variables in the original AST only need to be declared, this nulls out the initializers.
-            return var.withInitializer(null);
+            if (!insertionScope.isScopeInPath(variable)) {
+                //Variables in the original AST only need to be declared, this nulls out the initializers.
+                variable = variable.withInitializer(null);
+            } else {
+                //A variable within the insertion scope, we must mutate
+                variable = variable.withName(variable.getName().withName("_" + variable.getSimpleName()));
+            }
+            return super.visitVariable(variable, insertionScope);
         }
     }
 
@@ -220,27 +230,31 @@ public class JavaTemplate {
 
         private final Set<String> imports;
 
-        TemplatePrinter(boolean after, Cursor insertionScope, Set<String> imports) {
+
+        TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
             super(new TreePrinter<String>() {
                 @Override
                 public String doLast(Tree tree, String printed, String printedTemplate) {
+                    //Note: A block is added around the template and markers when the insertion point is within a
+                    //      member variable initializer to prevent compiler issues.
+                    String blockStart = memberVariableInitializer ? "{" : "";
+                    String blockEnd = memberVariableInitializer ? "}" : "";
                     // individual statement, but block doLast which is invoking this adds the ;
                     if (insertionScope.getTree().getId().equals(tree.getId())) {
-                        String templateCode = "/*" + SNIPPET_MARKER_START + "*/" +
-                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/";
+                        String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
+                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
                         if (after) {
                             // since the visit method on J.Block is responsible for adding the ';', we
                             // add it pre-emptively here before concatenating the template.
-                            return printed +
+                            printed = printed +
                                     ((insertionScope.getParentOrThrow().getTree() instanceof J.Block) ?
                                             ";" : "") +
                                     "\n" + templateCode;
                         } else {
-                            return "\n" + templateCode + "\n" + printed;
+                            printed = "\n" + templateCode + "\n" + printed;
                         }
-                    } else {
-                        return printed;
                     }
+                    return printed;
                 }
             });
             this.imports = imports;
@@ -255,7 +269,7 @@ public class JavaTemplate {
             StringBuilder output = new StringBuilder(originalImports.length() + acc.length() + 1024);
             output.append(originalImports);
             if (!cu.getImports().isEmpty()) {
-                output.append(";");
+                output.append(";\n");
             }
 
             for (String i : imports) {
