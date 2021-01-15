@@ -59,7 +59,6 @@ public class CoalesceProperties extends Recipe {
                         int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                                 findIndent.getMostCommonIndent() : 4;
                         doAfterVisit(new ShiftFormatLeftProcessor<>(subEntry.getValue(), indentToUse));
-//                        andThen(new ShiftFormatLeft(subEntry.getValue(), formatter.wholeSourceIndent().getIndentToUse())); // TODO
 
                         changed = true;
                     } else {
