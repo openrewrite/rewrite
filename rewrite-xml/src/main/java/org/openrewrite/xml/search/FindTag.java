@@ -37,8 +37,9 @@ public class FindTag extends Recipe {
     }
 
     public static Set<Xml.Tag> find(Xml x, String xpath) {
-        return SearchResult.find(new FindTagProcessor(new XPathMatcher(xpath)).visit(x,
-                ExecutionContext.builder().build()));
+        //noinspection ConstantConditions
+        return new FindTagProcessor(new XPathMatcher(xpath)).visit(x, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static class FindTagProcessor extends XmlProcessor<ExecutionContext> {
