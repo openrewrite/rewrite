@@ -310,7 +310,7 @@ public class Java11Parser implements JavaParser {
                         .register(meterRegistry));
 
                 Duration time = Duration.ofNanos(System.nanoTime() - start);
-                if(time.compareTo(attributionAlertThreshold) > 0) {
+                if (time.compareTo(attributionAlertThreshold) > 0) {
                     logger.warn("Type attribution took too long for {} ({})", sourceFile, time);
                 }
             }

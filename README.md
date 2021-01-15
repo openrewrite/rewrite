@@ -32,6 +32,5 @@ We use [IntellJ IDEA](https://www.jetbrains.com/idea/) to develop this project.
 Other IDEs or versions of this IDE can be made to work. 
 These are one set of versions we know works:
 
-* IDEA version:  2020.2
-* [Kotlin plugin](https://plugins.jetbrains.com/plugin/6954-kotlin): 1.4.10-release-IJ2020.2-1
-* [Lombok plugin](https://plugins.jetbrains.com/plugin/6317-lombok): 0.32-2020.2
+* IDEA version:  2020.3.1
+* [Kotlin plugin](https://plugins.jetbrains.com/plugin/6954-kotlin)

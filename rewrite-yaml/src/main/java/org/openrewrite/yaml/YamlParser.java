@@ -15,7 +15,6 @@
  */
 package org.openrewrite.yaml;
 
-import org.openrewrite.Formatting;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -31,7 +30,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +38,6 @@ import java.util.stream.Stream;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Formatting.format;
 import static org.openrewrite.Tree.randomId;
 
 public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
@@ -70,7 +67,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             Stack<BlockBuilder> blockStack = new Stack<>();
 
             for (Event event = parser.getEvent(); event != null; event = parser.getEvent()) {
-                Formatting fmt = reader.prefix(lastEnd, event);
+                String fmt = reader.prefix(lastEnd, event);
 
                 switch (event.getEventId()) {
                     case Alias:
@@ -140,7 +137,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             }
 
             return new Yaml.Documents(randomId(), sourceFile,
-                    documents, Formatting.EMPTY, Markers.EMPTY);
+                    documents, "", Markers.EMPTY);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -159,14 +156,14 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     }
 
     private static class MappingBuilder implements BlockBuilder {
-        private final Formatting formatting;
+        private final String formatting;
 
         private final List<Yaml.Mapping.Entry> entries = new ArrayList<>();
 
         @Nullable
         private Yaml.Scalar key;
 
-        private MappingBuilder(Formatting formatting) {
+        private MappingBuilder(String formatting) {
             this.formatting = formatting;
         }
 
@@ -178,10 +175,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 block = block.withPrefix(keySuffix.substring(keySuffix.lastIndexOf(':') + 1));
 
                 String keyPrefix = key.getPrefix();
-                key = key.withFormatting(format(""));
+                key = key.withPrefix("");
 
-                Yaml.Empty afterKey = new Yaml.Empty(randomId(), format(keySuffix.substring(0, keySuffix.lastIndexOf(':'))), Markers.EMPTY);
-                entries.add(new Yaml.Mapping.Entry(randomId(), key, afterKey, block, format(keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1)), Markers.EMPTY));
+                String beforeMappingValueIndicator = keySuffix.substring(0, keySuffix.lastIndexOf(':'));
+                String entryPrefix = keyPrefix.substring(keyPrefix.lastIndexOf(':') + 1);
+                entries.add(new Yaml.Mapping.Entry(randomId(), key, beforeMappingValueIndicator, block, entryPrefix, Markers.EMPTY));
                 key = null;
             }
         }
@@ -192,11 +190,11 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
     }
 
     private static class SequenceBuilder implements BlockBuilder {
-        private final Formatting formatting;
+        private final String formatting;
 
         private final List<Yaml.Sequence.Entry> entries = new ArrayList<>();
 
-        private SequenceBuilder(Formatting formatting) {
+        private SequenceBuilder(String formatting) {
             this.formatting = formatting;
         }
 
@@ -205,7 +203,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
             String entryPrefix = block.getPrefix();
             block = block.withPrefix(entryPrefix.substring(entryPrefix.lastIndexOf('-') + 1));
             entryPrefix = entryPrefix.substring(0, entryPrefix.lastIndexOf('-'));
-            entries.add(new Yaml.Sequence.Entry(randomId(), block, format(entryPrefix), Markers.EMPTY));
+            entries.add(new Yaml.Sequence.Entry(randomId(), block, entryPrefix, Markers.EMPTY));
         }
 
         public Yaml.Sequence build() {

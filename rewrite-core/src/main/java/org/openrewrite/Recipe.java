@@ -31,7 +31,7 @@ import static java.util.stream.Collectors.toSet;
 public abstract class Recipe {
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
-        Tree visitInternal(Tree tree, ExecutionContext ctx) {
+        public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             return tree;
         }
     };
@@ -42,46 +42,45 @@ public abstract class Recipe {
     protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
 
     public Recipe doNext(Recipe recipe) {
-        Recipe tail = recipe;
+        Recipe tail = this;
         //noinspection StatementWithEmptyBody
-        for(; tail.next != null; tail = tail.next);
+        for (; tail.next != null; tail = tail.next) ;
         tail.next = recipe;
         return this;
     }
 
+    Supplier<TreeProcessor<?, ExecutionContext>> getProcessor() {
+        return processor;
+    }
+
     private List<SourceFile> visit(List<SourceFile> before, ExecutionContext execution) {
-        List<SourceFile> acc = before;
-        List<SourceFile> temp = acc;
-        for (int i = 0; i < execution.getMaxCycles(); i++) {
-            // if this recipe isn't valid we just skip it and proceed to next
-            if (validate().isValid()) {
-                temp = ListUtils.map(temp, s -> {
-                    try {
-                        SourceFile after = (SourceFile) processor.get().visit(s, execution);
-                        if (after != null && after != s) {
-                            after = after.withMarkers(after.getMarkers().compute(
-                                    new RecipeThatMadeChanges(getName()),
-                                    (r1, r2) -> {
-                                        r1.names.addAll(r2.names);
-                                        return r1;
-                                    }));
-                        }
-                        return after;
-                    } catch (Throwable t) {
-                        execution.getOnError().accept(t);
-                        return s;
+        List<SourceFile> after = before;
+        // if this recipe isn't valid we just skip it and proceed to next
+        if (validate().isValid()) {
+            after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
+                try {
+                    SourceFile afterFile = (SourceFile) processor.get().visit(s, execution);
+                    if (afterFile != null && afterFile != s) {
+                        afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
+                                new RecipeThatMadeChanges(getName()),
+                                (r1, r2) -> {
+                                    r1.names.addAll(r2.names);
+                                    return r1;
+                                }));
                     }
-                });
-            }
-            if (next != null) {
-                temp = next.visit(temp, execution);
-            }
-            if (temp == acc) {
-                break;
-            }
-            acc = temp;
+                    return afterFile;
+                } catch (Throwable t) {
+                    if (execution.getOnError() != null) {
+                        execution.getOnError().accept(t);
+                    }
+                    return s;
+                }
+            });
         }
-        return acc;
+        if (next != null) {
+            after = next.visit(after, execution);
+        }
+        return after;
     }
 
     public final List<Result> run(List<SourceFile> before) {
@@ -89,7 +88,16 @@ public abstract class Recipe {
     }
 
     public final List<Result> run(List<SourceFile> before, ExecutionContext context) {
-        List<SourceFile> after = visit(before, context);
+        List<SourceFile> acc = before;
+        List<SourceFile> after = acc;
+        for (int i = 0; i < context.getMaxCycles(); i++) {
+            after = visit(before, context);
+            if (after == acc && !context.isNeedAnotherCycle()) {
+                break;
+            }
+            acc = after;
+            context.nextCycle();
+        }
 
         if (after == before) {
             return emptyList();
@@ -117,7 +125,7 @@ public abstract class Recipe {
 
         // removed files
         for (SourceFile s : before) {
-            if(!afterIds.contains(s.getId())) {
+            if (!afterIds.contains(s.getId())) {
                 // FIXME fix how we track which recipes are deleting files
                 results.add(new Result(s, null, emptySet()));
             }
@@ -140,10 +148,6 @@ public abstract class Recipe {
         private RecipeThatMadeChanges(String name) {
             this.names = new HashSet<>();
             this.names.add(name);
-        }
-
-        private RecipeThatMadeChanges(Set<String> names) {
-            this.names = names;
         }
     }
 }

@@ -157,7 +157,7 @@ public class RawPom {
     public List<RawRepositories.Repository> getActiveRepositories(Collection<String> activeProfiles) {
         List<RawRepositories.Repository> activeRepositories = new ArrayList<>();
 
-        if(repositories != null) {
+        if (repositories != null) {
             activeRepositories.addAll(repositories.getRepositories());
         }
 

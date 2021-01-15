@@ -26,6 +26,62 @@ import java.util.Iterator;
 import java.util.List;
 
 public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor<J, P> {
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param clazz The class that will be imported into the compilation unit.
+     */
+    public void maybeAddImport(@Nullable JavaType.FullyQualified clazz) {
+        if (clazz != null) {
+            maybeAddImport(clazz.getFullyQualifiedName());
+        }
+    }
+
+    /**
+     * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
+     * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent
+     * and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     */
+    public void maybeAddImport(String fullyQualifiedName) {
+        AddImport<P> op = new AddImport<>(fullyQualifiedName, null, true);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+    /**
+     * This method will add a static import to the compilation unit if there is a reference to the type/method. It adds
+     * an additional visitor which means the "add import" is deferred and does not complete immediately. This operation
+     * is idempotent and calling this method multiple times with the same arguments will only add an import once.
+     *
+     * @param fullyQualifiedName Fully-qualified name of the class.
+     * @param statik             The static method or field to be imported. A wildcard "*" may also be used to statically import all methods/fields.
+     */
+    public void maybeAddImport(String fullyQualifiedName, String statik) {
+        AddImport<P> op = new AddImport<>(fullyQualifiedName, statik, true);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+    public void maybeRemoveImport(@Nullable JavaType.FullyQualified clazz) {
+        if (clazz != null) {
+            maybeRemoveImport(clazz.getFullyQualifiedName());
+        }
+    }
+
+    public void maybeRemoveImport(String fullyQualifiedName) {
+        RemoveImport<P> op = new RemoveImport<>(fullyQualifiedName);
+        if (!getAfterVisit().contains(op)) {
+            doAfterVisit(op);
+        }
+    }
+
+
     public J visitExpression(Expression expression, P p) {
         return expression;
     }
@@ -42,14 +98,17 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         return nameTree;
     }
 
+    @Nullable
     private <N extends NameTree> JLeftPadded<N> visitTypeName(@Nullable JLeftPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
+    @Nullable
     private <N extends NameTree> JRightPadded<N> visitTypeName(@Nullable JRightPadded<N> nameTree, P p) {
         return nameTree == null ? null : nameTree.withElem(visitTypeName(nameTree.getElem(), p));
     }
 
+    @Nullable
     private <J2 extends J> JContainer<J2> visitTypeNames(@Nullable JContainer<J2> nameTrees, P p) {
         if (nameTrees == null) {
             return null;
@@ -146,7 +205,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     @Override
     public J visitBlock(J.Block block, P p) {
         J.Block b = call(block, p, this::visitEach);
-        b = b.withStatik(visitSpace(b.getStatic(), p));
+        b = b.withStatik(b.getStatic() == null ?
+                null :
+                visitSpace(b.getStatic(), p));
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
         b = call(b, p, this::visitStatement);
         b = b.withStatements(ListUtils.map(b.getStatements(), t -> call(t, p)));
@@ -185,6 +246,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = call(c, p, this::visitStatement);
         c = c.withAnnotations(call(c.getAnnotations(), p));
         c = c.withModifiers(call(c.getModifiers(), p));
+        c = c.withModifiers(ListUtils.map(c.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         c = c.withTypeParameters(call(c.getTypeParameters(), p));
         c = c.withName(call(c.getName(), p));
         c = c.withExtends(call(c.getExtends(), p));
@@ -210,6 +273,14 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = call(c, p, this::visitStatement);
         return c.withLabel(call(c.getLabel(), p));
+    }
+
+    @Override
+    public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, P p) {
+        J.ControlParentheses<T> cpa = call(controlParens, p, this::visitEach);
+        cpa = cpa.withPrefix(visitSpace(cpa.getPrefix(), p));
+        cpa = call(cpa, p, this::visitExpression);
+        return cpa.withTree(call(cpa.getTree(), p));
     }
 
     @Override
@@ -306,7 +377,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitImport(J.Import impoort, P p) {
         J.Import i = call(impoort, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = i.withStatik(visitSpace(i.getStatic(), p));
+        i = i.withStatik(i.getStatic() == null ? null :
+                visitSpace(i.getStatic(), p));
         return i.withQualid(call(i.getQualid(), p));
     }
 
@@ -360,9 +432,14 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = call(m, p, this::visitStatement);
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withModifiers(ListUtils.map(m.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         m = m.withTypeParameters(call(m.getTypeParameters(), p));
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
-        m = m.withReturnTypeExpr(visitTypeName(m.getReturnTypeExpr(), p));
+        m = m.withReturnTypeExpr(
+                m.getReturnTypeExpr() == null ?
+                        null :
+                        visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(call(m.getName(), p));
         m = m.withParams(call(m.getParams(), p));
         m = m.withParams(call(m.getParams(), p));
@@ -404,10 +481,16 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = call(m, p, this::visitStatement);
         m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withModifiers(ListUtils.map(m.getModifiers(),
+                mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
-        m = m.withTypeExpr(visitTypeName(m.getTypeExpr(), p));
-        m = m.withVarargs(visitSpace(m.getVarargs(), p));
+        m = m.withTypeExpr(m.getTypeExpr() == null ?
+                null :
+                visitTypeName(m.getTypeExpr(), p));
+        m = m.withVarargs(m.getVarargs() == null ?
+                null :
+                visitSpace(m.getVarargs(), p));
         return m.withVars(ListUtils.map(m.getVars(), t -> call(t, p)));
     }
 
@@ -417,7 +500,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = n.withPrefix(visitSpace(n.getPrefix(), p));
         n = call(n, p, this::visitExpression);
         n = n.withTypeExpr(call(n.getTypeExpr(), p));
-        n = n.withTypeExpr(visitTypeName(n.getTypeExpr(), p));
+        n = n.withTypeExpr(n.getTypeExpr() == null ?
+                null :
+                visitTypeName(n.getTypeExpr(), p));
         n = n.withDimensions(call(n.getDimensions(), p));
         return n.withInitializer(call(n.getInitializer(), p));
     }
@@ -430,7 +515,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = call(n, p, this::visitExpression);
         n = n.withNew(visitSpace(n.getNew(), p));
         n = n.withClazz(call(n.getClazz(), p));
-        n = n.withClazz(visitTypeName(n.getClazz(), p));
+        n = n.withClazz(n.getClazz() == null ?
+                null :
+                visitTypeName(n.getClazz(), p));
         n = n.withArgs(call(n.getArgs(), p));
         return n.withBody(call(n.getBody(), p));
     }
@@ -578,7 +665,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
         w = call(w, p, this::visitExpression);
         w = w.withBoundedType(call(w.getBoundedType(), p));
-        return w.withBoundedType(visitTypeName(w.getBoundedType(), p));
+        if (w.getBoundedType() != null) {
+            // i.e. not a "wildcard" type
+            w = w.withBoundedType(visitTypeName(w.getBoundedType(), p));
+        }
+        return w;
     }
 
     @Nullable
@@ -587,7 +678,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
             return null;
         }
         J2 j = call(right.getElem(), p);
-        return j == right.getElem() ? right : new JRightPadded<>(j, visitSpace(right.getAfter(), p));
+        Space space = visitSpace(right.getAfter(), p);
+        return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space);
     }
 
     @Nullable
@@ -595,8 +687,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         if (left == null) {
             return null;
         }
+        Space space = visitSpace(left.getBefore(), p);
         J2 j = call(left.getElem(), p);
-        return j == left.getElem() ? left : new JLeftPadded<>(visitSpace(left.getBefore(), p), j);
+        return (space == left.getBefore() && j == left.getElem()) ? left : new JLeftPadded<>(space, j);
     }
 
     @Nullable

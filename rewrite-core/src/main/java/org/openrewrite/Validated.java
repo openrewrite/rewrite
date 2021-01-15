@@ -16,7 +16,6 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.*;
@@ -102,6 +101,7 @@ public interface Validated extends Iterable<Validated> {
         return new Either(this, validated);
     }
 
+    @Nullable
     <T> T getValue();
 
     /**
@@ -113,7 +113,6 @@ public interface Validated extends Iterable<Validated> {
             return true;
         }
 
-        @NonNull
         @Override
         public Iterator<Validated> iterator() {
             return Collections.emptyIterator();
@@ -148,7 +147,7 @@ public interface Validated extends Iterable<Validated> {
         protected final String property;
         private final Object value;
 
-        public Valid(String property, Object value) {
+        public Valid(String property, @Nullable Object value) {
             this.property = property;
             this.value = value;
         }
@@ -158,7 +157,6 @@ public interface Validated extends Iterable<Validated> {
             return true;
         }
 
-        @NonNull
         @Override
         public Iterator<Validated> iterator() {
             return Stream.of((Validated) this).iterator();
@@ -206,7 +204,6 @@ public interface Validated extends Iterable<Validated> {
             return false;
         }
 
-        @NonNull
         @Override
         public Iterator<Validated> iterator() {
             return Stream.of((Validated) this).iterator();
@@ -220,6 +217,7 @@ public interface Validated extends Iterable<Validated> {
             return property;
         }
 
+        @SuppressWarnings("unchecked")
         @Nullable
         public Object getValue() {
             return value;
@@ -241,7 +239,7 @@ public interface Validated extends Iterable<Validated> {
     }
 
     class Missing extends Invalid {
-        public Missing(String property, Object value, String message) {
+        public Missing(String property, @Nullable Object value, String message) {
             super(property, value, message, null);
         }
     }
@@ -275,7 +273,6 @@ public interface Validated extends Iterable<Validated> {
                     .orElseThrow(() -> new IllegalStateException("Value does not exist"));
         }
 
-        @NonNull
         @Override
         public Iterator<Validated> iterator() {
             return Stream.concat(
@@ -304,7 +301,6 @@ public interface Validated extends Iterable<Validated> {
             return right.getValue();
         }
 
-        @NonNull
         @Override
         public Iterator<Validated> iterator() {
             return Stream.concat(

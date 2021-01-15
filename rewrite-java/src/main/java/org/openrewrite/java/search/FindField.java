@@ -44,8 +44,10 @@ public class FindField extends Recipe {
     }
 
     public static Set<J.VariableDecls> find(J j, String clazz) {
-        return SearchResult.find(new FindFieldsProcessor(clazz).visit(j,
-                ExecutionContext.builder().build()));
+        //noinspection ConstantConditions
+        return new FindFieldsProcessor(clazz)
+                .visit(j, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static final class FindFieldsProcessor extends JavaIsoProcessor<ExecutionContext> {

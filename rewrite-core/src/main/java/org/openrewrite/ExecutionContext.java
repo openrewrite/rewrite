@@ -19,21 +19,35 @@ import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 public final class ExecutionContext {
+    private volatile boolean needAnotherCycle = false;
+
     private final int maxCycles;
+
+    @Nullable
     private final Consumer<Throwable> onError;
 
-    Map<String, Object> messages = new HashMap<>();
+    private final ForkJoinPool forkJoinPool;
 
-    private ExecutionContext(int maxCycles, Consumer<Throwable> onError) {
+    private final Map<String, Object> messages = new ConcurrentHashMap<>();
+
+    private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
         this.onError = onError;
+        this.forkJoinPool = forkJoinPool;
     }
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    public void putMessage(String key, Object value) {
+        needAnotherCycle = true;
+        messages.put(key, value);
     }
 
     @Nullable
@@ -48,30 +62,52 @@ public final class ExecutionContext {
         return (T) messages.remove(key);
     }
 
+    boolean isNeedAnotherCycle() {
+        return needAnotherCycle;
+    }
+
+    void nextCycle() {
+        needAnotherCycle = false;
+    }
+
     int getMaxCycles() {
         return maxCycles;
     }
 
+    @Nullable
     Consumer<Throwable> getOnError() {
         return onError;
     }
 
+    ForkJoinPool getForkJoinPool() {
+        return forkJoinPool;
+    }
+
     public static class Builder {
         private int maxCycles = 3;
+
+        @Nullable
         private Consumer<Throwable> onError;
+
+        private ForkJoinPool forkJoinPool = ForkJoinPool.commonPool();
 
         public Builder maxCycles(int maxCycles) {
             this.maxCycles = maxCycles;
             return this;
         }
 
-        public Builder doOnError(Consumer<Throwable> onError) {
+        public Builder doOnError(@Nullable Consumer<Throwable> onError) {
             this.onError = onError;
             return this;
         }
 
+        public Builder forkJoinPool(ForkJoinPool forkJoinPool) {
+            this.forkJoinPool = forkJoinPool;
+            return this;
+        }
+
         public ExecutionContext build() {
-            return new ExecutionContext(maxCycles, onError);
+            return new ExecutionContext(maxCycles, onError, forkJoinPool);
         }
     }
 }

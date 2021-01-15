@@ -23,17 +23,18 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.Formatting;
 import org.openrewrite.SourceFile;
-import org.openrewrite.SourceVisitor;
 import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.yaml.YamlSourceVisitor;
-import org.openrewrite.yaml.internal.PrintYaml;
+import org.openrewrite.yaml.YamlVisitor;
+import org.openrewrite.yaml.internal.YamlPrinter;
 
 import java.io.Serializable;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,7 +45,11 @@ import static org.openrewrite.Tree.randomId;
 public interface Yaml extends Serializable, Tree {
     @Override
     default String print() {
-        return new PrintYaml().visit(this);
+        return new YamlPrinter<>(TreePrinter.identity()).visit(this, null);
+    }
+
+    default String print(TreePrinter<?> printer) {
+        return new YamlPrinter<>((TreePrinter<?>) printer).visit(this, null);
     }
 
     @SuppressWarnings("StatementWithEmptyBody")
@@ -62,19 +67,23 @@ public interface Yaml extends Serializable, Tree {
     }
 
     @Override
-    default <R> R accept(SourceVisitor<R> v) {
-        return v instanceof YamlSourceVisitor ?
-                acceptYaml((YamlSourceVisitor<R>) v) : v.defaultTo(null);
+    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+        return v instanceof YamlVisitor ?
+                acceptYaml((YamlVisitor<R, P>) v, p) : v.defaultValue(null, p);
     }
 
-    default <R> R acceptYaml(YamlSourceVisitor<R> v) {
-        return v.defaultTo(null);
+    default <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        return v.defaultValue(this, p);
     }
 
     /**
      * @return A new deep copy of this block with different IDs.
      */
     Yaml copyPaste();
+
+    String getPrefix();
+
+    Yaml withPrefix(String prefix);
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -90,20 +99,20 @@ public interface Yaml extends Serializable, Tree {
         List<Document> documents;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-            return v.visitDocuments(this);
+        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            return v.visitDocuments(this, p);
         }
 
         @Override
         public Documents copyPaste() {
             return new Documents(randomId(), sourcePath,
-                    documents.stream().map(Document::copyPaste).collect(toList()), formatting, Markers.EMPTY);
+                    documents.stream().map(Document::copyPaste).collect(toList()), prefix, Markers.EMPTY);
         }
     }
 
@@ -125,20 +134,20 @@ public interface Yaml extends Serializable, Tree {
         End end;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-            return v.visitDocument(this);
+        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            return v.visitDocument(this, p);
         }
 
         @Override
         public Document copyPaste() {
             return new Document(randomId(), explicit, blocks.stream().map(Block::copyPaste).collect(toList()),
-                    end == null ? null : end.copyPaste(), formatting, Markers.EMPTY);
+                    end == null ? null : end.copyPaste(), prefix, Markers.EMPTY);
         }
 
         /**
@@ -152,14 +161,14 @@ public interface Yaml extends Serializable, Tree {
             UUID id;
 
             @With
-            Formatting formatting;
+            String prefix;
 
             @With
             Markers markers;
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), formatting, Markers.EMPTY);
+                return new End(randomId(), prefix, Markers.EMPTY);
             }
         }
     }
@@ -178,7 +187,7 @@ public interface Yaml extends Serializable, Tree {
         String value;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
@@ -192,13 +201,13 @@ public interface Yaml extends Serializable, Tree {
         }
 
         @Override
-        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-            return v.visitScalar(this);
+        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            return v.visitScalar(this, p);
         }
 
         @Override
         public Scalar copyPaste() {
-            return new Scalar(randomId(), style, value, formatting, Markers.EMPTY);
+            return new Scalar(randomId(), style, value, prefix, Markers.EMPTY);
         }
     }
 
@@ -213,19 +222,19 @@ public interface Yaml extends Serializable, Tree {
         List<Entry> entries;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-            return v.visitMapping(this);
+        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            return v.visitMapping(this, p);
         }
 
         @Override
         public Mapping copyPaste() {
-            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting,
+            return new Mapping(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), prefix,
                     Markers.EMPTY);
         }
 
@@ -240,25 +249,26 @@ public interface Yaml extends Serializable, Tree {
             Scalar key;
 
             @With
-            Empty afterKey;
+            // https://yaml.org/spec/1.2/spec.html#:%20mapping%20value//
+            String beforeMappingValueIndicator;
 
             @With
             Block value;
 
             @With
-            Formatting formatting;
+            String prefix;
 
             @With
             Markers markers;
 
             @Override
-            public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-                return v.visitMappingEntry(this);
+            public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+                return v.visitMappingEntry(this, p);
             }
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), key.copyPaste(), afterKey, value.copyPaste(), formatting, Markers.EMPTY);
+                return new Entry(randomId(), key.copyPaste(), beforeMappingValueIndicator, value.copyPaste(), prefix, Markers.EMPTY);
             }
         }
     }
@@ -274,19 +284,19 @@ public interface Yaml extends Serializable, Tree {
         List<Entry> entries;
 
         @With
-        Formatting formatting;
+        String prefix;
 
         @With
         Markers markers;
 
         @Override
-        public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-            return v.visitSequence(this);
+        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            return v.visitSequence(this, p);
         }
 
         @Override
         public Sequence copyPaste() {
-            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), formatting,
+            return new Sequence(randomId(), entries.stream().map(Entry::copyPaste).collect(toList()), prefix,
                     Markers.EMPTY);
         }
 
@@ -301,39 +311,20 @@ public interface Yaml extends Serializable, Tree {
             Block block;
 
             @With
-            Formatting formatting;
+            String prefix;
 
             @With
             Markers markers;
 
             @Override
-            public <R> R acceptYaml(YamlSourceVisitor<R> v) {
-                return v.visitSequenceEntry(this);
+            public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+                return v.visitSequenceEntry(this, p);
             }
 
             @Override
             public Entry copyPaste() {
-                return new Entry(randomId(), block.copyPaste(), formatting, Markers.EMPTY);
+                return new Entry(randomId(), block.copyPaste(), prefix, Markers.EMPTY);
             }
-        }
-    }
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
-    final class Empty implements Yaml {
-        @EqualsAndHashCode.Include
-        UUID id;
-
-        @With
-        Formatting formatting;
-
-        @With
-        Markers markers;
-
-        @Override
-        public Empty copyPaste() {
-            return new Empty(randomId(), formatting, Markers.EMPTY);
         }
     }
 
@@ -342,5 +333,7 @@ public interface Yaml extends Serializable, Tree {
          * @return A new deep copy of this block with different IDs.
          */
         Block copyPaste();
+
+        Block withPrefix(String prefix);
     }
 }

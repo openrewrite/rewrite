@@ -23,17 +23,16 @@ import org.openrewrite.marker.SearchResult
 import org.openrewrite.xml.XmlParser
 
 class FindTagTest : RecipeTest {
-
-    private val parser = XmlParser()
+    override val parser = XmlParser()
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
 
     @Test
     fun simpleElement() = assertChanged(
-            parser,
-            FindTag().apply { setXPath("/dependencies/dependency") },
-            before = """
+        parser,
+        FindTag().apply { setXPath("/dependencies/dependency") },
+        before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>
@@ -41,7 +40,7 @@ class FindTagTest : RecipeTest {
                     </dependency>
                 </dependency>
             """,
-            after = """
+        after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     ~~><dependency>
@@ -53,9 +52,9 @@ class FindTagTest : RecipeTest {
 
     @Test
     fun wildcard() = assertChanged(
-            parser,
-            FindTag().apply { setXPath("/dependencies/*") },
-            before = """
+        parser,
+        FindTag().apply { setXPath("/dependencies/*") },
+        before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>
@@ -63,7 +62,7 @@ class FindTagTest : RecipeTest {
                     </dependency>
                 </dependency>
             """,
-            after = """
+        after = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     ~~><dependency>
@@ -75,9 +74,9 @@ class FindTagTest : RecipeTest {
 
     @Test
     fun noMatch() = assertUnchanged(
-            parser,
-            FindTag().apply { setXPath("/dependencies/dne") },
-            before = """
+        parser,
+        FindTag().apply { setXPath("/dependencies/dne") },
+        before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
                     <dependency>

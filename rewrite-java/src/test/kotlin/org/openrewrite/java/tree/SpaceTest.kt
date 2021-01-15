@@ -77,12 +77,13 @@ class SpaceTest {
               
             /**
              * /** Tip me over and pour me out!
+             * https://somewhere/over/the/rainbow.txt
              */
               
         """.trimIndent())
 
         assertThat(cf.comments).hasSize(1)
-        assertThat(cf.comments.first().text).isEqualTo("\n * /** Tip me over and pour me out!\n ")
+        assertThat(cf.comments.first().text).isEqualTo("\n * /** Tip me over and pour me out!\n * https://somewhere/over/the/rainbow.txt\n ")
         assertThat(cf.comments.first().suffix).isEqualTo("\n  ")
 
         assertThat(cf.whitespace).isEqualTo("  \n")

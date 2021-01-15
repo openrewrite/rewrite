@@ -67,8 +67,10 @@ public final class FindMethod extends Recipe {
     }
 
     public static Set<J.MethodInvocation> find(J j, String clazz) {
-        return SearchResult.find(new FindMethodProcessor(clazz).visit(j,
-                ExecutionContext.builder().build()));
+        //noinspection ConstantConditions
+        return new FindMethodProcessor(clazz)
+                .visit(j, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     private static class FindMethodProcessor extends JavaIsoProcessor<ExecutionContext> {

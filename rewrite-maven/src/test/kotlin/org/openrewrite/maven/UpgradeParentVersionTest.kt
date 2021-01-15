@@ -17,52 +17,50 @@ package org.openrewrite.maven
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
-import org.openrewrite.RefactorVisitor
-import org.openrewrite.RefactorVisitorTestForParser
+import org.openrewrite.RecipeTest
 import org.openrewrite.maven.tree.Maven
 
-class UpgradeParentVersionTest : RefactorVisitorTestForParser<Maven> {
-    override val visitors: Iterable<RefactorVisitor<*>> = emptyList()
+class UpgradeParentVersionTest : RecipeTest {
     override val parser: Parser<Maven> = MavenParser.builder().resolveOptional(false).build()
 
     @Test
-    fun upgradeVersion() = assertRefactored(
-            visitors = listOf(UpgradeParentVersion().apply {
-                setGroupId("org.springframework.boot")
-                setArtifactId("spring-boot-starter-parent")
-                setToVersion("~1.5")
-            }),
-            before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>1.5.12.RELEASE</version>
-                    <relativePath/> <!-- lookup parent from repository -->
-                  </parent>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
-            """,
-            after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>1.5.22.RELEASE</version>
-                    <relativePath/> <!-- lookup parent from repository -->
-                  </parent>
-                  
-                  <groupId>com.mycompany.app</groupId>
-                  <artifactId>my-app</artifactId>
-                  <version>1</version>
-                </project>
-            """
+    fun upgradeVersion() = assertChanged(
+        recipe = UpgradeParentVersion().apply {
+            setGroupId("org.springframework.boot")
+            setArtifactId("spring-boot-starter-parent")
+            setToVersion("~1.5")
+        },
+        before = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.12.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """,
+        after = """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>1.5.22.RELEASE</version>
+                <relativePath/> <!-- lookup parent from repository -->
+              </parent>
+              
+              <groupId>com.mycompany.app</groupId>
+              <artifactId>my-app</artifactId>
+              <version>1</version>
+            </project>
+        """
     )
 }

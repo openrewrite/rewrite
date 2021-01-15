@@ -123,11 +123,13 @@ public interface Parser<S extends SourceFile> {
             this.synthetic = synthetic;
         }
 
-        public @Nullable Path getPath() {
+        public @Nullable
+        Path getPath() {
             return path;
         }
 
-        public @Nullable Path getRelativePath(@Nullable Path relativeTo) {
+        public @Nullable
+        Path getRelativePath(@Nullable Path relativeTo) {
             return relativeTo == null ? path : relativeTo.relativize(path);
         }
 

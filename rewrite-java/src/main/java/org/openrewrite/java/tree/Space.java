@@ -18,7 +18,7 @@ package org.openrewrite.java.tree;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.apache.commons.lang.StringEscapeUtils;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.ArrayList;
@@ -29,18 +29,28 @@ import java.util.List;
  * Wherever whitespace can occur in Java, so can comments (at least block and javadoc style comments).
  * So whitespace and comments are like peanut butter and jelly.
  */
+@EqualsAndHashCode
 public class Space {
     public static Space EMPTY = new Space("", Collections.emptyList());
 
     private final List<Comment> comments;
     private final String whitespace;
 
-    @JsonCreator
-    public Space(
+    private Space(
             @JsonProperty("whitespace") String whitespace,
             @JsonProperty("comments") List<Comment> comments) {
         this.comments = comments;
         this.whitespace = whitespace;
+    }
+
+    @JsonCreator
+    public static Space build(
+            @JsonProperty("whitespace") String whitespace,
+            @JsonProperty("comments") List<Comment> comments) {
+        if (whitespace.isEmpty() && comments.isEmpty()) {
+            return Space.EMPTY;
+        }
+        return new Space(whitespace, comments);
     }
 
     @JsonIgnore
@@ -66,14 +76,17 @@ public class Space {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        return build(whitespace, comments);
     }
 
     public Space withWhitespace(String whitespace) {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        if (!whitespace.equals(this.whitespace)) {
+            return build(whitespace, comments);
+        }
+        return this;
     }
 
     public boolean isEmpty() {
@@ -99,7 +112,7 @@ public class Space {
         for (char c : charArray) {
             switch (c) {
                 case '/':
-                    if (last == '/' && !inSingleLineComment) {
+                    if (last == '/' && !inSingleLineComment && !inMultiLineComment && !inJavadoc) {
                         inSingleLineComment = true;
                         comment = new StringBuilder();
                     } else if (last == '*' && inMultiLineComment) {
@@ -167,7 +180,7 @@ public class Space {
             }
         }
 
-        return new Space(whitespace, comments);
+        return build(whitespace, comments);
     }
 
     public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,

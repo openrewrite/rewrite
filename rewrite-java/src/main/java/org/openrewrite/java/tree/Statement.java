@@ -21,7 +21,7 @@ import org.openrewrite.internal.lang.Nullable;
 public interface Statement extends J {
     @JsonIgnore
     default boolean hasClassType(@Nullable JavaType.Class classType) {
-        if(classType == null) {
+        if (classType == null) {
             return false;
         }
 

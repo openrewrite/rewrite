@@ -74,6 +74,15 @@ interface TryCatchTest : JavaTreeTest {
     )
 
     @Test
+    fun multipleResources(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Block, """
+            File f = new File("file.txt");
+            try(FileInputStream fis = new FileInputStream(f); FileInputStream fis2 = new FileInputStream(f)) {}
+            catch(RuntimeException | IOException e) {}
+        """, "java.io.*"
+    )
+
+    @Test
     fun tryCatchFinally(jp: JavaParser) = assertParsePrintAndProcess(
         jp, Block, """
             try {}

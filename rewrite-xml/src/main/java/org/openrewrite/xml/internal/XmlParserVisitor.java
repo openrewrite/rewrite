@@ -48,12 +48,12 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
+                prefix,
+                Markers.EMPTY,
                 path,
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
-                source.substring(cursor),
-                prefix,
-                Markers.EMPTY)
+                source.substring(cursor))
         );
     }
 
@@ -61,10 +61,10 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Prolog visitProlog(XMLParser.PrologContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Prolog(
                 randomId(),
-                ctx.xmldecl().stream().map(this::visitXmldecl).collect(toList()),
-                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()),
                 prefix,
-                Markers.EMPTY)
+                Markers.EMPTY,
+                ctx.xmldecl().stream().map(this::visitXmldecl).collect(toList()),
+                ctx.misc().stream().map(this::visit).map(Misc.class::cast).collect(toList()))
         );
     }
 
@@ -72,9 +72,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml visitMisc(XMLParser.MiscContext ctx) {
         if (ctx.COMMENT() != null) {
             return convert(ctx.COMMENT(), (comment, prefix) -> new Xml.Comment(randomId(),
-                    comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length()),
                     prefix,
-                    Markers.EMPTY));
+                    Markers.EMPTY,
+                    comment.getText().substring("<!--".length(), comment.getText().length() - "-->".length())));
         } else {
             return super.visitMisc(ctx);
         }
@@ -95,11 +95,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         } else if (ctx.reference() != null && ctx.reference().EntityRef() != null) {
             cursor += ctx.reference().EntityRef().getSymbol().getStopIndex() + 1;
             return new Xml.CharData(randomId(),
+                    "",
+                    Markers.EMPTY,
                     false,
                     ctx.reference().EntityRef().getText(),
-                    "",
-                    "",
-                    Markers.EMPTY);
+                    "");
         }
 
         return super.visitContent(ctx);
@@ -133,13 +133,13 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
         valueStr = valueStr.substring(0, valueStr.length() - suffix.length());
 
         return new Xml.CharData(randomId(),
+                prefix.toString(),
+                Markers.EMPTY,
                 cdata,
                 cdata ?
                         valueStr.substring("<![CDATA[".length(), text.length() - "]]>".length()) :
                         valueStr,
-                suffix.toString(),
-                prefix.toString(),
-                Markers.EMPTY);
+                suffix.toString());
     }
 
     @Override
@@ -151,11 +151,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             .collect(toList());
                     return new Xml.ProcessingInstruction(
                             randomId(),
+                            prefix,
+                            Markers.EMPTY,
                             "xml",
                             attributes,
-                            prefix(ctx.getStop()),
-                            prefix,
-                            Markers.EMPTY
+                            prefix(ctx.getStop())
                     );
                 }
         );
@@ -170,11 +170,11 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
                             .collect(toList());
                     return new Xml.ProcessingInstruction(
                             randomId(),
+                            prefix,
+                            Markers.EMPTY,
                             name,
                             attributes,
-                            prefix(ctx.getStop()),
-                            prefix,
-                            Markers.EMPTY
+                            prefix(ctx.getStop())
                     );
                 }
         );
@@ -208,16 +208,16 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
 
                         closeTag = new Xml.Tag.Closing(
                                 randomId(),
-                                convert(ctx.Name(1), (n, p) -> n.getText()),
-                                prefix(ctx.CLOSE(1)),
                                 closeTagPrefix,
-                                Markers.EMPTY
+                                Markers.EMPTY,
+                                convert(ctx.Name(1), (n, p) -> n.getText()),
+                                prefix(ctx.CLOSE(1))
                         );
                         cursor++;
                     }
 
-                    return new Xml.Tag(randomId(), name, attributes, content, closeTag,
-                            beforeTagDelimiterPrefix, prefix, Markers.EMPTY);
+                    return new Xml.Tag(randomId(), prefix, Markers.EMPTY, name, attributes,
+                            content, closeTag, beforeTagDelimiterPrefix);
                 }
         );
     }
@@ -225,20 +225,20 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     @Override
     public Xml.Attribute visitAttribute(XMLParser.AttributeContext ctx) {
         return convert(ctx, (c, prefix) -> {
-            Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), t.getText(), p, Markers.EMPTY));
+            Xml.Ident key = convert(c.Name(), (t, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, t.getText()));
 
             String beforeEquals = convert(c.EQUALS(), (e, p) -> p);
 
             Xml.Attribute.Value value = convert(c.STRING(), (v, p) -> new Xml.Attribute.Value(
                             randomId(),
-                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
-                            v.getText().substring(1, c.STRING().getText().length() - 1),
                             p,
-                            Markers.EMPTY
+                            Markers.EMPTY,
+                            v.getText().startsWith("'") ? Xml.Attribute.Value.Quote.Single : Xml.Attribute.Value.Quote.Double,
+                            v.getText().substring(1, c.STRING().getText().length() - 1)
                     )
             );
 
-            return new Xml.Attribute(randomId(), key, beforeEquals, value, prefix, Markers.EMPTY);
+            return new Xml.Attribute(randomId(), prefix, Markers.EMPTY, key, beforeEquals, value);
         });
     }
 
@@ -246,20 +246,20 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.DocTypeDecl visitDoctypedecl(XMLParser.DoctypedeclContext ctx) {
         return convert(ctx, (c, prefix) -> {
             skip(c.DOCTYPE());
-            Xml.Ident name = convert(c.Name(), (n, p) -> new Xml.Ident(randomId(), n.getText(), p, Markers.EMPTY));
-            Xml.Ident externalId = convert(c.externalid(), (n, p) -> new Xml.Ident(randomId(), n.Name().getText(), p, Markers.EMPTY));
+            Xml.Ident name = convert(c.Name(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.getText()));
+            Xml.Ident externalId = convert(c.externalid(), (n, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, n.Name().getText()));
             List<Xml.Ident> internalSubset = c.STRING().stream()
-                    .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), attr.getText(), p, Markers.EMPTY)))
+                    .map(s -> convert(s, (attr, p) -> new Xml.Ident(randomId(), p, Markers.EMPTY, attr.getText())))
                     .collect(toList());
             String beforeTagDelimiterPrefix = prefix(c.CLOSE());
             return new Xml.DocTypeDecl(randomId(),
+                    prefix,
+                    Markers.EMPTY,
                     name,
                     externalId,
                     internalSubset,
                     null, // TODO implement me!
-                    beforeTagDelimiterPrefix,
-                    prefix,
-                    Markers.EMPTY);
+                    beforeTagDelimiterPrefix);
         });
     }
 

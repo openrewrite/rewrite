@@ -26,7 +26,7 @@ buildscript {
 
 plugins {
     id("io.spring.release") version "0.20.1"
-    id("org.jetbrains.kotlin.jvm") version "1.4.0" apply false
+    id("org.jetbrains.kotlin.jvm") version "1.4.21" apply false
     id("org.gradle.test-retry") version "1.1.6" apply false
     id("com.github.jk1.dependency-license-report") version "1.16" apply false
 }
@@ -59,6 +59,7 @@ subprojects {
 
         "testImplementation"("org.jetbrains.kotlin:kotlin-reflect")
         "testImplementation"("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
+        "testImplementation"("org.jetbrains.kotlin:kotlin-stdlib-common")
 
         "testImplementation"("org.assertj:assertj-core:latest.release")
 
@@ -75,6 +76,15 @@ subprojects {
         }
 
         destinationDir.mkdirs()
+    }
+
+    // We use kotlin exclusively for tests
+    // The kotlin plugin adds kotlin-stdlib dependencies to the main sourceSet, even if it doesn't use any kotlin
+    // To avoid shipping dependencies we don't actually need, exclude them from the main sourceSet classpath but add them _back_ in for the test source sets
+    configurations.all {
+        if (project.name != "rewrite-test" && (name == "compileClasspath" || name == "runtimeClasspath")) {
+            exclude(group = "org.jetbrains.kotlin")
+        }
     }
 
     tasks.named<JavaCompile>("compileJava") {
@@ -136,6 +146,12 @@ subprojects {
                                 (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
                                     if ((dependency.getElementsByTagName("scope")
                                                     .item(0) as org.w3c.dom.Element).textContent == "provided") {
+                                        dependencies.removeChild(dependency)
+                                        i--
+                                        length--
+                                    }
+                                    if(project.name != "rewrite-test" && (dependency.getElementsByTagName("groupId")
+                                            .item(0) as org.w3c.dom.Element).textContent == "org.jetbrains.kotlin") {
                                         dependencies.removeChild(dependency)
                                         i--
                                         length--

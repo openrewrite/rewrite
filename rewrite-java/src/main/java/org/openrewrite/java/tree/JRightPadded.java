@@ -21,6 +21,8 @@ import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
 
+import java.util.function.Function;
+
 /**
  * A Java element that could have trailing space.
  *
@@ -35,4 +37,8 @@ public class JRightPadded<T> {
 
     @With
     Space after;
+
+    public JRightPadded<T> map(Function<T, T> map) {
+        return withElem(map.apply(elem));
+    }
 }

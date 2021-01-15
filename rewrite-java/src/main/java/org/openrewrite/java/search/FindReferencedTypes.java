@@ -15,46 +15,33 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.HashSet;
 import java.util.Set;
 
-public final class FindReferencedTypes {
+public class FindReferencedTypes {
     private FindReferencedTypes() {
     }
 
-    public static Set<JavaType> find(J j) {
-        Set<JavaType> types = new HashSet<>();
-        new FindReferencedTypesProcessor().visit(j, types);
-        return types;
+    public static Set<JavaType.Class> find(J j) {
+        Set<JavaType.Class> fields = new HashSet<>();
+        new FindReferencedTypesProcessor().visit(j, fields);
+        return fields;
     }
 
-    private static class FindReferencedTypesProcessor extends JavaProcessor<Set<JavaType>> {
+    private static class FindReferencedTypesProcessor extends JavaIsoProcessor<Set<JavaType.Class>> {
         @Override
-        public J visitMethodInvocation(J.MethodInvocation method, Set<JavaType> ctx) {
-            if (method.getType() != null) {
-                ctx.add(method.getType());
+        public <N extends NameTree> N visitTypeName(N name, Set<JavaType.Class> ctx) {
+            JavaType.Class asClass = TypeUtils.asClass(name.getType());
+            if (asClass != null) {
+                ctx.add(asClass);
             }
-            return super.visitMethodInvocation(method, ctx);
-        }
-
-        @Override
-        public J visitNewClass(J.NewClass newClass, Set<JavaType> ctx) {
-            if (newClass.getType() != null) {
-                ctx.add(newClass.getType());
-            }
-            return super.visitNewClass(newClass, ctx);
-        }
-
-        @Override
-        public J visitVariable(J.VariableDecls.NamedVar variable, Set<JavaType> ctx) {
-            if (variable.getType() != null) {
-                ctx.add(variable.getType());
-            }
-            return super.visitVariable(variable, ctx);
+            return super.visitTypeName(name, ctx);
         }
     }
 }

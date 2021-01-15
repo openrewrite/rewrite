@@ -97,7 +97,7 @@ interface FindTypeTest : RecipeTest {
         """,
         after = """
             import a.A1;
-            public class B extends ~~>A1 implements I1 {}
+            public class B extends ~~>A1 implements ~~>I1 {}
         """,
         dependsOn = arrayOf(a1, "public interface I1 {}")
     )

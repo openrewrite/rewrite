@@ -15,26 +15,20 @@
  */
 package org.openrewrite.maven
 
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
-import org.openrewrite.Refactor
-import org.openrewrite.RefactorVisitorTestForParser
-import org.openrewrite.maven.tree.Maven
+import org.openrewrite.RecipeTest
 
-class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
+class ExcludeDependencyTest : RecipeTest {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
-    override val visitors = listOf(
-            ExcludeDependency().apply {
-                setGroupId("org.junit.vintage")
-                setArtifactId("junit-vintage-engine")
-            })
+    override val recipe = ExcludeDependency().apply {
+        setGroupId("org.junit.vintage")
+        setArtifactId("junit-vintage-engine")
+    }
 
     @Test
-    fun excludeJUnitVintageEngineSpringBoot2_3() = assertRefactored(
-            before = """
+    fun excludeJUnitVintageEngineSpringBoot2_3() = assertChanged(
+        before = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -59,7 +53,7 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
                   </dependencies>
                 </project>
             """,
-            after = """
+        after = """
                 <project>
                   <modelVersion>4.0.0</modelVersion>
                   <parent>
@@ -94,7 +88,7 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
 
     @Test
     fun jUnitVintageEngineDoesntNeedExclusionFromSpringBoot2_4() = assertUnchanged(
-            before = """
+        before = """
                 <project>
                   <parent>
                     <groupId>org.springframework.boot</groupId>
@@ -117,31 +111,21 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
 
     @Issue("#92")
     @Test
-    fun playsNiceWithAddDependency() {
-        val before = """
+    fun playsNiceWithAddDependency() = assertChanged(
+        recipe = recipe.doNext(AddDependency().apply {
+            setGroupId("org.junit.jupiter");
+            setArtifactId("junit-jupiter-engine");
+            setVersion("5.3.0");
+            setScope("test")
+        }),
+        before = """
             <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>integration-testing</artifactId>
                 <version>1.0</version>
             </project>
-        """.trimIndent()
-
-        val pom = MavenParser.builder().build().parse(before)
-        val fixed = Refactor(true)
-                .visit(
-                        listOf(AddDependency().apply {
-                            setGroupId("org.junit.jupiter");
-                            setArtifactId("junit-jupiter-engine");
-                            setVersion("5.3.0");
-                            setScope("test")
-                        })
-                                + visitors
-                ).fix(pom)
-                .first()
-                .fixed!!
-                .printTrimmed()
-
-        val expected = """
+        """,
+        after =  """
             <project>
                 <groupId>org.openrewrite.example</groupId>
                 <artifactId>integration-testing</artifactId>
@@ -155,8 +139,6 @@ class ExcludeDependencyTest : RefactorVisitorTestForParser<Maven> {
                     </dependency>
                 </dependencies>
             </project>
-        """.trimIndent()
-
-        assertEquals(expected, fixed)
-    }
+        """
+    )
 }

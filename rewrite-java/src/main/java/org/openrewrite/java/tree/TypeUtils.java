@@ -44,7 +44,7 @@ public class TypeUtils {
     }
 
     public static boolean isAssignableTo(@Nullable JavaType to, @Nullable JavaType from) {
-        if(from == JavaType.Class.OBJECT) {
+        if (from == JavaType.Class.OBJECT) {
             return to == JavaType.Class.OBJECT;
         }
 
@@ -63,7 +63,7 @@ public class TypeUtils {
 
         try {
             Class<?> classFromReflect = Class.forName(classFrom.getFullyQualifiedName(), false, TypeUtils.class.getClassLoader());
-            if(classFromReflect.getSuperclass() != null && isAssignableTo(to, JavaType.Class.build(classFromReflect.getSuperclass().getName()))) {
+            if (classFromReflect.getSuperclass() != null && isAssignableTo(to, JavaType.Class.build(classFromReflect.getSuperclass().getName()))) {
                 return true;
             }
             return Arrays.stream(classFromReflect.getInterfaces()).anyMatch(i -> isAssignableTo(to, JavaType.Class.build(i.getName())));

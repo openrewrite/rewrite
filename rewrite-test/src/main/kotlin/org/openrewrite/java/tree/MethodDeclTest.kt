@@ -72,4 +72,12 @@ interface MethodDeclTest : JavaTreeTest {
             public native void foo();
         """
     )
+
+    @Test
+    fun methodWithSuffixMultiComment(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Class, """
+            public void foo() { }/*Comments*/
+        """
+    )
+
 }

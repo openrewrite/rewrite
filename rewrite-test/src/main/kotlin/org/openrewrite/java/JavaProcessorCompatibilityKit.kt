@@ -18,15 +18,48 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.java.format.BlankLinesTest
+import org.openrewrite.java.format.MinimumViableSpacingTest
+import org.openrewrite.java.format.SpacesTest
 import org.openrewrite.java.format.TabsAndIndentsTest
 import org.openrewrite.java.search.*
+import org.openrewrite.java.tree.TypeTreeTest
 
 @ExtendWith(JavaParserResolver::class)
 abstract class JavaProcessorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested
+    inner class AddImportTck : AddImportTest
+
+    @Nested
     inner class BlankLinesTck : BlankLinesTest
+
+    @Nested
+    inner class ChangeFieldNameTck : ChangeFieldNameTest
+
+    @Nested
+    inner class ChangeFieldTypeTck : ChangeFieldTypeTest
+
+    @Nested
+    inner class ChangeLiteralTck : ChangeLiteralTest
+
+    @Nested
+    inner class ChangeMethodNameTck : ChangeMethodNameTest
+
+    @Nested
+    inner class ChangeMethodTargetToStaticTck : ChangeMethodTargetToStaticTest
+
+    @Nested
+    inner class ChangeMethodTargetToVariableTck : ChangeMethodTargetToVariableTest
+
+    @Nested
+    inner class ChangeTypeTck : ChangeTypeTest
+
+    @Nested
+    inner class DeleteMethodArgumentTck : DeleteMethodArgumentTest
+
+    @Nested
+    inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
     inner class TabsAndIndentsTck : TabsAndIndentsTest
@@ -45,4 +78,40 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class FindTypeTck : FindTypeTest
+
+    @Nested
+    inner class ImplementInterfaceTck : ImplementInterfaceTest
+
+    @Nested
+    inner class JavaTemplateTck : JavaTemplateTest
+
+    @Nested
+    inner class MinimumViableSpacingTck : MinimumViableSpacingTest
+
+    @Nested
+    inner class OrderImportsTck : OrderImportsTest
+
+    @Nested
+    inner class RemoveImportTck : RemoveImportTest
+
+    @Nested
+    inner class RenameVariableTck : RenameVariableTest
+
+    @Nested
+    inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
+
+    @Nested
+    inner class SpacesTck : SpacesTest
+
+    @Nested
+    inner class TypeTreeTck : TypeTreeTest
+
+    @Nested
+    inner class UnwrapParenthesesTck : UnwrapParenthesesTest
+
+    @Nested
+    inner class UseStaticImportTck : UseStaticImportTest
+
+    @Nested
+    inner class SemanticallyEqualTck : SemanticallyEqualTest
 }

@@ -17,8 +17,10 @@ package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import org.openrewrite.internal.ListUtils;
 
 import java.util.List;
+import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 
@@ -74,5 +76,9 @@ public class JContainer<T> {
 
     public Space getBefore() {
         return before;
+    }
+
+    public JContainer<T> map(Function<T, T> map) {
+        return withElem(ListUtils.map(elem, t -> t.map(map)));
     }
 }

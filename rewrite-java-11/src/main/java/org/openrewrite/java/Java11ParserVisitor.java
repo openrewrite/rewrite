@@ -321,7 +321,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         J.VariableDecls paramDecl = convert(node.getParameter());
         paramDecl = paramDecl.withVars(Space.formatLastSuffix(paramDecl.getVars(), sourceBefore(")")));
 
-        J.Parentheses<J.VariableDecls> param = new J.Parentheses<>(randomId(), paramPrefix,
+        J.ControlParentheses<J.VariableDecls> param = new J.ControlParentheses<>(randomId(), paramPrefix,
                 Markers.EMPTY, padRight(paramDecl, EMPTY));
 
         return new J.Try.Catch(randomId(), fmt, Markers.EMPTY, param, convert(node.getBlock()));
@@ -895,8 +895,21 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitParenthesized(ParenthesizedTree node, Space fmt) {
         skip("(");
-        return new J.Parentheses<Expression>(randomId(), fmt, Markers.EMPTY,
-                convert(node.getExpression(), t -> sourceBefore(")")));
+        Tree parent = getCurrentPath().getParentPath().getLeaf();
+        switch (parent.getKind()) {
+            case CATCH:
+            case DO_WHILE_LOOP:
+            case IF:
+            case SWITCH:
+            case SYNCHRONIZED:
+            case TYPE_CAST:
+            case WHILE_LOOP:
+                return new J.ControlParentheses<Expression>(randomId(), fmt, Markers.EMPTY,
+                        convert(node.getExpression(), t -> sourceBefore(")")));
+            default:
+                return new J.Parentheses<Expression>(randomId(), fmt, Markers.EMPTY,
+                        convert(node.getExpression(), t -> sourceBefore(")")));
+        }
     }
 
     @Override
@@ -992,8 +1005,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                     resourceVar = resourceVar.withVars(Space.formatLastSuffix(resourceVar.getVars(), sourceBefore(";")));
                 }
 
-                resourceList.add(padRight(new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
-                        resourceVar.withPrefix(EMPTY), semicolonPresent), sourceBefore(")")));
+                J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,
+                        resourceVar.withPrefix(EMPTY), semicolonPresent);
+                resourceList.add(padRight(tryResource, i == node.getResources().size() - 1 ?
+                        sourceBefore(")") : EMPTY));
             }
 
             resources = JContainer.build(before, resourceList);
@@ -1011,7 +1026,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     @Override
     public J visitTypeCast(TypeCastTree node, Space fmt) {
         return new J.TypeCast(randomId(), fmt, Markers.EMPTY,
-                new J.Parentheses<>(randomId(),
+                new J.ControlParentheses<>(randomId(),
                         sourceBefore("("), Markers.EMPTY,
                         convert(node.getType(), t -> sourceBefore(")"))),
                 convert(node.getExpression()));
@@ -1698,7 +1713,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                             break;
                         case "*/":
                             inMultiLineComment = false;
-                            delimIndex++;
+                            delimIndex = delimIndex + 2;
                             break;
                     }
                 }
