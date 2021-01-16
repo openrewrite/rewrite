@@ -30,447 +30,574 @@ interface TabsAndIndentsTest : RecipeTest {
      */
     @Test
     fun tabsAndIndents(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class Test {
-            public int[] X = new int[]{1, 3, 5, 7, 9, 11};
-
-            public void test(boolean a, int x, int y, int z) {
-            label1:
-            do {
-            try {
-            if (x > 0) {
-            int someVariable = a ? x : y;
-            int anotherVariable = a ? x : y;
-            } else if (x < 0) {
-            int someVariable = (y + z);
-            someVariable = x = x + y;
-            } else {
-            label2:
-            for (int i = 0; i < 5; i++) doSomething(i);
-            }
-            switch (a) {
-            case 0:
-            doCase0();
-            break;
-            default:
-            doDefault();
-            }
-            } catch (Exception e) {
-            processException(e.getMessage(), x + y, z, a);
-            } finally {
-            processFinally();
-            }
-            }
-            while (true);
-
-            if (2 < 3) return;
-            if (3 < 4) return;
-            do {
-            x++;
-            }
-            while (x < 10000);
-            while (x < 50000) x++;
-            for (int i = 0; i < 5; i++) System.out.println(i);
-            }
-
-            private class InnerClass implements I1, I2 {
-            public void bar() throws E1, E2 {
-            }
-            }
-            }
-        """,
-        after = """
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
                 public int[] X = new int[]{1, 3, 5, 7, 9, 11};
-
+    
                 public void test(boolean a, int x, int y, int z) {
-                    label1:
-                    do {
-                        try {
-                            if (x > 0) {
-                                int someVariable = a ? x : y;
-                                int anotherVariable = a ? x : y;
-                            } else if (x < 0) {
-                                int someVariable = (y + z);
-                                someVariable = x = x + y;
-                            } else {
-                                label2:
-                                for (int i = 0; i < 5; i++) doSomething(i);
+                label1:
+                do {
+                try {
+                if (x > 0) {
+                int someVariable = a ? x : y;
+                int anotherVariable = a ? x : y;
+                } else if (x < 0) {
+                int someVariable = (y + z);
+                someVariable = x = x + y;
+                } else {
+                label2:
+                for (int i = 0; i < 5; i++) doSomething(i);
+                }
+                switch (a) {
+                case 0:
+                doCase0();
+                break;
+                default:
+                doDefault();
+                }
+                } catch (Exception e) {
+                processException(e.getMessage(), x + y, z, a);
+                } finally {
+                processFinally();
+                }
+                }
+                while (true);
+    
+                if (2 < 3) return;
+                if (3 < 4) return;
+                do {
+                x++;
+                }
+                while (x < 10000);
+                while (x < 50000) x++;
+                for (int i = 0; i < 5; i++) System.out.println(i);
+                }
+    
+                private class InnerClass implements I1, I2 {
+                public void bar() throws E1, E2 {
+                }
+                }
+                }
+            """,
+            after = """
+                public class Test {
+                    public int[] X = new int[]{1, 3, 5, 7, 9, 11};
+    
+                    public void test(boolean a, int x, int y, int z) {
+                        label1:
+                        do {
+                            try {
+                                if (x > 0) {
+                                    int someVariable = a ? x : y;
+                                    int anotherVariable = a ? x : y;
+                                } else if (x < 0) {
+                                    int someVariable = (y + z);
+                                    someVariable = x = x + y;
+                                } else {
+                                    label2:
+                                    for (int i = 0; i < 5; i++) doSomething(i);
+                                }
+                                switch (a) {
+                                    case 0:
+                                        doCase0();
+                                        break;
+                                    default:
+                                        doDefault();
+                                }
+                            } catch (Exception e) {
+                                processException(e.getMessage(), x + y, z, a);
+                            } finally {
+                                processFinally();
                             }
-                            switch (a) {
-                                case 0:
-                                    doCase0();
-                                    break;
-                                default:
-                                    doDefault();
-                            }
-                        } catch (Exception e) {
-                            processException(e.getMessage(), x + y, z, a);
-                        } finally {
-                            processFinally();
+                        }
+                        while (true);
+    
+                        if (2 < 3) return;
+                        if (3 < 4) return;
+                        do {
+                            x++;
+                        }
+                        while (x < 10000);
+                        while (x < 50000) x++;
+                        for (int i = 0; i < 5; i++) System.out.println(i);
+                    }
+    
+                    private class InnerClass implements I1, I2 {
+                        public void bar() throws E1, E2 {
                         }
                     }
-                    while (true);
-
-                    if (2 < 3) return;
-                    if (3 < 4) return;
-                    do {
-                        x++;
-                    }
-                    while (x < 10000);
-                    while (x < 50000) x++;
-                    for (int i = 0; i < 5; i++) System.out.println(i);
                 }
-
-                private class InnerClass implements I1, I2 {
-                    public void bar() throws E1, E2 {
-                    }
-                }
-            }
-        """
+            """
     )
-
 
     @Test
     fun tryCatchFinally(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class Test {
-            public void test(boolean a, int x, int y) {
-            try {
-            int someVariable = a ? x : y;
-            } catch (Exception e) {
-            e.printStackTrace();
-            } finally {
-            a = false;
-            }
-            }
-            }
-        """,
-        after = """
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
                 public void test(boolean a, int x, int y) {
-                    try {
-                        int someVariable = a ? x : y;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
-                        a = false;
+                try {
+                int someVariable = a ? x : y;
+                } catch (Exception e) {
+                e.printStackTrace();
+                } finally {
+                a = false;
+                }
+                }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                            int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
                     }
                 }
-            }
-        """
+            """
     )
 
     @Test
     fun doWhile(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class Test {
-            public void test() {
-            do {
-            }
-            while(true);
-
-            labeled: do {
-            }
-            while(false);
-            }
-            }
-        """,
-        after = """
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
                 public void test() {
-                    do {
-                    }
-                    while(true);
-
-                    labeled: do {
-                    }
-                    while(false);
+                do {
                 }
-            }
-        """
+                while(true);
+    
+                labeled: do {
+                }
+                while(false);
+                }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test() {
+                        do {
+                        }
+                        while(true);
+    
+                        labeled: do {
+                        }
+                        while(false);
+                    }
+                }
+            """
     )
 
     @Test
     fun elseBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class Test {
-            public void test(boolean a, int x, int y, int z) {
-            if (x > 0) {
-            } else if (x < 0) {
-            y += z;
-            }
-            }
-            }
-        """,
-        after = """
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
                 public void test(boolean a, int x, int y, int z) {
-                    if (x > 0) {
-                    } else if (x < 0) {
-                        y += z;
+                if (x > 0) {
+                } else if (x < 0) {
+                y += z;
+                }
+                }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y, int z) {
+                        if (x > 0) {
+                        } else if (x < 0) {
+                            y += z;
+                        }
                     }
                 }
-            }
-        """
+            """
     )
 
     @Test
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-            continuationIndent = 2
-        })).build(),
-        before = """
-            public class Test {
-                public void test() {
-                int m = 0;
-                int n = 0;
-                for (
-                 int i = 0;
-                 i < 5;
-                 i++, m++,
-                 n++);
-                for (int i = 0;
-                 i < 5;
-                 i++, m++,
-                 n++);
-                labeled: for (int i = 0;
-                 i < 5;
-                 i++, m++,
-                 n++);
-                }
-            }
-        """,
-        after = """
-            public class Test {
-                public void test() {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                continuationIndent = 2
+            })).build(),
+            before = """
+                public class Test {
+                    public void test() {
                     int m = 0;
                     int n = 0;
                     for (
-                      int i = 0;
-                      i < 5;
-                      i++, m++,
-                        n++);
+                     int i = 0;
+                     i < 5;
+                     i++, m++,
+                     n++);
                     for (int i = 0;
-                         i < 5;
-                         i++, m++,
-                           n++);
+                     i < 5;
+                     i++, m++,
+                     n++);
                     labeled: for (int i = 0;
-                                  i < 5;
-                                  i++, m++,
-                                    n++);
+                     i < 5;
+                     i++, m++,
+                     n++);
+                    }
                 }
-            }
-        """
+            """,
+            after = """
+                public class Test {
+                    public void test() {
+                        int m = 0;
+                        int n = 0;
+                        for (
+                          int i = 0;
+                          i < 5;
+                          i++, m++,
+                            n++);
+                        for (int i = 0;
+                             i < 5;
+                             i++, m++,
+                               n++);
+                        labeled: for (int i = 0;
+                                      i < 5;
+                                      i++, m++,
+                                        n++);
+                    }
+                }
+            """
     )
 
     @Test
     fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-            continuationIndent = 2
-        })).build(),
-        before = """
-            public class Test {
-            public void test(int a,
-            int b) {}
-
-            public void test2(
-            int a,
-            int b) {}
-            }
-        """,
-        after = """
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                continuationIndent = 2
+            })).build(),
+            before = """
+                public class Test {
                 public void test(int a,
-                                 int b) {}
-
+                int b) {}
+    
                 public void test2(
-                  int a,
-                  int b) {}
-            }
-        """
+                int a,
+                int b) {}
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(int a,
+                                     int b) {}
+    
+                    public void test2(
+                      int a,
+                      int b) {}
+                }
+            """
     )
 
     @Test
     fun expressions(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-            continuationIndent = 2
-        })).build(),
-        before = """
-            import java.util.function.Function;
-            public class Test {
-            int X[];
-            public int plus(int x) {
-                return 0;
-            }
-            public void test(boolean a, int x, int y) {
-            Function<Integer, Integer> op = this
-            ::
-            plus;
-            if (x
-            >
-            0) {
-            int someVariable = a ?
-            x :
-            y;
-            int anotherVariable = a
-            ?
-            x
-            :
-            y;
-            }
-            x
-            ++;
-            X
-            [
-            1
-            ]
-            =
-            0;
-            }
-            }
-        """,
-        after = """
-            import java.util.function.Function;
-            public class Test {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                continuationIndent = 2
+            })).build(),
+            before = """
+                import java.util.function.Function;
+                public class Test {
                 int X[];
                 public int plus(int x) {
                     return 0;
                 }
                 public void test(boolean a, int x, int y) {
-                    Function<Integer, Integer> op = this
-                      ::
-                      plus;
-                    if (x
-                      >
-                      0) {
-                        int someVariable = a ?
-                          x :
-                          y;
-                        int anotherVariable = a
-                          ?
-                          x
-                          :
-                          y;
-                    }
-                    x
-                      ++;
-                    X
-                      [
-                      1
-                      ]
-                      =
-                      0;
+                Function<Integer, Integer> op = this
+                ::
+                plus;
+                if (x
+                >
+                0) {
+                int someVariable = a ?
+                x :
+                y;
+                int anotherVariable = a
+                ?
+                x
+                :
+                y;
                 }
-            }
-        """
+                x
+                ++;
+                X
+                [
+                1
+                ]
+                =
+                0;
+                }
+                }
+            """,
+            after = """
+                import java.util.function.Function;
+                public class Test {
+                    int X[];
+                    public int plus(int x) {
+                        return 0;
+                    }
+                    public void test(boolean a, int x, int y) {
+                        Function<Integer, Integer> op = this
+                          ::
+                          plus;
+                        if (x
+                          >
+                          0) {
+                            int someVariable = a ?
+                              x :
+                              y;
+                            int anotherVariable = a
+                              ?
+                              x
+                              :
+                              y;
+                        }
+                        x
+                          ++;
+                        X
+                          [
+                          1
+                          ]
+                          =
+                          0;
+                    }
+                }
+            """
     )
 
     @Test
     fun lineComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class A {
-            // this is a comment
-            public void method() {}
-            }
-        """,
-        after = """
-            public class A {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class A {
                 // this is a comment
                 public void method() {}
-            }
-        """
+                }
+            """,
+            after = """
+                public class A {
+                    // this is a comment
+                    public void method() {}
+                }
+            """
     )
 
     @Test
     fun blockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class A {
-            /* this is a comment
-               that extends onto another line */
-            public void method() {}
-            }
-        """,
-        after = """
-            public class A {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class A {
                 /* this is a comment
                    that extends onto another line */
                 public void method() {}
-            }
-        """
+                }
+            """,
+            after = """
+                public class A {
+                    /* this is a comment
+                       that extends onto another line */
+                    public void method() {}
+                }
+            """
     )
 
     @Test
     fun annotations(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            @Deprecated
-            @SuppressWarnings("ALL")
-            public class A {
-            @Deprecated
-            @SuppressWarnings("ALL")
-                class B {
-                }
-            }
-        """,
-        after = """
-            @Deprecated
-            @SuppressWarnings("ALL")
-            public class A {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
                 @Deprecated
                 @SuppressWarnings("ALL")
-                class B {
+                public class A {
+                @Deprecated
+                @SuppressWarnings("ALL")
+                    class B {
+                    }
                 }
-            }
-        """
+            """,
+            after = """
+                @Deprecated
+                @SuppressWarnings("ALL")
+                public class A {
+                    @Deprecated
+                    @SuppressWarnings("ALL")
+                    class B {
+                    }
+                }
+            """
     )
 
     @Test
     fun javadoc(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-        before = """
-            public class A {
-            /**
-             * This is a javadoc
-             */
-            public void method() {}
-            }
-        """,
-        after = """
-            public class A {
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class A {
                 /**
                  * This is a javadoc
                  */
                 public void method() {}
-            }
-        """
+                }
+            """,
+            after = """
+                public class A {
+                    /**
+                     * This is a javadoc
+                     */
+                    public void method() {}
+                }
+            """
     )
 
     @Test
     fun tabs(jp: JavaParser.Builder<*, *>) = assertChanged(
-        // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
-        jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-            isUseTabCharacter = true
-        })).build(),
-        before = """
-            public class A {
-                public void method() {
-                int n = 0;
+            // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                isUseTabCharacter = true
+            })).build(),
+            before = """
+                public class A {
+                    public void method() {
+                    int n = 0;
+                    }
                 }
-            }
-        """,
-        after = """
-            public class A {
-                public void method() {
-                	int n = 0;
+            """,
+            after = """
+                public class A {
+                    public void method() {
+                    	int n = 0;
+                    }
                 }
-            }
-        """
+            """
+    )
+
+    @Test
+    fun shiftRight(jp: JavaParser.Builder<*, *>) = assertChanged(
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                    int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                            int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun shiftRightTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                isUseTabCharacter = true
+            })).build(),
+            before = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                	int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                			int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun shiftLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
+            before = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                                                int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                            int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun shiftLeftTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
+            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
+                isUseTabCharacter = true
+            })).build(),
+            before = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                				int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    public void test(boolean a, int x, int y) {
+                        try {
+                			int someVariable = a ? x : y;
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        } finally {
+                            a = false;
+                        }
+                    }
+                }
+            """
     )
 }
