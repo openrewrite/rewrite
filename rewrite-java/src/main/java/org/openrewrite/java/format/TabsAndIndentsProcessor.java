@@ -279,13 +279,12 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         int parentIndent = indent(((J) parent).getPrefix());
         int indent = indent(space);
 
-        if (indent - parentIndent < indentSize) {
-            int shiftRight = indentSize + parentIndent - indent;
+        if (indent != parentIndent + indentSize) {
+            int shift = indentSize + parentIndent - indent;
             space = space.withComments(ListUtils.map(space.getComments(), c ->
-                    indentComment(c, shiftRight)));
-            space = space.withWhitespace(indent(space.getWhitespace(), shiftRight));
+                    indentComment(c, shift)));
+            space = space.withWhitespace(indent(space.getWhitespace(), shift));
         }
-
         return space;
     }
 
@@ -308,19 +307,19 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
 
         int indent = indent(space);
 
-        if (indent - column < 0) {
-            int shiftRight = column - indent;
+        if (indent != column) {
+            int shift = column - indent;
             space = space.withComments(ListUtils.map(space.getComments(), c ->
-                    indentComment(c, shiftRight)));
-            space = space.withWhitespace(indent(space.getWhitespace(), shiftRight));
+                    indentComment(c, shift)));
+            space = space.withWhitespace(indent(space.getWhitespace(), shift));
         }
 
         return space;
     }
 
-    private Comment indentComment(Comment comment, int shiftRight) {
+    private Comment indentComment(Comment comment, int shift) {
         StringBuilder newSuffix = new StringBuilder(comment.getSuffix());
-        shiftRight(newSuffix, shiftRight);
+        shift(newSuffix, shift);
 
         String newText = comment.getText();
         if (comment.getStyle() != Comment.Style.LINE) {
@@ -328,7 +327,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             for (char c : comment.getText().toCharArray()) {
                 newTextBuilder.append(c);
                 if (c == '\n') {
-                    shiftRight(newTextBuilder, shiftRight);
+                    shift(newTextBuilder, shift);
                 }
             }
             newText = newTextBuilder.toString();
@@ -337,24 +336,32 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         return comment.withText(newText).withSuffix(newSuffix.toString());
     }
 
-    private String indent(String whitespace, int shiftRight) {
+    private String indent(String whitespace, int shift) {
         StringBuilder newWhitespace = new StringBuilder(whitespace);
-        shiftRight(newWhitespace, shiftRight);
+        shift(newWhitespace, shift);
         return newWhitespace.toString();
     }
 
-    private void shiftRight(StringBuilder text, int shiftRight) {
+    private void shift(StringBuilder text, int shift) {
         int tabIndent = style.getTabSize();
         if (!style.isUseTabCharacter()) {
             tabIndent = Integer.MAX_VALUE;
         }
 
-        for (int i = 0; i < shiftRight / tabIndent; i++) {
-            text.append('\t');
-        }
+        if (shift > 0) {
+            for (int i = 0; i < shift / tabIndent; i++) {
+                text.append('\t');
+            }
 
-        for (int i = 0; i < shiftRight % tabIndent; i++) {
-            text.append(' ');
+            for (int i = 0; i < shift % tabIndent; i++) {
+                text.append(' ');
+            }
+        } else {
+            if (style.isUseTabCharacter()) {
+                text.delete(text.length() + (shift / tabIndent), text.length());
+            } else {
+                text.delete(text.length() + shift, text.length());
+            }
         }
     }
 
