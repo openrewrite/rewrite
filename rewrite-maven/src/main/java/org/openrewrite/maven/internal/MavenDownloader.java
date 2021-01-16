@@ -20,8 +20,9 @@ import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import io.vavr.CheckedFunction0;
+import io.vavr.CheckedFunction1;
 import io.vavr.Function0;
+import io.vavr.Function1;
 import okhttp3.ConnectionSpec;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -61,6 +62,23 @@ public class MavenDownloader {
             .callTimeout(1, TimeUnit.MINUTES)
             .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
             .build();
+
+    private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
+
+    private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
+            mavenDownloaderRetry,
+            (request) -> httpClient.newCall(request).execute());
+
+    private static final Function1<String, Response> sendHeadFallbackToGet = Retry.decorateCheckedFunction(
+            mavenDownloaderRetry,
+            (String url) ->  httpClient.newCall(new Request.Builder().url(url).head().build()).execute()
+    ).recover((throwable) -> (String url) -> {
+        try {
+            return httpClient.newCall(new Request.Builder().url(url).get().build()).execute();
+        } catch (IOException e) {
+            return null;
+        }
+    });
 
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("central", "https://repo.maven.apache.org/maven2",
@@ -140,11 +158,7 @@ public class MavenDownloader {
                 "maven-metadata.xml";
 
         Request request = new Request.Builder().url(uri).get().build();
-        Retry retry = retryRegistry.retry("forceDownloadMetadata");
-        CheckedFunction0<Response> sendRequest = Retry.decorateCheckedSupplier(retry, () ->
-                httpClient.newCall(request).execute()
-        );
-        try (Response response = sendRequest.apply()) {
+        try (Response response =  sendRequest.apply(request)) {
             if (response.isSuccessful() && response.body() != null) {
                 @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                         .bytes();
@@ -236,12 +250,7 @@ public class MavenDownloader {
                                             artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
                                     Request request = new Request.Builder().url(uri).get().build();
-                                    Retry retry = retryRegistry.retry("download");
-                                    CheckedFunction0<Response> sendRequest = Retry.decorateCheckedSupplier(retry, () ->
-                                            httpClient.newCall(request).execute()
-                                    );
-
-                                    try (Response response = sendRequest.apply()) {
+                                    try (Response response = sendRequest.apply(request)) {
                                         if (response.isSuccessful() && response.body() != null) {
                                             @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                                     .bytes();
@@ -315,18 +324,7 @@ public class MavenDownloader {
         try {
             result = mavenCache.computeRepository(repoWithMirrors, () -> {
                 String url = repoWithMirrors.getUrl();
-                Retry retry = retryRegistry.retry("normalizeRepository");
-                Function0<Response> sendRequest = Retry.decorateCheckedSupplier(retry, () ->
-                        httpClient.newCall(new Request.Builder().url(url).head().build()).execute()
-                ).recover((throwable) -> () -> {
-                    try {
-                        return httpClient.newCall(new Request.Builder().url(url).get().build()).execute();
-                    } catch (IOException e) {
-                        return null;
-                    }
-                });
-
-                try (Response response = sendRequest.apply()) {
+                try (Response response = sendHeadFallbackToGet.apply(url)) {
                     if (url.toLowerCase().contains("http://")) {
                         return normalizeRepository(
                                 new RawRepositories.Repository(
@@ -352,7 +350,6 @@ public class MavenDownloader {
         }
 
         return result.getData();
-
     }
 
     private RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
