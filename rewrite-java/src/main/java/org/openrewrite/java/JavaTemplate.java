@@ -104,33 +104,27 @@ public class JavaTemplate {
         }
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit synthetic = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
+        J.CompilationUnit pruned = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
 
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
-                .visit(synthetic, printedTemplate);
+                .visit(pruned, printedTemplate);
 
         logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
         parser.reset();
-        synthetic = parser.parse(generatedSource).iterator().next();
+        J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
+
+        if (autoFormat) {
+            synthetic = (J.CompilationUnit) new AutoFormatProcessor<Void>(cu.getStyles()).visit(synthetic, null,
+                    new Cursor(null, synthetic));
+        }
 
         //Extract the compiled template tree elements.
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        List<J> snippets = extractionContext.getSnippets();
-        final Cursor finalInsertionScope = insertionScope;
-        return snippets.stream()
-                .map(t -> {
-                    if (autoFormat) {
-                        //noinspection unchecked
-                        return (J2) new AutoFormatProcessor<Void>(cu.getStyles()).visit(t, null,
-                                finalInsertionScope.getParentOrThrow());
-                    }
-                    //noinspection unchecked
-                    return (J2) t;
-                })
-                .collect(Collectors.toList());
+        //noinspection unchecked
+        return (List<J2>) extractionContext.getSnippets();
     }
 
     /**
@@ -249,9 +243,9 @@ public class JavaTemplate {
                             printed = printed +
                                     ((insertionScope.getParentOrThrow().getTree() instanceof J.Block) ?
                                             ";" : "") +
-                                    "\n" + templateCode;
+                                    templateCode;
                         } else {
-                            printed = "\n" + templateCode + "\n" + printed;
+                            printed = templateCode + printed;
                         }
                     }
                     return printed;

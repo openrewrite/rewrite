@@ -60,10 +60,14 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+                    val prefix = block.statements[0].elem.prefix
                     return block.withStatements(
                         ListUtils.concat(
                             JRightPadded(
-                                generatedMethodInvocations[0],
+                                generatedMethodInvocations[0].withPrefix(prefix),
                                 Space.EMPTY
                             ),
                             block.statements
@@ -131,10 +135,14 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+                    val prefix = block.statements[0].elem.prefix
                     return block.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodInvocations[0],
+                            JRightPadded(generatedMethodInvocations[0].withPrefix(prefix),
                                 Space.EMPTY
                             )
                         )
@@ -201,10 +209,15 @@ interface JavaTemplateTest : RecipeTest {
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+                    val prefix = b.statements[0].elem.prefix
+
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0],
+                            JRightPadded(generatedMethodDeclarations[0].withPrefix(prefix),
                                 Space.EMPTY
                             )
                         )
@@ -270,16 +283,21 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test generating the method using generateBefore and make sure the extraction is correct and has
                     //type attribution.
-                    generatedMethodDeclarations = template.generateBefore(
+                    generatedMethodDeclarations = template.generateBefore<J.MethodDecl>(
                         Cursor(cursor, block.statements[0].elem))
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+                    val prefix = b.statements[0].elem.prefix
+
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0],
+                            JRightPadded(generatedMethodDeclarations[0].withPrefix(prefix),
                                 Space.EMPTY
                             )
                         )
@@ -293,7 +311,7 @@ interface JavaTemplateTest : RecipeTest {
             import static java.util.Collections.emptyList;
 
             public class A {
-                int n = 0;
+                static int n = 0;
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
@@ -304,7 +322,7 @@ interface JavaTemplateTest : RecipeTest {
             import static java.util.Collections.emptyList;
 
             public class A {
-                int n = 0;
+                static int n = 0;
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
@@ -335,6 +353,11 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedMethodInvocations).`as`("The list of generated invocations should be 1.")
                     .hasSize(1)
                 assertThat(generatedMethodInvocations[0].type).isNotNull
+
+                //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                //statements.
+
                 return generatedMethodInvocations[0].withPrefix(m.prefix)
             }
         }.toRecipe(),
@@ -575,8 +598,15 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
+
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+
+                    val prefix = b.statements[0].elem.prefix
+
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state,
+                        JRightPadded<Statement>(state.withPrefix(prefix),
                             Space.EMPTY)
                     }.toList())
                 }
@@ -642,13 +672,18 @@ interface JavaTemplateTest : RecipeTest {
                             b.statements[1].elem as J,
                             b.statements[0].elem as J
                         )
-                    assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
+
+                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
+                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
+                    //statements.
+                    val prefix = b.statements[0].elem.prefix
+
                     //Make sure type attribution is valid on the generated method invocations.
                     assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state,
+                        JRightPadded<Statement>(state.withPrefix(prefix),
                             Space.EMPTY)
                     }.toList())
                 }
