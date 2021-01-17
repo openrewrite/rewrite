@@ -15,7 +15,7 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.Style;
+import org.openrewrite.style.Style;
 
 public class TextStyle implements Style {
     private String charset;

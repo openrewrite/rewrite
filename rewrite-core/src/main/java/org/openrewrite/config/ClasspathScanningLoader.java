@@ -1,0 +1,122 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite.config;
+
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
+import org.openrewrite.Recipe;
+import org.openrewrite.style.NamedStyles;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.UncheckedIOException;
+import java.lang.reflect.Constructor;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.Properties;
+
+import static java.util.stream.StreamSupport.stream;
+
+public class ClasspathScanningLoader implements ResourceLoader {
+    private static final Logger logger = LoggerFactory.getLogger(ClasspathScanningLoader.class);
+
+    private final List<Recipe> recipes = new ArrayList<>();
+    private final List<NamedStyles> styles = new ArrayList<>();
+
+    public ClasspathScanningLoader(Iterable<Path> compileClasspath, Properties properties, String[] acceptPackages) {
+        scanYaml(new ClassGraph().acceptPaths("META-INF/rewrite"), properties);
+        scanClasses(new ClassGraph(), acceptPackages);
+
+        if (compileClasspath.iterator().hasNext()) {
+            URLClassLoader classpathLoader = new URLClassLoader(
+                    stream(compileClasspath.spliterator(), false)
+                            .map(cc -> {
+                                try {
+                                    return cc.toUri().toURL();
+                                } catch (MalformedURLException e) {
+                                    throw new UncheckedIOException(e);
+                                }
+                            })
+                            .toArray(URL[]::new),
+                    getClass().getClassLoader()
+            );
+
+            scanYaml(new ClassGraph()
+                    .ignoreParentClassLoaders()
+                    .overrideClasspath(classpathLoader)
+                    .acceptPaths("META-INF/rewrite"), properties);
+
+            scanClasses(new ClassGraph()
+                    .ignoreParentClassLoaders()
+                    .overrideClasspath(classpathLoader), acceptPackages);
+        }
+    }
+
+    private void scanYaml(ClassGraph classGraph, Properties properties) {
+        try (ScanResult scanResult = classGraph.enableMemoryMapping().scan()) {
+            scanResult.getResourcesWithExtension("yml").forEachInputStreamIgnoringIOException((res, input) -> {
+                YamlResourceLoader resourceLoader = new YamlResourceLoader(input, res.getURI(), properties);
+                recipes.addAll(resourceLoader.listRecipes());
+                styles.addAll(resourceLoader.listStyles());
+            });
+        }
+    }
+
+    private void scanClasses(ClassGraph classGraph, String[] acceptPackages) {
+        try (ScanResult result = classGraph
+                .ignoreClassVisibility()
+                .acceptPackages(acceptPackages)
+                .scan()) {
+            for (ClassInfo classInfo : result.getSubclasses(Recipe.class.getName())) {
+                Class<?> recipeClass = classInfo.loadClass();
+                try {
+                    Constructor<?> constructor = recipeClass.getConstructor();
+                    constructor.setAccessible(true);
+                    recipes.add((Recipe) constructor.newInstance());
+                } catch (Exception e) {
+                    logger.warn("Unable to configure {}", recipeClass.getName(), e);
+                }
+            }
+
+            for (ClassInfo classInfo : result.getSubclasses(NamedStyles.class.getName())) {
+                Class<?> styleClass = classInfo.loadClass();
+                try {
+                    Constructor<?> constructor = styleClass.getConstructor();
+                    constructor.setAccessible(true);
+                    styles.add((NamedStyles) constructor.newInstance());
+                } catch (Exception e) {
+                    logger.warn("Unable to configure {}", styleClass.getName(), e);
+                }
+            }
+        }
+    }
+
+    @Override
+    public Collection<Recipe> listRecipes() {
+        return recipes;
+    }
+
+    @Override
+    public Collection<NamedStyles> listStyles() {
+        return styles;
+    }
+}

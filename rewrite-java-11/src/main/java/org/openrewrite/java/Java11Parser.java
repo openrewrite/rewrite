@@ -31,6 +31,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -78,7 +79,7 @@ public class Java11Parser implements JavaParser {
     private final JavaCompiler compiler;
     private final ResettableLog compilerLog;
 
-    private final Collection<JavaStyle> styles;
+    private final Collection<NamedStyles> styles;
 
     private final Duration attributionAlertThreshold;
 
@@ -88,7 +89,7 @@ public class Java11Parser implements JavaParser {
                          boolean suppressMappingErrors,
                          MeterRegistry meterRegistry,
                          boolean logCompilationWarningsAndErrors,
-                         Collection<JavaStyle> styles,
+                         Collection<NamedStyles> styles,
                          Duration attributionAlertThreshold) {
         this.meterRegistry = meterRegistry;
         this.classpath = classpath;

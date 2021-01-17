@@ -16,40 +16,14 @@
 package org.openrewrite;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.internal.lang.Nullable;
 
 import java.nio.file.Path;
-import java.util.Collection;
-
-import static java.util.Collections.emptyList;
 
 public interface SourceFile extends Tree {
     /**
      * This can refer to an absolute or relative file path or a remote location like an HTTP(s) URL.
      */
     Path getSourcePath();
-
-    /**
-     * Styles encode the surrounding project's expectation of formatting, etc.
-     * For example, the project's expected Java import ordering is a style.
-     *
-     * @return A list of styles.
-     */
-    default Collection<? extends Style> getStyles() {
-        return emptyList();
-    }
-
-    @Nullable
-    default <S extends Style> S getStyle(Class<S> styleType) {
-        for (Style style : getStyles()) {
-            if (styleType.isInstance(style)) {
-                //noinspection unchecked
-                return (S) style;
-            }
-        }
-
-        return null;
-    }
 
     @JsonProperty("@c")
     default String getJacksonPolymorphicTypeTag() {

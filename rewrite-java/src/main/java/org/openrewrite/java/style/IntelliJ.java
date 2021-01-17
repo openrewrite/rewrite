@@ -15,118 +15,71 @@
  */
 package org.openrewrite.java.style;
 
-public class IntelliJ {
-    public static TabsAndIndentsStyle defaultTabsAndIndents() {
-        TabsAndIndentsStyle style = new TabsAndIndentsStyle();
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 
-        style.setUseTabCharacter(false);
-        style.setTabSize(4);
-        style.setIndentSize(4);
-        style.setContinuationIndent(8);
-        style.setIndentsRelativeToExpressionStart(false);
+import java.util.Arrays;
+import java.util.Collection;
 
-        return style;
+public class IntelliJ extends NamedStyles {
+    private static final IntelliJ INSTANCE = new IntelliJ();
+
+    private IntelliJ() {
+        super("intellij-idea", Arrays.asList(
+                importLayout(),
+                blankLines(),
+                tabsAndIndents(),
+                spaces())
+        );
     }
 
-    public static BlankLineStyle defaultBlankLine() {
-        BlankLineStyle style = new BlankLineStyle();
-
-        BlankLineStyle.KeepMaximum max = new BlankLineStyle.KeepMaximum();
-        max.setInDeclarations(2);
-        max.setInCode(2);
-        max.setBeforeEndOfBlock(2);
-        max.setBetweenHeaderAndPackage(2);
-
-        style.setKeepMaximum(max);
-
-        BlankLineStyle.Minimum min = new BlankLineStyle.Minimum();
-        min.setBeforePackage(0);
-        min.setAfterPackage(1);
-        min.setBeforeImports(3);
-        min.setAfterImports(1);
-        min.setAroundClass(1);
-        min.setAfterClassHeader(0);
-        min.setBeforeClassEnd(0);
-        min.setAfterAnonymousClassHeader(0);
-        min.setAroundFieldInInterface(0);
-        min.setAroundField(0);
-
-        style.setMinimum(min);
-
-        return style;
+    @JsonCreator
+    public static IntelliJ defaults() {
+        return INSTANCE;
     }
 
-    public static SpacesStyle defaultSpaces() {
-        SpacesStyle style = new SpacesStyle();
+    @JsonIgnore
+    @Override
+    public Collection<Style> getStyles() {
+        return super.getStyles();
+    }
 
-        SpacesStyle.BeforeParentheses beforeParentheses = new SpacesStyle.BeforeParentheses();
-        beforeParentheses.setIfParentheses(true);
-        beforeParentheses.setForParentheses(true);
-        beforeParentheses.setWhileParentheses(true);
-        beforeParentheses.setSwitchParentheses(true);
-        beforeParentheses.setTryParentheses(true);
-        beforeParentheses.setCatchParentheses(true);
-        beforeParentheses.setSynchronizedParentheses(true);
-        style.setBeforeParentheses(beforeParentheses);
+    public static ImportLayoutStyle importLayout() {
+        return ImportLayoutStyle.builder()
+                .importAllOthers()
+                .blankLine()
+                .importPackage("javax.*")
+                .importPackage("java.*")
+                .blankLine()
+                .importStaticAllOthers()
+                .build();
+    }
 
-        SpacesStyle.AroundOperators aroundOperators = new SpacesStyle.AroundOperators();
-        aroundOperators.setAssignment(true);
-        aroundOperators.setLogical(true);
-        aroundOperators.setEquality(true);
-        aroundOperators.setRelational(true);
-        aroundOperators.setBitwise(true);
-        aroundOperators.setAdditive(true);
-        aroundOperators.setMultiplicative(true);
-        aroundOperators.setShift(true);
-        aroundOperators.setLambdaArrow(true);
-        style.setAroundOperators(aroundOperators);
+    public static TabsAndIndentsStyle tabsAndIndents() {
+        return new TabsAndIndentsStyle(false, 4, 4, 8, false);
+    }
 
-        SpacesStyle.BeforeLeftBrace beforeLeftBrace = new SpacesStyle.BeforeLeftBrace();
-        beforeLeftBrace.setClassLeftBrace(true);
-        beforeLeftBrace.setMethodLeftBrace(true);
-        beforeLeftBrace.setIfLeftBrace(true);
-        beforeLeftBrace.setElseLeftBrace(true);
-        beforeLeftBrace.setForLeftBrace(true);
-        beforeLeftBrace.setWhileLeftBrace(true);
-        beforeLeftBrace.setDoLeftBrace(true);
-        beforeLeftBrace.setSwitchLeftBrace(true);
-        beforeLeftBrace.setTryLeftBrace(true);
-        beforeLeftBrace.setCatchLeftBrace(true);
-        beforeLeftBrace.setFinallyLeftBrace(true);
-        beforeLeftBrace.setSynchronizedLeftBrace(true);
-        style.setBeforeLeftBrace(beforeLeftBrace);
+    public static BlankLinesStyle blankLines() {
+        return new BlankLinesStyle(
+                new BlankLinesStyle.KeepMaximum(2, 2, 2, 2),
+                new BlankLinesStyle.Minimum(0, 1, 3, 1, 1, 0, 0,
+                        0, 0, 0, 1, 1, 0, 1)
+        );
+    }
 
-        SpacesStyle.BeforeKeywords beforeKeywords = new SpacesStyle.BeforeKeywords();
-        beforeKeywords.setElseKeyword(true);
-        beforeKeywords.setWhileKeyword(true);
-        beforeKeywords.setCatchKeyword(true);
-        beforeKeywords.setFinallyKeyword(true);
-        style.setBeforeKeywords(beforeKeywords);
-
-        style.setWithin(new SpacesStyle.Within());
-
-        SpacesStyle.TernaryOperator ternaryOperator = new SpacesStyle.TernaryOperator();
-        ternaryOperator.setBeforeQuestionMark(true);
-        ternaryOperator.setAfterQuestionMark(true);
-        ternaryOperator.setBeforeColon(true);
-        ternaryOperator.setAfterColon(true);
-        style.setTernaryOperator(ternaryOperator);
-
-        SpacesStyle.TypeArguments typeArguments = new SpacesStyle.TypeArguments();
-        typeArguments.setAfterComma(true);
-        style.setTypeArguments(typeArguments);
-
-        SpacesStyle.Other other = new SpacesStyle.Other();
-        other.setAfterComma(true);
-        other.setAfterForSemicolon(true);
-        other.setAfterTypeCast(true);
-        other.setBeforeColonInForEach(true);
-        style.setOther(other);
-
-        SpacesStyle.TypeParameters typeParameters = new SpacesStyle.TypeParameters();
-        typeParameters.setAroundTypeBounds(true);
-        style.setTypeParameters(typeParameters);
-
-        return style;
+    public static SpacesStyle spaces() {
+        return new SpacesStyle(
+                new SpacesStyle.BeforeParentheses(false, false, true, true, true, true, true, true, true, false),
+                new SpacesStyle.AroundOperators(true, true, true, true, true, true, true, true, false, true, false),
+                new SpacesStyle.BeforeLeftBrace(true, true, true, true, true, true, true, true, true, true, true, true, false, false),
+                new SpacesStyle.BeforeKeywords(true, true, true, true),
+                new SpacesStyle.Within(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false),
+                new SpacesStyle.TernaryOperator(true, true, true, true),
+                new SpacesStyle.TypeArguments(true, false, false),
+                new SpacesStyle.Other(false, true, false, true, true, true, false),
+                new SpacesStyle.TypeParameters(false, true)
+        );
     }
 }

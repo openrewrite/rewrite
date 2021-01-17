@@ -673,14 +673,6 @@ public interface J extends Serializable, Tree {
         @With
         Space eof;
 
-        @With
-        Collection<JavaStyle> styles;
-
-        @Override
-        public Collection<JavaStyle> getStyles() {
-            return styles;
-        }
-
         @Override
         public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
             return v.visitCompilationUnit(this, p);

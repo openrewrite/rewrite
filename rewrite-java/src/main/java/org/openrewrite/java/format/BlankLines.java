@@ -18,7 +18,7 @@ package org.openrewrite.java.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoProcessor;
-import org.openrewrite.java.style.BlankLineStyle;
+import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 
@@ -30,9 +30,9 @@ public class BlankLines extends Recipe {
     private static class BlankLinesFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            BlankLineStyle style = cu.getStyle(BlankLineStyle.class);
-            if (style == null) {
-                style = IntelliJ.defaultBlankLine();
+            BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
+            if(style == null) {
+                style = IntelliJ.blankLines();
             }
             doAfterVisit(new BlankLinesProcessor<>(style));
             return cu;

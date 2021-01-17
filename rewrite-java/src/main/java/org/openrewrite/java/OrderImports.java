@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 
@@ -51,9 +52,8 @@ public class OrderImports extends Recipe {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .orElse(ImportLayoutStyle.getDefaultImportLayoutStyle());
+                    .orElse(IntelliJ.importLayout());
 
             List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getImports());
 

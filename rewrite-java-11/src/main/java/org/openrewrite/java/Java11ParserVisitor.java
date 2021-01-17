@@ -28,6 +28,7 @@ import com.sun.tools.javac.tree.JCTree.*;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,7 +60,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private final Path sourcePath;
     private final String source;
     private final boolean relaxedClassTypeMatching;
-    private final Collection<JavaStyle> styles;
+    private final Collection<NamedStyles> styles;
     private final Map<String, JavaType.Class> sharedClassTypes;
 
     private EndPosTable endPosTable;
@@ -68,8 +69,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
-    public Java11ParserVisitor(Path sourcePath, String source, boolean relaxedClassTypeMatching, Collection<JavaStyle> styles,
-                               Map<String, JavaType.Class> sharedClassTypes) {
+    public Java11ParserVisitor(Path sourcePath, String source, boolean relaxedClassTypeMatching,
+                               Collection<NamedStyles> styles, Map<String, JavaType.Class> sharedClassTypes) {
         this.sourcePath = sourcePath;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
@@ -437,9 +438,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 packageDecl == null ? null : padRight(packageDecl, sourceBefore(";")),
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
-                format(source.substring(cursor)),
-                styles
-        );
+                format(source.substring(cursor))
+        ).mark(styles.toArray(NamedStyles[]::new));
     }
 
     @Override

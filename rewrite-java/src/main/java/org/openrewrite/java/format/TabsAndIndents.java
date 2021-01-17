@@ -32,7 +32,7 @@ public class TabsAndIndents extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
             if (style == null) {
-                style = IntelliJ.defaultTabsAndIndents();
+                style = IntelliJ.tabsAndIndents();
             }
             doAfterVisit(new TabsAndIndentsProcessor<>(style));
             return cu;

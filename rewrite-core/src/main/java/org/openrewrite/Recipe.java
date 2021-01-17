@@ -23,12 +23,11 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import static java.util.Collections.emptyList;
-import static java.util.Collections.emptySet;
+import static java.util.Collections.*;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
-public abstract class Recipe {
+public class Recipe {
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
         public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -37,9 +36,20 @@ public abstract class Recipe {
     };
 
     @Nullable
+    private final String name;
+
+    @Nullable
     private Recipe next;
 
     protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
+
+    public Recipe(@Nullable String name) {
+        this.name = name;
+    }
+
+    public Recipe() {
+        this(null);
+    }
 
     public Recipe doNext(Recipe recipe) {
         Recipe tail = this;
@@ -138,8 +148,20 @@ public abstract class Recipe {
         return Validated.none();
     }
 
+    public final Collection<Validated> validateAll() {
+        return validateAll(new ArrayList<>());
+    }
+
+    private Collection<Validated> validateAll(Collection<Validated> acc) {
+        acc.add(validate());
+        if(next != null) {
+            validateAll(acc);
+        }
+        return acc;
+    }
+
     public String getName() {
-        return getClass().getName();
+        return name == null ? getClass().getName() : name;
     }
 
     private static class RecipeThatMadeChanges implements Marker {
@@ -149,5 +171,18 @@ public abstract class Recipe {
             this.names = new HashSet<>();
             this.names.add(name);
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Recipe recipe = (Recipe) o;
+        return getName().equals(recipe.getName());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(getName());
     }
 }

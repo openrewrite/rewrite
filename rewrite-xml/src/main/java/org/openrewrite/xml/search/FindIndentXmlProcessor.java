@@ -16,6 +16,7 @@
 package org.openrewrite.xml.search;
 
 import org.openrewrite.internal.StringUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlProcessor;
 import org.openrewrite.xml.tree.Xml;
 

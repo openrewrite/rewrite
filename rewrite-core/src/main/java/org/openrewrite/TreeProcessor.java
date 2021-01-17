@@ -54,8 +54,8 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
 
     public final Cursor getCursor() {
         if (cursor.get() == null) {
-            throw new IllegalStateException("Cursoring is not enabled for this visitor. " +
-                    "Call setCursoringOn() in the visitor's constructor to enable.");
+            throw new IllegalStateException("Cursoring is not enabled for this processor. " +
+                    "Call setCursoringOn() in the processor's constructor to enable.");
         }
         return cursor.get();
     }
@@ -121,11 +121,13 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         return (T2) callSuper.apply(t, p);
     }
 
+    @Nullable
     protected <T2 extends T> T2 call(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
     }
 
+    @Nullable
     protected <T2 extends T> List<T2> call(@Nullable List<T2> trees, P p) {
         if (trees == null) {
             return null;

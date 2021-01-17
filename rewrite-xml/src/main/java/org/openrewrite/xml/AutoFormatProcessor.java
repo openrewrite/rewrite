@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.search.FindIndentXmlProcessor;
 import org.openrewrite.xml.tree.Xml;
 

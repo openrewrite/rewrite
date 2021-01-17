@@ -19,6 +19,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
+import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.*;
 
 import java.util.*;
@@ -38,7 +39,7 @@ public class RemoveUnusedImports extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
 
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
-                    .orElse(ImportLayoutStyle.getDefaultImportLayoutStyle());
+                    .orElse(IntelliJ.importLayout());
 
             Map<String, Set<String>> methodsByTypeName = new HashMap<>();
             new StaticMethodsByType().visit(cu, methodsByTypeName);

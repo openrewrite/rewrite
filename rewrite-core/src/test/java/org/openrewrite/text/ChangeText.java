@@ -15,18 +15,14 @@
  */
 package org.openrewrite.text;
 
-import org.openrewrite.*;
+import org.openrewrite.ExecutionContext;
+import org.openrewrite.TreeProcessor;
+import org.openrewrite.internal.lang.Nullable;
 
-//@AutoConfigure
 public class ChangeText extends TreeProcessor<PlainText, ExecutionContext> {
     private String toText;
 
     public ChangeText() {
-    }
-
-    //@Override
-    public Validated validate() {
-        return Validated.required("toText", toText);
     }
 
     public void setToText(String toText) {

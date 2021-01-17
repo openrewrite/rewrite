@@ -27,6 +27,7 @@ import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
@@ -54,6 +55,7 @@ public interface Properties extends Serializable, Tree {
                 acceptProperties((PropertiesVisitor<R, P>) v, p) : v.defaultValue(null, p);
     }
 
+    @Nullable
     default <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }

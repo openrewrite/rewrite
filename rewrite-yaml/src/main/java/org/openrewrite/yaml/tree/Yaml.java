@@ -72,6 +72,7 @@ public interface Yaml extends Serializable, Tree {
                 acceptYaml((YamlVisitor<R, P>) v, p) : v.defaultValue(null, p);
     }
 
+    @Nullable
     default <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }

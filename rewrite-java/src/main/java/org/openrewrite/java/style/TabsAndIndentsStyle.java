@@ -15,12 +15,13 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
+import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
-@Getter
-@Setter
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Data
+@With
 public class TabsAndIndentsStyle implements JavaStyle {
     private boolean useTabCharacter;
     private int tabSize;

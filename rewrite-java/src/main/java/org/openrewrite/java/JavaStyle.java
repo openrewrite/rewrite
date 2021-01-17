@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Style;
+import org.openrewrite.style.Style;
 
 public interface JavaStyle extends Style {
 }

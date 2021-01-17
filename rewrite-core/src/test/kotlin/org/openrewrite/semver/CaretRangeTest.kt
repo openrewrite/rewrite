@@ -24,7 +24,7 @@ class CaretRangeTest {
      */
     @Test
     fun updateMinorAndPatch() {
-        val caretRange: CaretRange = CaretRange.build("^1.2.3", null).getValue()
+        val caretRange: CaretRange = CaretRange.build("^1.2.3", null).getValue()!!
 
         assertThat(caretRange.isValid("1.2.3")).isTrue()
         assertThat(caretRange.isValid("1.2.3.RELEASE")).isTrue()
@@ -38,7 +38,7 @@ class CaretRangeTest {
      */
     @Test
     fun updatePatch() {
-        val caretRange: CaretRange = CaretRange.build("^0.2.3", null).getValue()
+        val caretRange: CaretRange = CaretRange.build("^0.2.3", null).getValue()!!
 
         assertThat(caretRange.isValid("0.2.3")).isTrue()
         assertThat(caretRange.isValid("0.2.4")).isTrue()
@@ -49,7 +49,7 @@ class CaretRangeTest {
     fun updateNothing() {
         val caretRange: CaretRange = CaretRange
                 .build("^0.0.3", null)
-                .getValue()
+                .getValue()!!
 
         assertThat(caretRange.isValid("0.0.3")).isFalse()
         assertThat(caretRange.isValid("0.0.4")).isFalse()
@@ -60,7 +60,7 @@ class CaretRangeTest {
      */
     @Test
     fun desugarMinorWildcard() {
-        val caretRange: CaretRange = CaretRange.build("^1.x", null).getValue()
+        val caretRange: CaretRange = CaretRange.build("^1.x", null).getValue()!!
 
         assertThat(caretRange.isValid("1.0.0")).isTrue()
         assertThat(caretRange.isValid("1.0.1")).isTrue()
@@ -73,7 +73,7 @@ class CaretRangeTest {
      */
     @Test
     fun desugarPatchWildcard() {
-        val caretRange: CaretRange = CaretRange.build("^0.0.x", null).getValue()
+        val caretRange: CaretRange = CaretRange.build("^0.0.x", null).getValue()!!
 
         assertThat(caretRange.isValid("0.0.0")).isTrue()
         assertThat(caretRange.isValid("0.0.1")).isTrue()

@@ -163,14 +163,14 @@ interface AddImportTest : RecipeTest {
                     AddImport("$pkg.B", null, false)
                 ),
                 before = """
-                        package a;
-            
-                        import c.C0;
-                        import c.c.C1;
-                        import c.c.c.C2;
-            
-                        class A {}
-                    """,
+                    package a;
+        
+                    import c.C0;
+                    import c.c.C1;
+                    import c.c.c.C2;
+        
+                    class A {}
+                """,
                 after = "package a;\n\n${expectedImports.joinToString("\n") { fqn -> "import $fqn;" }}\n\nclass A {}"
             )
 

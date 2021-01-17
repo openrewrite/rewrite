@@ -17,9 +17,7 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
-import org.openrewrite.java.JavaIsoProcessor
 import org.openrewrite.java.JavaProcessor
-import org.openrewrite.java.tree.J
 import java.io.File
 import java.util.function.Supplier
 

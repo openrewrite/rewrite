@@ -33,7 +33,7 @@ public class Spaces extends Recipe {
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             SpacesStyle style = cu.getStyle(SpacesStyle.class);
             if (style == null) {
-                style = IntelliJ.defaultSpaces();
+                style = IntelliJ.spaces();
             }
             doAfterVisit(new SpacesProcessor<>(style));
             return super.visitCompilationUnit(cu, executionContext);

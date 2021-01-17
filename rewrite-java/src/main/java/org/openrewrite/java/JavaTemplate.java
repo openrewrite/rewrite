@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -27,6 +30,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.stream.Collectors;
+
 import static java.util.Collections.emptyList;
 
 @Incubating(since = "7.0.0")
@@ -115,7 +119,7 @@ public class JavaTemplate {
         J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
 
         if (autoFormat) {
-            synthetic = (J.CompilationUnit) new AutoFormatProcessor<Void>(cu.getStyles()).visit(synthetic, null,
+            synthetic = (J.CompilationUnit) new AutoFormatProcessor<Void>().visit(synthetic, null,
                     new Cursor(null, synthetic));
         }
 
@@ -123,8 +127,19 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        //noinspection unchecked
-        return (List<J2>) extractionContext.getSnippets();
+        List<J> snippets = extractionContext.getSnippets();
+        Cursor formatCursor = insertionScope.getParentOrThrow();
+
+        return snippets.stream()
+                .map(t -> {
+                    if (autoFormat) {
+                        //noinspection unchecked
+                        return (J2) new AutoFormatProcessor<Void>().visit(t, null, formatCursor);
+                    }
+                    //noinspection unchecked
+                    return (J2) t;
+                })
+                .collect(Collectors.toList());
     }
 
     /**

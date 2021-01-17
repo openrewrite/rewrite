@@ -54,6 +54,7 @@ public interface Xml extends Serializable, Tree {
                 acceptXml((XmlVisitor<R, P>) v, p) : v.defaultValue(null, p);
     }
 
+    @Nullable
     default <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }
@@ -295,14 +296,14 @@ public interface Xml extends Serializable, Tree {
 
         @JsonIgnore
         public Optional<Tag> getSibling(String name, Cursor cursor) {
-            Xml.Tag parent = cursor.getParentOrThrow().getTree();
+            Xml.Tag parent = cursor.getParent().getTree();
             if (parent == null) {
                 return Optional.empty();
             }
             return parent.getChild(name);
         }
 
-        public Tag withContent(List<? extends Content> content) {
+        public Tag withContent(@Nullable List<? extends Content> content) {
             if (this.content == content) {
                 return this;
             }

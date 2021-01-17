@@ -15,64 +15,37 @@
  */
 package org.openrewrite.java.style
 
-import com.fasterxml.jackson.databind.JsonMappingException
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
-
 import org.junit.jupiter.api.Test
-import java.lang.IllegalArgumentException
 
 class ImportLayoutStyleTest {
-
-    val mapper = ObjectMapper()
-
-    @Test
-    fun serializeStyle() {
-
-        val blocks = listOf<String>(
-            "import java.*",
-            "<blank line>",
-            "import javax.*",
-            "<blank line>",
-            "import all other imports",
-            "<blank line>",
-            "import org.springframework.*",
-            "<blank line>",
-            "import static all other imports"
-        )
-        val style = ImportLayoutStyle.layout(999,998, *blocks.toTypedArray())
-
-        val copy= mapper.readValue(mapper.writeValueAsString(style), ImportLayoutStyle::class.java)
-        assertThat(copy.classCountToUseStarImport).isEqualTo(999)
-        assertThat(copy.nameCountToUseStarImport).isEqualTo(998)
-
-        @Suppress("UNCHECKED_CAST") val blockCopy : List<String> = copy.layout.get("blocks") as List<String>
-
-        assertThat(blockCopy).containsExactly(*blocks.toTypedArray())
-
+    companion object {
+        private val mapper = ObjectMapper()
     }
 
     @Test
-    fun serializeStyleWithSyntaxError() {
-        val style = ImportLayoutStyle.layout(999,999,
-            "import java.*",
-            "<blank line>",
-            "import javax.*",
-            "<blank line>",
-            "import all other imports",
-            "<blank line>",
-            "import org.springframework.*",
-            "<blank line>",
-            "import static all other imports"
+    fun deserializeStyle() {
+        val styleConfig = mapOf(
+            "@c" to ImportLayoutStyle::class.qualifiedName,
+            "@ref" to 1,
+            "classCountToUseStarImport" to 999,
+            "nameCountToUseStarImport" to 998,
+            "layout" to listOf(
+                "import java.*",
+                "<blank line>",
+                "import javax.*",
+                "<blank line>",
+                "import all other imports",
+                "<blank line>",
+                "import org.springframework.*",
+                "<blank line>",
+                "import static all other imports"
+            )
         )
 
-        val serializedStyle = mapper.writeValueAsString(style)
-        val syntaxError = serializedStyle.replace("import org.springframework", "fred")
-
-        assertThatThrownBy {
-            mapper.readValue(syntaxError, ImportLayoutStyle::class.java)
-        }.isInstanceOf(JsonMappingException::class.java).hasMessageStartingWith("Syntax error")
+        val style = mapper.convertValue(styleConfig, ImportLayoutStyle::class.java)
+        assertThat(style.classCountToUseStarImport).isEqualTo(999)
+        assertThat(style.nameCountToUseStarImport).isEqualTo(998)
     }
-
 }

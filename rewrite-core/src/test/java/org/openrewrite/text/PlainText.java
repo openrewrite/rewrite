@@ -17,45 +17,43 @@ package org.openrewrite.text;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.*;
+import org.openrewrite.SourceFile;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.marker.Markers;
 
 import java.nio.file.Path;
-import java.util.Collection;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
     private final String text;
-    private final Collection<Style> styles;
+    private Markers markers;
 
     @JsonCreator
     public PlainText(@JsonProperty("id") UUID id,
                      @JsonProperty("text") String text,
-                     @JsonProperty("styles") Collection<Style> styles) {
+                     @JsonProperty("markers") Markers markers) {
         this.id = id;
         this.text = text;
-        this.styles = styles;
-    }
-
-    @Override
-    public Collection<Style> getStyles() {
-        return styles;
+        this.markers = markers;
     }
 
     @Override
     public Path getSourcePath() {
-        return null;
+        return Paths.get("text.txt");
     }
 
     @Override
     public Markers getMarkers() {
-        return Markers.EMPTY;
+        return markers;
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public PlainText withMarkers(Markers markers) {
+        this.markers = markers;
         return this;
     }
 
@@ -70,13 +68,11 @@ public class PlainText implements SourceFile, Tree {
     }
 
     public PlainText withText(String toText) {
-        return new PlainText(id, toText, styles);
+        return new PlainText(id, toText, markers);
     }
 
     @Override
     public String print() {
         return text;
     }
-
-
 }

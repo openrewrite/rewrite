@@ -20,18 +20,27 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
+import org.openrewrite.java.style.TabsAndIndentsStyle
+import org.openrewrite.style.NamedStyles
 
 interface TabsAndIndentsTest : RecipeTest {
     override val recipe: Recipe
         get() = TabsAndIndents()
+
+    fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle) = listOf(
+        NamedStyles(
+            "test", listOf(
+                IntelliJ.tabsAndIndents().apply { with(this) })
+        )
+    )
 
     /**
      * Slight renaming but structurally the same as IntelliJ's code style view.
      */
     @Test
     fun tabsAndIndents(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                 public int[] X = new int[]{1, 3, 5, 7, 9, 11};
     
@@ -80,7 +89,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public int[] X = new int[]{1, 3, 5, 7, 9, 11};
     
@@ -133,8 +142,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun tryCatchFinally(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                 public void test(boolean a, int x, int y) {
                 try {
@@ -147,7 +156,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -164,8 +173,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun doWhile(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                 public void test() {
                 do {
@@ -178,7 +187,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test() {
                         do {
@@ -195,8 +204,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun elseBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                 public void test(boolean a, int x, int y, int z) {
                 if (x > 0) {
@@ -206,7 +215,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y, int z) {
                         if (x > 0) {
@@ -220,10 +229,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                continuationIndent = 2
-            })).build(),
-            before = """
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
                 public class Test {
                     public void test() {
                     int m = 0;
@@ -244,7 +251,7 @@ interface TabsAndIndentsTest : RecipeTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test() {
                         int m = 0;
@@ -269,10 +276,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                continuationIndent = 2
-            })).build(),
-            before = """
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
                 public class Test {
                 public void test(int a,
                 int b) {}
@@ -282,7 +287,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 int b) {}
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(int a,
                                      int b) {}
@@ -296,10 +301,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun expressions(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                continuationIndent = 2
-            })).build(),
-            before = """
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
                 import java.util.function.Function;
                 public class Test {
                 int X[];
@@ -333,7 +336,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
                 }
             """,
-            after = """
+        after = """
                 import java.util.function.Function;
                 public class Test {
                     int X[];
@@ -371,14 +374,14 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun lineComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class A {
                 // this is a comment
                 public void method() {}
                 }
             """,
-            after = """
+        after = """
                 public class A {
                     // this is a comment
                     public void method() {}
@@ -388,15 +391,15 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun blockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class A {
                 /* this is a comment
                    that extends onto another line */
                 public void method() {}
                 }
             """,
-            after = """
+        after = """
                 public class A {
                     /* this is a comment
                        that extends onto another line */
@@ -407,18 +410,18 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun annotations(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
-                @Deprecated
-                @SuppressWarnings("ALL")
-                public class A {
-                @Deprecated
-                @SuppressWarnings("ALL")
-                    class B {
-                    }
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
+            @Deprecated
+            @SuppressWarnings("ALL")
+            public class A {
+            @Deprecated
+            @SuppressWarnings("ALL")
+                class B {
                 }
-            """,
-            after = """
+            }
+        """,
+        after = """
                 @Deprecated
                 @SuppressWarnings("ALL")
                 public class A {
@@ -432,51 +435,49 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun javadoc(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
-                public class A {
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
+            public class A {
+            /**
+             * This is a javadoc
+             */
+            public void method() {}
+            }
+        """,
+        after = """
+            public class A {
                 /**
                  * This is a javadoc
                  */
                 public void method() {}
-                }
-            """,
-            after = """
-                public class A {
-                    /**
-                     * This is a javadoc
-                     */
-                    public void method() {}
-                }
-            """
+            }
+        """
     )
 
     @Test
     fun tabs(jp: JavaParser.Builder<*, *>) = assertChanged(
-            // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                isUseTabCharacter = true
-            })).build(),
-            before = """
-                public class A {
-                    public void method() {
+        // TIP: turn on "Show Whitespaces" in the IDE to see this test clearly
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
+            public class A {
+                public void method() {
+                int n = 0;
+                }
+            }
+        """,
+        after = """
+            public class A {
+                public void method() {
                     int n = 0;
-                    }
                 }
-            """,
-            after = """
-                public class A {
-                    public void method() {
-                    	int n = 0;
-                    }
-                }
-            """
+            }
+        """
     )
 
     @Test
     fun shiftRight(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -489,7 +490,7 @@ interface TabsAndIndentsTest : RecipeTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -506,10 +507,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun shiftRightTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                isUseTabCharacter = true
-            })).build(),
-            before = """
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -522,7 +521,7 @@ interface TabsAndIndentsTest : RecipeTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -539,8 +538,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun shiftLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents())).build(),
-            before = """
+        jp.styles(tabsAndIndents { this }).build(),
+        before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -553,7 +552,7 @@ interface TabsAndIndentsTest : RecipeTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -570,10 +569,8 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun shiftLeftTabs(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultTabsAndIndents().apply {
-                isUseTabCharacter = true
-            })).build(),
-            before = """
+        jp.styles(tabsAndIndents { withUseTabCharacter(true) }).build(),
+        before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {
@@ -586,7 +583,7 @@ interface TabsAndIndentsTest : RecipeTest {
                     }
                 }
             """,
-            after = """
+        after = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
                         try {

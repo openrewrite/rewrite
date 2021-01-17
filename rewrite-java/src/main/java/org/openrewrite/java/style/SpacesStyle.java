@@ -15,30 +15,27 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 
-@FieldDefaults(level = AccessLevel.PRIVATE)
-@Getter
-@Setter
+@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+@Data
+@With
 public class SpacesStyle implements JavaStyle {
+    BeforeParentheses beforeParentheses;
+    AroundOperators aroundOperators;
+    BeforeLeftBrace beforeLeftBrace;
+    BeforeKeywords beforeKeywords;
+    Within within;
+    TernaryOperator ternaryOperator;
+    TypeArguments typeArguments;
+    Other other;
+    TypeParameters typeParameters;
 
-    BeforeParentheses beforeParentheses = new BeforeParentheses();
-    AroundOperators aroundOperators = new AroundOperators();
-    BeforeLeftBrace beforeLeftBrace = new BeforeLeftBrace();
-    BeforeKeywords beforeKeywords = new BeforeKeywords();
-    Within within = new Within();
-    TernaryOperator ternaryOperator = new TernaryOperator();
-    TypeArguments typeArguments = new TypeArguments();
-    Other other = new Other();
-    TypeParameters typeParameters = new TypeParameters();
-
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class BeforeParentheses {
         boolean methodDeclaration;
         boolean methodCall;
@@ -52,9 +49,9 @@ public class SpacesStyle implements JavaStyle {
         boolean annotationParameters;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class AroundOperators {
         boolean assignment;
         boolean logical;
@@ -69,9 +66,9 @@ public class SpacesStyle implements JavaStyle {
         boolean methodReferenceDoubleColon;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class BeforeLeftBrace {
         boolean classLeftBrace;
         boolean methodLeftBrace;
@@ -89,9 +86,9 @@ public class SpacesStyle implements JavaStyle {
         boolean annotationArrayInitializerLeftBrace;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class BeforeKeywords {
         boolean elseKeyword;
         boolean whileKeyword;
@@ -99,9 +96,9 @@ public class SpacesStyle implements JavaStyle {
         boolean finallyKeyword;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class Within {
         /*
         Based on testing in IntelliJ, within codeBraces only affects whether or not a space is inserted
@@ -128,9 +125,9 @@ public class SpacesStyle implements JavaStyle {
         boolean recordHeader;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class TernaryOperator {
         boolean beforeQuestionMark;
         boolean afterQuestionMark;
@@ -138,18 +135,18 @@ public class SpacesStyle implements JavaStyle {
         boolean afterColon;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class TypeArguments {
         boolean afterComma;
         boolean beforeOpeningAngleBracket;
         boolean afterClosingAngleBracket;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class Other {
         boolean beforeComma;
         boolean afterComma;
@@ -160,9 +157,9 @@ public class SpacesStyle implements JavaStyle {
         boolean insideOneLineEnumBraces;
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
-    @Getter
-    @Setter
+    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
+    @Data
+    @With
     public static class TypeParameters {
         boolean beforeOpeningAngleBracket;
         boolean aroundTypeBounds;

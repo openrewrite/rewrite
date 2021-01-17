@@ -18,9 +18,9 @@ package org.openrewrite.java;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.Parser;
-import org.openrewrite.Style;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.style.NamedStyles;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -33,7 +33,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.StreamSupport.stream;
 
 public interface JavaParser extends Parser<J.CompilationUnit> {
     /**
@@ -95,7 +94,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
                 Arrays.stream(sources)
                         .map(sourceFile -> {
                             Path path = Paths.get(Optional.ofNullable(simpleName.apply(sourceFile))
-                                .orElse(Long.toString(System.nanoTime())) + ".java");
+                                    .orElse(Long.toString(System.nanoTime())) + ".java");
                             return new Input(
                                     path,
                                     () -> new ByteArrayInputStream(sourceFile.getBytes())
@@ -127,7 +126,7 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
         protected MeterRegistry meterRegistry = Metrics.globalRegistry;
         protected boolean logCompilationWarningsAndErrors = true;
         protected boolean suppressMappingErrors = false;
-        protected List<JavaStyle> styles = new ArrayList<>();
+        protected List<NamedStyles> styles = new ArrayList<>();
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;
@@ -159,11 +158,10 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
             return (B) this;
         }
 
-        public B styles(Iterable<? extends Style> styles) {
-            stream(styles.spliterator(), false)
-                    .filter(JavaStyle.class::isInstance)
-                    .map(JavaStyle.class::cast)
-                    .forEach(this.styles::add);
+        public B styles(Iterable<? extends NamedStyles> styles) {
+            for (NamedStyles style : styles) {
+                this.styles.add(style);
+            }
             return (B) this;
         }
 

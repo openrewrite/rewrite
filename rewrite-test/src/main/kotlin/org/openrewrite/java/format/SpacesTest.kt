@@ -20,6 +20,7 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
+import org.openrewrite.style.NamedStyles
 
 interface SpacesTest : RecipeTest {
 
@@ -27,12 +28,14 @@ interface SpacesTest : RecipeTest {
         get() = Spaces()
 
     val dependsOn: Array<String>
-        get() = arrayOf("""
+        get() = arrayOf(
+            """
                     class MyResource implements AutoCloseable {
                         public void close() {
                         }
                     }
-                """)
+                """
+        )
 
     val testCode: String
         get() = """
@@ -114,62 +117,67 @@ interface SpacesTest : RecipeTest {
 
     @Test
     fun beforeParens(jp: JavaParser.Builder<*, *>) = assertChanged(
-            jp.styles(listOf(IntelliJ.defaultSpaces().apply {
-                beforeParentheses.apply {
-                    isMethodDeclaration = true
-                    isMethodCall = true
-                    isIfParentheses = false
-                    isForParentheses = false
-                    isWhileParentheses = false
-                    isSwitchParentheses = false
-                    isTryParentheses = false
-                    isCatchParentheses = false
-                    isSynchronizedParentheses = false
-                    isAnnotationParameters = true
-                }
-                aroundOperators.apply {
-                    isAssignment = false
-                    isLogical = false
-                    isEquality = false
-                    isRelational = false
-                    isBitwise = false
-                    isAdditive = false
-                    isMultiplicative = false
-                    isShift = false
-                    isUnary = true
-                    isLambdaArrow = false
-                    isMethodReferenceDoubleColon = true
-                }
-                beforeLeftBrace.apply {
-                    isClassLeftBrace = false
-                    isMethodLeftBrace = false
-                    isIfLeftBrace = false
-                    isElseLeftBrace = false
-                    isForLeftBrace = false
-                    isWhileLeftBrace = false
-                    isDoLeftBrace = false
-                    isSwitchLeftBrace = false
-                    isTryLeftBrace = false
-                    isCatchLeftBrace = false
-                    isFinallyLeftBrace = false
-                    isSynchronizedLeftBrace = false
-                    isArrayInitializerLeftBrace = true
-                    isAnnotationArrayInitializerLeftBrace = true
-                }
-                beforeKeywords.apply {
-                    isElseKeyword = false
-                    isWhileKeyword = false
-                    isCatchKeyword = false
-                    isFinallyKeyword = false
-                }
-                within.apply {
-                    isCodeBraces = true
-                    isBrackets = true
-                    isArrayInitializerBraces = true
-                    isEmptyArrayInitializerBraces = true
-                    isGroupingParentheses = true
-                }
-            })).build(),
+        jp.styles(
+            listOf(NamedStyles("test", listOf(IntelliJ.spaces().apply {
+                withBeforeParentheses(beforeParentheses.apply {
+                    withMethodDeclaration(true)
+                    withMethodCall(true)
+                    withIfParentheses(false)
+                    withForParentheses(false)
+                    withWhileParentheses(false)
+                    withSwitchParentheses(false)
+                    withTryParentheses(false)
+                    withCatchParentheses(false)
+                    withSynchronizedParentheses(false)
+                    withAnnotationParameters(true)
+                })
+                
+                withAroundOperators(aroundOperators.apply {
+                    withAssignment(false)
+                    withLogical(false)
+                    withEquality(false)
+                    withRelational(false)
+                    withBitwise(false)
+                    withAdditive(false)
+                    withMultiplicative(false)
+                    withShift(false)
+                    withUnary(true)
+                    withLambdaArrow(false)
+                    withMethodReferenceDoubleColon(true)
+                })
+
+                withBeforeLeftBrace(beforeLeftBrace.apply {
+                    withClassLeftBrace(false)
+                    withMethodLeftBrace(false)
+                    withIfLeftBrace(false)
+                    withElseLeftBrace(false)
+                    withForLeftBrace(false)
+                    withWhileLeftBrace(false)
+                    withDoLeftBrace(false)
+                    withSwitchLeftBrace(false)
+                    withTryLeftBrace(false)
+                    withCatchLeftBrace(false)
+                    withFinallyLeftBrace(false)
+                    withSynchronizedLeftBrace(false)
+                    withArrayInitializerLeftBrace(true)
+                    withAnnotationArrayInitializerLeftBrace(true)
+                })
+
+                withBeforeKeywords(beforeKeywords.apply {
+                    withElseKeyword(false)
+                    withWhileKeyword(false)
+                    withCatchKeyword(false)
+                    withFinallyKeyword(false)
+                })
+
+                withWithin(within.apply {
+                    withCodeBraces(true)
+                    withBrackets(true)
+                    withArrayInitializerBraces(true)
+                    withEmptyArrayInitializerBraces(true)
+                    withGroupingParentheses(true)
+                })
+            })))).build(),
             dependsOn = dependsOn,
             before = testCode,
             after = /* THE HORROR */ """
@@ -248,12 +256,12 @@ interface SpacesTest : RecipeTest {
                 
                 public class C{ }
             """
-    )
+        )
 
-    @Test
-    fun defaultsUnchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-            jp.styles(listOf(IntelliJ.defaultSpaces())).build(),
+        @Test
+        fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.styles(listOf(NamedStyles("testspaces", listOf(IntelliJ.spaces())))).build(),
             dependsOn = dependsOn,
             before = testCode
-    )
+        )
 }

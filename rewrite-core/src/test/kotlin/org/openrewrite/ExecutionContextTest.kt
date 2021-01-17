@@ -18,6 +18,7 @@ package org.openrewrite
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
+import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import java.util.function.Supplier
 
@@ -40,7 +41,7 @@ class ExecutionContextTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), "hello world", emptyList())))
+        }.run(listOf(PlainText(randomId(), "hello world", Markers.EMPTY)))
 
         assertThat(cycles).isEqualTo(2)
     }

@@ -15,15 +15,23 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import org.openrewrite.internal.lang.NonNull;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import lombok.Data;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
+import java.io.IOException;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -50,94 +58,33 @@ import static org.openrewrite.internal.StreamUtils.distinctBy;
  * ---
  * type: specs.openrewrite.org/v1beta/style
  * name: io.moderne.spring.style
- *
+ * <p>
  * configure:
- *   org.openrewrite.java.style.ImportLayoutStyle:
- *     layout:
- *       classCountToUseStarImport: 999
- *       nameCountToUseStarImport: 999
- *       blocks:
- *         - import java.*
- *         - &lt;blank line&gt;
- *         - import javax.*
- *         - &lt;blank line&gt;
- *         - import all other imports
- *         - &lt;blank line&gt;
- *         - import org.springframework.*
- *         - &lt;blank line&gt;
- *         - import static all other imports
+ * org.openrewrite.java.style.ImportLayoutStyle:
+ * layout:
+ * classCountToUseStarImport: 999
+ * nameCountToUseStarImport: 999
+ * blocks:
+ * - import java.*
+ * - &lt;blank line&gt;
+ * - import javax.*
+ * - &lt;blank line&gt;
+ * - import all other imports
+ * - &lt;blank line&gt;
+ * - import org.springframework.*
+ * - &lt;blank line&gt;
+ * - import static all other imports
  * </PRE>
  */
+@Data
 public class ImportLayoutStyle implements JavaStyle {
+    private final int classCountToUseStarImport;
+    private final int nameCountToUseStarImport;
 
-    //The layout is maintained as a map for serialization.
-    private Map<String, Object> layout;
-
-    private Layout.Builder layoutBuilder;
-    private int classCountToUseStarImport = 5;
-    private int nameCountToUseStarImport = 3;
-
-    public ImportLayoutStyle() {
-    }
-
-    @JsonIgnore
-    public int getClassCountToUseStarImport() {
-        return classCountToUseStarImport;
-    }
-
-    @JsonIgnore
-    public int getNameCountToUseStarImport() {
-        return nameCountToUseStarImport;
-    }
-
-    /**
-     * {@link ImportLayoutStyle}
-     * @param layout The layout is specified as a loosely-typed map that is typically populated using the declarative yml syntax.
-     */
-    @JsonProperty("layout")
-    public void setLayout(Map<String, Object> layout) {
-
-        this.layout = layout;
-        this.classCountToUseStarImport = (Integer) layout.getOrDefault("classCountToUseStarImport", 5);
-        this.nameCountToUseStarImport = (Integer) layout.getOrDefault("nameCountToUseStarImport", 3);
-
-        Layout.Builder builder = new Layout.Builder(this.classCountToUseStarImport, this.nameCountToUseStarImport);
-
-        //noinspection unchecked
-        for (String block : (List<String>) layout.get("blocks")) {
-            block = block.trim();
-            if (block.equals("<blank line>")) {
-                builder.blankLine();
-            } else if (block.startsWith("import ")) {
-                block = block.substring("import ".length());
-                boolean statik = false;
-                if (block.startsWith("static")) {
-                    statik = true;
-                    block = block.substring("static ".length());
-                }
-                if (block.equals("all other imports")) {
-                    if (statik) {
-                        builder.importStaticAllOthers();
-                    } else {
-                        builder.importAllOthers();
-                    }
-                } else {
-                    if (statik) {
-                        builder.staticImportPackage(block);
-                    } else {
-                        builder.importPackage(block);
-                    }
-                }
-            } else {
-                throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
-            }
-        }
-        this.layoutBuilder = builder;
-    }
-
-    public Map<String, Object> getLayout() {
-        return Collections.unmodifiableMap(layout);
-    }
+    @JsonTypeInfo(use = JsonTypeInfo.Id.NONE)
+    @JsonDeserialize(using = BlockDeserializer.class)
+    @JsonSerialize(using = BlockSerializer.class)
+    private final List<Block> layout;
 
     /**
      * This method will order and group a list of imports producing a new list that conforms to the rules defined
@@ -146,42 +93,30 @@ public class ImportLayoutStyle implements JavaStyle {
      * @param originalImports A list of potentially unordered imports.
      * @return A list of imports that are grouped and ordered.
      */
-    public @NonNull List<JRightPadded<J.Import>> orderImports(@NonNull List<JRightPadded<J.Import>> originalImports) {
-
-        if (layoutBuilder == null) {
-            //If the builder has not been defined, default to IntelliJ's import settings.
-            layoutBuilder = new Layout.Builder(5, 3)
-                    .importAllOthers()
-                    .blankLine()
-                    .importPackage("javax.*")
-                    .importPackage("java.*")
-                    .blankLine()
-                    .importStaticAllOthers();
-        }
-        Layout layout = layoutBuilder.build();
+    public List<JRightPadded<J.Import>> orderImports(List<JRightPadded<J.Import>> originalImports) {
         List<JRightPadded<J.Import>> orderedImports = new ArrayList<>();
-        assert (layout.getBlocks().stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && ((Layout.Block.AllOthers) it).isStatic()))
+        assert (layout.stream().anyMatch(it -> it instanceof Block.AllOthers && ((Block.AllOthers) it).isStatic()))
                 : "There must be at least one block that accepts all static imports, but no such block was found in the specified layout";
-        assert (layout.getBlocks().stream().anyMatch(it -> it instanceof Layout.Block.AllOthers && !((Layout.Block.AllOthers) it).isStatic()))
+        assert (layout.stream().anyMatch(it -> it instanceof Block.AllOthers && !((Block.AllOthers) it).isStatic()))
                 : "There must be at least one block that accepts all non-static imports, but no such block was found in the specified layout";
 
         // Divide the blocks into those that accept imports from any package ("catchalls") and those that accept imports from only specific packages
-        Map<Boolean, List<Layout.Block>> blockGroups = layout.getBlocks().stream()
-                .collect(Collectors.partitioningBy(block -> block instanceof Layout.Block.AllOthers));
-        List<Layout.Block> blocksNoCatchalls = blockGroups.get(false);
-        List<Layout.Block> blocksOnlyCatchalls = blockGroups.get(true);
+        Map<Boolean, List<Block>> blockGroups = layout.stream()
+                .collect(Collectors.partitioningBy(block -> block instanceof Block.AllOthers));
+        List<Block> blocksNoCatchalls = blockGroups.get(false);
+        List<Block> blocksOnlyCatchalls = blockGroups.get(true);
 
         // Allocate imports to blocks, preferring to put imports into non-catchall blocks
-        for (JRightPadded<J.Import> anImport: originalImports) {
+        for (JRightPadded<J.Import> anImport : originalImports) {
             boolean accepted = false;
-            for (Layout.Block block : blocksNoCatchalls) {
+            for (Block block : blocksNoCatchalls) {
                 if (block.accept(anImport)) {
                     accepted = true;
                     break;
                 }
             }
             if (!accepted) {
-                for (Layout.Block block : blocksOnlyCatchalls) {
+                for (Block block : blocksOnlyCatchalls) {
                     if (block.accept(anImport)) {
                         break;
                     }
@@ -191,10 +126,10 @@ public class ImportLayoutStyle implements JavaStyle {
 
         int importIndex = 0;
         String extraLineSpace = "";
-        for (Layout.Block block : layout.getBlocks()) {
-            if (block instanceof Layout.Block.BlankLines) {
+        for (Block block : layout) {
+            if (block instanceof Block.BlankLines) {
                 extraLineSpace = "";
-                for (int i = 0; i < ((Layout.Block.BlankLines) block).getCount(); i++) {
+                for (int i = 0; i < ((Block.BlankLines) block).getCount(); i++) {
                     //noinspection StringConcatenationInLoop
                     extraLineSpace += "\n";
                 }
@@ -217,269 +152,295 @@ public class ImportLayoutStyle implements JavaStyle {
         return orderedImports;
     }
 
-    /**
-     * @return Returns a layout style that is modeled after IntelliJ's default import settings.
-     */
-    public static ImportLayoutStyle getDefaultImportLayoutStyle() {
-        return new ImportLayoutStyle();
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static class Builder {
+        private final List<Block> blocks = new ArrayList<>();
+        private int classCountToUseStarImport = 5;
+        private int nameCountToUseStarImport = 3;
+
+        public Builder importAllOthers() {
+            blocks.add(new Block.AllOthers(false, classCountToUseStarImport, nameCountToUseStarImport));
+            return this;
+        }
+
+        public Builder importStaticAllOthers() {
+            blocks.add(new Block.AllOthers(true, classCountToUseStarImport, nameCountToUseStarImport));
+            return this;
+        }
+
+        public Builder blankLine() {
+            if (!blocks.isEmpty() &&
+                    blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
+                ((Block.BlankLines) blocks.get(blocks.size() - 1)).count++;
+            } else {
+                blocks.add(new Block.BlankLines());
+            }
+            return this;
+        }
+
+        public Builder importPackage(String packageWildcard, boolean withSubpackages) {
+            blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
+            return this;
+        }
+
+        public Builder importPackage(String packageWildcard) {
+            return importPackage(packageWildcard, true);
+        }
+
+        public Builder staticImportPackage(String packageWildcard, boolean withSubpackages) {
+            blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
+            return this;
+        }
+
+        public Builder staticImportPackage(String packageWildcard) {
+            return staticImportPackage(packageWildcard, true);
+        }
+
+        public Builder classCountToUseStarImport(int classCountToUseStarImport) {
+            this.classCountToUseStarImport = classCountToUseStarImport;
+            return this;
+        }
+
+        public Builder nameCountToUseStarImport(int nameCountToUseStarImport) {
+            this.nameCountToUseStarImport = nameCountToUseStarImport;
+            return this;
+        }
+
+        public ImportLayoutStyle build() {
+            for (Block block : blocks) {
+                if (block instanceof Block.AllOthers) {
+                    ((Block.AllOthers) block).setPackageImports(blocks.stream()
+                            .filter(b -> b.getClass().equals(Block.ImportPackage.class))
+                            .map(Block.ImportPackage.class::cast)
+                            .collect(toList()));
+                }
+            }
+            return new ImportLayoutStyle(classCountToUseStarImport, nameCountToUseStarImport, blocks);
+        }
     }
 
     /**
-     * A method to create an import layout style programatically using the same block syntax as that of the declartive
-     * approach. See {@link ImportLayoutStyle}
-     * <P><P>Block Syntax:<P>
-     *
-     * <PRE>
-     *      "import java.*"                   - All imports in the java package or a subpackage of java
-     *      "import static org.assertj.*"     - All static imports in the "org.assertj" package or subpacakge.
-     *      "&lt;blank line&gt;"                    - A blank line separator
-     *      "import all other imports"        - All other imports
-     *      "import static all other imports" - All other static imports
-     * </PRE>
-     * @param classCountToUseStarImport How many imports from the same package must be present before they should be collapsed into a star import.
-     * @param nameCountToUseStarImport How many static imports from the same type must be present before they should be collapsed into a static star import.
-     * @param blocks An ordered list of import groupings which define exactly how imports should be organized within a compilation unit
-     * @return ImportLayoutStyle
+     * A block represents a grouping of imports based on matching rules. The block provides a mechanism for matching
+     * and storing J.Imports that belong to the block.
      */
-    public static @NonNull ImportLayoutStyle layout(int classCountToUseStarImport, int nameCountToUseStarImport, String... blocks) {
-        Map<String, Object> settings = new HashMap<>(3);
-        settings.put("classCountToUseStarImport", classCountToUseStarImport);
-        settings.put("nameCountToUseStarImport", nameCountToUseStarImport);
-        settings.put("blocks", Arrays.asList(blocks));
-        ImportLayoutStyle style = new ImportLayoutStyle();
-        style.setLayout(settings);
-        return style;
-    }
-
-    /**
-     * A layout is a stateful structure that can be used to sort and group a set of J.Imports.
-     */
-    private static class Layout {
-
-        private final List<Block> blocks;
-
-        private Layout(List<Block> blocks) {
-            this.blocks = blocks == null?Collections.emptyList():blocks;
-        }
-
-        private List<Block> getBlocks() {
-            return blocks;
-        }
-
+    public interface Block {
 
         /**
-         * A block represents a grouping of imports based on matching rules. The block provides a mechanism for matching
-         * and storing J.Imports that belong to the block.
+         * This method will determine if the passed in import is a match for the rules defined on the block. If the
+         * import is matched, it will be internally stored in the block.
+         *
+         * @param anImport The import to be compared against the block's matching rules.
+         * @return true if the import was a match (and was stored within the block)
          */
-        private interface Block {
+        boolean accept(JRightPadded<J.Import> anImport);
 
-            /**
-             * This method will determine if the passed in import is a match for the rules defined on the block. If the
-             * import is matched, it will be internally stored in the block.
-             *
-             * @param anImport The import to be compared against the block's matching rules.
-             * @return true if the import was a match (and was stored within the block)
-             */
-            boolean accept(JRightPadded<J.Import> anImport);
+        /**
+         * @return Imports belonging to this block, folded appropriately.
+         */
+        List<JRightPadded<J.Import>> orderedImports();
 
-            /**
-             * @return Imports belonging to this block, folded appropriately.
-             */
-            List<JRightPadded<J.Import>> orderedImports();
+        /**
+         * A specialized block implementation to act as a blank line separator between import groupings.
+         */
+        class BlankLines implements Block {
+            private int count = 1;
 
-            /**
-             * A specialized block implementation to act as a blank line separator between import groupings.
-             */
-            class BlankLines implements Block {
-                private int count = 1;
-
-                private int getCount() {
-                    return count;
-                }
-
-                @Override
-                public boolean accept(JRightPadded<J.Import> anImport) {
-                    return false;
-                }
-
-                @Override
-                public List<JRightPadded<J.Import>> orderedImports() {
-                    return emptyList();
-                }
+            private int getCount() {
+                return count;
             }
 
-            class ImportPackage implements Layout.Block {
-
-                // VisibleForTesting
-                final static Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
-                    String[] import1 = i1.getElem().getQualid().printTrimmed().split("\\.");
-                    String[] import2 = i2.getElem().getQualid().printTrimmed().split("\\.");
-
-                    for (int i = 0; i < Math.min(import1.length, import2.length); i++) {
-                        int diff = import1[i].compareTo(import2[i]);
-                        if (diff != 0) {
-                            return diff;
-                        }
-                    }
-
-                    if (import1.length == import2.length) {
-                        return 0;
-                    }
-
-                    return import1.length > import2.length ? 1 : -1;
-                };
-
-                private final List<JRightPadded<J.Import>> imports = new ArrayList<>();
-
-                private final boolean statik;
-                private final Pattern packageWildcard;
-                private final int classCountToUseStarImport;
-                private final int nameCountToUseStarImport;
-
-                public ImportPackage(boolean statik, String packageWildcard, boolean withSubpackages,
-                                     int classCountToUseStarImport, int nameCountToUseStarImport) {
-                    this.statik = statik;
-                    this.classCountToUseStarImport = classCountToUseStarImport;
-                    this.nameCountToUseStarImport = nameCountToUseStarImport;
-                    this.packageWildcard = Pattern.compile(packageWildcard
-                            .replace(".", "\\.")
-                            .replace("*", withSubpackages ? ".+" : "[^.]+"));
-                }
-
-                @Override
-                public boolean accept(JRightPadded<J.Import> anImport) {
-                    if (anImport.getElem().isStatic() == statik &&
-                            packageWildcard.matcher(anImport.getElem().getQualid().printTrimmed()).matches()) {
-                        imports.add(anImport);
-                        return true;
-                    }
-                    return false;
-                }
-
-                @Override
-                public List<JRightPadded<J.Import>> orderedImports() {
-                    Map<String, List<JRightPadded<J.Import>>> groupedImports = imports
-                            .stream()
-                            .sorted(IMPORT_SORTING)
-                            .collect(groupingBy(
-                                    anImport -> {
-                                        if (anImport.getElem().isStatic()) {
-                                            return anImport.getElem().getTypeName();
-                                        } else {
-                                            return anImport.getElem().getPackageName();
-                                        }
-                                    },
-                                    LinkedHashMap::new, // Use an ordered map to preserve sorting
-                                    Collectors.toList()
-                            ));
-
-                    return groupedImports.values().stream()
-                            .flatMap(importGroup -> {
-                                JRightPadded<J.Import> toStar = importGroup.get(0);
-                                boolean statik1 = toStar.getElem().isStatic();
-                                int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
-                                boolean starImportExists = importGroup.stream()
-                                        .anyMatch(it -> it.getElem().getQualid().getSimpleName().equals("*"));
-                                if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
-                                    J.FieldAccess qualid = toStar.getElem().getQualid();
-                                    JLeftPadded<J.Ident> name = qualid.getName();
-                                    return Stream.of(toStar.withElem(toStar.getElem().withQualid(qualid.withName(
-                                            name.withElem(name.getElem().withName("*"))))));
-                                } else {
-                                    return importGroup.stream()
-                                            .filter(distinctBy(t -> t.getElem().printTrimmed()));
-                                }
-                            }).collect(toList());
-                }
+            @Override
+            public boolean accept(JRightPadded<J.Import> anImport) {
+                return false;
             }
 
-            class AllOthers extends Block.ImportPackage {
-                private final boolean statik;
-                private Collection<ImportPackage> packageImports = emptyList();
-
-                public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
-                    super(statik, "*", true,
-                            classCountToUseStarImport, nameCountToUseStarImport);
-                    this.statik = statik;
-                }
-
-                public void setPackageImports(Collection<ImportPackage> packageImports) {
-                    this.packageImports = packageImports;
-                }
-
-                public boolean isStatic() {
-                    return statik;
-                }
-
-                @Override
-                public boolean accept(JRightPadded<J.Import> anImport) {
-                    if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
-                        super.accept(anImport);
-                    }
-                    return anImport.getElem().isStatic() == statik;
-                }
+            @Override
+            public List<JRightPadded<J.Import>> orderedImports() {
+                return emptyList();
             }
         }
 
-        private static class Builder {
-            private final List<Block> blocks = new ArrayList<>();
+        class ImportPackage implements Block {
+
+            // VisibleForTesting
+            final static Comparator<JRightPadded<J.Import>> IMPORT_SORTING = (i1, i2) -> {
+                String[] import1 = i1.getElem().getQualid().printTrimmed().split("\\.");
+                String[] import2 = i2.getElem().getQualid().printTrimmed().split("\\.");
+
+                for (int i = 0; i < Math.min(import1.length, import2.length); i++) {
+                    int diff = import1[i].compareTo(import2[i]);
+                    if (diff != 0) {
+                        return diff;
+                    }
+                }
+
+                if (import1.length == import2.length) {
+                    return 0;
+                }
+
+                return import1.length > import2.length ? 1 : -1;
+            };
+
+            private final List<JRightPadded<J.Import>> imports = new ArrayList<>();
+
+            private final boolean statik;
+            private final Pattern packageWildcard;
             private final int classCountToUseStarImport;
             private final int nameCountToUseStarImport;
 
-            private Builder(int classCountToUseStarImport, int nameCountToUseStarImport) {
+            public ImportPackage(boolean statik, String packageWildcard, boolean withSubpackages,
+                                 int classCountToUseStarImport, int nameCountToUseStarImport) {
+                this.statik = statik;
                 this.classCountToUseStarImport = classCountToUseStarImport;
                 this.nameCountToUseStarImport = nameCountToUseStarImport;
+                this.packageWildcard = Pattern.compile(packageWildcard
+                        .replace(".", "\\.")
+                        .replace("*", withSubpackages ? ".+" : "[^.]+"));
             }
 
-            private Builder importAllOthers() {
-                blocks.add(new Block.AllOthers(false,classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
+            public boolean isStatic() {
+                return statik;
             }
 
-            private Builder importStaticAllOthers() {
-                blocks.add(new Block.AllOthers(true, classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
+            public Pattern getPackageWildcard() {
+                return packageWildcard;
             }
 
-            private Builder blankLine() {
-                if (!blocks.isEmpty() &&
-                        blocks.get(blocks.size() - 1) instanceof Block.BlankLines) {
-                    ((Block.BlankLines) blocks.get(blocks.size() - 1)).count++;
-                } else {
-                    blocks.add(new Block.BlankLines());
+            @Override
+            public boolean accept(JRightPadded<J.Import> anImport) {
+                if (anImport.getElem().isStatic() == statik &&
+                        packageWildcard.matcher(anImport.getElem().getQualid().printTrimmed()).matches()) {
+                    imports.add(anImport);
+                    return true;
                 }
-                return this;
+                return false;
             }
 
-            private Builder importPackage(String packageWildcard, boolean withSubpackages) {
-                blocks.add(new Block.ImportPackage(false, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
+            @Override
+            public List<JRightPadded<J.Import>> orderedImports() {
+                Map<String, List<JRightPadded<J.Import>>> groupedImports = imports
+                        .stream()
+                        .sorted(IMPORT_SORTING)
+                        .collect(groupingBy(
+                                anImport -> {
+                                    if (anImport.getElem().isStatic()) {
+                                        return anImport.getElem().getTypeName();
+                                    } else {
+                                        return anImport.getElem().getPackageName();
+                                    }
+                                },
+                                LinkedHashMap::new, // Use an ordered map to preserve sorting
+                                Collectors.toList()
+                        ));
+
+                return groupedImports.values().stream()
+                        .flatMap(importGroup -> {
+                            JRightPadded<J.Import> toStar = importGroup.get(0);
+                            boolean statik1 = toStar.getElem().isStatic();
+                            int threshold = statik1 ? nameCountToUseStarImport : classCountToUseStarImport;
+                            boolean starImportExists = importGroup.stream()
+                                    .anyMatch(it -> it.getElem().getQualid().getSimpleName().equals("*"));
+                            if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
+                                J.FieldAccess qualid = toStar.getElem().getQualid();
+                                JLeftPadded<J.Ident> name = qualid.getName();
+                                return Stream.of(toStar.withElem(toStar.getElem().withQualid(qualid.withName(
+                                        name.withElem(name.getElem().withName("*"))))));
+                            } else {
+                                return importGroup.stream()
+                                        .filter(distinctBy(t -> t.getElem().printTrimmed()));
+                            }
+                        }).collect(toList());
+            }
+        }
+
+        class AllOthers extends Block.ImportPackage {
+            private final boolean statik;
+            private Collection<ImportPackage> packageImports = emptyList();
+
+            public AllOthers(boolean statik, int classCountToUseStarImport, int nameCountToUseStarImport) {
+                super(statik, "*", true,
+                        classCountToUseStarImport, nameCountToUseStarImport);
+                this.statik = statik;
             }
 
-            private Builder importPackage(String packageWildcard) {
-                return importPackage(packageWildcard, true);
+            public void setPackageImports(Collection<ImportPackage> packageImports) {
+                this.packageImports = packageImports;
             }
 
-            private Builder staticImportPackage(String packageWildcard, boolean withSubpackages) {
-                blocks.add(new Block.ImportPackage(true, packageWildcard, withSubpackages, classCountToUseStarImport, nameCountToUseStarImport));
-                return this;
+            public boolean isStatic() {
+                return statik;
             }
 
-            private Builder staticImportPackage(String packageWildcard) {
-                return staticImportPackage(packageWildcard, true);
+            @Override
+            public boolean accept(JRightPadded<J.Import> anImport) {
+                if (packageImports.stream().noneMatch(pi -> pi.accept(anImport))) {
+                    super.accept(anImport);
+                }
+                return anImport.getElem().isStatic() == statik;
             }
+        }
+    }
 
-            private Layout build() {
-                for (Block block : blocks) {
-                    if (block instanceof Block.AllOthers) {
-                        ((Block.AllOthers) block).setPackageImports(blocks.stream()
-                                .filter(b -> b.getClass().equals(Block.ImportPackage.class))
-                                .map(Block.ImportPackage.class::cast)
-                                .collect(toList()));
+    private static class BlockDeserializer extends JsonDeserializer<List<Block>> {
+        @Override
+        public List<Block> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            String[] blockIter = p.readValueAs(String[].class);
+            Builder builder = builder();
+            for (String block : blockIter) {
+                block = block.trim();
+                if (block.equals("<blank line>")) {
+                    builder.blankLine();
+                } else if (block.startsWith("import ")) {
+                    block = block.substring("import ".length());
+                    boolean statik = false;
+                    if (block.startsWith("static")) {
+                        statik = true;
+                        block = block.substring("static ".length());
                     }
+                    if (block.equals("all other imports")) {
+                        if (statik) {
+                            builder.importStaticAllOthers();
+                        } else {
+                            builder.importAllOthers();
+                        }
+                    } else {
+                        if (statik) {
+                            builder.staticImportPackage(block);
+                        } else {
+                            builder.importPackage(block);
+                        }
+                    }
+                } else {
+                    throw new IllegalArgumentException("Syntax error in layout block [" + block + "]");
                 }
-                return new Layout(blocks);
             }
+            return builder.build().layout;
+        }
+    }
+
+    private static class BlockSerializer extends JsonSerializer<List<Block>> {
+        @Override
+        public void serialize(List<Block> value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+            String[] blocks = value.stream()
+                    .map(block -> {
+                        if (block instanceof Block.BlankLines) {
+                            return "<blank line>";
+                        } else if (block instanceof Block.AllOthers) {
+                            return (((Block.AllOthers) block).isStatic() ? "static " : "") +
+                                    "all other imports";
+                        } else if (block instanceof Block.ImportPackage) {
+                            Block.ImportPackage importPackage = (Block.ImportPackage) block;
+                            return (importPackage.isStatic() ? "static " : "") +
+                                    "import" + importPackage.getPackageWildcard();
+                        }
+                        return new UnsupportedOperationException("Unknown block type " + block.getClass().getName());
+                    })
+                    .toArray(String[]::new);
+
+            gen.writeArray(blocks, 0, value.size());
         }
     }
 }

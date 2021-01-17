@@ -18,7 +18,7 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoProcessor;
-import org.openrewrite.java.style.BlankLineStyle;
+import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
@@ -27,9 +27,9 @@ import org.openrewrite.java.tree.Statement;
 import java.util.List;
 
 class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
-    private final BlankLineStyle style;
+    private final BlankLinesStyle style;
 
-    public BlankLinesProcessor(BlankLineStyle style) {
+    public BlankLinesProcessor(BlankLinesStyle style) {
         this.style = style;
         setCursoringOn();
     }

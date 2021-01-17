@@ -18,6 +18,7 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.style.ImportLayoutStyle
+import org.openrewrite.style.NamedStyles
 
 interface OrderImportsTest : RecipeTest {
     override val recipe: OrderImports
@@ -245,18 +246,23 @@ interface OrderImportsTest : RecipeTest {
     @Test
     fun springCloudFormat() = assertUnchanged(
         JavaParser.fromJavaVersion().styles(
-            mutableListOf(
-                ImportLayoutStyle.layout(
-                    999, 999,
-                    "import java.*",
-                    "<blank line>",
-                    "import javax.*",
-                    "<blank line>",
-                    "import all other imports",
-                    "<blank line>",
-                    "import org.springframework.*",
-                    "<blank line>",
-                    "import static all other imports"
+            listOf(
+                NamedStyles(
+                    "spring", listOf(
+                        ImportLayoutStyle.builder()
+                            .classCountToUseStarImport(999)
+                            .nameCountToUseStarImport(999)
+                            .importPackage("java.*")
+                            .blankLine()
+                            .importPackage("javax.*")
+                            .blankLine()
+                            .importAllOthers()
+                            .blankLine()
+                            .importPackage("org.springframework.*")
+                            .blankLine()
+                            .importStaticAllOthers()
+                            .build()
+                    )
                 )
             )
         ).build(),

@@ -17,6 +17,8 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.Markers
+import org.openrewrite.style.NamedStyles
 import org.openrewrite.text.PlainText
 import org.openrewrite.text.TextStyle
 
@@ -25,12 +27,12 @@ class TreeSerializerTest {
     fun serializeStyle() {
         val serializer = TreeSerializer<PlainText>()
 
-        val styles = listOf(TextStyle().apply {
+        val styles = NamedStyles("utf8", listOf(TextStyle().apply {
             charset = "UTF-8"
-        })
+        }))
 
-        val plainText1 = PlainText(Tree.randomId(), "hi Jon", styles)
-        val plainText2 = PlainText(Tree.randomId(), "hi Jonathan", styles)
+        val plainText1 = PlainText(Tree.randomId(), "hi Jon", Markers.EMPTY).mark<PlainText>(styles)
+        val plainText2 = PlainText(Tree.randomId(), "hi Jonathan", Markers.EMPTY).mark<PlainText>(styles)
 
         val serialized = serializer.write(listOf(plainText1, plainText2))
 

@@ -15,11 +15,16 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.style.NamedStyles;
+import org.openrewrite.style.Style;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
@@ -32,6 +37,20 @@ public interface Tree {
 
     <T extends Tree> T withMarkers(Markers markers);
 
+    default <T extends Tree> T mark(Marker... add) {
+        Markers markers = getMarkers();
+        for (Marker marker : add) {
+            markers = markers.add(marker);
+        }
+        return withMarkers(markers);
+    }
+
+    @JsonIgnore
+    @Nullable
+    default <S extends Style> S getStyle(Class<S> style) {
+        return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
+    }
+
     /**
      * An id that can be used to identify a particular AST element, even after transformations have taken place on it
      *
@@ -39,6 +58,7 @@ public interface Tree {
      */
     UUID getId();
 
+    @Nullable
     default <R, P> R accept(TreeVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }

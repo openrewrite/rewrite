@@ -27,9 +27,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
-import java.util.function.Function;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
@@ -61,19 +59,18 @@ public class Markers {
      *
      * @return A marker collection containing any additional context about the containing {@link Tree} element.
      */
-    public Collection<Marker> entrySet() {
+    public Collection<Marker> entries() {
         return markers;
     }
 
     /**
-     * Overrides marker of the same type if it exists, otherwise adds
-     * a new marker element to the collection.
+     * Adds a new marker element to the collection.
      *
      * @param marker The data to add or update.
      * @return A new {@link Markers} with an added marker.
      */
     public Markers add(Marker marker) {
-        List<Marker> updatedmarker = new ArrayList<>(markers.size() + 1);
+        List<Marker> updatedmarker = new ArrayList<>(markers);
         updatedmarker.add(marker);
         return new Markers(updatedmarker);
     }
@@ -103,7 +100,7 @@ public class Markers {
         return new Markers(updatedmarker);
     }
 
-    public <M extends Marker> Collection<M> findAll(Class<M> markerType) {
+    public <M extends Marker> List<M> findAll(Class<M> markerType) {
         return markers.stream()
                 .filter(markerType::isInstance)
                 .map(markerType::cast)

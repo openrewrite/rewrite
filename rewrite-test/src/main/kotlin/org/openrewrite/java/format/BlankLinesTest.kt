@@ -19,15 +19,24 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
+import org.openrewrite.java.style.BlankLinesStyle
 import org.openrewrite.java.style.IntelliJ
+import org.openrewrite.style.NamedStyles
 
 interface BlankLinesTest : RecipeTest {
     override val recipe: Recipe?
         get() = BlankLines()
 
+    fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle) = listOf(
+        NamedStyles(
+            "test", listOf(
+                IntelliJ.blankLines().apply { with(this) })
+        )
+    )
+
     @Test
     fun keepMaximumInDeclarations(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply { keepMaximum.inDeclarations = 0 })).build(),
+        jp.styles(blankLines { withKeepMaximum(keepMaximum.withInDeclarations(0)) }).build(),
         before = """
             public class Test {
 
@@ -71,7 +80,7 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun keepMaximumInCode(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply { keepMaximum.inCode = 0 })).build(),
+        jp.styles(blankLines { withKeepMaximum(keepMaximum.withInCode(0)) }).build(),
         before = """
             public class Test {
                 private int field1;
@@ -94,9 +103,7 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun keepMaximumBeforeEndOfBlock(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            keepMaximum.beforeEndOfBlock = 0
-        })).build(),
+        jp.styles(blankLines { withKeepMaximum(keepMaximum.withBeforeEndOfBlock(0)) }).build(),
         before = """
             public class Test {
                 private int field1;
@@ -119,7 +126,12 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun keepMaximumBetweenHeaderAndPackage(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply { keepMaximum.betweenHeaderAndPackage = 0 })).build(),
+        jp.styles(blankLines {
+            withKeepMaximum(
+                keepMaximum
+                    .withBetweenHeaderAndPackage(0)
+            )
+        }).build(),
         before = """
             /*
              * This is a sample file.
@@ -143,10 +155,10 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumPackageWithComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            keepMaximum.betweenHeaderAndPackage = 0
-            minimum.beforePackage = 1 // this takes precedence over the "keep max"
-        })).build(),
+        jp.styles(blankLines {
+            withKeepMaximum(keepMaximum.withBeforeEndOfBlock(0))
+            withMinimum(minimum.withBeforePackage(1)) // this takes precedence over the "keep max"
+        }).build(),
         before = """
             /*
              * This is a sample file.
@@ -170,9 +182,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforePackage(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforePackage = 1 // no blank lines if nothing preceding package
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforePackage(1)) // no blank lines if nothing preceding package
+        }).build(),
         before = """
 
             package com.intellij.samples;
@@ -190,10 +202,10 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforePackageWithComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            keepMaximum.betweenHeaderAndPackage = 0
-            minimum.beforePackage = 1 // this takes precedence over the "keep max"
-        })).build(),
+        jp.styles(blankLines {
+            withKeepMaximum(keepMaximum.withBetweenHeaderAndPackage(0))
+            withMinimum(minimum.withBeforePackage(1)) // this takes precedence over the "keep max"
+        }).build(),
         before = """
             /** Comment */
             package com.intellij.samples;
@@ -213,9 +225,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforeImportsWithPackage(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeImports = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforeImports(1)) // no blank lines if nothing preceding package
+        }).build(),
         before = """
             package com.intellij.samples;
             import java.util.Vector;
@@ -235,9 +247,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforeImports(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeImports = 1 // no blank lines if nothing preceding imports
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforeImports(1)) // no blank lines if nothing preceding package
+        }).build(),
         before = """
 
             import java.util.Vector;
@@ -255,9 +267,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforeImportsWithComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeImports = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforeImports(1)) // no blank lines if nothing preceding package
+        }).build(),
         before = """
             /*
              * This is a sample file.
@@ -281,10 +293,11 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAfterPackageWithImport(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeImports = 0
-            minimum.afterPackage = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum
+                .withBeforeImports(0)
+                .withAfterPackage(1))
+        }).build(),
         before = """
             package com.intellij.samples;
             import java.util.Vector;
@@ -304,9 +317,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAfterPackage(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.afterPackage = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAfterPackage(1))
+        }).build(),
         before = """
             package com.intellij.samples;
             public class Test {
@@ -322,9 +335,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAfterImports(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.afterImports = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAfterImports(1))
+        }).build(),
         before = """
             import java.util.Vector;
             public class Test {
@@ -340,9 +353,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAroundClass(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundClass = 2
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundClass(2))
+        }).build(),
         before = """
             import java.util.Vector;
 
@@ -366,9 +379,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAfterClassHeader(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.afterClassHeader = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAfterClassHeader(1))
+        }).build(),
         before = """
             public class Test {
                 private int field1;
@@ -384,9 +397,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumBeforeClassEnd(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeClassEnd = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforeClassEnd(1))
+        }).build(),
         before = """
             public class Test {
             }
@@ -400,9 +413,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAfterAnonymousClassHeader(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.afterAnonymousClassHeader = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAfterAnonymousClassHeader(1))
+        }).build(),
         before = """
             public class Test {
                 public void test1() {
@@ -428,9 +441,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAroundFieldInInterface(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundFieldInInterface = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundFieldInInterface(1))
+        }).build(),
         before = """
             interface TestInterface {
                 int MAX = 10;
@@ -448,9 +461,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAroundField(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundField = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundField(1))
+        }).build(),
         before = """
             class Test {
                 int max = 10;
@@ -468,9 +481,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAroundMethodInInterface(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundMethodInInterface = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundMethodInInterface(1))
+        }).build(),
         before = """
             interface TestInterface {
                 void method1();
@@ -488,9 +501,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun minimumAroundMethod(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundMethod = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundMethod(1))
+        }).build(),
         before = """
             class Test {
                 void method1() {}
@@ -508,9 +521,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun beforeMethodBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.beforeMethodBody = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withBeforeMethodBody(1))
+        }).build(),
         before = """
             class Test {
                 void method1() {}
@@ -536,9 +549,9 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun aroundInitializer(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine().apply {
-            minimum.aroundInitializer = 1
-        })).build(),
+        jp.styles(blankLines {
+            withMinimum(minimum.withAroundInitializer(1))
+        }).build(),
         before = """
             public class Test {
                 private int field1;
@@ -563,7 +576,7 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(listOf(IntelliJ.defaultBlankLine())).build(),
+        jp.styles(blankLines { this }).build(),
         before = """
             package com.intellij.samples;
 

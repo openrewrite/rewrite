@@ -27,7 +27,7 @@ public class CoalesceProperties extends Recipe {
         this.processor = CoalescePropertiesProcessor::new;
     }
 
-    private static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
+    public static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
         public CoalescePropertiesProcessor() {
         }
 
