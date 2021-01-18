@@ -66,6 +66,7 @@ public interface Xml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         Path sourcePath;
 
         @With
