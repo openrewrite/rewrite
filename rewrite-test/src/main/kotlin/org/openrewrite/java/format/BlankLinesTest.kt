@@ -63,9 +63,11 @@ interface BlankLinesTest : RecipeTest {
             public class Test {
                 private int field1;
                 private int field2;
+            
                 {
                     field1 = 2;
                 }
+            
                 public void test1() {
                     new Runnable() {
                         public void run() {
@@ -84,6 +86,7 @@ interface BlankLinesTest : RecipeTest {
         before = """
             public class Test {
                 private int field1;
+            
                 {
 
 
@@ -94,6 +97,7 @@ interface BlankLinesTest : RecipeTest {
         after = """
             public class Test {
                 private int field1;
+            
                 {
                     field1 = 2;
                 }
@@ -107,6 +111,7 @@ interface BlankLinesTest : RecipeTest {
         before = """
             public class Test {
                 private int field1;
+            
                 {
                     field1 = 2;
 
@@ -117,6 +122,7 @@ interface BlankLinesTest : RecipeTest {
         after = """
             public class Test {
                 private int field1;
+            
                 {
                     field1 = 2;
                 }
@@ -294,9 +300,11 @@ interface BlankLinesTest : RecipeTest {
     @Test
     fun minimumAfterPackageWithImport(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(blankLines {
-            withMinimum(minimum
-                .withBeforeImports(0)
-                .withAfterPackage(1))
+            withMinimum(
+                minimum
+                    .withBeforeImports(0)
+                    .withAfterPackage(1)
+            )
         }).build(),
         before = """
             package com.intellij.samples;
