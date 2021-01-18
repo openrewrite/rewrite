@@ -36,7 +36,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 val parent = cursor.parentOrThrow.getTree<J>()
-                if(parent is J.MethodDecl) {
+                if (parent is J.MethodDecl) {
                     val template = JavaTemplate.builder("others.add(#{});").build()
 
                     //Test to make sure the template extraction is working correctly. Both of these calls should return
@@ -48,7 +48,8 @@ interface JavaTemplateTest : RecipeTest {
                             Cursor(cursor, block.statements[0].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
                     //Test when insertion scope is between two statements in a block
@@ -57,19 +58,13 @@ interface JavaTemplateTest : RecipeTest {
                             Cursor(cursor, block.statements[1].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-                    val prefix = block.statements[0].elem.prefix
                     return block.withStatements(
                         ListUtils.concat(
-                            JRightPadded(
-                                generatedMethodInvocations[0].withPrefix(prefix),
-                                Space.EMPTY
-                            ),
+                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY),
                             block.statements
                         )
                     )
@@ -98,7 +93,7 @@ interface JavaTemplateTest : RecipeTest {
                 }
             }
         """,
-        afterConditions = {cu -> cu.classes }
+        afterConditions = { cu -> cu.classes }
     )
 
     @Test
@@ -111,7 +106,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
                 val parent = cursor.parentOrThrow.getTree<J>()
-                if(parent is J.MethodDecl) {
+                if (parent is J.MethodDecl) {
                     val template = JavaTemplate.builder("others.add(#{});").build()
 
                     //Test to make sure the template extraction is working correctly. Both of these calls should return
@@ -123,7 +118,8 @@ interface JavaTemplateTest : RecipeTest {
                             Cursor(cursor, block.statements[0].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
                     //Test when insertion scope is after the last statements in a block
@@ -132,19 +128,14 @@ interface JavaTemplateTest : RecipeTest {
                             Cursor(cursor, block.statements[1].elem),
                             (parent.params.elem[0].elem as J.VariableDecls).vars[0]
                         )
-                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.").hasSize(1)
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-                    val prefix = block.statements[0].elem.prefix
                     return block.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodInvocations[0].withPrefix(prefix),
-                                Space.EMPTY
-                            )
+                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY)
                         )
                     )
                 }
@@ -186,17 +177,20 @@ interface JavaTemplateTest : RecipeTest {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.parentOrThrow.getTree<J>()
                 if (parent is J.ClassDecl) {
-                    val template = JavaTemplate.builder("""
+                    val template = JavaTemplate.builder(
+                        """
                             char incrementCounterByListSize(List<String> list) {
-                                n =+ list.size();
+                                n += list.size();
                                 return 'f';
                             }
-                        """).build()
+                        """
+                    ).build()
 
                     //Test generating the method using generateAfter and make sure the extraction is correct and has
                     //type attribution.
                     var generatedMethodDeclarations = template.generateAfter<J.MethodDecl>(
-                        Cursor(cursor, block.statements[0].elem))
+                        Cursor(cursor, block.statements[0].elem)
+                    )
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
@@ -204,22 +198,16 @@ interface JavaTemplateTest : RecipeTest {
                     //Test generating the method using generateBefore and make sure the extraction is correct and has
                     //type attribution.
                     generatedMethodDeclarations = template.generateBefore(
-                        Cursor(cursor, block.statements[0].elem))
+                        Cursor(cursor, block.statements[0].elem)
+                    )
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-                    val prefix = b.statements[0].elem.prefix
-
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0].withPrefix(prefix),
-                                Space.EMPTY
-                            )
+                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
                         )
                     )
                 }
@@ -247,7 +235,7 @@ interface JavaTemplateTest : RecipeTest {
                     others.add(m);
                 }
                 char incrementCounterByListSize(List<String> list) {
-                    n =+ list.size();
+                    n += list.size();
                     return 'f';
                 }
             }
@@ -266,17 +254,20 @@ interface JavaTemplateTest : RecipeTest {
                 var b = super.visitBlock(block, p)
                 val parent = cursor.parentOrThrow.getTree<J>()
                 if (parent is J.ClassDecl) {
-                    val template = JavaTemplate.builder("""
+                    val template = JavaTemplate.builder(
+                        """
                             static char incrementCounterByListSize(List<String> list) {
                                 n =+ list.size();
                                 return 'f';
                             }
-                        """).build()
+                        """
+                    ).build()
 
                     //Test generating the method using generateAfter and make sure the extraction is correct and has
                     //type attribution.
                     var generatedMethodDeclarations = template.generateAfter<J.MethodDecl>(
-                        Cursor(cursor, block.statements[0].elem))
+                        Cursor(cursor, block.statements[0].elem)
+                    )
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
@@ -284,22 +275,16 @@ interface JavaTemplateTest : RecipeTest {
                     //Test generating the method using generateBefore and make sure the extraction is correct and has
                     //type attribution.
                     generatedMethodDeclarations = template.generateBefore<J.MethodDecl>(
-                        Cursor(cursor, block.statements[0].elem))
+                        Cursor(cursor, block.statements[0].elem)
+                    )
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-                    val prefix = b.statements[0].elem.prefix
-
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0].withPrefix(prefix),
-                                Space.EMPTY
-                            )
+                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
                         )
                     )
                 }
@@ -341,24 +326,20 @@ interface JavaTemplateTest : RecipeTest {
 
             val template: JavaTemplate = JavaTemplate.builder("withString(#{}).length();")
                 .build()
+
             init {
                 setCursoringOn()
             }
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
-                val m =  super.visitMethodInvocation(method, p)
+                val m = super.visitMethodInvocation(method, p)
                 if (m.name.ident.simpleName != "countLetters") return m
                 val argument = m.args.elem[0].elem
                 val generatedMethodInvocations = template.generateBefore<J.MethodInvocation>(cursor, argument)
                 assertThat(generatedMethodInvocations).`as`("The list of generated invocations should be 1.")
                     .hasSize(1)
                 assertThat(generatedMethodInvocations[0].type).isNotNull
-
-                //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                //statements.
-
-                return generatedMethodInvocations[0].withPrefix(m.prefix)
+                return generatedMethodInvocations[0]
             }
         }.toRecipe(),
         before = """
@@ -473,11 +454,13 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethod(method: J.MethodDecl, p: ExecutionContext): J.MethodDecl {
                 var m = super.visitMethod(method, p)
-                m = m.withAnnotations(ListUtils.concat(
-                    m.annotations,
-                    JavaTemplate.builder("@Deprecated").build()
-                        .generateBefore<J.Annotation>(Cursor(cursor, method))[0]
-                ))
+                m = m.withAnnotations(
+                    ListUtils.concat(
+                        m.annotations,
+                        JavaTemplate.builder("@Deprecated").build()
+                            .generateBefore<J.Annotation>(Cursor(cursor, method))[0]
+                    )
+                )
                 m = MinimumViableSpacingProcessor<ExecutionContext>().visitMethod(m, ExecutionContext.builder().build())
                 return m
             }
@@ -514,7 +497,10 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedAnnotations[0].type).isNotNull
 
                 c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(c, ExecutionContext.builder().build())
+                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(
+                    c,
+                    ExecutionContext.builder().build()
+                )
                 return c
             }
         }.toRecipe(),
@@ -550,7 +536,10 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedAnnotations[0].type).isNotNull
 
                 c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(c, ExecutionContext.builder().build())
+                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(
+                    c,
+                    ExecutionContext.builder().build()
+                )
                 return c
             }
         }.toRecipe(),
@@ -573,7 +562,7 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    fun templateWithLocalMethodReference(jp: JavaParser) = assertChanged (
+    fun templateWithLocalMethodReference(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoProcessor<ExecutionContext>() {
             init {
@@ -599,15 +588,8 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-
-                    val prefix = b.statements[0].elem.prefix
-
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state.withPrefix(prefix),
-                            Space.EMPTY)
+                        JRightPadded<Statement>(state, Space.EMPTY)
                     }.toList())
                 }
                 return b
@@ -648,7 +630,7 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    fun templateWithSiblingClassMethodReference(jp: JavaParser) = assertChanged (
+    fun templateWithSiblingClassMethodReference(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoProcessor<ExecutionContext>() {
 
@@ -673,18 +655,12 @@ interface JavaTemplateTest : RecipeTest {
                             b.statements[0].elem as J
                         )
 
-                    //TODO - Remove the code that reuses the old prefix once auto-formatting is working.
-                    //Once auto-formattings is working, there will be no need to set the prefixes on the generated
-                    //statements.
-                    val prefix = b.statements[0].elem.prefix
-
                     //Make sure type attribution is valid on the generated method invocations.
                     assertThat(generatedStatements).`as`("The list of generated statements should be 2.").hasSize(2)
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state.withPrefix(prefix),
-                            Space.EMPTY)
+                        JRightPadded<Statement>(state, Space.EMPTY)
                     }.toList())
                 }
                 return b

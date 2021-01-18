@@ -33,15 +33,15 @@ public class AutoFormatProcessor<P> extends JavaIsoProcessor<P> {
         J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
-        new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        tree = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
                 .visit(tree, p, cursor);
 
-        new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        tree = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()))
                 .visit(tree, p, cursor);
 
-        new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+        tree = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
                 .visit(tree, p, cursor);
 

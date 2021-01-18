@@ -181,7 +181,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
         J.MethodDecl m = (J.MethodDecl) visitStatement(method, p);
-        m = m.withBody(call(method.getBody(), p));
 
         List<JRightPadded<Statement>> params = m.getParams().getElem();
         if (!params.isEmpty()) {
@@ -205,6 +204,8 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                         i == 0 ? param : param.withElem(alignTo(param.getElem(), column)))));
             }
         }
+
+        m = m.withBody(call(m.getBody(), p));
 
         return m;
     }
