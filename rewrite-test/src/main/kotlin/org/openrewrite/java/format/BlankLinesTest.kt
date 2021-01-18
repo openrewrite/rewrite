@@ -27,10 +27,10 @@ interface BlankLinesTest : RecipeTest {
     override val recipe: Recipe?
         get() = BlankLines()
 
-    fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle) = listOf(
+    fun blankLines(with: BlankLinesStyle.() -> BlankLinesStyle = { this }) = listOf(
         NamedStyles(
             "test", listOf(
-                IntelliJ.blankLines().apply { with(this) })
+                IntelliJ.blankLines().run { with(this) })
         )
     )
 
@@ -576,7 +576,7 @@ interface BlankLinesTest : RecipeTest {
 
     @Test
     fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(blankLines { this }).build(),
+        jp.styles(blankLines()).build(),
         before = """
             package com.intellij.samples;
 

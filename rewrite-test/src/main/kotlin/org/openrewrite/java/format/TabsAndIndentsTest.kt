@@ -27,10 +27,10 @@ interface TabsAndIndentsTest : RecipeTest {
     override val recipe: Recipe
         get() = TabsAndIndents()
 
-    fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle) = listOf(
+    fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
         NamedStyles(
             "test", listOf(
-                IntelliJ.tabsAndIndents().apply { with(this) })
+                IntelliJ.tabsAndIndents().run { with(this) })
         )
     )
 
@@ -39,7 +39,7 @@ interface TabsAndIndentsTest : RecipeTest {
      */
     @Test
     fun tabsAndIndents(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                 public int[] X = new int[]{1, 3, 5, 7, 9, 11};
@@ -142,7 +142,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun tryCatchFinally(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                 public void test(boolean a, int x, int y) {
@@ -173,7 +173,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun doWhile(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                 public void test() {
@@ -204,7 +204,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun elseBody(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                 public void test(boolean a, int x, int y, int z) {
@@ -374,7 +374,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun lineComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class A {
                 // this is a comment
@@ -391,7 +391,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun blockComment(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class A {
                 /* this is a comment
@@ -410,7 +410,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun annotations(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
             @Deprecated
             @SuppressWarnings("ALL")
@@ -435,7 +435,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun javadoc(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
             public class A {
             /**
@@ -476,7 +476,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun shiftRight(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
@@ -538,7 +538,7 @@ interface TabsAndIndentsTest : RecipeTest {
 
     @Test
     fun shiftLeft(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { this }).build(),
+        jp.styles(tabsAndIndents()).build(),
         before = """
                 public class Test {
                     public void test(boolean a, int x, int y) {
