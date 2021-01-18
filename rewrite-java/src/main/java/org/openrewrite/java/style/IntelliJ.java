@@ -31,7 +31,8 @@ public class IntelliJ extends NamedStyles {
                 importLayout(),
                 blankLines(),
                 tabsAndIndents(),
-                spaces())
+                spaces(),
+                wrappingAndBraces())
         );
     }
 
@@ -81,5 +82,9 @@ public class IntelliJ extends NamedStyles {
                 new SpacesStyle.Other(false, true, false, true, true, true, false),
                 new SpacesStyle.TypeParameters(false, true)
         );
+    }
+
+    public static WrappingAndBracesStyle wrappingAndBraces() {
+        return new WrappingAndBracesStyle();
     }
 }

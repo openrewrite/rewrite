@@ -336,6 +336,7 @@ interface JavaTemplateTest : RecipeTest {
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
+            
                 static char incrementCounterByListSize(List<String> list) {
                     n += list.size();
                     return 'f';
@@ -364,8 +365,7 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedMethodInvocations).`as`("The list of generated invocations should be 1.")
                     .hasSize(1)
                 assertThat(generatedMethodInvocations[0].type).isNotNull
-                doAfterVisit(AutoFormatProcessor(generatedMethodInvocations))
-                return generatedMethodInvocations[0]
+                return generatedMethodInvocations[0].withPrefix(method.prefix)
             }
         }.toRecipe(),
         before = """

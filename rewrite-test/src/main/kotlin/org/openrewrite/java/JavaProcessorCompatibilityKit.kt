@@ -17,10 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
-import org.openrewrite.java.format.BlankLinesTest
-import org.openrewrite.java.format.MinimumViableSpacingTest
-import org.openrewrite.java.format.SpacesTest
-import org.openrewrite.java.format.TabsAndIndentsTest
+import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -101,6 +98,9 @@ abstract class JavaProcessorCompatibilityKit {
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
 
     @Nested
+    inner class SemanticallyEqualTck : SemanticallyEqualTest
+
+    @Nested
     inner class SpacesTck : SpacesTest
 
     @Nested
@@ -113,5 +113,5 @@ abstract class JavaProcessorCompatibilityKit {
     inner class UseStaticImportTck : UseStaticImportTest
 
     @Nested
-    inner class SemanticallyEqualTck : SemanticallyEqualTest
+    inner class WrappingAndBracesTck : WrappingAndBracesTest
 }

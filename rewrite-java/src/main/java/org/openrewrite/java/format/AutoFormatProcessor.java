@@ -19,10 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaProcessor;
-import org.openrewrite.java.style.BlankLinesStyle;
-import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.SpacesStyle;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
 import java.util.List;
@@ -49,6 +46,10 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
                 .orElse(IntelliJ.spaces()), limitToTrees)
                 .visit(t, p, cursor);
 
+        t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+                .orElse(IntelliJ.wrappingAndBraces()), limitToTrees)
+                .visit(t, p, cursor);
+
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()), limitToTrees)
                 .visit(t, p, cursor);
@@ -64,6 +65,10 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()), limitToTrees)
+                .visit(t, p);
+
+        t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+                .orElse(IntelliJ.wrappingAndBraces()), limitToTrees)
                 .visit(t, p);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
