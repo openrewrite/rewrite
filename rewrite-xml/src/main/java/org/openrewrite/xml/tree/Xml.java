@@ -95,13 +95,13 @@ public interface Xml extends Serializable, Tree {
         UUID id;
 
         @With
+        Path sourcePath;
+
+        @With
         String prefix;
 
         @With
         Markers markers;
-
-        @With
-        Path sourcePath;
 
         @With
         Prolog prolog;
