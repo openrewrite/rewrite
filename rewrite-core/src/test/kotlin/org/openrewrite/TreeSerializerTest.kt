@@ -31,8 +31,8 @@ class TreeSerializerTest {
             charset = "UTF-8"
         }))
 
-        val plainText1 = PlainText(Tree.randomId(), "hi Jon", Markers.EMPTY).mark<PlainText>(styles)
-        val plainText2 = PlainText(Tree.randomId(), "hi Jonathan", Markers.EMPTY).mark<PlainText>(styles)
+        val plainText1 = PlainText(Tree.randomId(), Markers.EMPTY, "hi Jon").mark<PlainText>(styles)
+        val plainText2 = PlainText(Tree.randomId(), Markers.EMPTY, "hi Jonathan").mark<PlainText>(styles)
 
         val serialized = serializer.write(listOf(plainText1, plainText2))
 

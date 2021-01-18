@@ -41,7 +41,7 @@ class ExecutionContextTest {
                     }
                 }
             }
-        }.run(listOf(PlainText(randomId(), "hello world", Markers.EMPTY)))
+        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")))
 
         assertThat(cycles).isEqualTo(2)
     }

@@ -28,16 +28,16 @@ import java.util.UUID;
 
 public class PlainText implements SourceFile, Tree {
     private final UUID id;
-    private final String text;
     private Markers markers;
+    private final String text;
 
     @JsonCreator
     public PlainText(@JsonProperty("id") UUID id,
-                     @JsonProperty("text") String text,
-                     @JsonProperty("markers") Markers markers) {
+                     @JsonProperty("markers") Markers markers,
+                     @JsonProperty("text") String text) {
         this.id = id;
-        this.text = text;
         this.markers = markers;
+        this.text = text;
     }
 
     @Override
@@ -68,7 +68,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     public PlainText withText(String toText) {
-        return new PlainText(id, toText, markers);
+        return new PlainText(id, markers, toText);
     }
 
     @Override

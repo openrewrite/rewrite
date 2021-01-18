@@ -155,7 +155,7 @@ public class Recipe {
     private Collection<Validated> validateAll(Collection<Validated> acc) {
         acc.add(validate());
         if(next != null) {
-            validateAll(acc);
+            next.validateAll(acc);
         }
         return acc;
     }

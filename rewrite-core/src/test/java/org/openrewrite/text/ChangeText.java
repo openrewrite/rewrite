@@ -16,25 +16,38 @@
 package org.openrewrite.text;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.Validated;
 
-public class ChangeText extends TreeProcessor<PlainText, ExecutionContext> {
+import static org.openrewrite.Validated.required;
+
+public class ChangeText extends Recipe {
     private String toText;
 
     public ChangeText() {
+        this.processor = () -> new ChangeTextProcessor(toText);
     }
 
     public void setToText(String toText) {
         this.toText = toText;
     }
 
-    public String getToText() {
-        return toText;
+    @Override
+    public Validated validate() {
+        return required("toText", toText);
     }
 
-    @Override
-    public PlainText visitEach(PlainText tree, ExecutionContext ctx) {
-        return tree.withText(toText);
+    private static class ChangeTextProcessor extends TreeProcessor<PlainText, ExecutionContext> {
+        private final String toText;
+
+        private ChangeTextProcessor(String toText) {
+            this.toText = toText;
+        }
+
+        @Override
+        public PlainText visitEach(PlainText tree, ExecutionContext ctx) {
+            return tree.withText(toText);
+        }
     }
 }
