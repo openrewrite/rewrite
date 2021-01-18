@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
@@ -42,7 +43,7 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit j = super.visitCompilationUnit(cu, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
@@ -94,32 +95,15 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl j = super.visitClassDecl(classDecl, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
         List<JRightPadded<Statement>> statements = j.getBody().getStatements();
         j = j.withBody(j.getBody().withStatements(ListUtils.map(statements, (i, s) -> {
-            s = keepMaximumLines(s, style.getKeepMaximum().getInDeclarations());
             if (i == 0) {
                 s = minimumLines(s, style.getMinimum().getAfterClassHeader());
-            } else if (s.getElem() instanceof J.VariableDecls) {
-                if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
-                    s = minimumLines(s, style.getMinimum().getAroundFieldInInterface());
-                } else {
-                    s = minimumLines(s, style.getMinimum().getAroundField());
-                }
-            } else if (s.getElem() instanceof J.MethodDecl) {
-                if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
-                    s = minimumLines(s, style.getMinimum().getAroundMethodInInterface());
-                } else {
-                    s = minimumLines(s, style.getMinimum().getAroundMethod());
-                }
-            } else if (s.getElem() instanceof J.Block) {
-                s = minimumLines(s, style.getMinimum().getAroundInitializer());
-            }
-
-            if (i > 0 && statements.get(i - 1).getElem() instanceof J.Block) {
+            } else if (statements.get(i - 1).getElem() instanceof J.Block) {
                 s = minimumLines(s, style.getMinimum().getAroundInitializer());
             }
 
@@ -135,7 +119,7 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
         J.MethodDecl j = super.visitMethod(method, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
@@ -159,7 +143,7 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         J.NewClass j = super.visitNewClass(newClass, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
@@ -173,13 +157,41 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
         Cursor parent = getCursor().getParentOrThrow();
-        if (parent.getParent() != null && !(parent.getParentOrThrow().getTree() instanceof J.ClassDecl)) {
-            return keepMaximumLines(j, style.getKeepMaximum().getInCode());
+        if (parent.getParent() != null) {
+            Tree parentTree = parent.getTree();
+            Tree grandparentTree = parent.getParentOrThrow().getTree();
+            if (grandparentTree instanceof J.ClassDecl && parentTree instanceof J.Block) {
+                J.Block block = (J.Block) parentTree;
+                J.ClassDecl classDecl = (J.ClassDecl) grandparentTree;
+
+                j = keepMaximumLines(j, style.getKeepMaximum().getInDeclarations());
+
+                // don't adjust the first statement in a block
+                if (block.getStatements().iterator().next().getElem() != j) {
+                    if (j instanceof J.VariableDecls) {
+                        if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
+                            j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
+                        } else {
+                            j = minimumLines(j, style.getMinimum().getAroundField());
+                        }
+                    } else if (j instanceof J.MethodDecl) {
+                        if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
+                            j = minimumLines(j, style.getMinimum().getAroundMethodInInterface());
+                        } else {
+                            j = minimumLines(j, style.getMinimum().getAroundMethod());
+                        }
+                    } else if (j instanceof J.Block) {
+                        j = minimumLines(j, style.getMinimum().getAroundInitializer());
+                    }
+                }
+            } else {
+                return keepMaximumLines(j, style.getKeepMaximum().getInCode());
+            }
         }
         return j;
     }
@@ -187,7 +199,7 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block j = super.visitBlock(block, p);
-        if(shouldNotFormat()) {
+        if (shouldNotFormat()) {
             return j;
         }
 
