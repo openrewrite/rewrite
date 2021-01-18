@@ -118,69 +118,62 @@ interface SpacesTest : RecipeTest {
     @Test
     fun beforeParens(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(
-            listOf(NamedStyles("test", listOf(IntelliJ.spaces().apply {
-                withBeforeParentheses(beforeParentheses.apply {
+            listOf(NamedStyles("test", listOf(IntelliJ.spaces().run {
+                withBeforeParentheses(beforeParentheses.run {
                     withMethodDeclaration(true)
-                    withMethodCall(true)
-                    withIfParentheses(false)
-                    withForParentheses(false)
-                    withWhileParentheses(false)
-                    withSwitchParentheses(false)
-                    withTryParentheses(false)
-                    withCatchParentheses(false)
-                    withSynchronizedParentheses(false)
-                    withAnnotationParameters(true)
-                })
-                
-                withAroundOperators(aroundOperators.apply {
+                        .withMethodCall(true)
+                        .withIfParentheses(false)
+                        .withForParentheses(false)
+                        .withWhileParentheses(false)
+                        .withSwitchParentheses(false)
+                        .withTryParentheses(false)
+                        .withCatchParentheses(false)
+                        .withSynchronizedParentheses(false)
+                        .withAnnotationParameters(true)
+                }).withAroundOperators(aroundOperators.run {
                     withAssignment(false)
-                    withLogical(false)
-                    withEquality(false)
-                    withRelational(false)
-                    withBitwise(false)
-                    withAdditive(false)
-                    withMultiplicative(false)
-                    withShift(false)
-                    withUnary(true)
-                    withLambdaArrow(false)
-                    withMethodReferenceDoubleColon(true)
-                })
-
-                withBeforeLeftBrace(beforeLeftBrace.apply {
+                        .withLogical(false)
+                        .withEquality(false)
+                        .withRelational(false)
+                        .withBitwise(false)
+                        .withAdditive(false)
+                        .withMultiplicative(false)
+                        .withShift(false)
+                        .withUnary(true)
+                        .withLambdaArrow(false)
+                        .withMethodReferenceDoubleColon(true)
+                }).withBeforeLeftBrace(beforeLeftBrace.run {
                     withClassLeftBrace(false)
-                    withMethodLeftBrace(false)
-                    withIfLeftBrace(false)
-                    withElseLeftBrace(false)
-                    withForLeftBrace(false)
-                    withWhileLeftBrace(false)
-                    withDoLeftBrace(false)
-                    withSwitchLeftBrace(false)
-                    withTryLeftBrace(false)
-                    withCatchLeftBrace(false)
-                    withFinallyLeftBrace(false)
-                    withSynchronizedLeftBrace(false)
-                    withArrayInitializerLeftBrace(true)
-                    withAnnotationArrayInitializerLeftBrace(true)
-                })
-
-                withBeforeKeywords(beforeKeywords.apply {
+                        .withMethodLeftBrace(false)
+                        .withIfLeftBrace(false)
+                        .withElseLeftBrace(false)
+                        .withForLeftBrace(false)
+                        .withWhileLeftBrace(false)
+                        .withDoLeftBrace(false)
+                        .withSwitchLeftBrace(false)
+                        .withTryLeftBrace(false)
+                        .withCatchLeftBrace(false)
+                        .withFinallyLeftBrace(false)
+                        .withSynchronizedLeftBrace(false)
+                        .withArrayInitializerLeftBrace(true)
+                        .withAnnotationArrayInitializerLeftBrace(true)
+                }).withBeforeKeywords(beforeKeywords.run {
                     withElseKeyword(false)
-                    withWhileKeyword(false)
-                    withCatchKeyword(false)
-                    withFinallyKeyword(false)
-                })
-
-                withWithin(within.apply {
+                        .withWhileKeyword(false)
+                        .withCatchKeyword(false)
+                        .withFinallyKeyword(false)
+                }).withWithin(within.run {
                     withCodeBraces(true)
-                    withBrackets(true)
-                    withArrayInitializerBraces(true)
-                    withEmptyArrayInitializerBraces(true)
-                    withGroupingParentheses(true)
+                        .withBrackets(true)
+                        .withArrayInitializerBraces(true)
+                        .withEmptyArrayInitializerBraces(true)
+                        .withGroupingParentheses(true)
                 })
-            })))).build(),
-            dependsOn = dependsOn,
-            before = testCode,
-            after = /* THE HORROR */ """
+            })))
+        ).build(),
+        dependsOn = dependsOn,
+        before = testCode,
+        after = /* THE HORROR */ """
                 @SuppressWarnings ( { "ALL" })
                 public class A{
                     void bar (){}
@@ -256,12 +249,12 @@ interface SpacesTest : RecipeTest {
                 
                 public class C{ }
             """
-        )
+    )
 
-        @Test
-        fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-            jp.styles(listOf(NamedStyles("testspaces", listOf(IntelliJ.spaces())))).build(),
-            dependsOn = dependsOn,
-            before = testCode
-        )
+    @Test
+    fun unchanged(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(listOf(NamedStyles("testspaces", listOf(IntelliJ.spaces())))).build(),
+        dependsOn = dependsOn,
+        before = testCode
+    )
 }
