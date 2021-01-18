@@ -34,7 +34,7 @@ public class TabsAndIndents extends Recipe {
             if (style == null) {
                 style = IntelliJ.tabsAndIndents();
             }
-            doAfterVisit(new TabsAndIndentsProcessor<>(style));
+            doAfterVisit(new TabsAndIndentsProcessor<>(style, null));
             return cu;
         }
     }

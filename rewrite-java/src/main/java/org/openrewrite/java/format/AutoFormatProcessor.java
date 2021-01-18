@@ -50,7 +50,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
                 .visit(t, p, cursor);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()))
+                .orElse(IntelliJ.tabsAndIndents()), limitToTrees)
                 .visit(t, p, cursor);
 
         return t;
@@ -67,7 +67,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
                 .visit(t, p);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()))
+                .orElse(IntelliJ.tabsAndIndents()), limitToTrees)
                 .visit(t, p);
 
         return t;
