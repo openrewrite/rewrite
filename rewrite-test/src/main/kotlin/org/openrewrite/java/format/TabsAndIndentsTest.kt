@@ -468,7 +468,7 @@ interface TabsAndIndentsTest : RecipeTest {
         after = """
             public class A {
                 public void method() {
-                    int n = 0;
+                	int n = 0;
                 }
             }
         """
