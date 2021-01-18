@@ -46,7 +46,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
                 .visit(tree, p, cursor);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()))
+                .orElse(IntelliJ.spaces()), limitToTrees)
                 .visit(t, p, cursor);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
@@ -63,7 +63,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
                 .visit(cu, p);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()))
+                .orElse(IntelliJ.spaces()), limitToTrees)
                 .visit(t, p);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))

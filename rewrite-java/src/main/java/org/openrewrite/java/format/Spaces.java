@@ -35,7 +35,7 @@ public class Spaces extends Recipe {
             if (style == null) {
                 style = IntelliJ.spaces();
             }
-            doAfterVisit(new SpacesProcessor<>(style));
+            doAfterVisit(new SpacesProcessor<>(style, null));
             return super.visitCompilationUnit(cu, executionContext);
         }
     }
