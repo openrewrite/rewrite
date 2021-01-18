@@ -20,7 +20,6 @@ import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
@@ -60,16 +59,16 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-    public <J2 extends J> List<J2> generateBefore(@NonNull Cursor insertionScope, Object... parameters) {
+    public <J2 extends J> List<J2> generateBefore(Cursor insertionScope, Object... parameters) {
         return generate(false, insertionScope, parameters);
     }
 
-    public <J2 extends J> List<J2> generateAfter(@NonNull Cursor insertionScope, Object... parameters) {
+    public <J2 extends J> List<J2> generateAfter(Cursor insertionScope, Object... parameters) {
         return generate(true, insertionScope, parameters);
     }
 
     private <J2 extends J> List<J2> generate(boolean after,
-                                             @NonNull Cursor insertionScope,
+                                             Cursor insertionScope,
                                              Object... parameters) {
 
         if (parameters.length != parameterCount) {
@@ -79,7 +78,7 @@ public class JavaTemplate {
         //Substitute parameter markers with the string representation of each parameter.
         String printedTemplate = substituteParameters(parameters);
 
-        final J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
+        J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
         //Walk up the insertion scope and find the first element that is an immediate child of a J.Block. The template
@@ -113,12 +112,13 @@ public class JavaTemplate {
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
                 .visit(pruned, printedTemplate);
 
-        logger.debug("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
+        logger.trace("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
         parser.reset();
         J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
 
         if (autoFormat) {
+            synthetic = synthetic.withMarkers(cu.getMarkers());
             synthetic = (J.CompilationUnit) new AutoFormatProcessor<Void>().visit(synthetic, null,
                     new Cursor(null, synthetic));
         }
@@ -314,6 +314,7 @@ public class JavaTemplate {
         private static class CollectedElement {
             final long depth;
             final J element;
+            
             CollectedElement(long depth, J element) {
                 this.depth = depth;
                 this.element = element;
@@ -395,7 +396,7 @@ public class JavaTemplate {
         private boolean autoFormat = true;
         private String parameterMarker = "#{}";
 
-        Builder(@NonNull String code) {
+        Builder(String code) {
             this.code = code.trim();
         }
 
@@ -409,7 +410,7 @@ public class JavaTemplate {
          * java.util.Date
          * </PRE>
          */
-        public Builder imports(@NonNull String... fullyQualifiedTypeNames) {
+        public Builder imports(String... fullyQualifiedTypeNames) {
             for (String typeName : fullyQualifiedTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -431,7 +432,7 @@ public class JavaTemplate {
          * java.util.Collections.*
          * </PRE>
          */
-        public Builder staticImports(@NonNull String... fullyQualifiedMemberTypeNames) {
+        public Builder staticImports(String... fullyQualifiedMemberTypeNames) {
             for (String typeName : fullyQualifiedMemberTypeNames) {
                 if (typeName.startsWith("import ") || typeName.startsWith("static ")) {
                     throw new IllegalArgumentException("Imports are expressed as fully-qualified names and should not include an \"import \" or \"static \" prefix");
@@ -457,7 +458,7 @@ public class JavaTemplate {
          * Define an alternate marker to denote where a parameter should be inserted into the template. If not specified, the
          * default format for parameter marker is "#{}"
          */
-        public Builder parameterMarker(@NonNull String parameterMarker) {
+        public Builder parameterMarker(String parameterMarker) {
             this.parameterMarker = parameterMarker;
             return this;
         }

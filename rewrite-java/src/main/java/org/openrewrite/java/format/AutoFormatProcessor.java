@@ -38,10 +38,12 @@ public class AutoFormatProcessor<P> extends JavaIsoProcessor<P> {
                 .visit(tree, p, cursor);
 
         new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()));
+                .orElse(IntelliJ.tabsAndIndents()))
+                .visit(tree, p, cursor);
 
         new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()));
+                .orElse(IntelliJ.spaces()))
+                .visit(tree, p, cursor);
 
         return (J) tree;
     }
