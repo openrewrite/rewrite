@@ -19,6 +19,7 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
@@ -27,24 +28,41 @@ import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
-public class AutoFormatProcessor<P> extends JavaIsoProcessor<P> {
+public class AutoFormatProcessor<P> extends JavaProcessor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
-        tree = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
                 .visit(tree, p, cursor);
 
-        tree = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()))
-                .visit(tree, p, cursor);
-
-        tree = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+        t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
-                .visit(tree, p, cursor);
+                .visit(t, p, cursor);
 
-        return (J) tree;
+        t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()))
+                .visit(t, p, cursor);
+
+        return t;
+    }
+
+    @Override
+    public J visitCompilationUnit(J.CompilationUnit cu, P p) {
+        J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+                .orElse(IntelliJ.blankLines()))
+                .visit(cu, p);
+
+        t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+                .orElse(IntelliJ.spaces()))
+                .visit(t, p);
+
+        t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+                .orElse(IntelliJ.tabsAndIndents()))
+                .visit(t, p);
+
+        return t;
     }
 }

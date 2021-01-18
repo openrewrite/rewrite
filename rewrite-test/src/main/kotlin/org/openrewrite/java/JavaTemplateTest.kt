@@ -15,17 +15,33 @@
  */
 package org.openrewrite.java
 
+import ch.qos.logback.classic.Level
+import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
+import org.openrewrite.java.format.AutoFormat
 import org.openrewrite.java.format.MinimumViableSpacingProcessor
-import org.openrewrite.java.tree.*
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.JRightPadded
+import org.openrewrite.java.tree.Space
+import org.openrewrite.java.tree.Statement
+import org.slf4j.LoggerFactory
 import kotlin.streams.toList
 
 interface JavaTemplateTest : RecipeTest {
+    companion object {
+        @JvmStatic
+        @BeforeAll
+        fun turnUpLogging() {
+            (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger).level = Level.TRACE
+        }
+    }
+
     @Test
     fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
@@ -184,7 +200,7 @@ interface JavaTemplateTest : RecipeTest {
                                 return 'f';
                             }
                         """
-                    ).build()
+                    ).autoFormat(false).build()
 
                     //Test generating the method using generateAfter and make sure the extraction is correct and has
                     //type attribution.
@@ -210,6 +226,8 @@ interface JavaTemplateTest : RecipeTest {
                             JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
                         )
                     )
+
+                    doAfterVisit(AutoFormat())
                 }
                 return b
             }
@@ -231,9 +249,11 @@ interface JavaTemplateTest : RecipeTest {
 
             public class A {
                 int n = 0;
+            
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
+            
                 char incrementCounterByListSize(List<String> list) {
                     n += list.size();
                     return 'f';

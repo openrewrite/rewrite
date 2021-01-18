@@ -35,6 +35,27 @@ interface BlankLinesTest : RecipeTest {
     )
 
     @Test
+    fun eachMethodOnItsOwnLine(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(blankLines()).build(),
+        before = """
+            public class Test {
+                void a() {
+                }    void b() {
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                void a() {
+                }
+            
+                void b() {
+                }
+            }
+        """
+    )
+
+    @Test
     fun keepMaximumInDeclarations(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(blankLines { withKeepMaximum(keepMaximum.withInDeclarations(0)) }).build(),
         before = """
