@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.tree.J;
@@ -29,14 +30,21 @@ import java.util.List;
 class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     private final BlankLinesStyle style;
 
-    public BlankLinesProcessor(BlankLinesStyle style) {
+    @Nullable
+    private final List<? extends J> limitToTrees;
+
+    public BlankLinesProcessor(BlankLinesStyle style, @Nullable List<? extends J> limitToTrees) {
         this.style = style;
+        this.limitToTrees = limitToTrees;
         setCursoringOn();
     }
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit j = super.visitCompilationUnit(cu, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
 
         if (j.getPackageDecl() != null) {
             if (!j.getPrefix().getComments().isEmpty()) {
@@ -86,6 +94,9 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl j = super.visitClassDecl(classDecl, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
 
         List<JRightPadded<Statement>> statements = j.getBody().getStatements();
         j = j.withBody(j.getBody().withStatements(ListUtils.map(statements, (i, s) -> {
@@ -124,6 +135,9 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
         J.MethodDecl j = super.visitMethod(method, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
 
         if (j.getBody() != null) {
             if (j.getBody().getStatements().isEmpty()) {
@@ -145,6 +159,10 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.NewClass visitNewClass(J.NewClass newClass, P p) {
         J.NewClass j = super.visitNewClass(newClass, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
+
         if (j.getBody() != null) {
             j = j.withBody(j.getBody().withStatements(ListUtils.mapFirst(j.getBody().getStatements(), s ->
                     minimumLines(s, style.getMinimum().getAfterAnonymousClassHeader()))));
@@ -155,6 +173,10 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
+
         Cursor parent = getCursor().getParentOrThrow();
         if (parent.getParent() != null && !(parent.getParentOrThrow().getTree() instanceof J.ClassDecl)) {
             return keepMaximumLines(j, style.getKeepMaximum().getInCode());
@@ -165,6 +187,10 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block j = super.visitBlock(block, p);
+        if(shouldNotFormat()) {
+            return j;
+        }
+
         j = j.withEnd(keepMaximumLines(j.getEnd(), style.getKeepMaximum().getBeforeEndOfBlock()));
         return j;
     }
@@ -216,5 +242,9 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
             minWhitespace = "\n" + minWhitespace;
         }
         return minWhitespace;
+    }
+
+    private boolean shouldNotFormat() {
+        return limitToTrees != null && limitToTrees.stream().noneMatch(t -> getCursor().isScopeInPath(t));
     }
 }

@@ -21,7 +21,6 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
@@ -43,15 +42,13 @@ public class JavaTemplate {
     private final String code;
     private final int parameterCount;
     private final Set<String> imports;
-    private final boolean autoFormat;
     private final String parameterMarker;
 
-    private JavaTemplate(JavaParser parser, String code, Set<String> imports, boolean autoFormat, String parameterMarker) {
+    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker) {
         this.parser = parser;
         this.code = code;
         this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
-        this.autoFormat = autoFormat;
         this.parameterMarker = parameterMarker;
     }
 
@@ -117,29 +114,11 @@ public class JavaTemplate {
         parser.reset();
         J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
 
-        if (autoFormat) {
-            synthetic = synthetic.withMarkers(cu.getMarkers());
-            synthetic = (J.CompilationUnit) new AutoFormatProcessor<Void>().visit(synthetic, null,
-                    new Cursor(null, synthetic));
-        }
-
         //Extract the compiled template tree elements.
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        List<J> snippets = extractionContext.getSnippets();
-        Cursor formatCursor = insertionScope.getParentOrThrow();
-
-        return snippets.stream()
-                .map(t -> {
-                    if (autoFormat) {
-                        //noinspection unchecked
-                        return (J2) new AutoFormatProcessor<Void>().visit(t, null, formatCursor);
-                    }
-                    //noinspection unchecked
-                    return (J2) t;
-                })
-                .collect(Collectors.toList());
+        return extractionContext.getSnippets();
     }
 
     /**
@@ -303,9 +282,13 @@ public class JavaTemplate {
         Set<UUID> collectedIds = new HashSet<>();
         long startDepth = 0;
 
-        public List<J> getSnippets() {
+        @SuppressWarnings("unchecked")
+        public <J2 extends J> List<J2> getSnippets() {
             //This returns all elements that have the same depth as the starting element.
-            return collectedElements.stream().filter(e -> e.depth == startDepth).map(e -> e.element).collect(Collectors.toList());
+            return collectedElements.stream()
+                    .filter(e -> e.depth == startDepth)
+                    .map(e -> (J2) e.element)
+                    .collect(Collectors.toList());
         }
 
         /**
@@ -386,14 +369,13 @@ public class JavaTemplate {
     }
 
     public static class Builder {
-
         private final String code;
+        private final Set<String> imports = new HashSet<>();
+
         private JavaParser javaParser = JavaParser.fromJavaVersion()
                 .logCompilationWarningsAndErrors(false)
                 .build();
-        private final Set<String> imports = new HashSet<>();
 
-        private boolean autoFormat = true;
         private String parameterMarker = "#{}";
 
         Builder(String code) {
@@ -449,11 +431,6 @@ public class JavaTemplate {
             return this;
         }
 
-        public Builder autoFormat(boolean autoFormat) {
-            this.autoFormat = autoFormat;
-            return this;
-        }
-
         /**
          * Define an alternate marker to denote where a parameter should be inserted into the template. If not specified, the
          * default format for parameter marker is "#{}"
@@ -469,7 +446,7 @@ public class JavaTemplate {
                         .logCompilationWarningsAndErrors(false)
                         .build();
             }
-            return new JavaTemplate(javaParser, code, imports, autoFormat, parameterMarker);
+            return new JavaTemplate(javaParser, code, imports, parameterMarker);
         }
     }
 }

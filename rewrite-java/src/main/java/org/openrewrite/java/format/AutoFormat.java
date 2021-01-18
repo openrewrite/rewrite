@@ -28,7 +28,7 @@ public class AutoFormat extends Recipe {
     private static class AutoFormatFromCompilationUnit extends JavaIsoProcessor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext context) {
-            doAfterVisit(new AutoFormatProcessor<>());
+            doAfterVisit(new AutoFormatProcessor<>(null));
             return cu;
         }
     }

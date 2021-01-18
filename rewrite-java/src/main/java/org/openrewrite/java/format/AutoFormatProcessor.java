@@ -18,7 +18,6 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -26,16 +25,24 @@ import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 
+import java.util.List;
 import java.util.Optional;
 
 public class AutoFormatProcessor<P> extends JavaProcessor<P> {
+    @Nullable
+    private final List<? extends J> limitToTrees;
+
+    public AutoFormatProcessor(@Nullable List<? extends J> limitToTrees) {
+        this.limitToTrees = limitToTrees;
+    }
+
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
         assert cu != null;
 
         J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()))
+                .orElse(IntelliJ.blankLines()), limitToTrees)
                 .visit(tree, p, cursor);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
@@ -52,7 +59,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()))
+                .orElse(IntelliJ.blankLines()), limitToTrees)
                 .visit(cu, p);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))

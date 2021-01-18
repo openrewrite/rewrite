@@ -25,6 +25,7 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.AutoFormat
+import org.openrewrite.java.format.AutoFormatProcessor
 import org.openrewrite.java.format.MinimumViableSpacingProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
@@ -200,7 +201,7 @@ interface JavaTemplateTest : RecipeTest {
                                 return 'f';
                             }
                         """
-                    ).autoFormat(false).build()
+                    ).build()
 
                     //Test generating the method using generateAfter and make sure the extraction is correct and has
                     //type attribution.
@@ -227,7 +228,7 @@ interface JavaTemplateTest : RecipeTest {
                         )
                     )
 
-                    doAfterVisit(AutoFormat())
+                    doAfterVisit(AutoFormatProcessor(generatedMethodDeclarations))
                 }
                 return b
             }
@@ -249,7 +250,6 @@ interface JavaTemplateTest : RecipeTest {
 
             public class A {
                 int n = 0;
-            
                 void foo(String m, List<String> others) {
                     others.add(m);
                 }
