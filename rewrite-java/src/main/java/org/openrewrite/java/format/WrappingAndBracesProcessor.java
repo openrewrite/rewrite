@@ -44,9 +44,7 @@ public class WrappingAndBracesProcessor<P> extends JavaIsoProcessor<P> {
 
         J parentTree = getCursor().getParentOrThrow().getTree();
         if(parentTree instanceof J.Block) {
-            J.Block block = (J.Block) parentTree;
-            if(block.getStatements().iterator().next().getElem() == j &&
-                    !j.getPrefix().getWhitespace().contains("\n")) {
+            if(!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(j.getPrefix().withWhitespace("\n" + j.getPrefix().getWhitespace()));
             }
         }
