@@ -100,6 +100,7 @@ public interface Xml extends Serializable, Tree {
         @With
         Markers markers;
 
+        @With
         Path sourcePath;
 
         @With

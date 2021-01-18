@@ -94,6 +94,7 @@ public interface Yaml extends Serializable, Tree {
         @EqualsAndHashCode.Include
         UUID id;
 
+        @With
         Path sourcePath;
 
         @With
