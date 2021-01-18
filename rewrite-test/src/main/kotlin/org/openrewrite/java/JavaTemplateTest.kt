@@ -638,7 +638,7 @@ interface JavaTemplateTest : RecipeTest {
                     others.add(m);
                 }
                 char incrementCounterByListSize(List<String> list) {
-                    n =+ list.size();
+                    n += list.size();
                     return 'f';
                 }
             }
@@ -654,7 +654,7 @@ interface JavaTemplateTest : RecipeTest {
                     incrementCounterByListSize(others);
                 }
                 char incrementCounterByListSize(List<String> list) {
-                    n =+ list.size();
+                    n += list.size();
                     return 'f';
                 }
             }
