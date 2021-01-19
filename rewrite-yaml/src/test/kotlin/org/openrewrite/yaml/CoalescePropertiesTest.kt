@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -23,7 +24,7 @@ class CoalescePropertiesTest : RecipeTest {
 
     @Test
     fun fold() = assertChanged(
-            recipe = CoalesceProperties().apply { },
+            recipe = CoalesceProperties(),
             before = """
                 management:
                     metrics:
@@ -42,19 +43,19 @@ class CoalescePropertiesTest : RecipeTest {
             """
     )
 
-//    @Test
-//    fun group() {
-//        val y = parse("""
-//            management.metrics.enable.process.files: true
-//            management.metrics.enable.jvm: true
-//        """.trimIndent())
-//
-//        val fixed = y.refactor().visit(CoalesceProperties()).fix().fixed
-//
-//        assertRefactored(fixed, """
-//            management.metrics.enable:
-//                process.files: true
-//                jvm: true
-//        """.trimIndent())
-//    }
+    @Test
+    @Disabled
+    fun group() = assertChanged(
+            recipe = CoalesceProperties(),
+            before = """
+                management.metrics.enable.process.files: true
+                management.metrics.enable.jvm: true
+            """,
+            after = """
+                management.metrics.enable:
+                    process.files: true
+                    jvm: true
+            """
+    )
+
 }
