@@ -15,11 +15,12 @@
  */
 package org.openrewrite;
 
-import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Spliterators;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -27,12 +28,19 @@ import java.util.stream.Stream;
 import static java.util.stream.StreamSupport.stream;
 
 @EqualsAndHashCode
-@AllArgsConstructor
 public class Cursor {
     @Nullable
     private final Cursor parent;
 
     private final Tree tree;
+
+    @Nullable
+    private Map<String, Object> messages;
+
+    public Cursor(@Nullable Cursor parent, Tree tree) {
+        this.parent = parent;
+        this.tree = tree;
+    }
 
     public Iterator<Tree> getPath() {
         return new CursorIterator(this);
@@ -111,5 +119,41 @@ public class Cursor {
 
     public boolean isScopeInPath(Tree scope) {
         return (tree != null && tree.getId().equals(scope.getId())) || getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
+    }
+
+    @Incubating(since = "7.0.0")
+    public void putMessage(String key, Object value) {
+        if (messages == null) {
+            messages = new HashMap<>();
+        }
+        messages.put(key, value);
+    }
+
+    /**
+     * Finds the closest message matching the provided key, leaving it in the message map for further access.
+     *
+     * @param key The message key to find.
+     * @param <T> The expected value of the message.
+     * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
+     */
+    @Incubating(since = "7.0.0")
+    @Nullable
+    public <T> T peekMessage(String key) {
+        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
+        return t == null && parent != null ? parent.peekMessage(key) : t;
+    }
+
+    /**
+     * Finds the closest message matching the provided key, removing it from the message map.
+     *
+     * @param key The message key to find.
+     * @param <T> The expected value of the message.
+     * @return The closest message matching the provided key in the cursor stack, or <code>null</code> if none.
+     */
+    @Incubating(since = "7.0.0")
+    @Nullable
+    public <T> T pollMessage(String key) {
+        @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
+        return t == null && parent != null ? parent.pollMessage(key) : t;
     }
 }
