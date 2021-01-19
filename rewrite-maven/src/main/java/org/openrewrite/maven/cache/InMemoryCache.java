@@ -82,6 +82,7 @@ public class InMemoryCache implements MavenCache {
     public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
                                               Callable<RawMaven> orElseGet) throws Exception {
         // FIXME key be repo as well, because different repos may have different versions of the same POM
+//        String cacheKey = repo.toString() + ":" + groupId + ':' + artifactId + ':' + version;
         String cacheKey = groupId + ':' + artifactId + ':' + version;
         Optional<RawMaven> rawMaven = pomCache.get(cacheKey);
 
