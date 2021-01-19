@@ -63,13 +63,13 @@ public class Recipe {
         return processor;
     }
 
-    private List<SourceFile> visit(List<SourceFile> before, ExecutionContext execution) {
+    private List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         List<SourceFile> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
-        if (validate().isValid()) {
-            after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
+        if (validate(ctx).isValid()) {
+            after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
                 try {
-                    SourceFile afterFile = (SourceFile) processor.get().visit(s, execution);
+                    SourceFile afterFile = (SourceFile) processor.get().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),
@@ -80,15 +80,15 @@ public class Recipe {
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    if (execution.getOnError() != null) {
-                        execution.getOnError().accept(t);
+                    if (ctx.getOnError() != null) {
+                        ctx.getOnError().accept(t);
                     }
                     return s;
                 }
             });
         }
         if (next != null) {
-            after = next.visit(after, execution);
+            after = next.visit(after, ctx);
         }
         return after;
     }
@@ -144,18 +144,29 @@ public class Recipe {
         return results;
     }
 
+    @SuppressWarnings("unused")
+    @Incubating(since = "7.0.0")
+    public Validated validate(ExecutionContext context) {
+        return validate();
+    }
+
     public Validated validate() {
         return Validated.none();
     }
 
-    public final Collection<Validated> validateAll() {
-        return validateAll(new ArrayList<>());
+    @Incubating(since = "7.0.0")
+    public final Collection<Validated> validateAll(ExecutionContext ctx) {
+        return validateAll(ctx, new ArrayList<>());
     }
 
-    private Collection<Validated> validateAll(Collection<Validated> acc) {
-        acc.add(validate());
+    public final Collection<Validated> validateAll() {
+        return validateAll(ExecutionContext.builder().build(), new ArrayList<>());
+    }
+
+    private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
+        acc.add(validate(ctx));
         if(next != null) {
-            next.validateAll(acc);
+            next.validateAll(ctx, acc);
         }
         return acc;
     }
