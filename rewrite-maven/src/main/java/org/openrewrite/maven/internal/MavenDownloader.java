@@ -21,7 +21,6 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
-import io.vavr.Function0;
 import io.vavr.Function1;
 import okhttp3.ConnectionSpec;
 import okhttp3.OkHttpClient;
@@ -46,6 +45,7 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -229,59 +229,57 @@ public class MavenDownloader {
             }
         }
 
-        return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+        final Set<RawRepositories.Repository> validRepositories = Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
                 .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
                 .distinct()
-                .filter(repo -> repo.acceptsVersion(version))
-                .map(repo -> {
-                    Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                            .tag("group.id", groupId)
-                            .tag("artifact.id", artifactId)
-                            .tag("type", "pom");
+                .filter(repo -> repo.acceptsVersion(version)).collect(Collectors.toSet());
 
-                    try {
-                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
-                                versionMaybeDatedSnapshot, () -> {
-                                    String uri = URI.create(repo.getUrl()) + "/" +
-                                            groupId.replace('.', '/') + '/' +
-                                            artifactId + '/' +
-                                            version + '/' +
-                                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+        Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                .tag("group.id", groupId)
+                .tag("artifact.id", artifactId)
+                .tag("type", "pom");
 
-                                    Request request = new Request.Builder().url(uri).get().build();
-                                    try (Response response = sendRequest.apply(request)) {
-                                        if (response.isSuccessful() && response.body() != null) {
-                                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                                    .bytes();
+        try {
 
-                                            // This path doesn't matter except for debugging/error logs where it might get displayed
-                                            Path inputPath = Paths.get(groupId, artifactId, version);
-                                            return RawMaven.parse(
-                                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                                    null,
-                                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
-                                            );
-                                        }
-                                    } catch (Throwable throwable) {
-                                        return null;
-                                    }
+            CacheResult<RawMaven> result = mavenCache.computeMaven(null, groupId, artifactId,
+                    versionMaybeDatedSnapshot, () -> {
 
-                                    return null;
-                                });
+                        for (RawRepositories.Repository repo : validRepositories) {
+                            String uri = URI.create(repo.getUrl()) + "/" +
+                                    groupId.replace('.', '/') + '/' +
+                                    artifactId + '/' +
+                                    version + '/' +
+                                    artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-                        sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-                        return result.getData();
-                    } catch (Exception e) {
-                        logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
-                        sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
-                                .register(Metrics.globalRegistry));
+                            Request request = new Request.Builder().url(uri).get().build();
+                            try (Response response = sendRequest.apply(request)) {
+                                if (response.isSuccessful() && response.body() != null) {
+                                    @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                            .bytes();
+
+                                    // This path doesn't matter except for debugging/error logs where it might get displayed
+                                    Path inputPath = Paths.get(groupId, artifactId, version);
+                                    return RawMaven.parse(
+                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                            null,
+                                            versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
+                                    );
+                                }
+                            } catch (Throwable throwable) {
+                                //If an exception happens, just skip to the next repo.
+                            }
+                        }
                         return null;
-                    }
-                })
-                .filter(Objects::nonNull)
-                .findFirst()
-                .orElse(null);
+                    });
+            sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+            return result.getData();
+        } catch (Exception e) {
+            logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
+            sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
+                    .register(Metrics.globalRegistry));
+        }
+        return null;
     }
 
     @Nullable
