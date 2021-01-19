@@ -229,57 +229,59 @@ public class MavenDownloader {
             }
         }
 
-        final Set<RawRepositories.Repository> validRepositories = Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+        return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
                 .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
                 .distinct()
-                .filter(repo -> repo.acceptsVersion(version)).collect(Collectors.toSet());
+                .filter(repo -> repo.acceptsVersion(version))
+                .map(repo -> {
+                    Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("group.id", groupId)
+                            .tag("artifact.id", artifactId)
+                            .tag("type", "pom");
 
-        Timer.Builder timer = Timer.builder("rewrite.maven.download")
-                .tag("group.id", groupId)
-                .tag("artifact.id", artifactId)
-                .tag("type", "pom");
+                    try {
+                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
+                                versionMaybeDatedSnapshot, () -> {
+                                    String uri = URI.create(repo.getUrl()) + "/" +
+                                            groupId.replace('.', '/') + '/' +
+                                            artifactId + '/' +
+                                            version + '/' +
+                                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-        try {
+                                    Request request = new Request.Builder().url(uri).get().build();
+                                    try (Response response = sendRequest.apply(request)) {
+                                        if (response.isSuccessful() && response.body() != null) {
+                                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                                    .bytes();
 
-            CacheResult<RawMaven> result = mavenCache.computeMaven(null, groupId, artifactId,
-                    versionMaybeDatedSnapshot, () -> {
+                                            // This path doesn't matter except for debugging/error logs where it might get displayed
+                                            Path inputPath = Paths.get(groupId, artifactId, version);
+                                            return RawMaven.parse(
+                                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                                    null,
+                                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
+                                            );
+                                        }
+                                    } catch (Throwable throwable) {
+                                        return null;
+                                    }
 
-                        for (RawRepositories.Repository repo : validRepositories) {
-                            String uri = URI.create(repo.getUrl()) + "/" +
-                                    groupId.replace('.', '/') + '/' +
-                                    artifactId + '/' +
-                                    version + '/' +
-                                    artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+                                    return null;
+                                });
 
-                            Request request = new Request.Builder().url(uri).get().build();
-                            try (Response response = sendRequest.apply(request)) {
-                                if (response.isSuccessful() && response.body() != null) {
-                                    @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                            .bytes();
-
-                                    // This path doesn't matter except for debugging/error logs where it might get displayed
-                                    Path inputPath = Paths.get(groupId, artifactId, version);
-                                    return RawMaven.parse(
-                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                            null,
-                                            versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
-                                    );
-                                }
-                            } catch (Throwable throwable) {
-                                //If an exception happens, just skip to the next repo.
-                            }
-                        }
+                        sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
+                        return result.getData();
+                    } catch (Exception e) {
+                        logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
+                        sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
+                                .register(Metrics.globalRegistry));
                         return null;
-                    });
-            sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
-            return result.getData();
-        } catch (Exception e) {
-            logger.debug("Failed to download {}:{}:{}:{}", groupId, artifactId, version, classifier, e);
-            sample.stop(timer.tags("outcome", "error", "exception", e.getClass().getName())
-                    .register(Metrics.globalRegistry));
-        }
-        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .findFirst()
+                .orElse(null);
     }
 
     @Nullable
