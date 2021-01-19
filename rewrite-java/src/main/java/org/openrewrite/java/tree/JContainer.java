@@ -67,7 +67,10 @@ public class JContainer<T> {
     }
 
     public JContainer<T> withElem(List<JRightPadded<T>> elem) {
-        return build(getBefore(), elem);
+        if (elem != this.elem) {
+            return build(getBefore(), elem);
+        }
+        return this;
     }
 
     public List<JRightPadded<T>> getElem() {

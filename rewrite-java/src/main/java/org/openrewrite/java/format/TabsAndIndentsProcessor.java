@@ -36,56 +36,73 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement s = statement;
-        Cursor parentCursor = getCursor().getParentOrThrow();
-        J parent = parentCursor.getTree();
 
-        if (!(s instanceof J.Block)) {
-            parent = parentCursor.getTree();
-            Cursor cursor = parentCursor;
+        if (!useContinuationIndent(s)) {
+            Cursor parentCursor = getCursor().getParentOrThrow();
+            J parent = parentCursor.getTree();
+            if (!(s instanceof J.Block)) {
 
-            // find the first cursor element that is indented further to the left
-            for (;
-                 parent instanceof J.Block || parent instanceof J.Label || parent instanceof J.Try.Catch ||
-                         parent instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
-                         parent instanceof J.If.Else;
-                 parent = cursor.getTree()) {
-                cursor = cursor.getParentOrThrow();
+                parent = parentCursor.getTree();
+                Cursor cursor = parentCursor;
+
+                // find the first cursor element that is indented further to the left
+                for (;
+                     parent instanceof J.Block || parent instanceof J.Label || parent instanceof J.Try.Catch ||
+                             parent instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
+                             parent instanceof J.If.Else;
+                     parent = cursor.getTree()) {
+                    cursor = cursor.getParentOrThrow();
+                }
             }
+
+            s = indent(s, parent);
+            rebaseCursor(s);
         }
 
-        s = indent(s, parent);
-        rebaseCursor(s);
-
         return super.visitStatement(s, p);
+    }
+
+    private boolean useContinuationIndent(J j) {
+        Tree parent = getCursor().getParentOrThrow().getTree();
+        if (parent instanceof J.MethodDecl && j instanceof J.VariableDecls) {
+            return true;
+        }
+        if (parent instanceof J.VariableDecls && (j instanceof J.Ident || j instanceof J.ParameterizedType)) {
+            return false;
+        }
+        return !(parent instanceof J.Block ||
+                parent instanceof J.Case ||
+                parent instanceof J.MethodDecl ||
+                parent instanceof J.Label);
     }
 
     @Override
     public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension arrDim = super.visitArrayDimension(arrayDimension, p);
-        J.ArrayDimension a = continuationIndent(arrDim, enclosingStatement());
-        a = a.withIndex(continuationIndent(a.getIndex(), enclosingStatement()));
-        a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
+        J.ArrayDimension a = continuationIndent(arrDim, getContinuationIndentParentSpace());
+        a = a.withIndex(continuationIndent(a.getIndex(), getContinuationIndentParentSpace()));
+        a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), getContinuationIndentParentSpace())));
         return a;
     }
 
     @Override
     public J.Assign visitAssign(J.Assign assign, P p) {
         J.Assign a = super.visitAssign(assign, p);
-        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
+        a = a.withAssignment(continuationIndent(a.getAssignment(), a.getPrefix()));
         return a;
     }
 
     @Override
     public J.AssignOp visitAssignOp(J.AssignOp assignOp, P p) {
         J.AssignOp a = super.visitAssignOp(assignOp, p);
-        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
+        a = a.withAssignment(continuationIndent(a.getAssignment(), getContinuationIndentParentSpace()));
         return a;
     }
 
     @Override
     public J.Binary visitBinary(J.Binary binary, P p) {
         J.Binary b = super.visitBinary(binary, p);
-        b = b.withOperator(continuationIndent(b.getOperator(), enclosingStatement()));
+        b = b.withOperator(otherContinuationIndent(b.getOperator(), getContinuationIndentParentSpace()));
         return b;
     }
 
@@ -117,9 +134,10 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         if (expression instanceof J.Annotation) {
             e = e.withPrefix(alignTo(e.getPrefix(),
                     indent(getCursor().getParentOrThrow().<J>getTree().getPrefix())));
-        } else if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.Case)) {
-            e = continuationIndent(e, enclosingStatement());
+        } else {
+            if (useContinuationIndent(e)) {
+                e = continuationIndent(e, getContinuationIndentParentSpace());
+            }
         }
         return e;
     }
@@ -135,9 +153,9 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         List<JRightPadded<Statement>> update = control.getUpdate();
         if (init.getElem().getPrefix().getWhitespace().contains("\n")) {
             f = f.withControl(control
-                    .withInit(continuationIndent(init, f))
-                    .withCondition(continuationIndent(condition, f))
-                    .withUpdate(continuationIndent(update, f)));
+                    .withInit(continuationIndent(init, f.getPrefix()))
+                    .withCondition(continuationIndent(condition, f.getPrefix()))
+                    .withUpdate(continuationIndent(update, f.getPrefix())));
         } else {
             f = f.withControl(f.getControl().withCondition(condition.withElem(
                     alignTo(condition.getElem(), forInitColumn()))));
@@ -174,7 +192,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = super.visitMemberReference(memberRef, p);
-        m = m.withReference(continuationIndent(m.getReference(), enclosingStatement()));
+        m = m.withReference(continuationIndent(m.getReference(), getContinuationIndentParentSpace()));
         return m;
     }
 
@@ -186,7 +204,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             if (params.get(0).getElem().getPrefix().getWhitespace().contains("\n")) {
                 J.MethodDecl parent = m;
                 m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(),
-                        j -> continuationIndent(j, parent))));
+                        j -> continuationIndent(j, parent.getPrefix()))));
             } else if (params.stream().anyMatch(param -> param.getElem().getPrefix().getWhitespace().contains("\n"))) {
                 String print = m.withBody(null).print();
                 int nameStart = print.lastIndexOf(m.getSimpleName() + "(");
@@ -212,71 +230,90 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Ternary visitTernary(J.Ternary ternary, P p) {
         J.Ternary t = super.visitTernary(ternary, p);
-        t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
-        t = t.withFalsePart(continuationIndent(t.getFalsePart(), enclosingStatement()));
+        t = t.withTruePart(continuationIndent(t.getTruePart(), getContinuationIndentParentSpace()));
+        t = t.withFalsePart(continuationIndent(t.getFalsePart(), getContinuationIndentParentSpace()));
         return t;
     }
 
     @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         J.Unary u = super.visitUnary(unary, p);
-        u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
+        u = u.withOperator(otherContinuationIndent(u.getOperator(), u.getPrefix()));
         return u;
     }
 
-    private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Tree parent) {
+    private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Space parentSpace) {
         return ListUtils.map(js, (i, j) -> {
             if (i == 0) {
-                return continuationIndent(j, parent);
+                return continuationIndent(j, parentSpace);
             } else {
                 return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
-                        parent, style.getContinuationIndent() * 2)));
+                        parentSpace, style.getContinuationIndent() * 2)));
             }
         });
     }
 
-    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Tree parent) {
+    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Space parentSpace) {
         return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
-                parent, style.getContinuationIndent())));
+                parentSpace, style.getContinuationIndent())));
     }
 
-    private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, @Nullable Tree parent) {
-        return t.withBefore(continuationIndent(t.getBefore(), parent));
+    private <J2 extends J> JLeftPadded<J2> continuationIndent(JLeftPadded<J2> j, @Nullable Space parentSpace) {
+        return j
+                .withElem(continuationIndent(j.getElem(), parentSpace))
+                .withBefore(continuationIndent(j.getBefore(), parentSpace));
     }
 
-    private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Tree parent) {
-        return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
+    private <T> JLeftPadded<T> otherContinuationIndent(JLeftPadded<T> t, @Nullable Space parentSpace) {
+        return t
+                .withBefore(continuationIndent(t.getBefore(), parentSpace));
     }
 
-    private <J2 extends J> J2 indent(J2 j, Tree parent) {
+    private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Space parentSpace) {
+        return j.withPrefix(indent(j.getPrefix(), parentSpace, style.getContinuationIndent()));
+    }
+
+    private <J2 extends J> J2 indent(J2 j, @Nullable J parent) {
         if (parent instanceof J.CompilationUnit) {
             return j;
         }
-        return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
+        return j.withPrefix(indent(j.getPrefix(), parent == null ? null : parent.getPrefix(), style.getIndentSize()));
     }
 
     @Nullable
-    private Statement enclosingStatement() {
-        Cursor cursor = getCursor();
-        //noinspection StatementWithEmptyBody
-        for (; cursor != null &&
-                (!(cursor.getTree() instanceof Statement) ||
-                        !cursor.<J>getTree().getPrefix().getWhitespace().contains("\n"));
-             cursor = cursor.getParent())
-            ;
-        return cursor == null ? null : cursor.getTree();
+    private Space getContinuationIndentParentSpace() {
+        Cursor cursor = getCursor().getParent();
+        while (cursor != null) {
+            J j = cursor.getTree();
+            if (j instanceof Statement) {
+                if (j instanceof J.MethodInvocation) {
+                    J.MethodInvocation mi = (J.MethodInvocation) j;
+                    if (mi.getSelect() != null && mi.getSelect().getAfter().getWhitespace().contains("\n")) {
+                        return mi.getSelect().getAfter();
+                    } else if (mi.getPrefix().getWhitespace().contains("\n")) {
+                        return mi.getPrefix();
+                    }
+                } else {
+                    if (j.getPrefix().getWhitespace().contains("\n")) {
+                        return j.getPrefix();
+                    }
+                }
+            }
+            cursor = cursor.getParent();
+        }
+        return null;
     }
 
-    private Space continuationIndent(Space space, @Nullable Tree parent) {
-        return indent(space, parent, style.getContinuationIndent());
+    private Space continuationIndent(Space space, @Nullable Space parentSpace) {
+        return indent(space, parentSpace, style.getContinuationIndent());
     }
 
-    private Space indent(Space space, @Nullable Tree parent, int indentSize) {
-        if (parent == null || !space.getWhitespace().contains("\n")) {
+    private Space indent(Space space, @Nullable Space parentSpace, int indentSize) {
+        if (parentSpace == null || !space.getWhitespace().contains("\n")) {
             return space;
         }
 
-        int parentIndent = indent(((J) parent).getPrefix());
+        int parentIndent = indent(parentSpace);
         int indent = indent(space);
 
         if (indent != parentIndent + indentSize) {

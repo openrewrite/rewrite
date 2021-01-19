@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -28,10 +29,10 @@ interface TabsAndIndentsTest : RecipeTest {
         get() = TabsAndIndents()
 
     fun tabsAndIndents(with: TabsAndIndentsStyle.() -> TabsAndIndentsStyle = { this }) = listOf(
-        NamedStyles(
-            "test", listOf(
-                IntelliJ.tabsAndIndents().run { with(this) })
-        )
+            NamedStyles(
+                    "test", listOf(
+                    IntelliJ.tabsAndIndents().run { with(this) })
+            )
     )
 
     /**
@@ -373,6 +374,45 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun expressions2(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
+            import java.util.function.Function;
+            public class Test {
+                int X[];
+                public int plus(int x) {
+                    return 0;
+                }
+                public void test(boolean a, int x, int y) {
+                    Function<Integer, Integer> op = this
+                      ::
+                      plus;
+                    if (x
+                      >
+                      0) {
+                        int someVariable = a ?
+                          x :
+                          y;
+                        int anotherVariable = a
+                          ?
+                          x
+                          :
+                          y;
+                    }
+                    x
+                      ++;
+                    X
+                      [
+                      1
+                      ]
+                      =
+                      0;
+                }
+            }
+        """
+    )
+
+    @Test
     fun lineComment(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
@@ -596,5 +636,123 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
             }
         """
+    )
+
+    @Test
+    fun continuationIndents(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class A {
+                    public void setFamilyPattern(@Nullable String familyPattern) {
+                        this.familyPattern = familyPattern == null ?
+                                null :
+                                Pattern.compile(familyPattern.replace("*", ".*"));
+                    } 
+                }
+            """
+    )
+
+    @Test
+    fun continuationIndents2(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    public void foo() {
+                        if (skipIfPresent && findDependencies(groupId, artifactId).stream()
+                                .anyMatch(d -> (version == null || version.equals(d.getVersion())) &&
+                                        (classifier == null || classifier.equals(d.getClassifier())) &&
+                                        d.getScope().isInClasspathOf(Scope.fromName(scope))
+                                )) {
+                            return maven;
+                        }
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun continuationIndents3(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    @Nullable
+                    Consumer<Throwable> getOnError() {
+                        return onError;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun continuationIndents4(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system,
+                                                                                            @Nullable File localRepositoryDir) {
+                        DefaultRepositorySystemSession repositorySystemSession = org.apache.maven.repository.internal.MavenRepositorySystemUtils
+                                .newSession();
+                        repositorySystemSession.setDependencySelector(
+                                new AndDependencySelector(
+                                        new ExclusionDependencySelector(),
+                                        new ScopeDependencySelector(emptyList(), Arrays.asList("provided", "test")),
+                                        new OptionalDependencySelector()
+                                )
+                        );
+                        return repositorySystemSession;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun continuationIndents5(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    public void setFamilyPattern(@Nullable String familyPattern) {
+                        this.familyPattern = familyPattern == null ?
+                                null :
+                                Pattern.compile(familyPattern.replace("*", ".*"));
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun continuationIndents6(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    @Nullable
+                    Scope scope;
+            
+                    @Nullable
+                    String classifier;
+                    
+                    @With
+                    Collection<Dependency> dependencies;
+                }
+            """
+    )
+
+    // FIXME
+    @Test
+    @Disabled("Known failure")
+    fun continuationIndents7(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+            jp.build(),
+            before = """
+                public class Test {
+                    public void method() {
+                        Optional<Xml.Tag> maybePlugin = plugins.getChildren().stream()
+                            .filter(plugin ->
+                                    plugin.getName().equals("plugin") &&
+                                            groupId.equals(plugin.getChildValue("groupId").orElse(null)) &&
+                                            artifactId.equals(plugin.getChildValue("artifactId").orElse(null))
+                            )
+                            .findAny();
+                    }
+                }
+            """
     )
 }
