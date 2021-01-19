@@ -18,6 +18,7 @@ package org.openrewrite.config
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
+import org.openrewrite.ValidationException
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import java.net.URI
@@ -101,5 +102,63 @@ class EnvironmentTest {
 
         val results = recipe.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello")))
         assertThat(results).hasSize(1)
+    }
+
+    @Test
+    fun recipeDependsOnOtherDeclarativeRecipeSpecifiedInAnotherFile() {
+        val env = Environment.builder()
+            .load(
+                YamlResourceLoader(
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.TextMigration
+                        recipeList:
+                            - test.ChangeTextToHello
+                    """.trimIndent().byteInputStream(),
+                    URI.create("rewrite.yml"),
+                    Properties()
+                )
+            )
+            .load(
+                YamlResourceLoader(
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.ChangeTextToHello
+                        recipeList:
+                            - org.openrewrite.text.ChangeText:
+                                toText: Hello
+                    """.trimIndent().byteInputStream(),
+                    URI.create("text.yml"),
+                    Properties()
+                )
+            )
+            .build()
+
+        val recipe = env.activateRecipes("test.TextMigration")
+        assertThat(recipe.validateAll()).allMatch { v -> v.isValid }
+
+        val results = recipe.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello")))
+        assertThat(results).hasSize(1)
+    }
+
+    @Test
+    fun recipeDependsOnNonExistentRecipe() {
+        val env = Environment.builder()
+            .load(
+                YamlResourceLoader(
+                    """
+                        type: specs.openrewrite.org/v1beta/recipe
+                        name: test.TextMigration
+                        recipeList:
+                            - test.DoesNotExist
+                    """.trimIndent().byteInputStream(),
+                    URI.create("rewrite.yml"),
+                    Properties()
+                )
+            )
+            .build()
+
+        val recipe = env.activateRecipes("test.TextMigration")
+        assertThat(recipe.validateAll()).anyMatch { v -> v.isInvalid }
     }
 }

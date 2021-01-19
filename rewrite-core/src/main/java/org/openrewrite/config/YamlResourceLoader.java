@@ -110,9 +110,11 @@ public class YamlResourceLoader implements ResourceLoader {
         return loadResources(ResourceType.Recipe).stream()
                 .filter(r -> r.containsKey("name"))
                 .map(r -> {
-                    DeclarativeRecipe recipe = new DeclarativeRecipe((String) r.get("name"), source);
+                    String name = (String) r.get("name");
+                    DeclarativeRecipe recipe = new DeclarativeRecipe(name, source);
                     List<Object> recipeList = (List<Object>) r.get("recipeList");
-                    for (Object next : recipeList) {
+                    for (int i = 0; i < recipeList.size(); i++) {
+                        Object next = recipeList.get(i);
                         if (next instanceof String) {
                             recipe.doNext((String) next);
                         } else if (next instanceof Map) {
@@ -126,9 +128,9 @@ public class YamlResourceLoader implements ResourceLoader {
                             }
                         } else {
                             recipe.addValidation(invalid(
-                                    "recipeList",
+                                    name + ".recipeList[" + i + "] (in " + source + ")",
                                     next,
-                                    "Invalid object type in list in recipe defined in '" + source + "'",
+                                    "is an object type that isn't recognized as a recipe.",
                                     null));
                         }
                     }
@@ -144,7 +146,8 @@ public class YamlResourceLoader implements ResourceLoader {
                 .filter(r -> r.containsKey("name"))
                 .map(s -> {
                     List<Style> styles = new ArrayList<>();
-                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles((String) s.get("name"), styles);
+                    String name = (String) s.get("name");
+                    DeclarativeNamedStyles namedStyles = new DeclarativeNamedStyles(name, styles);
                     List<Map<String, Object>> styleConfigs = (List<Map<String, Object>>) s.get("styleConfigs");
                     if (styleConfigs != null) {
                         for (Map<String, Object> styleConfig : styleConfigs) {
@@ -153,9 +156,9 @@ public class YamlResourceLoader implements ResourceLoader {
                                 styles.add((Style) Class.forName(nameAndConfig.getKey()).getDeclaredConstructor().newInstance());
                             } catch (Exception e) {
                                 namedStyles.addValidation(Validated.invalid(
-                                        "configure",
+                                        name + ".configure (in " + source + ")",
                                         nameAndConfig.getKey(),
-                                        "Unable to construct named styles '" + namedStyles.getName() + "' defined in '" + source + "'",
+                                        "is a style that cannot be constructed.",
                                         e));
                             }
                         }

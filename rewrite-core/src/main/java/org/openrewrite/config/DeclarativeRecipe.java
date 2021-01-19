@@ -41,16 +41,17 @@ public class DeclarativeRecipe extends Recipe {
     }
 
     void initialize(Collection<Recipe> availableRecipes) {
-        for (String nextName : lazyNext) {
+        for (int i = 0; i < lazyNext.size(); i++) {
+            String nextName = lazyNext.get(i);
             Optional<Recipe> next = availableRecipes.stream()
                     .filter(r -> r.getName().equals(nextName)).findAny();
             if (next.isPresent()) {
                 doNext(next.get());
             } else {
                 validation = validation.and(
-                        invalid("next",
+                        invalid(name + ".recipeList[" + i + "] (in " + source + ")",
                                 nextName,
-                                "Recipe '" + name + "' defined in '" + source + "' refers to a recipe name does not exist",
+                                "refers to a recipe that doesn't exist.",
                                 null));
             }
         }
