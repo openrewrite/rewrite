@@ -20,6 +20,7 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
@@ -39,8 +40,9 @@ import static org.openrewrite.Validated.required;
 public class FindAnnotation extends Recipe {
     private String signature;
 
-    public FindAnnotation() {
-        this.processor = () -> new FindAnnotationProcessor(signature);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindAnnotationProcessor(signature);
     }
 
     public void setSignature(String signature) {

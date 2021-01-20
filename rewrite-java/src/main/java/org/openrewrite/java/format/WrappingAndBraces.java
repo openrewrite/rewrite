@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -24,8 +25,9 @@ import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 
 public class WrappingAndBraces extends Recipe {
-    public WrappingAndBraces() {
-        this.processor = WrappingAndBracesCompilationUnitStyle::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new WrappingAndBracesCompilationUnitStyle();
     }
 
     private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {

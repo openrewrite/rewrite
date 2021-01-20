@@ -15,7 +15,9 @@
  */
 package org.openrewrite.maven;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.HyphenRange;
@@ -55,8 +57,9 @@ public class AddDependency extends Recipe {
     @Nullable
     private Pattern familyPattern;
 
-    public AddDependency() {
-        this.processor = () -> new AddDependencyProcessor<>(
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new AddDependencyProcessor<>(
                 groupId,
                 artifactId,
                 version,

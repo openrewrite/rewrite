@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.yaml.search.FindIndentYamlProcessor;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -23,8 +25,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CoalesceProperties extends Recipe {
-    public CoalesceProperties() {
-        this.processor = CoalescePropertiesProcessor::new;
+
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new CoalescePropertiesProcessor<>();
     }
 
     public static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {

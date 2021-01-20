@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -32,8 +33,9 @@ public class ChangeMethodTargetToVariable extends Recipe {
     private String variable;
     private JavaType.Class variableType;
 
-    public ChangeMethodTargetToVariable() {
-        this.processor = () -> new ChangeMethodTargetToVariableProcessor(methodMatcher, variable, variableType);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeMethodTargetToVariableProcessor(methodMatcher, variable, variableType);
     }
 
     public void setMethod(String method) {

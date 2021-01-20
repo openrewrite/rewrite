@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.AddToTagProcessor;
@@ -31,8 +32,9 @@ public class ExcludeDependency extends Recipe {
     private String groupId;
     private String artifactId;
 
-    public ExcludeDependency() {
-        this.processor = () -> new ExcludeDependencyProcessor(groupId, artifactId);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ExcludeDependencyProcessor(groupId, artifactId);
     }
 
     public void setGroupId(String groupId) {

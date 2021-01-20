@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.java.JavaProcessor
 import java.io.File
-import java.util.function.Supplier
 
 interface RecipeTest {
     val recipe: Recipe?
@@ -50,7 +49,7 @@ interface RecipeTest {
         after: String,
         afterConditions: (T) -> Unit = { }
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull()
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
 
@@ -66,8 +65,8 @@ interface RecipeTest {
 
         val result = results.find { s -> source === s.before }
 
-        assertThat(result).`as`("The recipe must make changes").isNotNull()
-        assertThat(result!!.after).isNotNull()
+        assertThat(result).`as`("The recipe must make changes").isNotNull
+        assertThat(result!!.after).isNotNull
         assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             .isEqualTo(after.trimIndent())
     }
@@ -91,7 +90,7 @@ interface RecipeTest {
         after: String,
         afterConditions: (T) -> Unit = { }
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull()
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         val source = parser!!.parse((listOf(before) + dependsOn).map { it.toPath() }, null).first()
 
@@ -107,8 +106,8 @@ interface RecipeTest {
 
         val result = results.find { s -> source === s.before }
 
-        assertThat(result).`as`("The recipe must make changes").isNotNull()
-        assertThat(result!!.after).isNotNull()
+        assertThat(result).`as`("The recipe must make changes").isNotNull
+        assertThat(result!!.after).isNotNull
         assertThat(result.after!!.printTrimmed(treePrinter ?: TreePrinter.identity<Any>()))
             .isEqualTo(after.trimIndent())
     }
@@ -119,7 +118,7 @@ interface RecipeTest {
         before: String,
         dependsOn: Array<String> = emptyArray()
     ) {
-        assertThat(recipe).`as`("A recipe must be specified").isNotNull()
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
         val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).iterator().next()
         val results = recipe!!.run(listOf(source))
@@ -134,10 +133,8 @@ interface RecipeTest {
     }
 
     fun JavaProcessor<ExecutionContext>.toRecipe() = object : Recipe() {
-        init {
-            this.processor = Supplier {
-                this@toRecipe
-            }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return this@toRecipe
         }
     }
 }

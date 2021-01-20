@@ -17,14 +17,16 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 
 public class BlankLines extends Recipe {
-    public BlankLines() {
-        this.processor = BlankLinesFromCompilationUnitStyle::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new BlankLinesFromCompilationUnitStyle();
     }
 
     private static class BlankLinesFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {

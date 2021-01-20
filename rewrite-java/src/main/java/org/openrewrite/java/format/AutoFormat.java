@@ -17,12 +17,14 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.tree.J;
 
 public class AutoFormat extends Recipe {
-    public AutoFormat() {
-        this.processor = AutoFormatFromCompilationUnit::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new AutoFormatFromCompilationUnit();
     }
 
     private static class AutoFormatFromCompilationUnit extends JavaIsoProcessor<ExecutionContext> {

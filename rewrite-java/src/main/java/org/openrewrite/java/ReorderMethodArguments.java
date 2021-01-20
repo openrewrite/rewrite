@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -34,8 +35,9 @@ public class ReorderMethodArguments extends Recipe {
     private String[] order;
     private String[] originalOrder = new String[0];
 
-    public ReorderMethodArguments() {
-        this.processor = () -> new ReorderMethodArgumentsProcessor(methodMatcher, order, originalOrder);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ReorderMethodArgumentsProcessor(methodMatcher, order, originalOrder);
     }
 
     public void setMethod(String method) {

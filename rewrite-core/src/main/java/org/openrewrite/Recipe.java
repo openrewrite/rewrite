@@ -28,6 +28,7 @@ import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
 public class Recipe {
+
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
         public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
@@ -40,8 +41,6 @@ public class Recipe {
 
     @Nullable
     private Recipe next;
-
-    protected Supplier<TreeProcessor<?, ExecutionContext>> processor = () -> NOOP;
 
     public Recipe(@Nullable String name) {
         this.name = name;
@@ -59,8 +58,15 @@ public class Recipe {
         return this;
     }
 
-    Supplier<TreeProcessor<?, ExecutionContext>> getProcessor() {
-        return processor;
+    /**
+     * A recipe can optionally encasulate a processor that performs operations on a set of source files. Subclasses
+     * of the recipe may override this method to provide an instance of the process that will be used when the recipe
+     * is executed.
+     *
+     * @return A tree processor that will perform operations associated with the recipe.
+     */
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return NOOP;
     }
 
     @SuppressWarnings("SuspiciousMethodCalls")
@@ -70,7 +76,7 @@ public class Recipe {
         if (validate(ctx).isValid()) {
             after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
                 try {
-                    @SuppressWarnings("unchecked") S afterFile = (S) processor.get().visit(s, ctx);
+                    @SuppressWarnings("unchecked") S afterFile = (S) getProcessor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),

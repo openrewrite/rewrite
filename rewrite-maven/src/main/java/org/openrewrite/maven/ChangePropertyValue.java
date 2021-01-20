@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.tree.Xml;
@@ -27,8 +28,9 @@ public class ChangePropertyValue extends Recipe {
     private String key;
     private String toValue;
 
-    public ChangePropertyValue() {
-        this.processor = () -> new ChangePropertyValueProcessor(key, toValue);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangePropertyValueProcessor(key, toValue);
     }
 
     public void setKey(String key) {

@@ -16,10 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.Cursor
-import org.openrewrite.ExecutionContext
-import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
+import org.openrewrite.*
 import org.openrewrite.java.tree.J
 import java.util.function.Supplier
 
@@ -28,25 +25,24 @@ interface RenameVariableTest : RecipeTest {
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : Recipe() {
-            init {
-                this.processor = Supplier {
-                    object : JavaProcessor<ExecutionContext>() {
-                        init {
-                            setCursoringOn()
-                        }
+            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                return object : JavaProcessor<ExecutionContext>() {
+                    init {
+                        setCursoringOn()
+                    }
 
-                        override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
-                            val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
-                            if (cursor.parentOrThrow.getTree<J>() is J.MethodDecl) {
-                                doAfterVisit(RenameVariable(varCursor, "n2"))
-                            } else if (cursor.parentOrThrow.parentOrThrow.getTree<J>() !is J.ClassDecl) {
-                                doAfterVisit(RenameVariable(varCursor, "n1"))
-                            }
-                            return super.visitMultiVariable(multiVariable, p)
+                    override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
+                        val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
+                        if (cursor.parentOrThrow.getTree<J>() is J.MethodDecl) {
+                            doAfterVisit(RenameVariable(varCursor, "n2"))
+                        } else if (cursor.parentOrThrow.parentOrThrow.getTree<J>() !is J.ClassDecl) {
+                            doAfterVisit(RenameVariable(varCursor, "n1"))
                         }
+                        return super.visitMultiVariable(multiVariable, p)
                     }
                 }
             }
+
         },
         before = """
             public class B {

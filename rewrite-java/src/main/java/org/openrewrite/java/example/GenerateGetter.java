@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.example;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoProcessor;
@@ -30,8 +32,9 @@ import static org.openrewrite.Validated.required;
 public class GenerateGetter extends Recipe {
     private String fieldName;
 
-    public GenerateGetter() {
-        this.processor = () -> new GenerateGetterProcessor<>(fieldName);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new GenerateGetterProcessor<>(fieldName);
     }
 
     public void setFieldName(String fieldName) {

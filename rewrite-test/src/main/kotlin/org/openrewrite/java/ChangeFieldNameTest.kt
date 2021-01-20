@@ -19,31 +19,31 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 import java.util.function.Supplier
 
 interface ChangeFieldNameTest : RecipeTest {
     fun changeFieldName(from: String, to: String) = object : Recipe() {
-        init {
-            this.processor = Supplier {
-                object : JavaIsoProcessor<ExecutionContext>() {
-                    init {
-                        setCursoringOn()
-                    }
 
-                    override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
-                        val containing = cursor.parentOrThrow.parentOrThrow.getTree<J>()
-                        if (containing is J.ClassDecl) {
-                            val type = v.typeExpr?.type
-                            if(type is JavaType.FullyQualified) {
-                                doAfterVisit(ChangeFieldName(type.asClass(), from, to))
-                            } else {
-                                doAfterVisit(ChangeFieldName(containing.type, from, to))
-                            }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return object : JavaIsoProcessor<ExecutionContext>() {
+                init {
+                    setCursoringOn()
+                }
+
+                override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
+                    val containing = cursor.parentOrThrow.parentOrThrow.getTree<J>()
+                    if (containing is J.ClassDecl) {
+                        val type = v.typeExpr?.type
+                        if(type is JavaType.FullyQualified) {
+                            doAfterVisit(ChangeFieldName(type.asClass(), from, to))
+                        } else {
+                            doAfterVisit(ChangeFieldName(containing.type, from, to))
                         }
-                        return super.visitMultiVariable(v, p)
                     }
+                    return super.visitMultiVariable(v, p)
                 }
             }
         }

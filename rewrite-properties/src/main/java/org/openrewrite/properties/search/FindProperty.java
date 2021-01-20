@@ -15,7 +15,9 @@
  */
 package org.openrewrite.properties.search;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 
 import static org.openrewrite.Validated.required;
@@ -24,8 +26,9 @@ public class FindProperty extends Recipe {
 
     private String key;
 
-    public FindProperty() {
-        this.processor = () -> new FindPropertyProcessor(key);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindPropertyProcessor(key);
     }
 
     public void setKey(String key) {

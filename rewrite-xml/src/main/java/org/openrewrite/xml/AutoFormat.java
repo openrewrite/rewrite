@@ -15,11 +15,15 @@
  */
 package org.openrewrite.xml;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 
 public class AutoFormat extends Recipe {
 
-    public AutoFormat() {
-        this.processor = AutoFormatProcessor::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new AutoFormatProcessor<>();
     }
+
 }

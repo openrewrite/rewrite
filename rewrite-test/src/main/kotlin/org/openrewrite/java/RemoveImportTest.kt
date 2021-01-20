@@ -16,17 +16,18 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.TreeProcessor
 import java.util.function.Supplier
 
 interface RemoveImportTest : RecipeTest {
     fun removeImport(type: String) = object : Recipe() {
-        init {
-            this.processor = Supplier {
-                RemoveImport(type)
-            }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return RemoveImport(type)
         }
+
     }
 
     @Test

@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
@@ -24,8 +25,9 @@ import org.openrewrite.java.tree.J;
 
 public class Spaces extends Recipe {
 
-    public Spaces() {
-        this.processor = SpacesFromCompilationUnitStyle::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new SpacesFromCompilationUnitStyle();
     }
 
     private static class SpacesFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {

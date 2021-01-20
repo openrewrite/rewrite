@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
@@ -31,8 +32,9 @@ public class ChangeMethodTargetToStatic extends Recipe {
     private String method;
     private String targetType;
 
-    public ChangeMethodTargetToStatic() {
-        this.processor = () -> new ChangeMethodTargetToStaticProcessor(new MethodMatcher(method), targetType);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeMethodTargetToStaticProcessor(new MethodMatcher(method), targetType);
     }
 
     public void setMethod(String method) {
