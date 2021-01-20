@@ -69,7 +69,7 @@ public class Recipe {
         if (validate(execution).isValid()) {
             after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
                 try {
-                    S afterFile = (S) processor.get().visit(s, execution);
+                    @SuppressWarnings("unchecked") S afterFile = (S) processor.get().visit(s, execution);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),
@@ -93,13 +93,13 @@ public class Recipe {
         return after;
     }
 
-    public final List<Result> run(List<SourceFile> before) {
+    public final List<Result> run(List<? extends SourceFile> before) {
         return run(before, ExecutionContext.builder().build());
     }
 
-    public final List<Result> run(List<SourceFile> before, ExecutionContext context) {
-        List<SourceFile> acc = before;
-        List<SourceFile> after = acc;
+    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext context) {
+        List<? extends SourceFile> acc = before;
+        List<? extends SourceFile> after = acc;
         for (int i = 0; i < context.getMaxCycles(); i++) {
             after = visit(before, context);
             if (after == acc && !context.isNeedAnotherCycle()) {
