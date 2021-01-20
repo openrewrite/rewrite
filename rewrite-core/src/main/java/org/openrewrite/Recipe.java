@@ -63,13 +63,13 @@ public class Recipe {
         return processor;
     }
 
-    private <S extends SourceFile> List<S> visit(List<S> before, ExecutionContext execution) {
+    private <S extends SourceFile> List<S> visitInternal(List<S> before, ExecutionContext ctx) {
         List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
-        if (validate(execution).isValid()) {
-            after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
+        if (validate(ctx).isValid()) {
+            after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
                 try {
-                    @SuppressWarnings("unchecked") S afterFile = (S) processor.get().visit(s, execution);
+                    @SuppressWarnings("unchecked") S afterFile = (S) processor.get().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),
@@ -80,17 +80,32 @@ public class Recipe {
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    if (execution.getOnError() != null) {
-                        execution.getOnError().accept(t);
+                    if (ctx.getOnError() != null) {
+                        ctx.getOnError().accept(t);
                     }
                     return s;
                 }
             });
         }
+
+        after = visit(after, ctx);
+
         if (next != null) {
-            after = next.visit(after, execution);
+            after = next.visitInternal(after, ctx);
         }
         return after;
+    }
+
+    /**
+     * Override this to generate new source files or delete source files.
+     *
+     * @param before The set of source files to operate on.
+     * @param ctx    The current execution context.
+     * @param <S>    A supertype common to all source files in the set.
+     * @return A set of source files, with some files potentially added/deleted/modified.
+     */
+    protected <S> List<S> visit(List<S> before, ExecutionContext ctx) {
+        return before;
     }
 
     public final List<Result> run(List<? extends SourceFile> before) {
@@ -101,7 +116,7 @@ public class Recipe {
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
         for (int i = 0; i < context.getMaxCycles(); i++) {
-            after = visit(before, context);
+            after = visitInternal(before, context);
             if (after == acc && !context.isNeedAnotherCycle()) {
                 break;
             }
@@ -165,7 +180,7 @@ public class Recipe {
 
     private Collection<Validated> validateAll(ExecutionContext ctx, Collection<Validated> acc) {
         acc.add(validate(ctx));
-        if(next != null) {
+        if (next != null) {
             next.validateAll(ctx, acc);
         }
         return acc;
