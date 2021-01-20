@@ -17,7 +17,9 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
@@ -33,6 +35,8 @@ public final class ExecutionContext {
     private final ForkJoinPool forkJoinPool;
 
     private final Map<String, Object> messages = new ConcurrentHashMap<>();
+
+    final Map<UUID, String> recipeThatModifiedSourceFile = new HashMap<>();
 
     private ExecutionContext(int maxCycles, @Nullable Consumer<Throwable> onError, ForkJoinPool forkJoinPool) {
         this.maxCycles = maxCycles;
@@ -80,6 +84,14 @@ public final class ExecutionContext {
 
     ForkJoinPool getForkJoinPool() {
         return forkJoinPool;
+    }
+
+    void recordSourceFileModification(SourceFile sourceFile, Recipe recipe) {
+        recipeThatModifiedSourceFile.put(sourceFile.getId(), recipe.getName());
+    }
+
+    String getRecipeThatModifiedSourceFile(UUID sourceFileId) {
+        return recipeThatModifiedSourceFile.get(sourceFileId);
     }
 
     public static class Builder {

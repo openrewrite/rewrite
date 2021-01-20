@@ -63,7 +63,8 @@ public class Recipe {
         return processor;
     }
 
-    private <S extends SourceFile> List<S> visitInternal(List<S> before, ExecutionContext ctx) {
+    @SuppressWarnings("SuspiciousMethodCalls")
+    private <S extends SourceFile> List<SourceFile> visitInternal(List<S> before, ExecutionContext ctx) {
         List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
         if (validate(ctx).isValid()) {
@@ -78,6 +79,9 @@ public class Recipe {
                                     return r1;
                                 }));
                     }
+                    if (afterFile == null) {
+                        ctx.recordSourceFileModification(s, this);
+                    }
                     return afterFile;
                 } catch (Throwable t) {
                     if (ctx.getOnError() != null) {
@@ -88,12 +92,30 @@ public class Recipe {
             });
         }
 
-        after = visit(after, ctx);
+        // The type of the list is widened at this point, since a source file type may be generated that isn't
+        // of a type that is in the original set of source files (e.g. only XML files are given, and the
+        // recipe generates Java code).
+
+        //noinspection unchecked
+        List<SourceFile> afterWidened = visit((List<SourceFile>) after, ctx);
+
+        for (SourceFile maybeGenerated : afterWidened) {
+            if (!after.contains(maybeGenerated)) {
+                // a new source file generated
+                ctx.recordSourceFileModification(maybeGenerated, this);
+            }
+        }
+        for (SourceFile maybeDeleted : after) {
+            if (!afterWidened.contains(maybeDeleted)) {
+                // a source file deleted
+                ctx.recordSourceFileModification(maybeDeleted, this);
+            }
+        }
 
         if (next != null) {
-            after = next.visitInternal(after, ctx);
+            afterWidened = next.visitInternal(afterWidened, ctx);
         }
-        return after;
+        return afterWidened;
     }
 
     /**
@@ -101,10 +123,10 @@ public class Recipe {
      *
      * @param before The set of source files to operate on.
      * @param ctx    The current execution context.
-     * @param <S>    A supertype common to all source files in the set.
      * @return A set of source files, with some files potentially added/deleted/modified.
      */
-    protected <S> List<S> visit(List<S> before, ExecutionContext ctx) {
+    @SuppressWarnings("unused")
+    protected List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
         return before;
     }
 
@@ -112,16 +134,16 @@ public class Recipe {
         return run(before, ExecutionContext.builder().build());
     }
 
-    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext context) {
+    public final List<Result> run(List<? extends SourceFile> before, ExecutionContext ctx) {
         List<? extends SourceFile> acc = before;
         List<? extends SourceFile> after = acc;
-        for (int i = 0; i < context.getMaxCycles(); i++) {
-            after = visitInternal(before, context);
-            if (after == acc && !context.isNeedAnotherCycle()) {
+        for (int i = 0; i < ctx.getMaxCycles(); i++) {
+            after = visitInternal(before, ctx);
+            if (after == acc && !ctx.isNeedAnotherCycle()) {
                 break;
             }
             acc = after;
-            context.nextCycle();
+            ctx.nextCycle();
         }
 
         if (after == before) {
@@ -137,10 +159,15 @@ public class Recipe {
         for (SourceFile s : after) {
             SourceFile original = sourceFileIdentities.get(s.getId());
             if (original != s) {
-                results.add(new Result(original, s, s.getMarkers()
-                        .findFirst(RecipeThatMadeChanges.class)
-                        .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
-                        .names));
+                if (original == null) {
+                    results.add(new Result(null, s,
+                            singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
+                } else {
+                    results.add(new Result(original, s, s.getMarkers()
+                            .findFirst(RecipeThatMadeChanges.class)
+                            .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
+                            .names));
+                }
             }
         }
 
@@ -151,8 +178,8 @@ public class Recipe {
         // removed files
         for (SourceFile s : before) {
             if (!afterIds.contains(s.getId())) {
-                // FIXME fix how we track which recipes are deleting files
-                results.add(new Result(s, null, emptySet()));
+                results.add(new Result(s, null,
+                        singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
             }
         }
 
@@ -161,7 +188,7 @@ public class Recipe {
 
     @SuppressWarnings("unused")
     @Incubating(since = "7.0.0")
-    public Validated validate(ExecutionContext context) {
+    public Validated validate(ExecutionContext ctx) {
         return validate();
     }
 

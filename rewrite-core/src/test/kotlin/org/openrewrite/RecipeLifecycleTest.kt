@@ -1,0 +1,66 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package org.openrewrite
+
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Test
+import org.openrewrite.Tree.randomId
+import org.openrewrite.marker.Markers
+import org.openrewrite.text.PlainText
+import java.util.function.Supplier
+
+class RecipeLifecycleTest {
+    @Test
+    fun generateFile() {
+        val results = object : Recipe() {
+            override fun getName() = "test.GeneratingRecipe"
+
+            override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
+                before + PlainText(randomId(), Markers.EMPTY, "test")
+        }.run(emptyList())
+
+        assertThat(results.map { it.recipesThatMadeChanges.first() }).containsExactly("test.GeneratingRecipe")
+    }
+
+    @Test
+    fun deleteFile() {
+        val results = object : Recipe() {
+            override fun getName() = "test.DeletingRecipe"
+
+            override fun visit(before: List<SourceFile>, ctx: ExecutionContext) =
+                emptyList<SourceFile>()
+        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
+
+        assertThat(results.map { it.recipesThatMadeChanges.first() }).containsExactly("test.DeletingRecipe")
+    }
+
+    @Test
+    fun deleteFileByReturningNullFromVisit() {
+        val results = object : Recipe() {
+            override fun getName() = "test.DeletingRecipe"
+
+            init {
+                this.processor = Supplier {
+                    object: TreeProcessor<PlainText, ExecutionContext>() {
+                        override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
+                    }
+                }
+            }
+        }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
+
+        assertThat(results.map { it.recipesThatMadeChanges.first() }).containsExactly("test.DeletingRecipe")
+    }
+}
