@@ -21,7 +21,6 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
-import io.vavr.Function0;
 import io.vavr.Function1;
 import okhttp3.ConnectionSpec;
 import okhttp3.OkHttpClient;
@@ -236,6 +235,7 @@ public class MavenDownloader {
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("repo.id", repo.getUrl())
                             .tag("group.id", groupId)
                             .tag("artifact.id", artifactId)
                             .tag("type", "pom");
