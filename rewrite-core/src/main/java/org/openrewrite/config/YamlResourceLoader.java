@@ -38,7 +38,7 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
-    private static final ObjectMapper propertyConverter = new ObjectMapper()
+    private static final ObjectMapper mapper = new ObjectMapper()
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
@@ -120,9 +120,8 @@ public class YamlResourceLoader implements ResourceLoader {
                         } else if (next instanceof Map) {
                             Map.Entry<String, Object> nameAndConfig = ((Map<String, Object>) next).entrySet().iterator().next();
                             try {
-                                Recipe nextRecipe = (Recipe) Class.forName(nameAndConfig.getKey()).getDeclaredConstructor().newInstance();
-                                propertyConverter.updateValue(nextRecipe, nameAndConfig.getValue());
-                                recipe.doNext(nextRecipe);
+                                recipe.doNext((Recipe) mapper.convertValue(nameAndConfig.getValue(),
+                                        Class.forName(nameAndConfig.getKey())));
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }

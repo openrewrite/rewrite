@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.J;
 import java.util.Arrays;
 
 import static java.util.stream.Collectors.joining;
-import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
+import static org.assertj.core.api.Assertions.assertThat;
 
 public interface JavaTreeTest {
     default void assertParsePrintAndProcess(JavaParser parser, NestingLevel nestingLevel, String code,

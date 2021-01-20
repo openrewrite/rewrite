@@ -23,6 +23,7 @@ import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.TypeUtils;
 
 import static org.openrewrite.Validated.required;
 
@@ -75,7 +76,10 @@ public class GenerateGetter extends Recipe {
 //                        ListUtils.concat(
 //                                body.getStatements(),
 //                                new JRightPadded<>(
-//                                        GETTER.generateBefore(body.getEnd()).iterator().next(),
+//                                        GETTER.generateBefore(body.getEnd(),
+//                                                TypeUtils.asClass(var.getType()).getClassName(),
+//                                                var.getSimpleName() /* upper case */,
+//                                                var.getSimpleName()).iterator().next(),
 //                                        Space.EMPTY
 //                                )
 //                        )));

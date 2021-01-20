@@ -163,10 +163,12 @@ public class Recipe {
                     results.add(new Result(null, s,
                             singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
                 } else {
-                    results.add(new Result(original, s, s.getMarkers()
-                            .findFirst(RecipeThatMadeChanges.class)
-                            .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
-                            .names));
+                    if(!original.print().equals(s.print())) {
+                        results.add(new Result(original, s, s.getMarkers()
+                                .findFirst(RecipeThatMadeChanges.class)
+                                .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
+                                .names));
+                    }
                 }
             }
         }
