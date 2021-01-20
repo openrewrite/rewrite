@@ -88,8 +88,8 @@ public class Result {
     }
 
     static class InMemoryDiffEntry extends DiffEntry {
-        InMemoryRepository repo;
-        Set<String> recipesThatMadeChanges;
+        private final InMemoryRepository repo;
+        private final Set<String> recipesThatMadeChanges;
 
         InMemoryDiffEntry(Path filePath, @Nullable Path relativeTo, String oldSource, String newSource, Set<String> recipesThatMadeChanges) {
             this.changeType = ChangeType.MODIFY;

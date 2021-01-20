@@ -43,7 +43,7 @@ public interface JavaTreeTest {
 
         J.CompilationUnit cu = parser.parse(source).iterator().next();
 
-        J processed = new JavaProcessor<Void>().visit(cu, null);
+        J processed = new JavaProcessor<>().visit(cu, new Object());
         assertThat(processed).as("Processing is idempotent").isSameAs(cu);
 
         TreeSerializer<J.CompilationUnit> treeSerializer = new TreeSerializer<>();

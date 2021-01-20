@@ -59,14 +59,10 @@ public class ChangeMethodName extends Recipe {
         @Override
         public J.MethodDecl visitMethod(J.MethodDecl method, ExecutionContext ctx) {
             J.MethodDecl m = super.visitMethod(method, ctx);
-
-            J.ClassDecl classDecl = getCursor().firstEnclosing(J.ClassDecl.class);
-            assert classDecl != null;
-
+            J.ClassDecl classDecl = getCursor().firstEnclosingOrThrow(J.ClassDecl.class);
             if (methodMatcher.matches(method, classDecl)) {
                 m = m.withName(m.getName().withName(name));
             }
-
             return m;
         }
 

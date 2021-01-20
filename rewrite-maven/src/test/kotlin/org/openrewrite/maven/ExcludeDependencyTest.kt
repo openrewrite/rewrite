@@ -113,9 +113,9 @@ class ExcludeDependencyTest : RecipeTest {
     @Test
     fun playsNiceWithAddDependency() = assertChanged(
         recipe = recipe.doNext(AddDependency().apply {
-            setGroupId("org.junit.jupiter");
-            setArtifactId("junit-jupiter-engine");
-            setVersion("5.3.0");
+            setGroupId("org.junit.jupiter")
+            setArtifactId("junit-jupiter-engine")
+            setVersion("5.3.0")
             setScope("test")
         }),
         before = """

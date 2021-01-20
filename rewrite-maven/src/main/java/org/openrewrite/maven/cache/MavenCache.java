@@ -37,7 +37,6 @@ public interface MavenCache extends AutoCloseable {
     /**
      * Store a normalized repository given an input repository. Normalization takes, for example,
      * an http:// scheme repository URL for a repository that now requires https and changes the scheme.
-     * @return
      */
     CacheResult<RawRepositories.Repository> computeRepository(RawRepositories.Repository repository,
                                                               Callable<RawRepositories.Repository> orElseGet) throws Exception;

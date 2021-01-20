@@ -35,7 +35,11 @@ public final class ListUtils {
         T newLast = mapLast.apply(last);
         if (last != newLast) {
             List<T> newLs = new ArrayList<>(ls);
-            newLs.set(ls.size() - 1, newLast);
+            if (newLast == null) {
+                newLs.remove(ls.size() - 1);
+            } else {
+                newLs.set(ls.size() - 1, newLast);
+            }
             return newLs;
         }
         return ls;
@@ -49,7 +53,11 @@ public final class ListUtils {
         T newFirst = mapFirst.apply(first);
         if (first != newFirst) {
             List<T> newLs = new ArrayList<>(ls);
-            newLs.set(0, newFirst);
+            if (newFirst == null) {
+                newLs.remove(0);
+            } else {
+                newLs.set(0, newFirst);
+            }
             return newLs;
         }
         return ls;

@@ -39,7 +39,7 @@ import static java.util.stream.Collectors.toList;
         setterVisibility = Visibility.NONE
 )
 public class Markers {
-    public static Markers EMPTY = new Markers(emptyList()) {
+    public static final Markers EMPTY = new Markers(emptyList()) {
         @Override
         public String toString() {
             return "Markers{EMPTY}";

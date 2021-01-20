@@ -16,6 +16,7 @@
 package org.openrewrite.semver;
 
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.util.regex.Pattern;
 
@@ -25,7 +26,7 @@ public class Semver {
     private Semver() {
     }
 
-    public static Validated validate(String toVersion, String metadataPattern) {
+    public static Validated validate(@Nullable String toVersion, @Nullable String metadataPattern) {
         return test(
                 "metadataPattern",
                 "must be a valid regular expression",

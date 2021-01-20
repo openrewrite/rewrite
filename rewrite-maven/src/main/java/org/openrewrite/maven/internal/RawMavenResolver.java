@@ -59,10 +59,12 @@ public class RawMavenResolver {
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
+
+    @Nullable
     private final MavenSettings mavenSettings;
 
     public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            MavenSettings mavenSettings, boolean resolveOptional) {
+                            @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());

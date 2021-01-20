@@ -58,13 +58,12 @@ import java.util.stream.Collectors;
  */
 @Incubating(since = "6.1.0")
 public class MethodTypeBuilder {
-
-    JavaType.FullyQualified declaringType = null;
-    Set<Flag> flags = new HashSet<>();
-    JavaType resolvedReturnType;
-    JavaType genericReturnType;
-    String name;
-    List<Parameter> parameters = new ArrayList<>();
+    private JavaType.FullyQualified declaringType = null;
+    private final Set<Flag> flags = new HashSet<>();
+    private JavaType resolvedReturnType;
+    private JavaType genericReturnType;
+    private String name;
+    private final List<Parameter> parameters = new ArrayList<>();
 
     public static MethodTypeBuilder newMethodType() {
         return new MethodTypeBuilder();

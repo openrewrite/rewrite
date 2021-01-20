@@ -69,7 +69,7 @@ public final class FindType extends Recipe {
             JavaType.Class asClass = TypeUtils.asClass(n.getType());
             if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
-                return n.withMarkers(n.getMarkers().add(new SearchResult()));
+                return n.mark(new SearchResult());
             }
             return n;
         }

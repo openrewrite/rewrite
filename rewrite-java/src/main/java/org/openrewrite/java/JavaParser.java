@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java;
 
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Metrics;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
@@ -123,10 +121,9 @@ public interface JavaParser extends Parser<J.CompilationUnit> {
 
         protected Charset charset = Charset.defaultCharset();
         protected boolean relaxedClassTypeMatching = false;
-        protected MeterRegistry meterRegistry = Metrics.globalRegistry;
         protected boolean logCompilationWarningsAndErrors = true;
         protected boolean suppressMappingErrors = false;
-        protected List<NamedStyles> styles = new ArrayList<>();
+        protected final List<NamedStyles> styles = new ArrayList<>();
 
         public B logCompilationWarningsAndErrors(boolean logCompilationWarningsAndErrors) {
             this.logCompilationWarningsAndErrors = logCompilationWarningsAndErrors;

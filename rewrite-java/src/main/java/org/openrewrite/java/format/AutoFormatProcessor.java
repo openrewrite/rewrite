@@ -35,8 +35,7 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
 
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
-        J.CompilationUnit cu = cursor.firstEnclosing(J.CompilationUnit.class);
-        assert cu != null;
+        J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
         J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()), limitToTrees)

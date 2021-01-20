@@ -89,7 +89,7 @@ public final class FindMethod extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (matcher.matches(method)) {
-                return m.withMarkers(m.getMarkers().add(new SearchResult()));
+                return m.mark(new SearchResult());
             }
             return super.visitMethodInvocation(m, ctx);
         }

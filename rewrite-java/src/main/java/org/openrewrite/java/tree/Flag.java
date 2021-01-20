@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.tree;
 
+import org.openrewrite.internal.lang.Nullable;
+
 public enum Flag {
     Public("public"),
     Private("private"),
@@ -36,6 +38,7 @@ public enum Flag {
         return this.keyword;
     }
 
+    @Nullable
     public static Flag fromKeyword(String keyword) {
         for (Flag flag : values()) {
             if (flag.keyword.equals(keyword)) {

@@ -75,8 +75,7 @@ public class JavaTemplate {
         //Substitute parameter markers with the string representation of each parameter.
         String printedTemplate = substituteParameters(parameters);
 
-        J.CompilationUnit cu = insertionScope.firstEnclosing(J.CompilationUnit.class);
-        assert cu != null;
+        J.CompilationUnit cu = insertionScope.firstEnclosingOrThrow(J.CompilationUnit.class);
 
         //Walk up the insertion scope and find the first element that is an immediate child of a J.Block. The template
         //will always be inserted into a block.
@@ -277,10 +276,10 @@ public class JavaTemplate {
      * keep track of element IDs that have already been collected (so they are not inadvertently added twice)
      */
     private static class ExtractionContext {
-        boolean collectElements = false;
-        List<CollectedElement> collectedElements = new ArrayList<>();
-        Set<UUID> collectedIds = new HashSet<>();
-        long startDepth = 0;
+        private boolean collectElements = false;
+        private final List<CollectedElement> collectedElements = new ArrayList<>();
+        private final Set<UUID> collectedIds = new HashSet<>();
+        private long startDepth = 0;
 
         @SuppressWarnings("unchecked")
         public <J2 extends J> List<J2> getSnippets() {

@@ -18,7 +18,6 @@ package org.openrewrite;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.net.URI;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -68,7 +67,7 @@ public interface Validated extends Iterable<Validated> {
     static Validated required(String property, @Nullable Object value) {
         return value != null ?
                 valid(property, value) :
-                missing(property, value, "is required");
+                missing(property, null, "is required");
     }
 
     static Validated notBlank(String property, @Nullable String value) {

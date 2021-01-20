@@ -44,12 +44,12 @@ import static org.openrewrite.Tree.randomId;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Yaml extends Serializable, Tree {
     @Override
-    default String print() {
-        return new YamlPrinter<>(TreePrinter.identity()).visit(this, null);
+    default <P> String print(P p) {
+        return new YamlPrinter<>(TreePrinter.identity()).visit(this, p);
     }
 
-    default String print(TreePrinter<?> printer) {
-        return new YamlPrinter<>((TreePrinter<?>) printer).visit(this, null);
+    default <P> String print(TreePrinter<P> printer, P p) {
+        return new YamlPrinter<>(printer).visit(this, p);
     }
 
     @SuppressWarnings("StatementWithEmptyBody")
@@ -163,9 +163,6 @@ public interface Yaml extends Serializable, Tree {
             UUID id;
 
             @With
-            boolean explicit;
-
-            @With
             String prefix;
 
             @With
@@ -173,7 +170,7 @@ public interface Yaml extends Serializable, Tree {
 
             @Override
             public End copyPaste() {
-                return new End(randomId(), explicit, prefix, Markers.EMPTY);
+                return new End(randomId(), prefix, Markers.EMPTY);
             }
         }
     }

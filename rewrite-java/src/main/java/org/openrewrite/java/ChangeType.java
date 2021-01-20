@@ -245,6 +245,7 @@ public class ChangeType extends Recipe {
             return w.withBoundedType(transformName(w.getBoundedType()));
         }
 
+        @Nullable
         @SuppressWarnings("unchecked")
         private <T extends J> T transformName(@Nullable T nameField) {
             if (nameField instanceof NameTree) {

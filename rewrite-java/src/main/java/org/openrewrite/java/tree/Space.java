@@ -31,7 +31,7 @@ import java.util.List;
  */
 @EqualsAndHashCode
 public class Space {
-    public static Space EMPTY = new Space("", Collections.emptyList());
+    public static final Space EMPTY = new Space("", Collections.emptyList());
 
     private final List<Comment> comments;
     private final String whitespace;
@@ -183,6 +183,7 @@ public class Space {
         return build(whitespace, comments);
     }
 
+    @Nullable
     public static <J2 extends J> List<JRightPadded<J2>> formatLastSuffix(@Nullable List<JRightPadded<J2>> trees,
                                                                          Space suffix) {
         if (trees == null) {
@@ -201,6 +202,7 @@ public class Space {
         return trees;
     }
 
+    @Nullable
     public static <J2 extends J> List<J2> formatFirstPrefix(@Nullable List<J2> trees, Space prefix) {
         if (trees == null) {
             return null;

@@ -38,7 +38,7 @@ interface RecipeTest {
         dependsOn: Array<String> = emptyArray(),
         after: String
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after, {})
+        assertChanged(parser, recipe, before, dependsOn, after) {}
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -68,7 +68,7 @@ interface RecipeTest {
 
         assertThat(result).`as`("The recipe must make changes").isNotNull()
         assertThat(result!!.after).isNotNull()
-        assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>()))
+        assertThat(result.after!!.print(treePrinter ?: TreePrinter.identity<Any>(), null))
             .isEqualTo(after.trimIndent())
     }
 
@@ -79,7 +79,7 @@ interface RecipeTest {
         dependsOn: Array<File> = emptyArray(),
         after: String
     ) {
-        assertChanged(parser, recipe, before, dependsOn, after, {})
+        assertChanged(parser, recipe, before, dependsOn, after) {}
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -125,8 +125,8 @@ interface RecipeTest {
         val results = recipe!!.run(listOf(source))
 
         results.forEach { result ->
-            if(result.diff().isEmpty()) {
-               fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+            if (result.diff().isEmpty()) {
+                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
             }
         }
 

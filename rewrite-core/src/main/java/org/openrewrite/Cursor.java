@@ -83,7 +83,7 @@ public class Cursor {
         return null;
     }
 
-    public <T extends Tree> T firstEnclosingRequired(Class<T> tClass) {
+    public <T extends Tree> T firstEnclosingOrThrow(Class<T> tClass) {
         T firstEnclosing = firstEnclosing(tClass);
         if (firstEnclosing == null) {
             throw new IllegalStateException("Expected to find enclosing " + tClass.getSimpleName());
@@ -118,7 +118,8 @@ public class Cursor {
     }
 
     public boolean isScopeInPath(Tree scope) {
-        return (tree != null && tree.getId().equals(scope.getId())) || getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
+        return tree.getId().equals(scope.getId()) ||
+                getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
     }
 
     @Incubating(since = "7.0.0")

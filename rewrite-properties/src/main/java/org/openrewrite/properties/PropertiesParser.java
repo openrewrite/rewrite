@@ -82,6 +82,7 @@ public class PropertiesParser implements Parser<Properties.File> {
         );
     }
 
+    @Nullable
     private Properties.Content extractContent(String line, StringBuilder prefix) {
         Properties.Content content = null;
         if (line.trim().startsWith("#")) {

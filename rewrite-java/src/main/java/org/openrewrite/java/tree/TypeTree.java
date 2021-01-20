@@ -76,6 +76,8 @@ public interface TypeTree extends NameTree {
             nextLeftPad = whitespaceBeforeNext.toString();
         }
 
+        assert expr != null;
+
         //noinspection unchecked
         return (T) expr;
     }

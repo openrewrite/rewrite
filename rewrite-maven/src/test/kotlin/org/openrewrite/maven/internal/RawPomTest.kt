@@ -23,7 +23,6 @@ import org.mapdb.DBMaker
 import org.mapdb.serializer.SerializerString
 import org.openrewrite.Parser
 import org.openrewrite.maven.internal.RawRepositories.ArtifactPolicy
-import java.net.URI
 import java.nio.file.Path
 import java.nio.file.Paths
 

@@ -17,7 +17,6 @@ package org.openrewrite;
 
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;

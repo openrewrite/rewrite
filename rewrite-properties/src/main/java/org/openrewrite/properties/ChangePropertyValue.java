@@ -15,7 +15,6 @@
  */
 package org.openrewrite.properties;
 
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 

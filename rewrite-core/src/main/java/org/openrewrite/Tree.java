@@ -24,7 +24,6 @@ import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
@@ -63,18 +62,26 @@ public interface Tree {
         return v.defaultValue(this, p);
     }
 
-    String print(TreePrinter<?> printer);
+    <P> String print(TreePrinter<P> printer, P p);
 
-    default String print() {
-        return print(TreePrinter.identity());
+    default <P> String print(P p) {
+        return print(TreePrinter.identity(), p);
     }
 
-    default String printTrimmed(TreePrinter<?> printer) {
-        return StringUtils.trimIndent(print(printer).trim());
+    default String print() {
+        return print(TreePrinter.identity(), new Object());
+    }
+
+    default <P> String printTrimmed(TreePrinter<P> printer, P p) {
+        return StringUtils.trimIndent(print(printer, p).trim());
+    }
+
+    default <P> String printTrimmed(P p) {
+        return printTrimmed(TreePrinter.identity(), p);
     }
 
     default String printTrimmed() {
-        return printTrimmed(TreePrinter.identity());
+        return printTrimmed(TreePrinter.identity(), new Object());
     }
 
     default boolean isScope(@Nullable Tree tree) {

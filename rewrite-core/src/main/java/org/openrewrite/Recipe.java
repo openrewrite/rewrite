@@ -63,13 +63,13 @@ public class Recipe {
         return processor;
     }
 
-    private List<SourceFile> visit(List<SourceFile> before, ExecutionContext ctx) {
-        List<SourceFile> after = before;
+    private <S extends SourceFile> List<S> visit(List<S> before, ExecutionContext execution) {
+        List<S> after = before;
         // if this recipe isn't valid we just skip it and proceed to next
-        if (validate(ctx).isValid()) {
-            after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
+        if (validate(execution).isValid()) {
+            after = ListUtils.map(after, execution.getForkJoinPool(), s -> {
                 try {
-                    SourceFile afterFile = (SourceFile) processor.get().visit(s, ctx);
+                    S afterFile = (S) processor.get().visit(s, execution);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),
@@ -80,15 +80,15 @@ public class Recipe {
                     }
                     return afterFile;
                 } catch (Throwable t) {
-                    if (ctx.getOnError() != null) {
-                        ctx.getOnError().accept(t);
+                    if (execution.getOnError() != null) {
+                        execution.getOnError().accept(t);
                     }
                     return s;
                 }
             });
         }
         if (next != null) {
-            after = next.visit(after, ctx);
+            after = next.visit(after, execution);
         }
         return after;
     }

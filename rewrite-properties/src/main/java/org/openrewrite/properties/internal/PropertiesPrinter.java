@@ -17,6 +17,7 @@ package org.openrewrite.properties.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
@@ -31,13 +32,15 @@ public class PropertiesPrinter<P> implements PropertiesVisitor<String, P> {
         this.treePrinter = treePrinter;
     }
 
+    @NonNull
     @Override
     public String defaultValue(@Nullable Tree tree, P p) {
         return "";
     }
 
+    @NonNull
     @Override
-    public String visit(Tree tree, P p) {
+    public String visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
@@ -47,6 +50,7 @@ public class PropertiesPrinter<P> implements PropertiesVisitor<String, P> {
             return defaultValue(null, p);
         }
 
+        //noinspection ConstantConditions
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 
@@ -76,6 +80,6 @@ public class PropertiesPrinter<P> implements PropertiesVisitor<String, P> {
 
     @Override
     public String visitComment(Properties.Comment comment, P p) {
-        return null;
+        return comment.getPrefix() + "#" + comment.getMessage();
     }
 }

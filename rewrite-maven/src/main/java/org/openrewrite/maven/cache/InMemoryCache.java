@@ -37,9 +37,9 @@ public class InMemoryCache implements MavenCache {
     private final Map<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache = new HashMap<>();
     private final Map<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls = new HashMap<>();
 
-    CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public InMemoryCache() {
         Metrics.gaugeMapSize("rewrite.maven.cache.size", Tags.of("type", "inmem", "content", "poms"), pomCache);

@@ -63,8 +63,8 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public String print(TreePrinter<?> printer) {
-        return print();
+    public <P> String print(TreePrinter<P> printer, P p) {
+        return print(p);
     }
 
     public PlainText withText(String toText) {
@@ -72,7 +72,7 @@ public class PlainText implements SourceFile, Tree {
     }
 
     @Override
-    public String print() {
+    public <P> String print(P p) {
         return text;
     }
 }

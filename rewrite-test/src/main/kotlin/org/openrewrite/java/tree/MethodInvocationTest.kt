@@ -24,7 +24,7 @@ import org.openrewrite.java.hasElementType
 
 interface MethodInvocationTest {
     private fun J.CompilationUnit.allInvs() = classes[0].fields
-        .map { it.vars[0].elem?.initializer?.elem as J.MethodInvocation }
+        .map { it.vars[0].elem.initializer?.elem as J.MethodInvocation }
 
     @Test
     fun methodInvocation(jp: JavaParser) {
@@ -44,7 +44,7 @@ interface MethodInvocationTest {
         assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
             inv.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
 
-        val effectParams = inv.type!!.resolvedSignature!!.paramTypes
+        val effectParams = inv.type!!.resolvedSignature.paramTypes
         assertEquals("java.lang.Integer", effectParams[0].asClass()?.fullyQualifiedName)
         assertTrue(effectParams[1].hasElementType("java.lang.Integer"))
 
@@ -75,13 +75,13 @@ interface MethodInvocationTest {
             assertEquals(listOf(JavaType.Primitive.Int, JavaType.Primitive.Int, JavaType.Primitive.Int),
                 test.args.elem.map { it.elem }.filterIsInstance<J.Literal>().map { it.type })
 
-            val effectiveParams = test.type!!.resolvedSignature!!.paramTypes
+            val effectiveParams = test.type!!.resolvedSignature.paramTypes
             assertEquals("java.lang.Integer", effectiveParams[0].asClass()?.fullyQualifiedName)
             assertTrue(effectiveParams[1].hasElementType("java.lang.Integer"))
 
             // check assumptions about the target method
             // notice how, in the case of generic arguments, the generics are concretized to match the call site
-            val methType = test.type!!.genericSignature!!
+            val methType = test.type!!.genericSignature
             assertEquals("T", methType.returnType.asGeneric()?.fullyQualifiedName)
             assertEquals("T", methType.paramTypes[0].asGeneric()?.fullyQualifiedName)
             assertTrue(methType.paramTypes[1].hasElementType("T"))
@@ -117,7 +117,7 @@ interface MethodInvocationTest {
             }
         """)[0]
 
-        val inv = a.classes[0].fields[0].vars[0].elem?.initializer?.elem as J.MethodInvocation
+        val inv = a.classes[0].fields[0].vars[0].elem.initializer?.elem as J.MethodInvocation
         assertNull(inv.type?.declaringType)
         assertNull(inv.type)
         assertNull(inv.type)

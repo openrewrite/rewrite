@@ -30,6 +30,7 @@ import org.eclipse.aether.RepositorySystemSession;
 import org.eclipse.aether.RequestTrace;
 import org.eclipse.aether.impl.RemoteRepositoryManager;
 import org.eclipse.aether.repository.RemoteRepository;
+import org.openrewrite.internal.lang.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -155,11 +156,13 @@ public class ParentModelResolver extends ProjectModelResolver {
             this.version = version;
         }
 
+        @Nullable
         @Override
         public ModelSource2 getRelatedSource(String relPath) {
             return null;
         }
 
+        @Nullable
         @Override
         public URI getLocationURI() {
             return null;
@@ -178,6 +181,7 @@ public class ParentModelResolver extends ProjectModelResolver {
             return new ByteArrayInputStream(syntheticPom.getBytes());
         }
 
+        @Nullable
         @Override
         public String getLocation() {
             return null;

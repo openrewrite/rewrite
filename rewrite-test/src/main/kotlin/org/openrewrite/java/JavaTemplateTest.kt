@@ -297,7 +297,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     //Test generating the method using generateBefore and make sure the extraction is correct and has
                     //type attribution.
-                    generatedMethodDeclarations = template.generateBefore<J.MethodDecl>(
+                    generatedMethodDeclarations = template.generateBefore(
                         Cursor(cursor, block.statements[0].elem)
                     )
                     assertThat(generatedMethodDeclarations).`as`("The list of generated statements should be 1.")

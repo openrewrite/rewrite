@@ -54,7 +54,7 @@ public class InsertDependencyComparator implements Comparator<Xml.Tag> {
         return positions.get(o1).compareTo(positions.get(o2));
     }
 
-    Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
+    private static final Comparator<Xml.Tag> dependencyComparator = (d1, d2) -> {
         Scope scope1 = Scope.fromName(d1.getChildValue("scope").orElse(null));
         Scope scope2 = Scope.fromName(d2.getChildValue("scope").orElse(null));
         if (!scope1.equals(scope2)) {
@@ -93,7 +93,7 @@ public class InsertDependencyComparator implements Comparator<Xml.Tag> {
                 .compareTo(d2.getChildValue("version").orElse(""));
     };
 
-    private int comparePartByPart(String d1, String d2) {
+    private static int comparePartByPart(String d1, String d2) {
         String[] d1Parts = d1.split("[.-]");
         String[] d2Parts = d2.split("[.-]");
 

@@ -26,7 +26,6 @@ import org.openrewrite.xml.XmlParser;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.Collection;
 

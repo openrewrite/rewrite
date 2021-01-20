@@ -19,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtensionContext;
 import org.junit.jupiter.api.extension.ParameterContext;
 import org.junit.jupiter.api.extension.ParameterResolutionException;
 import org.junit.jupiter.api.extension.ParameterResolver;
+import org.openrewrite.internal.lang.Nullable;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -32,6 +33,7 @@ public class JavaParserResolver implements ParameterResolver {
         return paramType.equals(JavaParser.class) || paramType.equals(JavaParser.Builder.class);
     }
 
+    @Nullable
     @Override
     public Object resolveParameter(ParameterContext parameterContext, ExtensionContext extensionContext) throws ParameterResolutionException {
         @SuppressWarnings("OptionalGetWithoutIsPresent") Object o = extensionContext.getTestInstance().get();

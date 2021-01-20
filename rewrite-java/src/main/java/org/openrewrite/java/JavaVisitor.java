@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
 
 public interface JavaVisitor<R, P> extends TreeVisitor<R, P> {
@@ -33,7 +34,10 @@ public interface JavaVisitor<R, P> extends TreeVisitor<R, P> {
     R visitCase(J.Case caze, P p);
     R visitCatch(J.Try.Catch catzh, P p);
     R visitClassDecl(J.ClassDecl classDecl, P p);
+
+    @Nullable
     R visitCompilationUnit(J.CompilationUnit cu, P p);
+
     R visitContinue(J.Continue continueStatement, P p);
     <T extends J> R visitControlParentheses(J.ControlParentheses<T> controlParens, P p);
     R visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p);

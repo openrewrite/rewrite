@@ -59,13 +59,13 @@ public interface Xml extends Serializable, Tree {
         return v.defaultValue(this, p);
     }
 
-    default String print(TreePrinter<?> printer) {
-        return new XmlPrinter<>((TreePrinter<?>) printer).visit(this, null);
+    default <P> String print(TreePrinter<P> printer, P p) {
+        return new XmlPrinter<>(printer).visit(this, p);
     }
 
     @Override
-    default String print() {
-        return new XmlPrinter<>(TreePrinter.identity()).visit(this, null);
+    default <P> String print(P p) {
+        return print(TreePrinter.identity(), p);
     }
 
     String getPrefix();

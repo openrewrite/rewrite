@@ -18,7 +18,6 @@ package org.openrewrite.config
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
-import org.openrewrite.ValidationException
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
 import java.net.URI

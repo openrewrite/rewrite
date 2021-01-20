@@ -38,8 +38,7 @@ public class ChangeFieldName<P> extends JavaIsoProcessor<P> {
     @Override
     public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
         J.VariableDecls.NamedVar v = super.visitVariable(variable, p);
-        J.ClassDecl enclosingClass = getCursor().firstEnclosing(J.ClassDecl.class);
-        assert enclosingClass != null;
+        J.ClassDecl enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDecl.class);
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
             v = v.withName(v.getName().withName(toName));

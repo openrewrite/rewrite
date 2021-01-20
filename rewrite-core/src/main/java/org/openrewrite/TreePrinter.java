@@ -38,8 +38,7 @@ public interface TreePrinter<P> {
     /**
      * Transform the printed code.
      *
-     *
-     * @param tree
+     * @param tree    The tree that has been printed already.
      * @param printed The code as printed by the printer.
      * @return The code, possibly mutated.
      */

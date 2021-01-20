@@ -17,6 +17,7 @@ package org.openrewrite.xml.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
@@ -31,13 +32,15 @@ public class XmlPrinter<P> implements XmlVisitor<String, P> {
         this.treePrinter = treePrinter;
     }
 
+    @NonNull
     @Override
     public String defaultValue(@Nullable Tree tree, P p) {
         return "";
     }
 
+    @NonNull
     @Override
-    public String visit(Tree tree, P p) {
+    public String visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
@@ -47,6 +50,7 @@ public class XmlPrinter<P> implements XmlVisitor<String, P> {
             return defaultValue(null, p);
         }
 
+        //noinspection ConstantConditions
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 

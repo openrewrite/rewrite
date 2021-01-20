@@ -21,8 +21,6 @@ import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
-import static java.util.stream.Collectors.toList;
-
 public class ChangeFieldType<P> extends JavaIsoProcessor<P> {
     private final JavaType.Class type;
     private final String targetType;

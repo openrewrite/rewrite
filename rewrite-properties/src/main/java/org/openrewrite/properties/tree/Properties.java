@@ -40,13 +40,13 @@ import java.util.UUID;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Properties extends Serializable, Tree {
 
-    default String print(TreePrinter<?> printer) {
-        return new PropertiesPrinter<>((TreePrinter<?>)printer).visit(this, null);
+    default <P> String print(TreePrinter<P> printer, P p) {
+        return new PropertiesPrinter<>(printer).visit(this, p);
     }
 
     @Override
-    default String print() {
-        return new PropertiesPrinter<>(TreePrinter.identity()).visit(this, null);
+    default <P> String print(P p) {
+        return new PropertiesPrinter<>(TreePrinter.identity()).visit(this, p);
     }
 
     @Override

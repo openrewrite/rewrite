@@ -45,11 +45,14 @@ public class MavenParser implements Parser<Maven> {
 
     private final MavenCache mavenCache;
     private final Collection<String> activeProfiles;
+
+    @Nullable
     private final MavenSettings mavenSettings;
+
     private final boolean resolveOptional;
 
     private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles,
-                        MavenSettings mavenSettings, boolean resolveOptional) {
+                        @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
         this.mavenCache = mavenCache;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;

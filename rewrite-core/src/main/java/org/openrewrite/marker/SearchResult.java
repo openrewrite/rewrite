@@ -27,7 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
  */
 @Incubating(since = "7.0.0")
 public class SearchResult implements Marker {
-    public static TreePrinter<?> PRINTER = new TreePrinter<Object>() {
+    public static final TreePrinter<?> PRINTER = new TreePrinter<Object>() {
         @Override
         public String doLast(Tree tree, String printed, Object o) {
             if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {

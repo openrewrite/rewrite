@@ -21,7 +21,6 @@ import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
@@ -55,17 +54,18 @@ public interface J extends Serializable, Tree {
                 v.defaultValue(null, p);
     }
 
+    @Nullable
     default <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }
 
-    default String print(TreePrinter<?> printer) {
-        return new JavaPrinter<>((TreePrinter<?>) printer).visit(this, null);
+    default <P> String print(TreePrinter<P> printer, P p) {
+        return new JavaPrinter<>(printer).visit(this, p);
     }
 
     @Override
-    default String print() {
-        return new JavaPrinter<>(TreePrinter.identity()).visit(this, null);
+    default <P> String print(P p) {
+        return print(TreePrinter.identity(), p);
     }
 
     <J2 extends J> J2 withPrefix(Space space);
@@ -223,7 +223,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public ArrayType withType(JavaType type) {
+        public ArrayType withType(@Nullable JavaType type) {
             if (type == getType()) {
                 return this;
             }
@@ -761,7 +761,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Empty withType(JavaType type) {
+        public Empty withType(@Nullable JavaType type) {
             return this;
         }
 
@@ -1042,7 +1042,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Ident withType(JavaType type) {
+        public Ident withType(@Nullable JavaType type) {
             if (type == getType()) {
                 return this;
             }
@@ -1411,7 +1411,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Literal withType(JavaType type) {
+        public Literal withType(@Nullable JavaType type) {
             if (type == this.type) {
                 return this;
             }
@@ -1521,7 +1521,7 @@ public interface J extends Serializable, Tree {
         @Nullable
         JContainer<NameTree> throwz;
 
-        public MethodDecl withThrows(JContainer<NameTree> throwz) {
+        public MethodDecl withThrows(@Nullable JContainer<NameTree> throwz) {
             if (throwz == this.throwz) {
                 return this;
             }
@@ -1621,7 +1621,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public MethodInvocation withType(JavaType type) {
+        public MethodInvocation withType(@Nullable JavaType type) {
             if (type == this.type) {
                 return this;
             }
@@ -1723,7 +1723,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public MultiCatch withType(JavaType type) {
+        public MultiCatch withType(@Nullable JavaType type) {
             // cannot overwrite type directly, perform this operation on each alternative separately
             return this;
         }
@@ -1914,7 +1914,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public ParameterizedType withType(JavaType type) {
+        public ParameterizedType withType(@Nullable JavaType type) {
             if (type == clazz.getType()) {
                 return this;
             }
@@ -1963,7 +1963,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Parentheses<J2> withType(JavaType type) {
+        public Parentheses<J2> withType(@Nullable JavaType type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
@@ -2006,7 +2006,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public ControlParentheses<J2> withType(JavaType type) {
+        public ControlParentheses<J2> withType(@Nullable JavaType type) {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
@@ -2033,7 +2033,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Primitive withType(JavaType type) {
+        public Primitive withType(@Nullable JavaType type) {
             if (type == this.type) {
                 return this;
             }
@@ -2307,7 +2307,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public TypeCast withType(JavaType type) {
+        public TypeCast withType(@Nullable JavaType type) {
             return withClazz(clazz.withType(type));
         }
 
@@ -2441,6 +2441,7 @@ public interface J extends Serializable, Tree {
             return v.visitMultiVariable(this, p);
         }
 
+        @Nullable
         @JsonIgnore
         public JavaType.Class getTypeAsClass() {
             return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
@@ -2556,7 +2557,7 @@ public interface J extends Serializable, Tree {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Wildcard withType(JavaType type) {
+        public Wildcard withType(@Nullable JavaType type) {
             return this;
         }
 

@@ -153,7 +153,7 @@ public class AddDependencyProcessor<P> extends MavenProcessor<P> {
                         versionToUse = findDependencies(d -> familyPattern.matcher(d.getGroupId()).matches()).stream()
                                 .max(Comparator.comparing(d -> new Version(d.getVersion())))
                                 .map(Pom.Dependency::getRequestedVersion)
-                                .orElse(versionToUse);
+                                .orElse(null);
                     }
 
                     if (versionToUse == null) {

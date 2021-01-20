@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
@@ -32,11 +33,13 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
         this.treePrinter = treePrinter;
     }
 
+    @NonNull
     @Override
     public String defaultValue(@Nullable Tree tree, P p) {
         return "";
     }
 
+    @NonNull
     @Override
     public String visit(@Nullable Tree tree, P p) {
         if (tree == null) {
@@ -47,6 +50,7 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
         if (t == null) {
             return defaultValue(null, p);
         }
+        //noinspection ConstantConditions
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 

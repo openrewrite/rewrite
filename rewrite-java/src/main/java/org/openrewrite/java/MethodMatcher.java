@@ -17,7 +17,6 @@ package org.openrewrite.java;
 
 import lombok.Getter;
 import lombok.Setter;
-import lombok.experimental.NonFinal;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -245,12 +244,11 @@ class FormalParameterVisitor extends RefactorMethodSignatureParserBaseVisitor<St
             }
         };
 
-        static class FormalType extends Argument {
-            RefactorMethodSignatureParser.FormalTypePatternContext ctx;
+        private static class FormalType extends Argument {
+            private final RefactorMethodSignatureParser.FormalTypePatternContext ctx;
 
             @Setter
-            @NonFinal
-            boolean variableArgs = false;
+            private boolean variableArgs = false;
 
             public FormalType(RefactorMethodSignatureParser.FormalTypePatternContext ctx) {
                 this.ctx = ctx;

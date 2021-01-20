@@ -17,6 +17,7 @@ package org.openrewrite.yaml.internal;
 
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
@@ -31,13 +32,15 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
         this.treePrinter = treePrinter;
     }
 
+    @NonNull
     @Override
     public String defaultValue(@Nullable Tree tree, P p) {
         return "";
     }
 
+    @NonNull
     @Override
-    public String visit(Tree tree, P p) {
+    public String visit(@Nullable Tree tree, P p) {
         if (tree == null) {
             return defaultValue(null, p);
         }
@@ -47,6 +50,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
             return defaultValue(null, p);
         }
 
+        //noinspection ConstantConditions
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 
@@ -65,8 +69,7 @@ public class YamlPrinter<P> implements YamlVisitor<String, P> {
     @Override
     public String visitDocument(Yaml.Document document, P p) {
         return fmt(document, (document.isExplicit() ? "---" : "") + visit(document.getBlocks(), p) +
-                document.getEnd().getPrefix() +
-                (document.getEnd().isExplicit() ? "..." : ""));
+                (document.getEnd() != null ? document.getEnd().getPrefix() + "..." : ""));
     }
 
     @Override

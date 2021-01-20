@@ -71,7 +71,6 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun array(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.doNext(FindType().apply { setClass("I1") }),
         before = """
             import a.A1;
             public class B {
@@ -84,7 +83,7 @@ interface FindTypeTest : RecipeTest {
                ~~>A1[] a = new ~~>A1[0];
             }
         """,
-        dependsOn = arrayOf(a1, "public interface I1 {}")
+        dependsOn = arrayOf(a1)
     )
 
     @Test

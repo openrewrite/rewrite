@@ -45,9 +45,9 @@ public class MapdbCache implements MavenCache {
     private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
     private final HTreeMap<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls;
 
-    CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public MapdbCache(@Nullable File workspace,
                       @Nullable Long maxCacheStoreSize) {

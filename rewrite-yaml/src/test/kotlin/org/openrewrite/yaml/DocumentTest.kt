@@ -50,7 +50,7 @@ class DocumentTest : YamlParser() {
         val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(2)
-        assertThat(y.documents[0].end.isExplicit).isTrue()
+        assertThat(y.documents[0].end).isNotNull()
         assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 
@@ -70,7 +70,7 @@ class DocumentTest : YamlParser() {
         val y = parse(yText)[0]
 
         assertThat(y.documents).hasSize(1)
-        assertThat(y.documents[0].end.isExplicit).isFalse()
+        assertThat(y.documents[0].end).isNull()
         assertThat(y.printTrimmed()).isEqualTo(yText)
     }
 }

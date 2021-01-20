@@ -1683,12 +1683,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
-        assert tree != null;
         return new JRightPadded<>(tree, right);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
-        assert tree != null;
         return new JLeftPadded<>(left, tree);
     }
 
@@ -1775,10 +1773,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         return format(prefix);
     }
 
-    @Nullable
     private String skip(@Nullable String token) {
-        if (token == null)
+        if (token == null) {
+            //noinspection ConstantConditions
             return null;
+        }
         if (source.startsWith(token, cursor))
             cursor += token.length();
         return token;

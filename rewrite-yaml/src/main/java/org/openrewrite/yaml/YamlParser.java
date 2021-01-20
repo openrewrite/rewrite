@@ -71,16 +71,18 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                 String fmt = reader.prefix(lastEnd, event);
 
                 switch (event.getEventId()) {
-                    case Alias:
-                        break;
                     case DocumentEnd:
-                        documents.add(document.withEnd(new Yaml.Document.End(
-                                randomId(),
-                                ((DocumentEndEvent) event).getExplicit(),
-                                fmt,
-                                Markers.EMPTY
-                        )));
-                        lastEnd = event.getEndMark().getIndex();
+                        if(((DocumentEndEvent) event).getExplicit()) {
+                            assert document != null;
+                            documents.add(document.withEnd(new Yaml.Document.End(
+                                    randomId(),
+                                    fmt,
+                                    Markers.EMPTY
+                            )));
+                            lastEnd = event.getEndMark().getIndex();
+                        } else {
+                            documents.add(document);
+                        }
                         break;
                     case DocumentStart:
                         document = new Yaml.Document(
@@ -137,6 +139,7 @@ public class YamlParser implements org.openrewrite.Parser<Yaml.Documents> {
                     case SequenceStart:
                         blockStack.push(new SequenceBuilder(fmt));
                         break;
+                    case Alias:
                     case StreamEnd:
                     case StreamStart:
                         break;

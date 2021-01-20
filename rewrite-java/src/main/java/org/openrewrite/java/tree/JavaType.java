@@ -110,7 +110,7 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             return this == type  || (type instanceof ShallowClass &&
                     fullyQualifiedName.equals(((ShallowClass) type).fullyQualifiedName));
         }
@@ -252,14 +252,16 @@ public interface JavaType extends Serializable {
          * @return The set of public constructors for a class.
          */
         public List<Method> getConstructors() {
-            if (constructors != null) {
-                return constructors;
+            List<Method> constructorsTemp = constructors;
+            if (constructorsTemp != null) {
+                return constructorsTemp;
             }
 
             synchronized (flyweights) {
                 //Double checked locking.
-                if (constructors != null) {
-                    return constructors;
+                constructorsTemp = constructors;
+                if (constructorsTemp != null) {
+                    return constructorsTemp;
                 }
                 List<Method> reflectedConstructors = new ArrayList<>();
                 try {
@@ -287,6 +289,7 @@ public interface JavaType extends Serializable {
                 return reflectedConstructors;
             }
         }
+
         private static JavaType resolveTypeFromClass(java.lang.Class<?> _class) {
 
             if (!_class.isPrimitive() && !_class.isArray()) {
@@ -359,7 +362,7 @@ public interface JavaType extends Serializable {
         private final String fullyQualifiedName;
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             return this.equals(type);
         }
 
@@ -472,7 +475,7 @@ public interface JavaType extends Serializable {
         }
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             if (!(type instanceof Method)) {
                 return false;
             }
@@ -496,7 +499,7 @@ public interface JavaType extends Serializable {
         private final Class bound;
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             if (!(type instanceof GenericTypeVariable)) {
                 return false;
             }
@@ -512,34 +515,33 @@ public interface JavaType extends Serializable {
         private final JavaType elemType;
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             return type instanceof Array && (this == type || (elemType != null && elemType.deepEquals(((Array) type).elemType)));
         }
     }
 
     enum Primitive implements JavaType {
-        Boolean("boolean", "false"),
-        Byte("byte", "0"),
-        Char("char", "'\u0000'"),
-        Double("double", "0.0d"),
-        Float("float", "0.0f"),
-        Int("int", "0"),
-        Long("long", "0L"),
-        Short("short", "0"),
-        Void("void", null),
-        String("String", null),
-        None("", null),
-        Wildcard("*", null),
-        Null("null", null);
+        Boolean("boolean"),
+        Byte("byte"),
+        Char("char"),
+        Double("double"),
+        Float("float"),
+        Int("int"),
+        Long("long"),
+        Short("short"),
+        Void("void"),
+        String("String"),
+        None(""),
+        Wildcard("*"),
+        Null("null");
 
         private final String keyword;
-        private final String defaultValue;
 
-        Primitive(String keyword, String defaultValue) {
+        Primitive(String keyword) {
             this.keyword = keyword;
-            this.defaultValue = defaultValue;
         }
 
+        @Nullable
         public static Primitive fromKeyword(String keyword) {
             for (Primitive p : values()) {
                 if (p.keyword.equals(keyword)) {
@@ -554,13 +556,8 @@ public interface JavaType extends Serializable {
             return this.keyword;
         }
 
-        @JsonIgnore
-        public String getDefaultValue() {
-            return this.defaultValue;
-        }
-
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             return this == type;
         }
     }
