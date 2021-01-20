@@ -60,7 +60,7 @@ public class Recipe {
 
     /**
      * A recipe can optionally encasulate a processor that performs operations on a set of source files. Subclasses
-     * of the recipe may override this method to provide an instance of the process that will be used when the recipe
+     * of the recipe may override this method to provide an instance of a processor that will be used when the recipe
      * is executed.
      *
      * @return A tree processor that will perform operations associated with the recipe.
