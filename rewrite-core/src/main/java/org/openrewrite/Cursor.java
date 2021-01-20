@@ -123,6 +123,15 @@ public class Cursor {
     }
 
     @Incubating(since = "7.0.0")
+    public void putMessageOnFirstEnclosing(Class<? extends Tree> enclosing, String key, Object value) {
+        if (enclosing.isInstance(this)) {
+            putMessage(key, value);
+        } else if (parent != null) {
+            parent.putMessageOnFirstEnclosing(enclosing, key, value);
+        }
+    }
+
+    @Incubating(since = "7.0.0")
     public void putMessage(String key, Object value) {
         if (messages == null) {
             messages = new HashMap<>();
