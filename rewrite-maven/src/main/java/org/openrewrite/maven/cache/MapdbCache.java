@@ -32,7 +32,9 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 
 public class MapdbCache implements MavenCache {
@@ -46,9 +48,11 @@ public class MapdbCache implements MavenCache {
     private final HTreeMap<GroupArtifactRepository, Optional<MavenMetadata>> mavenMetadataCache;
     private final HTreeMap<RawRepositories.Repository, Optional<RawRepositories.Repository>> normalizedRepositoryUrls;
 
-    private final CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
-    private final CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
-    private final CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
+    private final Set<String> unresolvablePoms = new HashSet<>();
+
+    CacheResult<RawMaven> UNAVAILABLE_POM = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<MavenMetadata> UNAVAILABLE_METADATA = new CacheResult<>(CacheResult.State.Unavailable, null);
+    CacheResult<RawRepositories.Repository> UNAVAILABLE_REPOSITORY = new CacheResult<>(CacheResult.State.Unavailable, null);
 
     public MapdbCache(@Nullable File workspace,
                       @Nullable Long maxCacheStoreSize) {
@@ -122,7 +126,7 @@ public class MapdbCache implements MavenCache {
         new BufferedReader(new InputStreamReader(MavenDownloader.class.getResourceAsStream("/unresolvable.txt"), StandardCharsets.UTF_8))
                 .lines()
                 .filter(line -> !line.isEmpty())
-                .forEach(gav -> pomCache.put(gav, Optional.empty()));
+                .forEach(unresolvablePoms::add);
     }
 
     @Override
@@ -150,8 +154,14 @@ public class MapdbCache implements MavenCache {
     @Override
     public CacheResult<RawMaven> computeMaven(URI repo, String groupId, String artifactId, String version,
                                                       Callable<RawMaven> orElseGet) throws Exception {
-        // FIXME key be repo as well, because different repos may have different versions of the same POM
-        String cacheKey = groupId + ':' + artifactId + ':' + version;
+        //There are a few exceptional artifacts that will never be resolved by the repositories. This will always
+        //result in an Unavailable response from the cache.
+        String artifactCoordinates = groupId + ':' + artifactId + ':' + version;
+        if (unresolvablePoms.contains(artifactCoordinates)) {
+            return UNAVAILABLE_POM;
+        }
+
+        String cacheKey = repo.toString() + ":" + artifactCoordinates;
         Optional<RawMaven> rawMaven = pomCache.get(cacheKey);
 
         //noinspection OptionalAssignedToNull

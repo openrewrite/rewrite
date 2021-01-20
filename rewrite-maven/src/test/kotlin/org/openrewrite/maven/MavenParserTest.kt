@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.maven.tree.Pom
 
 class MavenParserTest {
+
     @Test
     fun parse() {
         val pom = """
