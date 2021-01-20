@@ -318,6 +318,7 @@ public class JavaRefactorVisitor extends AbstractRefactorVisitor<J> implements J
     public J visitNewArray(J.NewArray newArray) {
         J.NewArray n = refactor(newArray, this::visitExpression);
         n = n.withTypeExpr(refactor(n.getTypeExpr()));
+        n = n.withDimensions(refactor(n.getDimensions()));
         return n.withInitializer(refactor(n.getInitializer()));
     }
 
