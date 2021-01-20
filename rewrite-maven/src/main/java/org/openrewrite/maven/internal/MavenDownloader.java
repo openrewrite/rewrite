@@ -45,7 +45,6 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
@@ -236,6 +235,7 @@ public class MavenDownloader {
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("repo.id", repo.getUrl())
                             .tag("group.id", groupId)
                             .tag("artifact.id", artifactId)
                             .tag("type", "pom");
