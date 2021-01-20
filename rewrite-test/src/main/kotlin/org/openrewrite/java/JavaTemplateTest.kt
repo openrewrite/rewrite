@@ -24,7 +24,6 @@ import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
-import org.openrewrite.java.format.AutoFormatProcessor
 import org.openrewrite.java.format.MinimumViableSpacingProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
@@ -77,8 +76,6 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
-
-                    doAfterVisit(AutoFormatProcessor(generatedMethodInvocations))
 
                     return block.withStatements(
                         ListUtils.concat(
@@ -149,8 +146,6 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
                         .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
-
-                    doAfterVisit(AutoFormatProcessor(generatedMethodInvocations))
 
                     return block.withStatements(
                         ListUtils.concat(
@@ -230,8 +225,6 @@ interface JavaTemplateTest : RecipeTest {
                             JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
                         )
                     )
-
-                    doAfterVisit(AutoFormatProcessor(generatedMethodDeclarations))
                 }
                 return b
             }
@@ -310,8 +303,6 @@ interface JavaTemplateTest : RecipeTest {
                             JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
                         )
                     )
-
-                    doAfterVisit(AutoFormatProcessor(generatedMethodDeclarations))
                 }
                 return b
             }
@@ -489,7 +480,6 @@ interface JavaTemplateTest : RecipeTest {
                     )
                 )
                 m = MinimumViableSpacingProcessor<ExecutionContext>().visitMethod(m, ExecutionContext.builder().build())
-                doAfterVisit(AutoFormatProcessor(generatedElements))
                 return m
             }
         }.toRecipe(),
@@ -529,7 +519,6 @@ interface JavaTemplateTest : RecipeTest {
                     c,
                     ExecutionContext.builder().build()
                 )
-                doAfterVisit(AutoFormatProcessor(generatedAnnotations))
                 return c
             }
         }.toRecipe(),
@@ -569,7 +558,6 @@ interface JavaTemplateTest : RecipeTest {
                     c,
                     ExecutionContext.builder().build()
                 )
-                doAfterVisit(AutoFormatProcessor(generatedAnnotations))
                 return c
             }
         }.toRecipe(),
@@ -621,8 +609,6 @@ interface JavaTemplateTest : RecipeTest {
                     b = b.withStatements(generatedStatements.stream().map { state ->
                         JRightPadded<Statement>(state, Space.EMPTY)
                     }.toList())
-
-                    doAfterVisit(AutoFormatProcessor(generatedStatements))
                 }
                 return b
             }
@@ -694,8 +680,6 @@ interface JavaTemplateTest : RecipeTest {
                     b = b.withStatements(generatedStatements.stream().map { state ->
                         JRightPadded<Statement>(state, Space.EMPTY)
                     }.toList())
-
-                    doAfterVisit(AutoFormatProcessor(generatedStatements))
                 }
                 return b
             }

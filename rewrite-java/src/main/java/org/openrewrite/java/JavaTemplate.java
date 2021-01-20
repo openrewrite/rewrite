@@ -21,15 +21,16 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.format.AutoFormatProcessor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toList;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -117,7 +118,11 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        return extractionContext.getSnippets();
+        Cursor formatScope = insertionScope.getParent();
+        //noinspection unchecked
+        return extractionContext.getSnippets().stream()
+                .map(snippet -> (J2) new AutoFormatProcessor<Void>().visit(snippet, null, formatScope))
+                .collect(toList());
     }
 
     /**
@@ -287,7 +292,7 @@ public class JavaTemplate {
             return collectedElements.stream()
                     .filter(e -> e.depth == startDepth)
                     .map(e -> (J2) e.element)
-                    .collect(Collectors.toList());
+                    .collect(toList());
         }
 
         /**

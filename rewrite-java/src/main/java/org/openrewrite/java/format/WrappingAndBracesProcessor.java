@@ -15,33 +15,22 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
-import java.util.List;
-
 public class WrappingAndBracesProcessor<P> extends JavaIsoProcessor<P> {
     private final WrappingAndBracesStyle style;
 
-    @Nullable
-    private final List<? extends J> limitToTrees;
-
-    public WrappingAndBracesProcessor(WrappingAndBracesStyle style, @Nullable List<? extends J> limitToTrees) {
+    public WrappingAndBracesProcessor(WrappingAndBracesStyle style) {
         this.style = style;
-        this.limitToTrees = limitToTrees;
         setCursoringOn();
     }
 
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        if(shouldNotFormat()) {
-            return j;
-        }
-
         J parentTree = getCursor().getParentOrThrow().getTree();
         if(parentTree instanceof J.Block) {
             if(!j.getPrefix().getWhitespace().contains("\n")) {
@@ -50,9 +39,5 @@ public class WrappingAndBracesProcessor<P> extends JavaIsoProcessor<P> {
         }
 
         return j;
-    }
-
-    private boolean shouldNotFormat() {
-        return limitToTrees != null && limitToTrees.stream().noneMatch(t -> getCursor().isScopeInPath(t));
     }
 }

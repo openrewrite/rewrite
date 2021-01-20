@@ -17,12 +17,9 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
-
-import java.util.List;
 
 public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
 
@@ -32,12 +29,8 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
 
     private final SpacesStyle style;
 
-    @Nullable
-    private final List<? extends J> limitToTrees;
-
-    public SpacesProcessor(SpacesStyle style, @Nullable List<? extends J> limitToTrees) {
+    public SpacesProcessor(SpacesStyle style) {
         this.style = style;
-        this.limitToTrees = limitToTrees;
         setCursoringOn();
     }
 
@@ -79,16 +72,9 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
         return container.withElem(spaceBefore(container.getElem(), spaceBefore));
     }
 
-    private boolean shouldNotFormat() {
-        return limitToTrees != null && limitToTrees.stream().noneMatch(t -> getCursor().isScopeInPath(t));
-    }
-
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl classDecl1 = super.visitClassDecl(classDecl, p);
-        if (shouldNotFormat()) {
-            return classDecl1;
-        }
         classDecl1 = classDecl1.withBody(spaceBefore(classDecl1.getBody(), style.getBeforeLeftBrace().isClassLeftBrace()));
         boolean withinCodeBraces = style.getWithin().isCodeBraces();
         if (withinCodeBraces && StringUtils.isNullOrEmpty(classDecl1.getBody().getEnd().getWhitespace())) {
@@ -110,9 +96,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
         J.MethodDecl methodDecl = super.visitMethod(method, p);
-        if (shouldNotFormat()) {
-            return methodDecl;
-        }
         methodDecl = methodDecl.withParams(
                 spaceBefore(methodDecl.getParams(), style.getBeforeParentheses().isMethodDeclaration()));
         if (methodDecl.getBody() != null) {
@@ -124,18 +107,12 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
         J.MethodInvocation methodInvocation = super.visitMethodInvocation(method, p);
-        if (shouldNotFormat()) {
-            return methodInvocation;
-        }
         return methodInvocation.withArgs(spaceBefore(methodInvocation.getArgs(), style.getBeforeParentheses().isMethodCall()));
     }
 
     @Override
     public J.If visitIf(J.If iff, P p) {
         J.If anIf = super.visitIf(iff, p);
-        if (shouldNotFormat()) {
-            return anIf;
-        }
         anIf = anIf.withIfCondition(spaceBefore(anIf.getIfCondition(), style.getBeforeParentheses().isIfParentheses()));
         anIf = anIf.withThenPart(spaceBeforeRightPaddedElement(anIf.getThenPart(), style.getBeforeLeftBrace().isIfLeftBrace()));
         return anIf;
@@ -144,9 +121,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.If.Else visitElse(J.If.Else elze, P p) {
         J.If.Else anElse = super.visitElse(elze, p);
-        if (shouldNotFormat()) {
-            return anElse;
-        }
         anElse = anElse.withBody(spaceBeforeRightPaddedElement(anElse.getBody(), style.getBeforeLeftBrace().isElseLeftBrace()));
         anElse = spaceBefore(anElse, style.getBeforeKeywords().isElseKeyword());
         return anElse;
@@ -155,9 +129,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop fl = super.visitForLoop(forLoop, p);
-        if (shouldNotFormat()) {
-            return fl;
-        }
         fl = fl.withControl(spaceBefore(fl.getControl(), style.getBeforeParentheses().isForParentheses()));
         fl = fl.withBody(spaceBeforeRightPaddedElement(fl.getBody(), style.getBeforeLeftBrace().isForLeftBrace()));
         return fl;
@@ -166,9 +137,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ForEachLoop visitForEachLoop(J.ForEachLoop forLoop, P p) {
         J.ForEachLoop forEachLoop = super.visitForEachLoop(forLoop, p);
-        if (shouldNotFormat()) {
-            return forEachLoop;
-        }
         forEachLoop = forEachLoop.withControl(spaceBefore(forEachLoop.getControl(), style.getBeforeParentheses().isForParentheses()));
         forEachLoop = forEachLoop.withBody(spaceBeforeRightPaddedElement(forEachLoop.getBody(), style.getBeforeLeftBrace().isForLeftBrace()));
         return forEachLoop;
@@ -177,9 +145,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, P p) {
         J.WhileLoop wl = super.visitWhileLoop(whileLoop, p);
-        if (shouldNotFormat()) {
-            return wl;
-        }
         wl = wl.withCondition(spaceBefore(wl.getCondition(), style.getBeforeParentheses().isWhileParentheses()));
         wl = wl.withBody(spaceBeforeRightPaddedElement(wl.getBody(), style.getBeforeLeftBrace().isWhileLeftBrace()));
         return wl;
@@ -188,9 +153,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
         J.DoWhileLoop dwl = super.visitDoWhileLoop(doWhileLoop, p);
-        if (shouldNotFormat()) {
-            return dwl;
-        }
         dwl = dwl.withWhileCondition(spaceBefore(dwl.getWhileCondition(), style.getBeforeKeywords().isWhileKeyword()));
         dwl = dwl.withWhileCondition(spaceBeforeLeftPaddedElement(dwl.getWhileCondition(), style.getBeforeParentheses().isWhileParentheses()));
         dwl = dwl.withBody(spaceBeforeRightPaddedElement(dwl.getBody(), style.getBeforeLeftBrace().isDoLeftBrace()));
@@ -200,9 +162,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Switch visitSwitch(J.Switch _switch, P p) {
         J.Switch aSwitch = super.visitSwitch(_switch, p);
-        if (shouldNotFormat()) {
-            return aSwitch;
-        }
         aSwitch = aSwitch.withSelector(spaceBefore(aSwitch.getSelector(), style.getBeforeParentheses().isSwitchParentheses()));
         aSwitch = aSwitch.withCases(spaceBefore(aSwitch.getCases(), style.getBeforeLeftBrace().isSwitchLeftBrace()));
         return aSwitch;
@@ -211,9 +170,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Try visitTry(J.Try _try, P p) {
         J.Try aTry = super.visitTry(_try, p);
-        if (shouldNotFormat()) {
-            return aTry;
-        }
         if (aTry.getResources() != null) {
             aTry = aTry.withResources(spaceBefore(aTry.getResources(), style.getBeforeParentheses().isTryParentheses()));
         }
@@ -229,9 +185,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Try.Catch visitCatch(J.Try.Catch _catch, P p) {
         J.Try.Catch aCatch = super.visitCatch(_catch, p);
-        if (shouldNotFormat()) {
-            return aCatch;
-        }
         aCatch = spaceBefore(aCatch, style.getBeforeKeywords().isCatchKeyword());
         aCatch = aCatch.withParam(spaceBefore(aCatch.getParam(), style.getBeforeParentheses().isCatchParentheses()));
         aCatch = aCatch.withBody(spaceBefore(aCatch.getBody(), style.getBeforeLeftBrace().isCatchLeftBrace()));
@@ -241,9 +194,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Synchronized visitSynchronized(J.Synchronized _sync, P p) {
         J.Synchronized aSynchronized = super.visitSynchronized(_sync, p);
-        if (shouldNotFormat()) {
-            return aSynchronized;
-        }
         aSynchronized = aSynchronized.withLock(spaceBefore(aSynchronized.getLock(), style.getBeforeParentheses().isSynchronizedParentheses()));
         aSynchronized = aSynchronized.withBody(spaceBefore(aSynchronized.getBody(), style.getBeforeLeftBrace().isSynchronizedLeftBrace()));
         return aSynchronized;
@@ -252,9 +202,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Annotation visitAnnotation(J.Annotation annotation, P p) {
         J.Annotation anno = super.visitAnnotation(annotation, p);
-        if (shouldNotFormat()) {
-            return anno;
-        }
         if (anno.getArgs() != null) {
             anno = anno.withArgs(spaceBefore(anno.getArgs(), style.getBeforeParentheses().isAnnotationParameters()));
         }
@@ -264,9 +211,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Assign visitAssign(J.Assign assign, P p) {
         J.Assign assign1 = super.visitAssign(assign, p);
-        if (shouldNotFormat()) {
-            return assign1;
-        }
         assign1 = assign1.withAssignment(spaceBefore(assign1.getAssignment(), style.getAroundOperators().isAssignment()));
         assign1 = assign1.withAssignment(
                 assign1.getAssignment().withElem(
@@ -279,9 +223,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.AssignOp visitAssignOp(J.AssignOp assignOp, P p) {
         J.AssignOp assignOp1 = super.visitAssignOp(assignOp, p);
-        if (shouldNotFormat()) {
-            return assignOp1;
-        }
         String operatorBeforeWhitespace = assignOp1.getOperator().getBefore().getWhitespace();
         if (style.getAroundOperators().isAssignment() && StringUtils.isNullOrEmpty(operatorBeforeWhitespace)) {
             assignOp1 = assignOp1.withOperator(
@@ -303,9 +244,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
         J.VariableDecls.NamedVar namedVar = super.visitVariable(variable, p);
-        if (shouldNotFormat()) {
-            return namedVar;
-        }
         if (namedVar.getInitializer() != null) {
             namedVar = namedVar.withInitializer(spaceBefore(namedVar.getInitializer(), style.getAroundOperators().isAssignment()));
         }
@@ -324,9 +262,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Binary visitBinary(J.Binary binary, P p) {
         J.Binary binary1 = super.visitBinary(binary, p);
-        if (shouldNotFormat()) {
-            return binary1;
-        }
         J.Binary.Type operator = binary1.getOperator().getElem();
         switch (operator) {
             case And:
@@ -399,9 +334,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         J.Unary unary1 = super.visitUnary(unary, p);
-        if (shouldNotFormat()) {
-            return unary1;
-        }
         switch (unary1.getOperator().getElem()) {
             case PostIncrement:
             case PostDecrement:
@@ -457,9 +389,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Lambda visitLambda(J.Lambda lambda, P p) {
         J.Lambda l = super.visitLambda(lambda, p);
-        if (shouldNotFormat()) {
-            return l;
-        }
         boolean useSpaceAroundLambdaArrow = style.getAroundOperators().isLambdaArrow();
         if (useSpaceAroundLambdaArrow && StringUtils.isNullOrEmpty(l.getArrow().getWhitespace())) {
             l = l.withArrow(
@@ -477,9 +406,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference memberReference = super.visitMemberReference(memberRef, p);
-        if (shouldNotFormat()) {
-            return memberReference;
-        }
         memberReference = memberReference.withReference(
                 spaceBefore(memberReference.getReference(), style.getAroundOperators().isMethodReferenceDoubleColon())
         );
@@ -494,9 +420,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.NewArray visitNewArray(J.NewArray newArray, P p) {
         J.NewArray newArray1 = super.visitNewArray(newArray, p);
-        if (shouldNotFormat()) {
-            return newArray1;
-        }
         if (getCursor().getParent() != null && getCursor().getParent().getTree() instanceof J.Annotation) {
             if (newArray1.getInitializer() != null) {
                 newArray1 = newArray1.withInitializer(
@@ -555,9 +478,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ArrayAccess visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
         J.ArrayAccess arrayAccess1 = super.visitArrayAccess(arrayAccess, p);
-        if (shouldNotFormat()) {
-            return arrayAccess1;
-        }
         boolean useSpaceWithinBrackets = style.getWithin().isBrackets();
         if (useSpaceWithinBrackets) {
             if (StringUtils.isNullOrEmpty(arrayAccess1.getDimension().getIndex().getElem().getPrefix().getWhitespace())) {
@@ -608,9 +528,6 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public <T extends J> J.Parentheses<T> visitParentheses(J.Parentheses<T> parens, P p) {
         J.Parentheses<T> par = super.visitParentheses(parens, p);
-        if (shouldNotFormat()) {
-            return par;
-        }
         if (style.getWithin().isGroupingParentheses()) {
             if (StringUtils.isNullOrEmpty(par.getTree().getElem().getPrefix().getWhitespace())) {
                 par = par.withTree(

@@ -34,7 +34,7 @@ public class BlankLines extends Recipe {
             if(style == null) {
                 style = IntelliJ.blankLines();
             }
-            doAfterVisit(new BlankLinesProcessor<>(style, null));
+            doAfterVisit(new BlankLinesProcessor<>(style));
             return cu;
         }
     }

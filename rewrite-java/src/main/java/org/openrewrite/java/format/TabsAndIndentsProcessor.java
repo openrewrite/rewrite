@@ -28,26 +28,14 @@ import java.util.List;
 class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     private final TabsAndIndentsStyle style;
 
-    @Nullable
-    private final List<? extends J> limitToTrees;
-
-    public TabsAndIndentsProcessor(TabsAndIndentsStyle style, @Nullable List<? extends J> limitToTrees) {
+    public TabsAndIndentsProcessor(TabsAndIndentsStyle style) {
         this.style = style;
-        this.limitToTrees = limitToTrees;
         setCursoringOn();
-    }
-
-    private boolean shouldNotFormat() {
-        return limitToTrees != null && limitToTrees.stream().noneMatch(t -> getCursor().isScopeInPath(t));
     }
 
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement s = statement;
-        if (shouldNotFormat()) {
-            return super.visitStatement(s, p);
-        }
-
         Cursor parentCursor = getCursor().getParentOrThrow();
         J parent = parentCursor.getTree();
 
@@ -74,9 +62,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension arrDim = super.visitArrayDimension(arrayDimension, p);
-        if (shouldNotFormat()) {
-            return arrDim;
-        }
         J.ArrayDimension a = continuationIndent(arrDim, enclosingStatement());
         a = a.withIndex(continuationIndent(a.getIndex(), enclosingStatement()));
         a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
@@ -86,9 +71,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Assign visitAssign(J.Assign assign, P p) {
         J.Assign a = super.visitAssign(assign, p);
-        if (shouldNotFormat()) {
-            return a;
-        }
         a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
         return a;
     }
@@ -96,9 +78,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.AssignOp visitAssignOp(J.AssignOp assignOp, P p) {
         J.AssignOp a = super.visitAssignOp(assignOp, p);
-        if (shouldNotFormat()) {
-            return a;
-        }
         a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
         return a;
     }
@@ -106,9 +85,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Binary visitBinary(J.Binary binary, P p) {
         J.Binary b = super.visitBinary(binary, p);
-        if (shouldNotFormat()) {
-            return b;
-        }
         b = b.withOperator(continuationIndent(b.getOperator(), enclosingStatement()));
         return b;
     }
@@ -116,9 +92,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Block visitBlock(J.Block block, P p) {
         J.Block j = super.visitBlock(block, p);
-        if (shouldNotFormat()) {
-            return j;
-        }
         Cursor cursor = getCursor().getParentOrThrow();
         Tree parent = cursor.getTree();
 
@@ -134,9 +107,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
         J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, p);
-        if (shouldNotFormat()) {
-            return d;
-        }
         return d.withWhileCondition(d.getWhileCondition().withBefore(
                 alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
     }
@@ -144,9 +114,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         Expression e = super.visitExpression(expression, p);
-        if (shouldNotFormat()) {
-            return e;
-        }
         if (expression instanceof J.Annotation) {
             e = e.withPrefix(alignTo(e.getPrefix(),
                     indent(getCursor().getParentOrThrow().<J>getTree().getPrefix())));
@@ -160,9 +127,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = (J.ForLoop) visitStatement(forLoop, p);
-        if (shouldNotFormat()) {
-            return f;
-        }
         f = f.withBody(call(f.getBody(), p));
 
         J.ForLoop.Control control = forLoop.getControl();
@@ -210,9 +174,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
         J.MemberReference m = super.visitMemberReference(memberRef, p);
-        if (shouldNotFormat()) {
-            return m;
-        }
         m = m.withReference(continuationIndent(m.getReference(), enclosingStatement()));
         return m;
     }
@@ -220,10 +181,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
         J.MethodDecl m = super.visitMethod(method, p);
-        if (shouldNotFormat()) {
-            return m;
-        }
-
         List<JRightPadded<Statement>> params = m.getParams().getElem();
         if (!params.isEmpty()) {
             if (params.get(0).getElem().getPrefix().getWhitespace().contains("\n")) {
@@ -255,9 +212,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Ternary visitTernary(J.Ternary ternary, P p) {
         J.Ternary t = super.visitTernary(ternary, p);
-        if (shouldNotFormat()) {
-            return t;
-        }
         t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
         t = t.withFalsePart(continuationIndent(t.getFalsePart(), enclosingStatement()));
         return t;
@@ -266,9 +220,6 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         J.Unary u = super.visitUnary(unary, p);
-        if (shouldNotFormat()) {
-            return u;
-        }
         u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
         return u;
     }

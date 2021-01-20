@@ -26,31 +26,24 @@ import java.util.List;
 import java.util.Optional;
 
 public class AutoFormatProcessor<P> extends JavaProcessor<P> {
-    @Nullable
-    private final List<? extends J> limitToTrees;
-
-    public AutoFormatProcessor(@Nullable List<? extends J> limitToTrees) {
-        this.limitToTrees = limitToTrees;
-    }
-
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
         J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), limitToTrees)
+                .orElse(IntelliJ.blankLines()))
                 .visit(tree, p, cursor);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()), limitToTrees)
+                .orElse(IntelliJ.spaces()))
                 .visit(t, p, cursor);
 
         t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), limitToTrees)
+                .orElse(IntelliJ.wrappingAndBraces()))
                 .visit(t, p, cursor);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), limitToTrees)
+                .orElse(IntelliJ.tabsAndIndents()))
                 .visit(t, p, cursor);
 
         return t;
@@ -59,19 +52,19 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
-                .orElse(IntelliJ.blankLines()), limitToTrees)
+                .orElse(IntelliJ.blankLines()))
                 .visit(cu, p);
 
         t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
-                .orElse(IntelliJ.spaces()), limitToTrees)
+                .orElse(IntelliJ.spaces()))
                 .visit(t, p);
 
         t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
-                .orElse(IntelliJ.wrappingAndBraces()), limitToTrees)
+                .orElse(IntelliJ.wrappingAndBraces()))
                 .visit(t, p);
 
         t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
-                .orElse(IntelliJ.tabsAndIndents()), limitToTrees)
+                .orElse(IntelliJ.tabsAndIndents()))
                 .visit(t, p);
 
         return t;

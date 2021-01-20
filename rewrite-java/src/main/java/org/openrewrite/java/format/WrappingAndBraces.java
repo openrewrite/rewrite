@@ -18,23 +18,24 @@ package org.openrewrite.java.format;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
-import org.openrewrite.java.style.TabsAndIndentsStyle;
+import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 
-public class TabsAndIndents extends Recipe {
-    public TabsAndIndents() {
-        this.processor = TabsAndIndentsFromCompilationUnitStyle::new;
+public class WrappingAndBraces extends Recipe {
+    public WrappingAndBraces() {
+        this.processor = WrappingAndBracesCompilationUnitStyle::new;
     }
 
-    private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
+    private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
-            TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
-            if (style == null) {
-                style = IntelliJ.tabsAndIndents();
+            WrappingAndBracesStyle style = cu.getStyle(WrappingAndBracesStyle.class);
+            if(style == null) {
+                style = IntelliJ.wrappingAndBraces();
             }
-            doAfterVisit(new TabsAndIndentsProcessor<>(style));
+            doAfterVisit(new WrappingAndBracesProcessor<>(style));
             return cu;
         }
     }
