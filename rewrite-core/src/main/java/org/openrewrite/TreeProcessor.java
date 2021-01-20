@@ -22,6 +22,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiFunction;
 
+/**
+ * Always returns input type T
+ * provides Parameterizable P input which is mutable allowing context to be shared
+ *
+ * postProcessing via afterVisit.  Expectiation is that after TreeProcessors are invoked immediately after visiting SourceFile
+ * (modify imports) and then discarded.  Allows for conditionally chaining other things
+ * @param <T>
+ * @param <P>
+ */
 public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T, P> {
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
@@ -39,15 +48,18 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         this.cursor.set(new Cursor(getCursor().getParent(), t));
     }
 
+    // ephemeral do once after visit (sourceFile)
     protected void doAfterVisit(TreeProcessor<T, P> visitor) {
         afterVisit.get().add(visitor);
     }
 
+    // ephemeral do once after visit
     protected void doAfterVisit(Recipe visitor) {
         //noinspection unchecked
         afterVisit.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
     }
 
+    // ephemeral do once after visit
     protected List<TreeProcessor<T, P>> getAfterVisit() {
         return afterVisit.get();
     }

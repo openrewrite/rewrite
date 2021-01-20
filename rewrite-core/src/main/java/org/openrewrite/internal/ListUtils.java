@@ -95,6 +95,10 @@ public final class ListUtils {
         return map(ls, pool, (i, t) -> map.apply(t));
     }
 
+    /**
+     * Apply function to each element of the list. If any element has been modified then
+     * a new list will be returned where the modifed elements have been replaced with their new version.
+     */
     public static <T> List<T> map(List<T> ls, ForkJoinPool pool, BiFunction<Integer, T, T> map) {
         if (ls.isEmpty()) {
             return ls;

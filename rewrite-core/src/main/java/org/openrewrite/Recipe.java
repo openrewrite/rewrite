@@ -27,6 +27,24 @@ import static java.util.Collections.*;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
+/**
+ * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link #run(List<SourceFile>)} method will apply each recipes
+ * {@link TreeProcessor processor} visit method to a list of {@link SourceFile sourceFiles}
+ *
+ * Requires a name, {@link TreeProcessor processor}. Optionally a subsequent Recipe can be linked via {@link #doNext(Recipe)}}
+ *
+ * An {@link ExecutionContext} controls parallel execution and lifecycle while providing a message bus
+ * for sharing state between recipes and their processors
+ *
+ * returns a list of {@link Result results} for each modified element identifying each recipe which has modified the {@link SourceFile}
+ *
+ * characteristics
+ *  - visit list of SourceFile each visit
+ *  - a recipe which generates new source file overrides visit and adds something to the list
+ *  - a linked list data-structure contains next(recipe) optionaly
+ *  - can be a single unit of work or could be junit 4-5 migration
+ *  - iterate over all SourceFiles visit each by the processor
+ */
 public class Recipe {
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
@@ -51,6 +69,11 @@ public class Recipe {
         this(null);
     }
 
+    /**
+     * Append the provided {@link Recipe} to the last recipe in the doNext chain
+     * @param recipe
+     * @return
+     */
     public Recipe doNext(Recipe recipe) {
         Recipe tail = this;
         //noinspection StatementWithEmptyBody
