@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -26,8 +27,9 @@ import static org.openrewrite.Validated.required;
 public class UseStaticImport extends Recipe {
     private MethodMatcher methodMatcher;
 
-    public UseStaticImport() {
-        this.processor = () -> new UseStaticImportProcessor(methodMatcher);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new UseStaticImportProcessor(methodMatcher);
     }
 
     public void setMethod(String method) {

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.yaml;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
@@ -42,8 +44,9 @@ public class ChangePropertyKey extends Recipe {
     private String toProperty;
     private boolean coalesce = true;
 
-    public ChangePropertyKey() {
-        this.processor = () -> new ChangePropertyKeyProcessor<>(property, toProperty, coalesce);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangePropertyKeyProcessor<>(property, toProperty, coalesce);
     }
 
     public void setProperty(String property) {

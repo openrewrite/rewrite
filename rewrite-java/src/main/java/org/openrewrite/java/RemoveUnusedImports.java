@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -30,8 +31,10 @@ import java.util.*;
  * drop below the configured values.
  */
 public class RemoveUnusedImports extends Recipe {
-    public RemoveUnusedImports() {
-        this.processor = RemoveUnusedImportsProcessor::new;
+
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new RemoveUnusedImportsProcessor();
     }
 
     private static class RemoveUnusedImportsProcessor extends JavaIsoProcessor<ExecutionContext> {

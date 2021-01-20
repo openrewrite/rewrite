@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.tree.J;
@@ -35,8 +36,9 @@ import static org.openrewrite.Validated.required;
 public final class FindType extends Recipe {
     private String clazz;
 
-    public FindType() {
-        this.processor = () -> new FindTypeProcessor(clazz);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindTypeProcessor(clazz);
     }
 
     public void setClass(String clazz) {

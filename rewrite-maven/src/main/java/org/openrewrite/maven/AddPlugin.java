@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.xml.AddToTagProcessor;
@@ -33,8 +34,9 @@ public class AddPlugin extends Recipe {
     private String artifactId;
     private String version;
 
-    public AddPlugin() {
-        this.processor = () -> new AddPluginProcessor(groupId, artifactId, version);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new AddPluginProcessor(groupId, artifactId, version);
     }
 
     public void setGroupId(String groupId) {

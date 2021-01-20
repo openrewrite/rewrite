@@ -30,7 +30,10 @@ public class ChangeText extends Recipe {
     @JsonCreator
     public ChangeText(@JsonProperty("toText") String toText) {
         this.toText = toText;
-        this.processor = ChangeTextProcessor::new;
+    }
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeTextProcessor();
     }
 
     @Override

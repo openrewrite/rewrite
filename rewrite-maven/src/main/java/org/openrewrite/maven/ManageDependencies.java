@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
@@ -55,8 +56,9 @@ public class ManageDependencies extends Recipe {
     @Nullable
     private String version;
 
-    public ManageDependencies() {
-        this.processor = () -> new ManageDependenciesProcessor(groupPattern, artifactPattern, version);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ManageDependenciesProcessor(groupPattern, artifactPattern, version);
     }
 
     public void setGroupPattern(@Nullable String groupPattern) {

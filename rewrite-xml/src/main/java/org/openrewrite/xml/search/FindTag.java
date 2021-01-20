@@ -17,7 +17,9 @@ package org.openrewrite.xml.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.marker.SearchResult;
+import org.openrewrite.xml.AutoFormatProcessor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.XmlProcessor;
 import org.openrewrite.xml.tree.Xml;
@@ -28,8 +30,9 @@ public class FindTag extends Recipe {
 
     private XPathMatcher xPathMatcher;
 
-    public FindTag() {
-        this.processor = () -> new FindTagProcessor(xPathMatcher);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindTagProcessor(xPathMatcher);
     }
 
     public void setXPath(String xpath) {

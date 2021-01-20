@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagProcessor;
@@ -32,8 +33,9 @@ public class ChangeDependencyScope extends Recipe {
     private String groupId;
     private String artifactId;
 
-    public ChangeDependencyScope() {
-        this.processor = () -> new ChangeDependencyScopeProcessor(groupId, artifactId, toScope);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeDependencyScopeProcessor(groupId, artifactId, toScope);
     }
 
     /**

@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -35,8 +36,9 @@ public class DeleteMethodArgument extends Recipe {
     private MethodMatcher methodMatcher;
     private Integer index;
 
-    public DeleteMethodArgument() {
-        this.processor = () -> new DeleteMethodArgumentProcessor(methodMatcher, index);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new DeleteMethodArgumentProcessor(methodMatcher, index);
     }
 
     public void setMethod(String method) {

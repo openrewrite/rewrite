@@ -28,19 +28,18 @@ class ExecutionContextTest {
         var cycles = 0
 
         object: Recipe() {
-            init {
-                this.processor = Supplier {
-                    object : TreeProcessor<PlainText, ExecutionContext>() {
-                        override fun visit(tree: Tree?, p: ExecutionContext): PlainText? {
-                            if(p.pollMessage<String>("test") == null) {
-                                p.putMessage("test", "test")
-                            }
-                            cycles = cycles.inc()
-                            return super.visit(tree, p)
+            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                return object : TreeProcessor<PlainText, ExecutionContext>() {
+                    override fun visit(tree: Tree?, p: ExecutionContext): PlainText? {
+                        if(p.pollMessage<String>("test") == null) {
+                            p.putMessage("test", "test")
                         }
+                        cycles = cycles.inc()
+                        return super.visit(tree, p)
                     }
                 }
             }
+
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "hello world")))
 
         assertThat(cycles).isEqualTo(2)

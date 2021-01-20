@@ -16,17 +16,17 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.JavaType
 import java.util.function.Supplier
 
 interface ChangeFieldTypeTest : RecipeTest {
     fun changeFieldType(from: String, to: String) = object : Recipe() {
-        init {
-            this.processor = Supplier {
-                ChangeFieldType(JavaType.Class.build(from), to)
-            }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return ChangeFieldType(JavaType.Class.build(from), to)
         }
     }
 

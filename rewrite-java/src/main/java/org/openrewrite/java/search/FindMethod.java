@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.MethodMatcher;
@@ -53,8 +54,9 @@ import static org.openrewrite.Validated.required;
 public final class FindMethod extends Recipe {
     private String signature;
 
-    public FindMethod() {
-        this.processor = () -> new FindMethodProcessor(signature);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindMethodProcessor(signature);
     }
 
     public void setSignature(String signature) {

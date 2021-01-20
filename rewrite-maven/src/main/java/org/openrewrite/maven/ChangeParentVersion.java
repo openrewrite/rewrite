@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.xml.ChangeTagValueProcessor;
 import org.openrewrite.xml.XPathMatcher;
@@ -29,8 +30,9 @@ public class ChangeParentVersion extends Recipe {
     private String artifactId;
     private String toVersion;
 
-    public ChangeParentVersion() {
-        this.processor = () -> new ChangeParentVersionProcessor(groupId, artifactId, toVersion);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeParentVersionProcessor(groupId, artifactId, toVersion);
     }
 
     public void setGroupId(String groupId) {

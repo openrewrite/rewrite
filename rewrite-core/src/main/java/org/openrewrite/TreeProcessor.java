@@ -45,7 +45,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
 
     protected void doAfterVisit(Recipe visitor) {
         //noinspection unchecked
-        afterVisit.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
+        afterVisit.get().add((TreeProcessor<T, P>) visitor.getProcessor());
     }
 
     protected List<TreeProcessor<T, P>> getAfterVisit() {

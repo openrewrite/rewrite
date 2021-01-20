@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.TreeProcessor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaProcessor
 import org.openrewrite.java.tree.Space
@@ -43,20 +44,18 @@ interface MinimumViableSpacingTest : RecipeTest {
     )
 
     class StripWhitespace : Recipe() {
-        init {
-            this.processor = Supplier {
-                object: JavaProcessor<ExecutionContext>() {
-                    override fun visitSpace(space: Space, p: ExecutionContext): Space {
-                        return space.withWhitespace("")
-                    }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return object: JavaProcessor<ExecutionContext>() {
+                override fun visitSpace(space: Space, p: ExecutionContext): Space {
+                    return space.withWhitespace("")
                 }
             }
         }
     }
 
     class MinimumViableSpacing: Recipe() {
-        init {
-            this.processor = Supplier { MinimumViableSpacingProcessor() }
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return MinimumViableSpacingProcessor()
         }
     }
 }

@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.NoopCache;
@@ -56,9 +57,9 @@ public class UpgradeDependencyVersion extends Recipe {
     @Nullable
     private String metadataPattern;
 
-    public UpgradeDependencyVersion() {
-        this.processor = () -> new UpgradeDependencyVersionProcessor(groupId, artifactId,
-                toVersion, metadataPattern);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new UpgradeDependencyVersionProcessor(groupId, artifactId, toVersion, metadataPattern);
     }
 
     public void setGroupId(String groupId) {

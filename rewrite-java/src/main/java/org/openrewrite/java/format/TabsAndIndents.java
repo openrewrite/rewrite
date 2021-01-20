@@ -17,14 +17,16 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 
 public class TabsAndIndents extends Recipe {
-    public TabsAndIndents() {
-        this.processor = TabsAndIndentsFromCompilationUnitStyle::new;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new TabsAndIndentsFromCompilationUnitStyle();
     }
 
     private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {

@@ -17,6 +17,7 @@ package org.openrewrite.java.search;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.tree.J;
@@ -30,8 +31,9 @@ import static org.openrewrite.Validated.required;
 public class FindField extends Recipe {
     private String fullyQualifiedName;
 
-    public FindField() {
-        this.processor = () -> new FindFieldsProcessor(fullyQualifiedName);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindFieldsProcessor(fullyQualifiedName);
     }
 
     public void setFullyQualifiedName(String fullyQualifiedName) {

@@ -52,13 +52,13 @@ class RecipeLifecycleTest {
         val results = object : Recipe() {
             override fun getName() = "test.DeletingRecipe"
 
-            init {
-                this.processor = Supplier {
-                    object: TreeProcessor<PlainText, ExecutionContext>() {
-                        override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
-                    }
+            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                return object: TreeProcessor<PlainText, ExecutionContext>() {
+                    override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
                 }
+
             }
+
         }.run(listOf(PlainText(randomId(), Markers.EMPTY, "test")))
 
         assertThat(results.map { it.recipesThatMadeChanges.first() }).containsExactly("test.DeletingRecipe")

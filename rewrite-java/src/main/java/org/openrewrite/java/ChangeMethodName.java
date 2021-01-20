@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -28,8 +29,9 @@ public class ChangeMethodName extends Recipe {
     private String method;
     private String name;
 
-    public ChangeMethodName() {
-        this.processor = () -> new ChangeMethodNameProcessor(new MethodMatcher(method), name);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeMethodNameProcessor(new MethodMatcher(method), name);
     }
 
     public void setMethod(String method) {

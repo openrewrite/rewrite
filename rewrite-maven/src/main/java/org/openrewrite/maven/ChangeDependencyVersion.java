@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
@@ -35,8 +36,9 @@ public class ChangeDependencyVersion extends Recipe {
 
     private String toVersion;
 
-    public ChangeDependencyVersion() {
-        this.processor = () -> new ChangeDependencyVersionProcessor(groupId, artifactId, toVersion);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeDependencyVersionProcessor(groupId, artifactId, toVersion);
     }
 
     public void setGroupId(String groupId) {

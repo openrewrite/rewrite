@@ -15,7 +15,9 @@
  */
 package org.openrewrite.properties;
 
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 
 import static org.openrewrite.Validated.required;
@@ -24,8 +26,9 @@ public class ChangePropertyValue extends Recipe {
     private String key;
     private String toValue;
 
-    public ChangePropertyValue() {
-        this.processor = () -> new ChangePropertyValueProcessor<>(key, toValue);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangePropertyValueProcessor<>(key, toValue);
     }
 
     public void setKey(String key) {

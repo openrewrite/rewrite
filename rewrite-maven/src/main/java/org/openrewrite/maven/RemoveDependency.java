@@ -17,6 +17,7 @@ package org.openrewrite.maven;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.RemoveContentProcessor;
@@ -30,8 +31,9 @@ public class RemoveDependency extends Recipe {
     private String groupId;
     private String artifactId;
 
-    public RemoveDependency() {
-        this.processor = () -> new RemoveDependencyProcessor(groupId, artifactId);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new RemoveDependencyProcessor(groupId, artifactId);
     }
 
     public void setGroupId(String groupId) {

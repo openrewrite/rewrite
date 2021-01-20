@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -37,8 +38,9 @@ public class ChangeType extends Recipe {
     private String type;
     private JavaType targetType;
 
-    public ChangeType() {
-        this.processor = () -> new ChangeTypeProcessor(type, targetType);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeTypeProcessor(type, targetType);
     }
 
     public void setType(String type) {

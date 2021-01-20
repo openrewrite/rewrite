@@ -16,10 +16,7 @@
 package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
-import org.openrewrite.Issue
-import org.openrewrite.Recipe
-import org.openrewrite.RecipeTest
+import org.openrewrite.*
 import org.openrewrite.java.tree.J
 import java.util.function.Supplier
 
@@ -27,8 +24,8 @@ interface AddImportTest : RecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
         .map { add ->
             object : Recipe() {
-                init {
-                    this.processor = Supplier { add }
+                override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                    return add
                 }
             }
         }
@@ -306,14 +303,13 @@ interface AddImportTest : RecipeTest {
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : Recipe() {
-            init {
-                this.processor = Supplier {
-                    object : JavaIsoProcessor<ExecutionContext>() {
-                        override fun visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext) =
-                            m.withSelect(null)
-                    }
+            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                return object : JavaIsoProcessor<ExecutionContext>() {
+                    override fun visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext) =
+                        m.withSelect(null)
                 }
             }
+
         }.doNext(
             addImports(AddImport("java.util.Collections", "emptyList", true))
         ),
@@ -395,19 +391,17 @@ interface AddImportTest : RecipeTest {
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
     private class FixEmptyListMethodType : Recipe() {
-        init {
-            this.processor = Supplier {
-                object : JavaIsoProcessor<ExecutionContext>() {
-                    override fun visitMethodInvocation(
-                        method: J.MethodInvocation,
-                        ctx: ExecutionContext
-                    ): J.MethodInvocation {
-                        val original: J.MethodInvocation = super.visitMethodInvocation(method, ctx)
-                        if (original.name.simpleName == "emptyList") {
-                            return original.withSelect(null)
-                        }
-                        return original
+        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            return object : JavaIsoProcessor<ExecutionContext>() {
+                override fun visitMethodInvocation(
+                    method: J.MethodInvocation,
+                    ctx: ExecutionContext
+                ): J.MethodInvocation {
+                    val original: J.MethodInvocation = super.visitMethodInvocation(method, ctx)
+                    if (original.name.simpleName == "emptyList") {
+                        return original.withSelect(null)
                     }
+                    return original
                 }
             }
         }

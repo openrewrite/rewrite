@@ -17,6 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
@@ -35,8 +36,9 @@ import java.util.*;
 public class OrderImports extends Recipe {
     private boolean removeUnused = true;
 
-    public OrderImports() {
-        this.processor = () -> new OrderImportsProcessor(removeUnused);
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new OrderImportsProcessor(removeUnused);
     }
 
     public void setRemoveUnused(boolean removeUnused) {
