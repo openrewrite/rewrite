@@ -32,6 +32,14 @@ import static org.openrewrite.Validated.required;
 
 @Data
 public class GenerateGetter extends Recipe {
+
+    private static final JavaTemplate GETTER = JavaTemplate
+            .builder("" +
+                    "public #{} get#{}() {\n" +
+                    "    return #{};" +
+                    "}")
+            .build();
+
     private final String fieldName;
 
     @Override
@@ -45,12 +53,6 @@ public class GenerateGetter extends Recipe {
     }
 
     private class GenerateGetterProcessor<P> extends JavaIsoProcessor<P> {
-        private final JavaTemplate GETTER = JavaTemplate
-                .builder("" +
-                        "public #{} get#{}() {\n" +
-                        "    return #{};" +
-                        "}")
-                .build();
 
         public GenerateGetterProcessor() {
             setCursoringOn();
