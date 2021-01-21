@@ -72,8 +72,8 @@ class UpgradeDependencyVersionTest : RecipeTest {
     fun upgradeGuava() = assertChanged(
         recipe = UpgradeDependencyVersion(
             "com.google.guava",
-            "25-28",
             null,
+            "25-28",
             "-jre"),
         before = """
             <project>
