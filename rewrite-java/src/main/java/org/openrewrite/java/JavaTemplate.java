@@ -178,7 +178,7 @@ public class JavaTemplate {
                     //up to the statement that is in insertion scope.
                     List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
                     for (JRightPadded<Statement> statement : b.getStatements()) {
-                        statementsInScope.add(call(statement, insertionScope));
+                        statementsInScope.add(visitRightPadded(statement, SpaceType.BLOCK_STATEMENT, insertionScope));
                         if (insertionScope.isScopeInPath(statement.getElem())) {
                             break;
                         }

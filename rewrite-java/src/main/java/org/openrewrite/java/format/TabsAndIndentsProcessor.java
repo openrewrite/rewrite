@@ -129,7 +129,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = (J.ForLoop) visitStatement(forLoop, p);
-        f = f.withBody(call(f.getBody(), p));
+        f = f.withBody(visitRightPadded(f.getBody(), SpaceType.FOR_BODY, p));
 
         J.ForLoop.Control control = forLoop.getControl();
         JRightPadded<Statement> init = control.getInit();
