@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
@@ -37,7 +39,8 @@ public class ChangePropertyValue extends Recipe {
         return new ChangePropertyValueProcessor();
     }
 
-    public ChangePropertyValue(String key, String toValue) {
+    @JsonCreator
+    public ChangePropertyValue(@JsonProperty("key") String key, @JsonProperty("toValue") String toValue) {
         //Customizing lombok constructor to replace the property markers.
         this.key = key.replace("${", "").replace("}", "");
         this.toValue = toValue;
