@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -27,6 +28,7 @@ import org.openrewrite.java.tree.TypeTree;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
     private final String method;

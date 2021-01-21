@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -31,6 +32,7 @@ import java.util.Optional;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyScope extends Recipe {
     private final String groupId;
     private final String artifactId;

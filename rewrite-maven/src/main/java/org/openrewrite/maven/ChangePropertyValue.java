@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -26,6 +27,7 @@ import org.openrewrite.xml.tree.Xml;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
     private final String key;
     private final String toValue;

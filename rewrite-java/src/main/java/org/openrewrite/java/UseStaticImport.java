@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -26,6 +27,7 @@ import org.openrewrite.java.tree.JavaType;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
     private final String methodPattern;

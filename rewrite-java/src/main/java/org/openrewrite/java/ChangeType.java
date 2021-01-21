@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -36,6 +37,7 @@ import static org.openrewrite.Validated.required;
  * is defined on the super class.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
     private final String type;
     private final String targetType;

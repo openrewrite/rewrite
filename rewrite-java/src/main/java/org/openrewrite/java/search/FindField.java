@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -30,6 +31,7 @@ import java.util.Set;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class FindField extends Recipe {
     private final String fullyQualifiedName;
 

@@ -59,13 +59,13 @@ public final class FindMethod extends Recipe {
     private final String methodPattern;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindMethodProcessor(methodPattern);
+    public Validated validate() {
+        return required("methodPattern", methodPattern);
     }
 
     @Override
-    public Validated validate() {
-        return required("signature", methodPattern);
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindMethodProcessor(methodPattern);
     }
 
     public static Set<J.MethodInvocation> find(J j, String methodPattern) {

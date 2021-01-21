@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -35,6 +36,7 @@ import static org.openrewrite.Validated.required;
  * Find places where a type is mentioned explicitly, excluding imports.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public final class FindType extends Recipe {
     private final String fullyQualifiedClassName;
 

@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -45,6 +46,7 @@ import static org.openrewrite.Validated.required;
  * more precise control over version updates to patch or minor releases.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
     private final String groupId;
 

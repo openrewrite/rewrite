@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -27,6 +28,7 @@ import org.openrewrite.xml.tree.Xml;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeParentVersion extends Recipe {
 
     private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");

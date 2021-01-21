@@ -16,6 +16,7 @@
 package org.openrewrite.java.example;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -31,6 +32,7 @@ import org.openrewrite.java.tree.TypeUtils;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
 
     private static final JavaTemplate GETTER = JavaTemplate

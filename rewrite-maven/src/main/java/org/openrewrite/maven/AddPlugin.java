@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -31,6 +32,7 @@ import java.util.Optional;
 import static org.openrewrite.Validated.required;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class AddPlugin extends Recipe {
 
     private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
@@ -52,7 +54,6 @@ public class AddPlugin extends Recipe {
     }
 
     private class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
-
 
         public AddPluginProcessor() {
             setCursoringOn();

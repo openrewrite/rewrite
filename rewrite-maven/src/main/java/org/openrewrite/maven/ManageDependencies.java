@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -49,6 +50,7 @@ import static org.openrewrite.Validated.required;
  * version if none is provided).
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ManageDependencies extends Recipe {
 
     private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
@@ -75,6 +77,7 @@ public class ManageDependencies extends Recipe {
     }
 
     private class ManageDependenciesProcessor extends MavenProcessor<ExecutionContext> {
+
         @Nullable
         private final Pattern groupPattern;
 
