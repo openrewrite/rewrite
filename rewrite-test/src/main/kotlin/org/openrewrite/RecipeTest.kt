@@ -129,7 +129,11 @@ interface RecipeTest {
             }
         }
 
-        assertThat(results).`as`("The recipe must not make changes").isEmpty()
+        for (result in results) {
+            assertThat(result.after?.print())
+                .`as`("The recipe must not make changes")
+                .isEqualTo(result.before?.print())
+        }
     }
 
     fun JavaProcessor<ExecutionContext>.toRecipe() = object : Recipe() {
