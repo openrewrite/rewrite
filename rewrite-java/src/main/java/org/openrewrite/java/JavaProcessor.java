@@ -25,11 +25,6 @@ import org.openrewrite.java.tree.*;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * responsible for changing a single Tree element
- * modify or delete by returning null
- * @param <P>
- */
 public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor<J, P> {
     /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
