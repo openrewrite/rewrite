@@ -34,10 +34,7 @@ interface DeleteMethodArgumentTest : RecipeTest {
     fun deleteMiddleArgumentDeclarative(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = DeleteMethodArgument().apply {
-            setMethod("B foo(int, int, int)")
-            setIndex(1)
-        },
+        recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
         after = "public class A {{ B.foo(0, 2); }}"
     )
@@ -46,10 +43,7 @@ interface DeleteMethodArgumentTest : RecipeTest {
     fun deleteMiddleArgument(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = DeleteMethodArgument().apply {
-            setMethod("B foo(int, int, int)")
-            setIndex(1)
-        },
+        recipe = DeleteMethodArgument("B foo(int, int, int)", 1),
         before = "public class A {{ B.foo(0, 1, 2); }}",
         after = "public class A {{ B.foo(0, 2); }}"
     )
@@ -58,13 +52,8 @@ interface DeleteMethodArgumentTest : RecipeTest {
     fun deleteArgumentsConsecutively(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = DeleteMethodArgument().apply {
-            setMethod("B foo(int, int, int)")
-            setIndex(1)
-        }.doNext(DeleteMethodArgument().apply {
-            setMethod("B foo(int, int, int)") // TODO because type signature isn't updated
-            setIndex(1)
-        }),
+        recipe = DeleteMethodArgument("B foo(int, int, int)", 1)
+            .doNext(DeleteMethodArgument("B foo(int, int, int)", 1)),
         before = "public class A {{ B.foo(0, 1, 2); }}",
         after = "public class A {{ B.foo(0); }}"
     )
@@ -73,10 +62,7 @@ interface DeleteMethodArgumentTest : RecipeTest {
     fun doNotDeleteEmptyContainingFormatting(jp: JavaParser) = assertUnchanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = DeleteMethodArgument().apply {
-            setMethod("B foo(..)")
-            setIndex(0)
-        },
+        recipe = DeleteMethodArgument("B foo(..)", 0),
         before = "public class A {{ B.foo( ); }}"
     )
 
@@ -84,10 +70,7 @@ interface DeleteMethodArgumentTest : RecipeTest {
     fun insertEmptyWhenLastArgumentIsDeleted(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = DeleteMethodArgument().apply {
-            setMethod("B foo(..)")
-            setIndex(0)
-        },
+        recipe = DeleteMethodArgument("B foo(..)", 0),
         before = "public class A {{ B.foo(1); }}",
         after = "public class A {{ B.foo(); }}"
     )

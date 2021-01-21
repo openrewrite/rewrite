@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -36,34 +38,15 @@ import java.util.stream.Collectors;
 import static java.util.Collections.emptyList;
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
-    private String groupId;
-    private String artifactId;
-    private String toVersion;
+    private final String groupId;
+    private final String artifactId;
+    private final String toVersion;
 
     @Nullable
-    private String metadataPattern;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new UpgradeParentVersionProcessor(groupId, artifactId, toVersion, metadataPattern);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setToVersion(String toVersion) {
-        this.toVersion = toVersion;
-    }
-
-    public void setMetadataPattern(@Nullable String metadataPattern) {
-        this.metadataPattern = metadataPattern;
-    }
+    private final String metadataPattern;
 
     @Override
     public Validated validate() {
@@ -73,14 +56,12 @@ public class UpgradeParentVersion extends Recipe {
                 .and(Semver.validate(toVersion, metadataPattern));
     }
 
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new UpgradeParentVersionProcessor(groupId, artifactId, toVersion, metadataPattern);
+    }
 
-    private static class UpgradeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
-        private final String toVersion;
-
-        @Nullable
-        private final String metadataPattern;
+    private class UpgradeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
 
         @Nullable
         private Collection<String> availableVersions;
@@ -88,10 +69,6 @@ public class UpgradeParentVersion extends Recipe {
         private VersionComparator versionComparator;
 
         public UpgradeParentVersionProcessor(String groupId, String artifactId, String toVersion, @Nullable String metadataPattern) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.toVersion = toVersion;
-            this.metadataPattern = metadataPattern;
             setCursoringOn();
         }
 
@@ -109,10 +86,7 @@ public class UpgradeParentVersion extends Recipe {
                     tag.getChildValue("version")
                             .flatMap(parentVersion -> findNewerDependencyVersion(groupId, artifactId, parentVersion))
                             .ifPresent(newer -> {
-                                ChangeParentVersion changeParentVersion = new ChangeParentVersion();
-                                changeParentVersion.setGroupId(groupId);
-                                changeParentVersion.setArtifactId(artifactId);
-                                changeParentVersion.setToVersion(newer);
+                                ChangeParentVersion changeParentVersion = new ChangeParentVersion(groupId, artifactId, newer);
                                 doAfterVisit(changeParentVersion);
                             });
                 }

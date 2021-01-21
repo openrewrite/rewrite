@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,36 +30,28 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class ChangeMethodTargetToStatic extends Recipe {
-    private String method;
-    private String targetType;
+    private final String methodPattern;
+    private final String targetType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodTargetToStaticProcessor(new MethodMatcher(method), targetType);
-    }
-
-    public void setMethod(String method) {
-        this.method = method;
-    }
-
-    public void setTargetType(String targetType) {
-        this.targetType = targetType;
+        return new ChangeMethodTargetToStaticProcessor(new MethodMatcher(methodPattern));
     }
 
     @Override
     public Validated validate() {
-        return required("method", method)
+        return required("methodPattern", methodPattern)
                 .and(required("target.type", targetType));
     }
 
-    private static class ChangeMethodTargetToStaticProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ChangeMethodTargetToStaticProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final String targetType;
 
-        public ChangeMethodTargetToStaticProcessor(MethodMatcher methodMatcher, String targetType) {
+        public ChangeMethodTargetToStaticProcessor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
-            this.targetType = targetType;
         }
 
         @Override

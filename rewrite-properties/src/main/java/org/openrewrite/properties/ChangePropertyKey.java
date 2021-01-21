@@ -15,34 +15,44 @@
  */
 package org.openrewrite.properties;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
+import org.openrewrite.properties.tree.Properties;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class ChangePropertyKey extends Recipe {
 
-    private String property;
-    private String toProperty;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyKeyProcessor<>(property, toProperty);
-    }
-
-    public void setProperty(String property) {
-        this.property = property;
-    }
-
-    public void setToProperty(String toProperty) {
-        this.toProperty = toProperty;
-    }
+    private final String property;
+    private final String toProperty;
 
     @Override
     public Validated validate() {
         return required("property", property)
                 .and(required("toProperty", toProperty));
     }
+
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangePropertyKeyProcessor<>();
+    }
+
+    public class ChangePropertyKeyProcessor<P> extends PropertiesProcessor<P> {
+
+        public ChangePropertyKeyProcessor() {
+        }
+
+        @Override
+        public Properties visitEntry(Properties.Entry entry, P p) {
+            if (entry.getKey().equals(property)) {
+                entry = entry.withKey(toProperty);
+            }
+            return super.visitEntry(entry, p);
+        }
+    }
+
 }

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -25,21 +27,16 @@ import org.openrewrite.java.tree.TypeTree;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
-    private String method;
-    private String name;
+
+    private final String method;
+    private final String name;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodNameProcessor(new MethodMatcher(method), name);
-    }
-
-    public void setMethod(String method) {
-        this.method = method;
-    }
-
-    public void setName(String name) {
-        this.name = name;
+        return new ChangeMethodNameProcessor(new MethodMatcher(method));
     }
 
     @Override
@@ -48,13 +45,11 @@ public class ChangeMethodName extends Recipe {
                 .and(required("name", name));
     }
 
-    private static class ChangeMethodNameProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ChangeMethodNameProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final String name;
 
-        private ChangeMethodNameProcessor(MethodMatcher methodMatcher, String name) {
+        private ChangeMethodNameProcessor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
-            this.name = name;
             setCursoringOn();
         }
 

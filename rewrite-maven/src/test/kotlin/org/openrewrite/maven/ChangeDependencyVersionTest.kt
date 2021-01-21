@@ -24,11 +24,7 @@ import java.nio.file.Path
 class ChangeDependencyVersionTest : RecipeTest {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
-    override val recipe = ChangeDependencyVersion().apply {
-        setGroupId("com.google.guava")
-        setArtifactId("guava")
-        setToVersion("29.0-jre")
-    }
+    override val recipe = ChangeDependencyVersion("com.google.guava", "guava", "29.0-jre")
 
     @Test
     fun fixedVersion() = assertChanged(

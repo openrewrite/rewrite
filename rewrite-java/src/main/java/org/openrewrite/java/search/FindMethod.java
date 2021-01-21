@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -51,26 +53,24 @@ import static org.openrewrite.Validated.required;
  *      my.org.MyClass *(boolean, ..)           - All method invocations where the first arg is a boolean in my.org.MyClass
  * </PRE>
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 public final class FindMethod extends Recipe {
-    private String signature;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindMethodProcessor(signature);
-    }
-
-    public void setSignature(String signature) {
-        this.signature = signature;
-    }
+    private final String methodPattern;
 
     @Override
     public Validated validate() {
-        return required("signature", signature);
+        return required("methodPattern", methodPattern);
     }
 
-    public static Set<J.MethodInvocation> find(J j, String clazz) {
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new FindMethodProcessor(methodPattern);
+    }
+
+    public static Set<J.MethodInvocation> find(J j, String methodPattern) {
         //noinspection ConstantConditions
-        return new FindMethodProcessor(clazz)
+        return new FindMethodProcessor(methodPattern)
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }

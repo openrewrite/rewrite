@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,16 +30,14 @@ import java.util.Set;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class FindField extends Recipe {
-    private String fullyQualifiedName;
+    private final String fullyQualifiedName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindFieldsProcessor(fullyQualifiedName);
-    }
-
-    public void setFullyQualifiedName(String fullyQualifiedName) {
-        this.fullyQualifiedName = fullyQualifiedName;
+        return new FindFieldsProcessor();
     }
 
     @Override
@@ -47,17 +47,12 @@ public class FindField extends Recipe {
 
     public static Set<J.VariableDecls> find(J j, String clazz) {
         //noinspection ConstantConditions
-        return new FindFieldsProcessor(clazz)
+        return ((FindFieldsProcessor) new FindField(clazz).getProcessor())
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static final class FindFieldsProcessor extends JavaIsoProcessor<ExecutionContext> {
-        private final String fullyQualifiedName;
-
-        public FindFieldsProcessor(String fullyQualifiedName) {
-            this.fullyQualifiedName = fullyQualifiedName;
-        }
+    private final class FindFieldsProcessor extends JavaIsoProcessor<ExecutionContext> {
 
         @Override
         public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {

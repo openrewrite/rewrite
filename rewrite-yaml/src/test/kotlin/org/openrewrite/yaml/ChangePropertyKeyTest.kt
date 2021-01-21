@@ -21,10 +21,8 @@ import org.openrewrite.RecipeTest
 class ChangePropertyKeyTest : RecipeTest {
     override val parser = YamlParser()
 
-    private val changeProp = ChangePropertyKey().apply {
-        setProperty("management.metrics.binders.files.enabled")
-        setToProperty("management.metrics.enable.process.files")
-    }
+    private val changeProp = ChangePropertyKey("management.metrics.binders.files.enabled",
+        "management.metrics.enable.process.files")
 
     @Test
     fun singleEntry() = assertChanged(

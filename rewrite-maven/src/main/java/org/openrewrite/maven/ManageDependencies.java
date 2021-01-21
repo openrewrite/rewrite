@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -47,56 +49,46 @@ import static org.openrewrite.Validated.required;
  * align-able to the same version (either the version provided to this visitor or the maximum matching
  * version if none is provided).
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class ManageDependencies extends Recipe {
-    private Pattern groupPattern;
+
+    private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
+
+    private final String groupPattern;
 
     @Nullable
-    private Pattern artifactPattern;
+    private final String artifactPattern;
 
     @Nullable
-    private String version;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ManageDependenciesProcessor(groupPattern, artifactPattern, version);
-    }
-
-    public void setGroupPattern(@Nullable String groupPattern) {
-        this.groupPattern = groupPattern == null ?
-                null :
-                Pattern.compile(groupPattern.replace("*", ".*"));
-    }
-
-    public void setArtifactPattern(@Nullable String artifactPattern) {
-        this.artifactPattern = artifactPattern == null ?
-                null :
-                Pattern.compile(artifactPattern.replace("*", ".*"));
-    }
-
-    public void setVersion(@Nullable String version) {
-        this.version = version;
-    }
+    private final String version;
 
     @Override
     public Validated validate() {
         return required("groupPattern", groupPattern);
     }
 
-    private static class ManageDependenciesProcessor extends MavenProcessor<ExecutionContext> {
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ManageDependenciesProcessor(
+                groupPattern == null ? null : Pattern.compile(groupPattern.replace("*", ".*")),
+                artifactPattern == null ? null : Pattern.compile(artifactPattern.replace("*", ".*"))
+        );
+    }
+
+    private class ManageDependenciesProcessor extends MavenProcessor<ExecutionContext> {
+
+        @Nullable
         private final Pattern groupPattern;
 
         @Nullable
         private final Pattern artifactPattern;
 
-        @Nullable
-        private final String version;
-
         private String selectedVersion;
 
-        private ManageDependenciesProcessor(Pattern groupPattern, @Nullable Pattern artifactPattern, @Nullable String version) {
+        private ManageDependenciesProcessor(Pattern groupPattern, @Nullable Pattern artifactPattern) {
             this.groupPattern = groupPattern;
             this.artifactPattern = artifactPattern;
-            this.version = version;
             setCursoringOn();
         }
 
@@ -161,8 +153,7 @@ public class ManageDependencies extends Recipe {
                             .orElse(model.getArtifactId())).matches());
         }
 
-        private static class InsertDependencyInOrder extends MavenProcessor<ExecutionContext> {
-            private static final XPathMatcher MANAGED_DEPENDENCIES_MATCHER = new XPathMatcher("/project/dependencyManagement/dependencies");
+        private class InsertDependencyInOrder extends MavenProcessor<ExecutionContext> {
 
             private final String groupId;
             private final String artifactId;

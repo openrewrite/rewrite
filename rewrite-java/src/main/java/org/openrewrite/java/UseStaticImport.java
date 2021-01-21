@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -24,21 +26,20 @@ import org.openrewrite.java.tree.JavaType;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
-    private MethodMatcher methodMatcher;
+
+    private final String methodPattern;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new UseStaticImportProcessor(methodMatcher);
-    }
-
-    public void setMethod(String method) {
-        this.methodMatcher = new MethodMatcher(method);
+        return new UseStaticImportProcessor(new MethodMatcher(methodPattern));
     }
 
     @Override
     public Validated validate() {
-        return required("method", methodMatcher);
+        return required("methodPattern", methodPattern);
     }
 
     private static class UseStaticImportProcessor extends JavaIsoProcessor<ExecutionContext> {

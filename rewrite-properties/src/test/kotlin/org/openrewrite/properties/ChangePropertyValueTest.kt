@@ -20,10 +20,8 @@ import org.openrewrite.RecipeTest
 
 class ChangePropertyValueTest : RecipeTest {
 
-    override val recipe = ChangePropertyValue().apply {
-        setKey("management.metrics.binders.files.enabled")
-        setToValue("false")
-    }
+    override val recipe = ChangePropertyValue("management.metrics.binders.files.enabled",
+        "false")
 
     @Test
     fun changeValue() = assertChanged(

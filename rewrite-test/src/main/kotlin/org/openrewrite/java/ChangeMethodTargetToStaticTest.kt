@@ -37,16 +37,8 @@ interface ChangeMethodTargetToStaticTest : RecipeTest {
                     }
                 """
         ),
-        recipe = ChangeMethodTargetToStatic()
-            .apply {
-                setMethod("a.A nonStatic()")
-                setTargetType("b.B")
-            }.doNext(ChangeMethodName()
-                .apply {
-                    setMethod("b.B nonStatic()")
-                    name = "foo"
-                }
-            ),
+        recipe = ChangeMethodTargetToStatic("a.A nonStatic()", "b.B")
+            .doNext(ChangeMethodName("b.B nonStatic()", "foo")),
         before = """
             import a.*;
             class C {
@@ -83,10 +75,7 @@ interface ChangeMethodTargetToStaticTest : RecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToStatic().apply {
-            setMethod("a.A foo()")
-            setTargetType("b.B")
-        },
+        recipe = ChangeMethodTargetToStatic("a.A foo()","b.B"),
         before = """
             import static a.A.*;
             class C {

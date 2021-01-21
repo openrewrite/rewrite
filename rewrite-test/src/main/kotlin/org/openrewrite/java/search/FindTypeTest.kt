@@ -23,7 +23,7 @@ import org.openrewrite.marker.SearchResult
 
 interface FindTypeTest : RecipeTest {
     override val recipe: FindType
-        get() = FindType().apply { setClass("a.A1") }
+        get() = FindType("a.A1")
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
@@ -62,7 +62,7 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.apply { setClass("A1") },
+        recipe = FindType("A1"),
         before = "@A1 public class B {}",
         after = "@~~>A1 public class B {}",
         dependsOn = arrayOf("public @interface A1 {}")
@@ -89,7 +89,7 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.doNext(FindType().apply { setClass("I1") }),
+        recipe = recipe.doNext(FindType("I1")),
         before = """
             import a.A1;
             public class B extends A1 implements I1 {}

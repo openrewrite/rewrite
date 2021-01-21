@@ -15,6 +15,10 @@
  */
 package org.openrewrite.maven;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -24,22 +28,24 @@ import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
-    private String key;
-    private String toValue;
+    private final String key;
+    private final String toValue;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyValueProcessor(key, toValue);
+        return new ChangePropertyValueProcessor();
     }
 
-    public void setKey(String key) {
+    @JsonCreator
+    public ChangePropertyValue(@JsonProperty("key") String key, @JsonProperty("toValue") String toValue) {
+        //Customizing lombok constructor to replace the property markers.
         this.key = key.replace("${", "").replace("}", "");
-    }
-
-    public void setToValue(String toValue) {
         this.toValue = toValue;
     }
+
 
     @Override
     public Validated validate() {
@@ -47,13 +53,9 @@ public class ChangePropertyValue extends Recipe {
                 .and(required("toValue", toValue));
     }
 
-    private static class ChangePropertyValueProcessor extends MavenProcessor<ExecutionContext> {
-        private final String key;
-        private final String toValue;
+    private class ChangePropertyValueProcessor extends MavenProcessor<ExecutionContext> {
 
-        public ChangePropertyValueProcessor(String key, String toValue) {
-            this.key = key;
-            this.toValue = toValue;
+        public ChangePropertyValueProcessor() {
             setCursoringOn();
         }
 

@@ -15,6 +15,9 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -30,43 +33,35 @@ import java.util.List;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
 public class ReorderMethodArguments extends Recipe {
-    private MethodMatcher methodMatcher;
-    private String[] order;
+    private final String methodPattern;
+    private final String[] order;
     private String[] originalOrder = new String[0];
 
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ReorderMethodArgumentsProcessor(methodMatcher, order, originalOrder);
-    }
-
-    public void setMethod(String method) {
-        this.methodMatcher = new MethodMatcher(method);
-    }
-
-    public void setOrder(String... order) {
+    public ReorderMethodArguments(String methodPattern, String[] order) {
+        this.methodPattern = methodPattern;
         this.order = order;
     }
 
-    public void setOriginalOrder(String... originalOrder) {
-        this.originalOrder = originalOrder;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ReorderMethodArgumentsProcessor(new MethodMatcher(methodPattern));
     }
 
     @Override
     public Validated validate() {
-        return required("method", methodMatcher)
+        return required("methodPattern", methodPattern)
                 .and(required("order", order));
     }
 
-    private static class ReorderMethodArgumentsProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ReorderMethodArgumentsProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final String[] order;
-        private final String[] originalOrder;
 
-        private ReorderMethodArgumentsProcessor(MethodMatcher methodMatcher, String[] order, String[] originalOrder) {
+        private ReorderMethodArgumentsProcessor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
-            this.order = order;
-            this.originalOrder = originalOrder;
         }
 
         @Override

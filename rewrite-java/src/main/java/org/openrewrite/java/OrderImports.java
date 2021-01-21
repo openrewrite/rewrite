@@ -15,6 +15,10 @@
  */
 package org.openrewrite.java;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -30,27 +34,23 @@ import java.util.*;
  * If a style has not been defined, this recipe will use the default import layout style that is modelled after
  * IntelliJ's default import settings.
  *
- * The @{link {@link OrderImports#setRemoveUnused}} flag (which is defaulted to true) can be used to also remove any
+ * The @{link {@link OrderImports#removeUnused}} flag (which is defaulted to true) can be used to also remove any
  * imports that are not referenced within the compilation unit.
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
+@AllArgsConstructor
+@NoArgsConstructor
 public class OrderImports extends Recipe {
+
     private boolean removeUnused = true;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new OrderImportsProcessor(removeUnused);
+        return new OrderImportsProcessor();
     }
 
-    public void setRemoveUnused(boolean removeUnused) {
-        this.removeUnused = removeUnused;
-    }
-
-    private static class OrderImportsProcessor extends JavaIsoProcessor<ExecutionContext> {
-        private final boolean removeUnused;
-
-        private OrderImportsProcessor(boolean removeUnused) {
-            this.removeUnused = removeUnused;
-        }
+    private class OrderImportsProcessor extends JavaIsoProcessor<ExecutionContext> {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {

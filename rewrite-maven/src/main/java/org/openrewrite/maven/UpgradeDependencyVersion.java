@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -43,47 +45,26 @@ import static org.openrewrite.Validated.required;
  * <a href="https://github.com/npm/node-semver#advanced-range-syntax">advanced range selectors</a>, allowing
  * more precise control over version updates to patch or minor releases.
  */
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
-    private String groupId;
+    private final String groupId;
 
     @Nullable
-    private String artifactId;
+    private final String artifactId;
 
     /**
      * Node Semver range syntax.
      */
-    private String toVersion;
-
-    @Nullable
-    private String metadataPattern;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new UpgradeDependencyVersionProcessor(groupId, artifactId, toVersion, metadataPattern);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(@Nullable String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setToVersion(String toVersion) {
-        this.toVersion = toVersion;
-    }
+    private final String toVersion;
 
     /**
-     * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
-     * We can pair a {@link HyphenRange} of "25-29" with a metadata pattern of "-jre" to select
+     * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
+     * The {@link HyphenRange} of "25-29" can be paired with a metadata pattern of "-jre" to select
      * Guava 29.0-jre
-     *
-     * @param metadataPattern The metadata pattern extending semver selection.
      */
-    public void setMetadataPattern(@Nullable String metadataPattern) {
-        this.metadataPattern = metadataPattern;
-    }
+    @Nullable
+    private final String metadataPattern;
 
     @Override
     public Validated validate() {
@@ -92,31 +73,20 @@ public class UpgradeDependencyVersion extends Recipe {
                 .and(Semver.validate(toVersion, metadataPattern));
     }
 
-    private static class UpgradeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new UpgradeDependencyVersionProcessor();
+    }
 
-        @Nullable
-        private final String artifactId;
 
-        /**
-         * Node Semver range syntax.
-         */
-        private final String toVersion;
-
-        @Nullable
-        private final String metadataPattern;
+    private class UpgradeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
 
         @Nullable
         private Collection<String> availableVersions;
 
         private VersionComparator versionComparator;
 
-        public UpgradeDependencyVersionProcessor(String groupId,  @Nullable String artifactId,
-                                                 String toVersion, @Nullable String metadataPattern) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.toVersion = toVersion;
-            this.metadataPattern = metadataPattern;
+        public UpgradeDependencyVersionProcessor() {
             setCursoringOn();
         }
 
@@ -137,10 +107,7 @@ public class UpgradeDependencyVersion extends Recipe {
             for (Pom.Dependency dependency : model.getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
                     findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
-                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                        changeDependencyVersion.setGroupId(groupId);
-                        changeDependencyVersion.setArtifactId(dependency.getArtifactId());
-                        changeDependencyVersion.setToVersion(newer);
+                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
                         doAfterVisit(changeDependencyVersion);
                     });
                 }
@@ -149,10 +116,7 @@ public class UpgradeDependencyVersion extends Recipe {
             for (DependencyManagementDependency dependency : model.getDependencyManagement().getDependencies()) {
                 if (dependency.getGroupId().equals(groupId) && (artifactId == null || dependency.getArtifactId().equals(artifactId))) {
                     findNewerDependencyVersion(groupId, dependency.getArtifactId(), dependency.getVersion()).ifPresent(newer -> {
-                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion();
-                        changeDependencyVersion.setGroupId(groupId);
-                        changeDependencyVersion.setArtifactId(dependency.getArtifactId());
-                        changeDependencyVersion.setToVersion(newer);
+                        ChangeDependencyVersion changeDependencyVersion = new ChangeDependencyVersion(groupId, dependency.getArtifactId(), newer);
                         doAfterVisit(changeDependencyVersion);
                     });
                 }

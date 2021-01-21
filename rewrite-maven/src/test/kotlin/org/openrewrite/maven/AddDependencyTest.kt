@@ -28,12 +28,12 @@ class AddDependencyTest : RecipeTest {
     }
 
     override val recipe: AddDependency
-        get() = AddDependency().apply {
-            setGroupId("org.springframework.boot")
-            setArtifactId("spring-boot")
-            setVersion("1.5.22.RELEASE")
-            setSkipIfPresent(false)
-        }
+        get() = AddDependency(
+            "org.springframework.boot",
+            "spring-boot",
+            "1.5.22.RELEASE").apply {
+                setSkipIfPresent(false)
+            }
 
     override val parser: Parser<*>?
         get() = MavenParser.builder()
@@ -119,8 +119,11 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun addBySemver() = assertChanged(
-        recipe = recipe.apply {
-            setVersion("1.4.X")
+        recipe = AddDependency(
+            "org.springframework.boot",
+            "spring-boot",
+            "1.4.X").apply {
+            setSkipIfPresent(false)
         },
         before = """
             <project>
@@ -152,10 +155,7 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun addTestDependenciesAfterCompile() = assertChanged(
-        recipe = AddDependency().apply {
-            setGroupId("org.junit.jupiter")
-            setArtifactId("junit-jupiter-api")
-            setVersion("5.7.0")
+        recipe = AddDependency("org.junit.jupiter", "junit-jupiter-api", "5.7.0").apply {
             setScope("test")
             setSkipIfPresent(false)
         },
@@ -246,11 +246,10 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun useManagedDependency() = assertChanged(
-        recipe = AddDependency().apply {
-            setGroupId("com.fasterxml.jackson.core")
-            setArtifactId("jackson-databind")
-            setVersion("2.12.0") // will defer instead to dependency management
-        },
+        recipe = AddDependency(
+            "com.fasterxml.jackson.core",
+            "jackson-databind",
+            "2.12.0"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -298,10 +297,11 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun useRequestedVersionInUseByOtherMembersOfTheFamily() = assertChanged(
-        recipe = AddDependency().apply {
-            setGroupId("com.fasterxml.jackson.core")
-            setArtifactId("jackson-databind")
-            setVersion("2.12.0") // will be overridden by family alignment
+        recipe = AddDependency(
+            "com.fasterxml.jackson.core",
+            "jackson-databind",
+            "2.12.0"
+        ).apply {
             setFamilyPattern("com.fasterxml.jackson*")
             setSkipIfPresent(false)
         },

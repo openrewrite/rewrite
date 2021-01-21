@@ -25,10 +25,7 @@ class ChangePropertyValueTest : RecipeTest {
 
     @Test
     fun property() = assertChanged(
-        recipe = ChangePropertyValue().apply {
-            setKey("guava.version")
-            setToValue("29.0-jre")
-        },
+        recipe = ChangePropertyValue("guava.version", "29.0-jre"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

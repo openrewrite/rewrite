@@ -27,10 +27,11 @@ class UpgradeDependencyVersionTest : RecipeTest {
 
     @Test
     fun upgradeVersion() = assertChanged(
-        recipe = UpgradeDependencyVersion().apply {
-            setGroupId("org.springframework.boot")
-            setToVersion("~1.5")
-        },
+        recipe = UpgradeDependencyVersion(
+            "org.springframework.boot",
+            null,
+            "~1.5",
+            null),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -69,11 +70,11 @@ class UpgradeDependencyVersionTest : RecipeTest {
 
     @Test
     fun upgradeGuava() = assertChanged(
-        recipe = UpgradeDependencyVersion().apply {
-            setGroupId("com.google.guava")
-            setToVersion("25-28")
-            setMetadataPattern("-jre")
-        },
+        recipe = UpgradeDependencyVersion(
+            "com.google.guava",
+            null,
+            "25-28",
+            "-jre"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -160,11 +161,11 @@ class UpgradeDependencyVersionTest : RecipeTest {
         )
 
         assertChanged(
-            recipe = UpgradeDependencyVersion().apply {
-                setGroupId("com.google.guava")
-                setToVersion("25-28")
-                setMetadataPattern("-jre")
-            },
+            recipe = UpgradeDependencyVersion(
+                "com.google.guava",
+                null,
+                "25-28",
+                "-jre"),
             dependsOn = arrayOf(server.toFile()),
             before = parent.toFile(),
             after = """

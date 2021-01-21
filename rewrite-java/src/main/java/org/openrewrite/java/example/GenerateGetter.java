@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.example;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -29,16 +31,22 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
-    private String fieldName;
+
+    private static final JavaTemplate GETTER = JavaTemplate
+            .builder("" +
+                    "public #{} get#{}() {\n" +
+                    "    return #{};" +
+                    "}")
+            .build();
+
+    private final String fieldName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new GenerateGetterProcessor<>(fieldName);
-    }
-
-    public void setFieldName(String fieldName) {
-        this.fieldName = fieldName;
+        return new GenerateGetterProcessor<>();
     }
 
     @Override
@@ -46,18 +54,9 @@ public class GenerateGetter extends Recipe {
         return required("fieldName", fieldName);
     }
 
-    private static class GenerateGetterProcessor<P> extends JavaIsoProcessor<P> {
-        private static final JavaTemplate GETTER = JavaTemplate
-                .builder("" +
-                        "public #{} get#{}() {\n" +
-                        "    return #{};" +
-                        "}")
-                .build();
+    private class GenerateGetterProcessor<P> extends JavaIsoProcessor<P> {
 
-        private final String fieldName;
-
-        public GenerateGetterProcessor(String fieldName) {
-            this.fieldName = fieldName;
+        public GenerateGetterProcessor() {
             setCursoringOn();
         }
 

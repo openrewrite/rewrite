@@ -37,11 +37,7 @@ interface ChangeMethodTargetToVariableTest : RecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToVariable().apply {
-            setMethod("b.B foo()")
-            setVariable("a")
-            setVariableType("a.A")
-        },
+        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A"),
         before = """
             import a.*;
             
@@ -81,11 +77,7 @@ interface ChangeMethodTargetToVariableTest : RecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodTargetToVariable().apply {
-            setMethod("b.B foo()")
-            setVariable("a")
-            setVariableType("a.A")
-        },
+        recipe = ChangeMethodTargetToVariable("b.B foo()", "a", "a.A"),
         before = """
             import a.*;
             import static b.B.*;

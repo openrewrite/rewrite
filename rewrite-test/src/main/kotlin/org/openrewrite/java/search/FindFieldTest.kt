@@ -28,7 +28,7 @@ interface FindFieldTest : RecipeTest {
     @Test
     fun findPrivateNonInheritedField(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField().apply { setFullyQualifiedName("java.util.List") },
+        recipe = FindField("java.util.List"),
         before = """
             import java.util.*;
             public class A {
@@ -48,7 +48,7 @@ interface FindFieldTest : RecipeTest {
     @Test
     fun findArrayOfType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField().apply { setFullyQualifiedName("java.lang.String") },
+        recipe = FindField("java.lang.String"),
         before = """
             import java.util.*;
             public class A {
@@ -66,7 +66,7 @@ interface FindFieldTest : RecipeTest {
     @Test
     fun skipsMultiCatches(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField().apply { setFullyQualifiedName("java.io.File") },
+        recipe = FindField("java.io.File"),
         before = """
             import java.io.*;
             public class A {

@@ -21,10 +21,7 @@ import org.openrewrite.RecipeTest
 
 class ExcludeDependencyTest : RecipeTest {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
-    override val recipe = ExcludeDependency().apply {
-        setGroupId("org.junit.vintage")
-        setArtifactId("junit-vintage-engine")
-    }
+    override val recipe = ExcludeDependency("org.junit.vintage","junit-vintage-engine")
 
     @Test
     fun excludeJUnitVintageEngineSpringBoot2_3() = assertChanged(
@@ -112,12 +109,13 @@ class ExcludeDependencyTest : RecipeTest {
     @Issue("#92")
     @Test
     fun playsNiceWithAddDependency() = assertChanged(
-        recipe = recipe.doNext(AddDependency().apply {
-            setGroupId("org.junit.jupiter")
-            setArtifactId("junit-jupiter-engine")
-            setVersion("5.3.0")
-            setScope("test")
-        }),
+        recipe = recipe.doNext(
+            AddDependency(
+                "org.junit.jupiter",
+                "junit-jupiter-engine",
+                "5.3.0"
+            ).apply { setScope("test") }
+        ),
         before = """
             <project>
                 <groupId>org.openrewrite.example</groupId>

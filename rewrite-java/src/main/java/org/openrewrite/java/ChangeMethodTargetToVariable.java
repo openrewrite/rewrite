@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,43 +30,31 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToVariable extends Recipe {
-    private MethodMatcher methodMatcher;
-    private String variable;
-    private JavaType.Class variableType;
+    private final String methodPattern;
+    private final String variable;
+    private final String variableType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodTargetToVariableProcessor(methodMatcher, variable, variableType);
-    }
-
-    public void setMethod(String method) {
-        this.methodMatcher = new MethodMatcher(method);
-    }
-
-    public void setVariable(String variable) {
-        this.variable = variable;
-    }
-
-    public void setVariableType(String variableType) {
-        this.variableType = JavaType.Class.build(variableType);
+        return new ChangeMethodTargetToVariableProcessor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
     }
 
     @Override
     public Validated validate() {
-        return required("method", methodMatcher)
+        return required("methodPattern", methodPattern)
                 .and(required("variable", variable))
-                .and(required("variableType", variableType.getFullyQualifiedName()));
+                .and(required("variableType", variableType));
     }
 
-    private static class ChangeMethodTargetToVariableProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ChangeMethodTargetToVariableProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final String variable;
         private final JavaType.Class variableType;
 
-        private ChangeMethodTargetToVariableProcessor(MethodMatcher methodMatcher, String variable, JavaType.Class variableType) {
+        private ChangeMethodTargetToVariableProcessor(MethodMatcher methodMatcher, JavaType.Class variableType) {
             this.methodMatcher = methodMatcher;
-            this.variable = variable;
             this.variableType = variableType;
         }
 
@@ -76,7 +66,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
                 if (m.getType() != null) {
                     Set<Flag> flags = new LinkedHashSet<>(m.getType().getFlags());
                     flags.remove(Flag.Static);
-                    methodType = m.getType().withDeclaringType(variableType).withFlags(flags);
+                    methodType = m.getType().withDeclaringType(this.variableType).withFlags(flags);
                 }
 
                 m = m.withSelect(
@@ -86,7 +76,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
                                         m.getSelect().getElem().getPrefix(),
                                 Markers.EMPTY,
                                 variable,
-                                variableType),
+                                this.variableType),
                                 Space.EMPTY
                         )
                 ).withType(methodType);

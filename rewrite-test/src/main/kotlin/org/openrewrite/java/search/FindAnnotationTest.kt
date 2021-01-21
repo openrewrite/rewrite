@@ -38,7 +38,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesSimpleFullyQualifiedAnnotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("@java.lang.Deprecated") },
+        recipe = FindAnnotation("@java.lang.Deprecated"),
         before = "@Deprecated public class A {}",
         after = "~~>@Deprecated public class A {}"
     )
@@ -46,7 +46,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesAnnotationOnMethod(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("@java.lang.Deprecated") },
+        recipe = FindAnnotation("@java.lang.Deprecated"),
         before = """
             public class A {
                 @Deprecated
@@ -64,7 +64,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesAnnotationOnField(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("@java.lang.Deprecated") },
+        recipe = FindAnnotation("@java.lang.Deprecated"),
         before = """
             public class A {
                 @Deprecated String s;
@@ -80,14 +80,14 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchNotFullyQualifiedAnnotations(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("@Deprecated") },
+        recipe = FindAnnotation("@Deprecated"),
         before = "@Deprecated public class A {}"
     )
 
     @Test
     fun matchesSingleAnnotationParameter(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("""@java.lang.SuppressWarnings("deprecation")""") },
+        recipe = FindAnnotation("""@java.lang.SuppressWarnings("deprecation")"""),
         before = "@SuppressWarnings(\"deprecation\") public class A {}",
         after = "~~>@SuppressWarnings(\"deprecation\") public class A {}"
     )
@@ -95,14 +95,14 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchDifferentSingleAnnotationParameter(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("""@java.lang.SuppressWarnings("foo")""") },
+        recipe = FindAnnotation("""@java.lang.SuppressWarnings("foo")"""),
         before = "@SuppressWarnings(\"deprecation\") public class A {}"
     )
 
     @Test
     fun matchesNamedParameters(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("""@com.netflix.foo.Foo(bar="quux",baz="bar")""") },
+        recipe = FindAnnotation("""@com.netflix.foo.Foo(bar="quux",baz="bar")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -119,7 +119,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchDifferentNamedParameters(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("""@com.netflix.foo.Foo(bar="qux",baz="baz")""") },
+        recipe = FindAnnotation("""@com.netflix.foo.Foo(bar="qux",baz="baz")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -131,7 +131,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesNamedParametersRegardlessOfOrder(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation().apply { setSignature("""@com.netflix.foo.Foo(baz="bar",bar="quux")""") },
+        recipe = FindAnnotation("""@com.netflix.foo.Foo(baz="bar",bar="quux")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
