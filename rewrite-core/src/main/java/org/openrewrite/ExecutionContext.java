@@ -24,6 +24,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
+/**
+ * Passes messages between individual TreeProcessor / Recipes in the chain
+ * controls execution and lifecycle by providing a ForkJoinPool and max number of cycles
+ */
 public final class ExecutionContext {
     private volatile boolean needAnotherCycle = false;
 
@@ -69,6 +73,9 @@ public final class ExecutionContext {
         return needAnotherCycle;
     }
 
+    /**
+     * Break the {@link org.openrewrite.Recipe} execution cycle for the current visitor
+     */
     void nextCycle() {
         needAnotherCycle = false;
     }

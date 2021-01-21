@@ -27,6 +27,19 @@ import static java.util.Collections.*;
 import static java.util.stream.Collectors.toMap;
 import static java.util.stream.Collectors.toSet;
 
+/**
+ * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link #run(List<SourceFile>)} method which will
+ * apply each recipes {@link TreeProcessor processor} visit method to a list of {@link SourceFile sourceFiles}
+ *
+ * Requires a name, {@link TreeProcessor processor}.
+ * Optionally a subsequent Recipe can be linked via {@link #doNext(Recipe)}}
+ *
+ * An {@link ExecutionContext} controls parallel execution and lifecycle while providing a message bus
+ * for sharing state between recipes and their processors
+ *
+ * returns a list of {@link Result results} for each modified {@link SourceFile}
+ *
+ */
 public class Recipe {
 
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
@@ -50,6 +63,11 @@ public class Recipe {
         this(null);
     }
 
+    /**
+     * Append the provided {@link Recipe} to the last recipe in the doNext chain
+     * @param recipe
+     * @return
+     */
     public Recipe doNext(Recipe recipe) {
         Recipe tail = this;
         //noinspection StatementWithEmptyBody
