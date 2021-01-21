@@ -21,12 +21,8 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
-import io.vavr.Function0;
 import io.vavr.Function1;
-import okhttp3.ConnectionSpec;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -46,9 +42,12 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public class MavenDownloader {
     private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
@@ -69,12 +68,17 @@ public class MavenDownloader {
             mavenDownloaderRetry,
             (request) -> httpClient.newCall(request).execute());
 
-    private static final Function1<String, Response> sendHeadFallbackToGet = Retry.decorateCheckedFunction(
+    /**
+     * Sends the request as provided, if it fails fall back to sending the same request but with the HTTP Method
+     * set to GET.
+     * Intended to be used with HEAD requests that may fail due to bugs/misconfiguration of the remote server
+     */
+    private static final Function1<Request, Response> sendRequestFallbackToGet = Retry.decorateCheckedFunction(
             mavenDownloaderRetry,
-            (String url) ->  httpClient.newCall(new Request.Builder().url(url).head().build()).execute()
-    ).recover((throwable) -> (String url) -> {
+            (Request request) ->  httpClient.newCall(request).execute()
+    ).recover((throwable) -> (Request request) -> {
         try {
-            return httpClient.newCall(new Request.Builder().url(url).get().build()).execute();
+            return httpClient.newCall( new Request.Builder(request).get().build()).execute();
         } catch (IOException e) {
             return null;
         }
@@ -88,6 +92,7 @@ public class MavenDownloader {
     private final Map<Path, RawMaven> projectPoms;
     @Nullable
     private final MavenSettings settings;
+    private final Map<String, MavenSettings.Server> serverIdToServer;
 
     /**
      * Any visitor constructing a MavenDownloader should provide the MavenSettings from {@link Maven#getSettings()}.
@@ -98,6 +103,13 @@ public class MavenDownloader {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
         this.settings = settings;
+        if(settings == null || settings.getServers() == null) {
+            serverIdToServer = new HashMap<>();
+        } else {
+            serverIdToServer = settings.getServers().getServers()
+                    .stream()
+                    .collect(toMap(MavenSettings.Server::getId, Function.identity()));
+        }
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
@@ -157,8 +169,8 @@ public class MavenDownloader {
                 (version == null ? "" : version + '/') +
                 "maven-metadata.xml";
 
-        Request request = new Request.Builder().url(uri).get().build();
-        try (Response response =  sendRequest.apply(request)) {
+        Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+        try (Response response = sendRequest.apply(request.build())) {
             if (response.isSuccessful() && response.body() != null) {
                 @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                         .bytes();
@@ -249,8 +261,8 @@ public class MavenDownloader {
                                             version + '/' +
                                             artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-                                    Request request = new Request.Builder().url(uri).get().build();
-                                    try (Response response = sendRequest.apply(request)) {
+                                    Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+                                    try (Response response = sendRequest.apply(request.build())) {
                                         if (response.isSuccessful() && response.body() != null) {
                                             @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                                     .bytes();
@@ -324,7 +336,8 @@ public class MavenDownloader {
         try {
             result = mavenCache.computeRepository(repoWithMirrors, () -> {
                 String url = repoWithMirrors.getUrl();
-                try (Response response = sendHeadFallbackToGet.apply(url)) {
+                Request.Builder request = applyAuthentication(repository, new Request.Builder().url(url).get());
+                try (Response response = sendRequestFallbackToGet.apply(request.build())) {
                     if (url.toLowerCase().contains("http://")) {
                         return normalizeRepository(
                                 new RawRepositories.Repository(
@@ -358,5 +371,14 @@ public class MavenDownloader {
         } else {
             return settings.applyMirrors(repository);
         }
+    }
+
+    private Request.Builder applyAuthentication(RawRepositories.Repository repository, Request.Builder request) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if(authInfo != null) {
+            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
+            request.header("Authentication", credentials);
+        }
+        return request;
     }
 }
