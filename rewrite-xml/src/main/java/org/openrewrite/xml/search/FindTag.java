@@ -16,6 +16,7 @@
 package org.openrewrite.xml.search;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,18 +29,19 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.Set;
 
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class FindTag extends Recipe {
 
-    private final String xPath;
+    private final String path;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindTagProcessor(new XPathMatcher(xPath));
+        return new FindTagProcessor(new XPathMatcher(path));
     }
 
-    public static Set<Xml.Tag> find(Xml x, String xpath) {
+    public static Set<Xml.Tag> find(Xml x, String path) {
         //noinspection ConstantConditions
-        return new FindTagProcessor(new XPathMatcher(xpath)).visit(x, ExecutionContext.builder().build())
+        return new FindTagProcessor(new XPathMatcher(path)).visit(x, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
