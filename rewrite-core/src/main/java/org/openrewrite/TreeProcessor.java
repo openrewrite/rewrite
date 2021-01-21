@@ -23,11 +23,14 @@ import java.util.List;
 import java.util.function.BiFunction;
 
 /**
+ * Abstract {@link TreeVisitor} for processing {@link Tree elements}
+ *
  * Always returns input type T
  * provides Parameterizable P input which is mutable allowing context to be shared
  *
- * postProcessing via afterVisit.  Expectiation is that after TreeProcessors are invoked immediately after visiting SourceFile
- * (modify imports) and then discarded.  Allows for conditionally chaining other things
+ * postProcessing via afterVisit for conditionally chaining other operations with the expectation is that after
+ * TreeProcessors are invoked immediately after visiting SourceFile
+ *
  * @param <T>
  * @param <P>
  */
@@ -59,7 +62,6 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         afterVisit.get().add((TreeProcessor<T, P>) visitor.getProcessor().get());
     }
 
-    // ephemeral do once after visit
     protected List<TreeProcessor<T, P>> getAfterVisit() {
         return afterVisit.get();
     }

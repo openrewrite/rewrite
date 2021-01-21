@@ -26,8 +26,7 @@ import java.util.function.Consumer;
 
 /**
  * Passes messages between individual TreeProcessor / Recipes in the chain
- * controls execution and lifecycle
- * receiver of messages has responsibility for clearing state
+ * controls execution and lifecycle by providing a ForkJoinPool and max number of cycles
  */
 public final class ExecutionContext {
     private volatile boolean needAnotherCycle = false;
