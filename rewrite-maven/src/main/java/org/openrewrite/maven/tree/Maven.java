@@ -21,7 +21,6 @@ import org.openrewrite.Metadata;
 import org.openrewrite.SourceVisitor;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.MavenSourceVisitor;
-import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.xml.XmlSourceVisitor;
 import org.openrewrite.xml.tree.Xml;
 
