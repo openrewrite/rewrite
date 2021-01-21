@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -34,28 +35,14 @@ import static org.openrewrite.Validated.required;
  * it were prefixed like `this.a`, or `MyClass.this.a`, or indirectly via a separate method call like `getA()` where `getA()`
  * is defined on the super class.
  */
+@Data
 public class ChangeType extends Recipe {
-    private String type;
-    private JavaType targetType;
+    private final String type;
+    private final String targetType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeTypeProcessor(type, targetType);
-    }
-
-    public void setType(String type) {
-        this.type = type;
-    }
-
-    public void setTargetType(String targetType) {
-        this.targetType = JavaType.Primitive.fromKeyword(targetType);
-        if (this.targetType == null) {
-            this.targetType = JavaType.Class.build(targetType);
-        }
-    }
-
-    public void setTargetType(JavaType.Class targetType) {
-        this.targetType = targetType;
+        return new ChangeTypeProcessor(targetType);
     }
 
     @Override
@@ -64,13 +51,14 @@ public class ChangeType extends Recipe {
                 .and(required("targetType", targetType));
     }
 
-    private static class ChangeTypeProcessor extends JavaProcessor<ExecutionContext> {
-        private final String type;
-        private final JavaType targetType;
+    private class ChangeTypeProcessor extends JavaProcessor<ExecutionContext> {
+        private JavaType targetType;
 
-        private ChangeTypeProcessor(String type, JavaType targetType) {
-            this.type = type;
-            this.targetType = targetType;
+        private ChangeTypeProcessor(String targetType) {
+            this.targetType = JavaType.Primitive.fromKeyword(targetType);
+            if (this.targetType == null) {
+                this.targetType = JavaType.Class.build(targetType);
+            }
         }
 
         @Override

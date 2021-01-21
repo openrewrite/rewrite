@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -29,31 +30,20 @@ import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class ChangeDependencyScope extends Recipe {
-    private String groupId;
-    private String artifactId;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeDependencyScopeProcessor(groupId, artifactId, toScope);
-    }
+    private final String groupId;
+    private final String artifactId;
 
     /**
      * If null, strips the scope from an existing dependency.
      */
     @Nullable
-    private String toScope;
+    private final String toScope;
 
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setToScope(@Nullable String toScope) {
-        this.toScope = toScope;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangeDependencyScopeProcessor();
     }
 
     @Override
@@ -62,17 +52,9 @@ public class ChangeDependencyScope extends Recipe {
                 .and(required("artifactId", artifactId));
     }
 
-    private static class ChangeDependencyScopeProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
+    private class ChangeDependencyScopeProcessor extends MavenProcessor<ExecutionContext> {
 
-        @Nullable
-        private final String toScope;
-
-        private ChangeDependencyScopeProcessor(String groupId, String artifactId, @Nullable String toScope) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.toScope = toScope;
+        private ChangeDependencyScopeProcessor() {
             setCursoringOn();
         }
 

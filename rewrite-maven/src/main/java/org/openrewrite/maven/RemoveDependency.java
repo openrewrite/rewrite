@@ -15,9 +15,11 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
+import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.RemoveContentProcessor;
@@ -26,31 +28,26 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.Validated.required;
 
+@Data
 public class RemoveDependency extends Recipe {
-    private String groupId;
-    private String artifactId;
+    private final String groupId;
+    private final String artifactId;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new RemoveDependencyProcessor(groupId, artifactId);
+        return new RemoveDependencyProcessor();
     }
 
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
+    @Override
+    public Validated validate() {
+        return required("groupId", groupId).and(required("artifactId", artifactId));
     }
 
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
+    private class RemoveDependencyProcessor extends MavenProcessor<ExecutionContext> {
 
-    private static class RemoveDependencyProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
-
-        public RemoveDependencyProcessor(String groupId, String artifactId) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
+        public RemoveDependencyProcessor() {
             setCursoringOn();
         }
 

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;

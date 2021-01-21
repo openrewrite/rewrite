@@ -36,10 +36,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B singleArg(String)")
-            name = "bar"
-        },
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar"),
         before = """
             package com.abc;
             class A {
@@ -62,10 +59,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeMethodNameForMethodWithSingleArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B singleArg(String)")
-            name = "bar"
-        },
+        recipe = ChangeMethodName("com.abc.B singleArg(String)", "bar"),
         before = """
             package com.abc;
             class A {
@@ -88,10 +82,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeMethodNameForMethodWithArrayArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B arrArg(String[])")
-            name = "bar"
-        },
+        recipe = ChangeMethodName("com.abc.B arrArg(String[])", "bar"),
         before = """
             package com.abc;
             class A {
@@ -114,10 +105,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeMethodNameForMethodWithVarargArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B varargArg(String...)")
-            name = "bar"
-        },
+        recipe = ChangeMethodName("com.abc.B varargArg(String...)", "bar"),
         before = """
             package com.abc;
             class A {
@@ -148,10 +136,7 @@ interface ChangeMethodNameTest : RecipeTest {
                 }
             """
         ),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B error()")
-            name = "foo"
-        },
+        recipe = ChangeMethodName("com.abc.B error()", "foo"),
         before = """
             package com.abc;
             class A {
@@ -174,10 +159,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeMethodDeclarationForMethodWithSingleArg(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.A foo(String)")
-            name = "bar"
-        },
+        recipe = ChangeMethodName("com.abc.A foo(String)", "bar"),
         before = """
             package com.abc;
             class A {
@@ -198,10 +180,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeStaticMethodTest(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B static1(String)")
-            name = "static2"
-        },
+        recipe = ChangeMethodName("com.abc.B static1(String)", "static2"),
         before = """
             package com.abc;
             class A {
@@ -224,10 +203,7 @@ interface ChangeMethodNameTest : RecipeTest {
     fun changeStaticImportTest(jp: JavaParser) = assertChanged(
         jp,
         dependsOn = arrayOf(b),
-        recipe = ChangeMethodName().apply {
-            setMethod("com.abc.B static1(String)")
-            name = "static2"
-        },
+        recipe = ChangeMethodName("com.abc.B static1(String)", "static2"),
         before = """
             package com.abc;
             import static com.abc.B.static1;

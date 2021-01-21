@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -32,36 +34,28 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class DeleteMethodArgument extends Recipe {
-    private MethodMatcher methodMatcher;
-    private Integer index;
+    private final String methodPattern;
+    private final Integer index;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new DeleteMethodArgumentProcessor(methodMatcher, index);
-    }
-
-    public void setMethod(String method) {
-        this.methodMatcher = new MethodMatcher(method);
-    }
-
-    public void setIndex(Integer index) {
-        this.index = index;
+        return new DeleteMethodArgumentProcessor(new MethodMatcher(methodPattern));
     }
 
     @Override
     public Validated validate() {
-        return required("method", methodMatcher)
+        return required("methodPattern", methodPattern)
                 .and(required("index", index));
     }
 
-    private static class DeleteMethodArgumentProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class DeleteMethodArgumentProcessor extends JavaIsoProcessor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
-        private final Integer index;
 
-        public DeleteMethodArgumentProcessor(MethodMatcher methodMatcher, Integer index) {
+        public DeleteMethodArgumentProcessor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
-            this.index = index;
         }
 
         @Override

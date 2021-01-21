@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -25,26 +26,18 @@ import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class ChangeParentVersion extends Recipe {
-    private String groupId;
-    private String artifactId;
-    private String toVersion;
+
+    private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
+
+    private final String groupId;
+    private final String artifactId;
+    private final String toVersion;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeParentVersionProcessor(groupId, artifactId, toVersion);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setToVersion(String toVersion) {
-        this.toVersion = toVersion;
+        return new ChangeParentVersionProcessor();
     }
 
     @Override
@@ -54,17 +47,9 @@ public class ChangeParentVersion extends Recipe {
                 .and(required("toVersion", toVersion));
     }
 
-    private static class ChangeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
-        private static final XPathMatcher PARENT_VERSION_MATCHER = new XPathMatcher("/project/parent/version");
+    private class ChangeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
 
-        private final String groupId;
-        private final String artifactId;
-        private final String toVersion;
-
-        private ChangeParentVersionProcessor(String groupId, String artifactId, String toVersion) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.toVersion = toVersion;
+        private ChangeParentVersionProcessor() {
             setCursoringOn();
         }
 

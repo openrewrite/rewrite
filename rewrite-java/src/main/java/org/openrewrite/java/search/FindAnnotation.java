@@ -16,6 +16,7 @@
 package org.openrewrite.java.search;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
@@ -37,16 +38,15 @@ import java.util.Set;
 import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.required;
 
+@Data
+@EqualsAndHashCode(callSuper = true)
 public class FindAnnotation extends Recipe {
-    private String signature;
+
+    private final String signature;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new FindAnnotationProcessor(signature);
-    }
-
-    public void setSignature(String signature) {
-        this.signature = signature;
     }
 
     @Override

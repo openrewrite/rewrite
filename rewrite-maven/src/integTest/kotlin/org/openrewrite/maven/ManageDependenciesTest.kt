@@ -32,9 +32,10 @@ class ManageDependenciesTest : RecipeTest {
 
     @Test
     fun createDependencyManagementWithDependencyWhenNoneExists() = assertChanged(
-        recipe = ManageDependencies().apply {
-            setGroupPattern("org.junit.jupiter")
-        },
+        recipe = ManageDependencies(
+            "org.junit.jupiter",
+            null,
+            null),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
@@ -77,9 +78,10 @@ class ManageDependenciesTest : RecipeTest {
 
     @Test
     fun deferToDependencyManagementWhenDependencyIsAlreadyManaged() = assertChanged(
-        recipe = ManageDependencies().apply {
-            setGroupPattern("org.junit.jupiter")
-        },
+        recipe = ManageDependencies(
+            "org.junit.jupiter",
+            null,
+            null),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>
@@ -123,11 +125,10 @@ class ManageDependenciesTest : RecipeTest {
 
     @Test
     fun updateVersionIfDifferent() = assertChanged(
-        recipe = ManageDependencies().apply {
-            setGroupPattern("org.junit.jupiter")
-            setArtifactPattern("junit-jupiter-api")
-            setVersion("10.100")
-        },
+        recipe = ManageDependencies(
+            "org.junit.jupiter",
+            "junit-jupiter-api",
+            "10.100"),
         before = """
             <project>
                 <groupId>com.mycompany.app</groupId>

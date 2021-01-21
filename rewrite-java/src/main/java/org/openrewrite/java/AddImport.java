@@ -119,8 +119,7 @@ public class AddImport<P> extends JavaIsoProcessor<P> {
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY));
         cu = cu.withImports(imports);
 
-        OrderImports orderImports = new OrderImports();
-        orderImports.setRemoveUnused(false);
+        OrderImports orderImports = new OrderImports(false);
         doAfterVisit(orderImports);
 
         return cu;

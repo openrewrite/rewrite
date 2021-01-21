@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,29 +29,18 @@ import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class ChangeDependencyVersion extends Recipe {
-    private String groupId;
+    private final String groupId;
 
     @Nullable
-    private String artifactId;
+    private final String artifactId;
 
-    private String toVersion;
+    private final String toVersion;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeDependencyVersionProcessor(groupId, artifactId, toVersion);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(@Nullable String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setToVersion(String toVersion) {
-        this.toVersion = toVersion;
+        return new ChangeDependencyVersionProcessor();
     }
 
     @Override
@@ -60,18 +50,9 @@ public class ChangeDependencyVersion extends Recipe {
                 .and(required("toVersion", toVersion));
     }
 
-    private static class ChangeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
+    private class ChangeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
 
-        @Nullable
-        private final String artifactId;
-
-        private final String toVersion;
-
-        public ChangeDependencyVersionProcessor(String groupId, @Nullable String artifactId, String toVersion) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.toVersion = toVersion;
+        public ChangeDependencyVersionProcessor() {
             setCursoringOn();
         }
 
@@ -84,9 +65,7 @@ public class ChangeDependencyVersion extends Recipe {
                     if (version != null) {
                         if (version.trim().startsWith("${") &&
                                 !toVersion.equals(model.getProperty(version.trim()))) {
-                            ChangePropertyValue changePropertyValue = new ChangePropertyValue();
-                            changePropertyValue.setKey(version);
-                            changePropertyValue.setToValue(toVersion);
+                            ChangePropertyValue changePropertyValue = new ChangePropertyValue(version, toVersion);
                             doAfterVisit(changePropertyValue);
                         } else if (!toVersion.equals(version)) {
                             doAfterVisit(new ChangeTagValueProcessor<>(versionTag.get(), toVersion));

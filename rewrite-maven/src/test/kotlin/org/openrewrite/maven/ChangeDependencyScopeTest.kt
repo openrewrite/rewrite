@@ -22,11 +22,7 @@ class ChangeDependencyScopeTest : RecipeTest {
     override val parser: MavenParser = MavenParser.builder().resolveOptional(false).build()
 
     override val recipe: ChangeDependencyScope
-        get() = ChangeDependencyScope().apply {
-            setGroupId("com.google.guava")
-            setArtifactId("guava")
-            setToScope("test")
-        }
+        get() = ChangeDependencyScope("com.google.guava", "guava", "test")
 
     @Test
     fun noScopeToScope() = assertChanged(
@@ -109,7 +105,7 @@ class ChangeDependencyScopeTest : RecipeTest {
 
     @Test
     fun scopeToNoScope() = assertChanged(
-        recipe = recipe.apply { setToScope(null) },
+        recipe = ChangeDependencyScope("com.google.guava", "guava", null),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

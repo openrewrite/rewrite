@@ -27,11 +27,10 @@ class ChangeParentVersionTest : RecipeTest {
 
     @Test
     fun fixedVersion() = assertChanged(
-        recipe = ChangeParentVersion().apply {
-            setGroupId("org.springframework.boot")
-            setArtifactId("spring-boot-starter-parent")
-            setToVersion("2.3.1.RELEASE")
-        },
+        recipe = ChangeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "2.3.1.RELEASE"),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

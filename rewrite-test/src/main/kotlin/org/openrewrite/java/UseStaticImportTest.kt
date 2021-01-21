@@ -33,7 +33,7 @@ interface UseStaticImportTest : RecipeTest {
                 }
             """
         ),
-        recipe = UseStaticImport().apply { setMethod("asserts.Assert assert*(..)") },
+        recipe = UseStaticImport("asserts.Assert assert*(..)"),
         before = """
             package test;
             
@@ -67,9 +67,7 @@ interface UseStaticImportTest : RecipeTest {
         parser = jp
             .classpath(JavaParser.dependenciesFromClasspath("junit-jupiter-api", "apiguardian-api"))
             .build(),
-        recipe = UseStaticImport().apply {
-            setMethod("org.junit.jupiter.api.Assertions assert*(..)")
-        },
+        recipe = UseStaticImport("org.junit.jupiter.api.Assertions assert*(..)"),
         before = """
             package org.openrewrite;
 

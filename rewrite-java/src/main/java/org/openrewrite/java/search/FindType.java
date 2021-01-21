@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -33,35 +34,30 @@ import static org.openrewrite.Validated.required;
 /**
  * Find places where a type is mentioned explicitly, excluding imports.
  */
+@Data
 public final class FindType extends Recipe {
-    private String clazz;
+    private final String fullyQualifiedClassName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindTypeProcessor(clazz);
-    }
-
-    public void setClass(String clazz) {
-        this.clazz = clazz;
+        return new FindTypeProcessor();
     }
 
     @Override
     public Validated validate() {
-        return required("class", clazz);
+        return required("fullyQualifiedClassName", fullyQualifiedClassName);
     }
 
-    public static Set<NameTree> find(J j, String clazz) {
+    public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
         //noinspection ConstantConditions
-        return new FindTypeProcessor(clazz)
+        return ((FindTypeProcessor) new FindType(fullyQualifiedClassName).getProcessor())
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindTypeProcessor extends JavaProcessor<ExecutionContext> {
-        private final String clazz;
+    private class FindTypeProcessor extends JavaProcessor<ExecutionContext> {
 
-        public FindTypeProcessor(String clazz) {
-            this.clazz = clazz;
+        public FindTypeProcessor() {
             setCursoringOn();
         }
 
@@ -69,7 +65,7 @@ public final class FindType extends Recipe {
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             N n = super.visitTypeName(name, ctx);
             JavaType.Class asClass = TypeUtils.asClass(n.getType());
-            if (asClass != null && asClass.getFullyQualifiedName().equals(clazz) &&
+            if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
                 return n.mark(new SearchResult());
             }

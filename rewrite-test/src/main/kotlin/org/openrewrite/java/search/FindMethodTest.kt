@@ -28,7 +28,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod().apply { setSignature("java.util.Collections emptyList()") },
+        recipe = FindMethod("java.util.Collections emptyList()") ,
         before = """
             import java.util.Collections;
             public class A {
@@ -46,7 +46,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun findStaticallyImportedMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod().apply { setSignature("java.util.Collections emptyList()") },
+        recipe = FindMethod("java.util.Collections emptyList()"),
         before = """
             import static java.util.Collections.emptyList;
             public class A {
@@ -64,7 +64,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun matchVarargs(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod().apply { setSignature("A foo(String, Object...)") },
+        recipe = FindMethod("A foo(String, Object...)"),
         before = """
             public class B {
                public void test() {
@@ -89,7 +89,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun matchOnInnerClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod().apply { setSignature("B.C foo()") },
+        recipe = FindMethod("B.C foo()"),
         before = """
             public class A {
                void test() {

@@ -29,10 +29,8 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArguments(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments().apply {
-            setMethod("a.A foo(String, Integer, Integer)")
-            setOrder("n", "m", "s")
-        }.doNext(
+        recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"))
+        .doNext(
             object : Recipe() {
                 override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
                     return object: JavaProcessor<ExecutionContext>() {
@@ -86,11 +84,7 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments().apply {
-            setMethod("a.A foo(..)")
-            setOrder("n", "s")
-            setOriginalOrder("s", "n")
-        },
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("n", "s"), arrayOf("s", "n")),
         dependsOn = arrayOf(
             """
                 package a;
@@ -123,10 +117,7 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments().apply {
-            setMethod("a.A foo(..)")
-            setOrder("s", "o", "n")
-        },
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "o", "n")),
         dependsOn = arrayOf(
             """
                 package a;
@@ -159,10 +150,7 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ReorderMethodArguments().apply {
-            setMethod("a.A foo(..)")
-            setOrder("o", "s")
-        },
+        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("o", "s")),
         dependsOn = arrayOf(
             """
                 package a;

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -29,26 +30,18 @@ import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class AddPlugin extends Recipe {
-    private String groupId;
-    private String artifactId;
-    private String version;
+
+    private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
+
+    private final String groupId;
+    private final String artifactId;
+    private final String version;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new AddPluginProcessor(groupId, artifactId, version);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setVersion(String version) {
-        this.version = version;
+        return new AddPluginProcessor();
     }
 
     @Override
@@ -58,17 +51,10 @@ public class AddPlugin extends Recipe {
                         .and(required("version", version)));
     }
 
-    private static class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
-        private static final XPathMatcher BUILD_MATCHER = new XPathMatcher("/project/build");
+    private class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
 
-        private final String groupId;
-        private final String artifactId;
-        private final String version;
 
-        public AddPluginProcessor(String groupId, String artifactId, String version) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
-            this.version = version;
+        public AddPluginProcessor() {
             setCursoringOn();
         }
 

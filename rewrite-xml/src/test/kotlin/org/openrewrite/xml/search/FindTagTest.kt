@@ -31,7 +31,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun simpleElement() = assertChanged(
             parser,
-            FindTag().apply { setXPath("/dependencies/dependency") },
+            FindTag("/dependencies/dependency"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
@@ -53,7 +53,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun wildcard() = assertChanged(
             parser,
-            FindTag().apply { setXPath("/dependencies/*") },
+            FindTag("/dependencies/*"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
@@ -75,7 +75,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun noMatch() = assertUnchanged(
             parser,
-            FindTag().apply { setXPath("/dependencies/dne") },
+            FindTag("/dependencies/dne"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>

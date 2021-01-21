@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -28,21 +29,14 @@ import java.util.Optional;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class ExcludeDependency extends Recipe {
-    private String groupId;
-    private String artifactId;
+    private final String groupId;
+    private final String artifactId;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ExcludeDependencyProcessor(groupId, artifactId);
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
+        return new ExcludeDependencyProcessor();
     }
 
     @Override
@@ -51,13 +45,9 @@ public class ExcludeDependency extends Recipe {
                 .and(required("artifactId", artifactId));
     }
 
-    private static class ExcludeDependencyProcessor extends MavenProcessor<ExecutionContext> {
-        private final String groupId;
-        private final String artifactId;
+    private class ExcludeDependencyProcessor extends MavenProcessor<ExecutionContext> {
 
-        public ExcludeDependencyProcessor(String groupId, String artifactId) {
-            this.groupId = groupId;
-            this.artifactId = artifactId;
+        public ExcludeDependencyProcessor() {
             setCursoringOn();
         }
 

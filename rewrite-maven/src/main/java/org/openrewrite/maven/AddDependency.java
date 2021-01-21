@@ -15,6 +15,8 @@
  */
 package org.openrewrite.maven;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -27,9 +29,10 @@ import java.util.regex.Pattern;
 
 import static org.openrewrite.Validated.required;
 
+@Data
 public class AddDependency extends Recipe {
-    private String groupId;
-    private String artifactId;
+    private final String groupId;
+    private final String artifactId;
 
     /**
      * When other modules exist from the same dependency family, defined as those dependencies whose
@@ -39,8 +42,13 @@ public class AddDependency extends Recipe {
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
     @Nullable
-    private String version;
+    private final String version;
 
+    /**
+     * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
+     * A {@link HyphenRange} of "25-29" can be paried with a metadata pattern of "-jre" to select
+     * Guava 29.0-jre
+     */
     @Nullable
     private String metadataPattern;
 
@@ -54,23 +62,11 @@ public class AddDependency extends Recipe {
 
     private boolean skipIfPresent = true;
 
+    /**
+     * A glob expression used to identify other dependencies in the same family as the dependency to be added.
+     */
     @Nullable
-    private Pattern familyPattern;
-
-    @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new AddDependencyProcessor<>(
-                groupId,
-                artifactId,
-                version,
-                metadataPattern,
-                releasesOnly,
-                classifier,
-                scope,
-                skipIfPresent,
-                familyPattern
-        );
-    }
+    private String familyPattern;
 
     /**
      * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
@@ -81,18 +77,6 @@ public class AddDependency extends Recipe {
      */
     public void setMetadataPattern(@Nullable String metadataPattern) {
         this.metadataPattern = metadataPattern;
-    }
-
-    public void setGroupId(String groupId) {
-        this.groupId = groupId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
-    }
-
-    public void setVersion(@Nullable String version) {
-        this.version = version;
     }
 
     public void setClassifier(@Nullable String classifier) {
@@ -116,9 +100,7 @@ public class AddDependency extends Recipe {
      *                      family as the dependency to be added.
      */
     public void setFamilyPattern(@Nullable String familyPattern) {
-        this.familyPattern = familyPattern == null ?
-                null :
-                Pattern.compile(familyPattern.replace("*", ".*"));
+        this.familyPattern = familyPattern;
     }
 
     @Override
@@ -127,5 +109,20 @@ public class AddDependency extends Recipe {
                 .and(required("artifactId", artifactId))
                 .and(required("version", version)
                         .or(Semver.validate(version, metadataPattern)));
+    }
+
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new AddDependencyProcessor<>(
+                groupId,
+                artifactId,
+                version,
+                metadataPattern,
+                releasesOnly,
+                classifier,
+                scope,
+                skipIfPresent,
+                familyPattern == null ? null : Pattern.compile(familyPattern.replace("*", ".*"))
+        );
     }
 }

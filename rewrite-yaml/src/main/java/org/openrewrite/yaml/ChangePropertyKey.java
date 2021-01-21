@@ -15,6 +15,7 @@
  */
 package org.openrewrite.yaml;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -39,44 +40,26 @@ import static org.openrewrite.Validated.required;
  * separated property names, e.g. as Spring Boot
  * interprets application.yml files.
  */
+@Data
 public class ChangePropertyKey extends Recipe {
-    private String property;
-    private String toProperty;
-    private boolean coalesce = true;
+    private final String property;
+    private final String toProperty;
+    private final boolean coalesce = true;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyKeyProcessor<>(property, toProperty, coalesce);
-    }
-
-    public void setProperty(String property) {
-        this.property = property;
-    }
-
-    public void setToProperty(String toProperty) {
-        this.toProperty = toProperty;
-    }
-
-    public void setCoalesce(boolean coalesce) {
-        this.coalesce = coalesce;
-    }
-
-    @Override
-    @NonNull
     public Validated validate() {
         return required("property", property)
                 .and(required("toProperty", toProperty));
     }
 
-    private static class ChangePropertyKeyProcessor<P> extends YamlProcessor<P> {
-        private final String property;
-        private final String toProperty;
-        private final boolean coalesce;
+    @Override
+    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+        return new ChangePropertyKeyProcessor<>();
+    }
 
-        public ChangePropertyKeyProcessor(String property, String toProperty, boolean coalesce) {
-            this.property = property;
-            this.toProperty = toProperty;
-            this.coalesce = coalesce;
+    private class ChangePropertyKeyProcessor<P> extends YamlProcessor<P> {
+
+        public ChangePropertyKeyProcessor() {
             setCursoringOn();
         }
 
@@ -89,12 +72,12 @@ public class ChangePropertyKey extends Recipe {
                     .map(Yaml.Mapping.Entry.class::cast)
                     .collect(Collectors.toCollection(ArrayDeque::new));
 
-            String property = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
+            String prop = stream(spliteratorUnknownSize(propertyEntries.descendingIterator(), 0), false)
                     .map(e2 -> e2.getKey().getValue())
                     .collect(Collectors.joining("."));
 
-            String propertyToTest = this.toProperty;
-            if (property.equals(this.property)) {
+            String propertyToTest = toProperty;
+            if (prop.equals(property)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();

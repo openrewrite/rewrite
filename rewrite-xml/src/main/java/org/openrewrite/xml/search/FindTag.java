@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.search;
 
+import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
@@ -26,17 +27,14 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.Set;
 
+@Data
 public class FindTag extends Recipe {
 
-    private XPathMatcher xPathMatcher;
+    private final String xPath;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindTagProcessor(xPathMatcher);
-    }
-
-    public void setXPath(String xpath) {
-        this.xPathMatcher = new XPathMatcher(xpath);
+        return new FindTagProcessor(new XPathMatcher(xPath));
     }
 
     public static Set<Xml.Tag> find(Xml x, String xpath) {

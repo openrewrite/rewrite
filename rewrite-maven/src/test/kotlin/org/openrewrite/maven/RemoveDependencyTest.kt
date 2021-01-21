@@ -31,10 +31,7 @@ class RemoveDependencyTest : RecipeTest {
         .cache(mavenCache)
         .build()
 
-    override val recipe = RemoveDependency().apply {
-        setGroupId("junit")
-        setArtifactId("junit")
-    }
+    override val recipe = RemoveDependency("junit","junit")
 
     @Test
     fun removeDependency() = assertChanged(

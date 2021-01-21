@@ -25,11 +25,11 @@ class UpgradeParentVersionTest : RecipeTest {
 
     @Test
     fun upgradeVersion() = assertChanged(
-        recipe = UpgradeParentVersion().apply {
-            setGroupId("org.springframework.boot")
-            setArtifactId("spring-boot-starter-parent")
-            setToVersion("~1.5")
-        },
+        recipe = UpgradeParentVersion(
+            "org.springframework.boot",
+            "spring-boot-starter-parent",
+            "~1.5",
+        null),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>

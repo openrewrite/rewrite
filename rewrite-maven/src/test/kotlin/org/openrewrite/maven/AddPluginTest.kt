@@ -28,11 +28,7 @@ class AddPluginTest : RecipeTest {
             .build()
 
     override val recipe: Recipe
-        get() = AddPlugin().apply {
-            setGroupId("org.openrewrite.maven")
-            setArtifactId("rewrite-maven-plugin")
-            setVersion("100.0")
-        }
+        get() = AddPlugin("org.openrewrite.maven", "rewrite-maven-plugin", "100.0")
 
     @Test
     fun addPlugin() = assertChanged(

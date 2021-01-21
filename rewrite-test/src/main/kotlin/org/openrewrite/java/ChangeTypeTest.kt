@@ -21,7 +21,7 @@ import org.openrewrite.RecipeTest
 
 interface ChangeTypeTest : RecipeTest {
     override val recipe: ChangeType
-        get() = ChangeType().apply { setType("a.A1"); setTargetType("a.A2") }
+        get() = ChangeType("a.A1","a.A2")
 
     companion object {
         private val a1 = """
@@ -110,7 +110,7 @@ interface ChangeTypeTest : RecipeTest {
             "public interface I2 {}"
         ),
         recipe = recipe.doNext(
-            ChangeType().apply { setType("I1"); setTargetType("I2") }
+            ChangeType("I1", "I2")
         ),
         before = """
             import a.A1;
@@ -326,10 +326,7 @@ interface ChangeTypeTest : RecipeTest {
     @Test
     fun primitiveToClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType().apply {
-            setType("int")
-            setTargetType("java.lang.Integer")
-        },
+        recipe = ChangeType("int", "java.lang.Integer"),
         before = """
             class A {
                 int foo = 5;
@@ -351,10 +348,7 @@ interface ChangeTypeTest : RecipeTest {
     @Test
     fun classToPrimitive(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ChangeType().apply {
-            setType("java.lang.Integer")
-            setTargetType("int")
-        },
+        recipe = ChangeType("java.lang.Integer","int"),
         before = """
             class A {
                 Integer foo = 5;
