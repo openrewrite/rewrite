@@ -118,7 +118,9 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             e = e.withPrefix(alignTo(e.getPrefix(),
                     indent(getCursor().getParentOrThrow().<J>getTree().getPrefix())));
         } else if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.Case)) {
+                !(getCursor().getParentOrThrow().getTree() instanceof J.Case) &&
+                !(getCursor().getParentOrThrow().getTree() instanceof J.MethodDecl) &&
+                !(getCursor().getParentOrThrow().getTree() instanceof J.VariableDecls)) {
             e = continuationIndent(e, enclosingStatement());
         }
         return e;
@@ -210,6 +212,24 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     @Override
+    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+        J.MethodInvocation m = super.visitMethodInvocation(method, p);
+        if (m.getSelect() != null && m.getSelect().getAfter().getWhitespace().contains("\n")) {
+            m = m.withSelect(m.getSelect().withAfter(continuationIndent(m.getSelect().getAfter(), enclosingStatement())));
+        }
+        if (m.getArgs().getLastSpace().getWhitespace().contains("\n")) {
+            // align the closing ')' with the first enclosing statement on its own line
+//            m = m.withArgs(m.getArgs().withElem(ListUtils.mapLast(m.getArgs().getElem(),
+//                    arg -> {
+//                        J enc = enclosingStatement(new Cursor(getCursor(), arg.getElem()));
+//                        assert enc != null;
+//                        return arg.withElem(alignTo(arg.getElem(), indent(enc.getPrefix())));
+//                    })));
+        }
+        return m;
+    }
+
+    @Override
     public J.Ternary visitTernary(J.Ternary ternary, P p) {
         J.Ternary t = super.visitTernary(ternary, p);
         t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
@@ -255,16 +275,25 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
     }
 
+    private J enclosingStatement() {
+        return enclosingStatement(getCursor());
+    }
+
+    /**
+     * @return The first enclosing statement on its own line, used for continuation indenting.
+     */
     @Nullable
-    private Statement enclosingStatement() {
-        Cursor cursor = getCursor();
-        //noinspection StatementWithEmptyBody
-        for (; cursor != null &&
-                (!(cursor.getTree() instanceof Statement) ||
-                        !cursor.<J>getTree().getPrefix().getWhitespace().contains("\n"));
-             cursor = cursor.getParent())
-            ;
-        return cursor == null ? null : cursor.getTree();
+    private J enclosingStatement(Cursor cursor) {
+        cursor = cursor.getParent();
+        while (cursor != null) {
+            J tree = cursor.getTree();
+            if (tree.getPrefix().getWhitespace().contains("\n") &&
+                    (tree instanceof Statement || tree instanceof Expression)) {
+                return tree;
+            }
+            cursor = cursor.getParent();
+        }
+        return null;
     }
 
     private Space continuationIndent(Space space, @Nullable Tree parent) {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -300,79 +301,6 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun expressions(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
-        before = """
-            import java.util.function.Function;
-            public class Test {
-            int X[];
-            public int plus(int x) {
-                return 0;
-            }
-            public void test(boolean a, int x, int y) {
-            Function<Integer, Integer> op = this
-            ::
-            plus;
-            if (x
-            >
-            0) {
-            int someVariable = a ?
-            x :
-            y;
-            int anotherVariable = a
-            ?
-            x
-            :
-            y;
-            }
-            x
-            ++;
-            X
-            [
-            1
-            ]
-            =
-            0;
-            }
-            }
-        """,
-        after = """
-            import java.util.function.Function;
-            public class Test {
-                int X[];
-                public int plus(int x) {
-                    return 0;
-                }
-                public void test(boolean a, int x, int y) {
-                    Function<Integer, Integer> op = this
-                      ::
-                      plus;
-                    if (x
-                      >
-                      0) {
-                        int someVariable = a ?
-                          x :
-                          y;
-                        int anotherVariable = a
-                          ?
-                          x
-                          :
-                          y;
-                    }
-                    x
-                      ++;
-                    X
-                      [
-                      1
-                      ]
-                      =
-                      0;
-                }
-            }
-        """
-    )
-
-    @Test
     fun lineComment(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """
@@ -593,6 +521,319 @@ interface TabsAndIndentsTest : RecipeTest {
                     } finally {
                         a = false;
                     }
+                }
+            }
+        """
+    )
+
+    @Test
+    fun lambda(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            public class Test {
+                public void method(int n) {
+                    Supplier<Integer> ns = () ->
+                        n;
+                }
+            }
+        """,
+        after = """
+            import java.util.function.Supplier;
+            public class Test {
+                public void method(int n) {
+                    Supplier<Integer> ns = () ->
+                            n;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun methodInvocations(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
+                public Test method(int n) {
+                    return method(n)
+                        .method(n)
+                        .method(n);
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                public Test method(int n) {
+                    return method(n)
+                            .method(n)
+                            .method(n);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun ternaries(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            public class Test {
+                public Test method(int n) {
+                    return n > 0 ?
+                        this :
+                        method(n).method(n);
+                }
+            }
+        """,
+        after = """
+            public class Test {
+                public Test method(int n) {
+                    return n > 0 ?
+                            this :
+                            method(n).method(n);
+                }
+            }
+        """
+    )
+
+    @Test
+    fun methodWithAnnotation(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.build(),
+        before = """
+                public class Test {
+                    @Nullable
+                    Consumer<Throwable> getOnError() {
+                        return onError;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun variableWithAnnotation(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.build(),
+        before = """
+                public class Test {
+                    @Nullable
+                    Scope scope;
+            
+                    @Nullable
+                    String classifier;
+                    
+                    @With
+                    Collection<Dependency> dependencies;
+                }
+            """
+    )
+
+    @Test
+    @Disabled
+    fun failure1(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.build(),
+        before = """
+                public class Test {
+                    public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system,
+                                                                                            @Nullable File localRepositoryDir) {
+                        DefaultRepositorySystemSession repositorySystemSession = org.apache.maven.repository.internal.MavenRepositorySystemUtils
+                                .newSession();
+                        repositorySystemSession.setDependencySelector(
+                                new AndDependencySelector(
+                                        new ExclusionDependencySelector(),
+                                        new ScopeDependencySelector(emptyList(), Arrays.asList("provided", "test")),
+                                        new OptionalDependencySelector()
+                                )
+                        );
+                        return repositorySystemSession;
+                    }
+                }
+            """
+    )
+
+    @Test
+    @Disabled
+    fun failure2(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.build(),
+        before = """
+            import java.util.stream.Stream;
+            public class Test {        
+                boolean b;
+                public Stream<Test> method() {
+                    if (b && method()
+                        .anyMatch(t -> b ||
+                                b
+                        )) {
+                        // do nothing
+                    }
+                    return Stream.of(this);
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    fun failure3(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
+            import java.util.function.Function;
+            public class Test {
+            int X[];
+            public int plus(int x) {
+                return 0;
+            }
+            public void test(boolean a, int x, int y) {
+            Function<Integer, Integer> op = this
+            ::
+            plus;
+            if (x
+            >
+            0) {
+            int someVariable = a ?
+            x :
+            y;
+            int anotherVariable = a
+            ?
+            x
+            :
+            y;
+            }
+            x
+            ++;
+            X
+            [
+            1
+            ]
+            =
+            0;
+            }
+            }
+        """,
+        after = """
+            import java.util.function.Function;
+            public class Test {
+                int X[];
+                public int plus(int x) {
+                    return 0;
+                }
+                public void test(boolean a, int x, int y) {
+                    Function<Integer, Integer> op = this
+                      ::
+                      plus;
+                    if (x
+                      >
+                      0) {
+                        int someVariable = a ?
+                          x :
+                          y;
+                        int anotherVariable = a
+                          ?
+                          x
+                          :
+                          y;
+                    }
+                    x
+                      ++;
+                    X
+                      [
+                      1
+                      ]
+                      =
+                      0;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+//    fun lambdaMethodParameter(jp: JavaParser) = assertUnchanged(
+    fun failure4(jp: JavaParser) = assertUnchanged(
+        jp,
+        // FIXME c(f) sees its parent as the method invocation a(f)... not .b(...
+        before = """
+            import java.util.function.Function;
+            abstract class Test {
+                abstract Test a(Function<Test, Test> f);
+                abstract Test b(Function<Test, Test> f);
+                abstract Test c(Function<Test, Test> f);
+                
+                Test method(Function<Test, Test> f) {
+                    return a(f)
+                            .b(t ->
+                                    c(f)
+                            );
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    fun failure5(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        before = """
+            import java.util.function.Function;
+            public class Test {
+                int X[];
+                public int plus(int x) {
+                    return 0;
+                }
+                public void test(boolean a, int x, int y) {
+                    Function<Integer, Integer> op = this
+                      ::
+                      plus;
+                    if (x
+                      >
+                      0) {
+                        int someVariable = a ?
+                          x :
+                          y;
+                        int anotherVariable = a
+                          ?
+                          x
+                          :
+                          y;
+                    }
+                    x
+                      ++;
+                    X
+                      [
+                      1
+                      ]
+                      =
+                      0;
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+//    fun newClass(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun failure6(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.build(),
+        before = """
+            class Test {
+                Test(Test t) {}
+                Test() {}
+                void method(Test t) {
+                    method(
+                        new Test(
+                            new Test()
+                        )
+                    );
+                }
+            }
+        """,
+        after = """
+            class Test {
+                Test(Test t) {}
+                Test() {}
+                void method(Test t) {
+                    method(
+                            new Test(
+                                    new Test()
+                            )
+                    );
                 }
             }
         """
