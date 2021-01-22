@@ -36,9 +36,9 @@ public class Maven extends Xml.Document {
     public Maven(Xml.Document document, MavenSettings settings) {
         super(
                 document.getId(),
+                document.getSourcePath(),
                 document.getPrefix(),
                 document.getMarkers(),
-                document.getSourcePath(),
                 document.getProlog(),
                 document.getRoot(),
                 document.getEof()

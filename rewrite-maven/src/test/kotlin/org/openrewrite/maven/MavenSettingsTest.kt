@@ -15,6 +15,11 @@
  */
 package org.openrewrite.maven
 
+import com.ctc.wstx.stax.WstxInputFactory
+import com.ctc.wstx.stax.WstxOutputFactory
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.dataformat.xml.XmlFactory
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Condition
 import org.junit.jupiter.api.Disabled
@@ -22,6 +27,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.Parser
 import java.nio.file.Paths
+import javax.xml.stream.XMLInputFactory
 
 class MavenSettingsTest {
     @Test
@@ -229,5 +235,46 @@ class MavenSettingsTest {
             .hasSize(2)
             .haveAtLeastOne(Condition({repo -> repo.url == "https://internalartifactrepository.yourorg.com"}, "Repository should-be-mirrored should have had its URL changed to https://internalartifactrepository.yourorg.com"))
             .haveAtLeastOne(Condition({repo -> repo.url == "https://externalrepository.com" && repo.id == "should-not-be-mirrored"}, "Repository should-not-be-mirrored should have had its URL left unchanged"))
+    }
+
+    @Test
+    fun serverCredentials() {
+        val settings = MavenSettings.parse(Parser.Input(Paths.get("settings.xml")) {
+            """
+            <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 http://maven.apache.org/xsd/settings-1.0.0.xsd">
+                  <servers>
+                    <server>
+                      <id>server001</id>
+                      <username>my_login</username>
+                      <password>my_password</password>
+                    </server>
+                  </servers>
+            </settings>
+            """.trimIndent().byteInputStream()
+        })
+        assertThat(settings.servers)
+                .isNotNull
+        assertThat(settings.servers!!.servers)
+                .hasSize(1)
+        assertThat(settings.servers!!.servers.first())
+                .matches { it.id == "server001" }
+                .matches { it.username == "my_login" }
+                .matches { it.password == "my_password" }
+
+        // Configuration of this mapper copied from the one internal to MavenSettings
+        val input: XMLInputFactory = WstxInputFactory()
+        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false)
+        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false)
+        val xmlMapper = XmlMapper(XmlFactory(input, WstxOutputFactory()))
+                .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
+                .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+
+        val serversXml = xmlMapper.writeValueAsString(settings.servers)
+        assertThat(serversXml)
+                .isEqualTo("<Servers><server><id>server001</id></server></Servers>")
+                .`as`("To avoid accidental publication of sensitive credentials, username and password should be omitted")
     }
 }
