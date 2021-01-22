@@ -16,15 +16,18 @@
 package org.openrewrite;
 
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Function;
 
 import static java.util.Collections.*;
 import static java.util.stream.Collectors.*;
-
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
  * apply each recipes {@link TreeProcessor processor} visit method to a list of {@link SourceFile sourceFiles}
@@ -39,6 +42,8 @@ import static java.util.stream.Collectors.*;
  *
  */
 public class Recipe {
+
+    private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
 
     /**
      * This tree printer is used when comparing before/after source files and reifies any markers as a list of
@@ -234,8 +239,24 @@ public class Recipe {
         return validate();
     }
 
+    /**
+     * The default implementation of validate on the recipe will look for package and field level annotations that
+     * indicate a field is not-null. The annotations must have run-time retention and the simple name of the annotation
+     * must match one of the common names defined in {@link NullUtils}
+     *
+     * @return A validated instance based using non-null/nullable annotations to determine which fields of the recipe are required.
+     */
     public Validated validate() {
-        return Validated.none();
+        Validated validated = Validated.none();
+        List<Field> requiredFields = NullUtils.findNonNullFields(this.getClass());
+        for (Field field : requiredFields) {
+            try {
+                validated = validated.and(Validated.required(field.getName(), field.get(this)));
+            } catch (IllegalAccessException e) {
+                logger.warn("Unable to validate the field [{}] on the class [{}]", field.getName(), this.getClass().getName());
+            }
+        }
+        return validated;
     }
 
     @Incubating(since = "7.0.0")

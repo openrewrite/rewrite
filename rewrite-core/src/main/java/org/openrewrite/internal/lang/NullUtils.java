@@ -74,8 +74,11 @@ public class NullUtils {
                 .anyMatch(PACKAGE_LEVEL_NON_NULL_ANNOTATIONS::contains);
 
         Field[] fields = _class.getDeclaredFields();
-        List<Field> nonNullFields = new ArrayList<>(fields.length);
+        if (fields.length == 0) {
+            return Collections.emptyList();
+        }
 
+        List<Field> nonNullFields = new ArrayList<>(fields.length);
         for (Field field : fields) {
             field.setAccessible(true);
             if(fieldHasNonNullableAnnotation(field) ||
