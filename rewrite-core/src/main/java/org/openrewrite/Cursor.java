@@ -16,6 +16,7 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
 import java.util.HashMap;
@@ -42,6 +43,7 @@ public class Cursor {
         this.value = value;
     }
 
+    @NonNull
     public Cursor getRoot() {
         Cursor c = this;
         while (c.parent != null) {
