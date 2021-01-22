@@ -138,8 +138,8 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
         Statement j = super.visitStatement(statement, p);
         Cursor parent = getCursor().getParentOrThrow();
         if (parent.getParent() != null) {
-            Tree parentTree = parent.getTree();
-            Tree grandparentTree = parent.getParentOrThrow().getTree();
+            Tree parentTree = parent.getValue();
+            Tree grandparentTree = parent.getParentOrThrow().getValue();
             if (grandparentTree instanceof J.ClassDecl && parentTree instanceof J.Block) {
                 J.Block block = (J.Block) parentTree;
                 J.ClassDecl classDecl = (J.ClassDecl) grandparentTree;

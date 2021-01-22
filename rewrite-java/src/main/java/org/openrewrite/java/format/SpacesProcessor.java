@@ -420,7 +420,7 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.NewArray visitNewArray(J.NewArray newArray, P p) {
         J.NewArray newArray1 = super.visitNewArray(newArray, p);
-        if (getCursor().getParent() != null && getCursor().getParent().getTree() instanceof J.Annotation) {
+        if (getCursor().getParent() != null && getCursor().getParent().getValue() instanceof J.Annotation) {
             if (newArray1.getInitializer() != null) {
                 newArray1 = newArray1.withInitializer(
                         spaceBefore(newArray1.getInitializer(), style.getBeforeLeftBrace().isAnnotationArrayInitializerLeftBrace())

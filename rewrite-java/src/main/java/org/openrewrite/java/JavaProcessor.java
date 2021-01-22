@@ -735,7 +735,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
      */
     protected boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
-        Tree baseScope = base.getPathAsStream()
+        Tree baseScope = (Tree) base.getPathAsStream()
                 .filter(t -> t instanceof J.Block ||
                         t instanceof J.MethodDecl ||
                         t instanceof J.Try ||
@@ -744,8 +744,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
                 .findFirst().orElseThrow(() -> new IllegalArgumentException("The base cursor does not have an scoped context."));
 
         //Now walk up the child path looking for the base scope.
-        for (Iterator<Tree> it = child.getPath(); it.hasNext(); ) {
-            Tree childScope = it.next();
+        for (Iterator<Object> it = child.getPath(); it.hasNext(); ) {
+            Tree childScope = (Tree) it.next();
             if (childScope instanceof J.ClassDecl) {
                 J.ClassDecl childClass = (J.ClassDecl) childScope;
                 if (!(childClass.getKind().getElem().equals(J.ClassDecl.Kind.Class)) ||

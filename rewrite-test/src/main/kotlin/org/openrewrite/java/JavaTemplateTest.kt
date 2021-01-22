@@ -50,7 +50,7 @@ interface JavaTemplateTest : RecipeTest {
             }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.MethodDecl) {
                     val template = JavaTemplate.builder("others.add(#{});").build()
 
@@ -120,7 +120,7 @@ interface JavaTemplateTest : RecipeTest {
             }
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J {
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.MethodDecl) {
                     val template = JavaTemplate.builder("others.add(#{});").build()
 
@@ -190,7 +190,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.ClassDecl) {
                     val template = JavaTemplate.builder(
                         """
@@ -268,7 +268,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.ClassDecl) {
                     val template = JavaTemplate.builder(
                         """
@@ -589,7 +589,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.MethodDecl && parent.name.ident.simpleName == "foo") {
 
                     val template = JavaTemplate.builder("\n#{};\n#{};").build()
@@ -660,7 +660,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitBlock(block: J.Block, p: ExecutionContext): J.Block {
                 var b = super.visitBlock(block, p)
-                val parent = cursor.parentOrThrow.getTree<J>()
+                val parent = cursor.parentOrThrow.getValue<J>()
                 if (parent is J.If) {
 
                     val template = JavaTemplate.builder("#{};\n#{}").build()

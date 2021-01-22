@@ -32,25 +32,33 @@ public class Cursor {
     @Nullable
     private final Cursor parent;
 
-    private final Tree tree;
+    private final Object value;
 
     @Nullable
     private Map<String, Object> messages;
 
-    public Cursor(@Nullable Cursor parent, Tree tree) {
+    public Cursor(@Nullable Cursor parent, Object value) {
         this.parent = parent;
-        this.tree = tree;
+        this.value = value;
     }
 
-    public Iterator<Tree> getPath() {
+    public Cursor getRoot() {
+        Cursor c = this;
+        while (c.parent != null) {
+            c = c.parent;
+        }
+        return c;
+    }
+
+    public Iterator<Object> getPath() {
         return new CursorIterator(this);
     }
 
-    public Stream<Tree> getPathAsStream() {
+    public Stream<Object> getPathAsStream() {
         return stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false);
     }
 
-    private static class CursorIterator implements Iterator<Tree> {
+    private static class CursorIterator implements Iterator<Object> {
         private Cursor cursor;
 
         private CursorIterator(Cursor cursor) {
@@ -63,27 +71,27 @@ public class Cursor {
         }
 
         @Override
-        public Tree next() {
-            Tree t = cursor.tree;
+        public Object next() {
+            Object v = cursor.value;
             cursor = cursor.parent;
-            return t;
+            return v;
         }
     }
 
     @Nullable
-    public <T extends Tree> T firstEnclosing(Class<T> tClass) {
+    public <T> T firstEnclosing(Class<T> tClass) {
         CursorIterator iter = new CursorIterator(this);
         while (iter.hasNext()) {
-            Tree t = iter.next();
-            if (tClass.isInstance(t)) {
+            Object value = iter.next();
+            if (tClass.isInstance(value)) {
                 //noinspection unchecked
-                return (T) t;
+                return (T) value;
             }
         }
         return null;
     }
 
-    public <T extends Tree> T firstEnclosingOrThrow(Class<T> tClass) {
+    public <T> T firstEnclosingOrThrow(Class<T> tClass) {
         T firstEnclosing = firstEnclosing(tClass);
         if (firstEnclosing == null) {
             throw new IllegalStateException("Expected to find enclosing " + tClass.getSimpleName());
@@ -113,17 +121,17 @@ public class Cursor {
     }
 
     @SuppressWarnings("unchecked")
-    public <T extends Tree> T getTree() {
-        return (T) tree;
+    public <T> T getValue() {
+        return (T) value;
     }
 
     public boolean isScopeInPath(Tree scope) {
-        return tree.getId().equals(scope.getId()) ||
-                getPathAsStream().anyMatch(p -> p.getId().equals(scope.getId()));
+        return value instanceof Tree && ((Tree)value).getId().equals(scope.getId()) ||
+                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree)p).getId().equals(scope.getId()));
     }
 
     @Incubating(since = "7.0.0")
-    public void putMessageOnFirstEnclosing(Class<? extends Tree> enclosing, String key, Object value) {
+    public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
         if (enclosing.isInstance(this)) {
             putMessage(key, value);
         } else if (parent != null) {

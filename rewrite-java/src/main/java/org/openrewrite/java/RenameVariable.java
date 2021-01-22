@@ -29,7 +29,7 @@ public class RenameVariable<P> extends JavaIsoProcessor<P> {
     public RenameVariable(Cursor scope, String toName) {
         this.scope = scope;
         Validated validated = Validated.test("scope", "Must be a cursor to a J.VariableDecls.NamedVar",
-                scope, s -> s.getTree() instanceof J.VariableDecls.NamedVar);
+                scope, s -> s.getValue() instanceof J.VariableDecls.NamedVar);
         if (validated.isInvalid()) {
             throw new ValidationException(validated);
         }
@@ -39,7 +39,7 @@ public class RenameVariable<P> extends JavaIsoProcessor<P> {
 
     @Override
     public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        scopeVariableName = ((J.VariableDecls.NamedVar) scope.getTree()).getSimpleName();
+        scopeVariableName = ((J.VariableDecls.NamedVar) scope.getValue()).getSimpleName();
         return super.visitCompilationUnit(cu, p);
     }
 
@@ -47,7 +47,7 @@ public class RenameVariable<P> extends JavaIsoProcessor<P> {
     public J.Ident visitIdentifier(J.Ident ident, P p) {
         if (ident.getSimpleName().equals(scopeVariableName) &&
                 isInSameNameScope(scope, getCursor()) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.FieldAccess)) {
+                !(getCursor().getParentOrThrow().getValue() instanceof J.FieldAccess)) {
             return ident.withName(toName);
         }
 

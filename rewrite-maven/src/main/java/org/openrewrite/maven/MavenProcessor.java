@@ -79,7 +79,7 @@ public class MavenProcessor<P> extends XmlProcessor<P>
     }
 
     private boolean hasGroupAndArtifact(String groupId, @Nullable String artifactId) {
-        Xml.Tag tag = getCursor().getTree();
+        Xml.Tag tag = getCursor().getValue();
         return groupId.equals(tag.getChildValue("groupId").orElse(model.getGroupId())) &&
                 tag.getChildValue("artifactId")
                         .map(a -> a.equals(artifactId))

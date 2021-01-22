@@ -55,8 +55,8 @@ public class XPathMatcher {
             for (int i = 0; i < parts.size(); i++, pathIndex++) {
                 String part = parts.get(i);
                 if (part.startsWith("@")) {
-                    if (!(cursor.getTree() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1))) ||
+                    if (!(cursor.getValue() instanceof Xml.Attribute &&
+                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1))) ||
                             part.substring(1).equals("*"))) {
                         return false;
                     }
@@ -78,8 +78,8 @@ public class XPathMatcher {
             for (int i = 0; i < parts.length; i++) {
                 String part = parts[i];
                 if (part.startsWith("@")) {
-                    return cursor.getTree() instanceof Xml.Attribute &&
-                            (((Xml.Attribute) cursor.getTree()).getKeyAsString().equals(part.substring(1)) ||
+                    return cursor.getValue() instanceof Xml.Attribute &&
+                            (((Xml.Attribute) cursor.getValue()).getKeyAsString().equals(part.substring(1)) ||
                                     part.substring(1).equals("*"));
                 }
 
@@ -88,7 +88,7 @@ public class XPathMatcher {
                 }
             }
 
-            return cursor.getTree() instanceof Xml.Tag && path.size() == parts.length;
+            return cursor.getValue() instanceof Xml.Tag && path.size() == parts.length;
         }
 
         return false;

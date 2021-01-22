@@ -21,7 +21,6 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
 
@@ -174,8 +173,8 @@ public class ChangePropertyKey extends Recipe {
             if (changed) {
                 m = m.withEntries(entries);
 
-                if (getCursor().getParentOrThrow().getTree() instanceof Yaml.Document) {
-                    Yaml.Document document = getCursor().getParentOrThrow().getTree();
+                if (getCursor().getParentOrThrow().getValue() instanceof Yaml.Document) {
+                    Yaml.Document document = getCursor().getParentOrThrow().getValue();
                     if (!document.isExplicit()) {
                         m = m.withEntries(m.getEntries());
                     }

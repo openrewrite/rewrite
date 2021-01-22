@@ -34,10 +34,10 @@ public class UnwrapParentheses<P> extends JavaProcessor<P> {
     }
 
     public static boolean isUnwrappable(Cursor parensScope) {
-        if (!(parensScope.getTree() instanceof J.Parentheses)) {
+        if (!(parensScope.getValue() instanceof J.Parentheses)) {
             return false;
         }
-        J parent = parensScope.getParentOrThrow().getTree();
+        J parent = parensScope.getParentOrThrow().getValue();
         if (parent instanceof J.If ||
                 parent instanceof J.Switch ||
                 parent instanceof J.Synchronized ||
@@ -46,7 +46,7 @@ public class UnwrapParentheses<P> extends JavaProcessor<P> {
                 parent instanceof J.WhileLoop) {
             return false;
         } else if (parent instanceof J.DoWhileLoop) {
-            return !(parensScope.getTree() == ((J.DoWhileLoop) parent).getWhileCondition().getElem());
+            return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition().getElem());
         }
         return true;
     }

@@ -18,7 +18,6 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface RenameVariableTest : RecipeTest {
     @Test
@@ -33,9 +32,9 @@ interface RenameVariableTest : RecipeTest {
 
                     override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
                         val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
-                        if (cursor.parentOrThrow.getTree<J>() is J.MethodDecl) {
+                        if (cursor.parentOrThrow.getValue<J>() is J.MethodDecl) {
                             doAfterVisit(RenameVariable(varCursor, "n2"))
-                        } else if (cursor.parentOrThrow.parentOrThrow.getTree<J>() !is J.ClassDecl) {
+                        } else if (cursor.parentOrThrow.parentOrThrow.getValue<J>() !is J.ClassDecl) {
                             doAfterVisit(RenameVariable(varCursor, "n1"))
                         }
                         return super.visitMultiVariable(multiVariable, p)
