@@ -322,8 +322,8 @@ public class MavenDownloader {
                 // Always prefer to use https, fallback to http only if https isn't available
                 // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
                 // This regex accepts any capitalization of the letters in "http"
-                String httpsUrl = repoWithMirrors.getUrl().replaceFirst("[hH][tT][tT][pP]://", "https://");
                 String originalUrl = repoWithMirrors.getUrl();
+                String httpsUrl = originalUrl.replaceFirst("[hH][tT][tT][pP]://", "https://");
 
                 Request.Builder request = applyAuthentication(repoWithMirrors, new Request.Builder().url(httpsUrl).get());
                 try (Response response = sendRequest.apply(request.build())) {
