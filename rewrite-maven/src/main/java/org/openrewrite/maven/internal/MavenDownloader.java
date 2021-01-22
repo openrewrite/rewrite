@@ -21,11 +21,7 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
 import io.vavr.CheckedFunction1;
-import io.vavr.Function1;
-import okhttp3.ConnectionSpec;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import okhttp3.*;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -36,6 +32,7 @@ import org.openrewrite.maven.tree.Maven;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
@@ -45,9 +42,11 @@ import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public class MavenDownloader {
     private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
@@ -68,17 +67,6 @@ public class MavenDownloader {
             mavenDownloaderRetry,
             (request) -> httpClient.newCall(request).execute());
 
-    private static final Function1<String, Response> sendHeadFallbackToGet = Retry.decorateCheckedFunction(
-            mavenDownloaderRetry,
-            (String url) ->  httpClient.newCall(new Request.Builder().url(url).head().build()).execute()
-    ).recover((throwable) -> (String url) -> {
-        try {
-            return httpClient.newCall(new Request.Builder().url(url).get().build()).execute();
-        } catch (IOException e) {
-            return null;
-        }
-    });
-
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
     private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("central", "https://repo.maven.apache.org/maven2",
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
@@ -87,6 +75,7 @@ public class MavenDownloader {
     private final Map<Path, RawMaven> projectPoms;
     @Nullable
     private final MavenSettings settings;
+    private final Map<String, MavenSettings.Server> serverIdToServer;
 
     /**
      * Any visitor constructing a MavenDownloader should provide the MavenSettings from {@link Maven#getSettings()}.
@@ -97,6 +86,13 @@ public class MavenDownloader {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
         this.settings = settings;
+        if (settings == null || settings.getServers() == null) {
+            serverIdToServer = new HashMap<>();
+        } else {
+            serverIdToServer = settings.getServers().getServers()
+                    .stream()
+                    .collect(toMap(MavenSettings.Server::getId, Function.identity()));
+        }
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
@@ -156,8 +152,8 @@ public class MavenDownloader {
                 (version == null ? "" : version + '/') +
                 "maven-metadata.xml";
 
-        Request request = new Request.Builder().url(uri).get().build();
-        try (Response response =  sendRequest.apply(request)) {
+        Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+        try (Response response = sendRequest.apply(request.build())) {
             if (response.isSuccessful() && response.body() != null) {
                 @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                         .bytes();
@@ -249,8 +245,8 @@ public class MavenDownloader {
                                             version + '/' +
                                             artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-                                    Request request = new Request.Builder().url(uri).get().build();
-                                    try (Response response = sendRequest.apply(request)) {
+                                    Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+                                    try (Response response = sendRequest.apply(request.build())) {
                                         if (response.isSuccessful() && response.body() != null) {
                                             @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                                                     .bytes();
@@ -323,27 +319,42 @@ public class MavenDownloader {
         CacheResult<RawRepositories.Repository> result;
         try {
             result = mavenCache.computeRepository(repoWithMirrors, () -> {
-                String url = repoWithMirrors.getUrl();
-                try (Response response = sendHeadFallbackToGet.apply(url)) {
-                    if (url.toLowerCase().contains("http://")) {
-                        return normalizeRepository(
-                                new RawRepositories.Repository(
-                                        repoWithMirrors.getId(),
-                                        url.toLowerCase().replace("http://", "https://"),
-                                        repoWithMirrors.getReleases(),
-                                        repoWithMirrors.getSnapshots()
-                                )
-                        );
-                    } else if (response.isSuccessful()) {
+                // Always prefer to use https, fallback to http only if https isn't available
+                // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
+                // This regex accepts any capitalization of the letters in "http"
+                String originalUrl = repoWithMirrors.getUrl();
+                String httpsUrl = originalUrl.replaceFirst("[hH][tT][tT][pP]://", "https://");
+
+                Request.Builder request = applyAuthentication(repoWithMirrors, new Request.Builder().url(httpsUrl).get());
+                try (Response response = sendRequest.apply(request.build())) {
+                    if (response.isSuccessful()) {
                         return new RawRepositories.Repository(
                                 repoWithMirrors.getId(),
-                                url,
+                                httpsUrl,
                                 repoWithMirrors.getReleases(),
-                                repoWithMirrors.getSnapshots()
-                        );
+                                repoWithMirrors.getSnapshots());
                     }
                     return null;
+                } catch (SSLException e) {
+                    // Fallback to http if https is unavailable and the original URL was an http URL
+                    if(httpsUrl.equals(originalUrl)) {
+                        return null;
+                    }
+                    try (Response httpResponse = sendRequest.apply(request.url(originalUrl).build())) {
+                        if (httpResponse.isSuccessful()) {
+                            return new RawRepositories.Repository(
+                                    repoWithMirrors.getId(),
+                                    originalUrl,
+                                    repoWithMirrors.getReleases(),
+                                    repoWithMirrors.getSnapshots());
+                        }
+                    } catch (Throwable t) {
+                        return null;
+                    }
+                } catch (Throwable t) {
+                    return null;
                 }
+                return null;
             });
         } catch (Exception e) {
             return null;
@@ -358,5 +369,14 @@ public class MavenDownloader {
         } else {
             return settings.applyMirrors(repository);
         }
+    }
+
+    private Request.Builder applyAuthentication(RawRepositories.Repository repository, Request.Builder request) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null) {
+            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
+            request.header("Authorization", credentials);
+        }
+        return request;
     }
 }
