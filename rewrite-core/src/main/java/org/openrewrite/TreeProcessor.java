@@ -43,14 +43,12 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
     private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();
 
-    protected final boolean isCursoringOn() { return this.cursored; }
-
     protected final void setCursoringOn() {
         this.cursored = true;
     }
 
-    protected void rebaseCursor(Tree t) {
-        this.cursor.set(new Cursor(getCursor().getParent(), t));
+    protected void setCursor(@Nullable Cursor cursor) {
+        this.cursor.set(cursor);
     }
 
     // ephemeral do once after visit (sourceFile)
@@ -74,10 +72,6 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
                     "Call setCursoringOn() in the processor's constructor to enable.");
         }
         return cursor.get();
-    }
-
-    public final void setCursor(Cursor value) {
-        cursor.set(value);
     }
 
     @Nullable
