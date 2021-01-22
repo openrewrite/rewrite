@@ -38,7 +38,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
-    private boolean cursored = IS_DEBUGGING;
+    protected boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
     private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();
@@ -47,8 +47,8 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
         this.cursored = true;
     }
 
-    protected void rebaseCursor(Tree t) {
-        this.cursor.set(new Cursor(getCursor().getParent(), t));
+    protected void setCursor(@Nullable Cursor cursor) {
+        this.cursor.set(cursor);
     }
 
     // ephemeral do once after visit (sourceFile)

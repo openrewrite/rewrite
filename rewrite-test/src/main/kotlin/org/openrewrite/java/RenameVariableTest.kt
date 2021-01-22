@@ -23,26 +23,20 @@ interface RenameVariableTest : RecipeTest {
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object : JavaProcessor<ExecutionContext>() {
-                    init {
-                        setCursoringOn()
-                    }
-
-                    override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
-                        val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
-                        if (cursor.parentOrThrow.getValue<J>() is J.MethodDecl) {
-                            doAfterVisit(RenameVariable(varCursor, "n2"))
-                        } else if (cursor.parentOrThrow.parentOrThrow.getValue<J>() !is J.ClassDecl) {
-                            doAfterVisit(RenameVariable(varCursor, "n1"))
-                        }
-                        return super.visitMultiVariable(multiVariable, p)
-                    }
+        recipe = object : JavaProcessor<ExecutionContext>() {
+            override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
+                val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
+                if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDecl) {
+                    doAfterVisit(RenameVariable(varCursor, "n2"))
+                } else if (cursor
+                        .dropParentUntil { it is J }
+                        .dropParentUntil { it is J }
+                        .getValue<J>() !is J.ClassDecl) {
+                    doAfterVisit(RenameVariable(varCursor, "n1"))
                 }
+                return super.visitMultiVariable(multiVariable, p)
             }
-
-        },
+        }.toRecipe(cursored = true),
         before = """
             public class B {
                int n;

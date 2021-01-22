@@ -17,36 +17,25 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldNameTest : RecipeTest {
-    fun changeFieldName(from: String, to: String) = object : Recipe() {
-
-        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-            return object : JavaIsoProcessor<ExecutionContext>() {
-                init {
-                    setCursoringOn()
-                }
-
-                override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
-                    val containing = cursor.parentOrThrow.parentOrThrow.getValue<J>()
-                    if (containing is J.ClassDecl) {
-                        val type = v.typeExpr?.type
-                        if(type is JavaType.FullyQualified) {
-                            doAfterVisit(ChangeFieldName(type.asClass(), from, to))
-                        } else {
-                            doAfterVisit(ChangeFieldName(containing.type, from, to))
-                        }
-                    }
-                    return super.visitMultiVariable(v, p)
+    fun changeFieldName(from: String, to: String) = object : JavaIsoProcessor<ExecutionContext>() {
+        override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
+            val containing = cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>()
+            if (containing is J.ClassDecl) {
+                val type = v.typeExpr?.type
+                if (type is JavaType.FullyQualified) {
+                    doAfterVisit(ChangeFieldName(type.asClass()!!, from, to))
+                } else {
+                    doAfterVisit(ChangeFieldName(containing.type!!, from, to))
                 }
             }
+            return super.visitMultiVariable(v, p)
         }
-    }
+    }.toRecipe(cursored = true)
 
     @Test
     fun changeFieldName(jp: JavaParser) = assertChanged(

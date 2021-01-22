@@ -136,10 +136,10 @@ class BlankLinesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        Cursor parent = getCursor().getParentOrThrow();
+        Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
         if (parent.getParent() != null) {
-            Tree parentTree = parent.getValue();
-            Tree grandparentTree = parent.getParentOrThrow().getValue();
+            Object parentTree = parent.getValue();
+            Object grandparentTree = parent.dropParentUntil(J.class::isInstance).getValue();
             if (grandparentTree instanceof J.ClassDecl && parentTree instanceof J.Block) {
                 J.Block block = (J.Block) parentTree;
                 J.ClassDecl classDecl = (J.ClassDecl) grandparentTree;

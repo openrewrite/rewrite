@@ -61,7 +61,7 @@ public class MinimumViableSpacingProcessor<P> extends JavaIsoProcessor<P> {
             first = false;
         }
         if (m.getTypeParameters() != null && !m.getTypeParameters().getElem().isEmpty()) {
-            if (!first && !m.getTypeParameters().getBefore().getWhitespace().isEmpty()) {
+            if (!first && m.getTypeParameters().getBefore().getWhitespace().isEmpty()) {
                 m = m.withTypeParameters(m.getTypeParameters().withBefore(m.getTypeParameters().getBefore().withWhitespace(" ")));
             }
             first = false;

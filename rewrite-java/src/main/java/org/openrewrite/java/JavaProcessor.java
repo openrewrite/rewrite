@@ -683,23 +683,46 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         if (right == null) {
             return null;
         }
+
+        if (cursored) {
+            setCursor(new Cursor(getCursor(), right));
+        }
+
         J2 j = call(right.getElem(), p);
         Space space = visitSpace(right.getAfter(), p);
+
+        if (cursored) {
+            setCursor(getCursor().getParent());
+        }
+
         return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space);
     }
 
     @Nullable
     public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left,
-                                                          JLeftPadded.Location loc, P p) {
+                                              JLeftPadded.Location loc, P p) {
         if (left == null) {
             return null;
         }
+
+        if (cursored) {
+            setCursor(new Cursor(getCursor(), left));
+        }
+
         Space space = visitSpace(left.getBefore(), p);
+
         T t = left.getElem();
-        if(t instanceof J) {
+
+
+        if (t instanceof J) {
             //noinspection unchecked
             t = call((J) left.getElem(), p);
         }
+
+        if (cursored) {
+            setCursor(getCursor().getParent());
+        }
+
         return (space == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(space, t);
     }
 
@@ -709,8 +732,21 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         if (container == null) {
             return null;
         }
+
+        if (cursored) {
+            setCursor(new Cursor(getCursor(), container));
+        }
+
+        Space before = visitSpace(container.getBefore(), p);
         List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
-        return js == container.getElem() ? container : JContainer.build(container.getBefore(), js);
+
+        if (cursored) {
+            setCursor(getCursor().getParent());
+        }
+
+        return js == container.getElem() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js);
     }
 
     /**
@@ -735,26 +771,24 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
      */
     protected boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
-        Tree baseScope = (Tree) base.getPathAsStream()
-                .filter(t -> t instanceof J.Block ||
-                        t instanceof J.MethodDecl ||
-                        t instanceof J.Try ||
-                        t instanceof J.ForLoop ||
-                        t instanceof J.ForEachLoop)
-                .findFirst().orElseThrow(() -> new IllegalArgumentException("The base cursor does not have an scoped context."));
+        Tree baseScope = (Tree) base.dropParentUntil(t -> t instanceof J.Block ||
+                t instanceof J.MethodDecl ||
+                t instanceof J.Try ||
+                t instanceof J.ForLoop ||
+                t instanceof J.ForEachLoop).getValue();
 
         //Now walk up the child path looking for the base scope.
         for (Iterator<Object> it = child.getPath(); it.hasNext(); ) {
-            Tree childScope = (Tree) it.next();
+            Object childScope = it.next();
             if (childScope instanceof J.ClassDecl) {
                 J.ClassDecl childClass = (J.ClassDecl) childScope;
                 if (!(childClass.getKind().getElem().equals(J.ClassDecl.Kind.Class)) ||
                         childClass.hasModifier("static")) {
                     //Short circuit the search if a terminating element is encountered.
-                    break;
+                    return false;
                 }
             }
-            if (baseScope.isScope(childScope)) {
+            if (childScope instanceof Tree && baseScope.isScope((Tree) childScope)) {
                 return true;
             }
         }

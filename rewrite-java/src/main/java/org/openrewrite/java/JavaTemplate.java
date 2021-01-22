@@ -83,11 +83,11 @@ public class JavaTemplate {
         boolean memberVariableInitializer = false;
 
         while(insertionScope.getParent() != null &&
-                !(insertionScope.getParent().getValue() instanceof J.CompilationUnit) &&
-                !(insertionScope.getParent().getValue() instanceof J.Block)
+                !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.CompilationUnit) &&
+                !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block)
             ) {
 
-            if (insertionScope.getParent().getValue() instanceof J.VariableDecls.NamedVar) {
+            if (insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.VariableDecls.NamedVar) {
                 //There is one edge case that can trip up compilation: If the insertion scope is the initializer
                 //of a member variable and that scope is not itself in a nested block. In this case, a class block
                 //must be created to correctly compile the template
@@ -118,7 +118,7 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        Cursor formatScope = insertionScope.getParent();
+        Cursor formatScope = insertionScope.dropParentUntil(J.class::isInstance);
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
                 .map(snippet -> (J2) new AutoFormatProcessor<Void>().visit(snippet, null, formatScope))
@@ -165,7 +165,7 @@ public class JavaTemplate {
 
         @Override
         public J.Block visitBlock(J.Block block, Cursor insertionScope) {
-            Cursor parent = getCursor().getParent();
+            Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
 
             if (parent != null && !(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
                 J.Block b = call(block, insertionScope, this::visitEach);
@@ -238,7 +238,7 @@ public class JavaTemplate {
                             // since the visit method on J.Block is responsible for adding the ';', we
                             // add it pre-emptively here before concatenating the template.
                             printed = printed +
-                                    ((insertionScope.getParentOrThrow().getValue() instanceof J.Block) ?
+                                    ((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
                                             ";" : "") +
                                     templateCode;
                         } else {

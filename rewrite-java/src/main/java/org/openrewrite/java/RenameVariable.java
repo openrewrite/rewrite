@@ -47,10 +47,9 @@ public class RenameVariable<P> extends JavaIsoProcessor<P> {
     public J.Ident visitIdentifier(J.Ident ident, P p) {
         if (ident.getSimpleName().equals(scopeVariableName) &&
                 isInSameNameScope(scope, getCursor()) &&
-                !(getCursor().getParentOrThrow().getValue() instanceof J.FieldAccess)) {
+                !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
             return ident.withName(toName);
         }
-
         return super.visitIdentifier(ident, p);
     }
 }
