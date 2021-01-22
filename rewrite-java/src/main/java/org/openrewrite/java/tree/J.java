@@ -2214,7 +2214,7 @@ public interface J extends Serializable, Tree {
         @Nullable
         JLeftPadded<Block> finallie;
 
-        public Try withFinally(JLeftPadded<Block> finallie) {
+        public Try withFinally(@Nullable JLeftPadded<Block> finallie) {
             if (finallie == this.finallie) {
                 return this;
             }

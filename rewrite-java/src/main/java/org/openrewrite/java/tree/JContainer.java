@@ -87,4 +87,27 @@ public class JContainer<T> {
     public Space getLastSpace() {
         return elem.isEmpty() ? Space.EMPTY : elem.get(elem.size() - 1).getAfter();
     }
+
+    public enum Location {
+        ANNOTATION_ARGUMENT(JRightPadded.Location.ANNOTATION_ARGUMENT),
+        CASE(JRightPadded.Location.CASE),
+        IMPLEMENTS(JRightPadded.Location.IMPLEMENTS),
+        METHOD_ARGUMENT(JRightPadded.Location.METHOD_ARGUMENT),
+        NEW_ARRAY_INITIALIZER(JRightPadded.Location.NEW_ARRAY_INITIALIZER),
+        NEW_CLASS_ARGS(JRightPadded.Location.NEW_CLASS_ARGS),
+        THROWS(JRightPadded.Location.THROWS),
+        TRY_RESOURCES(JRightPadded.Location.TRY_RESOURCES),
+        TYPE_BOUND(JRightPadded.Location.TYPE_BOUND),
+        TYPE_PARAMETER(JRightPadded.Location.TYPE_PARAMETER);
+
+        private final JRightPadded.Location elemLocation;
+
+        Location(JRightPadded.Location elemLocation) {
+            this.elemLocation = elemLocation;
+        }
+
+        public JRightPadded.Location getElemLocation() {
+            return elemLocation;
+        }
+    }
 }

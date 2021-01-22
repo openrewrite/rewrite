@@ -63,30 +63,8 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension arrDim = super.visitArrayDimension(arrayDimension, p);
         J.ArrayDimension a = continuationIndent(arrDim, enclosingStatement());
-        a = a.withIndex(continuationIndent(a.getIndex(), enclosingStatement()));
         a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
         return a;
-    }
-
-    @Override
-    public J.Assign visitAssign(J.Assign assign, P p) {
-        J.Assign a = super.visitAssign(assign, p);
-        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
-        return a;
-    }
-
-    @Override
-    public J.AssignOp visitAssignOp(J.AssignOp assignOp, P p) {
-        J.AssignOp a = super.visitAssignOp(assignOp, p);
-        a = a.withAssignment(continuationIndent(a.getAssignment(), enclosingStatement()));
-        return a;
-    }
-
-    @Override
-    public J.Binary visitBinary(J.Binary binary, P p) {
-        J.Binary b = super.visitBinary(binary, p);
-        b = b.withOperator(continuationIndent(b.getOperator(), enclosingStatement()));
-        return b;
     }
 
     @Override
@@ -129,7 +107,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = (J.ForLoop) visitStatement(forLoop, p);
-        f = f.withBody(visitRightPadded(f.getBody(), SpaceType.FOR_BODY, p));
+        f = f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
 
         J.ForLoop.Control control = forLoop.getControl();
         JRightPadded<Statement> init = control.getInit();
@@ -217,6 +195,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         if (m.getSelect() != null && m.getSelect().getAfter().getWhitespace().contains("\n")) {
             m = m.withSelect(m.getSelect().withAfter(continuationIndent(m.getSelect().getAfter(), enclosingStatement())));
         }
+
         if (m.getArgs().getLastSpace().getWhitespace().contains("\n")) {
             // align the closing ')' with the first enclosing statement on its own line
 //            m = m.withArgs(m.getArgs().withElem(ListUtils.mapLast(m.getArgs().getElem(),
@@ -230,17 +209,87 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     @Override
-    public J.Ternary visitTernary(J.Ternary ternary, P p) {
-        J.Ternary t = super.visitTernary(ternary, p);
-        t = t.withTruePart(continuationIndent(t.getTruePart(), enclosingStatement()));
-        t = t.withFalsePart(continuationIndent(t.getFalsePart(), enclosingStatement()));
+    public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
+        JContainer<J2> j = super.visitContainer(container, loc, p);
+        if (j == null) {
+            return null;
+        }
+
+        J current = getCursor().getTree();
+        switch (loc) {
+            case IMPLEMENTS:
+            case METHOD_ARGUMENT:
+            case NEW_ARRAY_INITIALIZER:
+            case NEW_CLASS_ARGS:
+            case THROWS:
+            case TRY_RESOURCES:
+            case TYPE_PARAMETER:
+                j = j.withBefore(continuationIndent(j.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
+                        current : enclosingStatement()));
+                break;
+            case TYPE_BOUND:
+                // need TYPE_PARAMETER JContainer outside the TYPE_BOUND JContainer...
+                break;
+            case ANNOTATION_ARGUMENT:
+                // any prefix will be on the parent MethodDecl/ClassDecl/VariableDecls
+                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().getParentOrThrow().getTree()));
+                break;
+            case CASE:
+                // for some reason not needed?
+                break;
+        }
+        return j;
+    }
+
+    @Nullable
+    @Override
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
+        JLeftPadded<T> t = super.visitLeftPadded(left, loc, p);
+        if (t == null) {
+            return null;
+        }
+
+        switch (loc) {
+            case ASSIGNMENT:
+            case BINARY_OPERATOR:
+            case MEMBER_REFERENCE:
+            case TERNARY_TRUE:
+            case TERNARY_FALSE:
+                J current = getCursor().getTree();
+                t = t.withBefore(continuationIndent(t.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
+                        current : enclosingStatement()));
+                break;
+            case EXTENDS:
+            case FIELD_ACCESS_NAME:
+            case TRY_FINALLY:
+            case VARIABLE_INITIALIZER:
+            case WHILE_CONDITION:
+                break;
+            case UNARY_OPERATOR:
+                // handled in visitUnary
+                break;
+        }
         return t;
     }
 
     @Override
     public J.Unary visitUnary(J.Unary unary, P p) {
         J.Unary u = super.visitUnary(unary, p);
-        u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
+        switch (u.getOperator().getElem()) {
+            case PreIncrement:
+            case PreDecrement:
+            case Negative:
+            case Complement:
+            case Not:
+            case Positive:
+                u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
+                break;
+            case PostIncrement:
+            case PostDecrement:
+                u = u.withOperator(continuationIndent(u.getOperator(),
+                        u.getPrefix().getWhitespace().contains("\n") ? u : enclosingStatement()));
+                break;
+        }
         return u;
     }
 
@@ -275,6 +324,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
     }
 
+    @Nullable
     private J enclosingStatement() {
         return enclosingStatement(getCursor());
     }

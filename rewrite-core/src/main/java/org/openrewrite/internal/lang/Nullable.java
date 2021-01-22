@@ -33,7 +33,7 @@ import java.lang.annotation.*;
  * @see NonNullFields
  * @see NonNull
  */
-@Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD})
+@Target({ElementType.METHOD, ElementType.PARAMETER, ElementType.FIELD, ElementType.TYPE_USE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Nonnull(when = When.MAYBE)

@@ -41,4 +41,36 @@ public class JRightPadded<T> {
     public JRightPadded<T> map(Function<T, T> map) {
         return withElem(map.apply(elem));
     }
+
+    public enum Location {
+        ANNOTATION_ARGUMENT,
+        ARRAY_INDEX,
+        BLOCK_STATEMENT,
+        CASE,
+        CATCH_ALTERNATIVE,
+        ENUM_VALUE,
+        FOR_BODY,
+        FOR_CONDITION,
+        FOR_INIT,
+        FOR_UPDATE,
+        FOREACH_VARIABLE,
+        FOREACH_ITERABLE,
+        IF_ELSE,
+        IF_THEN,
+        IMPLEMENTS,
+        IMPORT,
+        INSTANCEOF,
+        METHOD_ARGUMENT,
+        METHOD_SELECT,
+        NAMED_VARIABLE,
+        NEW_ARRAY_INITIALIZER,
+        NEW_CLASS_ARGS,
+        PACKAGE,
+        PARENTHESES,
+        THROWS,
+        TRY_RESOURCES,
+        TYPE_PARAMETER,
+        TYPE_BOUND,
+        WHILE_BODY
+    }
 }

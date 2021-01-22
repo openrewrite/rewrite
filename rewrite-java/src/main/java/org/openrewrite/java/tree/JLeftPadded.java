@@ -44,4 +44,18 @@ public class JLeftPadded<T> {
     public JLeftPadded<T> map(Function<T, T> map) {
         return withElem(map.apply(elem));
     }
+
+    public enum Location {
+        ASSIGNMENT,
+        BINARY_OPERATOR,
+        EXTENDS,
+        FIELD_ACCESS_NAME,
+        MEMBER_REFERENCE,
+        TERNARY_TRUE,
+        TERNARY_FALSE,
+        TRY_FINALLY,
+        UNARY_OPERATOR,
+        VARIABLE_INITIALIZER,
+        WHILE_CONDITION
+    }
 }

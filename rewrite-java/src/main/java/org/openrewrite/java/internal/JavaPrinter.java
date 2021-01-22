@@ -47,9 +47,11 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
         }
 
         J t = treePrinter.doFirst((J) tree, p);
+
         if (t == null) {
             return defaultValue(null, p);
         }
+
         //noinspection ConstantConditions
         return treePrinter.doLast(tree, t.accept(this, p), p);
     }

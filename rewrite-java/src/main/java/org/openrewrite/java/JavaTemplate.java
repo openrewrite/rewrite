@@ -178,7 +178,7 @@ public class JavaTemplate {
                     //up to the statement that is in insertion scope.
                     List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
                     for (JRightPadded<Statement> statement : b.getStatements()) {
-                        statementsInScope.add(visitRightPadded(statement, SpaceType.BLOCK_STATEMENT, insertionScope));
+                        statementsInScope.add(visitRightPadded(statement, JRightPadded.Location.BLOCK_STATEMENT, insertionScope));
                         if (insertionScope.isScopeInPath(statement.getElem())) {
                             break;
                         }
@@ -219,9 +219,7 @@ public class JavaTemplate {
      * Custom Java Printer that will add additional import and add the printed template at the insertion point.
      */
     private static class TemplatePrinter extends JavaPrinter<String> {
-
         private final Set<String> imports;
-
 
         TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
             super(new TreePrinter<String>() {

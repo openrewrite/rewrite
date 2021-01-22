@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format
 
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -403,8 +402,8 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun shiftRight(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(tabsAndIndents()).build(),
+    fun shiftRight(jp: JavaParser) = assertChanged(
+        jp,
         before = """
             public class Test {
                 public void test(boolean a, int x, int y) {
@@ -550,23 +549,96 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodInvocations(jp: JavaParser) = assertChanged(
+    fun containers(jp: JavaParser) = assertChanged(
         jp,
         before = """
-            public class Test {
-                public Test method(int n) {
-                    return method(n)
-                        .method(n)
-                        .method(n);
+            import java.io.ByteArrayInputStream;
+            import java.io.InputStream;
+            import java.io.Serializable;
+            @Deprecated
+            (since = "1.0")
+            class Test
+            <T
+            extends Object>
+            implements
+            Serializable {
+                Test method
+                ()
+                throws Exception {
+                    try
+                    (InputStream is = new ByteArrayInputStream(new byte[0])) {}
+                    int n[] = 
+                    {0};
+                    switch (1) {
+                    case 1:
+                    n
+                    [0]++;
+                    }
+                    return new Test
+                    ();
                 }
             }
         """,
         after = """
-            public class Test {
-                public Test method(int n) {
+            import java.io.ByteArrayInputStream;
+            import java.io.InputStream;
+            import java.io.Serializable;
+            @Deprecated
+                    (since = "1.0")
+            class Test
+                    <T
+                            extends Object>
+                    implements
+                    Serializable {
+                Test method
+                        ()
+                        throws Exception {
+                    try
+                            (InputStream is = new ByteArrayInputStream(new byte[0])) {}
+                    int n[] = 
+                            {0};
+                    switch (1) {
+                        case 1:
+                            n
+                                    [0]++;
+                    }
+                    return new Test
+                            ();
+                }
+            }
+        """
+    )
+
+    @Test
+    fun methodInvocations(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                Test method(int n) {
+                    return method(n)
+                        .method(n)
+                        .method(n);
+                }
+            
+                Test method2() {
+                    return method2().
+                        method2().
+                        method2();
+                }
+            }
+        """,
+        after = """
+            class Test {
+                Test method(int n) {
                     return method(n)
                             .method(n)
                             .method(n);
+                }
+            
+                Test method2() {
+                    return method2().
+                            method2().
+                            method2();
                 }
             }
         """
@@ -626,9 +698,29 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
-    fun failure1(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.build(),
+    fun lambdaMethodParameter(jp: JavaParser) = assertUnchanged(
+        jp,
+        // FIXME c(f) sees its parent as the method invocation a(f)... not .b(...
+        before = """
+            import java.util.function.Function;
+            abstract class Test {
+                abstract Test a(Function<Test, Test> f);
+                abstract Test b(Function<Test, Test> f);
+                abstract Test c(Function<Test, Test> f);
+                
+                Test method(Function<Test, Test> f) {
+                    return a(f)
+                            .b(t ->
+                                    c(f)
+                            );
+                }
+            }
+        """
+    )
+
+    @Test
+    fun failure1(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
                 public class Test {
                     public static DefaultRepositorySystemSession getRepositorySystemSession(RepositorySystem system,
@@ -649,9 +741,8 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
-    fun failure2(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.build(),
+    fun failure2(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
             import java.util.stream.Stream;
             public class Test {        
@@ -670,8 +761,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
-    fun failure3(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun punctuation(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
             import java.util.function.Function;
@@ -744,73 +834,8 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
-//    fun lambdaMethodParameter(jp: JavaParser) = assertUnchanged(
-    fun failure4(jp: JavaParser) = assertUnchanged(
+    fun newClass(jp: JavaParser) = assertChanged(
         jp,
-        // FIXME c(f) sees its parent as the method invocation a(f)... not .b(...
-        before = """
-            import java.util.function.Function;
-            abstract class Test {
-                abstract Test a(Function<Test, Test> f);
-                abstract Test b(Function<Test, Test> f);
-                abstract Test c(Function<Test, Test> f);
-                
-                Test method(Function<Test, Test> f) {
-                    return a(f)
-                            .b(t ->
-                                    c(f)
-                            );
-                }
-            }
-        """
-    )
-
-    @Test
-    @Disabled
-    fun failure5(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
-        before = """
-            import java.util.function.Function;
-            public class Test {
-                int X[];
-                public int plus(int x) {
-                    return 0;
-                }
-                public void test(boolean a, int x, int y) {
-                    Function<Integer, Integer> op = this
-                      ::
-                      plus;
-                    if (x
-                      >
-                      0) {
-                        int someVariable = a ?
-                          x :
-                          y;
-                        int anotherVariable = a
-                          ?
-                          x
-                          :
-                          y;
-                    }
-                    x
-                      ++;
-                    X
-                      [
-                      1
-                      ]
-                      =
-                      0;
-                }
-            }
-        """
-    )
-
-    @Test
-    @Disabled
-//    fun newClass(jp: JavaParser.Builder<*, *>) = assertChanged(
-    fun failure6(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.build(),
         before = """
             class Test {
                 Test(Test t) {}

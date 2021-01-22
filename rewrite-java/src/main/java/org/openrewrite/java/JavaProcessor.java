@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.*;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 
 public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor<J, P> {
     /**
@@ -133,7 +134,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.Annotation a = call(annotation, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = call(a, p, this::visitExpression);
-        a = a.withArgs(visitContainer(a.getArgs(), SpaceType.ANNOTATION_ARGUMENT, p));
+        a = a.withArgs(visitContainer(a.getArgs(), JContainer.Location.ANNOTATION_ARGUMENT, p));
         a = a.withAnnotationType(call(a.getAnnotationType(), p));
         return a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
     }
@@ -152,7 +153,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
         J.ArrayDimension a = call(arrayDimension, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = a.withIndex(visitRightPadded(a.getIndex(), SpaceType.ARRAY_INDEX, p));
+        a = a.withIndex(visitRightPadded(a.getIndex(), JRightPadded.Location.ARRAY_INDEX, p));
         return a;
     }
 
@@ -180,7 +181,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         a = call(a, p, this::visitStatement);
         a = call(a, p, this::visitExpression);
         a = a.withVariable(call(a.getVariable(), p));
-        return a.withAssignment(visitLeftPadded(a.getAssignment(), SpaceType.ASSIGNMENT, p));
+        return a.withAssignment(visitLeftPadded(a.getAssignment(), JLeftPadded.Location.ASSIGNMENT, p));
     }
 
     @Override
@@ -199,6 +200,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
         b = call(b, p, this::visitExpression);
         b = b.withLeft(call(b.getLeft(), p));
+        b = b.withOperator(visitLeftPadded(b.getOperator(), JLeftPadded.Location.BINARY_OPERATOR, p));
         return b.withRight(call(b.getRight(), p));
     }
 
@@ -211,7 +213,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
         b = call(b, p, this::visitStatement);
         b = b.withStatements(ListUtils.map(b.getStatements(), t ->
-                visitRightPadded(t, SpaceType.BLOCK_STATEMENT, p)));
+                visitRightPadded(t, JRightPadded.Location.BLOCK_STATEMENT, p)));
         return b.withEnd(visitSpace(b.getEnd(), p));
     }
 
@@ -229,7 +231,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         c = call(c, p, this::visitStatement);
         c = c.withPattern(call(c.getPattern(), p));
-        return c.withStatements(visitContainer(c.getStatements(), SpaceType.CASE, p));
+        return c.withStatements(visitContainer(c.getStatements(), JContainer.Location.CASE, p));
     }
 
     @Override
@@ -249,11 +251,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         c = c.withModifiers(call(c.getModifiers(), p));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        c = c.withTypeParameters(visitContainer(c.getTypeParameters(), SpaceType.TYPE_PARAMETER, p));
+        c = c.withTypeParameters(visitContainer(c.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         c = c.withName(call(c.getName(), p));
-        c = c.withExtends(visitLeftPadded(c.getExtends(), SpaceType.EXTENDS, p));
+        c = c.withExtends(visitLeftPadded(c.getExtends(), JLeftPadded.Location.EXTENDS, p));
         c = c.withExtends(visitTypeName(c.getExtends(), p));
-        c = c.withImplements(visitContainer(c.getImplements(), SpaceType.IMPLEMENTS, p));
+        c = c.withImplements(visitContainer(c.getImplements(), JContainer.Location.IMPLEMENTS, p));
         c = c.withImplements(visitTypeNames(c.getImplements(), p));
         return c.withBody(call(c.getBody(), p));
     }
@@ -262,8 +264,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = call(cu, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = c.withPackageDecl(visitRightPadded(c.getPackageDecl(), SpaceType.PACKAGE, p));
-        c = c.withImports(ListUtils.map(c.getImports(), t -> visitRightPadded(t, SpaceType.IMPORT, p)));
+        c = c.withPackageDecl(visitRightPadded(c.getPackageDecl(), JRightPadded.Location.PACKAGE, p));
+        c = c.withImports(ListUtils.map(c.getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
         c = c.withClasses(call(c.getClasses(), p));
         return c.withEof(visitSpace(c.getEof(), p));
     }
@@ -281,7 +283,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.ControlParentheses<T> cpa = call(controlParens, p, this::visitEach);
         cpa = cpa.withPrefix(visitSpace(cpa.getPrefix(), p));
         cpa = call(cpa, p, this::visitExpression);
-        return cpa.withTree(visitRightPadded(cpa.getTree(), SpaceType.PARENTHESES, p));
+        return cpa.withTree(visitRightPadded(cpa.getTree(), JRightPadded.Location.PARENTHESES, p));
     }
 
     @Override
@@ -289,8 +291,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.DoWhileLoop d = call(doWhileLoop, p, this::visitEach);
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
         d = call(d, p, this::visitStatement);
-        d = d.withWhileCondition(visitLeftPadded(d.getWhileCondition(), SpaceType.WHILE_CONDITION, p));
-        return d.withBody(visitRightPadded(d.getBody(), SpaceType.WHILE_BODY, p));
+        d = d.withWhileCondition(visitLeftPadded(d.getWhileCondition(), JLeftPadded.Location.WHILE_CONDITION, p));
+        return d.withBody(visitRightPadded(d.getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     @Override
@@ -315,7 +317,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.EnumValueSet e = call(enums, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
         e = call(e, p, this::visitStatement);
-        return e.withEnums(ListUtils.map(e.getEnums(), t -> visitRightPadded(t, SpaceType.ENUM_VALUE, p)));
+        return e.withEnums(ListUtils.map(e.getEnums(), t -> visitRightPadded(t, JRightPadded.Location.ENUM_VALUE, p)));
     }
 
     @Override
@@ -325,7 +327,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         f = visitTypeName(f, p);
         f = call(f, p, this::visitExpression);
         f = f.withTarget(call(f.getTarget(), p));
-        return f.withName(visitLeftPadded(f.getName(), SpaceType.FIELD_ACCESS_NAME, p));
+        return f.withName(visitLeftPadded(f.getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
     }
 
     @Override
@@ -333,9 +335,9 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.ForEachLoop f = call(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withVariable(visitRightPadded(f.getControl().getVariable(), SpaceType.FOREACH_VARIABLE, p)));
-        f = f.withControl(f.getControl().withIterable(visitRightPadded(f.getControl().getIterable(), SpaceType.FOREACH_ITERABLE, p)));
-        return f.withBody(visitRightPadded(f.getBody(), SpaceType.FOR_BODY, p));
+        f = f.withControl(f.getControl().withVariable(visitRightPadded(f.getControl().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p)));
+        f = f.withControl(f.getControl().withIterable(visitRightPadded(f.getControl().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p)));
+        return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
     }
 
     @Override
@@ -343,10 +345,10 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.ForLoop f = call(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withInit(visitRightPadded(f.getControl().getInit(), SpaceType.FOR_INIT, p)));
-        f = f.withControl(f.getControl().withCondition(visitRightPadded(f.getControl().getCondition(), SpaceType.FOR_CONDITION, p)));
-        f = f.withControl(f.getControl().withUpdate(ListUtils.map(f.getControl().getUpdate(), t -> visitRightPadded(t, SpaceType.FOR_UPDATE, p))));
-        return f.withBody(visitRightPadded(f.getBody(), SpaceType.FOR_BODY, p));
+        f = f.withControl(f.getControl().withInit(visitRightPadded(f.getControl().getInit(), JRightPadded.Location.FOR_INIT, p)));
+        f = f.withControl(f.getControl().withCondition(visitRightPadded(f.getControl().getCondition(), JRightPadded.Location.FOR_CONDITION, p)));
+        f = f.withControl(f.getControl().withUpdate(ListUtils.map(f.getControl().getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p))));
+        return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
     }
 
     @Override
@@ -360,7 +362,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     public J visitElse(J.If.Else elze, P p) {
         J.If.Else e = call(elze, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        return e.withBody(visitRightPadded(e.getBody(), SpaceType.IF_ELSE, p));
+        return e.withBody(visitRightPadded(e.getBody(), JRightPadded.Location.IF_ELSE, p));
     }
 
     @Override
@@ -369,7 +371,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
         i = call(i, p, this::visitStatement);
         i = i.withIfCondition(call(i.getIfCondition(), p));
-        i = i.withThenPart(visitRightPadded(i.getThenPart(), SpaceType.IF_THEN, p));
+        i = i.withThenPart(visitRightPadded(i.getThenPart(), JRightPadded.Location.IF_THEN, p));
         i = i.withElsePart(call(i.getElsePart(), p));
         return i;
     }
@@ -388,7 +390,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.InstanceOf i = call(instanceOf, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
         i = call(i, p, this::visitExpression);
-        i = i.withExpr(visitRightPadded(i.getExpr(), SpaceType.INSTANCEOF, p));
+        i = i.withExpr(visitRightPadded(i.getExpr(), JRightPadded.Location.INSTANCEOF, p));
         return i.withClazz(call(i.getClazz(), p));
     }
 
@@ -422,8 +424,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.MemberReference m = call(memberRef, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withContaining(call(m.getContaining(), p));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), SpaceType.TYPE_PARAMETER, p));
-        return m.withReference(visitLeftPadded(m.getReference(), SpaceType.MEMBER_REFERENCE, p));
+        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        return m.withReference(visitLeftPadded(m.getReference(), JLeftPadded.Location.MEMBER_REFERENCE, p));
     }
 
     @Override
@@ -435,15 +437,15 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), SpaceType.TYPE_PARAMETER, p));
+        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
         m = m.withReturnTypeExpr(
                 m.getReturnTypeExpr() == null ?
                         null :
                         visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(call(m.getName(), p));
-        m = m.withParams(visitContainer(m.getParams(), SpaceType.METHOD_ARGUMENT, p));
-        m = m.withThrows(visitContainer(m.getThrows(), SpaceType.THROWS, p));
+        m = m.withParams(visitContainer(m.getParams(), JContainer.Location.METHOD_ARGUMENT, p));
+        m = m.withThrows(visitContainer(m.getThrows(), JContainer.Location.THROWS, p));
         m = m.withThrows(visitTypeNames(m.getThrows(), p));
         return m.withBody(call(m.getBody(), p));
     }
@@ -461,11 +463,11 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
                     (JRightPadded<Expression>) (JRightPadded<?>)
                             visitTypeName((JRightPadded<NameTree>) (JRightPadded<?>) m.getSelect(), p));
         }
-        m = m.withSelect(visitRightPadded(m.getSelect(), SpaceType.METHOD_SELECT, p));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), SpaceType.TYPE_PARAMETER, p));
+        m = m.withSelect(visitRightPadded(m.getSelect(), JRightPadded.Location.METHOD_SELECT, p));
+        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         m = m.withTypeParameters(visitTypeNames(m.getTypeParameters(), p));
         m = m.withName(call(m.getName(), p));
-        return m.withArgs(visitContainer(m.getArgs(), SpaceType.METHOD_ARGUMENT, p));
+        return m.withArgs(visitContainer(m.getArgs(), JContainer.Location.METHOD_ARGUMENT, p));
     }
 
     @Override
@@ -473,7 +475,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.MultiCatch m = call(multiCatch, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         return m.withAlternatives(ListUtils.map(m.getAlternatives(), t ->
-                visitTypeName(visitRightPadded(t, SpaceType.CATCH_ALTERNATIVE, p), p)));
+                visitTypeName(visitRightPadded(t, JRightPadded.Location.CATCH_ALTERNATIVE, p), p)));
     }
 
     @Override
@@ -481,7 +483,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.VariableDecls m = call(multiVariable, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = call(m, p, this::visitStatement);
-        m = m.withModifiers(call(m.getModifiers(), p));
+        m = m.withModifiers(Objects.requireNonNull(call(m.getModifiers(), p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         m = m.withAnnotations(call(m.getAnnotations(), p));
@@ -492,7 +494,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         m = m.withVarargs(m.getVarargs() == null ?
                 null :
                 visitSpace(m.getVarargs(), p));
-        return m.withVars(ListUtils.map(m.getVars(), t -> visitRightPadded(t, SpaceType.NAMED_VARIABLE, p)));
+        return m.withVars(ListUtils.map(m.getVars(), t -> visitRightPadded(t, JRightPadded.Location.NAMED_VARIABLE, p)));
     }
 
     @Override
@@ -505,7 +507,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
                 null :
                 visitTypeName(n.getTypeExpr(), p));
         n = n.withDimensions(call(n.getDimensions(), p));
-        return n.withInitializer(visitContainer(n.getInitializer(), SpaceType.NEW_ARRAY_INITIALIZER, p));
+        return n.withInitializer(visitContainer(n.getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, p));
     }
 
     @Override
@@ -519,7 +521,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         n = n.withClazz(n.getClazz() == null ?
                 null :
                 visitTypeName(n.getClazz(), p));
-        n = n.withArgs(visitContainer(n.getArgs(), SpaceType.NEW_CLASS_ARGS, p));
+        n = n.withArgs(visitContainer(n.getArgs(), JContainer.Location.NEW_CLASS_ARGS, p));
         return n.withBody(call(n.getBody(), p));
     }
 
@@ -537,7 +539,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         pt = call(pt, p, this::visitExpression);
         pt = pt.withClazz(call(pt.getClazz(), p));
         pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
-        pt = pt.withTypeParameters(visitContainer(pt.getTypeParameters(), SpaceType.TYPE_PARAMETER, p));
+        pt = pt.withTypeParameters(visitContainer(pt.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         return pt.withTypeParameters(visitTypeNames(pt.getTypeParameters(), p));
     }
 
@@ -546,7 +548,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.Parentheses<T> pa = call(parens, p, this::visitEach);
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), p));
         pa = call(pa, p, this::visitExpression);
-        return pa.withTree(visitRightPadded(pa.getTree(), SpaceType.PARENTHESES, p));
+        return pa.withTree(visitRightPadded(pa.getTree(), JRightPadded.Location.PARENTHESES, p));
     }
 
     @Override
@@ -588,8 +590,8 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
         t = call(t, p, this::visitExpression);
         t = t.withCondition(call(t.getCondition(), p));
-        t = t.withTruePart(visitLeftPadded(t.getTruePart(), SpaceType.TERNARY_TRUE, p));
-        return t.withFalsePart(visitLeftPadded(t.getFalsePart(), SpaceType.TERNARY_FALSE, p));
+        t = t.withTruePart(visitLeftPadded(t.getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p));
+        return t.withFalsePart(visitLeftPadded(t.getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p));
     }
 
     @Override
@@ -605,10 +607,10 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         J.Try t = call(tryable, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
         t = call(t, p, this::visitStatement);
-        t = t.withResources(visitContainer(t.getResources(), SpaceType.TRY_RESOURCES, p));
+        t = t.withResources(visitContainer(t.getResources(), JContainer.Location.TRY_RESOURCES, p));
         t = t.withBody(call(t.getBody(), p));
         t = t.withCatches(call(t.getCatches(), p));
-        return t.withFinally(visitLeftPadded(t.getFinally(), SpaceType.TRY_FINALLY, p));
+        return t.withFinally(visitLeftPadded(t.getFinally(), JLeftPadded.Location.TRY_FINALLY, p));
     }
 
     @Override
@@ -630,7 +632,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         if (t.getName() instanceof NameTree) {
             t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));
         }
-        t = t.withBounds(visitContainer(t.getBounds(), SpaceType.TYPE_BOUND, p));
+        t = t.withBounds(visitContainer(t.getBounds(), JContainer.Location.TYPE_BOUND, p));
         return t.withBounds(visitTypeNames(t.getBounds(), p));
     }
 
@@ -640,6 +642,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         u = u.withPrefix(visitSpace(u.getPrefix(), p));
         u = call(u, p, this::visitStatement);
         u = call(u, p, this::visitExpression);
+        u = u.withOperator(visitLeftPadded(u.getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p));
         return u.withExpr(call(u.getExpr(), p));
     }
 
@@ -649,7 +652,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         v = v.withPrefix(visitSpace(v.getPrefix(), p));
         v = v.withName(call(v.getName(), p));
         return v.withInitializer(visitLeftPadded(v.getInitializer(),
-                SpaceType.VARIABLE_INITIALIZER, p));
+                JLeftPadded.Location.VARIABLE_INITIALIZER, p));
     }
 
     @Override
@@ -658,7 +661,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
         w = call(w, p, this::visitStatement);
         w = w.withCondition(call(w.getCondition(), p));
-        return w.withBody(visitRightPadded(w.getBody(), SpaceType.WHILE_BODY, p));
+        return w.withBody(visitRightPadded(w.getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     @Override
@@ -676,7 +679,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
 
     @Nullable
     public <J2 extends J> JRightPadded<J2> visitRightPadded(@Nullable JRightPadded<J2> right,
-                                                            SpaceType type, P p) {
+                                                            JRightPadded.Location type, P p) {
         if (right == null) {
             return null;
         }
@@ -686,23 +689,27 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
     }
 
     @Nullable
-    public <J2 extends J> JLeftPadded<J2> visitLeftPadded(@Nullable JLeftPadded<J2> left,
-                                                          SpaceType type, P p) {
+    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left,
+                                                          JLeftPadded.Location loc, P p) {
         if (left == null) {
             return null;
         }
         Space space = visitSpace(left.getBefore(), p);
-        J2 j = call(left.getElem(), p);
-        return (space == left.getBefore() && j == left.getElem()) ? left : new JLeftPadded<>(space, j);
+        T t = left.getElem();
+        if(t instanceof J) {
+            //noinspection unchecked
+            t = call((J) left.getElem(), p);
+        }
+        return (space == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(space, t);
     }
 
     @Nullable
     public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
-                                                        SpaceType type, P p) {
+                                                        JContainer.Location loc, P p) {
         if (container == null) {
             return null;
         }
-        List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, type, p));
+        List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
         return js == container.getElem() ? container : JContainer.build(container.getBefore(), js);
     }
 
@@ -766,46 +773,5 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
      */
     protected boolean isInSameNameScope(Cursor child) {
         return isInSameNameScope(getCursor(), child);
-    }
-
-    public enum SpaceType {
-        ANNOTATION_ARGUMENT,
-        ARRAY_INDEX,
-        ASSIGNMENT,
-        BLOCK_STATEMENT,
-        CASE,
-        CATCH_ALTERNATIVE,
-        ENUM_VALUE,
-        EXTENDS,
-        FIELD_ACCESS_NAME,
-        FOR_BODY,
-        FOR_CONDITION,
-        FOR_INIT,
-        FOR_UPDATE,
-        FOREACH_VARIABLE,
-        FOREACH_ITERABLE,
-        IF_ELSE,
-        IF_THEN,
-        IMPLEMENTS,
-        IMPORT,
-        INSTANCEOF,
-        MEMBER_REFERENCE,
-        METHOD_ARGUMENT,
-        METHOD_SELECT,
-        NAMED_VARIABLE,
-        NEW_ARRAY_INITIALIZER,
-        NEW_CLASS_ARGS,
-        PACKAGE,
-        PARENTHESES,
-        TERNARY_TRUE,
-        TERNARY_FALSE,
-        THROWS,
-        TRY_RESOURCES,
-        TRY_FINALLY,
-        TYPE_PARAMETER,
-        TYPE_BOUND,
-        VARIABLE_INITIALIZER,
-        WHILE_CONDITION,
-        WHILE_BODY,
     }
 }
