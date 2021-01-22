@@ -2490,7 +2490,7 @@ public interface J extends Serializable, Tree {
                         .getParentOrThrow() // J.VariableDecls
                         .getParentOrThrow() // J.Block
                         .getParentOrThrow() // maybe J.ClassDecl
-                        .getTree() instanceof J.ClassDecl;
+                        .getValue() instanceof J.ClassDecl;
             }
         }
 

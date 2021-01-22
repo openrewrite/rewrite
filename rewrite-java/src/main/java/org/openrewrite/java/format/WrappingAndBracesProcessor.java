@@ -31,7 +31,7 @@ public class WrappingAndBracesProcessor<P> extends JavaIsoProcessor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        J parentTree = getCursor().getParentOrThrow().getTree();
+        J parentTree = getCursor().getParentOrThrow().getValue();
         if(parentTree instanceof J.Block) {
             if(!j.getPrefix().getWhitespace().contains("\n")) {
                 j = j.withPrefix(j.getPrefix().withWhitespace("\n" + j.getPrefix().getWhitespace()));

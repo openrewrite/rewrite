@@ -77,7 +77,7 @@ public class ChangeFieldName<P> extends JavaIsoProcessor<P> {
                 .getParentOrThrow() // maybe J.VariableDecls
                 .getParentOrThrow() // maybe J.Block
                 .getParentOrThrow() // maybe J.ClassDecl
-                .getTree() instanceof J.ClassDecl;
+                .getValue() instanceof J.ClassDecl;
     }
 
     private static class FindVariableDefinition extends JavaIsoProcessor<AtomicReference<Cursor>> {

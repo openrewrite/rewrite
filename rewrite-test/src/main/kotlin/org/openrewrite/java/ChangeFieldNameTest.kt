@@ -22,7 +22,6 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
-import java.util.function.Supplier
 
 interface ChangeFieldNameTest : RecipeTest {
     fun changeFieldName(from: String, to: String) = object : Recipe() {
@@ -34,7 +33,7 @@ interface ChangeFieldNameTest : RecipeTest {
                 }
 
                 override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
-                    val containing = cursor.parentOrThrow.parentOrThrow.getTree<J>()
+                    val containing = cursor.parentOrThrow.parentOrThrow.getValue<J>()
                     if (containing is J.ClassDecl) {
                         val type = v.typeExpr?.type
                         if(type is JavaType.FullyQualified) {

@@ -83,17 +83,17 @@ public class JavaTemplate {
         boolean memberVariableInitializer = false;
 
         while(insertionScope.getParent() != null &&
-                !(insertionScope.getParent().getTree() instanceof J.CompilationUnit) &&
-                !(insertionScope.getParent().getTree() instanceof J.Block)
+                !(insertionScope.getParent().getValue() instanceof J.CompilationUnit) &&
+                !(insertionScope.getParent().getValue() instanceof J.Block)
             ) {
 
-            if (insertionScope.getParent().getTree() instanceof J.VariableDecls.NamedVar) {
+            if (insertionScope.getParent().getValue() instanceof J.VariableDecls.NamedVar) {
                 //There is one edge case that can trip up compilation: If the insertion scope is the initializer
                 //of a member variable and that scope is not itself in a nested block. In this case, a class block
                 //must be created to correctly compile the template
 
                 //Find the first block's parent and if that parent is a class declaration, account for the edge case.
-                Iterator<Tree> index =  insertionScope.getPath();
+                Iterator<Object> index = insertionScope.getPath();
                 while (index.hasNext()) {
                     if (index.next() instanceof J.Block && index.hasNext() && index.next() instanceof J.ClassDecl) {
                         memberVariableInitializer = true;
@@ -167,7 +167,7 @@ public class JavaTemplate {
         public J.Block visitBlock(J.Block block, Cursor insertionScope) {
             Cursor parent = getCursor().getParent();
 
-            if (parent != null && !(parent.getTree() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
+            if (parent != null && !(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
                 J.Block b = call(block, insertionScope, this::visitEach);
                 b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), insertionScope) : null);
                 b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
@@ -185,7 +185,7 @@ public class JavaTemplate {
                     }
                     return b.withStatements(statementsInScope);
                 }
-            } else if (parent != null && parent.getTree() instanceof J.ClassDecl) {
+            } else if (parent != null && parent.getValue() instanceof J.ClassDecl) {
                 return super.visitBlock(block, insertionScope);
             }
             return block.withStatements(emptyList());
@@ -230,14 +230,15 @@ public class JavaTemplate {
                     String blockStart = memberVariableInitializer ? "{" : "";
                     String blockEnd = memberVariableInitializer ? "}" : "";
                     // individual statement, but block doLast which is invoking this adds the ;
-                    if (insertionScope.getTree().getId().equals(tree.getId())) {
+                    Object insertionValue = insertionScope.getValue();
+                    if (insertionValue instanceof Tree && ((Tree)insertionValue).getId().equals(tree.getId())) {
                         String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
                                 printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
                         if (after) {
                             // since the visit method on J.Block is responsible for adding the ';', we
                             // add it pre-emptively here before concatenating the template.
                             printed = printed +
-                                    ((insertionScope.getParentOrThrow().getTree() instanceof J.Block) ?
+                                    ((insertionScope.getParentOrThrow().getValue() instanceof J.Block) ?
                                             ";" : "") +
                                     templateCode;
                         } else {
@@ -335,10 +336,10 @@ public class JavaTemplate {
                 //remove the marker comment, and flag the extractor to start collecting all elements until the end marker
                 //is found.
                 context.collectElements = true;
-                context.collectedIds.add(getCursor().getTree().getId());
+                context.collectedIds.add(((Tree)getCursor().getValue()).getId());
                 context.startDepth = templateDepth;
 
-                if (getCursor().getTree() instanceof J.CompilationUnit) {
+                if (getCursor().getValue() instanceof J.CompilationUnit) {
                     //Special case: The starting marker can exist at the compilation unit (when inserting before
                     //the first class declaration (with no imports). Do not add the compilation unit to the collected
                     //elements
@@ -347,11 +348,11 @@ public class JavaTemplate {
                 }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
-                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getTree()).withPrefix(space.withComments(comments))));
-            } else if (context.collectElements && !context.collectedIds.contains(getCursor().getTree().getId())) {
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getValue()).withPrefix(space.withComments(comments))));
+            } else if (context.collectElements && !context.collectedIds.contains(((Tree)getCursor().getValue()).getId())) {
                 //If collecting elements and the current cursor element has not already been collected, add it.
-                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().getTree())));
-                context.collectedIds.add(getCursor().getTree().getId());
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().getValue())));
+                context.collectedIds.add(((Tree)getCursor().getValue()).getId());
             }
 
             return space;

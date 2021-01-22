@@ -58,7 +58,7 @@ public class ChangeParentVersion extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (PARENT_VERSION_MATCHER.matches(getCursor())) {
-                Xml.Tag parent = getCursor().getParentOrThrow().getTree();
+                Xml.Tag parent = getCursor().getParentOrThrow().getValue();
                 if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
                         artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
                         !toVersion.equals(tag.getValue().orElse(null))) {

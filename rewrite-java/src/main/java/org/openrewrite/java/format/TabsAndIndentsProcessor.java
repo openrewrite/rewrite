@@ -37,18 +37,18 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     public Statement visitStatement(Statement statement, P p) {
         Statement s = statement;
         Cursor parentCursor = getCursor().getParentOrThrow();
-        J parent = parentCursor.getTree();
+        J parent = parentCursor.getValue();
 
         if (!(s instanceof J.Block)) {
-            parent = parentCursor.getTree();
+            parent = parentCursor.getValue();
             Cursor cursor = parentCursor;
 
             // find the first cursor element that is indented further to the left
             for (;
                  parent instanceof J.Block || parent instanceof J.Label || parent instanceof J.Try.Catch ||
-                         parent instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
+                         parent instanceof J.If && cursor.getParentOrThrow().getValue() instanceof J.If.Else ||
                          parent instanceof J.If.Else;
-                 parent = cursor.getTree()) {
+                 parent = cursor.getValue()) {
                 cursor = cursor.getParentOrThrow();
             }
         }
@@ -71,11 +71,11 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     public J.Block visitBlock(J.Block block, P p) {
         J.Block j = super.visitBlock(block, p);
         Cursor cursor = getCursor().getParentOrThrow();
-        Tree parent = cursor.getTree();
+        Tree parent = cursor.getValue();
 
         for (; parent instanceof J.Try.Catch ||
-                parent instanceof J.If && cursor.getParentOrThrow().getTree() instanceof J.If.Else ||
-                parent instanceof J.If.Else; parent = cursor.getTree()) {
+                parent instanceof J.If && cursor.getParentOrThrow().getValue() instanceof J.If.Else ||
+                parent instanceof J.If.Else; parent = cursor.getValue()) {
             cursor = cursor.getParentOrThrow();
         }
 
@@ -94,11 +94,11 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         Expression e = super.visitExpression(expression, p);
         if (expression instanceof J.Annotation) {
             e = e.withPrefix(alignTo(e.getPrefix(),
-                    indent(getCursor().getParentOrThrow().<J>getTree().getPrefix())));
-        } else if (!(getCursor().getParentOrThrow().getTree() instanceof J.Block) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.Case) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.MethodDecl) &&
-                !(getCursor().getParentOrThrow().getTree() instanceof J.VariableDecls)) {
+                    indent(getCursor().getParentOrThrow().<J>getValue().getPrefix())));
+        } else if (!(getCursor().getParentOrThrow().getValue() instanceof J.Block) &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.Case) &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.MethodDecl) &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.VariableDecls)) {
             e = continuationIndent(e, enclosingStatement());
         }
         return e;
@@ -132,8 +132,8 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     private int forInitColumn() {
-        J.ForLoop forLoop = getCursor().getTree();
-        J parent = getCursor().getParentOrThrow().getTree();
+        J.ForLoop forLoop = getCursor().getValue();
+        J parent = getCursor().getParentOrThrow().getValue();
         J alignTo = parent instanceof J.Label ?
                 ((J.Label) parent).withStatement(forLoop.withBody(null)) :
                 forLoop.withBody(null);
@@ -215,7 +215,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             return null;
         }
 
-        J current = getCursor().getTree();
+        J current = getCursor().getValue();
         switch (loc) {
             case IMPLEMENTS:
             case METHOD_ARGUMENT:
@@ -232,7 +232,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                 break;
             case ANNOTATION_ARGUMENT:
                 // any prefix will be on the parent MethodDecl/ClassDecl/VariableDecls
-                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().getParentOrThrow().getTree()));
+                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().getParentOrThrow().getValue()));
                 break;
             case CASE:
                 // for some reason not needed?
@@ -255,7 +255,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             case MEMBER_REFERENCE:
             case TERNARY_TRUE:
             case TERNARY_FALSE:
-                J current = getCursor().getTree();
+                J current = getCursor().getValue();
                 t = t.withBefore(continuationIndent(t.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
                         current : enclosingStatement()));
                 break;
@@ -336,7 +336,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     private J enclosingStatement(Cursor cursor) {
         cursor = cursor.getParent();
         while (cursor != null) {
-            J tree = cursor.getTree();
+            J tree = cursor.getValue();
             if (tree.getPrefix().getWhitespace().contains("\n") &&
                     (tree instanceof Statement || tree instanceof Expression)) {
                 return tree;
@@ -368,9 +368,9 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     private Space alignToParentStatement(Space space, Cursor parent) {
-        J alignTo = parent.getParentOrThrow().getTree() instanceof J.Label ?
-                parent.getParentOrThrow().getTree() :
-                parent.getTree();
+        J alignTo = parent.getParentOrThrow().getValue() instanceof J.Label ?
+                parent.getParentOrThrow().getValue() :
+                parent.getValue();
 
         return alignTo(space, indent(alignTo.getPrefix()));
     }

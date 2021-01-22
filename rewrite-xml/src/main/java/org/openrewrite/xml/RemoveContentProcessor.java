@@ -43,7 +43,7 @@ public class RemoveContentProcessor<P> extends XmlProcessor<P> {
                     contents.remove(content);
 
                     if (removeEmptyAncestors && contents.isEmpty()) {
-                        if (getCursor().getParentOrThrow().getTree() instanceof Xml.Document) {
+                        if (getCursor().getParentOrThrow().getValue() instanceof Xml.Document) {
                             return t.withContent(null).withClosing(null);
                         } else {
                             doAfterVisit(new RemoveContentProcessor<>(t, true));

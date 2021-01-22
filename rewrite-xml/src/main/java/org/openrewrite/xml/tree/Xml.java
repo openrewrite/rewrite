@@ -297,7 +297,7 @@ public interface Xml extends Serializable, Tree {
 
         @JsonIgnore
         public Optional<Tag> getSibling(String name, Cursor cursor) {
-            Xml.Tag parent = cursor.getParent().getTree();
+            Xml.Tag parent = cursor.getParent().getValue();
             if (parent == null) {
                 return Optional.empty();
             }
