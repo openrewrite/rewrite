@@ -231,6 +231,7 @@ public class MavenDownloader {
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("repo.id", repo.getUrl())
                             .tag("group.id", groupId)
                             .tag("artifact.id", artifactId)
                             .tag("type", "pom");
