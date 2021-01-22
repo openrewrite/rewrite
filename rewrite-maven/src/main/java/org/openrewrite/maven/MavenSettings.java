@@ -339,7 +339,6 @@ public class MavenSettings {
     public static class Servers {
         @JacksonXmlProperty(localName = "server")
         @JacksonXmlElementWrapper(useWrapping = false)
-        @With
         List<Server> servers = emptyList();
     }
 

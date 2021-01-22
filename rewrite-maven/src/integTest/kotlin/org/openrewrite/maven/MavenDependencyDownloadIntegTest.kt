@@ -15,9 +15,13 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.Parser
 import org.openrewrite.maven.tree.Maven
 import org.openrewrite.maven.tree.Scope
+import java.nio.file.Paths
 
 class MavenDependencyDownloadIntegTest {
     @Test
@@ -49,5 +53,57 @@ class MavenDependencyDownloadIntegTest {
         compileDependencies.forEach { dep ->
             println("${dep.coordinates} -> ${dep.artifactUri}")
         }
+    }
+
+    @Disabled("This requires a full instance of artifactory with particular configuration to be running locally")
+    @Test
+    fun withAuth() {
+        // Don't worry about the credentials stored in here being useful for any other purpose or worth protecting
+        val maven: Maven = MavenParser.builder()
+            .mavenSettings(Parser.Input(Paths.get("settings.xml")) {
+                """
+                <settings>
+                    <mirrors>
+                        <mirror>
+                            <mirrorOf>*</mirrorOf>
+                            <name>repo</name>
+                            <url>http://localhost:8081/artifactory/jcenter-authenticated/</url>
+                            <id>repo</id>
+                        </mirror>
+                    </mirrors>
+                    <servers>
+                        <server>
+                            <id>repo</id>
+                            <username>admin</username>
+                            <password>E0Sl0n85N0DK</password>
+                        </server>
+                    </servers>
+                </settings>
+                """.trimIndent().byteInputStream()
+            })
+            .build()
+            .parse(
+                """
+                <project>
+                    <modelVersion>4.0.0</modelVersion>
+                
+                    <groupId>org.openrewrite.test</groupId>
+                    <artifactId>foo</artifactId>
+                    <version>0.1.0-SNAPSHOT</version>
+                
+                    <dependencies>
+                        <dependency>
+                            <groupId>com.google.guava</groupId>
+                            <artifactId>guava</artifactId>
+                            <version>29.0-jre</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """)
+            .first()
+
+        assertThat(maven.model.dependencies)
+            .hasSize(1)
+            .matches { it.first().artifactId == "guava" }
     }
 }
