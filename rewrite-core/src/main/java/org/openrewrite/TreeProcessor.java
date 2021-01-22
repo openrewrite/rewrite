@@ -38,7 +38,7 @@ public abstract class TreeProcessor<T extends Tree, P> implements TreeVisitor<T,
     private static final boolean IS_DEBUGGING = System.getProperty("org.openrewrite.debug") != null ||
             ManagementFactory.getRuntimeMXBean().getInputArguments().toString().indexOf("-agentlib:jdwp") > 0;
 
-    private boolean cursored = IS_DEBUGGING;
+    protected boolean cursored = IS_DEBUGGING;
 
     private final ThreadLocal<Cursor> cursor = new ThreadLocal<>();
     private final ThreadLocal<List<TreeProcessor<T, P>>> afterVisit = new ThreadLocal<>();

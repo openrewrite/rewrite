@@ -74,9 +74,9 @@ public class ChangeFieldName<P> extends JavaIsoProcessor<P> {
         AtomicReference<Cursor> nearest = new AtomicReference<>();
         new FindVariableDefinition(ident, getCursor()).visit(getCursor().firstEnclosing(J.CompilationUnit.class), nearest);
         return nearest.get() != null && nearest.get()
-                .getParentOrThrow() // maybe J.VariableDecls
-                .getParentOrThrow() // maybe J.Block
-                .getParentOrThrow() // maybe J.ClassDecl
+                .dropParentUntil(J.class::isInstance) // maybe J.VariableDecls
+                .dropParentUntil(J.class::isInstance) // maybe J.Block
+                .dropParentUntil(J.class::isInstance) // maybe J.ClassDecl
                 .getValue() instanceof J.ClassDecl;
     }
 

@@ -136,8 +136,11 @@ interface RecipeTest {
         }
     }
 
-    fun JavaProcessor<ExecutionContext>.toRecipe() = object : Recipe() {
+    fun JavaProcessor<ExecutionContext>.toRecipe(cursored: Boolean = false) = object : Recipe() {
         override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+            if(cursored) {
+                this@toRecipe.setCursoringOn()
+            }
             return this@toRecipe
         }
     }

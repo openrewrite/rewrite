@@ -16,13 +16,10 @@
 package org.openrewrite;
 
 import lombok.EqualsAndHashCode;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Spliterators;
+import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -43,7 +40,6 @@ public class Cursor {
         this.value = value;
     }
 
-    @NonNull
     public Cursor getRoot() {
         Cursor c = this;
         while (c.parent != null) {
@@ -110,16 +106,54 @@ public class Cursor {
                 + "}";
     }
 
-    @Nullable
-    public Cursor getParent() {
-        return parent;
+    public Cursor dropParentUntil(Predicate<Object> valuePredicate) {
+        Cursor cursor = parent;
+        while(cursor != null && !valuePredicate.test(cursor.value)) {
+            cursor = cursor.parent;
+        }
+        if (cursor == null) {
+            throw new IllegalStateException("Expected to find a matching parent for " + this);
+        }
+        return cursor;
     }
 
-    public Cursor getParentOrThrow() {
+    public Cursor dropParentWhile(Predicate<Object> valuePredicate) {
+        Cursor cursor = parent;
+        while(cursor != null && valuePredicate.test(cursor.value)) {
+            cursor = cursor.parent;
+        }
+        if (cursor == null) {
+            throw new IllegalStateException("Expected to find a matching parent for " + this);
+        }
+        return cursor;
+    }
+
+    @Incubating(since = "7.0.0")
+    @Nullable
+    public Cursor getParent(int levels) {
+        Cursor cursor = this;
+        for (int i = 0; i < levels && cursor != null; i++) {
+            cursor = cursor.parent;
+        }
+        return cursor;
+    }
+
+    @Nullable
+    public Cursor getParent() {
+        return getParent(1);
+    }
+
+    @Incubating(since = "7.0.0")
+    public Cursor getParentOrThrow(int levels) {
+        Cursor parent = getParent(levels);
         if (parent == null) {
             throw new IllegalStateException("Expected to find a parent for " + this);
         }
         return parent;
+    }
+
+    public Cursor getParentOrThrow() {
+        return getParentOrThrow(1);
     }
 
     @SuppressWarnings("unchecked")
@@ -128,8 +162,8 @@ public class Cursor {
     }
 
     public boolean isScopeInPath(Tree scope) {
-        return value instanceof Tree && ((Tree)value).getId().equals(scope.getId()) ||
-                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree)p).getId().equals(scope.getId()));
+        return value instanceof Tree && ((Tree) value).getId().equals(scope.getId()) ||
+                getPathAsStream().anyMatch(p -> p instanceof Tree && ((Tree) p).getId().equals(scope.getId()));
     }
 
     @Incubating(since = "7.0.0")

@@ -54,7 +54,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         }
 
         s = indent(s, parent);
-        rebaseCursor(s);
+        setCursor(new Cursor(getCursor().getParent(), s));
 
         return super.visitStatement(s, p);
     }
