@@ -18,7 +18,6 @@ package org.openrewrite.java
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
 import org.openrewrite.java.format.*
-import org.openrewrite.java.internal.JavaPrinter2Test
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
 
@@ -141,7 +140,3 @@ class Java11UseStaticImportTest : Java11Test, UseStaticImportTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11WrappingAndBracesTest : Java11Test, WrappingAndBracesTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11JavaPrinter2Test : Java11Test, JavaPrinter2Test
