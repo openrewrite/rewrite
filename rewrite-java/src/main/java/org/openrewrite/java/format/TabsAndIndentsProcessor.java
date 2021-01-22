@@ -215,7 +215,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             return null;
         }
 
-        J current = getCursor().getTree();
+        J current = getCursor().getValue();
         switch (loc) {
             case IMPLEMENTS:
             case METHOD_ARGUMENT:
@@ -232,7 +232,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                 break;
             case ANNOTATION_ARGUMENT:
                 // any prefix will be on the parent MethodDecl/ClassDecl/VariableDecls
-                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().getParentOrThrow().getTree()));
+                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().getParentOrThrow().getValue()));
                 break;
             case CASE:
                 // for some reason not needed?
@@ -255,7 +255,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
             case MEMBER_REFERENCE:
             case TERNARY_TRUE:
             case TERNARY_FALSE:
-                J current = getCursor().getTree();
+                J current = getCursor().getValue();
                 t = t.withBefore(continuationIndent(t.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
                         current : enclosingStatement()));
                 break;
