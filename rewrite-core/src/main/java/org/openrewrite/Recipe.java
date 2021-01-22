@@ -21,14 +21,12 @@ import org.openrewrite.marker.Marker;
 
 import java.util.*;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static java.util.Collections.*;
-import static java.util.stream.Collectors.toMap;
-import static java.util.stream.Collectors.toSet;
+import static java.util.stream.Collectors.*;
 
 /**
- * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link #run(List<SourceFile>)} method which will
+ * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
  * apply each recipes {@link TreeProcessor processor} visit method to a list of {@link SourceFile sourceFiles}
  *
  * Requires a name, {@link TreeProcessor processor}.
@@ -41,6 +39,21 @@ import static java.util.stream.Collectors.toSet;
  *
  */
 public class Recipe {
+
+    /**
+     * This tree printer is used when comparing before/after source files and reifies any markers as a list of
+     * hash codes.
+     */
+    private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
+        @Override
+        public String doLast(Tree tree, String printed, ExecutionContext o) {
+            String markerIds = tree.getMarkers().entries().stream().map(marker -> String.valueOf(marker.hashCode())).collect(joining(","));
+            if (!markerIds.isEmpty()) {
+                return "markers[" + markerIds + "]->" + printed;
+            }
+            return printed;
+        }
+    };
 
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
         @Override
@@ -64,9 +77,7 @@ public class Recipe {
     }
 
     /**
-     * Append the provided {@link Recipe} to the last recipe in the doNext chain
-     * @param recipe
-     * @return
+     * @param recipe {@link Recipe} to append to the doNext chain
      */
     public Recipe doNext(Recipe recipe) {
         Recipe tail = this;
@@ -187,7 +198,9 @@ public class Recipe {
                     results.add(new Result(null, s,
                             singleton(ctx.getRecipeThatModifiedSourceFile(s.getId()))));
                 } else {
-                    if(!original.print().equals(s.print())) {
+                    //printing both the before and after (and including markers in the output) and then comparing the
+                    //output to dermine if a change has been made.
+                    if(!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(RecipeThatMadeChanges.class)
                                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))
