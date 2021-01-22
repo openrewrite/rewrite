@@ -54,7 +54,6 @@ interface ChangeMethodNameTest : RecipeTest {
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("newMethodName")
-
     }
     @Test
     fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertChanged(
