@@ -33,14 +33,6 @@ public interface Tree extends Markable {
         return UUID.randomUUID();
     }
 
-    default <T extends Tree> T mark(Marker... add) {
-        Markers markers = getMarkers();
-        for (Marker marker : add) {
-            markers = markers.add(marker);
-        }
-        return withMarkers(markers);
-    }
-
     @JsonIgnore
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
