@@ -168,7 +168,7 @@ public class Cursor {
 
     @Incubating(since = "7.0.0")
     public void putMessageOnFirstEnclosing(Class<?> enclosing, String key, Object value) {
-        if (enclosing.isInstance(this)) {
+        if (enclosing.isInstance(this.getValue())) {
             putMessage(key, value);
         } else if (parent != null) {
             parent.putMessageOnFirstEnclosing(enclosing, key, value);

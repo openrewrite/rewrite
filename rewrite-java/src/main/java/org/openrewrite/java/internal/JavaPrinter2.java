@@ -197,10 +197,10 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
         visit(arrayType.getElementType(), p);
         StringBuilder acc = getPrinterAcc();
         for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            acc.append(visitSpace(d.getElem(), p))
-                    .append('[')
-                    .append(visitSpace(d.getAfter(), p))
-                    .append(']');
+            visitSpace(d.getElem(), p);
+            acc.append('[');
+            visitSpace(d.getAfter(), p);
+            acc.append(']');
         }
         return arrayType;
     }
@@ -417,17 +417,15 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
 
     @Override
     public J visitCase(Case caze, P p) {
-        String pattern;
-        Expression elem = caze.getPattern();
-        if (elem instanceof Ident && ((Ident) elem).getSimpleName().equals("default")) {
-            pattern = "default";
-        } else {
-            pattern = "case" + visit(elem, p);
-        }
-
         visitSpace(caze.getPrefix(), p);
         StringBuilder acc = getPrinterAcc();
-        acc.append(pattern);
+        Expression elem = caze.getPattern();
+        if (elem instanceof Ident && ((Ident) elem).getSimpleName().equals("default")) {
+            acc.append("default");
+        } else {
+            acc.append("case");
+            visit(elem, p);
+        }
         visitSpace(caze.getStatements().getBefore(), p);
         acc.append(':');
         visitStatements(caze.getStatements().getElem(), p);
@@ -945,26 +943,33 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
             case PreIncrement:
                 acc.append("++");
                 visit(unary.getExpr(), p);
+                break;
             case PreDecrement:
                 acc.append("--");
                 visit(unary.getExpr(), p);
+                break;
             case PostIncrement:
                 visit(unary.getExpr(), p);
                 visitSpace(unary.getOperator().getBefore(), p);
                 acc.append("++");
+                break;
             case PostDecrement:
                 visit(unary.getExpr(), p);
                 visitSpace(unary.getOperator().getBefore(), p);
                 acc.append("--");
+                break;
             case Positive:
                 acc.append("+");
                 visit(unary.getExpr(), p);
+                break;
             case Negative:
                 acc.append("-");
                 visit(unary.getExpr(), p);
+                break;
             case Complement:
                 acc.append("~");
                 visit(unary.getExpr(), p);
+                break;
             case Not:
             default:
                 acc.append("!");

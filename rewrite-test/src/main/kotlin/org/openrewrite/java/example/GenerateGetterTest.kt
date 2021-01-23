@@ -17,28 +17,40 @@ package org.openrewrite.java.example
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 
 interface GenerateGetterTest : RecipeTest {
+
     @Test
     fun forField(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            class A {
-                String field;
-            }
-        """,
-        after = """
-            class A {
-                String field;
-                
-                public String getField() {
-                    return field;
+            jp,
+            recipe = GenerateGetter("field"),
+            before = """
+                class A {
+                    String field;
                 }
-            }
-        """
+            """,
+
+            /*
+            Note: if a human added the getter, there would be an indent on the blank line after field,
+            from when the author hit enter after "String field;" but IntelliJ reformat does not
+            add that indent into the blank line if it's missing, and if IntelliJ adds the blank line it lacks the indent
+            so I think it's not a formatting behavior, it's an auto-indent while typing behavior.
+            */
+
+            after = """
+                class A {
+                    String field;
+                
+                    public String getField() {
+                        return field;
+                    }
+                }
+            """
     )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {

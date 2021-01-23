@@ -349,10 +349,10 @@ public class JavaTemplate {
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
                 context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getValue()).withPrefix(space.withComments(comments))));
-            } else if (context.collectElements && !context.collectedIds.contains(((Tree)getCursor().getValue()).getId())) {
+            } else if (context.collectElements && !context.collectedIds.contains(((Tree)getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId())) {
                 //If collecting elements and the current cursor element has not already been collected, add it.
-                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().getValue())));
-                context.collectedIds.add(((Tree)getCursor().getValue()).getId());
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().dropParentUntil(v -> v instanceof J).getValue())));
+                context.collectedIds.add(((Tree)getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId());
             }
 
             return space;

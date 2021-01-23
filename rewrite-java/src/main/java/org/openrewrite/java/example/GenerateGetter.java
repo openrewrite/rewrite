@@ -17,20 +17,19 @@ package org.openrewrite.java.example;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
-
-import static org.openrewrite.Validated.required;
+import org.openrewrite.marker.Markers;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -39,7 +38,7 @@ public class GenerateGetter extends Recipe {
     private static final JavaTemplate GETTER = JavaTemplate
             .builder("" +
                     "public #{} get#{}() {\n" +
-                    "    return #{};" +
+                    "    return #{};\n" +
                     "}")
             .build();
 
@@ -59,7 +58,7 @@ public class GenerateGetter extends Recipe {
         @Override
         public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
             if (variable.isField(getCursor()) && variable.getSimpleName().equals(fieldName)) {
-                getCursor().putMessageOnFirstEnclosing(J.ClassDecl.class, "var", variable);
+                getCursor().putMessageOnFirstEnclosing(J.ClassDecl.class, "varCursor", getCursor());
             }
             return super.visitVariable(variable, p);
         }
@@ -67,20 +66,20 @@ public class GenerateGetter extends Recipe {
         @Override
         public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
             J.ClassDecl c = super.visitClassDecl(classDecl, p);
-            J.VariableDecls.NamedVar var = getCursor().pollMessage("var");
-            if (var != null) {
+            Cursor varCursor = getCursor().pollMessage("varCursor");
+            if (varCursor != null) {
+                J.VariableDecls.NamedVar var = varCursor.getValue();
                 J.Block body = c.getBody();
-//                c = c.withBody(body.withStatements(
-//                        ListUtils.concat(
-//                                body.getStatements(),
-//                                new JRightPadded<>(
-//                                        GETTER.generateBefore(body.getEnd(),
-//                                                TypeUtils.asClass(var.getType()).getClassName(),
-//                                                var.getSimpleName() /* upper case */,
-//                                                var.getSimpleName()).iterator().next(),
-//                                        Space.EMPTY
-//                                )
-//                        )));
+                J.MethodDecl generatedMethodDecl =
+                        (J.MethodDecl) GETTER.generateAfter(varCursor,
+                                TypeUtils.asClass(var.getType()).getClassName(),
+                                StringUtils.capitalize(var.getSimpleName()),
+                                var.getSimpleName()).iterator().next();
+                c = c.withBody(body.withStatements(
+                        ListUtils.concat(
+                                body.getStatements(),
+                                new JRightPadded<>(generatedMethodDecl, Space.EMPTY, Markers.EMPTY)
+                        )));
             }
             return c;
         }
