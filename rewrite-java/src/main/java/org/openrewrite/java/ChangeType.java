@@ -39,10 +39,7 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
 
-    @NonNull
     private final String originalType;
-
-    @NonNull
     private final String replacementType;
 
     @Override
@@ -55,10 +52,11 @@ public class ChangeType extends Recipe {
         private JavaType targetType;
 
         private ChangeTypeProcessor(String targetType) {
-            this.targetType = JavaType.Primitive.fromKeyword(targetType);
-            if (this.targetType == null) {
-                this.targetType = JavaType.Class.build(targetType);
+            JavaType type = JavaType.Primitive.fromKeyword(targetType);
+            if (type == null) {
+                type = JavaType.Class.build(targetType);
             }
+            this.targetType = type;
         }
 
         @Override
@@ -131,9 +129,9 @@ public class ChangeType extends Recipe {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             J.Ident i = call(ident, ctx, super::visitIdentifier);
-            JavaType.Class originalType = JavaType.Class.build(ChangeType.this.originalType);
+            JavaType.Class original = JavaType.Class.build(originalType);
 
-            if (TypeUtils.isOfClassType(i.getType(), ChangeType.this.originalType) && i.getSimpleName().equals(originalType.getClassName())) {
+            if (TypeUtils.isOfClassType(i.getType(), originalType) && i.getSimpleName().equals(original.getClassName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
                 } else if (targetType instanceof JavaType.Primitive) {

@@ -27,11 +27,14 @@ import org.openrewrite.java.tree.JavaType;
 
 import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe will find any method invocations that match the method pattern, ensure the method is statically imported
+ * and convert's the invocation to use the static import by dropping the invocation's select.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
-    @NonNull
     private final String methodPattern;
 
     @Override

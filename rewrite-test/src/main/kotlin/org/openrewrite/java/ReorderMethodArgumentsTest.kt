@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
@@ -23,7 +23,6 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
-import java.util.function.Supplier
 
 interface ReorderMethodArgumentsTest : RecipeTest {
 
@@ -172,31 +171,31 @@ interface ReorderMethodArgumentsTest : RecipeTest {
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
-    fun validation() {
+    fun checkValidation() {
         var cm = ReorderMethodArguments(null, null, null)
         var valid = cm.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(2)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-        Assertions.assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
 
         cm = ReorderMethodArguments(null, null, arrayOf("a"))
         valid = cm.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(2)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-        Assertions.assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
 
         cm = ReorderMethodArguments(null, arrayOf("a"),null)
         valid = cm.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
         cm = ReorderMethodArguments("b.B foo()", null,null)
         valid = cm.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("orderedArgumentNames")
     }
 }

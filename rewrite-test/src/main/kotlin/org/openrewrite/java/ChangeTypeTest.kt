@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
@@ -373,22 +373,22 @@ interface ChangeTypeTest : RecipeTest {
     fun checkValidation() {
         var recipe = ChangeType(null, null)
         var valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(2)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("originalType")
-        Assertions.assertThat(valid.failures()[1].property).isEqualTo("replacementType")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("originalType")
+        assertThat(valid.failures()[1].property).isEqualTo("replacementType")
 
         recipe = ChangeType(null, "java.lang.String")
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("originalType")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("originalType")
 
         recipe = ChangeType("java.lang.String", null)
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("replacementType")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("replacementType")
     }
 
 }

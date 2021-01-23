@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java
 
-import org.assertj.core.api.Assertions
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -100,17 +100,15 @@ interface UseStaticImportTest : RecipeTest {
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
-    fun validation() {
+    fun checkValidation() {
         var recipe = UseStaticImport(null)
         var valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isFalse()
-        Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
         recipe = UseStaticImport("Foo.F foo()")
         valid = recipe.validate()
-        Assertions.assertThat(valid.isValid).isTrue()
-
+        assertThat(valid.isValid).isTrue()
     }
-
 }

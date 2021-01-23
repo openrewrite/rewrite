@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.search
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreePrinter
@@ -144,4 +145,18 @@ interface FindAnnotationTest: RecipeTest {
         """,
         dependsOn = arrayOf(foo)
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = FindAnnotation(null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("annotationPattern")
+
+        recipe = FindAnnotation("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

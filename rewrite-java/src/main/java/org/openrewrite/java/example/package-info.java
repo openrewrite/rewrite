@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 @NonNullApi
+@NonNullFields
 package org.openrewrite.java.example;
 
 import io.micrometer.core.lang.NonNullApi;
+import org.openrewrite.internal.lang.NonNullFields;
 
 /*
 This package contains example recipes demonstrating key capabilities.

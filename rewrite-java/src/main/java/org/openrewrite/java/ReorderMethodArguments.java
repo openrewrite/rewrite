@@ -23,6 +23,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -43,19 +44,18 @@ import static org.openrewrite.Validated.required;
 @AllArgsConstructor
 public class ReorderMethodArguments extends Recipe {
 
-    @NonNull
     private final String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
-    @NonNull
     private final String[] orderedArgumentNames;
 
     /**
      * If the original method signature has changed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
+    @Nullable
     private String[] originalOrderedArgumentNames = new String[0];
 
     public ReorderMethodArguments(String methodPattern, String[] orderedArgumentNames) {

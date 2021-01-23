@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.example
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
@@ -38,4 +39,17 @@ interface GenerateGetterTest : RecipeTest {
             }
         """
     )
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = GenerateGetter(null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("fieldName")
+
+        recipe = GenerateGetter("foo")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }
