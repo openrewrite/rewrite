@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
+import static java.util.Collections.emptyMap;
 import static org.openrewrite.Validated.required;
 
 @Data
@@ -95,14 +96,14 @@ public class UpgradeParentVersion extends Recipe {
             return super.visitTag(tag, ctx);
         }
 
-        private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
-            if (availableVersions == null) {
-                MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache())
-                        .downloadMetadata(groupId, artifactId, emptyList());
-                availableVersions = mavenMetadata.getVersioning().getVersions().stream()
-                        .filter(versionComparator::isValid)
-                        .collect(Collectors.toList());
-            }
+    private Optional<String> findNewerDependencyVersion(String groupId, String artifactId, String currentVersion) {
+        if (availableVersions == null) {
+            MavenMetadata mavenMetadata = new MavenDownloader(new NoopCache(), emptyMap(), settings)
+                    .downloadMetadata(groupId, artifactId, emptyList());
+            availableVersions = mavenMetadata.getVersioning().getVersions().stream()
+                    .filter(versionComparator::isValid)
+                    .collect(Collectors.toList());
+        }
 
             LatestRelease latestRelease = new LatestRelease(metadataPattern);
             return availableVersions.stream()

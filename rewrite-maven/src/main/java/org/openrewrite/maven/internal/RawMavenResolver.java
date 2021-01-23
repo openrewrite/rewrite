@@ -49,6 +49,7 @@ public class RawMavenResolver {
 
     private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
+    private final Map<RawPom.Parent, RawMaven> parentLookupCache = new HashMap<>();
 
     private final MavenDownloader downloader;
 
@@ -326,11 +327,13 @@ public class RawMavenResolver {
         RawPom pom = rawMaven.getPom();
         Pom parent = null;
         if (pom.getParent() != null) {
-            // TODO would it help to limit lookups of parents here by pre-caching RawMaven by RawPom.Parent?
             RawPom.Parent rawParent = pom.getParent();
-            RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
-                    rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
-                    partialMaven.getRepositories());
+            RawMaven rawParentModel = parentLookupCache.computeIfAbsent(rawParent, (it) -> {
+                logger.debug("Downloading parent POM " + rawParent.getGroupId() + ":" + rawParent.getArtifactId() + ":" + rawParent.getVersion() + " with relativePath: " + rawParent.getRelativePath());
+                return downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
+                        rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
+                        partialMaven.getRepositories());
+            });
             if (rawParentModel != null) {
                 PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
                 Optional<Pom> maybeParent = resolved.get(parentKey);
@@ -345,13 +348,17 @@ public class RawMavenResolver {
                 }
             }
         }
-
         partialMaven.setParent(parent);
     }
 
     private void processRepositories(ResolutionTask task, PartialMaven partialMaven) {
         List<RawRepositories.Repository> repositories = new ArrayList<>();
-        for (RawRepositories.Repository repository : task.getRawMaven().getPom().getActiveRepositories(activeProfiles)) {
+        List<RawRepositories.Repository> repositoriesFromPom = task.getRawMaven().getPom().getActiveRepositories(activeProfiles);
+        if(mavenSettings != null) {
+            repositoriesFromPom = mavenSettings.applyMirrors(repositoriesFromPom);
+        }
+
+        for (RawRepositories.Repository repository : repositoriesFromPom) {
             String url = repository.getUrl().trim();
             if (repository.getUrl().contains("${")) {
                 url = placeholderHelper.replacePlaceholders(url, k -> partialMaven.getProperties().get(k));
@@ -360,7 +367,7 @@ public class RawMavenResolver {
             try {
                 //noinspection ResultOfMethodCallIgnored
                 URI.create(url);
-                repositories.add(new RawRepositories.Repository(url, repository.getReleases(), repository.getSnapshots()));
+                repositories.add(new RawRepositories.Repository(repository.getId(), url, repository.getReleases(), repository.getSnapshots()));
             } catch (Throwable t) {
                 logger.debug("Unable to make a URI out of repositoriy url {}", url);
             }

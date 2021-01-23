@@ -27,6 +27,8 @@ import org.openrewrite.xml.tree.Misc;
 import org.openrewrite.xml.tree.Xml;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.function.BiFunction;
 
@@ -48,9 +50,9 @@ public class XmlParserVisitor extends XMLParserBaseVisitor<Xml> {
     public Xml.Document visitDocument(XMLParser.DocumentContext ctx) {
         return convert(ctx, (c, prefix) -> new Xml.Document(
                 randomId(),
+                path,
                 prefix,
                 Markers.EMPTY,
-                path,
                 visitProlog(ctx.prolog()),
                 visitElement(ctx.element()),
                 source.substring(cursor))

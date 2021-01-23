@@ -15,10 +15,34 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
 interface ChangeMethodTargetToStaticTest : RecipeTest {
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun validation() {
+        var cm = ChangeMethodTargetToStatic(null, null)
+        var valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("targetType")
+
+        cm = ChangeMethodTargetToStatic(null, "java.lang.String")
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+
+        cm = ChangeMethodTargetToStatic("java.lang.String emptyString(..)", null)
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("targetType")
+    }
 
     @Test
     fun targetToStatic(jp: JavaParser) = assertChanged(

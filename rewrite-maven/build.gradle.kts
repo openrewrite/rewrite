@@ -14,7 +14,7 @@ dependencies {
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")
 
     implementation("org.antlr:antlr4:4.8-1")
-
+    implementation("io.github.resilience4j:resilience4j-retry:latest.release")
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")

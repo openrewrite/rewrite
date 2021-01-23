@@ -515,7 +515,7 @@ public interface JavaType extends Serializable {
         private final JavaType elemType;
 
         @Override
-        public boolean deepEquals(@Nullable JavaType type) {
+        public boolean deepEquals(JavaType type) {
             return type instanceof Array && (this == type || (elemType != null && elemType.deepEquals(((Array) type).elemType)));
         }
     }

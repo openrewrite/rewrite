@@ -20,7 +20,7 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -28,25 +28,23 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToVariable extends Recipe {
+
+    @NonNull
     private final String methodPattern;
-    private final String variable;
+
+    @NonNull
+    private final String variableName;
+
+    @NonNull
     private final String variableType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new ChangeMethodTargetToVariableProcessor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern)
-                .and(required("variable", variable))
-                .and(required("variableType", variableType));
     }
 
     private class ChangeMethodTargetToVariableProcessor extends JavaIsoProcessor<ExecutionContext> {
@@ -75,7 +73,7 @@ public class ChangeMethodTargetToVariable extends Recipe {
                                         Space.EMPTY :
                                         m.getSelect().getElem().getPrefix(),
                                 Markers.EMPTY,
-                                variable,
+                                variableName,
                                 this.variableType),
                                 Space.EMPTY,
                                 Markers.EMPTY

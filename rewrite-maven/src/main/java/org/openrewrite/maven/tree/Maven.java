@@ -16,6 +16,7 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
@@ -30,17 +31,20 @@ import static java.util.Collections.emptyList;
 public class Maven extends Xml.Document {
     private final transient Pom model;
     private final transient Collection<Pom> modules;
+    private final transient MavenSettings settings;
 
-    public Maven(Xml.Document document) {
+    public Maven(Xml.Document document, MavenSettings settings) {
         super(
                 document.getId(),
+                document.getSourcePath(),
                 document.getPrefix(),
                 document.getMarkers(),
-                document.getSourcePath(),
                 document.getProlog(),
                 document.getRoot(),
                 document.getEof()
         );
+
+        this.settings = settings;
 
         model = document.getMarkers().findFirst(Pom.class).orElse(null);
         assert model != null;
@@ -60,6 +64,11 @@ public class Maven extends Xml.Document {
         return modules;
     }
 
+    @JsonIgnore
+    public MavenSettings getSettings() {
+        return settings;
+    }
+
     @Override
     @Nullable
     public <R, P> R accept(TreeVisitor<R, P> v, P p) {
@@ -77,7 +86,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -86,7 +95,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -95,7 +104,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m);
+        return new Maven(m, settings);
     }
 
     @Override
@@ -104,7 +113,7 @@ public class Maven extends Xml.Document {
         if (m instanceof Maven) {
             return (Maven) m;
         }
-        return new Maven(m);
+        return new Maven(m, settings);
     }
 
     public Maven withModel(Pom model) {

@@ -13,18 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.cache;
+@NonNullFields
+package org.openrewrite.internal.lang.nonnull;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.maven.tree.GroupArtifact;
-
-import java.net.URI;
-
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
-class GroupArtifactRepository {
-    URI repository;
-    GroupArtifact groupArtifact;
-}
+import org.openrewrite.internal.lang.NonNullFields;

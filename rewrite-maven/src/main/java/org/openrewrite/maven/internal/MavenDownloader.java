@@ -15,59 +15,92 @@
  */
 package org.openrewrite.maven.internal;
 
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
-import okhttp3.ConnectionSpec;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.Response;
+import io.vavr.CheckedFunction1;
+import okhttp3.*;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.cache.CacheResult;
 import org.openrewrite.maven.cache.MavenCache;
+import org.openrewrite.maven.tree.Maven;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLException;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
-import static java.util.Collections.emptyMap;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
 
 public class MavenDownloader {
     private static final Logger logger = LoggerFactory.getLogger(MavenDownloader.class);
+
+    private static final RetryConfig retryConfig = RetryConfig.custom()
+            .retryExceptions(SocketTimeoutException.class, TimeoutException.class)
+            .build();
+    private static final RetryRegistry retryRegistry = RetryRegistry.of(retryConfig);
 
     private static final OkHttpClient httpClient = new OkHttpClient.Builder()
             .connectionSpecs(Arrays.asList(ConnectionSpec.CLEARTEXT, ConnectionSpec.MODERN_TLS, ConnectionSpec.COMPATIBLE_TLS))
             .build();
 
+    private static final Retry mavenDownloaderRetry = retryRegistry.retry("MavenDownloader");
+
+    private static final CheckedFunction1<Request, Response> sendRequest = Retry.decorateCheckedFunction(
+            mavenDownloaderRetry,
+            (request) -> httpClient.newCall(request).execute());
+
     // https://maven.apache.org/ref/3.6.3/maven-model-builder/super-pom.html
-    private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("https://repo.maven.apache.org/maven2",
+    private static final RawRepositories.Repository SUPER_POM_REPOSITORY = new RawRepositories.Repository("central", "https://repo.maven.apache.org/maven2",
             new RawRepositories.ArtifactPolicy(true), new RawRepositories.ArtifactPolicy(false));
 
     private final MavenCache mavenCache;
     private final Map<Path, RawMaven> projectPoms;
+    @Nullable
+    private final MavenSettings settings;
+    private final Map<String, MavenSettings.Server> serverIdToServer;
 
-    public MavenDownloader(MavenCache mavenCache) {
-        this(mavenCache, emptyMap());
-    }
-
-    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms) {
+    /**
+     * Any visitor constructing a MavenDownloader should provide the MavenSettings from {@link Maven#getSettings()}.
+     * Failing to do this will result in being unable to download dependencies or their metadata when information from settings.xml is required to access artifact
+     * repositories.
+     */
+    public MavenDownloader(MavenCache mavenCache, Map<Path, RawMaven> projectPoms, @Nullable MavenSettings settings) {
         this.mavenCache = mavenCache;
         this.projectPoms = projectPoms;
+        this.settings = settings;
+        if (settings == null || settings.getServers() == null) {
+            serverIdToServer = new HashMap<>();
+        } else {
+            serverIdToServer = settings.getServers().getServers()
+                    .stream()
+                    .collect(toMap(MavenSettings.Server::getId, Function.identity()));
+        }
     }
 
     public MavenMetadata downloadMetadata(String groupId, String artifactId,
                                           List<RawRepositories.Repository> repositories) {
         Timer.Sample sample = Timer.start();
 
-        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
+        return Stream.concat(repositories.stream().distinct(), Stream.of(SUPER_POM_REPOSITORY))
+                .map(this::normalizeRepository)
+                .distinct()
                 .filter(Objects::nonNull)
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
@@ -76,7 +109,7 @@ public class MavenDownloader {
                             .tag("type", "metadata");
 
                     try {
-                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                        CacheResult<MavenMetadata> result = mavenCache.computeMavenMetadata(URI.create(repo.getUrl()), groupId, artifactId,
                                 () -> forceDownloadMetadata(groupId, artifactId, null, repo));
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
@@ -118,14 +151,16 @@ public class MavenDownloader {
                 (version == null ? "" : version + '/') +
                 "maven-metadata.xml";
 
-        Request request = new Request.Builder().url(uri).get().build();
-        try (Response response = httpClient.newCall(request).execute()) {
+        Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+        try (Response response = sendRequest.apply(request.build())) {
             if (response.isSuccessful() && response.body() != null) {
                 @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
                         .bytes();
 
                 return MavenMetadata.parse(responseBody);
             }
+        } catch (Throwable throwable) {
+            return null;
         }
 
         return null;
@@ -176,51 +211,59 @@ public class MavenDownloader {
             if (folderContainingPom != null) {
                 RawMaven maybeLocalPom = projectPoms.get(folderContainingPom.resolve(Paths.get(relativePath, "pom.xml"))
                         .normalize());
+                // Even poms published to remote repositories still contain relative paths to their parent poms
+                // So double check that the GAV coordinates match so that we don't get a relative path from a remote
+                // pom like ".." or "../.." which coincidentally _happens_ to have led to an unrelated pom on the local filesystem
                 if (maybeLocalPom != null
                         && groupId.equals(maybeLocalPom.getPom().getGroupId())
                         && artifactId.equals(maybeLocalPom.getPom().getArtifactId())
-                        && version.equals(maybeLocalPom.getPom().getVersion()) ) {
+                        && version.equals(maybeLocalPom.getPom().getVersion())) {
                     return maybeLocalPom;
                 }
             }
         }
 
-        return Stream.concat(repositories.stream().distinct().map(this::normalizeRepository), Stream.of(SUPER_POM_REPOSITORY))
+        return Stream.concat(repositories.stream(), Stream.of(SUPER_POM_REPOSITORY))
+                .map(this::normalizeRepository)
                 .filter(Objects::nonNull)
+                .distinct()
                 .filter(repo -> repo.acceptsVersion(version))
                 .map(repo -> {
                     Timer.Builder timer = Timer.builder("rewrite.maven.download")
+                            .tag("repo.id", repo.getUrl())
                             .tag("group.id", groupId)
                             .tag("artifact.id", artifactId)
                             .tag("type", "pom");
 
                     try {
-                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()).toURL(), groupId, artifactId,
+                        CacheResult<RawMaven> result = mavenCache.computeMaven(URI.create(repo.getUrl()), groupId, artifactId,
                                 versionMaybeDatedSnapshot, () -> {
-                            String uri = repo.getUrl() + "/" +
-                                    groupId.replace('.', '/') + '/' +
-                                    artifactId + '/' +
-                                    version + '/' +
-                                    artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
+                                    String uri = URI.create(repo.getUrl()) + "/" +
+                                            groupId.replace('.', '/') + '/' +
+                                            artifactId + '/' +
+                                            version + '/' +
+                                            artifactId + '-' + versionMaybeDatedSnapshot + ".pom";
 
-                            Request request = new Request.Builder().url(uri).get().build();
-                            try (Response response = httpClient.newCall(request).execute()) {
-                                if (response.isSuccessful() && response.body() != null) {
-                                    @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
-                                            .bytes();
+                                    Request.Builder request = applyAuthentication(repo, new Request.Builder().url(uri).get());
+                                    try (Response response = sendRequest.apply(request.build())) {
+                                        if (response.isSuccessful() && response.body() != null) {
+                                            @SuppressWarnings("ConstantConditions") byte[] responseBody = response.body()
+                                                    .bytes();
 
-                                    // This path doesn't matter except for debugging/error logs where it might get displayed
-                                    Path inputPath = Paths.get(groupId, artifactId, version);
-                                    return RawMaven.parse(
-                                            new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
-                                            null,
-                                            versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
-                                    );
-                                }
-                            }
+                                            // This path doesn't matter except for debugging/error logs where it might get displayed
+                                            Path inputPath = Paths.get(groupId, artifactId, version);
+                                            return RawMaven.parse(
+                                                    new Parser.Input(inputPath, () -> new ByteArrayInputStream(responseBody), true),
+                                                    null,
+                                                    versionMaybeDatedSnapshot.equals(version) ? null : versionMaybeDatedSnapshot
+                                            );
+                                        }
+                                    } catch (Throwable throwable) {
+                                        return null;
+                                    }
 
-                            return null;
-                        });
+                                    return null;
+                                });
 
                         sample.stop(addTagsByResult(timer, result).register(Metrics.globalRegistry));
                         return result.getData();
@@ -240,9 +283,9 @@ public class MavenDownloader {
     private String findDatedSnapshotVersionIfNecessary(String groupId, String artifactId, String version, List<RawRepositories.Repository> repositories) {
         if (version.endsWith("-SNAPSHOT")) {
             MavenMetadata mavenMetadata = repositories.stream()
-                    .distinct()
                     .map(this::normalizeRepository)
                     .filter(Objects::nonNull)
+                    .distinct()
                     .filter(repo -> repo.acceptsVersion(version))
                     .map(repo -> {
                         try {
@@ -270,35 +313,69 @@ public class MavenDownloader {
 
     @Nullable
     private RawRepositories.Repository normalizeRepository(RawRepositories.Repository repository) {
-        try {
-            CacheResult<RawRepositories.Repository> result = mavenCache.computeRepository(repository, () -> {
-                // FIXME add retry logic
-                String url = repository.getUrl();
-                Request request = new Request.Builder().url(url).head().build();
-                try (Response response = httpClient.newCall(request).execute()) {
-                    if (url.toLowerCase().contains("http://")) {
-                        return normalizeRepository(
-                                new RawRepositories.Repository(
-                                        url.toLowerCase().replace("http://", "https://"),
-                                        repository.getReleases(),
-                                        repository.getSnapshots()
-                                )
-                        );
-                    } else if (response.isSuccessful()) {
-                        return new RawRepositories.Repository(
-                                url,
-                                repository.getReleases(),
-                                repository.getSnapshots()
-                        );
-                    }
 
+        RawRepositories.Repository repoWithMirrors = applyMirrors(repository);
+        CacheResult<RawRepositories.Repository> result;
+        try {
+            result = mavenCache.computeRepository(repoWithMirrors, () -> {
+                // Always prefer to use https, fallback to http only if https isn't available
+                // URLs are case-sensitive after the domain name, so it can be incorrect to lowerCase() a whole URL
+                // This regex accepts any capitalization of the letters in "http"
+                String originalUrl = repoWithMirrors.getUrl();
+                String httpsUrl = originalUrl.replaceFirst("[hH][tT][tT][pP]://", "https://");
+
+                Request.Builder request = applyAuthentication(repoWithMirrors, new Request.Builder().url(httpsUrl).get());
+                try (Response response = sendRequest.apply(request.build())) {
+                    if (response.isSuccessful()) {
+                        return new RawRepositories.Repository(
+                                repoWithMirrors.getId(),
+                                httpsUrl,
+                                repoWithMirrors.getReleases(),
+                                repoWithMirrors.getSnapshots());
+                    }
+                    return null;
+                } catch (SSLException e) {
+                    // Fallback to http if https is unavailable and the original URL was an http URL
+                    if(httpsUrl.equals(originalUrl)) {
+                        return null;
+                    }
+                    try (Response httpResponse = sendRequest.apply(request.url(originalUrl).build())) {
+                        if (httpResponse.isSuccessful()) {
+                            return new RawRepositories.Repository(
+                                    repoWithMirrors.getId(),
+                                    originalUrl,
+                                    repoWithMirrors.getReleases(),
+                                    repoWithMirrors.getSnapshots());
+                        }
+                    } catch (Throwable t) {
+                        return null;
+                    }
+                } catch (Throwable t) {
                     return null;
                 }
+                return null;
             });
-
-            return result.getData();
         } catch (Exception e) {
             return null;
         }
+
+        return result.getData();
+    }
+
+    private RawRepositories.Repository applyMirrors(RawRepositories.Repository repository) {
+        if (settings == null) {
+            return repository;
+        } else {
+            return settings.applyMirrors(repository);
+        }
+    }
+
+    private Request.Builder applyAuthentication(RawRepositories.Repository repository, Request.Builder request) {
+        MavenSettings.Server authInfo = serverIdToServer.get(repository.getId());
+        if (authInfo != null) {
+            String credentials = Credentials.basic(authInfo.getUsername(), authInfo.getPassword());
+            request.header("Authorization", credentials);
+        }
+        return request;
     }
 }

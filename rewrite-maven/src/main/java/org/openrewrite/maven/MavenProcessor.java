@@ -16,6 +16,7 @@
 package org.openrewrite.maven;
 
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenDownloader;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.XPathMatcher;
@@ -37,11 +38,13 @@ public class MavenProcessor<P> extends XmlProcessor<P>
 
     protected Pom model;
     protected Collection<Pom> modules;
+    protected MavenSettings settings;
 
     @Override
     public Maven visitMaven(Maven maven, P p) {
         this.model = maven.getModel();
         this.modules = maven.getModules();
+        this.settings = maven.getSettings();
         return (Maven) visitDocument(maven, p);
     }
 
@@ -49,7 +52,7 @@ public class MavenProcessor<P> extends XmlProcessor<P>
     public final Xml visitDocument(Xml.Document document, P p) {
         Xml.Document refactored = (Xml.Document) super.visitDocument(document, p);
         if (refactored != document) {
-            return new Maven(refactored);
+            return new Maven(refactored, settings);
         }
         return refactored;
     }

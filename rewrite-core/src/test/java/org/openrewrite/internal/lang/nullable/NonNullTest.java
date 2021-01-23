@@ -13,18 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.maven.cache;
+package org.openrewrite.internal.lang.nullable;
 
-import lombok.AccessLevel;
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
-import org.openrewrite.maven.tree.GroupArtifact;
+import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.internal.lang.Nullable;
 
-import java.net.URI;
+@SuppressWarnings("ALL")
+public class NonNullTest {
 
-@FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
-class GroupArtifactRepository {
-    URI repository;
-    GroupArtifact groupArtifact;
+    @NonNull
+    private String yourCoolNonNullName = "sally";
+
+    @NonNull
+    String coolNonNullName = "fred";
+
+    @NonNull
+    protected String aCoolNonNullName;
+
+    protected String myLessCoolNullableName;
+
+    @NonNull
+    protected String beCoolNonNullName = "Samuel L Jackson";
+
 }

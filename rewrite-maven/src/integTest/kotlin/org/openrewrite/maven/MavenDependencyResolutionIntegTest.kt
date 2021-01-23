@@ -115,6 +115,78 @@ class MavenDependencyResolutionIntegTest {
         assertThat(maven.model.dependencies.first().model.snapshotVersion).startsWith("6.2.0")
     }
 
+    @Issue("#166")
+    @Test
+    fun testMultipleRepositories() {
+
+        val pom = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+            
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+
+                <developers>
+                    <developer>
+                        <name>Trygve Laugst&oslash;l</name>
+                    </developer>
+                </developers>
+
+                <repositories>
+                    <repository>
+                        <id>maven-central</id>
+                        <name>Maven Central Repository</name>
+                        <url>https://repo.maven.apache.org/maven2</url>
+                        <releases>
+                            <enabled>true</enabled>
+                            <updatePolicy>always</updatePolicy>
+                        </releases>                        
+                    </repository>
+                    <repository>
+                        <id>apache-m2-snapshot</id>
+                        <name>Apache Snapshot Repository</name>
+                        <url>https://repository.apache.org/content/groups/snapshots</url>
+                    </repository>
+                    <repository>
+                        <id>jboss-public-repository-group</id>
+                        <name>JBoss Public Maven Repository Group</name>
+                        <url>https://repository.jboss.org/nexus/content/repositories/releases/</url>
+                        <layout>default</layout>
+                        <releases>
+                            <enabled>true</enabled>
+                            <updatePolicy>always</updatePolicy>
+                        </releases>
+                        <snapshots>
+                            <enabled>true</enabled>
+                            <updatePolicy>always</updatePolicy>
+                        </snapshots>
+                    </repository>
+                </repositories>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.springframework.boot</groupId>
+                        <artifactId>spring-boot-starter</artifactId>
+                    </dependency>
+                </dependencies>
+                <dependencyManagement>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-dependencies</artifactId>
+                            <version>2.3.4.RELEASE</version>
+                            <type>pom</type>
+                            <scope>import</scope>
+                        </dependency>
+                    </dependencies>
+                </dependencyManagement>                
+            </project>
+        """.trimIndent()
+
+        val parser = MavenParser.builder().build()
+        parser.parse(pom)[0]
+    }
+
     @Test
     fun springBootConfigurationProcessor(@TempDir tempDir: Path) {
         val pom = """
