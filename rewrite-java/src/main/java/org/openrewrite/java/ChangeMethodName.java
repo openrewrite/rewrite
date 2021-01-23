@@ -20,29 +20,27 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeTree;
 
-import static org.openrewrite.Validated.required;
-
+/**
+ * A recipe that will look for a specific method target (using a method pattern) and rename the method. This recipe renames
+ * both the method declaration and any invocations/references to the method.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
-    private final String method;
-    private final String name;
+    @NonNull
+    private final String methodPattern;
+    @NonNull
+    private final String newMethodName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodNameProcessor(new MethodMatcher(method));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("method", method)
-                .and(required("name", name));
+        return new ChangeMethodNameProcessor(new MethodMatcher(methodPattern));
     }
 
     private class ChangeMethodNameProcessor extends JavaIsoProcessor<ExecutionContext> {
@@ -58,7 +56,7 @@ public class ChangeMethodName extends Recipe {
             J.MethodDecl m = super.visitMethod(method, ctx);
             J.ClassDecl classDecl = getCursor().firstEnclosingOrThrow(J.ClassDecl.class);
             if (methodMatcher.matches(method, classDecl)) {
-                m = m.withName(m.getName().withName(name));
+                m = m.withName(m.getName().withName(newMethodName));
             }
             return m;
         }
@@ -66,8 +64,8 @@ public class ChangeMethodName extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            if (methodMatcher.matches(method) && !method.getSimpleName().equals(name)) {
-                m = m.withName(m.getName().withName(name));
+            if (methodMatcher.matches(method) && !method.getSimpleName().equals(newMethodName)) {
+                m = m.withName(m.getName().withName(newMethodName));
             }
             return m;
         }
@@ -86,7 +84,7 @@ public class ChangeMethodName extends Recipe {
                 Expression target = f.getTarget();
                 if (target instanceof J.FieldAccess) {
                     String className = target.printTrimmed();
-                    String fullyQualified = className + "." + name;
+                    String fullyQualified = className + "." + newMethodName;
                     return TypeTree.build(fullyQualified)
                             .withPrefix(f.getPrefix());
                 }

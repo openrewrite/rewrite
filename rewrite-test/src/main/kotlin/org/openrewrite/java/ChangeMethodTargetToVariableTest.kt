@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -98,4 +99,38 @@ interface ChangeMethodTargetToVariableTest : RecipeTest {
             }
         """
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun validation() {
+        var cm = ChangeMethodTargetToVariable(null, null, null)
+        var valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(3)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("variableName")
+        Assertions.assertThat(valid.failures()[2].property).isEqualTo("variableType")
+
+        cm = ChangeMethodTargetToVariable(null, null,"a.A")
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("variableName")
+
+        cm = ChangeMethodTargetToVariable(null, "a",null)
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("variableType")
+
+        cm = ChangeMethodTargetToVariable("b.B foo()", null,null)
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("variableName")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("variableType")
+    }
+
 }

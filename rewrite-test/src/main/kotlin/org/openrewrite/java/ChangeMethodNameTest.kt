@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -32,6 +33,28 @@ interface ChangeMethodNameTest : RecipeTest {
         """
     }
 
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun validation() {
+        var cm = ChangeMethodName(null, null)
+        var valid = cm.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        assertThat(valid.failures()[1].property).isEqualTo("newMethodName")
+
+        cm = ChangeMethodName(null, "hello")
+        valid = cm.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+
+        cm = ChangeMethodName("java.util.String emptyString(..)", null)
+        valid = cm.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("newMethodName")
+    }
     @Test
     fun changeMethodNameForMethodWithSingleArgDeclarative(jp: JavaParser) = assertChanged(
         jp,

@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -30,21 +31,18 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
-@EqualsAndHashCode(callSuper = true)
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToStatic extends Recipe {
+
+    @NonNull
     private final String methodPattern;
+    @NonNull
     private final String targetType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new ChangeMethodTargetToStaticProcessor(new MethodMatcher(methodPattern));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern)
-                .and(required("target.type", targetType));
     }
 
     private class ChangeMethodTargetToStaticProcessor extends JavaIsoProcessor<ExecutionContext> {
