@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -74,4 +75,28 @@ interface DeleteMethodArgumentTest : RecipeTest {
         before = "public class A {{ B.foo(1); }}",
         after = "public class A {{ B.foo(); }}"
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = DeleteMethodArgument(null, null)
+        var valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("argumentIndex")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("methodPattern")
+
+        recipe = DeleteMethodArgument(null, 0)
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+
+        recipe = DeleteMethodArgument("b.B foo()", null)
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("argumentIndex")
+    }
+
 }

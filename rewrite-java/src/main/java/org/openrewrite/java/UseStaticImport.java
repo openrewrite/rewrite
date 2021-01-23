@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -30,16 +31,12 @@ import static org.openrewrite.Validated.required;
 @EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
+    @NonNull
     private final String methodPattern;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new UseStaticImportProcessor(new MethodMatcher(methodPattern));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern);
     }
 
     private static class UseStaticImportProcessor extends JavaIsoProcessor<ExecutionContext> {

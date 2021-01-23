@@ -22,6 +22,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -33,28 +34,38 @@ import java.util.List;
 
 import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
+ * array of parameter names.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 @AllArgsConstructor
 public class ReorderMethodArguments extends Recipe {
-    private final String methodPattern;
-    private final String[] order;
-    private String[] originalOrder = new String[0];
 
-    public ReorderMethodArguments(String methodPattern, String[] order) {
+    @NonNull
+    private final String methodPattern;
+
+    /**
+     * An array of parameter names that indicates the new order in which those arguments should be arranged.
+     */
+    @NonNull
+    private final String[] orderedArgumentNames;
+
+    /**
+     * If the original method signature has changed, this is an optional list that indicates the original order
+     * in which the arguments were arranged.
+     */
+    private String[] originalOrderedArgumentNames = new String[0];
+
+    public ReorderMethodArguments(String methodPattern, String[] orderedArgumentNames) {
         this.methodPattern = methodPattern;
-        this.order = order;
+        this.orderedArgumentNames = orderedArgumentNames;
     }
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new ReorderMethodArgumentsProcessor(new MethodMatcher(methodPattern));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern)
-                .and(required("order", order));
     }
 
     private class ReorderMethodArgumentsProcessor extends JavaIsoProcessor<ExecutionContext> {
@@ -69,8 +80,8 @@ public class ReorderMethodArguments extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (methodMatcher.matches(m) && m.getType() != null) {
-                List<String> paramNames = originalOrder.length == 0 ? m.getType().getParamNames() :
-                        Arrays.asList(originalOrder);
+                List<String> paramNames = originalOrderedArgumentNames.length == 0 ? m.getType().getParamNames() :
+                        Arrays.asList(originalOrderedArgumentNames);
 
                 if (paramNames == null) {
                     throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
@@ -87,7 +98,7 @@ public class ReorderMethodArguments extends Recipe {
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
-                for (String name : order) {
+                for (String name : orderedArgumentNames) {
                     int fromPos = paramNames.indexOf(name);
                     if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
                         // this is a varargs argument

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
@@ -168,4 +169,34 @@ interface ReorderMethodArgumentsTest : RecipeTest {
             }
         """
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun validation() {
+        var cm = ReorderMethodArguments(null, null, null)
+        var valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+
+        cm = ReorderMethodArguments(null, null, arrayOf("a"))
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(2)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+
+        cm = ReorderMethodArguments(null, arrayOf("a"),null)
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
+
+        cm = ReorderMethodArguments("b.B foo()", null,null)
+        valid = cm.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("orderedArgumentNames")
+    }
 }

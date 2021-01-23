@@ -20,14 +20,13 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 /**
  * NOTE: Does not currently transform all possible type references, and accomplishing this would be non-trivial.
@@ -39,19 +38,18 @@ import static org.openrewrite.Validated.required;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangeType extends Recipe {
-    private final String type;
-    private final String targetType;
+
+    @NonNull
+    private final String originalType;
+
+    @NonNull
+    private final String replacementType;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeTypeProcessor(targetType);
+        return new ChangeTypeProcessor(replacementType);
     }
 
-    @Override
-    public Validated validate() {
-        return required("type", type)
-                .and(required("targetType", targetType));
-    }
 
     private class ChangeTypeProcessor extends JavaProcessor<ExecutionContext> {
         private JavaType targetType;
@@ -68,7 +66,7 @@ public class ChangeType extends Recipe {
             if (targetType instanceof JavaType.FullyQualified) {
                 maybeAddImport((JavaType.FullyQualified) targetType);
             }
-            maybeRemoveImport(type);
+            maybeRemoveImport(originalType);
             return super.visitCompilationUnit(cu, ctx);
         }
 
@@ -76,7 +74,7 @@ public class ChangeType extends Recipe {
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
             N n = call(name, ctx, super::visitTypeName);
-            if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(type)) {
+            if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(originalType)) {
                 n = n.withType(targetType);
             }
             return n;
@@ -112,7 +110,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
             J.FieldAccess f = call(fieldAccess, ctx, super::visitFieldAccess);
-            if (f.isFullyQualifiedClassReference(type)) {
+            if (f.isFullyQualifiedClassReference(originalType)) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     return TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
                             .withPrefix(f.getPrefix());
@@ -133,9 +131,9 @@ public class ChangeType extends Recipe {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
             J.Ident i = call(ident, ctx, super::visitIdentifier);
-            JavaType.Class originalType = JavaType.Class.build(type);
+            JavaType.Class originalType = JavaType.Class.build(ChangeType.this.originalType);
 
-            if (TypeUtils.isOfClassType(i.getType(), type) && i.getSimpleName().equals(originalType.getClassName())) {
+            if (TypeUtils.isOfClassType(i.getType(), ChangeType.this.originalType) && i.getSimpleName().equals(originalType.getClassName())) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     i = i.withName(((JavaType.FullyQualified) targetType).getClassName());
                 } else if (targetType instanceof JavaType.Primitive) {
@@ -164,13 +162,13 @@ public class ChangeType extends Recipe {
 
             if (m.getSelect() != null) {
                 JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getElem().getType());
-                if (selectType != null && selectType.getFullyQualifiedName().equals(type)) {
+                if (selectType != null && selectType.getFullyQualifiedName().equals(originalType)) {
                     m = m.withSelect(m.getSelect().map(s -> s.withType(targetType)));
                 }
             }
 
             if (m.getType() != null) {
-                if (m.getType().getDeclaringType().getFullyQualifiedName().equals(type) &&
+                if (m.getType().getDeclaringType().getFullyQualifiedName().equals(originalType) &&
                         targetType instanceof JavaType.FullyQualified) {
                     m = m.withDeclaringType((JavaType.FullyQualified) targetType);
                 }
@@ -199,7 +197,7 @@ public class ChangeType extends Recipe {
             J.VariableDecls.NamedVar v = call(variable, ctx, super::visitVariable);
 
             JavaType.Class varType = TypeUtils.asClass(variable.getType());
-            if (varType != null && varType.getFullyQualifiedName().equals(type)) {
+            if (varType != null && varType.getFullyQualifiedName().equals(originalType)) {
                 v = v.withType(targetType).withName(v.getName().withType(targetType));
             }
 
@@ -248,7 +246,7 @@ public class ChangeType extends Recipe {
                 } else {
                     name = ((JavaType.Primitive) targetType).getKeyword();
                 }
-                if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(type)) {
+                if (nameTreeClass != null && nameTreeClass.getFullyQualifiedName().equals(originalType)) {
                     return (T) J.Ident.build(randomId(),
                             nameField.getPrefix(),
                             Markers.EMPTY,

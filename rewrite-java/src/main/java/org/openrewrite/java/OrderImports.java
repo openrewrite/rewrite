@@ -30,7 +30,7 @@ import org.openrewrite.java.tree.JRightPadded;
 import java.util.*;
 
 /**
- * This recipe will group and order the imports for a compilation unit using the rules defined by a {@link ImportLayoutStyle}.
+ * This recipe will group and order the imports for a compilation unit using the rules defined by an {@link ImportLayoutStyle}.
  * If a style has not been defined, this recipe will use the default import layout style that is modelled after
  * IntelliJ's default import settings.
  *
