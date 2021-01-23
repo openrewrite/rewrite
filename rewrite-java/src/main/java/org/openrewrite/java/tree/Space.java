@@ -20,6 +20,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markable;
+import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,27 +32,31 @@ import java.util.List;
  * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
-public class Space {
-    public static final Space EMPTY = new Space("", Collections.emptyList());
+public class Space implements Markable {
+    public static final Space EMPTY = new Space("", Collections.emptyList(), Markers.EMPTY);
 
     private final List<Comment> comments;
     private final String whitespace;
+    private final Markers markers;
 
     private Space(
             @JsonProperty("whitespace") String whitespace,
-            @JsonProperty("comments") List<Comment> comments) {
+            @JsonProperty("comments") List<Comment> comments,
+            @JsonProperty("markers") Markers markers) {
         this.comments = comments;
         this.whitespace = whitespace;
+        this.markers = markers;
     }
 
     @JsonCreator
     public static Space build(
             @JsonProperty("whitespace") String whitespace,
-            @JsonProperty("comments") List<Comment> comments) {
+            @JsonProperty("comments") List<Comment> comments,
+            @JsonProperty("markers") Markers markers) {
         if (whitespace.isEmpty() && comments.isEmpty()) {
             return Space.EMPTY;
         }
-        return new Space(whitespace, comments);
+        return new Space(whitespace, comments, markers);
     }
 
     @JsonIgnore
@@ -72,11 +78,21 @@ public class Space {
         return whitespace;
     }
 
+    public Markers getMarkers() {
+        return markers;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Space withMarkers(Markers markers) {
+        return Space.build(whitespace, comments, markers);
+    }
+
     public Space withComments(List<Comment> comments) {
         if (comments.isEmpty() && whitespace.isEmpty()) {
             return Space.EMPTY;
         }
-        return build(whitespace, comments);
+        return build(whitespace, comments, markers);
     }
 
     public Space withWhitespace(String whitespace) {
@@ -84,7 +100,7 @@ public class Space {
             return Space.EMPTY;
         }
         if (!whitespace.equals(this.whitespace)) {
-            return build(whitespace, comments);
+            return build(whitespace, comments, markers);
         }
         return this;
     }
@@ -180,7 +196,7 @@ public class Space {
             }
         }
 
-        return build(whitespace, comments);
+        return build(whitespace, comments, Markers.EMPTY);
     }
 
     @Nullable

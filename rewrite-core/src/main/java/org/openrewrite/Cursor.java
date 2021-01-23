@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 
 import static java.util.stream.StreamSupport.stream;
 
-@EqualsAndHashCode
+@EqualsAndHashCode(exclude = "messages")
 public class Cursor {
     @Nullable
     private final Cursor parent;

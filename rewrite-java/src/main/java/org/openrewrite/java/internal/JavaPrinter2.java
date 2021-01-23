@@ -34,7 +34,7 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
     }
 
     public String print(J j, P p) {
-        setCursor(new Cursor(null, null));
+        setCursor(new Cursor(null, "EPSILON"));
         visit(j, p);
         return getPrinterAcc().toString();
     }

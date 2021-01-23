@@ -19,6 +19,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.marker.Markable;
+import org.openrewrite.marker.Markers;
 
 import java.util.List;
 import java.util.function.Function;
@@ -37,25 +39,28 @@ import static java.util.Collections.emptyList;
  *
  * @param <T> The type of the inner list of elements.
  */
-public class JContainer<T> {
-    private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList());
+public class JContainer<T> implements Markable {
+    private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
 
     private final Space before;
     private final List<JRightPadded<T>> elem;
+    private final Markers markers;
 
-    private JContainer(Space before, List<JRightPadded<T>> elem) {
+    private JContainer(Space before, List<JRightPadded<T>> elem, Markers markers) {
         this.before = before;
         this.elem = elem;
+        this.markers = markers;
     }
 
     @JsonCreator
     public static <T> JContainer<T> build(
             @JsonProperty("before") Space before,
-            @JsonProperty("elem") List<JRightPadded<T>> elem) {
+            @JsonProperty("elem") List<JRightPadded<T>> elem,
+            @JsonProperty("markers") Markers markers) {
         if (before.isEmpty() && elem.isEmpty()) {
             return empty();
         }
-        return new JContainer<>(before, elem);
+        return new JContainer<>(before, elem, markers);
     }
 
     @SuppressWarnings("unchecked")
@@ -64,11 +69,16 @@ public class JContainer<T> {
     }
 
     public JContainer<T> withBefore(Space before) {
-        return build(before, elem);
+        return build(before, elem, markers);
     }
 
     public JContainer<T> withElem(List<JRightPadded<T>> elem) {
-        return build(getBefore(), elem);
+        return build(getBefore(), elem, markers);
+    }
+
+    @SuppressWarnings("unchecked")
+    public JContainer<T> withMarkers(Markers markers) {
+        return build(getBefore(), elem, markers);
     }
 
     public List<JRightPadded<T>> getElem() {
@@ -77,6 +87,11 @@ public class JContainer<T> {
 
     public Space getBefore() {
         return before;
+    }
+
+    @Override
+    public Markers getMarkers() {
+        return markers;
     }
 
     public JContainer<T> map(Function<T, T> map) {

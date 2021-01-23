@@ -116,7 +116,7 @@ public class AddImport<P> extends JavaIsoProcessor<P> {
             }
         }
 
-        imports.add(new JRightPadded<>(importToAdd, Space.EMPTY));
+        imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
         cu = cu.withImports(imports);
 
         OrderImports orderImports = new OrderImports(false);

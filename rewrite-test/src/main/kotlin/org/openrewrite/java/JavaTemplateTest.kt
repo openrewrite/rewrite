@@ -29,6 +29,7 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
 import org.openrewrite.java.tree.Space
 import org.openrewrite.java.tree.Statement
+import org.openrewrite.marker.Markers
 import org.slf4j.LoggerFactory
 import kotlin.streams.toList
 
@@ -79,7 +80,7 @@ interface JavaTemplateTest : RecipeTest {
 
                     return block.withStatements(
                         ListUtils.concat(
-                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY),
+                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY, Markers.EMPTY),
                             block.statements
                         )
                     )
@@ -150,7 +151,7 @@ interface JavaTemplateTest : RecipeTest {
                     return block.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY)
+                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY, Markers.EMPTY)
                         )
                     )
                 }
@@ -222,7 +223,7 @@ interface JavaTemplateTest : RecipeTest {
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
+                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY, Markers.EMPTY)
                         )
                     )
                 }
@@ -300,7 +301,7 @@ interface JavaTemplateTest : RecipeTest {
                     b = b.withStatements(
                         ListUtils.concat(
                             block.statements,
-                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY)
+                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY, Markers.EMPTY)
                         )
                     )
                 }
@@ -607,7 +608,7 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
 
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state, Space.EMPTY)
+                        JRightPadded<Statement>(state, Space.EMPTY, Markers.EMPTY)
                     }.toList())
                 }
                 return b
@@ -678,7 +679,7 @@ interface JavaTemplateTest : RecipeTest {
                     assertThat(generatedStatements[0].type).`as`("The type information should be populated").isNotNull
                     assertThat(generatedStatements[1].type).`as`("The type information should be populated").isNotNull
                     b = b.withStatements(generatedStatements.stream().map { state ->
-                        JRightPadded<Statement>(state, Space.EMPTY)
+                        JRightPadded<Statement>(state, Space.EMPTY, Markers.EMPTY)
                     }.toList())
                 }
                 return b

@@ -69,7 +69,8 @@ public class ChangeMethodTargetToStatic extends Recipe {
                                         Markers.EMPTY,
                                         classType.getClassName(),
                                         classType),
-                                Space.EMPTY
+                                Space.EMPTY,
+                                Markers.EMPTY
                         )
                 );
 

@@ -98,7 +98,8 @@ public class DeleteStatement<P> extends JavaIsoProcessor<P> {
                         emptyList(),
                         Space.EMPTY
                 ),
-                Space.EMPTY
+                Space.EMPTY,
+                Markers.EMPTY
         );
     }
 }

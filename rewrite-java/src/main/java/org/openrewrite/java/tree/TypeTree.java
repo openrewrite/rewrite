@@ -66,7 +66,17 @@ public interface TypeTree extends NameTree {
                         Space.EMPTY,
                         Markers.EMPTY,
                         expr,
-                        new JLeftPadded<>(Space.format(nextLeftPad), J.Ident.build(randomId(), Space.format(whitespaceBefore.toString()), Markers.EMPTY, part.trim(), null)),
+                        new JLeftPadded<>(
+                                Space.format(nextLeftPad),
+                                J.Ident.build(
+                                        randomId(),
+                                        Space.format(whitespaceBefore.toString()),
+                                        Markers.EMPTY,
+                                        part.trim(),
+                                        null
+                                ),
+                                Markers.EMPTY
+                        ),
                         (Character.isUpperCase(part.charAt(0))) ?
                                 JavaType.Class.build(fullName) :
                                 null

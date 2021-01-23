@@ -53,14 +53,16 @@ public class ImplementInterface<P> extends JavaIsoProcessor<P> {
                             interfaceType.getClassName(),
                             interfaceType
                     ),
-                    Space.EMPTY
+                    Space.EMPTY,
+                    Markers.EMPTY
             );
 
             if (c.getImplements() == null) {
                 c = c.withImplements(
                         JContainer.build(
                                 format(" "),
-                                singletonList(lifeCycle)
+                                singletonList(lifeCycle),
+                                Markers.EMPTY
                         )
                 );
             } else {

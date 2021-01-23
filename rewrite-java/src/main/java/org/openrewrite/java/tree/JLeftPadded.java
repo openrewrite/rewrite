@@ -20,6 +20,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.marker.Markable;
+import org.openrewrite.marker.Markers;
 
 import java.util.function.Function;
 
@@ -34,12 +36,15 @@ import java.util.function.Function;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
 @Data
-public class JLeftPadded<T> {
+public class JLeftPadded<T> implements Markable {
     @With
     Space before;
 
     @With
     T elem;
+
+    @With
+    Markers markers;
 
     public JLeftPadded<T> map(Function<T, T> map) {
         return withElem(map.apply(elem));

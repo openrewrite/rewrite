@@ -21,6 +21,7 @@ import org.openrewrite.TreeProcessor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 
 import java.util.Iterator;
 import java.util.List;
@@ -116,7 +117,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         }
         @SuppressWarnings("unchecked") List<JRightPadded<J2>> js = ListUtils.map(nameTrees.getElem(),
                 t -> t.getElem() instanceof NameTree ? (JRightPadded<J2>) visitTypeName((JRightPadded<NameTree>) t, p) : t);
-        return js == nameTrees.getElem() ? nameTrees : JContainer.build(nameTrees.getBefore(), js);
+        return js == nameTrees.getElem() ? nameTrees : JContainer.build(nameTrees.getBefore(), js, Markers.EMPTY);
     }
 
     @Override
@@ -695,7 +696,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
             setCursor(getCursor().getParent());
         }
 
-        return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space);
+        return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space, Markers.EMPTY);
     }
 
     @Nullable
@@ -723,7 +724,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
             setCursor(getCursor().getParent());
         }
 
-        return (space == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(space, t);
+        return (space == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(space, t, Markers.EMPTY);
     }
 
     @Nullable
@@ -746,7 +747,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
 
         return js == container.getElem() && before == container.getBefore() ?
                 container :
-                JContainer.build(before, js);
+                JContainer.build(before, js, Markers.EMPTY);
     }
 
     /**
@@ -771,7 +772,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
      */
     protected boolean isInSameNameScope(Cursor base, Cursor child) {
         //First establish the base scope by finding the first enclosing element.
-        Tree baseScope = (Tree) base.dropParentUntil(t -> t instanceof J.Block ||
+        Tree baseScope = base.dropParentUntil(t -> t instanceof J.Block ||
                 t instanceof J.MethodDecl ||
                 t instanceof J.Try ||
                 t instanceof J.ForLoop ||

@@ -69,7 +69,7 @@ public class DeleteMethodArgument extends Recipe {
 
                 args.remove((int) index);
                 if (args.isEmpty()) {
-                    args = singletonList(new JRightPadded<>(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY));
+                    args = singletonList(new JRightPadded<>(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
                 }
 
                 m = m.withArgs(m.getArgs().withElem(args));

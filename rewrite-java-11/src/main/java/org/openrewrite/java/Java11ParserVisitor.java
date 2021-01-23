@@ -102,7 +102,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 expressions = convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")"));
             }
 
-            args = JContainer.build(argsPrefix, expressions);
+            args = JContainer.build(argsPrefix, expressions, Markers.EMPTY);
         } else {
             String remaining = source.substring(cursor, endPos(node));
 
@@ -112,7 +112,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             if (remaining.contains("(") && remaining.contains(")")) {
                 args = JContainer.build(
                         sourceBefore("("),
-                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY))
+                        singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)),
+                        Markers.EMPTY
                 );
             }
         }
@@ -311,7 +312,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
         return new J.Case(randomId(), fmt, Markers.EMPTY,
                 pattern,
-                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements())));
+                JContainer.build(sourceBefore(":"), convertStatements(node.getStatements()), Markers.EMPTY));
     }
 
     @Override
@@ -350,7 +351,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null : JContainer.build(
                 sourceBefore("<"),
-                convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")));
+                convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
+                Markers.EMPTY);
 
         JLeftPadded<TypeTree> extendings = node.getExtendsClause() == null ? null :
                 padLeft(sourceBefore("extends"), convertOrNull(node.getExtendsClause()));
@@ -360,7 +362,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             Space implementsPrefix = sourceBefore(kind.getElem() == J.ClassDecl.Kind.Interface ?
                     "extends" : "implements");
 
-            implementings = JContainer.build(implementsPrefix, convertAll(node.getImplementsClause(), commaDelim, noDelim));
+            implementings = JContainer.build(
+                    implementsPrefix,
+                    convertAll(node.getImplementsClause(), commaDelim, noDelim),
+                    Markers.EMPTY
+            );
         }
 
         Space bodyPrefix = sourceBefore("{");
@@ -718,7 +724,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Expression> typeParams = null;
         if (!node.getTypeArguments().isEmpty()) {
             typeParams = JContainer.build(sourceBefore("<"), convertAll(node.getTypeArguments(), commaDelim,
-                    t -> sourceBefore(">")));
+                    t -> sourceBefore(">")), Markers.EMPTY);
         }
 
         J.Ident name;
@@ -731,7 +737,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         JContainer<Expression> args = JContainer.build(sourceBefore("("), node.getArguments().isEmpty() ?
                 singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")));
+                convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
 
         Symbol genericSymbol = (jcSelect instanceof JCFieldAccess) ? ((JCFieldAccess) jcSelect).sym : ((JCIdent) jcSelect).sym;
 
@@ -749,7 +755,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         // see https://docs.oracle.com/javase/tutorial/java/generics/methods.html
         JContainer<J.TypeParameter> typeParams = node.getTypeParameters().isEmpty() ? null :
                 JContainer.build(sourceBefore("<"),
-                        convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")));
+                        convertAll(node.getTypeParameters(), commaDelim, t -> sourceBefore(">")),
+                        Markers.EMPTY);
 
         TypeTree returnType = convertOrNull(node.getReturnType());
 
@@ -780,11 +787,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         Space paramFmt = sourceBefore("(");
         JContainer<Statement> params = !node.getParameters().isEmpty() ?
-                JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")"))) :
-                JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)));
+                JContainer.build(paramFmt, convertAll(node.getParameters(), commaDelim, t -> sourceBefore(")")),
+                        Markers.EMPTY) :
+                JContainer.build(paramFmt, singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"),
+                        Markers.EMPTY), EMPTY)), Markers.EMPTY);
 
         JContainer<NameTree> throwss = node.getThrows().isEmpty() ? null :
-                JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim));
+                JContainer.build(sourceBefore("throws"), convertAll(node.getThrows(), commaDelim, noDelim),
+                        Markers.EMPTY);
 
         J.Block body = convertOrNull(node.getBody());
 
@@ -837,7 +847,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         JContainer<Expression> initializer = node.getInitializers() == null ? null :
                 JContainer.build(sourceBefore("{"), node.getInitializers().isEmpty() ?
                         singletonList(padRight(new J.Empty(randomId(), sourceBefore("}"), Markers.EMPTY), EMPTY)) :
-                        convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")));
+                        convertAll(node.getInitializers(), commaDelim, t -> sourceBefore("}")), Markers.EMPTY);
 
         return new J.NewArray(randomId(), fmt, Markers.EMPTY, typeExpr, dimensions,
                 initializer, type(node));
@@ -863,7 +873,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             args = JContainer.build(sourceBefore("("),
                     node.getArguments().isEmpty() ?
                             singletonList(padRight(new J.Empty(randomId(), sourceBefore(")"), Markers.EMPTY), EMPTY)) :
-                            convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")));
+                            convertAll(node.getArguments(), commaDelim, t -> sourceBefore(")")), Markers.EMPTY);
         }
 
         J.Block body = null;
@@ -1011,7 +1021,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                         sourceBefore(")") : EMPTY));
             }
 
-            resources = JContainer.build(before, resourceList);
+            resources = JContainer.build(before, resourceList, Markers.EMPTY);
         }
 
         J.Block block = convert(node.getBlock());
@@ -1048,7 +1058,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         // see https://docs.oracle.com/javase/tutorial/java/generics/bounded.html
         JContainer<TypeTree> bounds = node.getBounds().isEmpty() ? null :
                 JContainer.build(sourceBefore("extends"),
-                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim));
+                        convertAll(node.getBounds(), t -> sourceBefore("&"), noDelim), Markers.EMPTY);
 
         return new J.TypeParameter(randomId(), fmt, Markers.EMPTY, annotations, name, bounds);
     }
@@ -1286,7 +1296,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     private <J2 extends J> JRightPadded<J2> convert(Tree t, Function<Tree, Space> suffix) {
         J2 j = convert(t);
-        JRightPadded<J2> rightPadded = j == null ? null : new JRightPadded<>(j, suffix.apply(t));
+        JRightPadded<J2> rightPadded = j == null ? null : new JRightPadded<>(j, suffix.apply(t), Markers.EMPTY);
         cursor(max(endPos(t), cursor)); // if there is a non-empty suffix, the cursor may have already moved past it
         return rightPadded;
     }
@@ -1357,7 +1367,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             params = convertAll(typeArguments, commaDelim, t -> sourceBefore(">"));
         }
 
-        return JContainer.build(typeArgPrefix, params);
+        return JContainer.build(typeArgPrefix, params, Markers.EMPTY);
     }
 
     private Space statementDelim(@Nullable Tree t) {
@@ -1683,11 +1693,11 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private <T> JRightPadded<T> padRight(T tree, Space right) {
-        return new JRightPadded<>(tree, right);
+        return new JRightPadded<>(tree, right, Markers.EMPTY);
     }
 
     private <T> JLeftPadded<T> padLeft(Space left, T tree) {
-        return new JLeftPadded<>(left, tree);
+        return new JLeftPadded<>(left, tree, Markers.EMPTY);
     }
 
     private int positionOfNext(String untilDelim, @Nullable Character stop) {

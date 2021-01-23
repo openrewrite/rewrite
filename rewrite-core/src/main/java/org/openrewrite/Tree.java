@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
@@ -27,14 +28,10 @@ import org.openrewrite.style.Style;
 import java.util.UUID;
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.CLASS, property = "@c")
-public interface Tree {
+public interface Tree extends Markable {
     static UUID randomId() {
         return UUID.randomUUID();
     }
-
-    Markers getMarkers();
-
-    <T extends Tree> T withMarkers(Markers markers);
 
     default <T extends Tree> T mark(Marker... add) {
         Markers markers = getMarkers();

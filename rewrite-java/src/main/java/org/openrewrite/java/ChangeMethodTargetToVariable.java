@@ -77,7 +77,8 @@ public class ChangeMethodTargetToVariable extends Recipe {
                                 Markers.EMPTY,
                                 variable,
                                 this.variableType),
-                                Space.EMPTY
+                                Space.EMPTY,
+                                Markers.EMPTY
                         )
                 ).withType(methodType);
 
