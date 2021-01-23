@@ -22,7 +22,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
@@ -36,22 +36,20 @@ import java.util.List;
 import java.util.Set;
 
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe will find all annotations matching the annotation pattern and mark those elements with a
+ * {@link SearchResult} marker.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindAnnotation extends Recipe {
 
-    private final String signature;
+    private final String annotationPattern;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindAnnotationProcessor(signature);
-    }
-
-    @Override
-    public Validated validate() {
-        return required("signature", signature);
+        return new FindAnnotationProcessor(annotationPattern);
     }
 
     public static Set<J.Annotation> find(J j, String clazz) {

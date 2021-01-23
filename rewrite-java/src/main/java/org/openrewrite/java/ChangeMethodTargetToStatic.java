@@ -35,9 +35,7 @@ import static org.openrewrite.Validated.required;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToStatic extends Recipe {
 
-    @NonNull
     private final String methodPattern;
-    @NonNull
     private final String targetType;
 
     @Override

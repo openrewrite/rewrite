@@ -43,7 +43,6 @@ public class AddDependency extends Recipe {
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
      */
-    @Nullable
     private final String version;
 
     /**
@@ -107,10 +106,11 @@ public class AddDependency extends Recipe {
 
     @Override
     public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId))
-                .and(required("version", version)
-                        .or(Semver.validate(version, metadataPattern)));
+        Validated validated = super.validate();
+        if (version != null) {
+            validated = validated.or(Semver.validate(version, metadataPattern));
+        }
+        return validated;
     }
 
     @Override

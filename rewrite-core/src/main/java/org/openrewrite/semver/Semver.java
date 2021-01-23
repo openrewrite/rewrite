@@ -26,7 +26,7 @@ public class Semver {
     private Semver() {
     }
 
-    public static Validated validate(@Nullable String toVersion, @Nullable String metadataPattern) {
+    public static Validated validate(String toVersion, @Nullable String metadataPattern) {
         return test(
                 "metadataPattern",
                 "must be a valid regular expression",

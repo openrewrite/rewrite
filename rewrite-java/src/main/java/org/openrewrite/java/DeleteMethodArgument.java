@@ -21,6 +21,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -34,21 +35,20 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe finds method invocations matching a method pattern and uses a zero-based argument index to determine
+ * which argument is removed.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class DeleteMethodArgument extends Recipe {
+
     private final String methodPattern;
-    private final Integer index;
+    private final Integer argumentIndex;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new DeleteMethodArgumentProcessor(new MethodMatcher(methodPattern));
-    }
-
-    @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern)
-                .and(required("index", index));
     }
 
     private class DeleteMethodArgumentProcessor extends JavaIsoProcessor<ExecutionContext> {
@@ -64,10 +64,10 @@ public class DeleteMethodArgument extends Recipe {
             List<JRightPadded<Expression>> originalArgs = m.getArgs().getElem();
             if (methodMatcher.matches(m) && originalArgs.stream()
                     .filter(a -> !(a.getElem() instanceof J.Empty))
-                    .count() >= index + 1) {
+                    .count() >= argumentIndex + 1) {
                 List<JRightPadded<Expression>> args = new ArrayList<>(m.getArgs().getElem());
 
-                args.remove((int) index);
+                args.remove((int) argumentIndex);
                 if (args.isEmpty()) {
                     args = singletonList(new JRightPadded<>(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
                 }

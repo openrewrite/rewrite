@@ -19,6 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.RecipeTest
+import org.openrewrite.java.search.FindField
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
 
@@ -356,4 +357,34 @@ class AddDependencyTest : RecipeTest {
             assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
         }
     )
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = AddDependency(null, null, null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(3)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        assertThat(valid.failures()[1].property).isEqualTo("groupId")
+        assertThat(valid.failures()[2].property).isEqualTo("version")
+
+        recipe = AddDependency(null, "rewrite-maven", null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("groupId")
+        assertThat(valid.failures()[1].property).isEqualTo("version")
+
+        recipe = AddDependency("org.openrewrite", null, null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        assertThat(valid.failures()[1].property).isEqualTo("version")
+
+        recipe = AddDependency("org.openrewrite", "rewrite-maven","1.0.0")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
+
 }

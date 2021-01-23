@@ -22,6 +22,7 @@ import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
@@ -47,11 +48,6 @@ public class GenerateGetter extends Recipe {
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new GenerateGetterProcessor<>();
-    }
-
-    @Override
-    public Validated validate() {
-        return required("fieldName", fieldName);
     }
 
     private class GenerateGetterProcessor<P> extends JavaIsoProcessor<P> {

@@ -33,13 +33,8 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToVariable extends Recipe {
 
-    @NonNull
     private final String methodPattern;
-
-    @NonNull
     private final String variableName;
-
-    @NonNull
     private final String variableType;
 
     @Override

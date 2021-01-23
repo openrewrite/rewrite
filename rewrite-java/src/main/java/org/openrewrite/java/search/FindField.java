@@ -30,19 +30,19 @@ import java.util.Set;
 
 import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe will find all fields that have a type matching the fully qualified type name and mark those fields with
+ * {@link SearchResult} markers.
+ */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindField extends Recipe {
-    private final String fullyQualifiedName;
+
+    private final String fullyQualifiedTypeName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new FindFieldsProcessor();
-    }
-
-    @Override
-    public Validated validate() {
-        return required("fullyQualifiedName", fullyQualifiedName);
     }
 
     public static Set<J.VariableDecls> find(J j, String clazz) {
@@ -60,7 +60,7 @@ public class FindField extends Recipe {
                 return multiVariable;
             }
             if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
-                    .getType(), fullyQualifiedName)) {
+                    .getType(), fullyQualifiedTypeName)) {
                 return multiVariable.mark(new SearchResult());
             }
             return multiVariable;

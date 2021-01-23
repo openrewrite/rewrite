@@ -33,9 +33,7 @@ import org.openrewrite.java.tree.TypeTree;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
-    @NonNull
     private final String methodPattern;
-    @NonNull
     private final String newMethodName;
 
     @Override

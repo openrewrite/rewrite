@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
 import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -30,24 +29,18 @@ import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
 
-import static org.openrewrite.Validated.required;
-
 /**
- * Find places where a type is mentioned explicitly, excluding imports.
+ * This recipe will find all references to a type matching the fully qualified type name and mark those fields with
+ * {@link SearchResult} markers.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public final class FindType extends Recipe {
-    private final String fullyQualifiedClassName;
+    private final String fullyQualifiedTypeName;
 
     @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new FindTypeProcessor();
-    }
-
-    @Override
-    public Validated validate() {
-        return required("fullyQualifiedClassName", fullyQualifiedClassName);
     }
 
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
@@ -67,7 +60,7 @@ public final class FindType extends Recipe {
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             N n = super.visitTypeName(name, ctx);
             JavaType.Class asClass = TypeUtils.asClass(n.getType());
-            if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedClassName) &&
+            if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
                     getCursor().firstEnclosing(J.Import.class) == null) {
                 return n.mark(new SearchResult());
             }
