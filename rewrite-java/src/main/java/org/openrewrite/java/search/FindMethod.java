@@ -59,11 +59,6 @@ public final class FindMethod extends Recipe {
     private final String methodPattern;
 
     @Override
-    public Validated validate() {
-        return required("methodPattern", methodPattern);
-    }
-
-    @Override
     protected TreeProcessor<?, ExecutionContext> getProcessor() {
         return new FindMethodProcessor(methodPattern);
     }
