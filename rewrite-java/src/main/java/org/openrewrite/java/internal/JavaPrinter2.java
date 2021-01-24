@@ -39,7 +39,7 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
         return getPrinterAcc().toString();
     }
 
-    private void visit(@Nullable List<? extends J> nodes, P p) {
+    protected void visit(@Nullable List<? extends J> nodes, P p) {
         if (nodes != null) {
             for (J node : nodes) {
                 visit(node, p);

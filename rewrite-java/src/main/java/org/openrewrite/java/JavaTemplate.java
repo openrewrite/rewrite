@@ -18,11 +18,11 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.openrewrite.TreeProcessor;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatProcessor;
-import org.openrewrite.java.internal.JavaPrinter;
+import org.openrewrite.java.internal.JavaPrinter2;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -104,10 +104,10 @@ public class JavaTemplate {
         }
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateProcessor().visit(cu, insertionScope);
 
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
-                .visit(pruned, printedTemplate);
+                .print(pruned, printedTemplate);
 
         logger.trace("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
@@ -218,57 +218,86 @@ public class JavaTemplate {
     /**
      * Custom Java Printer that will add additional import and add the printed template at the insertion point.
      */
-    private static class TemplatePrinter extends JavaPrinter<String> {
+    private static class TemplatePrinter extends JavaPrinter2<String> {
+
+        private boolean after;
+
+        private final boolean memberVariableInitializer;
+
+        private final Cursor insertionScope;
+
         private final Set<String> imports;
 
-        TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
-            super(new TreePrinter<String>() {
-                @Override
-                public String doLast(Tree tree, String printed, String printedTemplate) {
-                    //Note: A block is added around the template and markers when the insertion point is within a
-                    //      member variable initializer to prevent compiler issues.
-                    String blockStart = memberVariableInitializer ? "{" : "";
-                    String blockEnd = memberVariableInitializer ? "}" : "";
-                    // individual statement, but block doLast which is invoking this adds the ;
-                    Object insertionValue = insertionScope.getValue();
-                    if (insertionValue instanceof Tree && ((Tree)insertionValue).getId().equals(tree.getId())) {
-                        String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
-                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
-                        if (after) {
-                            // since the visit method on J.Block is responsible for adding the ';', we
-                            // add it pre-emptively here before concatenating the template.
-                            printed = printed +
-                                    ((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
-                                            ";" : "") +
-                                    templateCode;
-                        } else {
-                            printed = templateCode + printed;
-                        }
-                    }
-                    return printed;
-                }
-            });
+        private TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
+            this.after = after;
+            this.memberVariableInitializer = memberVariableInitializer;
+            this.insertionScope = insertionScope;
             this.imports = imports;
         }
 
         @Override
-        public String visitCompilationUnit(J.CompilationUnit cu, String acc) {
+        public @Nullable J visit(@Nullable Tree tree, String printedTemplate) {
 
-            //Print all original imports from the compilation unit
-            String originalImports = super.visit(cu.getImports(), ";", acc);
-
-            StringBuilder output = new StringBuilder(originalImports.length() + acc.length() + 1024);
-            output.append(originalImports);
-            if (!cu.getImports().isEmpty()) {
-                output.append(";\n");
+            if (tree == null) {
+                return defaultValue(null, printedTemplate);
             }
 
-            for (String i : imports) {
-                output.append(i);
+            StringBuilder acc = getPrinterAcc();
+            //Note: A block is added around the template and markers when the insertion point is within a
+            //      member variable initializer to prevent compiler issues.
+            String blockStart = memberVariableInitializer ? "{" : "";
+            String blockEnd = memberVariableInitializer ? "}" : "";
+            // individual statement, but block doLast which is invoking this adds the ;
+            Object insertionValue = insertionScope.getValue();
+            if (insertionValue instanceof Tree && ((Tree)insertionValue).getId().equals(tree.getId())) {
+                String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
+                        printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
+                if (after) {
+                    // since the visit method on J.Block is responsible for adding the ';', we
+                    // add it pre-emptively here before concatenating the template.
+                    tree = super.visit(tree, printedTemplate);
+                    acc.append(((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
+                            ";" : "")).append(templateCode);
+                } else {
+                    acc.append(templateCode);
+                    tree = super.visit(tree, printedTemplate);
+                }
+            } else {
+                super.visit(tree, printedTemplate);
             }
+            return (J) tree;
+        }
 
-            //Visit the classes of the compilation unit.
-            return output.append(visit(cu.getClasses(), acc)).append(visit(cu.getEof())).toString();
+        @Override
+        public J visitCompilationUnit(J.CompilationUnit cu, String acc) {
+
+            for (String impoort : imports) {
+                doAfterVisit(new AddImport<>(impoort, null, false));
+            }
+            return super.visitCompilationUnit(cu, acc);
+
+//            //Print all original imports from the compilation unit
+//            visit(cu.getImports(), ";", acc);
+//            String originalImports = getPrinterAcc().toString();
+//
+//            StringBuilder output = new StringBuilder(originalImports.length() + acc.length() + 1024);
+//            output.append(originalImports);
+//            if (!cu.getImports().isEmpty()) {
+//                output.append(";\n");
+//            }
+//
+//            for (String i : imports) {
+//                output.append(i);
+//            }
+//            getPrinterAcc().append(output);
+//
+//            //Visit the classes of the compilation unit.
+//            for (J.ClassDecl clazz : cu.getClasses()) {
+//                visit(clazz, acc);
+//            }
+//
+//            visitSpace(cu.getEof(), acc);
+//            return cu;
         }
     }
 
