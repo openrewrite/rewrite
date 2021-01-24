@@ -34,7 +34,6 @@ import org.openrewrite.marker.Markers;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
-
     private static final JavaTemplate GETTER = JavaTemplate
             .builder("" +
                     "public #{} get#{}() {\n" +

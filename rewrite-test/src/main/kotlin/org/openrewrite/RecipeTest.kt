@@ -55,7 +55,7 @@ interface RecipeTest {
 
         val results = recipe!!.run(listOf(source),
             ExecutionContext.builder()
-                .maxCycles(1)
+                .maxCycles(2)
                 .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }
                 .build())
 

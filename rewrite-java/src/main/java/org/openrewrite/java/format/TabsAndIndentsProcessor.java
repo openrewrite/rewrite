@@ -227,6 +227,8 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
                 break;
             case TYPE_BOUND:
                 // need TYPE_PARAMETER JContainer outside the TYPE_BOUND JContainer...
+                j = j.withBefore(continuationIndent(j.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
+                        current : enclosingStatement()));
                 break;
             case ANNOTATION_ARGUMENT:
                 // any prefix will be on the parent MethodDecl/ClassDecl/VariableDecls
@@ -302,16 +304,16 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         });
     }
 
-    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Tree parent) {
+    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Object parent) {
         return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
                 parent, style.getContinuationIndent())));
     }
 
-    private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, @Nullable Tree parent) {
+    private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, @Nullable Object parent) {
         return t.withBefore(continuationIndent(t.getBefore(), parent));
     }
 
-    private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Tree parent) {
+    private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Object parent) {
         return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
     }
 
@@ -323,7 +325,7 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
     }
 
     @Nullable
-    private J enclosingStatement() {
+    private Object enclosingStatement() {
         return enclosingStatement(getCursor());
     }
 
@@ -331,10 +333,13 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
      * @return The first enclosing statement on its own line, used for continuation indenting.
      */
     @Nullable
-    private J enclosingStatement(Cursor cursor) {
+    private Object enclosingStatement(Cursor cursor) {
         cursor = cursor.getParent();
         while (cursor != null) {
             Object tree = cursor.getValue();
+            if(tree instanceof JContainer) {
+                return tree;
+            }
             if (tree instanceof J && ((J) tree).getPrefix().getWhitespace().contains("\n") &&
                     (tree instanceof Statement || tree instanceof Expression)) {
                 return (J) tree;
@@ -344,16 +349,18 @@ class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
         return null;
     }
 
-    private Space continuationIndent(Space space, @Nullable Tree parent) {
+    private Space continuationIndent(Space space, @Nullable Object parent) {
         return indent(space, parent, style.getContinuationIndent());
     }
 
-    private Space indent(Space space, @Nullable Tree parent, int indentSize) {
+    private Space indent(Space space, @Nullable Object parent, int indentSize) {
         if (parent == null || !space.getWhitespace().contains("\n")) {
             return space;
         }
 
-        int parentIndent = indent(((J) parent).getPrefix());
+        int parentIndent = parent instanceof J ?
+                indent(((J) parent).getPrefix()) :
+                indent(((JContainer<?>) parent).getBefore());
         int indent = indent(space);
 
         if (indent != parentIndent + indentSize) {

@@ -711,9 +711,7 @@ public class JavaProcessor<P> extends TreeProcessor<J, P> implements JavaVisitor
         }
 
         Space space = visitSpace(left.getBefore(), p);
-
         T t = left.getElem();
-
 
         if (t instanceof J) {
             //noinspection unchecked
