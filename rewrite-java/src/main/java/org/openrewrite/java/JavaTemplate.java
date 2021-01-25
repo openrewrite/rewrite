@@ -164,7 +164,7 @@ public class JavaTemplate {
         public J.Block visitBlock(J.Block block, Cursor insertionScope) {
             Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
 
-            if (parent != null && !(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
+            if (!(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
                 J.Block b = call(block, insertionScope, this::visitEach);
                 b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), insertionScope) : null);
                 b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
@@ -182,7 +182,7 @@ public class JavaTemplate {
                     }
                     return b.withStatements(statementsInScope);
                 }
-            } else if (parent != null && parent.getValue() instanceof J.ClassDecl) {
+            } else if (parent.getValue() instanceof J.ClassDecl) {
                 return super.visitBlock(block, insertionScope);
             }
             return block.withStatements(emptyList());
@@ -224,12 +224,12 @@ public class JavaTemplate {
 
                 //Note: A block is added around the template and markers when the insertion point is within a
                 //      member variable initializer to prevent compiler issues.
-                private String blockStart = memberVariableInitializer ? "{" : "";
-                private String blockEnd = memberVariableInitializer ? "}" : "";
-                private Object insertionValue = insertionScope.getValue();
+                private final String blockStart = memberVariableInitializer ? "{" : "";
+                private final String blockEnd = memberVariableInitializer ? "}" : "";
+                private final Object insertionValue = insertionScope.getValue();
 
                 @Override
-                public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, String printedTemplate) {
+                public void doBefore(Tree tree, StringBuilder printerAcc, String printedTemplate) {
                     if (!after) {
                         // individual statement, but block doLast which is invoking this adds the ;
                         if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
@@ -242,7 +242,7 @@ public class JavaTemplate {
                 }
 
                 @Override
-                public void doAfter(@Nullable Tree tree, StringBuilder printerAcc, String printedTemplate) {
+                public void doAfter(Tree tree, StringBuilder printerAcc, String printedTemplate) {
                     if (after) {
                         // individual statement, but block doLast which is invoking this adds the ;
                         if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
@@ -312,7 +312,7 @@ public class JavaTemplate {
         @Override
         public Space visitSpace(Space space, ExtractionContext context) {
 
-            long templateDepth = getCursor().getPathAsStream().count();
+            long templateDepth = getCursor().getPathAsStream(v -> v instanceof J).count();
             if (findMarker(space, SNIPPET_MARKER_END) != null) {
                 //Ending marker found, stop collecting elements. NOTE: if the space was part of a prefix of an element
                 //that element will not be collected.
@@ -332,7 +332,8 @@ public class JavaTemplate {
                 //remove the marker comment, and flag the extractor to start collecting all elements until the end marker
                 //is found.
                 context.collectElements = true;
-                context.collectedIds.add(((Tree) getCursor().getValue()).getId());
+                J treeValue = getCursor().getValue();
+                context.collectedIds.add(treeValue.getId());
                 context.startDepth = templateDepth;
 
                 if (getCursor().getValue() instanceof J.CompilationUnit) {
@@ -344,11 +345,16 @@ public class JavaTemplate {
                 }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
-                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getValue()).withPrefix(space.withComments(comments))));
-            } else if (context.collectElements && !context.collectedIds.contains(((Tree) getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId())) {
+                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, treeValue.withPrefix(space.withComments(comments))));
+            } else if (context.collectElements) {
                 //If collecting elements and the current cursor element has not already been collected, add it.
-                context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().dropParentUntil(v -> v instanceof J).getValue())));
-                context.collectedIds.add(((Tree) getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId());
+                if (getCursor().getValue() instanceof J) {
+                    J treeValue = getCursor().getValue();
+                    if (!context.collectedIds.contains(treeValue.getId())) {
+                        context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, treeValue));
+                        context.collectedIds.add(treeValue.getId());
+                    }
+                }
             }
 
             return space;
@@ -440,11 +446,6 @@ public class JavaTemplate {
         }
 
         public JavaTemplate build() {
-            if (javaParser == null) {
-                javaParser = JavaParser.fromJavaVersion()
-                        .logCompilationWarningsAndErrors(false)
-                        .build();
-            }
             return new JavaTemplate(javaParser, code, imports, parameterMarker);
         }
     }

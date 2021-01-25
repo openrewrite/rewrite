@@ -52,15 +52,31 @@ public class Cursor {
         return new CursorIterator(this);
     }
 
+    public Iterator<Object> getPath(Predicate<Object> filter) {
+        return new CursorIterator(this, filter);
+    }
+
     public Stream<Object> getPathAsStream() {
         return stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false);
     }
 
+    public Stream<Object> getPathAsStream(Predicate<Object> filter) {
+        return stream(Spliterators.spliteratorUnknownSize(getPath(filter), 0), false);
+    }
+
     private static class CursorIterator implements Iterator<Object> {
+
         private Cursor cursor;
+
+        private Predicate<Object> filter = (v) -> true;
 
         private CursorIterator(Cursor cursor) {
             this.cursor = cursor;
+        }
+
+        private CursorIterator(Cursor cursor, Predicate<Object> filter) {
+            this.cursor = cursor;
+            this.filter = filter;
         }
 
         @Override
@@ -72,6 +88,15 @@ public class Cursor {
         public Object next() {
             Object v = cursor.value;
             cursor = cursor.parent;
+            if (cursor != null) {
+                Object nextValue = cursor.value;
+                while (!filter.test(nextValue)) {
+                    cursor = cursor.parent;
+                    if (cursor != null) {
+                        nextValue = cursor.value;
+                    }
+                }
+            }
             return v;
         }
     }
