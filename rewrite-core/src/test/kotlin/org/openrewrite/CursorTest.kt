@@ -28,10 +28,10 @@ class CursorTest {
         val cursor = Cursor(null, t)
 
         cursor.putMessage("key", 1)
-        assertThat(cursor.peekMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(cursor.peekNearestMessage<Int>("key")!!).isEqualTo(1)
 
         val child = Cursor(cursor, t)
-        assertThat(child.peekMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(child.peekNearestMessage<Int>("key")!!).isEqualTo(1)
     }
 
     @Test
@@ -40,13 +40,13 @@ class CursorTest {
         val cursor = Cursor(null, t)
 
         cursor.putMessage("key", 1)
-        assertThat(cursor.pollMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(cursor.pollNearestMessage<Int>("key")!!).isEqualTo(1)
 
         @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-        assertThat(cursor.pollMessage<Integer>("key")).isNull()
+        assertThat(cursor.pollNearestMessage<Integer>("key")).isNull()
 
         cursor.putMessage("key", 1)
         val child = Cursor(cursor, t)
-        assertThat(child.peekMessage<Int>("key")!!).isEqualTo(1)
+        assertThat(child.peekNearestMessage<Int>("key")!!).isEqualTo(1)
     }
 }

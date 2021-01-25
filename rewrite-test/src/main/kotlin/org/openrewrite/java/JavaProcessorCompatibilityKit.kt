@@ -59,9 +59,6 @@ abstract class JavaProcessorCompatibilityKit {
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
-    inner class TabsAndIndentsTck : TabsAndIndentsTest
-
-    @Nested
     inner class FindAnnotationTck : FindAnnotationTest
 
     @Nested
@@ -102,6 +99,9 @@ abstract class JavaProcessorCompatibilityKit {
 
     @Nested
     inner class SpacesTck : SpacesTest
+
+    @Nested
+    inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest

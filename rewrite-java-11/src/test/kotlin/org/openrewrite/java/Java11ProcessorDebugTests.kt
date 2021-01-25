@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.example.GenerateGetter
 import org.openrewrite.java.example.GenerateGetterTest
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
@@ -130,10 +129,6 @@ class Java11SpacesTest : Java11Test, SpacesTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TabsAndIndentsTest : Java11Test, TabsAndIndentsTest
-
-@DebugOnly
-@ExtendWith(JavaParserResolver::class)
-class Java11TabsAndIndentsTest2 : Java11Test, TabsAndIndentsTest2
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
