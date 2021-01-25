@@ -35,15 +35,17 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodChain(jp: JavaParser) = assertUnchanged(
-        jp,
+    fun methodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
+        // t -> 12
+        // ); -> 10
         before = """
             class Test {
-                Test method(Test t) {
-                    return this
-                            .method(
-                                    t
-                            );
+                void method(Test t) {
+                    this
+                      .method(
+                        t
+                      );
                 }
             }
         """
@@ -652,24 +654,9 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodInvocations(jp: JavaParser) = assertChanged(
+    fun methodInvocations(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            class Test {
-                Test method(int n) {
-                    return method(n)
-                        .method(n)
-                        .method(n);
-                }
-            
-                Test method2() {
-                    return method2().
-                        method2().
-                        method2();
-                }
-            }
-        """,
-        after = """
             class Test {
                 Test method(int n) {
                     return method(n)

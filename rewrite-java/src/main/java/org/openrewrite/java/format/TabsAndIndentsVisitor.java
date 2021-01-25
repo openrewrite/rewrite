@@ -95,7 +95,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         Space s = indentTo(space, indent);
-        if(!(getCursor().getValue() instanceof JLeftPadded)) {
+        if (!(getCursor().getValue() instanceof JLeftPadded)) {
             getCursor().putMessage("lastIndent", indent);
         }
         return s;
@@ -128,16 +128,29 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 break;
             case ARRAY_INDEX:
             case METHOD_DECL_ARGUMENT:
+            case METHOD_INVOCATION_ARGUMENT:
             case NEW_CLASS_ARGS:
             case PARENTHESES:
             case TYPE_PARAMETER:
                 j = call(right.getElem(), p);
                 after = indentTo(right.getAfter(), indent);
                 break;
-            case METHOD_INVOCATION_ARGUMENT:
-                getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
-                j = call(right.getElem(), p);
+            case METHOD_SELECT:
+                for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
+                    if (cursor.getValue() instanceof JRightPadded) {
+                        cursor = cursor.getParentOrThrow();
+                    }
+                    if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+                        break;
+                    }
+                    Integer methodIndent = cursor.peekNearestMessage("lastIndent");
+                    if (methodIndent != null) {
+                        indent = methodIndent;
+                    }
+                }
+
                 getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                j = call(right.getElem(), p);
                 after = visitSpace(right.getAfter(), p);
                 break;
             case ANNOTATION_ARGUMENT:
@@ -158,7 +171,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             case TYPE_BOUND:
             case WHILE_BODY:
             default:
-            case METHOD_SELECT:
             case PACKAGE:
                 j = call(right.getElem(), p);
                 after = visitSpace(right.getAfter(), p);
