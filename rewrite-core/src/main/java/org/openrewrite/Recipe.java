@@ -71,18 +71,7 @@ public class Recipe {
     };
 
     @Nullable
-    private final String name;
-
-    @Nullable
     private Recipe next;
-
-    public Recipe(@Nullable String name) {
-        this.name = name;
-    }
-
-    public Recipe() {
-        this(null);
-    }
 
     /**
      * @param recipe {@link Recipe} to append to the doNext chain
@@ -277,7 +266,7 @@ public class Recipe {
     }
 
     public String getName() {
-        return name == null ? getClass().getName() : name;
+        return getClass().getName();
     }
 
     private static class RecipeThatMadeChanges implements Marker {
