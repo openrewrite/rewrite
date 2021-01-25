@@ -17,7 +17,6 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
-import org.openrewrite.java.example.GenerateGetter
 import org.openrewrite.java.example.GenerateGetterTest
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*

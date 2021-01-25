@@ -34,6 +34,21 @@ interface TabsAndIndentsTest : RecipeTest {
         )
     )
 
+    @Test
+    fun methodChain(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                Test method(Test t) {
+                    return this
+                            .method(
+                                    t
+                            );
+                }
+            }
+        """
+    )
+
     /**
      * Slight renaming but structurally the same as IntelliJ's code style view.
      */
@@ -236,10 +251,13 @@ interface TabsAndIndentsTest : RecipeTest {
                 int m = 0;
                 int n = 0;
                 for (
-                 int i = 0;
-                 i < 5;
+                 int i = 0
+                 ;
+                 i < 5
+                 ;
                  i++, m++,
-                 n++);
+                 n++
+                );
                 for (int i = 0;
                  i < 5;
                  i++, m++,
@@ -257,10 +275,13 @@ interface TabsAndIndentsTest : RecipeTest {
                     int m = 0;
                     int n = 0;
                     for (
-                      int i = 0;
-                      i < 5;
+                      int i = 0
+                      ;
+                      i < 5
+                      ;
                       i++, m++,
-                        n++);
+                        n++
+                    );
                     for (int i = 0;
                          i < 5;
                          i++, m++,
@@ -549,6 +570,27 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun methodWithAnnotation(jp: JavaParser.Builder<*, *>) = assertChanged(
+        jp.build(),
+        before = """
+            class Test {
+                @Deprecated
+            String getOnError() {
+                    return "uh oh";
+                }
+            }
+        """,
+        after = """
+            class Test {
+                @Deprecated
+                String getOnError() {
+                    return "uh oh";
+                }
+            }
+        """
+    )
+
+    @Test
     fun containers(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -665,19 +707,6 @@ interface TabsAndIndentsTest : RecipeTest {
                 }
             }
         """
-    )
-
-    @Test
-    fun methodWithAnnotation(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.build(),
-        before = """
-                public class Test {
-                    @Nullable
-                    Consumer<Throwable> getOnError() {
-                        return onError;
-                    }
-                }
-            """
     )
 
     @Test

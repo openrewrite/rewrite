@@ -1,22 +1,6 @@
-/*
- * Copyright 2020 the original author or authors.
- * <p>
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * https://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -24,6 +8,7 @@ import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
+import java.util.Optional;
 
 class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private final TabsAndIndentsStyle style;
@@ -34,355 +19,164 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public Statement visitStatement(Statement statement, P p) {
-        Statement s = statement;
-        Cursor parentCursor = getCursor().dropParentUntil(J.class::isInstance);
-        J parent = parentCursor.getValue();
-
-        if (!(s instanceof J.Block)) {
-            parent = parentCursor.getValue();
-            Cursor cursor = parentCursor;
-
-            // find the first cursor element that is indented further to the left
-            for (;
-                 parent instanceof J.Block || parent instanceof J.Label || parent instanceof J.Try.Catch ||
-                         parent instanceof J.If && cursor.dropParentUntil(J.class::isInstance).getValue() instanceof J.If.Else ||
-                         parent instanceof J.If.Else;
-                 parent = cursor.getValue()) {
-                cursor = cursor.dropParentUntil(J.class::isInstance);
-            }
-        }
-
-        s = indent(s, parent);
-        setCursor(new Cursor(getCursor().getParent(), s));
-
-        return super.visitStatement(s, p);
-    }
-
-    @Override
-    public J.ArrayDimension visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
-        J.ArrayDimension arrDim = super.visitArrayDimension(arrayDimension, p);
-        J.ArrayDimension a = continuationIndent(arrDim, enclosingStatement());
-        a = a.withIndex(a.getIndex().withAfter(continuationIndent(a.getIndex().getAfter(), enclosingStatement())));
-        return a;
-    }
-
-    @Override
-    public J.Block visitBlock(J.Block block, P p) {
-        J.Block j = super.visitBlock(block, p);
-        Cursor cursor = getCursor().dropParentUntil(J.class::isInstance);
-        Tree parent = cursor.getValue();
-
-        for (; parent instanceof J.Try.Catch ||
-                parent instanceof J.If && cursor.dropParentUntil(J.class::isInstance).getValue() instanceof J.If.Else ||
-                parent instanceof J.If.Else; parent = cursor.getValue()) {
-            cursor = cursor.dropParentUntil(J.class::isInstance);
-        }
-
-        return j.withEnd(alignToParentStatement(j.getEnd(), cursor));
-    }
-
-    @Override
-    public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
-        J.DoWhileLoop d = super.visitDoWhileLoop(doWhileLoop, p);
-        return d.withWhileCondition(d.getWhileCondition().withBefore(
-                alignToParentStatement(d.getWhileCondition().getBefore(), getCursor())));
-    }
-
-    @Override
-    public Expression visitExpression(Expression expression, P p) {
-        Expression e = super.visitExpression(expression, p);
-        J j = getCursor().dropParentUntil(J.class::isInstance).getValue();
-        if (expression instanceof J.Annotation) {
-            e = e.withPrefix(alignTo(e.getPrefix(), indent(j.getPrefix())));
-        } else if (!(j instanceof J.Block) && !(j instanceof J.Case) && !(j instanceof J.MethodDecl) &&
-                !(j instanceof J.VariableDecls)) {
-            e = continuationIndent(e, enclosingStatement());
-        }
-        return e;
-    }
-
-    @Override
-    public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
-        J.ForLoop f = (J.ForLoop) visitStatement(forLoop, p);
-        f = f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
-
-        J.ForLoop.Control control = forLoop.getControl();
-        JRightPadded<Statement> init = control.getInit();
-        JRightPadded<Expression> condition = control.getCondition();
-        List<JRightPadded<Statement>> update = control.getUpdate();
-        if (init.getElem().getPrefix().getWhitespace().contains("\n")) {
-            f = f.withControl(control
-                    .withInit(continuationIndent(init, f))
-                    .withCondition(continuationIndent(condition, f))
-                    .withUpdate(continuationIndent(update, f)));
+    public @Nullable J visitEach(J tree, P p) {
+        if (tree instanceof J.CompilationUnit ||
+                tree instanceof J.Package ||
+                tree instanceof J.Import ||
+                tree instanceof J.Label ||
+                tree instanceof J.DoWhileLoop ||
+                tree instanceof J.ArrayDimension) {
+            getCursor().putMessage("indentType", IndentType.ALIGN);
+        } else if (tree instanceof J.Block ||
+                tree instanceof J.If ||
+                tree instanceof J.If.Else ||
+                tree instanceof J.ForLoop ||
+                tree instanceof J.ForEachLoop ||
+                tree instanceof J.WhileLoop ||
+                tree instanceof J.Case) {
+            getCursor().putMessage("indentType", IndentType.INDENT);
         } else {
-            f = f.withControl(f.getControl().withCondition(condition.withElem(
-                    alignTo(condition.getElem(), forInitColumn()))));
-
-            int column = forInitColumn();
-            f = f.withControl(f.getControl().withUpdate(ListUtils.map(update, (i, j) ->
-                    j.withElem(alignTo(j.getElem(), i == 0 ? column :
-                            column + style.getContinuationIndent())))));
+            getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
         }
 
-        return f;
-    }
-
-    private int forInitColumn() {
-        J.ForLoop forLoop = getCursor().getValue();
-        J parent = getCursor().dropParentUntil(J.class::isInstance).getValue();
-        J alignTo = parent instanceof J.Label ?
-                ((J.Label) parent).withStatement(forLoop.withBody(null)) :
-                forLoop.withBody(null);
-
-        int column = 0;
-        boolean afterInitStart = false;
-        for (char c : alignTo.print().toCharArray()) {
-            if (c == '(') {
-                afterInitStart = true;
-            } else if (afterInitStart && !Character.isWhitespace(c)) {
-                return column - 1;
-            }
-            column++;
+        if (tree instanceof J.Annotation) {
+            getCursor().getParentOrThrow().putMessage("afterAnnotation", true);
         }
-        throw new IllegalStateException("For loops must have a control section");
+
+        return super.visitEach(tree, p);
     }
 
     @Override
-    public J.MemberReference visitMemberReference(J.MemberReference memberRef, P p) {
-        J.MemberReference m = super.visitMemberReference(memberRef, p);
-        m = m.withReference(continuationIndent(m.getReference(), enclosingStatement()));
-        return m;
-    }
-
-    @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl m = super.visitMethod(method, p);
-        List<JRightPadded<Statement>> params = m.getParams().getElem();
-        if (!params.isEmpty()) {
-            if (params.get(0).getElem().getPrefix().getWhitespace().contains("\n")) {
-                J.MethodDecl parent = m;
-                m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(),
-                        j -> continuationIndent(j, parent))));
-            } else if (params.stream().anyMatch(param -> param.getElem().getPrefix().getWhitespace().contains("\n"))) {
-                String print = m.withBody(null).print();
-                int nameStart = print.lastIndexOf(m.getSimpleName() + "(");
-                int lastNl = -1;
-                while (true) {
-                    int nl = print.indexOf('\n', ++lastNl);
-                    if (nl < 0 || nl > nameStart) {
-                        break;
-                    }
-                    lastNl = nl;
-                }
-                int column = nameStart - lastNl + m.getSimpleName().length() + 1;
-                m = m.withParams(m.getParams().withElem(ListUtils.map(m.getParams().getElem(), (i, param) ->
-                        i == 0 ? param : param.withElem(alignTo(param.getElem(), column)))));
-            }
-        }
-
-        m = m.withBody(call(m.getBody(), p));
-
-        return m;
-    }
-
-    @Override
-    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-        J.MethodInvocation m = super.visitMethodInvocation(method, p);
-        if (m.getSelect() != null && m.getSelect().getAfter().getWhitespace().contains("\n")) {
-            m = m.withSelect(m.getSelect().withAfter(continuationIndent(m.getSelect().getAfter(), enclosingStatement())));
-        }
-
-        if (m.getArgs().getLastSpace().getWhitespace().contains("\n")) {
-            // align the closing ')' with the first enclosing statement on its own line
-//            m = m.withArgs(m.getArgs().withElem(ListUtils.mapLast(m.getArgs().getElem(),
-//                    arg -> {
-//                        J enc = enclosingStatement(new Cursor(getCursor(), arg.getElem()));
-//                        assert enc != null;
-//                        return arg.withElem(alignTo(arg.getElem(), indent(enc.getPrefix())));
-//                    })));
-        }
-        return m;
-    }
-
-    @Override
-    public @Nullable <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container, JContainer.Location loc, P p) {
-        JContainer<J2> j = super.visitContainer(container, loc, p);
-        if (j == null) {
-            return null;
-        }
-
-        J current = getCursor().getValue();
-        switch (loc) {
-            case IMPLEMENTS:
-            case METHOD_ARGUMENT:
-            case NEW_ARRAY_INITIALIZER:
-            case NEW_CLASS_ARGS:
-            case THROWS:
-            case TRY_RESOURCES:
-            case TYPE_PARAMETER:
-                j = j.withBefore(continuationIndent(j.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
-                        current : enclosingStatement()));
-                break;
-            case TYPE_BOUND:
-                // need TYPE_PARAMETER JContainer outside the TYPE_BOUND JContainer...
-                break;
-            case ANNOTATION_ARGUMENT:
-                // any prefix will be on the parent MethodDecl/ClassDecl/VariableDecls
-                j = j.withBefore(continuationIndent(j.getBefore(), getCursor().dropParentUntil(J.class::isInstance).getValue()));
-                break;
-            case CASE:
-                // for some reason not needed?
-                break;
-        }
-        return j;
-    }
-
-    @Nullable
-    @Override
-    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
-        JLeftPadded<T> t = super.visitLeftPadded(left, loc, p);
-        if (t == null) {
-            return null;
-        }
-
-        switch (loc) {
-            case ASSIGNMENT:
-            case BINARY_OPERATOR:
-            case MEMBER_REFERENCE:
-            case TERNARY_TRUE:
-            case TERNARY_FALSE:
-                J current = getCursor().getValue();
-                t = t.withBefore(continuationIndent(t.getBefore(), current.getPrefix().getWhitespace().contains("\n") ?
-                        current : enclosingStatement()));
-                break;
-            case EXTENDS:
-            case FIELD_ACCESS_NAME:
-            case TRY_FINALLY:
-            case VARIABLE_INITIALIZER:
-            case WHILE_CONDITION:
-                break;
-            case UNARY_OPERATOR:
-                // handled in visitUnary
-                break;
-        }
-        return t;
-    }
-
-    @Override
-    public J.Unary visitUnary(J.Unary unary, P p) {
-        J.Unary u = super.visitUnary(unary, p);
-        switch (u.getOperator().getElem()) {
-            case PreIncrement:
-            case PreDecrement:
-            case Negative:
-            case Complement:
-            case Not:
-            case Positive:
-                u = u.withOperator(continuationIndent(u.getOperator(), enclosingStatement()));
-                break;
-            case PostIncrement:
-            case PostDecrement:
-                u = u.withOperator(continuationIndent(u.getOperator(),
-                        u.getPrefix().getWhitespace().contains("\n") ? u : enclosingStatement()));
-                break;
-        }
-        return u;
-    }
-
-    private <J2 extends J> List<JRightPadded<J2>> continuationIndent(List<JRightPadded<J2>> js, Tree parent) {
-        return ListUtils.map(js, (i, j) -> {
-            if (i == 0) {
-                return continuationIndent(j, parent);
-            } else {
-                return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
-                        parent, style.getContinuationIndent() * 2)));
-            }
-        });
-    }
-
-    private <J2 extends J> JRightPadded<J2> continuationIndent(JRightPadded<J2> j, @Nullable Tree parent) {
-        return j.withElem(j.getElem().withPrefix(indent(j.getElem().getPrefix(),
-                parent, style.getContinuationIndent())));
-    }
-
-    private <T> JLeftPadded<T> continuationIndent(JLeftPadded<T> t, @Nullable Tree parent) {
-        return t.withBefore(continuationIndent(t.getBefore(), parent));
-    }
-
-    private <J2 extends J> J2 continuationIndent(J2 j, @Nullable Tree parent) {
-        return j.withPrefix(indent(j.getPrefix(), parent, style.getContinuationIndent()));
-    }
-
-    private <J2 extends J> J2 indent(J2 j, Tree parent) {
-        if (parent instanceof J.CompilationUnit) {
-            return j;
-        }
-        return j.withPrefix(indent(j.getPrefix(), parent, style.getIndentSize()));
-    }
-
-    @Nullable
-    private J enclosingStatement() {
-        return enclosingStatement(getCursor());
-    }
-
-    /**
-     * @return The first enclosing statement on its own line, used for continuation indenting.
-     */
-    @Nullable
-    private J enclosingStatement(Cursor cursor) {
-        cursor = cursor.getParent();
-        while (cursor != null) {
-            Object tree = cursor.getValue();
-            if (tree instanceof J && ((J) tree).getPrefix().getWhitespace().contains("\n") &&
-                    (tree instanceof Statement || tree instanceof Expression)) {
-                return (J) tree;
-            }
-            cursor = cursor.getParent();
-        }
-        return null;
-    }
-
-    private Space continuationIndent(Space space, @Nullable Tree parent) {
-        return indent(space, parent, style.getContinuationIndent());
-    }
-
-    private Space indent(Space space, @Nullable Tree parent, int indentSize) {
-        if (parent == null || !space.getWhitespace().contains("\n")) {
+    public Space visitSpace(Space space, P p) {
+        if (!space.getWhitespace().contains("\n") || getCursor().getParent() == null) {
             return space;
         }
 
-        int parentIndent = indent(((J) parent).getPrefix());
-        int indent = indent(space);
+        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
 
-        if (indent != parentIndent + indentSize) {
-            int shift = indentSize + parentIndent - indent;
-            space = space.withComments(ListUtils.map(space.getComments(), c ->
-                    indentComment(c, shift)));
-            space = space.withWhitespace(indent(space.getWhitespace(), shift));
+        IndentType indentType = Optional.ofNullable(getCursor().getParentOrThrow().
+                <IndentType>peekNearestMessage("indentType")).orElse(IndentType.ALIGN);
+
+        // block spaces are always aligned to their parent
+        boolean alignBlockToParent = getCursor().getValue() instanceof J.Block;
+
+        // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
+        boolean alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
+
+        if (alignBlockToParent || alignToAnnotation) {
+            indentType = IndentType.ALIGN;
         }
-        return space;
+
+        switch (indentType) {
+            case ALIGN:
+                break;
+            case INDENT:
+                indent += style.getIndentSize();
+                break;
+            case CONTINUATION_INDENT:
+                indent += style.getContinuationIndent();
+                break;
+        }
+
+        Space s = indentTo(space, indent);
+        if(!(getCursor().getValue() instanceof JLeftPadded)) {
+            getCursor().putMessage("lastIndent", indent);
+        }
+        return s;
     }
 
-    private Space alignToParentStatement(Space space, Cursor parent) {
-        J alignTo = parent.dropParentUntil(J.class::isInstance).getValue() instanceof J.Label ?
-                parent.dropParentUntil(J.class::isInstance).getValue() :
-                parent.getValue();
+    @Override
+    public <J2 extends J> JRightPadded<J2> visitRightPadded(JRightPadded<J2> right, JRightPadded.Location type, P p) {
+        setCursor(new Cursor(getCursor(), right));
 
-        return alignTo(space, indent(alignTo.getPrefix()));
+        J2 j;
+        Space after;
+
+        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+
+        switch (type) {
+            case FOR_CONDITION:
+            case FOR_INIT:
+            case FOREACH_VARIABLE:
+                getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                j = call(right.getElem(), p);
+                getCursor().putMessage("indentType", IndentType.INDENT);
+                after = indentTo(right.getAfter(), indent + style.getContinuationIndent());
+                break;
+            case FOR_UPDATE:
+            case FOREACH_ITERABLE:
+                getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                j = call(right.getElem(), p);
+                getCursor().putMessage("indentType", IndentType.INDENT);
+                after = indentTo(right.getAfter(), indent);
+                break;
+            case ARRAY_INDEX:
+            case METHOD_DECL_ARGUMENT:
+            case NEW_CLASS_ARGS:
+            case PARENTHESES:
+            case TYPE_PARAMETER:
+                j = call(right.getElem(), p);
+                after = indentTo(right.getAfter(), indent);
+                break;
+            case METHOD_INVOCATION_ARGUMENT:
+                getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                j = call(right.getElem(), p);
+                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                after = visitSpace(right.getAfter(), p);
+                break;
+            case ANNOTATION_ARGUMENT:
+            case BLOCK_STATEMENT:
+            case CASE:
+            case CATCH_ALTERNATIVE:
+            case ENUM_VALUE:
+            case FOR_BODY:
+            case IF_ELSE:
+            case IF_THEN:
+            case IMPLEMENTS:
+            case IMPORT:
+            case INSTANCEOF:
+            case NAMED_VARIABLE:
+            case NEW_ARRAY_INITIALIZER:
+            case THROWS:
+            case TRY_RESOURCES:
+            case TYPE_BOUND:
+            case WHILE_BODY:
+            default:
+            case METHOD_SELECT:
+            case PACKAGE:
+                j = call(right.getElem(), p);
+                after = visitSpace(right.getAfter(), p);
+        }
+
+        setCursor(getCursor().getParent());
+        return (after == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, after, right.getMarkers());
     }
 
-    private <J2 extends J> J2 alignTo(J2 j, int column) {
-        return j.withPrefix(alignTo(j.getPrefix(), column));
+    @Override
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
+        setCursor(new Cursor(getCursor(), container));
+        Space before = visitSpace(container.getBefore(), p);
+        switch (loc) {
+            case IMPLEMENTS:
+            case THROWS:
+                getCursor().putMessage("indentType", IndentType.ALIGN);
+                break;
+        }
+
+        List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+        setCursor(getCursor().getParent());
+        return js == container.getElem() && before == container.getBefore() ?
+                container :
+                JContainer.build(before, js, container.getMarkers());
     }
 
-    private Space alignTo(Space space, int column) {
+    private Space indentTo(Space space, int column) {
         if (!space.getWhitespace().contains("\n")) {
             return space;
         }
 
-        int indent = indent(space);
+        int indent = findIndent(space);
 
         if (indent != column) {
             int shift = column - indent;
@@ -442,7 +236,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
     }
 
-    private int indent(Space space) {
+    private int findIndent(Space space) {
         String indent = space.getIndent();
         int size = 0;
         for (char c : indent.toCharArray()) {
@@ -452,5 +246,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         return size;
+    }
+
+    private enum IndentType {
+        ALIGN,
+        INDENT,
+        CONTINUATION_INDENT
     }
 }

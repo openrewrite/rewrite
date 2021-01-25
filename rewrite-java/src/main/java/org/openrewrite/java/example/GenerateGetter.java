@@ -34,7 +34,6 @@ import org.openrewrite.marker.Markers;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
-
     private static final JavaTemplate GETTER = JavaTemplate
             .builder("" +
                     "public #{} get#{}() {\n" +
@@ -66,7 +65,7 @@ public class GenerateGetter extends Recipe {
         @Override
         public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
             J.ClassDecl c = super.visitClassDecl(classDecl, p);
-            Cursor varCursor = getCursor().pollMessage("varCursor");
+            Cursor varCursor = getCursor().pollNearestMessage("varCursor");
             if (varCursor != null) {
                 J.VariableDecls.NamedVar var = varCursor.getValue();
                 J.Block body = c.getBody();

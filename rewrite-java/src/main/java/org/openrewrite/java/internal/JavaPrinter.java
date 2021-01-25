@@ -40,7 +40,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @NonNull
     protected StringBuilder getPrinterAcc() {
-        StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
+        StringBuilder acc = getCursor().getRoot().peekNearestMessage(PRINTER_ACC_KEY);
         if (acc == null) {
             acc = new StringBuilder();
             getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);

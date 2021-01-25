@@ -59,9 +59,6 @@ abstract class JavaVisitorCompatibilityKit {
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
-    inner class TabsAndIndentsTck : TabsAndIndentsTest
-
-    @Nested
     inner class FindAnnotationTck : FindAnnotationTest
 
     @Nested
@@ -102,6 +99,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class SpacesTck : SpacesTest
+
+    @Nested
+    inner class TabsAndIndentsTck : TabsAndIndentsTest
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest

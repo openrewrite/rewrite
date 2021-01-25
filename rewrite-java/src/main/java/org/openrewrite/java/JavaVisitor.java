@@ -133,7 +133,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Annotation a = call(annotation, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = call(a, p, this::visitExpression);
-        a = a.withArgs(visitContainer(a.getArgs(), JContainer.Location.ANNOTATION_ARGUMENT, p));
+        if (a.getArgs() != null) {
+            a = a.withArgs(visitContainer(a.getArgs(), JContainer.Location.ANNOTATION_ARGUMENT, p));
+        }
         a = a.withAnnotationType(call(a.getAnnotationType(), p));
         return a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
     }
@@ -238,11 +240,17 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         c = c.withModifiers(call(c.getModifiers(), p));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        c = c.withTypeParameters(visitContainer(c.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        if (c.getTypeParameters() != null) {
+            c = c.withTypeParameters(visitContainer(c.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        }
         c = c.withName(call(c.getName(), p));
-        c = c.withExtends(visitLeftPadded(c.getExtends(), JLeftPadded.Location.EXTENDS, p));
+        if (c.getExtends() != null) {
+            c = c.withExtends(visitLeftPadded(c.getExtends(), JLeftPadded.Location.EXTENDS, p));
+        }
         c = c.withExtends(visitTypeName(c.getExtends(), p));
-        c = c.withImplements(visitContainer(c.getImplements(), JContainer.Location.IMPLEMENTS, p));
+        if (c.getImplements() != null) {
+            c = c.withImplements(visitContainer(c.getImplements(), JContainer.Location.IMPLEMENTS, p));
+        }
         c = c.withImplements(visitTypeNames(c.getImplements(), p));
         return c.withBody(call(c.getBody(), p));
     }
@@ -250,7 +258,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
         J.CompilationUnit c = call(cu, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = c.withPackageDecl(visitRightPadded(c.getPackageDecl(), JRightPadded.Location.PACKAGE, p));
+        if (c.getPackageDecl() != null) {
+            c = c.withPackageDecl(visitRightPadded(c.getPackageDecl(), JRightPadded.Location.PACKAGE, p));
+        }
         c = c.withImports(ListUtils.map(c.getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
         c = c.withClasses(call(c.getClasses(), p));
         return c.withEof(visitSpace(c.getEof(), p));
@@ -392,7 +402,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.MemberReference m = call(memberRef, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = m.withContaining(call(m.getContaining(), p));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        if (m.getTypeParameters() != null) {
+            m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        }
         return m.withReference(visitLeftPadded(m.getReference(), JLeftPadded.Location.MEMBER_REFERENCE, p));
     }
 
@@ -404,15 +416,19 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         m = m.withModifiers(call(m.getModifiers(), p));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        if (m.getTypeParameters() != null) {
+            m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        }
         m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
         m = m.withReturnTypeExpr(
                 m.getReturnTypeExpr() == null ?
                         null :
                         visitTypeName(m.getReturnTypeExpr(), p));
         m = m.withName(call(m.getName(), p));
-        m = m.withParams(visitContainer(m.getParams(), JContainer.Location.METHOD_ARGUMENT, p));
-        m = m.withThrows(visitContainer(m.getThrows(), JContainer.Location.THROWS, p));
+        m = m.withParams(visitContainer(m.getParams(), JContainer.Location.METHOD_DECL_ARGUMENT, p));
+        if (m.getThrows() != null) {
+            m = m.withThrows(visitContainer(m.getThrows(), JContainer.Location.THROWS, p));
+        }
         m = m.withThrows(visitTypeNames(m.getThrows(), p));
         return m.withBody(call(m.getBody(), p));
     }
@@ -429,11 +445,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                     (JRightPadded<Expression>) (JRightPadded<?>)
                             visitTypeName((JRightPadded<NameTree>) (JRightPadded<?>) m.getSelect(), p));
         }
-        m = m.withSelect(visitRightPadded(m.getSelect(), JRightPadded.Location.METHOD_SELECT, p));
-        m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        if (m.getSelect() != null) {
+            m = m.withSelect(visitRightPadded(m.getSelect(), JRightPadded.Location.METHOD_SELECT, p));
+        }
+        if (m.getTypeParameters() != null) {
+            m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        }
         m = m.withTypeParameters(visitTypeNames(m.getTypeParameters(), p));
         m = m.withName(call(m.getName(), p));
-        return m.withArgs(visitContainer(m.getArgs(), JContainer.Location.METHOD_ARGUMENT, p));
+        return m.withArgs(visitContainer(m.getArgs(), JContainer.Location.METHOD_INVOCATION_ARGUMENT, p));
     }
 
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
@@ -470,7 +490,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 null :
                 visitTypeName(n.getTypeExpr(), p));
         n = n.withDimensions(call(n.getDimensions(), p));
-        return n.withInitializer(visitContainer(n.getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, p));
+        if (n.getInitializer() != null) {
+            n = n.withInitializer(visitContainer(n.getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, p));
+        }
+        return n;
     }
 
     public J visitNewClass(J.NewClass newClass, P p) {
@@ -483,7 +506,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         n = n.withClazz(n.getClazz() == null ?
                 null :
                 visitTypeName(n.getClazz(), p));
-        n = n.withArgs(visitContainer(n.getArgs(), JContainer.Location.NEW_CLASS_ARGS, p));
+        if (n.getArgs() != null) {
+            n = n.withArgs(visitContainer(n.getArgs(), JContainer.Location.NEW_CLASS_ARGS, p));
+        }
         return n.withBody(call(n.getBody(), p));
     }
 
@@ -499,7 +524,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         pt = call(pt, p, this::visitExpression);
         pt = pt.withClazz(call(pt.getClazz(), p));
         pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
-        pt = pt.withTypeParameters(visitContainer(pt.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        if (pt.getTypeParameters() != null) {
+            pt = pt.withTypeParameters(visitContainer(pt.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
+        }
         return pt.withTypeParameters(visitTypeNames(pt.getTypeParameters(), p));
     }
 
@@ -559,10 +586,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.Try t = call(tryable, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
         t = call(t, p, this::visitStatement);
-        t = t.withResources(visitContainer(t.getResources(), JContainer.Location.TRY_RESOURCES, p));
+        if (t.getResources() != null) {
+            t = t.withResources(visitContainer(t.getResources(), JContainer.Location.TRY_RESOURCES, p));
+        }
         t = t.withBody(call(t.getBody(), p));
         t = t.withCatches(call(t.getCatches(), p));
-        return t.withFinally(visitLeftPadded(t.getFinally(), JLeftPadded.Location.TRY_FINALLY, p));
+        if (t.getFinally() != null) {
+            t = t.withFinally(visitLeftPadded(t.getFinally(), JLeftPadded.Location.TRY_FINALLY, p));
+        }
+        return t;
     }
 
     public J visitTypeCast(J.TypeCast typeCast, P p) {
@@ -582,7 +614,9 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (t.getName() instanceof NameTree) {
             t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));
         }
-        t = t.withBounds(visitContainer(t.getBounds(), JContainer.Location.TYPE_BOUND, p));
+        if (t.getBounds() != null) {
+            t = t.withBounds(visitContainer(t.getBounds(), JContainer.Location.TYPE_BOUND, p));
+        }
         return t.withBounds(visitTypeNames(t.getBounds(), p));
     }
 
@@ -599,8 +633,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.VariableDecls.NamedVar v = call(variable, p, this::visitEach);
         v = v.withPrefix(visitSpace(v.getPrefix(), p));
         v = v.withName(call(v.getName(), p));
-        return v.withInitializer(visitLeftPadded(v.getInitializer(),
-                JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        if (v.getInitializer() != null) {
+            v = v.withInitializer(visitLeftPadded(v.getInitializer(),
+                    JLeftPadded.Location.VARIABLE_INITIALIZER, p));
+        }
+        return v;
     }
 
     public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
@@ -623,42 +660,30 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         return w;
     }
 
-    @Nullable
-    public <J2 extends J> JRightPadded<J2> visitRightPadded(@Nullable JRightPadded<J2> right,
-                                                            JRightPadded.Location type, P p) {
-        if (right == null) {
-            return null;
-        }
-
+    @SuppressWarnings("unused")
+    public <J2 extends J> JRightPadded<J2> visitRightPadded(JRightPadded<J2> right, JRightPadded.Location type, P p) {
         if (cursored) {
             setCursor(new Cursor(getCursor(), right));
         }
 
         J2 j = call(right.getElem(), p);
-        Space space = visitSpace(right.getAfter(), p);
+        Space after = visitSpace(right.getAfter(), p);
 
         if (cursored) {
             setCursor(getCursor().getParent());
         }
 
-        return (space == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, space, Markers.EMPTY);
+        return (after == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, after, right.getMarkers());
     }
 
-    @Nullable
-    public <T> JLeftPadded<T> visitLeftPadded(@Nullable JLeftPadded<T> left,
-                                              JLeftPadded.Location loc, P p) {
-        if (left == null) {
-            return null;
-        }
 
+    public <T> JLeftPadded<T> visitLeftPadded(JLeftPadded<T> left, JLeftPadded.Location loc, P p) {
         if (cursored) {
             setCursor(new Cursor(getCursor(), left));
         }
 
-        Space space = visitSpace(left.getBefore(), p);
-
+        Space before = visitSpace(left.getBefore(), p);
         T t = left.getElem();
-
 
         if (t instanceof J) {
             //noinspection unchecked
@@ -669,16 +694,11 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             setCursor(getCursor().getParent());
         }
 
-        return (space == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(space, t, Markers.EMPTY);
+        return (before == left.getBefore() && t == left.getElem()) ? left : new JLeftPadded<>(before, t, left.getMarkers());
     }
 
-    @Nullable
-    public <J2 extends J> JContainer<J2> visitContainer(@Nullable JContainer<J2> container,
+    public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container,
                                                         JContainer.Location loc, P p) {
-        if (container == null) {
-            return null;
-        }
-
         if (cursored) {
             setCursor(new Cursor(getCursor(), container));
         }
@@ -692,7 +712,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         return js == container.getElem() && before == container.getBefore() ?
                 container :
-                JContainer.build(before, js, Markers.EMPTY);
+                JContainer.build(before, js, container.getMarkers());
     }
 
     /**

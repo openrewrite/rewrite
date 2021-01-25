@@ -192,9 +192,9 @@ public class Cursor {
      */
     @Incubating(since = "7.0.0")
     @Nullable
-    public <T> T peekMessage(String key) {
+    public <T> T peekNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.get(key);
-        return t == null && parent != null ? parent.peekMessage(key) : t;
+        return t == null && parent != null ? parent.peekNearestMessage(key) : t;
     }
 
     /**
@@ -206,8 +206,36 @@ public class Cursor {
      */
     @Incubating(since = "7.0.0")
     @Nullable
-    public <T> T pollMessage(String key) {
+    public <T> T pollNearestMessage(String key) {
         @SuppressWarnings("unchecked") T t = messages == null ? null : (T) messages.remove(key);
-        return t == null && parent != null ? parent.pollMessage(key) : t;
+        return t == null && parent != null ? parent.pollNearestMessage(key) : t;
+    }
+
+    /**
+     * Finds the closest message matching the provided key, leaving it in the message map for further access.
+     *
+     * @param key The message key to find.
+     * @param <T> The expected value of the message.
+     * @return The message matching the provided key, or <code>null</code> if none.
+     */
+    @Incubating(since = "7.0.0")
+    @Nullable
+    public <T> T peekMessage(String key) {
+        //noinspection unchecked
+        return messages == null ? null : (T) messages.get(key);
+    }
+
+    /**
+     * Finds the message matching the provided key, removing it from the message map.
+     *
+     * @param key The message key to find.
+     * @param <T> The expected value of the message.
+     * @return The message matching the provided key, or <code>null</code> if none.
+     */
+    @Incubating(since = "7.0.0")
+    @Nullable
+    public <T> T pollMessage(String key) {
+        //noinspection unchecked
+        return messages == null ? null : (T) messages.remove(key);
     }
 }
