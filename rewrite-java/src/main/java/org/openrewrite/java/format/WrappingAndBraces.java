@@ -19,7 +19,6 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
 import org.openrewrite.java.JavaIsoProcessor;
-import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;

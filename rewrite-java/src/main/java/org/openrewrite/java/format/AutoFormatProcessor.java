@@ -22,7 +22,6 @@ import org.openrewrite.java.JavaProcessor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
-import java.util.List;
 import java.util.Optional;
 
 public class AutoFormatProcessor<P> extends JavaProcessor<P> {

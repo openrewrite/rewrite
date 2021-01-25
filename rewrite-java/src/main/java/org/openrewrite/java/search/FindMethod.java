@@ -20,15 +20,12 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * A Java search visitor that will return a list of matching method invocations within the abstract syntax tree.

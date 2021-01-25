@@ -21,7 +21,6 @@ import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.TreeProcessor
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface ChangeLiteralTest : RecipeTest {
     override val recipe: Recipe

@@ -15,6 +15,8 @@
  */
 package org.openrewrite.marker;
 
+import org.eclipse.jgit.util.MutableInteger;
+import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
@@ -27,26 +29,28 @@ import org.openrewrite.internal.lang.Nullable;
  */
 @Incubating(since = "7.0.0")
 public class SearchResult implements Marker {
-    public static final TreePrinter<?> PRINTER = new TreePrinter<Object>() {
-        @Override
-        public String doLast(Tree tree, String printed, Object o) {
-            if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
-                StringBuilder print = new StringBuilder();
-                boolean prefixWhitespace = true;
-                for (char c : printed.toCharArray()) {
-                    if (prefixWhitespace) {
-                        if (!Character.isWhitespace(c)) {
-                            print.append("~~>").append(c);
-                            prefixWhitespace = false;
-                            continue;
-                        }
-                    }
-                    print.append(c);
-                }
+    public static final TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
 
-                return print.toString();
+        private Integer mark = null;
+
+        @Override
+        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, Void unused) {
+            if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
+                mark = printerAcc.length();
             }
-            return printed;
+        }
+
+        @Override
+        public void doAfter(@Nullable Tree tree, StringBuilder printerAcc, Void unused) {
+            if (mark != null) {
+                for (int i = mark; i < printerAcc.length(); i++) {
+                    if (!Character.isWhitespace(printerAcc.charAt(i))) {
+                        printerAcc.insert(i, "~~>");
+                        break;
+                    }
+                }
+                mark = null;
+            }
         }
     };
 

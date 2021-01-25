@@ -20,15 +20,12 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe will find all fields that have a type matching the fully qualified type name and mark those fields with

@@ -20,8 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -33,7 +31,6 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe finds method invocations matching a method pattern and uses a zero-based argument index to determine

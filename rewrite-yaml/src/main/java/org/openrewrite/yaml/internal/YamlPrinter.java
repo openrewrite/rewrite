@@ -15,114 +15,144 @@
  */
 package org.openrewrite.yaml.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.yaml.YamlVisitor;
+import org.openrewrite.yaml.YamlProcessor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 
-public class YamlPrinter<P> implements YamlVisitor<String, P> {
+public class YamlPrinter<P> extends YamlProcessor<P> {
+
+    private static final String PRINTER_ACC_KEY = "printed";
 
     private final TreePrinter<P> treePrinter;
 
     public YamlPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
+        setCursoringOn();
     }
 
     @NonNull
-    @Override
-    public String defaultValue(@Nullable Tree tree, P p) {
-        return "";
+    protected StringBuilder getPrinterAcc() {
+        StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
+        if (acc == null) {
+            acc = new StringBuilder();
+            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
+        }
+        return acc;
     }
 
-    @NonNull
+    public String print(Yaml yaml, P p) {
+        setCursor(new Cursor(null, "EPSILON"));
+        visit(yaml, p);
+        return getPrinterAcc().toString();
+    }
+
     @Override
-    public String visit(@Nullable Tree tree, P p) {
+    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
+
         if (tree == null) {
             return defaultValue(null, p);
         }
 
-        Yaml t = treePrinter.doFirst((Yaml) tree, p);
-        if (t == null) {
-            return defaultValue(null, p);
+        StringBuilder printerAcc = getPrinterAcc();
+        treePrinter.doBefore(tree, printerAcc, p);
+        tree = super.visit(tree, p);
+        treePrinter.doAfter(tree, printerAcc, p);
+        return (Yaml) tree;
+    }
+
+    public void visit(@Nullable List<? extends Yaml> nodes, P p) {
+        if (nodes != null) {
+            for (Yaml node : nodes) {
+                visit(node, p);
+            }
         }
-
-        //noinspection ConstantConditions
-        return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 
-    public String visit(@Nullable List<? extends Yaml> nodes, P p) {
-        if (nodes == null) {
-            return "";
+    @Override
+    public Yaml visitDocument(Yaml.Document document, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(document.getPrefix());
+        if (document.isExplicit()) {
+            acc.append("---");
         }
-
-        StringBuilder acc = new StringBuilder();
-        for (Yaml node : nodes) {
-            acc.append(visit(node, p));
+        visit(document.getBlocks(), p);
+        if (document.getEnd() != null) {
+            acc.append(document.getEnd().getPrefix()).append("...");
         }
-        return acc.toString();
+        return document;
     }
 
     @Override
-    public String visitDocument(Yaml.Document document, P p) {
-        return fmt(document, (document.isExplicit() ? "---" : "") + visit(document.getBlocks(), p) +
-                (document.getEnd() != null ? document.getEnd().getPrefix() + "..." : ""));
+    public Yaml visitDocuments(Yaml.Documents documents, P p) {
+        getPrinterAcc().append(documents.getPrefix());
+        return super.visitDocuments(documents, p);
     }
 
     @Override
-    public String visitDocuments(Yaml.Documents documents, P p) {
-        return fmt(documents, visit(documents.getDocuments(), p));
+    public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(entry.getPrefix()).append('-');
+        visit(entry.getBlock(), p);
+        return entry;
     }
 
     @Override
-    public String visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-        return fmt(entry, "-" + visit(entry.getBlock(), p));
+    public Yaml visitSequence(Yaml.Sequence sequence, P p) {
+        getPrinterAcc().append(sequence.getPrefix());
+        return super.visitSequence(sequence, p);
     }
 
     @Override
-    public String visitSequence(Yaml.Sequence sequence, P p) {
-        return visit(sequence.getEntries(), p);
+    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(entry.getPrefix());
+        visit(entry.getKey(), p);
+        acc.append(entry.getBeforeMappingValueIndicator())
+                .append(':');
+        visit(entry.getValue(), p);
+        return entry;
     }
 
     @Override
-    public String visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
-        return fmt(entry, visit(entry.getKey(), p) + entry.getBeforeMappingValueIndicator() + ":" + visit(entry.getValue(), p));
+    public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+        return super.visitMapping(mapping, p);
     }
 
     @Override
-    public String visitMapping(Yaml.Mapping mapping, P p) {
-        return visit(mapping.getEntries(), p);
-    }
-
-    @Override
-    public String visitScalar(Yaml.Scalar scalar, P p) {
-        String value;
+    public Yaml visitScalar(Yaml.Scalar scalar, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(scalar.getPrefix());
         switch (scalar.getStyle()) {
             case DOUBLE_QUOTED:
-                value = "\"" + scalar.getValue() + "\"";
+                acc.append('"')
+                        .append(scalar.getValue())
+                        .append('"');
                 break;
             case SINGLE_QUOTED:
-                value = "'" + scalar.getValue() + "'";
+                acc.append('\'')
+                        .append(scalar.getValue())
+                        .append('\'');
                 break;
             case LITERAL:
-                value = "|" + scalar.getValue();
+                acc.append('|')
+                        .append(scalar.getValue());
                 break;
             case FOLDED:
-                value = ">" + scalar.getValue();
+                acc.append('>')
+                        .append(scalar.getValue());
                 break;
             case PLAIN:
             default:
-                value = scalar.getValue();
+                acc.append(scalar.getValue());
                 break;
+
         }
-
-        return fmt(scalar, value);
-    }
-
-    private String fmt(@Nullable Yaml tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code;
+        return scalar;
     }
 }

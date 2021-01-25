@@ -20,8 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -29,7 +27,6 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)

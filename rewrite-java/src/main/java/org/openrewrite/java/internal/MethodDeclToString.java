@@ -21,19 +21,25 @@ import org.openrewrite.java.tree.J;
 public class MethodDeclToString {
     public static String toString(J.MethodDecl method) {
         //noinspection ConstantConditions
-        return METHOD_PRINTER.visit(method, null);
+        return METHOD_PRINTER.print(method, null);
     }
 
     private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public String visitMethod(J.MethodDecl method, Void unused) {
-            return visitModifiers(method.getModifiers()).trim() +
-                    (method.getModifiers().isEmpty() ? "" : " ") +
-                    visit("<", method.getTypeParameters(), ",", ">", unused) +
-                    (method.getReturnTypeExpr() == null ? "" : method.getReturnTypeExpr().printTrimmed() + " ") +
-                    method.getSimpleName() +
-                    visit("(", method.getParams(), ",", ")", unused) +
-                    visit("throws", method.getThrows(), ",", "", unused);
+        public J visitMethod(J.MethodDecl method, Void unused) {
+            visitModifiers(method.getModifiers(), unused);
+            StringBuilder acc = getPrinterAcc();
+            if (method.getModifiers().isEmpty()) {
+                acc.append(' ');
+            }
+            visit("<", method.getTypeParameters(), ",", ">", unused);
+            if (method.getReturnTypeExpr() != null) {
+                acc.append(method.getReturnTypeExpr().printTrimmed()).append(' ');
+            }
+            acc.append(method.getSimpleName());
+            visit("(", method.getParams(), ",", ")", unused);
+            visit("throws", method.getThrows(), ",", "", unused);
+            return method;
         }
     };
 }

@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 

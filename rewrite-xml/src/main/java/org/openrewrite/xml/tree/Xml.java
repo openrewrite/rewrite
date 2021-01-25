@@ -60,7 +60,7 @@ public interface Xml extends Serializable, Tree {
     }
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new XmlPrinter<>(printer).visit(this, p);
+        return new XmlPrinter<>(printer).print(this, p);
     }
 
     @Override

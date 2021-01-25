@@ -41,12 +41,12 @@ import java.util.UUID;
 public interface Properties extends Serializable, Tree {
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new PropertiesPrinter<>(printer).visit(this, p);
+        return new PropertiesPrinter<>(printer).print(this, p);
     }
 
     @Override
     default <P> String print(P p) {
-        return new PropertiesPrinter<>(TreePrinter.identity()).visit(this, p);
+        return new PropertiesPrinter<>(TreePrinter.identity()).print(this, p);
     }
 
     @Override

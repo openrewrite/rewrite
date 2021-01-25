@@ -51,16 +51,30 @@ public class Recipe {
      */
     private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
-        public String doLast(Tree tree, String printed, ExecutionContext o) {
+        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
             String markerIds = tree.getMarkers().entries().stream()
                     .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
                     .map(marker -> String.valueOf(marker.hashCode()))
                     .collect(joining(","));
             if (!markerIds.isEmpty()) {
-                return "markers[" + markerIds + "]->" + printed;
+                printerAcc
+                        .append("markers[")
+                        .append(markerIds)
+                        .append("]->");
             }
-            return printed;
         }
+
+//        @Override
+//        public String doLast(Tree tree, String printed, ExecutionContext o) {
+//            String markerIds = tree.getMarkers().entries().stream()
+//                    .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
+//                    .map(marker -> String.valueOf(marker.hashCode()))
+//                    .collect(joining(","));
+//            if (!markerIds.isEmpty()) {
+//                return "markers[" + markerIds + "]->" + printed;
+//            }
+//            return printed;
+//        }
     };
 
     public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {

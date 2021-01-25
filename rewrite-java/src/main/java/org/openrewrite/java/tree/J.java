@@ -60,7 +60,7 @@ public interface J extends Serializable, Tree {
     }
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new JavaPrinter<>(printer).visit(this, p);
+        return new JavaPrinter<>(printer).print(this, p);
     }
 
     @Override

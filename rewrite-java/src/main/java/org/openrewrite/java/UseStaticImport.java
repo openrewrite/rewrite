@@ -20,12 +20,8 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe will find any method invocations that match the method pattern, ensure the method is statically imported

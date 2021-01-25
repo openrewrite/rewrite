@@ -19,7 +19,7 @@ import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatProcessor;
-import org.openrewrite.java.internal.JavaPrinter2;
+import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -215,12 +215,12 @@ public class JavaTemplate {
     /**
      * Custom Java Printer that will add additional import and add the printed template at the insertion point.
      */
-    private static class TemplatePrinter extends JavaPrinter2<String> {
+    private static class TemplatePrinter extends JavaPrinter<String> {
 
         private final Set<String> imports;
 
         private TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
-            super(new TreePrinter2<String>() {
+            super(new TreePrinter<String>() {
 
                 //Note: A block is added around the template and markers when the insertion point is within a
                 //      member variable initializer to prevent compiler issues.

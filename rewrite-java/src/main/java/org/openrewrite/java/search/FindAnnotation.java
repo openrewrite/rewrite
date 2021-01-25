@@ -22,7 +22,6 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.java.JavaIsoProcessor;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;

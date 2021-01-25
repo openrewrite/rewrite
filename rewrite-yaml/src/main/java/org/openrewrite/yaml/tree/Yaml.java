@@ -45,11 +45,11 @@ import static org.openrewrite.Tree.randomId;
 public interface Yaml extends Serializable, Tree {
     @Override
     default <P> String print(P p) {
-        return new YamlPrinter<>(TreePrinter.identity()).visit(this, p);
+        return new YamlPrinter<>(TreePrinter.identity()).print(this, p);
     }
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new YamlPrinter<>(printer).visit(this, p);
+        return new YamlPrinter<>(printer).print(this, p);
     }
 
     @SuppressWarnings("StatementWithEmptyBody")

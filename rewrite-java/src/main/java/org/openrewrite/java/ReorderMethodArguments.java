@@ -21,8 +21,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -32,8 +30,6 @@ import org.openrewrite.java.tree.Space;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
