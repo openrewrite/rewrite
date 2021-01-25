@@ -66,10 +66,10 @@ class XPathMatcherTest : XmlParser() {
         assertThat(visit("//dependency/artifactId/@scope")).isTrue
     }
 
-    private fun visitor(xPath: String): XmlProcessor<MutableList<Xml>> {
+    private fun visitor(xPath: String): XmlVisitor<MutableList<Xml>> {
         val matcher = XPathMatcher(xPath)
 
-        return object : XmlProcessor<MutableList<Xml>>() {
+        return object : XmlVisitor<MutableList<Xml>>() {
             init {
                 setCursoringOn()
             }

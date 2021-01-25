@@ -15,11 +15,25 @@
  */
 package org.openrewrite.java.internal;
 
-class Test {
-    Test method(Test t) {
-        return this
-                .method(
-                        t
-                );
+import org.openrewrite.java.JavaVisitor;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.marker.Marker;
+
+import java.util.Set;
+
+public class JavaListMarkersVisitor<T> extends JavaVisitor<Set<T>> {
+    private final Class<? extends Marker> markerType;
+
+    public JavaListMarkersVisitor(Class<? extends Marker> markerType) {
+        this.markerType = markerType;
+    }
+
+    @Override
+    public J visitEach(J j, Set<T> ts) {
+        if (j.getMarkers().findFirst(markerType).isPresent()) {
+            //noinspection unchecked
+            ts.add((T) j);
+        }
+        return super.visitEach(j, ts);
     }
 }

@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
 
-public class MinimumViableSpacingProcessor<P> extends JavaIsoProcessor<P> {
+public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl c = super.visitClassDecl(classDecl, p);

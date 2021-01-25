@@ -20,10 +20,10 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.Cursor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -44,13 +44,13 @@ public class GenerateGetter extends Recipe {
     private final String fieldName;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new GenerateGetterProcessor<>();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new GenerateGetterVisitor<>();
     }
 
-    private class GenerateGetterProcessor<P> extends JavaIsoProcessor<P> {
+    private class GenerateGetterVisitor<P> extends JavaIsoVisitor<P> {
 
-        public GenerateGetterProcessor() {
+        public GenerateGetterVisitor() {
             setCursoringOn();
         }
 

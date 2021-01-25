@@ -21,7 +21,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
@@ -46,11 +46,11 @@ public class OrderImports extends Recipe {
     private boolean removeUnused = true;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new OrderImportsProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new OrderImportsVisitor();
     }
 
-    private class OrderImportsProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class OrderImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {

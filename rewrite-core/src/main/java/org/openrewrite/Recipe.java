@@ -30,13 +30,13 @@ import static java.util.Collections.*;
 import static java.util.stream.Collectors.*;
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
- * apply each recipes {@link TreeProcessor processor} visit method to a list of {@link SourceFile sourceFiles}
+ * apply each recipes {@link TreeVisitor visitor} visit method to a list of {@link SourceFile sourceFiles}
  *
- * Requires a name, {@link TreeProcessor processor}.
+ * Requires a name, {@link TreeVisitor visitor}.
  * Optionally a subsequent Recipe can be linked via {@link #doNext(Recipe)}}
  *
  * An {@link ExecutionContext} controls parallel execution and lifecycle while providing a message bus
- * for sharing state between recipes and their processors
+ * for sharing state between recipes and their visitors
  *
  * returns a list of {@link Result results} for each modified {@link SourceFile}
  *
@@ -51,19 +51,21 @@ public class Recipe {
      */
     private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
-        public String doLast(Tree tree, String printed, ExecutionContext o) {
+        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
             String markerIds = tree.getMarkers().entries().stream()
                     .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
                     .map(marker -> String.valueOf(marker.hashCode()))
                     .collect(joining(","));
             if (!markerIds.isEmpty()) {
-                return "markers[" + markerIds + "]->" + printed;
+                printerAcc
+                        .append("markers[")
+                        .append(markerIds)
+                        .append("]->");
             }
-            return printed;
         }
     };
 
-    public static final TreeProcessor<?, ExecutionContext> NOOP = new TreeProcessor<Tree, ExecutionContext>() {
+    public static final TreeVisitor<?, ExecutionContext> NOOP = new TreeVisitor<Tree, ExecutionContext>() {
         @Override
         public Tree visit(@Nullable Tree tree, ExecutionContext ctx) {
             return tree;
@@ -85,13 +87,13 @@ public class Recipe {
     }
 
     /**
-     * A recipe can optionally encasulate a processor that performs operations on a set of source files. Subclasses
-     * of the recipe may override this method to provide an instance of a processor that will be used when the recipe
+     * A recipe can optionally encasulate a visitor that performs operations on a set of source files. Subclasses
+     * of the recipe may override this method to provide an instance of a visitor that will be used when the recipe
      * is executed.
      *
-     * @return A tree processor that will perform operations associated with the recipe.
+     * @return A tree visitor that will perform operations associated with the recipe.
      */
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return NOOP;
     }
 
@@ -102,7 +104,7 @@ public class Recipe {
         if (validate(ctx).isValid()) {
             after = ListUtils.map(after, ctx.getForkJoinPool(), s -> {
                 try {
-                    @SuppressWarnings("unchecked") S afterFile = (S) getProcessor().visit(s, ctx);
+                    @SuppressWarnings("unchecked") S afterFile = (S) getVisitor().visit(s, ctx);
                     if (afterFile != null && afterFile != s) {
                         afterFile = afterFile.withMarkers(afterFile.getMarkers().compute(
                                 new RecipeThatMadeChanges(getName()),

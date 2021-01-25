@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 
 import static org.openrewrite.Validated.required;
@@ -32,8 +32,8 @@ public class ChangeText extends Recipe {
         this.toText = toText;
     }
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeTextProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeTextVisitor();
     }
 
     @Override
@@ -41,7 +41,7 @@ public class ChangeText extends Recipe {
         return required("toText", toText);
     }
 
-    private class ChangeTextProcessor extends TreeProcessor<PlainText, ExecutionContext> {
+    private class ChangeTextVisitor extends TreeVisitor<PlainText, ExecutionContext> {
         @Override
         public PlainText visitEach(PlainText tree, ExecutionContext ctx) {
             return tree.withText(toText);

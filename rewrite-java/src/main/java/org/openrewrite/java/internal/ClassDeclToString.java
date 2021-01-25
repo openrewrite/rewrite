@@ -21,36 +21,46 @@ import org.openrewrite.java.tree.J;
 public class ClassDeclToString {
     public static String toString(J.ClassDecl clazz) {
         //noinspection ConstantConditions
-        return CLASS_DECL_PRINTER.visit(clazz, null);
+        return CLASS_DECL_PRINTER.print(clazz, null);
     }
 
     private static final JavaPrinter<Void> CLASS_DECL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public String visitClassDecl(J.ClassDecl classDecl, Void unused) {
-            String modifiers = visitModifiers(classDecl.getModifiers()).trim();
-
-            String kind = "";
+        public J visitClassDecl(J.ClassDecl classDecl, Void unused) {
+            visitModifiers(classDecl.getModifiers(), unused);
+            StringBuilder acc = getPrinterAcc();
+            if (!classDecl.getModifiers().isEmpty()) {
+                acc.append(' ');
+            }
             switch (classDecl.getKind().getElem()) {
                 case Class:
-                    kind = "class ";
+                    acc.append("class ");
                     break;
                 case Enum:
-                    kind = "enum ";
+                    acc.append("enum ");
                     break;
                 case Interface:
-                    kind = "interface ";
+                    acc.append("interface ");
                     break;
                 case Annotation:
-                    kind = "@interface ";
+                    acc.append("@interface ");
                     break;
             }
-
-            return (modifiers.isEmpty() ? "" : modifiers + " ") +
-                    kind + classDecl.getName().printTrimmed() +
-                    (classDecl.getTypeParameters() == null ? "" : visit("<", classDecl.getTypeParameters(), ",", ">", unused) + " ") +
-                    visit("extends", classDecl.getExtends(), unused) +
-                    (classDecl.getImplements() == null ? "" : (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem()) ? "extends" : "implements") +
-                            visit("", classDecl.getImplements(), ",", "", unused));
+            acc.append(classDecl.getName().printTrimmed());
+            if (classDecl.getTypeParameters() != null) {
+                visit("<", classDecl.getTypeParameters(), ",", ">", unused);
+                acc.append(' ');
+            }
+            visit("extends", classDecl.getExtends(), unused);
+            if (classDecl.getImplements() != null) {
+                if (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem())) {
+                    acc.append("extends");
+                } else {
+                    acc.append("implements");
+                }
+            }
+            visit("", classDecl.getImplements(), ",", "", unused);
+            return classDecl;
         }
     };
 }

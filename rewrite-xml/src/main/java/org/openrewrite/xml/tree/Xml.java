@@ -30,7 +30,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.XmlVisitor;
-import org.openrewrite.xml.internal.XmlListMarkersProcessor;
+import org.openrewrite.xml.internal.XmlListMarkersVisitor;
 import org.openrewrite.xml.internal.XmlPrinter;
 
 import java.io.Serializable;
@@ -48,19 +48,20 @@ import static org.openrewrite.Tree.randomId;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface Xml extends Serializable, Tree {
 
+    @SuppressWarnings("unchecked")
     @Override
-    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof XmlVisitor ?
-                acceptXml((XmlVisitor<R, P>) v, p) : v.defaultValue(null, p);
+                (R) acceptXml((XmlVisitor<P>) v, p) : v.defaultValue(null, p);
     }
 
     @Nullable
-    default <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+    default <P> Xml acceptXml(XmlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new XmlPrinter<>(printer).visit(this, p);
+        return new XmlPrinter<>(printer).print(this, p);
     }
 
     @Override
@@ -76,12 +77,12 @@ public interface Xml extends Serializable, Tree {
      * Find all subtrees marked with a particular marker rooted at this tree.
      *
      * @param markerType The marker type to look for
-     * @param <Xml2>       The expected supertype common to all subtrees that could be found.
+     * @param <Xml2>     The expected supertype common to all subtrees that could be found.
      * @return The set of matching subtrees.
      */
     default <Xml2 extends Xml> Set<Xml2> findMarkedWith(Class<? extends Marker> markerType) {
         Set<Xml2> trees = new HashSet<>();
-        new XmlListMarkersProcessor<Xml2>(markerType).visit(this, trees);
+        new XmlListMarkersVisitor<Xml2>(markerType).visit(this, trees);
         return trees;
     }
 
@@ -113,7 +114,7 @@ public interface Xml extends Serializable, Tree {
         String eof;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
         }
     }
@@ -139,7 +140,7 @@ public interface Xml extends Serializable, Tree {
         List<Misc> misc;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitProlog(this, p);
         }
     }
@@ -170,7 +171,7 @@ public interface Xml extends Serializable, Tree {
         String beforeTagDelimiterPrefix;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitProcessingInstruction(this, p);
         }
     }
@@ -345,7 +346,7 @@ public interface Xml extends Serializable, Tree {
         String beforeTagDelimiterPrefix;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitTag(this, p);
         }
 
@@ -402,7 +403,7 @@ public interface Xml extends Serializable, Tree {
         Value value;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitAttribute(this, p);
         }
 
@@ -464,7 +465,7 @@ public interface Xml extends Serializable, Tree {
         String afterText;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitCharData(this, p);
         }
     }
@@ -486,7 +487,7 @@ public interface Xml extends Serializable, Tree {
         String text;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitComment(this, p);
         }
     }
@@ -541,7 +542,7 @@ public interface Xml extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitDocTypeDecl(this, p);
         }
     }
@@ -569,7 +570,7 @@ public interface Xml extends Serializable, Tree {
         String beforeTagDelimiterPrefix;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitElement(this, p);
         }
     }
@@ -591,7 +592,7 @@ public interface Xml extends Serializable, Tree {
         String name;
 
         @Override
-        public <R, P> R acceptXml(XmlVisitor<R, P> v, P p) {
+        public <P> Xml acceptXml(XmlVisitor<P> v, P p) {
             return v.visitIdent(this, p);
         }
 

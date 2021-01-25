@@ -19,15 +19,14 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeProcessor
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface ChangeLiteralTest : RecipeTest {
     override val recipe: Recipe
         get() = object : Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object : JavaProcessor<ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaVisitor<ExecutionContext>() {
                     override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {
                         doAfterVisit(ChangeLiteral(literal) { s ->
                             s?.toString()?.replace("%s", "{}") ?: s

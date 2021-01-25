@@ -17,7 +17,7 @@ package org.openrewrite.java;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.style.ImportLayoutStyle;
 import org.openrewrite.java.style.IntelliJ;
@@ -33,11 +33,11 @@ import java.util.*;
 public class RemoveUnusedImports extends Recipe {
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new RemoveUnusedImportsProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new RemoveUnusedImportsVisitor();
     }
 
-    private static class RemoveUnusedImportsProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private static class RemoveUnusedImportsVisitor extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
 
@@ -120,7 +120,7 @@ public class RemoveUnusedImports extends Recipe {
             return cu;
         }
 
-        private static class TypesByPackage extends JavaIsoProcessor<Map<String, Set<JavaType.Class>>> {
+        private static class TypesByPackage extends JavaIsoVisitor<Map<String, Set<JavaType.Class>>> {
             TypesByPackage() {
                 setCursoringOn();
             }
@@ -137,7 +137,7 @@ public class RemoveUnusedImports extends Recipe {
             }
         }
 
-        private static class StaticMethodsByType extends JavaIsoProcessor<Map<String, Set<String>>> {
+        private static class StaticMethodsByType extends JavaIsoVisitor<Map<String, Set<String>>> {
             @Override
             public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, Map<String, Set<String>> ctx) {
                 J.MethodInvocation m = super.visitMethodInvocation(method, ctx);

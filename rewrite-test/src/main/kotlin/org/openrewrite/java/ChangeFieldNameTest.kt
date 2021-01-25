@@ -22,7 +22,7 @@ import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldNameTest : RecipeTest {
-    fun changeFieldName(from: String, to: String) = object : JavaIsoProcessor<ExecutionContext>() {
+    fun changeFieldName(from: String, to: String) = object : JavaIsoVisitor<ExecutionContext>() {
         override fun visitMultiVariable(v: J.VariableDecls, p: ExecutionContext): J.VariableDecls {
             val containing = cursor.dropParentUntil { it is J }.dropParentUntil { it is J }.getValue<J>()
             if (containing is J.ClassDecl) {

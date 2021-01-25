@@ -47,7 +47,7 @@ public interface Tree extends Markable {
     UUID getId();
 
     @Nullable
-    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
     }
 

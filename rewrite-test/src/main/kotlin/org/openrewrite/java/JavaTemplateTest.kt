@@ -24,7 +24,7 @@ import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
-import org.openrewrite.java.format.MinimumViableSpacingProcessor
+import org.openrewrite.java.format.MinimumViableSpacingVisitor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.JRightPadded
 import org.openrewrite.java.tree.Space
@@ -45,7 +45,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaProcessor<ExecutionContext>() {
+        recipe = object : JavaVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -115,7 +115,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun afterMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaProcessor<ExecutionContext>() {
+        recipe = object : JavaVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -184,7 +184,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun addMethodToClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -262,7 +262,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun addStaticMethodToClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -340,7 +340,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun changeMethodInvocations(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
 
             val template: JavaTemplate = JavaTemplate.builder("withString(#{}).length();")
                 .build()
@@ -465,7 +465,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun addAnnotationToMethod(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -480,7 +480,7 @@ interface JavaTemplateTest : RecipeTest {
                         generatedElements[0]
                     )
                 )
-                m = MinimumViableSpacingProcessor<ExecutionContext>().visitMethod(m, ExecutionContext.builder().build())
+                m = MinimumViableSpacingVisitor<ExecutionContext>().visitMethod(m, ExecutionContext.builder().build())
                 return m
             }
         }.toRecipe(),
@@ -501,7 +501,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun addAnnotationToClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -516,7 +516,7 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedAnnotations[0].type).isNotNull
 
                 c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(
+                c = MinimumViableSpacingVisitor<ExecutionContext>().visitClassDecl(
                     c,
                     ExecutionContext.builder().build()
                 )
@@ -540,7 +540,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun addAnnotationToClassWithImports(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -555,7 +555,7 @@ interface JavaTemplateTest : RecipeTest {
                 assertThat(generatedAnnotations[0].type).isNotNull
 
                 c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingProcessor<ExecutionContext>().visitClassDecl(
+                c = MinimumViableSpacingVisitor<ExecutionContext>().visitClassDecl(
                     c,
                     ExecutionContext.builder().build()
                 )
@@ -583,7 +583,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun templateWithLocalMethodReference(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
                 setCursoringOn()
             }
@@ -651,7 +651,7 @@ interface JavaTemplateTest : RecipeTest {
     @Test
     fun templateWithSiblingClassMethodReference(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaIsoProcessor<ExecutionContext>() {
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
 
             //This test ensures that the source generation is working when a parameter contains a method invocation
             //to a method that exists in a sibling class. It

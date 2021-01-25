@@ -25,7 +25,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.function.Consumer;
 
 /**
- * Passes messages between individual TreeProcessor / Recipes in the chain
+ * Passes messages between individual TreeVisitor / Recipes in the chain
  * controls execution and lifecycle by providing a ForkJoinPool and max number of cycles
  */
 public final class ExecutionContext {

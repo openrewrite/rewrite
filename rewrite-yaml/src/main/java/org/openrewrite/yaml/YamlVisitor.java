@@ -18,13 +18,41 @@ package org.openrewrite.yaml;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
-public interface YamlVisitor<R, P> extends TreeVisitor<R, P> {
+public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
-    R visitDocuments(Yaml.Documents documents, P p);
-    R visitDocument(Yaml.Document document, P p);
-    R visitSequence(Yaml.Sequence sequence, P p);
-    R visitSequenceEntry(Yaml.Sequence.Entry entry, P p);
-    R visitMapping(Yaml.Mapping mapping, P p);
-    R visitMappingEntry(Yaml.Mapping.Entry entry, P p);
-    R visitScalar(Yaml.Scalar scalar, P p);
+    public Yaml visitDocuments(Yaml.Documents documents, P p) {
+        return documents.withDocuments(call(documents.getDocuments(), p));
+    }
+
+    public Yaml visitDocument(Yaml.Document document, P p) {
+        return document.withBlocks(call(document.getBlocks(), p));
+    }
+
+    public Yaml visitMapping(Yaml.Mapping mapping, P p) {
+        return mapping.withEntries(call(mapping.getEntries(), p));
+    }
+
+    public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
+        Yaml.Mapping.Entry e = entry;
+        e = e.withKey(call(e.getKey(), p));
+        return e.withValue(call(e.getValue(), p));
+    }
+
+    public Yaml visitScalar(Yaml.Scalar scalar, P p) {
+        return scalar;
+    }
+
+    public Yaml visitSequence(Yaml.Sequence sequence, P p) {
+        return sequence.withEntries(call(sequence.getEntries(), p));
+    }
+
+    public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
+        return entry.withBlock(call(entry.getBlock(), p));
+    }
+
+    public void maybeCoalesceProperties() {
+        if (getAfterVisit().stream().noneMatch(CoalesceProperties.CoalescePropertiesVisitor.class::isInstance)) {
+            doAfterVisit(new CoalesceProperties());
+        }
+    }
 }

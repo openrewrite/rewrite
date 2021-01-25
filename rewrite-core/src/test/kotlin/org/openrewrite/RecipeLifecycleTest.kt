@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
-import java.util.function.Supplier
 
 class RecipeLifecycleTest {
     @Test
@@ -52,8 +51,8 @@ class RecipeLifecycleTest {
         val results = object : Recipe() {
             override fun getName() = "test.DeletingRecipe"
 
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object: TreeProcessor<PlainText, ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object: TreeVisitor<PlainText, ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? = null
                 }
 

@@ -19,16 +19,13 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * A Java search visitor that will return a list of matching method invocations within the abstract syntax tree.
@@ -59,18 +56,18 @@ public final class FindMethod extends Recipe {
     private final String methodPattern;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindMethodProcessor(methodPattern);
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new FindMethodVisitor(methodPattern);
     }
 
     public static Set<J.MethodInvocation> find(J j, String methodPattern) {
         //noinspection ConstantConditions
-        return new FindMethodProcessor(methodPattern)
+        return new FindMethodVisitor(methodPattern)
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindMethodProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private static class FindMethodVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher matcher;
 
         /**
@@ -78,7 +75,7 @@ public final class FindMethod extends Recipe {
          *
          * @param signature Pointcut expression for matching methods.
          */
-        public FindMethodProcessor(String signature) {
+        public FindMethodVisitor(String signature) {
             this.matcher = new MethodMatcher(signature);
         }
 

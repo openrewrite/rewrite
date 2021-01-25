@@ -20,16 +20,16 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
-import org.openrewrite.java.JavaProcessor
+import org.openrewrite.java.JavaVisitor
 import org.openrewrite.java.tree.Space
 
 interface MinimumViableSpacingTest : RecipeTest {
     override val recipe: Recipe
-        get() = object : JavaProcessor<ExecutionContext>() {
+        get() = object : JavaVisitor<ExecutionContext>() {
             override fun visitSpace(space: Space, p: ExecutionContext): Space {
                 return space.withWhitespace("")
             }
-        }.toRecipe().doNext(MinimumViableSpacingProcessor<ExecutionContext>().toRecipe())
+        }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>().toRecipe())
 
     @Test
     fun method(jp: JavaParser) = assertChanged(

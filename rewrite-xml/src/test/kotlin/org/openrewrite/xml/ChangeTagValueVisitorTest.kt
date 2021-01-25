@@ -18,12 +18,12 @@ package org.openrewrite.xml
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.tree.Xml
 
-class ChangeTagValueProcessorTest : XmlProcessorTest() {
+class ChangeTagValueVisitorTest : XmlVisitorTest() {
 
     @Test
     fun changeTagValue() = assertChanged(
-            processorMapped = { x ->
-                ChangeTagValueProcessor(x.root.content[0] as Xml.Tag, "2.0")
+            visitorMapped = { x ->
+                ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "2.0")
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -41,8 +41,8 @@ class ChangeTagValueProcessorTest : XmlProcessorTest() {
 
     @Test
     fun preserveOriginalFormatting() = assertChanged(
-            processorMapped = { x ->
-                ChangeTagValueProcessor(x.root.content[0] as Xml.Tag, "3.0")
+            visitorMapped = { x ->
+                ChangeTagValueVisitor(x.root.content[0] as Xml.Tag, "3.0")
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>

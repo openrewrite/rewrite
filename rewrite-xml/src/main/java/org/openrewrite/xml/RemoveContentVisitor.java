@@ -21,12 +21,12 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.ArrayList;
 import java.util.List;
 
-public class RemoveContentProcessor<P> extends XmlProcessor<P> {
+public class RemoveContentVisitor<P> extends XmlVisitor<P> {
 
     private final Content scope;
     private final boolean removeEmptyAncestors;
 
-    public RemoveContentProcessor(Content tag, boolean removeEmptyAncestors) {
+    public RemoveContentVisitor(Content tag, boolean removeEmptyAncestors) {
         this.scope = tag;
         this.removeEmptyAncestors = removeEmptyAncestors;
         setCursoringOn();
@@ -46,7 +46,7 @@ public class RemoveContentProcessor<P> extends XmlProcessor<P> {
                         if (getCursor().getParentOrThrow().getValue() instanceof Xml.Document) {
                             return t.withContent(null).withClosing(null);
                         } else {
-                            doAfterVisit(new RemoveContentProcessor<>(t, true));
+                            doAfterVisit(new RemoveContentVisitor<>(t, true));
                         }
                     } else {
                         return t.withContent(contents);

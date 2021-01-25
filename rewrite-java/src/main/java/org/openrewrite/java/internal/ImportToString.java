@@ -22,12 +22,12 @@ import org.openrewrite.java.tree.Space;
 public class ImportToString {
     public static String toString(J.Import impoort) {
         //noinspection ConstantConditions
-        return IMPORT_PRINTER.visit(impoort, null);
+        return IMPORT_PRINTER.print(impoort, null);
     }
 
     private static final JavaPrinter<Void> IMPORT_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public String visitImport(J.Import impoort, Void unused) {
+        public J visitImport(J.Import impoort, Void unused) {
             J.Import i = impoort.withPrefix(Space.EMPTY);
             i = i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
 

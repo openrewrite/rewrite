@@ -24,23 +24,32 @@ import java.util.stream.Collectors;
 public class VariableDeclsToString {
     public static String toString(J.VariableDecls v) {
         //noinspection ConstantConditions
-        return VARIABLE_PRINTER.visit(v, null);
+        return VARIABLE_PRINTER.print(v, null);
     }
 
     private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
-        public String visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
-            return visitModifiers(multiVariable.getModifiers()).trim() +
-                    (multiVariable.getModifiers().isEmpty() ? "" : " ") +
-                    (multiVariable.getTypeExpr() == null ? "" : multiVariable.getTypeExpr().printTrimmed() + " ") +
-                    multiVariable.getDimensionsBeforeName().stream()
-                            .map(d -> "[]")
-                            .collect(Collectors.joining("")) +
-                    (multiVariable.getVarargs() == null ? "" : "...") +
-                    multiVariable.getVars().stream()
-                            .map(JRightPadded::getElem)
-                            .map(J.VariableDecls.NamedVar::getSimpleName)
-                            .collect(Collectors.joining(", "));
+        public J visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
+            visitModifiers(multiVariable.getModifiers(), unused);
+            StringBuilder acc = getPrinterAcc();
+            if (multiVariable.getModifiers().isEmpty()) {
+                acc.append(' ');
+            }
+            if (multiVariable.getTypeExpr() != null) {
+                acc.append(multiVariable.getTypeExpr().printTrimmed())
+                        .append(' ');
+            }
+            acc.append(multiVariable.getDimensionsBeforeName().stream()
+                    .map(d -> "[]")
+                    .collect(Collectors.joining("")));
+            if (multiVariable.getVarargs() != null) {
+                acc.append("...");
+            }
+            acc.append(multiVariable.getVars().stream()
+                    .map(JRightPadded::getElem)
+                    .map(J.VariableDecls.NamedVar::getSimpleName)
+                    .collect(Collectors.joining(", ")));
+            return multiVariable;
         }
     };
 }

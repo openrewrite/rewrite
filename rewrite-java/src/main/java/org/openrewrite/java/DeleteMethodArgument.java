@@ -19,9 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -33,7 +31,6 @@ import java.util.List;
 
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe finds method invocations matching a method pattern and uses a zero-based argument index to determine
@@ -47,14 +44,14 @@ public class DeleteMethodArgument extends Recipe {
     private final Integer argumentIndex;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new DeleteMethodArgumentProcessor(new MethodMatcher(methodPattern));
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new DeleteMethodArgumentVisitor(new MethodMatcher(methodPattern));
     }
 
-    private class DeleteMethodArgumentProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class DeleteMethodArgumentVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
-        public DeleteMethodArgumentProcessor(MethodMatcher methodMatcher) {
+        public DeleteMethodArgumentVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
         }
 

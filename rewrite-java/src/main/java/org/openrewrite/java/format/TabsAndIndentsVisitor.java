@@ -18,17 +18,17 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
 import java.util.Optional;
 
-public class TabsAndIndentsProcessor<P> extends JavaIsoProcessor<P> {
+class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     private final TabsAndIndentsStyle style;
 
-    public TabsAndIndentsProcessor(TabsAndIndentsStyle style) {
+    public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this.style = style;
         setCursoringOn();
     }

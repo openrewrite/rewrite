@@ -19,11 +19,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.RemoveContentProcessor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
@@ -38,8 +38,8 @@ public class RemoveDependency extends Recipe {
     private final String artifactId;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new RemoveDependencyProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new RemoveDependencyVisitor();
     }
 
     @Override
@@ -47,16 +47,16 @@ public class RemoveDependency extends Recipe {
         return required("groupId", groupId).and(required("artifactId", artifactId));
     }
 
-    private class RemoveDependencyProcessor extends MavenProcessor<ExecutionContext> {
+    private class RemoveDependencyVisitor extends MavenVisitor<ExecutionContext> {
 
-        public RemoveDependencyProcessor() {
+        public RemoveDependencyVisitor() {
             setCursoringOn();
         }
 
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isDependencyTag(groupId, artifactId)) {
-                doAfterVisit(new RemoveContentProcessor<>(tag, true));
+                doAfterVisit(new RemoveContentVisitor<>(tag, true));
             }
 
             return super.visitTag(tag, ctx);

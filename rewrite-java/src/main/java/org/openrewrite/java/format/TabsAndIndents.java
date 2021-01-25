@@ -17,26 +17,26 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.TabsAndIndentsStyle;
 import org.openrewrite.java.tree.J;
 
 public class TabsAndIndents extends Recipe {
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new TabsAndIndentsFromCompilationUnitStyle();
     }
 
-    private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
+    private static class TabsAndIndentsFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             TabsAndIndentsStyle style = cu.getStyle(TabsAndIndentsStyle.class);
             if (style == null) {
                 style = IntelliJ.tabsAndIndents();
             }
-            doAfterVisit(new TabsAndIndentsProcessor<>(style));
+            doAfterVisit(new TabsAndIndentsVisitor<>(style));
             return cu;
         }
     }

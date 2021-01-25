@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -28,11 +28,11 @@ public final class FindTypesInNameScope {
 
     public static Set<JavaType> find(J j) {
         Set<JavaType> types = new HashSet<>();
-        new FindReferencedTypesProcessor().visit(j, types);
+        new FindReferencedTypesVisitor().visit(j, types);
         return types;
     }
 
-    private static class FindReferencedTypesProcessor extends JavaProcessor<Set<JavaType>> {
+    private static class FindReferencedTypesVisitor extends JavaVisitor<Set<JavaType>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, Set<JavaType> ctx) {
             if (method.getType() != null) {

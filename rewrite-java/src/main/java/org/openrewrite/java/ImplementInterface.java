@@ -25,7 +25,7 @@ import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
 
-public class ImplementInterface<P> extends JavaIsoProcessor<P> {
+public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     private final J.ClassDecl scope;
     private final JavaType.FullyQualified interfaceType;
 

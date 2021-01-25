@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
@@ -24,62 +25,82 @@ import org.openrewrite.properties.tree.Properties;
 
 import java.util.List;
 
-public class PropertiesPrinter<P> implements PropertiesVisitor<String, P> {
+public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
+
+    private static final String PRINTER_ACC_KEY = "printed";
 
     private final TreePrinter<P> treePrinter;
 
     public PropertiesPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
+        setCursoringOn();
     }
 
     @NonNull
-    @Override
-    public String defaultValue(@Nullable Tree tree, P p) {
-        return "";
+    protected StringBuilder getPrinterAcc() {
+        StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
+        if (acc == null) {
+            acc = new StringBuilder();
+            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
+        }
+        return acc;
     }
 
-    @NonNull
+    public String print(Properties properties, P p) {
+        setCursor(new Cursor(null, "EPSILON"));
+        visit(properties, p);
+        return getPrinterAcc().toString();
+    }
+
     @Override
-    public String visit(@Nullable Tree tree, P p) {
+    public @Nullable Properties visit(@Nullable Tree tree, P p) {
+
         if (tree == null) {
             return defaultValue(null, p);
         }
 
-        Properties t = treePrinter.doFirst((Properties) tree, p);
-        if (t == null) {
-            return defaultValue(null, p);
-        }
-
-        //noinspection ConstantConditions
-        return treePrinter.doLast(tree, t.accept(this, p), p);
+        StringBuilder printerAcc = getPrinterAcc();
+        treePrinter.doBefore(tree, printerAcc, p);
+        tree = super.visit(tree, p);
+        treePrinter.doAfter(tree, printerAcc, p);
+        return (Properties) tree;
     }
 
-    public String visit(@Nullable List<? extends Properties> nodes, P p) {
-        if (nodes == null) {
-            return "";
+    public void visit(@Nullable List<? extends Properties> nodes, P p) {
+        if (nodes != null) {
+            for (Properties node : nodes) {
+                visit(node, p);
+            }
         }
-
-        StringBuilder acc = new StringBuilder();
-        for (Properties node : nodes) {
-            acc.append(visit(node, p));
-        }
-        return acc.toString();
     }
 
     @Override
-    public String visitFile(Properties.File file, P p) {
-        return file.getPrefix() + visit(file.getContent(), p) + file.getEof();
+    public Properties visitFile(Properties.File file, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(file.getPrefix());
+        visit(file.getContent(), p);
+        acc.append(file.getEof());
+        return file;
     }
 
     @Override
-    public String visitEntry(Properties.Entry entry, P p) {
-        return entry.getPrefix() + entry.getKey() +
-                entry.getBeforeEquals() + "=" +
-                entry.getValue().getPrefix() + entry.getValue().getText();
+    public Properties visitEntry(Properties.Entry entry, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(entry.getPrefix())
+                .append(entry.getKey())
+                .append(entry.getBeforeEquals())
+                .append('=')
+                .append(entry.getValue().getPrefix())
+                .append(entry.getValue().getText());
+        return entry;
     }
 
     @Override
-    public String visitComment(Properties.Comment comment, P p) {
-        return comment.getPrefix() + "#" + comment.getMessage();
+    public Properties visitComment(Properties.Comment comment, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(comment.getPrefix())
+                .append('#')
+                .append(comment.getMessage());
+        return comment;
     }
 }

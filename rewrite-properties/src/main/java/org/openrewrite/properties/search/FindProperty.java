@@ -18,9 +18,9 @@ package org.openrewrite.properties.search;
 import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
-import org.openrewrite.properties.PropertiesProcessor;
+import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
 import static org.openrewrite.Validated.required;
@@ -36,11 +36,11 @@ public class FindProperty extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindPropertyProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new FindPropertyVisitor();
     }
 
-    public class FindPropertyProcessor extends PropertiesProcessor<ExecutionContext> {
+    public class FindPropertyVisitor extends PropertiesVisitor<ExecutionContext> {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {

@@ -19,8 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -38,15 +37,15 @@ public class ChangeMethodTargetToVariable extends Recipe {
     private final String variableType;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodTargetToVariableProcessor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeMethodTargetToVariableVisitor(new MethodMatcher(methodPattern), JavaType.Class.build(variableType));
     }
 
-    private class ChangeMethodTargetToVariableProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ChangeMethodTargetToVariableVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
         private final JavaType.Class variableType;
 
-        private ChangeMethodTargetToVariableProcessor(MethodMatcher methodMatcher, JavaType.Class variableType) {
+        private ChangeMethodTargetToVariableVisitor(MethodMatcher methodMatcher, JavaType.Class variableType) {
             this.methodMatcher = methodMatcher;
             this.variableType = variableType;
         }

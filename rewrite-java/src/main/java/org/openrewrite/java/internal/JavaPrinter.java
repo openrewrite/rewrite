@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
@@ -26,109 +27,124 @@ import java.util.List;
 
 import static org.openrewrite.java.tree.J.Modifier.*;
 
-public class JavaPrinter<P> implements JavaVisitor<String, P> {
+public class JavaPrinter<P> extends JavaVisitor<P> {
+
+    private static final String PRINTER_ACC_KEY = "printed";
+
     private final TreePrinter<P> treePrinter;
 
     public JavaPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
+        setCursoringOn();
     }
 
     @NonNull
-    @Override
-    public String defaultValue(@Nullable Tree tree, P p) {
-        return "";
+    protected StringBuilder getPrinterAcc() {
+        StringBuilder acc = getCursor().getRoot().peekNearestMessage(PRINTER_ACC_KEY);
+        if (acc == null) {
+            acc = new StringBuilder();
+            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
+        }
+        return acc;
     }
 
-    @NonNull
+    public String print(J j, P p) {
+        setCursor(new Cursor(null, "EPSILON"));
+        visit(j, p);
+        return getPrinterAcc().toString();
+    }
+
     @Override
-    public String visit(@Nullable Tree tree, P p) {
+    public @Nullable J visit(@Nullable Tree tree, P p) {
+
         if (tree == null) {
             return defaultValue(null, p);
         }
 
-        J t = treePrinter.doFirst((J) tree, p);
-
-        if (t == null) {
-            return defaultValue(null, p);
-        }
-
-        //noinspection ConstantConditions
-        return treePrinter.doLast(tree, t.accept(this, p), p);
+        StringBuilder printerAcc = getPrinterAcc();
+        treePrinter.doBefore(tree, printerAcc, p);
+        tree = super.visit(tree, p);
+        treePrinter.doAfter(tree, printerAcc, p);
+        return (J) tree;
     }
 
-    public String visit(@Nullable List<? extends J> nodes, P p) {
-        if (nodes == null) {
-            return "";
+    protected void visit(@Nullable List<? extends J> nodes, P p) {
+        if (nodes != null) {
+            for (J node : nodes) {
+                visit(node, p);
+            }
         }
-
-        StringBuilder acc = new StringBuilder();
-        for (J node : nodes) {
-            acc.append(visit(node, p));
-        }
-        return acc.toString();
     }
 
-    protected String visit(List<? extends JRightPadded<? extends J>> nodes, String suffixBetween, P p) {
-        StringBuilder acc = new StringBuilder();
+    protected void visit(List<? extends JRightPadded<? extends J>> nodes, String suffixBetween, P p) {
+        StringBuilder acc = getPrinterAcc();
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
-            acc.append(visit(node.getElem(), p)).append(visit(node.getAfter()));
+            visit(node.getElem(), p);
+            visitSpace(node.getAfter(), p);
             if (i < nodes.size() - 1) {
                 acc.append(suffixBetween);
             }
         }
-        return acc.toString();
     }
 
-    protected String visit(String before, @Nullable JContainer<? extends J> container, String suffixBetween, @Nullable String after, P p) {
+    protected void visit(String before, @Nullable JContainer<? extends J> container, String suffixBetween, @Nullable String after, P p) {
         if (container == null) {
-            return "";
+            return;
         }
-        return visit(container.getBefore()) + before + visit(container.getElem(), suffixBetween, p) +
-                (after == null ? "" : after);
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(container.getBefore(), p);
+        acc.append(before);
+        visit(container.getElem(), suffixBetween, p);
+        acc.append(after == null ? "" : after);
     }
 
-    protected String visit(@Nullable Space space) {
-        if (space == null) {
-            return "";
-        }
-
-        StringBuilder fmt = new StringBuilder(space.getWhitespace());
+    @Override
+    public Space visitSpace(Space space, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(space.getWhitespace());
 
         for (Comment comment : space.getComments()) {
             switch (comment.getStyle()) {
                 case LINE:
-                    fmt.append("//").append(comment.getText());
+                    acc.append("//").append(comment.getText());
                     break;
                 case BLOCK:
-                    fmt.append("/*").append(comment.getText()).append("*/");
+                    acc.append("/*").append(comment.getText()).append("*/");
                     break;
                 case JAVADOC:
-                    fmt.append("/**").append(comment.getText()).append("*/");
+                    acc.append("/**").append(comment.getText()).append("*/");
                     break;
             }
-            fmt.append(comment.getSuffix());
+            acc.append(comment.getSuffix());
         }
-
-        return fmt.toString();
+        return space;
     }
 
-    protected String fmt(@Nullable J tree, @Nullable String code) {
-        return tree == null || code == null ? "" : visit(tree.getPrefix()) + code;
+    protected void visit(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, P p) {
+        if (leftPadded != null) {
+            StringBuilder acc = getPrinterAcc();
+            visitSpace(leftPadded.getBefore(), p);
+            if (prefix != null) {
+                acc.append(prefix);
+            }
+            visit(leftPadded.getElem(), p);
+        }
     }
 
-    protected String visit(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, P p) {
-        return leftPadded == null ? "" : visit(leftPadded.getBefore()) + (prefix == null ? "" : prefix) +
-                visit(leftPadded.getElem(), p);
+    protected void visit(@Nullable JRightPadded<? extends J> rightPadded, @Nullable String suffix, P p) {
+        if (rightPadded != null) {
+            StringBuilder acc = getPrinterAcc();
+            visit(rightPadded.getElem(), p);
+            visitSpace(rightPadded.getAfter(), p);
+            if (suffix != null) {
+                acc.append(suffix);
+            }
+        }
     }
 
-    protected String visit(@Nullable JRightPadded<? extends J> rightPadded, @Nullable String suffix, P p) {
-        return rightPadded == null ? "" : visit(rightPadded.getElem(), p) + visit(rightPadded.getAfter()) +
-                (suffix == null ? "" : suffix);
-    }
-
-    protected String visitModifiers(Iterable<Modifier> modifiers) {
-        StringBuilder acc = new StringBuilder();
+    protected void visitModifiers(Iterable<Modifier> modifiers, P p) {
+        StringBuilder acc = getPrinterAcc();
         for (Modifier mod : modifiers) {
             String keyword = "";
             switch (mod.getType()) {
@@ -169,59 +185,63 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                     keyword = "volatile";
                     break;
             }
-            acc.append(fmt(mod, keyword));
+            visitSpace(mod.getPrefix(), p);
+            acc.append(keyword);
         }
-
-        return acc.toString();
     }
 
     @Override
-    public String visitAnnotatedType(AnnotatedType annotatedType, P p) {
-        return fmt(annotatedType, visit(annotatedType.getAnnotations(), p) + visit(annotatedType.getTypeExpr(), p));
+    public J visitAnnotation(Annotation annotation, P p) {
+        visitSpace(annotation.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("@");
+        visit(annotation.getAnnotationType(), p);
+        visit("(", annotation.getArgs(), ",", ")", p);
+        return annotation;
     }
 
     @Override
-    public String visitAnnotation(Annotation annotation, P p) {
-        String args = annotation.getArgs() == null ? "" : visit("(", annotation.getArgs(), ",", ")", p);
-        return fmt(annotation, "@" + visit(annotation.getAnnotationType(), p) + args);
+    public J visitArrayDimension(ArrayDimension arrayDimension, P p) {
+        visitSpace(arrayDimension.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("[");
+        visit(arrayDimension.getIndex(), "]", p);
+        return arrayDimension;
     }
 
     @Override
-    public String visitArrayAccess(ArrayAccess arrayAccess, P p) {
-        return fmt(arrayAccess, visit(arrayAccess.getIndexed(), p) +
-                visit(arrayAccess.getDimension(), p));
-    }
-
-    @Override
-    public String visitArrayDimension(ArrayDimension arrayDimension, P p) {
-        return fmt(arrayDimension, "[" + visit(arrayDimension.getIndex(), "]", p));
-    }
-
-    @Override
-    public String visitArrayType(ArrayType arrayType, P p) {
-        StringBuilder dimensions = new StringBuilder();
+    public J visitArrayType(ArrayType arrayType, P p) {
+        visitSpace(arrayType.getPrefix(), p);
+        visit(arrayType.getElementType(), p);
+        StringBuilder acc = getPrinterAcc();
         for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            dimensions.append(visit(d.getElem()))
-                    .append('[')
-                    .append(visit(d.getAfter()))
-                    .append(']');
+            visitSpace(d.getElem(), p);
+            acc.append('[');
+            visitSpace(d.getAfter(), p);
+            acc.append(']');
         }
-        return fmt(arrayType, visit(arrayType.getElementType(), p) + dimensions.toString());
+        return arrayType;
     }
 
     @Override
-    public String visitAssert(Assert azzert, P p) {
-        return fmt(azzert, "assert" + visit(azzert.getCondition(), p));
+    public J visitAssert(Assert azzert, P p) {
+        visitSpace(azzert.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("assert");
+        visit(azzert.getCondition(), p);
+        return azzert;
     }
 
     @Override
-    public String visitAssign(Assign assign, P p) {
-        return fmt(assign, visit(assign.getVariable(), p) +
-                visit("=", assign.getAssignment(), p));
+    public J visitAssign(Assign assign, P p) {
+        visitSpace(assign.getPrefix(), p);
+        visit(assign.getVariable(), p);
+        visit("=", assign.getAssignment(), p);
+        return assign;
     }
 
     @Override
-    public String visitAssignOp(AssignOp assignOp, P p) {
+    public J visitAssignOp(AssignOp assignOp, P p) {
         String keyword = "";
         switch (assignOp.getOperator().getElem()) {
             case Addition:
@@ -259,13 +279,17 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                 break;
         }
 
-        return fmt(assignOp, visit(assignOp.getVariable(), p) +
-                visit(assignOp.getOperator().getBefore()) + keyword +
-                visit(assignOp.getAssignment(), p));
+        visitSpace(assignOp.getPrefix(), p);
+        visit(assignOp.getVariable(), p);
+        visitSpace(assignOp.getOperator().getBefore(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append(keyword);
+        visit(assignOp.getAssignment(), p);
+        return assignOp;
     }
 
     @Override
-    public String visitBinary(Binary binary, P p) {
+    public J visitBinary(Binary binary, P p) {
         String keyword = "";
         switch (binary.getOperator().getElem()) {
             case Addition:
@@ -326,41 +350,48 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                 keyword = "&&";
                 break;
         }
-        return fmt(binary, visit(binary.getLeft(), p) + visit(binary.getOperator().getBefore()) +
-                keyword + visit(binary.getRight(), p));
+        visitSpace(binary.getPrefix(), p);
+        visit(binary.getLeft(), p);
+        visitSpace(binary.getOperator().getBefore(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append(keyword);
+        visit(binary.getRight(), p);
+        return binary;
     }
 
     @Override
-    public String visitBlock(Block block, P p) {
-        StringBuilder acc = new StringBuilder();
+    public J visitBlock(Block block, P p) {
+        visitSpace(block.getPrefix(), p);
+
+        StringBuilder acc = getPrinterAcc();
 
         if (block.getStatic() != null) {
-            acc.append("static").append(visit(block.getStatic()));
+            acc.append("static");
+            visitSpace(block.getStatic(), p);
         }
 
-        acc.append('{')
-                .append(visitStatements(block.getStatements(), p))
-                .append(visit(block.getEnd()))
-                .append('}');
-
-        return fmt(block, acc.toString());
+        acc.append('{');
+        visitStatements(block.getStatements(), p);
+        visitSpace(block.getEnd(), p);
+        acc.append('}');
+        return block;
     }
 
-    private String visitStatements(List<JRightPadded<Statement>> statements, P p) {
-        StringBuilder acc = new StringBuilder();
+    private void visitStatements(List<JRightPadded<Statement>> statements, P p) {
         for (JRightPadded<Statement> paddedStat : statements) {
-            acc.append(visitStatement(paddedStat, p));
+            visitStatement(paddedStat, p);
         }
-        return acc.toString();
     }
 
-    private String visitStatement(@Nullable JRightPadded<Statement> paddedStat, P p) {
+    private void visitStatement(@Nullable JRightPadded<Statement> paddedStat, P p) {
         if (paddedStat == null) {
-            return "";
+            return;
         }
 
-        String acc = visit(paddedStat.getElem(), p) + visit(paddedStat.getAfter());
+        visit(paddedStat.getElem(), p);
+        visitSpace(paddedStat.getAfter(), p);
 
+        StringBuilder acc = getPrinterAcc();
         Statement s = paddedStat.getElem();
         while (true) {
             if (s instanceof Assert ||
@@ -376,51 +407,61 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                     s instanceof Throw ||
                     s instanceof Unary ||
                     s instanceof VariableDecls) {
-                return acc + ';';
+                acc.append(';');
+                return;
             }
 
             if (s instanceof MethodDecl && ((MethodDecl) s).getBody() == null) {
-                return acc + ';';
+                acc.append(';');
+                return;
             }
 
             if (s instanceof Label) {
                 s = ((Label) s).getStatement();
                 continue;
             }
-
-            return acc;
+            return;
         }
     }
 
     @Override
-    public String visitBreak(Break breakStatement, P p) {
-        return fmt(breakStatement, "break" + visit(breakStatement.getLabel(), p));
+    public J visitBreak(Break breakStatement, P p) {
+        visitSpace(breakStatement.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("break");
+        visit(breakStatement.getLabel(), p);
+        return breakStatement;
     }
 
     @Override
-    public String visitCase(Case caze, P p) {
-        String pattern;
+    public J visitCase(Case caze, P p) {
+        visitSpace(caze.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
         Expression elem = caze.getPattern();
         if (elem instanceof Ident && ((Ident) elem).getSimpleName().equals("default")) {
-            pattern = "default";
+            acc.append("default");
         } else {
-            pattern = "case" + visit(elem, p);
+            acc.append("case");
+            visit(elem, p);
         }
-
-        return fmt(caze, pattern +
-                visit(caze.getStatements().getBefore()) + ":" +
-                visitStatements(caze.getStatements().getElem(), p));
+        visitSpace(caze.getStatements().getBefore(), p);
+        acc.append(':');
+        visitStatements(caze.getStatements().getElem(), p);
+        return caze;
     }
 
     @Override
-    public String visitCatch(Try.Catch catzh, P p) {
-        return fmt(catzh, "catch" + visit(catzh.getParam(), p) + visit(catzh.getBody(), p));
+    public J visitCatch(Try.Catch catzh, P p) {
+        visitSpace(catzh.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("catch");
+        visit(catzh.getParam(), p);
+        visit(catzh.getBody(), p);
+        return catzh;
     }
 
     @Override
-    public String visitClassDecl(ClassDecl classDecl, P p) {
-        String modifiers = visitModifiers(classDecl.getModifiers());
-
+    public J visitClassDecl(ClassDecl classDecl, P p) {
         String kind = "";
         switch (classDecl.getKind().getElem()) {
             case Class:
@@ -437,229 +478,325 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
                 break;
         }
 
-        return fmt(classDecl, visit(classDecl.getAnnotations(), p) +
-                modifiers +
-                visit(classDecl.getKind().getBefore()) + kind +
-                visit(classDecl.getName(), p) +
-                visit("<", classDecl.getTypeParameters(), ",", ">", p) +
-                visit("extends", classDecl.getExtends(), p) +
-                visit(classDecl.getKind().getElem().equals(ClassDecl.Kind.Interface) ? "extends" : "implements",
-                        classDecl.getImplements(), ",", null, p) +
-                visit(classDecl.getBody(), p));
+        visitSpace(classDecl.getPrefix(), p);
+        visit(classDecl.getAnnotations(), p);
+        visitModifiers(classDecl.getModifiers(), p);
+        visitSpace(classDecl.getKind().getBefore(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append(kind);
+        visit(classDecl.getName(), p);
+        visit("<", classDecl.getTypeParameters(), ",", ">", p);
+        visit("extends", classDecl.getExtends(), p);
+        visit(classDecl.getKind().getElem().equals(ClassDecl.Kind.Interface) ? "extends" : "implements",
+                classDecl.getImplements(), ",", null, p);
+        visit(classDecl.getBody(), p);
+        return classDecl;
     }
 
     @Override
-    public String visitCompilationUnit(CompilationUnit cu, P p) {
-        return fmt(cu,
-                visit(cu.getPackageDecl(), ";", p) +
-                        visit(cu.getImports(), ";", p) +
-                        (cu.getImports().isEmpty() ? "" : ";") +
-                        visit(cu.getClasses(), p) +
-                        visit(cu.getEof()));
-    }
-
-    @Override
-    public String visitContinue(Continue continueStatement, P p) {
-        return fmt(continueStatement, "continue" + visit(continueStatement.getLabel(), p));
-    }
-
-    @Override
-    public <T extends J> String visitControlParentheses(ControlParentheses<T> controlParens, P p) {
-        return fmt(controlParens, "(" + visit(controlParens.getTree(), ")", p));
-    }
-
-    @Override
-    public String visitDoWhileLoop(DoWhileLoop doWhileLoop, P p) {
-        return fmt(doWhileLoop, "do" + visitStatement(doWhileLoop.getBody(), p) +
-                visit("while", doWhileLoop.getWhileCondition(), p));
-    }
-
-    @Override
-    public String visitElse(If.Else elze, P p) {
-        return fmt(elze, "else" + visitStatement(elze.getBody(), p));
-    }
-
-    @Override
-    public String visitEmpty(Empty empty, P p) {
-        return fmt(empty, "");
-    }
-
-    @Override
-    public String visitEnumValue(EnumValue enoom, P p) {
-        String init = "";
-
-        NewClass initializer = enoom.getInitializer();
-        if (initializer != null) {
-            init = fmt(initializer,
-                    visit("(", initializer.getArgs(), ",", ")", p) +
-                            visit(initializer.getBody(), p));
+    public J visitCompilationUnit(CompilationUnit cu, P p) {
+        visitSpace(cu.getPrefix(), p);
+        visit(cu.getPackageDecl(), ";", p);
+        visit(cu.getImports(), ";", p);
+        StringBuilder acc = getPrinterAcc();
+        if (!cu.getImports().isEmpty()) {
+            acc.append(";");
         }
-
-        return fmt(enoom, visit(enoom.getName(), p) + init);
+        visit(cu.getClasses(), p);
+        visitSpace(cu.getEof(), p);
+        return cu;
     }
 
     @Override
-    public String visitEnumValueSet(EnumValueSet enums, P p) {
-        return fmt(enums, visit(enums.getEnums(), ",", p) +
-                (enums.isTerminatedWithSemicolon() ? ";" : ""));
+    public J visitContinue(Continue continueStatement, P p) {
+        visitSpace(continueStatement.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("continue");
+        visit(continueStatement.getLabel(), p);
+        return continueStatement;
     }
 
     @Override
-    public String visitFieldAccess(FieldAccess fieldAccess, P p) {
-        return fmt(fieldAccess, visit(fieldAccess.getTarget(), p) +
-                visit(".", fieldAccess.getName(), p));
+    public <T extends J> J visitControlParentheses(ControlParentheses<T> controlParens, P p) {
+        visitSpace(controlParens.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append('(');
+        visit(controlParens.getTree(), ")", p);
+        return controlParens;
     }
 
     @Override
-    public String visitForLoop(ForLoop forLoop, P p) {
+    public J visitDoWhileLoop(DoWhileLoop doWhileLoop, P p) {
+        visitSpace(doWhileLoop.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("do");
+        visitStatement(doWhileLoop.getBody(), p);
+        visit("while", doWhileLoop.getWhileCondition(), p);
+        return doWhileLoop;
+    }
+
+    @Override
+    public J visitElse(If.Else elze, P p) {
+        visitSpace(elze.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("else");
+        visitStatement(elze.getBody(), p);
+        return elze;
+    }
+
+    @Override
+    public J visitEnumValue(EnumValue enoom, P p) {
+
+        visitSpace(enoom.getPrefix(), p);
+        visit(enoom.getName(), p);
+        NewClass initializer = enoom.getInitializer();
+        if (enoom.getInitializer() != null) {
+            visitSpace(initializer.getPrefix(), p);
+            visit("(", initializer.getArgs(), ",", ")", p);
+            visit(initializer.getBody(), p);
+        }
+        return enoom;
+    }
+
+    @Override
+    public J visitEnumValueSet(EnumValueSet enums, P p) {
+        visitSpace(enums.getPrefix(), p);
+        visit(enums.getEnums(), ",", p);
+        StringBuilder acc = getPrinterAcc();
+        if (enums.isTerminatedWithSemicolon()) {
+            acc.append(';');
+        }
+        return enums;
+    }
+
+    @Override
+    public J visitFieldAccess(FieldAccess fieldAccess, P p) {
+        visitSpace(fieldAccess.getPrefix(), p);
+        visit(fieldAccess.getTarget(), p);
+        visit(".", fieldAccess.getName(), p);
+        return fieldAccess;
+    }
+
+    @Override
+    public J visitForLoop(ForLoop forLoop, P p) {
+        visitSpace(forLoop.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("for");
         ForLoop.Control ctrl = forLoop.getControl();
-        String expr = fmt(ctrl, "(" +
-                visit(ctrl.getInit(), ";", p) +
-                visit(ctrl.getCondition(), ";", p) +
-                visit(ctrl.getUpdate(), ",", p) +
-                ")");
-        return fmt(forLoop, "for" + expr + visitStatement(forLoop.getBody(), p));
+        visitSpace(ctrl.getPrefix(), p);
+        acc.append('(');
+        visit(ctrl.getInit(), ";", p);
+        visit(ctrl.getCondition(), ";", p);
+        visit(ctrl.getUpdate(), ",", p);
+        acc.append(')');
+        visitStatement(forLoop.getBody(), p);
+        return forLoop;
     }
 
     @Override
-    public String visitForEachLoop(ForEachLoop forEachLoop, P p) {
+    public J visitForEachLoop(ForEachLoop forEachLoop, P p) {
+        visitSpace(forEachLoop.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("for");
         ForEachLoop.Control ctrl = forEachLoop.getControl();
-        String expr = fmt(ctrl, "(" +
-                visit(ctrl.getVariable(), ":", p) +
-                visit(ctrl.getIterable(), "", p) +
-                ")");
-        return fmt(forEachLoop, "for" + expr + visitStatement(forEachLoop.getBody(), p));
+        visitSpace(ctrl.getPrefix(), p);
+        acc.append('(');
+        visit(ctrl.getVariable(), ":", p);
+        visit(ctrl.getIterable(), "", p);
+        acc.append(')');
+        visitStatement(forEachLoop.getBody(), p);
+        return forEachLoop;
     }
 
     @Override
-    public String visitIdentifier(Ident ident, P p) {
-        return fmt(ident, ident.getSimpleName());
+    public J visitIdentifier(Ident ident, P p) {
+        visitSpace(ident.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append(ident.getSimpleName());
+        return ident;
     }
 
     @Override
-    public String visitIf(If iff, P p) {
-        return fmt(iff, "if" + visit(iff.getIfCondition(), p) +
-                visitStatement(iff.getThenPart(), p) +
-                visit(iff.getElsePart(), p));
+    public J visitIf(If iff, P p) {
+        visitSpace(iff.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append("if");
+        visit(iff.getIfCondition(), p);
+        visitStatement(iff.getThenPart(), p);
+        visit(iff.getElsePart(), p);
+        return iff;
     }
 
     @Override
-    public String visitImport(Import impoort, P p) {
-        return fmt(impoort, "import" +
+    public J visitImport(Import impoort, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(impoort.getPrefix(), p);
+        acc.append("import");
+        if (impoort.isStatic()) {
+            if (impoort.getStatic() != null) {
+                visitSpace(impoort.getStatic(), p);
+            }
+            acc.append("static");
+        }
+        visit(impoort.getQualid(), p);
+        return impoort;
+    }
+
+    /*
+    return fmt(impoort, "import" +
                 (impoort.isStatic() ? visit(impoort.getStatic()) + "static" : "") +
                 visit(impoort.getQualid(), p));
+     */
+
+    @Override
+    public J visitInstanceOf(InstanceOf instanceOf, P p) {
+        visitSpace(instanceOf.getPrefix(), p);
+        visit(instanceOf.getExpr(), "instanceof", p);
+        visit(instanceOf.getClazz(), p);
+        return instanceOf;
     }
 
     @Override
-    public String visitInstanceOf(InstanceOf instanceOf, P p) {
-        return fmt(instanceOf, visit(instanceOf.getExpr(), "instanceof", p) +
-                visit(instanceOf.getClazz(), p));
+    public J visitLabel(Label label, P p) {
+        visitSpace(label.getPrefix(), p);
+        visit(label.getLabel(), ":", p);
+        visit(label.getStatement(), p);
+        return label;
     }
 
     @Override
-    public String visitLabel(Label label, P p) {
-        return fmt(label, visit(label.getLabel(), ":", p) +
-                visit(label.getStatement(), p));
+    public J visitLambda(Lambda lambda, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(lambda.getPrefix(), p);
+        visitSpace(lambda.getParameters().getPrefix(), p);
+        if (lambda.getParameters().isParenthesized()) {
+            acc.append('(');
+            visit(lambda.getParameters().getParams(), ",", p);
+            acc.append(')');
+        } else {
+            visit(lambda.getParameters().getParams(), ",", p);
+        }
+        visitSpace(lambda.getArrow(), p);
+        acc.append("->");
+        visit(lambda.getBody(), p);
+        return lambda;
     }
 
     @Override
-    public String visitLambda(Lambda lambda, P p) {
-        String params = visit(lambda.getParameters().getParams(), ",", p);
-        String paramSet = fmt(lambda.getParameters(), lambda.getParameters().isParenthesized() ? "(" + params + ")" : params);
-        return fmt(lambda, paramSet + visit(lambda.getArrow()) + "->") + visit(lambda.getBody(), p);
+    public J visitLiteral(Literal literal, P p) {
+        visitSpace(literal.getPrefix(), p);
+        StringBuilder acc = getPrinterAcc();
+        acc.append(literal.getValueSource());
+        return literal;
     }
 
     @Override
-    public String visitLiteral(Literal literal, P p) {
-        return fmt(literal, literal.getValueSource());
+    public J visitMemberReference(MemberReference memberRef, P p) {
+        visitSpace(memberRef.getPrefix(), p);
+        visit(memberRef.getContaining(), p);
+        visit("<", memberRef.getTypeParameters(), ",", ">", p);
+        visit("::", memberRef.getReference(), p);
+        return memberRef;
     }
 
     @Override
-    public String visitMemberReference(MemberReference memberRef, P p) {
-        return fmt(memberRef, visit(memberRef.getContaining(), p) +
-                visit("<", memberRef.getTypeParameters(), ",", ">", p) +
-                visit("::", memberRef.getReference(), p));
+    public J visitMethod(MethodDecl method, P p) {
+        visitSpace(method.getPrefix(), p);
+        visit(method.getAnnotations(), p);
+        visitModifiers(method.getModifiers(), p);
+        visit("<", method.getTypeParameters(), ",", ">", p);
+        visit(method.getReturnTypeExpr(), p);
+        visit(method.getName(), p);
+        visit("(", method.getParams(), ",", ")", p);
+        visit("throws", method.getThrows(), ",", null, p);
+        visit(method.getBody(), p);
+        visit("default", method.getDefaultValue(), p);
+        return method;
     }
 
     @Override
-    public String visitMethod(MethodDecl method, P p) {
-        return fmt(method,
-                visit(method.getAnnotations(), p) +
-                        visitModifiers(method.getModifiers()) +
-                        visit("<", method.getTypeParameters(), ",", ">", p) +
-                        visit(method.getReturnTypeExpr(), p) +
-                        visit(method.getName(), p) +
-                        visit("(", method.getParams(), ",", ")", p) +
-                        visit("throws", method.getThrows(), ",", null, p) +
-                        visit(method.getBody(), p) +
-                        visit("default", method.getDefaultValue(), p));
+    public J visitMethodInvocation(MethodInvocation method, P p) {
+        visitSpace(method.getPrefix(), p);
+        visit(method.getSelect(), ".", p);
+        visit("<", method.getTypeParameters(), ",", ">", p);
+        visit(method.getName(), p);
+        visit("(", method.getArgs(), ",", ")", p);
+        return method;
     }
 
     @Override
-    public String visitMethodInvocation(MethodInvocation method, P p) {
-        return fmt(method,
-                visit(method.getSelect(), ".", p) +
-                        visit("<", method.getTypeParameters(), ",", ">", p) +
-                        visit(method.getName(), p) +
-                        visit("(", method.getArgs(), ",", ")", p));
+    public J visitMultiCatch(MultiCatch multiCatch, P p) {
+        visitSpace(multiCatch.getPrefix(), p);
+        visit(multiCatch.getAlternatives(), "|", p);
+        return multiCatch;
     }
 
     @Override
-    public String visitMultiCatch(MultiCatch multiCatch, P p) {
-        return fmt(multiCatch, visit(multiCatch.getAlternatives(), "|", p));
-    }
-
-    @Override
-    public String visitMultiVariable(VariableDecls multiVariable, P p) {
-        StringBuilder acc = new StringBuilder(visit(multiVariable.getAnnotations(), p));
-        acc.append(visitModifiers(multiVariable.getModifiers()));
-        acc.append(visit(multiVariable.getTypeExpr(), p));
-
+    public J visitMultiVariable(VariableDecls multiVariable, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(multiVariable.getPrefix(), p);
+        visit(multiVariable.getAnnotations(), p);
+        visitModifiers(multiVariable.getModifiers(), p);
+        visit(multiVariable.getTypeExpr(), p);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-            acc.append(visit(dim.getBefore())).append('[')
-                    .append(dim.getElem().getWhitespace()).append(']');
+            visitSpace(dim.getBefore(), p);
+            acc.append('[');
+            visitSpace(dim.getElem(), p);
+            acc.append(']');
         }
-
         if (multiVariable.getVarargs() != null) {
-            acc.append(visit(multiVariable.getVarargs())).append("...");
+            visitSpace(multiVariable.getVarargs(), p);
+            acc.append("...");
         }
-
-        acc.append(visit(multiVariable.getVars(), ",", p));
-
-        return fmt(multiVariable, acc.toString());
+        visit(multiVariable.getVars(), ",", p);
+        return multiVariable;
     }
 
     @Override
-    public String visitNewArray(NewArray newArray, P p) {
-        return fmt(newArray, (newArray.getTypeExpr() != null ? "new" : "") +
-                visit(newArray.getTypeExpr(), p) +
-                visit(newArray.getDimensions(), p) +
-                visit("{", newArray.getInitializer(), ",", "}", p));
+    public J visitNewArray(NewArray newArray, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(newArray.getPrefix(), p);
+        if (newArray.getTypeExpr() != null) {
+            acc.append("new");
+        }
+        visit(newArray.getTypeExpr(), p);
+        visit(newArray.getDimensions(), p);
+        visit("{", newArray.getInitializer(), ",", "}", p);
+        return newArray;
     }
 
     @Override
-    public String visitNewClass(NewClass newClass, P p) {
-        return fmt(newClass,
-                visit(newClass.getEncl(), ".", p) +
-                        visit(newClass.getNew()) + "new" +
-                        visit(newClass.getClazz(), p) +
-                        visit("(", newClass.getArgs(), ",", ")", p) +
-                        visit(newClass.getBody(), p));
+    public J visitNewClass(NewClass newClass, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(newClass.getPrefix(), p);
+        visit(newClass.getEncl(), ".", p);
+        visitSpace(newClass.getNew(), p);
+        acc.append("new");
+        visit(newClass.getClazz(), p);
+        visit("(", newClass.getArgs(), ",", ")", p);
+        visit(newClass.getBody(), p);
+        return newClass;
     }
 
     @Override
-    public String visitPackage(J.Package pkg, P p) {
-        return fmt(pkg, "package" + visit(pkg.getExpr(), p));
+    public J visitPackage(J.Package pkg, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(pkg.getPrefix(), p);
+        acc.append("package");
+        visit(pkg.getExpr(), p);
+        return pkg;
     }
 
     @Override
-    public String visitParameterizedType(ParameterizedType type, P p) {
-        return fmt(type, visit(type.getClazz(), p) +
-                visit("<", type.getTypeParameters(), ",", ">", p));
+    public J visitParameterizedType(ParameterizedType type, P p) {
+        visitSpace(type.getPrefix(), p);
+        visit(type.getClazz(), p);
+        visit("<", type.getTypeParameters(), ",", ">", p);
+        return type;
     }
 
     @Override
-    public String visitPrimitive(Primitive primitive, P p) {
+    public J visitPrimitive(Primitive primitive, P p) {
         String keyword;
         switch (primitive.getType()) {
             case Boolean:
@@ -702,139 +839,193 @@ public class JavaPrinter<P> implements JavaVisitor<String, P> {
             default:
                 throw new IllegalStateException("Unable to print non-primitive type");
         }
-
-        return fmt(primitive, keyword);
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(primitive.getPrefix(), p);
+        acc.append(keyword);
+        return primitive;
     }
 
     @Override
-    public <T extends J> String visitParentheses(Parentheses<T> parens, P p) {
-        return fmt(parens, "(" + visit(parens.getTree(), ")", p));
+    public <T extends J> J visitParentheses(Parentheses<T> parens, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(parens.getPrefix(), p);
+        acc.append("(");
+        visit(parens.getTree(), ")", p);
+        return parens;
     }
 
     @Override
-    public String visitReturn(Return retrn, P p) {
-        return fmt(retrn, "return" + visit(retrn.getExpr(), p));
+    public J visitReturn(Return retrn, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(retrn.getPrefix(), p);
+        acc.append("return");
+        visit(retrn.getExpr(), p);
+        return retrn;
     }
 
     @Override
-    public String visitSwitch(Switch switzh, P p) {
-        return fmt(switzh, "switch" + visit(switzh.getSelector(), p) +
-                visit(switzh.getCases(), p));
+    public J visitSwitch(Switch switzh, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(switzh.getPrefix(), p);
+        acc.append("switch");
+        visit(switzh.getSelector(), p);
+        visit(switzh.getCases(), p);
+        return switzh;
     }
 
     @Override
-    public String visitSynchronized(J.Synchronized synch, P p) {
-        return fmt(synch, "synchronized" + visit(synch.getLock(), p) + visit(synch.getBody(), p));
+    public J visitSynchronized(J.Synchronized synch, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(synch.getPrefix(), p);
+        acc.append("synchronized");
+        visit(synch.getLock(), p);
+        visit(synch.getBody(), p);
+        return synch;
     }
 
     @Override
-    public String visitTernary(Ternary ternary, P p) {
-        return fmt(ternary, visit(ternary.getCondition(), p) +
-                visit("?", ternary.getTruePart(), p) +
-                visit(":", ternary.getFalsePart(), p));
+    public J visitTernary(Ternary ternary, P p) {
+        visitSpace(ternary.getPrefix(), p);
+        visit(ternary.getCondition(), p);
+        visit("?", ternary.getTruePart(), p);
+        visit(":", ternary.getFalsePart(), p);
+        return ternary;
     }
 
     @Override
-    public String visitThrow(Throw thrown, P p) {
-        return fmt(thrown, "throw" + visit(thrown.getException(), p));
+    public J visitThrow(Throw thrown, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(thrown.getPrefix(), p);
+        acc.append("throw");
+        visit(thrown.getException(), p);
+        return thrown;
     }
 
     @Override
-    public String visitTry(Try tryable, P p) {
-        StringBuilder acc = new StringBuilder("try");
-
+    public J visitTry(Try tryable, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(tryable.getPrefix(), p);
+        acc.append("try");
         if (tryable.getResources() != null) {
-            acc.append(visit(tryable.getResources().getBefore())).append('(');
+            visitSpace(tryable.getResources().getBefore(), p);
+            acc.append('(');
             List<JRightPadded<Try.Resource>> resources = tryable.getResources().getElem();
             for (int i = 0; i < resources.size(); i++) {
                 JRightPadded<Try.Resource> resource = resources.get(i);
 
-                acc.append(visit(resource.getElem().getPrefix()))
-                        .append(visit(resource.getElem().getVariableDecls(), p));
+                visitSpace(resource.getElem().getPrefix(), p);
+                visit(resource.getElem().getVariableDecls(), p);
 
                 if (i < resources.size() - 1 || resource.getElem().isTerminatedWithSemicolon()) {
                     acc.append(';');
                 }
 
-                acc.append(visit(resource.getAfter()));
+                visitSpace(resource.getAfter(), p);
             }
             acc.append(')');
         }
 
-        acc.append(visit(tryable.getBody(), p));
-        acc.append(visit(tryable.getCatches(), p));
-        acc.append(visit("finally", tryable.getFinally(), p));
-
-        return fmt(tryable, acc.toString());
+        visit(tryable.getBody(), p);
+        visit(tryable.getCatches(), p);
+        visit("finally", tryable.getFinally(), p);
+        return tryable;
     }
 
     @Override
-    public String visitTypeCast(TypeCast typeCast, P p) {
-        return fmt(typeCast, visit(typeCast.getClazz(), p) + visit(typeCast.getExpr(), p));
+    public J visitTypeParameter(TypeParameter typeParam, P p) {
+        visitSpace(typeParam.getPrefix(), p);
+        visit(typeParam.getAnnotations(), p);
+        visit(typeParam.getName(), p);
+        visit("extends", typeParam.getBounds(), "&", "", p);
+        return typeParam;
     }
 
     @Override
-    public String visitTypeParameter(TypeParameter typeParam, P p) {
-        return fmt(typeParam, visit(typeParam.getAnnotations(), p) +
-                visit(typeParam.getName(), p) +
-                visit("extends", typeParam.getBounds(), "&", "", p));
-    }
-
-    @Override
-    public String visitUnary(Unary unary, P p) {
+    public J visitUnary(Unary unary, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(unary.getPrefix(), p);
         switch (unary.getOperator().getElem()) {
             case PreIncrement:
-                return fmt(unary, "++" + visit(unary.getExpr(), p));
+                acc.append("++");
+                visit(unary.getExpr(), p);
+                break;
             case PreDecrement:
-                return fmt(unary, "--" + visit(unary.getExpr(), p));
+                acc.append("--");
+                visit(unary.getExpr(), p);
+                break;
             case PostIncrement:
-                return fmt(unary, visit(unary.getExpr(), p) + visit(unary.getOperator().getBefore()) + "++");
+                visit(unary.getExpr(), p);
+                visitSpace(unary.getOperator().getBefore(), p);
+                acc.append("++");
+                break;
             case PostDecrement:
-                return fmt(unary, visit(unary.getExpr(), p) + visit(unary.getOperator().getBefore()) + "--");
+                visit(unary.getExpr(), p);
+                visitSpace(unary.getOperator().getBefore(), p);
+                acc.append("--");
+                break;
             case Positive:
-                return fmt(unary, "+" + visit(unary.getExpr(), p));
+                acc.append("+");
+                visit(unary.getExpr(), p);
+                break;
             case Negative:
-                return fmt(unary, "-" + visit(unary.getExpr(), p));
+                acc.append("-");
+                visit(unary.getExpr(), p);
+                break;
             case Complement:
-                return fmt(unary, "~" + visit(unary.getExpr(), p));
+                acc.append("~");
+                visit(unary.getExpr(), p);
+                break;
             case Not:
             default:
-                return fmt(unary, "!" + visit(unary.getExpr(), p));
+                acc.append("!");
+                visit(unary.getExpr(), p);
         }
+        return unary;
     }
 
     @Override
-    public String visitVariable(VariableDecls.NamedVar variable, P p) {
-        StringBuilder dimensions = new StringBuilder();
+    public J visitVariable(VariableDecls.NamedVar variable, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(variable.getPrefix(), p);
+        visit(variable.getName(), p);
         for (JLeftPadded<Space> dimension : variable.getDimensionsAfterName()) {
-            dimensions.append(visit(dimension.getBefore())).append('[')
-                    .append(dimension.getElem().getWhitespace()).append(']');
+            visitSpace(dimension.getBefore(), p);
+            acc.append('[');
+            visitSpace(dimension.getElem(), p);
+            acc.append(']');
         }
-
-        return fmt(variable, visit(variable.getName(), p) +
-                dimensions.toString() +
-                visit("=", variable.getInitializer(), p));
+        visit("=", variable.getInitializer(), p);
+        return variable;
     }
 
     @Override
-    public String visitWhileLoop(WhileLoop whileLoop, P p) {
-        return fmt(whileLoop, "while" + visit(whileLoop.getCondition(), p) +
-                visitStatement(whileLoop.getBody(), p));
+    public J visitWhileLoop(WhileLoop whileLoop, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(whileLoop.getPrefix(), p);
+        acc.append("while");
+        visit(whileLoop.getCondition(), p);
+        visitStatement(whileLoop.getBody(), p);
+        return whileLoop;
     }
 
     @Override
-    public String visitWildcard(Wildcard wildcard, P p) {
-        String bound = "";
+    public J visitWildcard(Wildcard wildcard, P p) {
+        StringBuilder acc = getPrinterAcc();
+        visitSpace(wildcard.getPrefix(), p);
+        acc.append('?');
         if (wildcard.getBound() != null) {
             switch (wildcard.getBound().getElem()) {
                 case Extends:
-                    bound = visit(wildcard.getBound().getBefore()) + "extends";
+                    visitSpace(wildcard.getBound().getBefore(), p);
+                    acc.append("extends");
                     break;
                 case Super:
-                    bound = visit(wildcard.getBound().getBefore()) + "super";
+                    visitSpace(wildcard.getBound().getBefore(), p);
+                    acc.append("super");
                     break;
             }
         }
-        return fmt(wildcard, "?" + bound + visit(wildcard.getBoundedType(), p));
+        visit(wildcard.getBoundedType(), p);
+        return wildcard;
     }
 }

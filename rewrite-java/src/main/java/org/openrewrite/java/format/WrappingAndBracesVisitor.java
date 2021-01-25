@@ -15,15 +15,15 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Statement;
 
-public class WrappingAndBracesProcessor<P> extends JavaIsoProcessor<P> {
+public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     private final WrappingAndBracesStyle style;
 
-    public WrappingAndBracesProcessor(WrappingAndBracesStyle style) {
+    public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
         this.style = style;
         setCursoringOn();
     }

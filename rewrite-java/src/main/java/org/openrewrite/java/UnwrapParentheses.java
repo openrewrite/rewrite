@@ -18,7 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.java.tree.J;
 
-public class UnwrapParentheses<P> extends JavaProcessor<P> {
+public class UnwrapParentheses<P> extends JavaVisitor<P> {
     private final J.Parentheses<?> scope;
 
     public UnwrapParentheses(J.Parentheses<?> scope) {

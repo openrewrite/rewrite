@@ -18,13 +18,12 @@ package org.openrewrite.java
 import org.junit.jupiter.api.Test
 import org.openrewrite.*
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface AddImportTest : RecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
         .map { add ->
             object : Recipe() {
-                override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+                override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
                     return add
                 }
             }
@@ -303,8 +302,8 @@ interface AddImportTest : RecipeTest {
     fun addNamedStaticImportWhenReferenced(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object : JavaIsoProcessor<ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaIsoVisitor<ExecutionContext>() {
                     override fun visitMethodInvocation(m: J.MethodInvocation, ctx: ExecutionContext) =
                         m.withSelect(null)
                 }
@@ -391,8 +390,8 @@ interface AddImportTest : RecipeTest {
      * This allows us to test that AddImport with setOnlyIfReferenced = true will add a static import when an applicable static method call is present
      */
     private class FixEmptyListMethodType : Recipe() {
-        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-            return object : JavaIsoProcessor<ExecutionContext>() {
+        override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+            return object : JavaIsoVisitor<ExecutionContext>() {
                 override fun visitMethodInvocation(
                     method: J.MethodInvocation,
                     ctx: ExecutionContext

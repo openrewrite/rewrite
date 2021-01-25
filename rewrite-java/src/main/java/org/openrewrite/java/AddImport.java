@@ -41,7 +41,7 @@ import static org.openrewrite.Tree.randomId;
  * if there is a reference to the imported class/method.
  */
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class AddImport<P> extends JavaIsoProcessor<P> {
+public class AddImport<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode.Include
     private final String type;
 

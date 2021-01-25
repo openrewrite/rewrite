@@ -18,8 +18,18 @@ package org.openrewrite.properties;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-public interface PropertiesVisitor<R, P> extends TreeVisitor<R, P> {
-    R visitFile(Properties.File file, P p);
-    R visitEntry(Properties.Entry entry, P p);
-    R visitComment(Properties.Comment comment, P p);
+public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
+
+    public Properties visitFile(Properties.File file, P p) {
+        Properties.File f = call(file, p, this::visitEach);
+        return f.withContent(call(file.getContent(), p));
+    }
+
+    public Properties visitEntry(Properties.Entry entry, P p) {
+        return call(entry, p, this::visitEach);
+    }
+
+    public Properties visitComment(Properties.Comment comment, P p) {
+        return call(comment, p, this::visitEach);
+    }
 }

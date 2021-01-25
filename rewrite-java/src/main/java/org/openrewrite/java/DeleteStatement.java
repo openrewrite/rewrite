@@ -26,7 +26,7 @@ import static org.openrewrite.Tree.randomId;
 /**
  * Deletes standalone statements. Does not include deletion of control statements present in for loops.
  */
-public class DeleteStatement<P> extends JavaIsoProcessor<P> {
+public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     private final Statement statement;
 
     public DeleteStatement(Statement statement) {

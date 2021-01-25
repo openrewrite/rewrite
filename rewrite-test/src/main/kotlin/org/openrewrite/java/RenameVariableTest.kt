@@ -23,7 +23,7 @@ interface RenameVariableTest : RecipeTest {
     @Test
     fun renameVariable(jp: JavaParser) = assertChanged(
         jp,
-        recipe = object : JavaProcessor<ExecutionContext>() {
+        recipe = object : JavaVisitor<ExecutionContext>() {
             override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
                 val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
                 if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDecl) {

@@ -18,31 +18,31 @@ package org.openrewrite;
 import org.openrewrite.internal.lang.Nullable;
 
 public interface TreePrinter<P> {
+
     static <P> TreePrinter<P> identity() {
         return new TreePrinter<P>() {
         };
     }
 
     /**
-     * Transform the AST before a printer prints the subtree.
+     * Called before tree is printed, allows printing additional output before tree.
      *
-     * @param tree The subtree to print.
-     * @return A tree, possibly mutated for the purpose of printing only. The mutation
-     * is discarded after printing.
+     * @param tree AST element that is about to be printed
+     * @param printerAcc Printer accumulator, can be appended to, contains everything written for the overall visit
+     *                   operation so far
+     * @param p visit context
      */
-    @Nullable
-    default <T2 extends Tree> T2 doFirst(T2 tree, P p) {
-        return tree;
-    }
+    default void doBefore(@Nullable Tree tree, StringBuilder printerAcc, P p) {}
 
     /**
-     * Transform the printed code.
+     * Called after tree has been printed, allows printing additional output after tree.
      *
-     * @param tree    The tree that has been printed already.
-     * @param printed The code as printed by the printer.
-     * @return The code, possibly mutated.
+     * @param tree AST element that has just been printed
+     * @param printerAcc Printer accumulator, can be appended to, contains everything written for the overall visit
+     *      *                   operation so far
+     * @param p visit context
      */
-    default String doLast(Tree tree, String printed, P p) {
-        return printed;
-    }
+    default void doAfter(@Nullable Tree tree, StringBuilder printerAcc, P p) {}
+
+
 }

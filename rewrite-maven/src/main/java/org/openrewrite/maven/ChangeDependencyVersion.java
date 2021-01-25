@@ -19,11 +19,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -41,8 +41,8 @@ public class ChangeDependencyVersion extends Recipe {
     private final String toVersion;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeDependencyVersionProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeDependencyVersionVisitor();
     }
 
     @Override
@@ -52,9 +52,9 @@ public class ChangeDependencyVersion extends Recipe {
                 .and(required("toVersion", toVersion));
     }
 
-    private class ChangeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
+    private class ChangeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
 
-        public ChangeDependencyVersionProcessor() {
+        public ChangeDependencyVersionVisitor() {
             setCursoringOn();
         }
 
@@ -70,7 +70,7 @@ public class ChangeDependencyVersion extends Recipe {
                             ChangePropertyValue changePropertyValue = new ChangePropertyValue(version, toVersion);
                             doAfterVisit(changePropertyValue);
                         } else if (!toVersion.equals(version)) {
-                            doAfterVisit(new ChangeTagValueProcessor<>(versionTag.get(), toVersion));
+                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), toVersion));
                         }
                     }
                 }
@@ -81,7 +81,7 @@ public class ChangeDependencyVersion extends Recipe {
                 for (Pom module : modules) {
                     for (Pom.Dependency dependency : module.getDependencies()) {
                         if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
-                            doAfterVisit(new ChangeTagValueProcessor<>(tag, toVersion));
+                            doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
                             break OUTER;
                         }
                     }

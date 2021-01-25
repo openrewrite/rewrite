@@ -24,18 +24,18 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-public class AddToTagProcessor<P> extends XmlProcessor<P> {
+public class AddToTagVisitor<P> extends XmlVisitor<P> {
     private final Xml.Tag scope;
     private final Xml.Tag tagToAdd;
 
     @Nullable
     private final Comparator<Xml.Tag> tagComparator;
 
-    public AddToTagProcessor(Xml.Tag scope, Xml.Tag tagToAdd) {
+    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd) {
         this(scope, tagToAdd, null);
     }
 
-    public AddToTagProcessor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Xml.Tag> tagComparator) {
+    public AddToTagVisitor(Xml.Tag scope, Xml.Tag tagToAdd, @Nullable Comparator<Xml.Tag> tagComparator) {
         this.scope = scope;
         this.tagToAdd = tagToAdd;
         this.tagComparator = tagComparator;
@@ -50,7 +50,7 @@ public class AddToTagProcessor<P> extends XmlProcessor<P> {
                 t = t.withClosing(new Xml.Tag.Closing(Tree.randomId(), "\n",
                         Markers.EMPTY, t.getName(), ""))
                         .withBeforeTagDelimiterPrefix("");
-                doAfterVisit(new AutoFormatProcessor<>(t));
+                doAfterVisit(new AutoFormatVisitor<>(t));
                 formatRequested = true;
             }
 
@@ -74,7 +74,7 @@ public class AddToTagProcessor<P> extends XmlProcessor<P> {
             t = t.withContent(content);
 
             if (!formatRequested) {
-                doAfterVisit(new AutoFormatProcessor<>(formattedTagToAdd));
+                doAfterVisit(new AutoFormatVisitor<>(formattedTagToAdd));
             }
         }
         return super.visitTag(t, p);

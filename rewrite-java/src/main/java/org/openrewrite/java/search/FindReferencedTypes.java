@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
@@ -30,11 +30,11 @@ public class FindReferencedTypes {
 
     public static Set<JavaType.Class> find(J j) {
         Set<JavaType.Class> fields = new HashSet<>();
-        new FindReferencedTypesProcessor().visit(j, fields);
+        new FindReferencedTypesVisitor().visit(j, fields);
         return fields;
     }
 
-    private static class FindReferencedTypesProcessor extends JavaIsoProcessor<Set<JavaType.Class>> {
+    private static class FindReferencedTypesVisitor extends JavaIsoVisitor<Set<JavaType.Class>> {
         @Override
         public <N extends NameTree> N visitTypeName(N name, Set<JavaType.Class> ctx) {
             JavaType.Class asClass = TypeUtils.asClass(name.getType());

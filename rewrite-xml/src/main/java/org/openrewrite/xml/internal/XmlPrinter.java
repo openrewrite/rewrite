@@ -15,6 +15,7 @@
  */
 package org.openrewrite.xml.internal;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
@@ -24,118 +25,184 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 
-public class XmlPrinter<P> implements XmlVisitor<String, P> {
+public class XmlPrinter<P> extends XmlVisitor<P> {
+
+    private static final String PRINTER_ACC_KEY = "printed";
 
     private final TreePrinter<P> treePrinter;
 
     public XmlPrinter(TreePrinter<P> treePrinter) {
         this.treePrinter = treePrinter;
+        setCursoringOn();
     }
 
     @NonNull
-    @Override
-    public String defaultValue(@Nullable Tree tree, P p) {
-        return "";
+    protected StringBuilder getPrinterAcc() {
+        StringBuilder acc = getCursor().getRoot().peekMessage(PRINTER_ACC_KEY);
+        if (acc == null) {
+            acc = new StringBuilder();
+            getCursor().getRoot().putMessage(PRINTER_ACC_KEY, acc);
+        }
+        return acc;
     }
 
-    @NonNull
+    public String print(Xml xml, P p) {
+        setCursor(new Cursor(null, "EPSILON"));
+        visit(xml, p);
+        return getPrinterAcc().toString();
+    }
+
     @Override
-    public String visit(@Nullable Tree tree, P p) {
+    public @Nullable Xml visit(@Nullable Tree tree, P p) {
+
         if (tree == null) {
             return defaultValue(null, p);
         }
 
-        Xml t = treePrinter.doFirst((Xml) tree, p);
-        if (t == null) {
-            return defaultValue(null, p);
+        StringBuilder printerAcc = getPrinterAcc();
+        treePrinter.doBefore(tree, printerAcc, p);
+        tree = super.visit(tree, p);
+        treePrinter.doAfter(tree, printerAcc, p);
+        return (Xml) tree;
+    }
+
+    public void visit(@Nullable List<? extends Xml> nodes, P p) {
+        if (nodes != null) {
+            for (Xml node : nodes) {
+                visit(node, p);
+            }
         }
-
-        //noinspection ConstantConditions
-        return treePrinter.doLast(tree, t.accept(this, p), p);
     }
 
-    public String visit(@Nullable List<? extends Xml> nodes, P p) {
-        if (nodes == null) {
-            return "";
+    @Override
+    public Xml visitDocument(Xml.Document document, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(document.getPrefix());
+        document = (Xml.Document) super.visitDocument(document, p);
+        acc.append(document.getEof());
+        return document;
+    }
+
+    @Override
+    public Xml visitProlog(Xml.Prolog prolog, P p) {
+        getPrinterAcc().append(prolog.getPrefix());
+        return super.visitProlog(prolog, p);
+    }
+
+    @Override
+    public Xml visitTag(Xml.Tag tag, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(tag.getPrefix())
+                .append('<')
+                .append(tag.getName());
+        visit(tag.getAttributes(), p);
+        acc.append(tag.getBeforeTagDelimiterPrefix());
+        if (tag.getClosing() == null) {
+            acc.append("/>");
+        } else {
+            acc.append('>');
+            visit(tag.getContent(), p);
+            acc.append(tag.getClosing().getPrefix())
+                    .append("</")
+                    .append(tag.getClosing().getName())
+                    .append(tag.getClosing().getBeforeTagDelimiterPrefix())
+                    .append(">");
+
         }
+        return tag;
+    }
 
-        StringBuilder acc = new StringBuilder();
-        for (Xml node : nodes) {
-            acc.append(visit(node, p));
+    @Override
+    public Xml visitAttribute(Xml.Attribute attribute, P p) {
+        StringBuilder acc = getPrinterAcc();
+        char valueDelim;
+        if (Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote())) {
+            valueDelim = '"';
+        } else {
+            valueDelim = '\'';
         }
-        return acc.toString();
+        acc.append(attribute.getPrefix())
+                .append(attribute.getKey().getPrefix())
+                .append(attribute.getKeyAsString())
+                .append('=')
+                .append(attribute.getValue().getPrefix())
+                .append(valueDelim)
+                .append(attribute.getValueAsString())
+                .append(valueDelim);
+
+
+        return attribute;
     }
 
     @Override
-    public String visitDocument(Xml.Document document, P p) {
-        return fmt(document, visit(document.getProlog(), p) + visit(document.getRoot(), p) + document.getEof());
+    public Xml visitComment(Xml.Comment comment, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(comment.getPrefix())
+                .append("<!--")
+                .append(comment.getText())
+                .append("-->");
+        return comment;
     }
 
     @Override
-    public String visitProlog(Xml.Prolog prolog, P p) {
-        return fmt(prolog, visit(prolog.getXmlDecls(), p) + visit(prolog.getMisc(), p));
+    public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(pi.getPrefix())
+                .append("<?")
+                .append(pi.getName());
+        visit(pi.getAttributes(), p);
+        acc.append(pi.getBeforeTagDelimiterPrefix())
+                .append("?>");
+        return pi;
     }
 
     @Override
-    public String visitTag(Xml.Tag tag, P p) {
-        return fmt(tag, "<" + tag.getName() + visit(tag.getAttributes(), p) +
-                tag.getBeforeTagDelimiterPrefix() +
-                (tag.getClosing() == null ?
-                        "/>" :
-                        ">" + visit(tag.getContent(), p) + fmt(tag.getClosing(), "</" + tag.getClosing().getName() + tag.getClosing().getBeforeTagDelimiterPrefix() + ">")
-                )
-        );
+    public Xml visitCharData(Xml.CharData charData, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(charData.getPrefix());
+        if (charData.isCdata()) {
+            acc.append("<![CDATA[")
+                    .append(charData.getText())
+                    .append("]]>");
+        } else {
+            acc.append(charData.getText());
+        }
+        acc.append(charData.getAfterText());
+        return charData;
     }
 
     @Override
-    public String visitAttribute(Xml.Attribute attribute, P p) {
-        String valueDelim = Xml.Attribute.Value.Quote.Double.equals(attribute.getValue().getQuote()) ?
-                "\"" : "'";
-
-        return fmt(attribute, fmt(attribute.getKey(), attribute.getKeyAsString()) + "=" +
-                fmt(attribute.getValue(), valueDelim + attribute.getValueAsString() + valueDelim));
+    public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(docTypeDecl.getPrefix())
+                .append("<!DOCTYPE");
+        visit(docTypeDecl.getName(), p);
+        visit(docTypeDecl.getExternalId(), p);
+        visit(docTypeDecl.getInternalSubset(), p);
+        if (docTypeDecl.getExternalSubsets() != null) {
+            acc.append(docTypeDecl.getExternalSubsets().getPrefix())
+                    .append('[');
+            visit(docTypeDecl.getExternalSubsets().getElements(), p);
+            acc.append(']');
+        }
+        acc.append('>');
+        return docTypeDecl;
     }
 
     @Override
-    public String visitComment(Xml.Comment comment, P p) {
-        return fmt(comment, "<!--" + comment.getText() + "-->");
+    public Xml visitElement(Xml.Element element, P p) {
+        StringBuilder acc = getPrinterAcc();
+        acc.append(element.getPrefix())
+                .append("<!ELEMENT");
+        visit(element.getSubset(), p);
+        acc.append('>');
+        return element;
     }
 
     @Override
-    public String visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
-        return fmt(pi, "<?" + pi.getName() + visit(pi.getAttributes(), p) +
-                pi.getBeforeTagDelimiterPrefix() + "?>");
-    }
-
-    @Override
-    public String visitCharData(Xml.CharData charData, P p) {
-        return fmt(charData, charData.isCdata() ?
-                "<![CDATA[" + charData.getText() + "]]>" :
-                charData.getText()
-        ) + charData.getAfterText();
-    }
-
-    @Override
-    public String visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
-        return fmt(docTypeDecl, "<!DOCTYPE" + visit(docTypeDecl.getName(), p) + visit(docTypeDecl.getExternalId(), p) +
-                visit(docTypeDecl.getInternalSubset(), p) +
-                (docTypeDecl.getExternalSubsets() == null ?
-                        "" :
-                        fmt(docTypeDecl.getExternalSubsets(), "[" + visit(docTypeDecl.getExternalSubsets().getElements(), p) + "]")) +
-                ">");
-    }
-
-    @Override
-    public String visitElement(Xml.DocTypeDecl.Element element, P p) {
-        return fmt(element, "<!ELEMENT" + visit(element.getSubset(), p) + ">");
-    }
-
-    @Override
-    public String visitIdent(Xml.Ident ident, P p) {
-        return fmt(ident, ident.getName());
-    }
-
-    private String fmt(@Nullable Xml tree, @Nullable String code) {
-        return tree == null || code == null ? "" : tree.getPrefix() + code;
+    public Xml visitIdent(Xml.Ident ident, P p) {
+        getPrinterAcc().append(ident.getPrefix())
+                .append(ident.getName());
+        return ident;
     }
 }

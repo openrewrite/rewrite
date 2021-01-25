@@ -16,7 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.*;
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
@@ -33,20 +33,20 @@ public class SemanticallyEqual {
     private SemanticallyEqual() {}
 
     public static boolean areEqual(J firstElem, J secondElem) {
-        SemanticallyEqualProcessor sep = new SemanticallyEqualProcessor();
+        SemanticallyEqualVisitor sep = new SemanticallyEqualVisitor();
         sep.visit(firstElem, secondElem); // returns null, but changes value of class variable isEqual
         return sep.isEqual;
     }
 
     /**
-     * Note: The following visit methods extend JavaProcessor in order to inherit access to the
+     * Note: The following visit methods extend JavaVisitor in order to inherit access to the
      * visitor pattern set up there; however, the necessity to return a J did not fit the purposes of
-     * SemanticallyEqualProcessor, so while the equality is tracked in isEqual, all the visitors return null.
+     * SemanticallyEqualVisitor, so while the equality is tracked in isEqual, all the visitors return null.
      */
-    private static class SemanticallyEqualProcessor extends JavaProcessor<J> {
+    private static class SemanticallyEqualVisitor extends JavaVisitor<J> {
         boolean isEqual;
 
-        SemanticallyEqualProcessor() {
+        SemanticallyEqualVisitor() {
             isEqual = true;
         }
 

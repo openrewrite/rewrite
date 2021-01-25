@@ -20,9 +20,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.NonNull;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
@@ -32,8 +30,6 @@ import org.openrewrite.java.tree.Space;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-
-import static org.openrewrite.Validated.required;
 
 /**
  * This recipe finds method invocations matching the given method pattern and reorders the arguments based on the ordered
@@ -64,14 +60,14 @@ public class ReorderMethodArguments extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ReorderMethodArgumentsProcessor(new MethodMatcher(methodPattern));
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ReorderMethodArgumentsVisitor(new MethodMatcher(methodPattern));
     }
 
-    private class ReorderMethodArgumentsProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ReorderMethodArgumentsVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
-        private ReorderMethodArgumentsProcessor(MethodMatcher methodMatcher) {
+        private ReorderMethodArgumentsVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
         }
 

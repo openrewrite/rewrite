@@ -47,20 +47,21 @@ import static java.util.stream.Collectors.toList;
 @SuppressWarnings("unused")
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public interface J extends Serializable, Tree {
+    @SuppressWarnings("unchecked")
     @Override
-    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof JavaVisitor ?
-                acceptJava((JavaVisitor<R, P>) v, p) :
+                (R) acceptJava((JavaVisitor<P>) v, p) :
                 v.defaultValue(null, p);
     }
 
     @Nullable
-    default <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+    default <P> J acceptJava(JavaVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
     default <P> String print(TreePrinter<P> printer, P p) {
-        return new JavaPrinter<>(printer).visit(this, p);
+        return new JavaPrinter<>(printer).print(this, p);
     }
 
     @Override
@@ -90,7 +91,7 @@ public interface J extends Serializable, Tree {
      */
     default <J2 extends J> Set<J2> findMarkedWith(Class<? extends Marker> markerType) {
         Set<J2> trees = new HashSet<>();
-        new JavaListMarkersProcessor<J2>(markerType).visit(this, trees);
+        new JavaListMarkersVisitor<J2>(markerType).visit(this, trees);
         return trees;
     }
 
@@ -125,7 +126,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotatedType(this, p);
         }
     }
@@ -163,7 +164,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotation(this, p);
         }
     }
@@ -192,7 +193,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayAccess(this, p);
         }
     }
@@ -231,7 +232,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayType(this, p);
         }
     }
@@ -253,7 +254,7 @@ public interface J extends Serializable, Tree {
         Expression condition;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssert(this, p);
         }
     }
@@ -282,7 +283,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssign(this, p);
         }
 
@@ -320,7 +321,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAssignOp(this, p);
         }
 
@@ -372,7 +373,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBinary(this, p);
         }
 
@@ -450,7 +451,7 @@ public interface J extends Serializable, Tree {
         Space end;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBlock(this, p);
         }
     }
@@ -473,7 +474,7 @@ public interface J extends Serializable, Tree {
         Ident label;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBreak(this, p);
         }
     }
@@ -498,7 +499,7 @@ public interface J extends Serializable, Tree {
         JContainer<Statement> statements;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitCase(this, p);
         }
     }
@@ -584,7 +585,7 @@ public interface J extends Serializable, Tree {
         JavaType.Class type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitClassDecl(this, p);
         }
 
@@ -674,7 +675,7 @@ public interface J extends Serializable, Tree {
         Space eof;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitCompilationUnit(this, p);
         }
 
@@ -711,7 +712,7 @@ public interface J extends Serializable, Tree {
         Ident label;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitContinue(this, p);
         }
     }
@@ -736,7 +737,7 @@ public interface J extends Serializable, Tree {
         JLeftPadded<ControlParentheses<Expression>> whileCondition;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDoWhileLoop(this, p);
         }
     }
@@ -766,7 +767,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEmpty(this, p);
         }
     }
@@ -792,7 +793,7 @@ public interface J extends Serializable, Tree {
         NewClass initializer;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValue(this, p);
         }
     }
@@ -816,7 +817,7 @@ public interface J extends Serializable, Tree {
         boolean terminatedWithSemicolon;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValueSet(this, p);
         }
     }
@@ -845,7 +846,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitFieldAccess(this, p);
         }
 
@@ -940,7 +941,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForEachLoop(this, p);
         }
 
@@ -985,7 +986,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForLoop(this, p);
         }
 
@@ -1055,7 +1056,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIdentifier(this, p);
         }
 
@@ -1141,7 +1142,7 @@ public interface J extends Serializable, Tree {
         Else elsePart;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitIf(this, p);
         }
 
@@ -1162,7 +1163,7 @@ public interface J extends Serializable, Tree {
             JRightPadded<Statement> body;
 
             @Override
-            public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitElse(this, p);
             }
         }
@@ -1203,7 +1204,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitImport(this, p);
         }
 
@@ -1299,7 +1300,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
         }
     }
@@ -1327,7 +1328,7 @@ public interface J extends Serializable, Tree {
         Statement statement;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLabel(this, p);
         }
     }
@@ -1359,7 +1360,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLambda(this, p);
         }
 
@@ -1422,7 +1423,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLiteral(this, p);
         }
 
@@ -1468,7 +1469,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMemberReference(this, p);
         }
     }
@@ -1557,7 +1558,7 @@ public interface J extends Serializable, Tree {
         JavaType.Method type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMethod(this, p);
         }
 
@@ -1640,7 +1641,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMethodInvocation(this, p);
         }
 
@@ -1717,7 +1718,7 @@ public interface J extends Serializable, Tree {
         List<JRightPadded<NameTree>> alternatives;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMultiCatch(this, p);
         }
 
@@ -1767,7 +1768,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
         }
     }
@@ -1789,7 +1790,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<Expression> index;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayDimension(this, p);
         }
     }
@@ -1854,7 +1855,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewClass(this, p);
         }
 
@@ -1882,7 +1883,7 @@ public interface J extends Serializable, Tree {
         Expression expr;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPackage(this, p);
         }
     }
@@ -1922,7 +1923,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParameterizedType(this, p);
         }
     }
@@ -1944,7 +1945,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<J2> tree;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParentheses(this, p);
         }
 
@@ -1987,7 +1988,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<J2> tree;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitControlParentheses(this, p);
         }
 
@@ -2050,7 +2051,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPrimitive(this, p);
         }
     }
@@ -2073,7 +2074,7 @@ public interface J extends Serializable, Tree {
         Expression expr;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitReturn(this, p);
         }
     }
@@ -2098,7 +2099,7 @@ public interface J extends Serializable, Tree {
         Block cases;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitSwitch(this, p);
         }
     }
@@ -2123,7 +2124,7 @@ public interface J extends Serializable, Tree {
         Block body;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitSynchronized(this, p);
         }
     }
@@ -2155,7 +2156,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTernary(this, p);
         }
     }
@@ -2177,7 +2178,7 @@ public interface J extends Serializable, Tree {
         Expression exception;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitThrow(this, p);
         }
     }
@@ -2228,7 +2229,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTry(this, p);
         }
 
@@ -2275,7 +2276,7 @@ public interface J extends Serializable, Tree {
             Block body;
 
             @Override
-            public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitCatch(this, p);
             }
         }
@@ -2312,7 +2313,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeCast(this, p);
         }
     }
@@ -2345,7 +2346,7 @@ public interface J extends Serializable, Tree {
         JContainer<TypeTree> bounds;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeParameter(this, p);
         }
     }
@@ -2374,7 +2375,7 @@ public interface J extends Serializable, Tree {
         JavaType type;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitUnary(this, p);
         }
 
@@ -2437,7 +2438,7 @@ public interface J extends Serializable, Tree {
         List<JRightPadded<NamedVar>> vars;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMultiVariable(this, p);
         }
 
@@ -2480,7 +2481,7 @@ public interface J extends Serializable, Tree {
             }
 
             @Override
-            public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitVariable(this, p);
             }
 
@@ -2524,7 +2525,7 @@ public interface J extends Serializable, Tree {
         JRightPadded<Statement> body;
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWhileLoop(this, p);
         }
     }
@@ -2562,7 +2563,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptJava(JavaVisitor<R, P> v, P p) {
+        public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
         }
 

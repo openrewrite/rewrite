@@ -19,7 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.cache.NoopCache;
@@ -75,19 +75,19 @@ public class UpgradeDependencyVersion extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new UpgradeDependencyVersionProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new UpgradeDependencyVersionVisitor();
     }
 
 
-    private class UpgradeDependencyVersionProcessor extends MavenProcessor<ExecutionContext> {
+    private class UpgradeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
 
         @Nullable
         private Collection<String> availableVersions;
 
         private VersionComparator versionComparator;
 
-        public UpgradeDependencyVersionProcessor() {
+        public UpgradeDependencyVersionVisitor() {
             setCursoringOn();
         }
 

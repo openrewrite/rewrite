@@ -15,20 +15,17 @@
  */
 package org.openrewrite.maven;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.semver.HyphenRange;
 import org.openrewrite.semver.Semver;
 
 import java.util.regex.Pattern;
-
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -114,8 +111,8 @@ public class AddDependency extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new AddDependencyProcessor<>(
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new AddDependencyVisitor<>(
                 groupId,
                 artifactId,
                 version,

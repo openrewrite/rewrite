@@ -15,13 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.format.AutoFormatProcessor;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
@@ -82,10 +79,10 @@ public class JavaTemplate {
         //will always be inserted into a block.
         boolean memberVariableInitializer = false;
 
-        while(insertionScope.getParent() != null &&
+        while (insertionScope.getParent() != null &&
                 !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.CompilationUnit) &&
                 !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block)
-            ) {
+        ) {
 
             if (insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.VariableDecls.NamedVar) {
                 //There is one edge case that can trip up compilation: If the insertion scope is the initializer
@@ -104,10 +101,10 @@ public class JavaTemplate {
         }
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = new TemplateProcessor().visitCompilationUnit(cu, insertionScope);
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor().visit(cu, insertionScope);
 
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
-                .visit(pruned, printedTemplate);
+                .print(pruned, printedTemplate);
 
         logger.trace("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
 
@@ -121,7 +118,7 @@ public class JavaTemplate {
         Cursor formatScope = insertionScope.dropParentUntil(J.class::isInstance);
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
-                .map(snippet -> (J2) new AutoFormatProcessor<Void>().visit(snippet, null, formatScope))
+                .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
                 .collect(toList());
     }
 
@@ -154,12 +151,12 @@ public class JavaTemplate {
     }
 
     /**
-     * A java processor that prunes the original AST down to just the things needed to compile the template code.
+     * A java visitor that prunes the original AST down to just the things needed to compile the template code.
      * The typed Cursor represents the insertion point within the original AST.
      */
-    private static class TemplateProcessor extends JavaIsoProcessor<Cursor> {
+    private static class TemplateVisitor extends JavaIsoVisitor<Cursor> {
 
-        TemplateProcessor() {
+        TemplateVisitor() {
             setCursoringOn();
         }
 
@@ -219,56 +216,55 @@ public class JavaTemplate {
      * Custom Java Printer that will add additional import and add the printed template at the insertion point.
      */
     private static class TemplatePrinter extends JavaPrinter<String> {
+
         private final Set<String> imports;
 
-        TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
+        private TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
             super(new TreePrinter<String>() {
+
+                //Note: A block is added around the template and markers when the insertion point is within a
+                //      member variable initializer to prevent compiler issues.
+                private String blockStart = memberVariableInitializer ? "{" : "";
+                private String blockEnd = memberVariableInitializer ? "}" : "";
+                private Object insertionValue = insertionScope.getValue();
+
                 @Override
-                public String doLast(Tree tree, String printed, String printedTemplate) {
-                    //Note: A block is added around the template and markers when the insertion point is within a
-                    //      member variable initializer to prevent compiler issues.
-                    String blockStart = memberVariableInitializer ? "{" : "";
-                    String blockEnd = memberVariableInitializer ? "}" : "";
-                    // individual statement, but block doLast which is invoking this adds the ;
-                    Object insertionValue = insertionScope.getValue();
-                    if (insertionValue instanceof Tree && ((Tree)insertionValue).getId().equals(tree.getId())) {
-                        String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
-                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
-                        if (after) {
-                            // since the visit method on J.Block is responsible for adding the ';', we
-                            // add it pre-emptively here before concatenating the template.
-                            printed = printed +
-                                    ((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
-                                            ";" : "") +
-                                    templateCode;
-                        } else {
-                            printed = templateCode + printed;
+                public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, String printedTemplate) {
+                    if (!after) {
+                        // individual statement, but block doLast which is invoking this adds the ;
+                        if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
+                            String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
+                                    printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
+
+                            printerAcc.append(templateCode);
                         }
                     }
-                    return printed;
+                }
+
+                @Override
+                public void doAfter(@Nullable Tree tree, StringBuilder printerAcc, String printedTemplate) {
+                    if (after) {
+                        // individual statement, but block doLast which is invoking this adds the ;
+                        if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
+                            String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
+                                    printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
+                            // since the visit method on J.Block is responsible for adding the ';', we
+                            // add it pre-emptively here before concatenating the template.
+                            printerAcc.append(((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
+                                    ";" : "")).append(templateCode);
+                        }
+                    }
                 }
             });
             this.imports = imports;
         }
 
         @Override
-        public String visitCompilationUnit(J.CompilationUnit cu, String acc) {
-
-            //Print all original imports from the compilation unit
-            String originalImports = super.visit(cu.getImports(), ";", acc);
-
-            StringBuilder output = new StringBuilder(originalImports.length() + acc.length() + 1024);
-            output.append(originalImports);
-            if (!cu.getImports().isEmpty()) {
-                output.append(";\n");
+        public J visitCompilationUnit(J.CompilationUnit cu, String acc) {
+            for (String impoort : imports) {
+                doAfterVisit(new AddImport<>(impoort, null, false));
             }
-
-            for (String i : imports) {
-                output.append(i);
-            }
-
-            //Visit the classes of the compilation unit.
-            return output.append(visit(cu.getClasses(), acc)).append(visit(cu.getEof())).toString();
+            return super.visitCompilationUnit(cu, acc);
         }
     }
 
@@ -300,7 +296,7 @@ public class JavaTemplate {
         private static class CollectedElement {
             final long depth;
             final J element;
-            
+
             CollectedElement(long depth, J element) {
                 this.depth = depth;
                 this.element = element;
@@ -308,7 +304,7 @@ public class JavaTemplate {
         }
     }
 
-    private static class ExtractTemplatedCode extends JavaProcessor<ExtractionContext> {
+    private static class ExtractTemplatedCode extends JavaVisitor<ExtractionContext> {
         public ExtractTemplatedCode() {
             setCursoringOn();
         }
@@ -336,7 +332,7 @@ public class JavaTemplate {
                 //remove the marker comment, and flag the extractor to start collecting all elements until the end marker
                 //is found.
                 context.collectElements = true;
-                context.collectedIds.add(((Tree)getCursor().getValue()).getId());
+                context.collectedIds.add(((Tree) getCursor().getValue()).getId());
                 context.startDepth = templateDepth;
 
                 if (getCursor().getValue() instanceof J.CompilationUnit) {
@@ -349,10 +345,10 @@ public class JavaTemplate {
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);
                 context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, ((J) getCursor().getValue()).withPrefix(space.withComments(comments))));
-            } else if (context.collectElements && !context.collectedIds.contains(((Tree)getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId())) {
+            } else if (context.collectElements && !context.collectedIds.contains(((Tree) getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId())) {
                 //If collecting elements and the current cursor element has not already been collected, add it.
                 context.collectedElements.add(new ExtractionContext.CollectedElement(templateDepth, (getCursor().dropParentUntil(v -> v instanceof J).getValue())));
-                context.collectedIds.add(((Tree)getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId());
+                context.collectedIds.add(((Tree) getCursor().dropParentUntil(v -> v instanceof Tree).getValue()).getId());
             }
 
             return space;

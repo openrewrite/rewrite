@@ -18,16 +18,56 @@ package org.openrewrite.xml;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.xml.tree.Xml;
 
-public interface XmlVisitor<R, P> extends TreeVisitor<R, P> {
+public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
 
-    R visitDocument(Xml.Document document, P p);
-    R visitProcessingInstruction(Xml.ProcessingInstruction pi, P p);
-    R visitTag(Xml.Tag tag, P p);
-    R visitAttribute(Xml.Attribute attribute, P p);
-    R visitCharData(Xml.CharData charData, P p);
-    R visitComment(Xml.Comment comment, P p);
-    R visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p);
-    R visitProlog(Xml.Prolog prolog, P p);
-    R visitIdent(Xml.Ident ident, P p);
-    R visitElement(Xml.DocTypeDecl.Element element, P p);
+    public Xml visitDocument(Xml.Document document, P p) {
+        Xml.Document d = call(document, p, this::visitEach);
+        d = d.withProlog(call(d.getProlog(), p));
+        return d.withRoot(call(d.getRoot(), p));
+    }
+
+    public Xml visitProcessingInstruction(Xml.ProcessingInstruction pi, P p) {
+        Xml.ProcessingInstruction procInstr = call(pi, p, this::visitEach);
+        return procInstr.withAttributes(call(procInstr.getAttributes(), p));
+    }
+
+    public Xml visitTag(Xml.Tag tag, P p) {
+        Xml.Tag t = call(tag, p, this::visitEach);
+        t = t.withAttributes(call(t.getAttributes(), p));
+        t = t.withContent(call(t.getContent(), p));
+        return t.withClosing(call(t.getClosing(), p));
+    }
+
+    public Xml visitAttribute(Xml.Attribute attribute, P p) {
+        return call(attribute, p, this::visitEach);
+    }
+
+    public Xml visitCharData(Xml.CharData charData, P p) {
+        return call(charData, p, this::visitEach);
+    }
+
+    public Xml visitComment(Xml.Comment comment, P p) {
+        return call(comment, p, this::visitEach);
+    }
+
+    public Xml visitDocTypeDecl(Xml.DocTypeDecl docTypeDecl, P p) {
+        Xml.DocTypeDecl d = call(docTypeDecl, p, this::visitEach);
+        d = d.withInternalSubset(call(d.getInternalSubset(), p));
+        return d.withExternalSubsets(call(d.getExternalSubsets(), p));
+    }
+
+    public Xml visitProlog(Xml.Prolog prolog, P p) {
+        Xml.Prolog pl = call(prolog, p, this::visitEach);
+        pl = pl.withXmlDecls(call(pl.getXmlDecls(), p));
+        return pl.withMisc(call(pl.getMisc(), p));
+    }
+
+    public Xml visitIdent(Xml.Ident ident, P p) {
+        return call(ident, p, this::visitEach);
+    }
+
+    public Xml visitElement(Xml.Element element, P p) {
+        Xml.Element e = call(element, p, this::visitEach);
+        return e.withSubset(call(e.getSubset(), p));
+    }
 }

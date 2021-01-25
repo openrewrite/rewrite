@@ -19,11 +19,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
-import org.openrewrite.xml.AddToTagProcessor;
-import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -42,8 +42,8 @@ public class AddPlugin extends Recipe {
     private final String version;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new AddPluginProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new AddPluginVisitor();
     }
 
     @Override
@@ -53,9 +53,9 @@ public class AddPlugin extends Recipe {
                         .and(required("version", version)));
     }
 
-    private class AddPluginProcessor extends MavenProcessor<ExecutionContext> {
+    private class AddPluginVisitor extends MavenVisitor<ExecutionContext> {
 
-        public AddPluginProcessor() {
+        public AddPluginVisitor() {
             setCursoringOn();
         }
 
@@ -63,7 +63,7 @@ public class AddPlugin extends Recipe {
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
             Xml.Tag root = maven.getRoot();
             if (!root.getChild("build").isPresent()) {
-                doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<build>\n" +
+                doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<build>\n" +
                         "<plugins>\n" +
                         "<plugin>\n" +
                         "<groupId>" + groupId + "</groupId>\n" +
@@ -85,7 +85,7 @@ public class AddPlugin extends Recipe {
             if (BUILD_MATCHER.matches(getCursor())) {
                 Optional<Xml.Tag> maybePlugins = t.getChild("plugins");
                 if (!maybePlugins.isPresent()) {
-                    doAfterVisit(new AddToTagProcessor<>(t, Xml.Tag.build("<plugins/>")));
+                    doAfterVisit(new AddToTagVisitor<>(t, Xml.Tag.build("<plugins/>")));
                 } else {
                     Xml.Tag plugins = maybePlugins.get();
 
@@ -101,10 +101,10 @@ public class AddPlugin extends Recipe {
                         Xml.Tag plugin = maybePlugin.get();
                         if (!version.equals(plugin.getChildValue("version").orElse(null))) {
                             //noinspection OptionalGetWithoutIsPresent
-                            doAfterVisit(new ChangeTagValueProcessor<>(plugin.getChild("version").get(), version));
+                            doAfterVisit(new ChangeTagValueVisitor<>(plugin.getChild("version").get(), version));
                         }
                     } else {
-                        doAfterVisit(new AddToTagProcessor<>(plugins, Xml.Tag.build("<plugin>\n" +
+                        doAfterVisit(new AddToTagVisitor<>(plugins, Xml.Tag.build("<plugin>\n" +
                                 "<groupId>" + groupId + "</groupId>\n" +
                                 "<artifactId>" + artifactId + "</artifactId>\n" +
                                 "<version>" + version + "</version>\n" +

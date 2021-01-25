@@ -17,7 +17,7 @@ package org.openrewrite
 
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
-import org.openrewrite.java.JavaProcessor
+import org.openrewrite.java.JavaVisitor
 import java.io.File
 
 interface RecipeTest {
@@ -136,8 +136,8 @@ interface RecipeTest {
         }
     }
 
-    fun JavaProcessor<ExecutionContext>.toRecipe(cursored: Boolean = false) = object : Recipe() {
-        override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
+    fun JavaVisitor<ExecutionContext>.toRecipe(cursored: Boolean = false) = object : Recipe() {
+        override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             if(cursored) {
                 this@toRecipe.setCursoringOn()
             }

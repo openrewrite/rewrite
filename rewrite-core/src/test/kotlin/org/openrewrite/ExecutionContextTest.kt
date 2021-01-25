@@ -20,7 +20,6 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
-import java.util.function.Supplier
 
 class ExecutionContextTest {
     @Test
@@ -28,8 +27,8 @@ class ExecutionContextTest {
         var cycles = 0
 
         object: Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object : TreeProcessor<PlainText, ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : TreeVisitor<PlainText, ExecutionContext>() {
                     override fun visit(tree: Tree?, p: ExecutionContext): PlainText? {
                         if(p.pollMessage<String>("test") == null) {
                             p.putMessage("test", "test")

@@ -19,9 +19,8 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeProcessor
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
-import java.util.function.Supplier
 
 interface DeleteStatementTest : RecipeTest {
 
@@ -29,8 +28,8 @@ interface DeleteStatementTest : RecipeTest {
     fun deleteField(jp: JavaParser) = assertChanged(
         jp,
         recipe = object: Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object: JavaProcessor<ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object: JavaVisitor<ExecutionContext>() {
                     override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
                         doAfterVisit(DeleteStatement(multiVariable))
                         return super.visitMultiVariable(multiVariable, p)

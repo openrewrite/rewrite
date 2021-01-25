@@ -20,11 +20,11 @@ import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 
-public class ChangeTagContentProcessor<P> extends XmlProcessor<P> {
+public class ChangeTagContentVisitor<P> extends XmlVisitor<P> {
     private final Xml.Tag scope;
     private final List<Content> content;
 
-    public ChangeTagContentProcessor(Xml.Tag scope, List<Content> content) {
+    public ChangeTagContentVisitor(Xml.Tag scope, List<Content> content) {
         this.scope = scope;
         this.content = content;
     }
