@@ -15,6 +15,7 @@
  */
 package org.openrewrite.properties
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -30,4 +31,30 @@ class ChangePropertyKeyTest : RecipeTest {
         after = "management.metrics.enable.process.files=true"
     )
 
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = ChangePropertyKey(null, null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
+        assertThat(valid.failures()[1].property).isEqualTo("originalPropertyKey")
+
+        recipe = ChangePropertyKey(null, "management.metrics.enable.process.files")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("originalPropertyKey")
+
+        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("newPropertyKey")
+
+        recipe = ChangePropertyKey("management.metrics.binders.files.enabled", "management.metrics.enable.process.files")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

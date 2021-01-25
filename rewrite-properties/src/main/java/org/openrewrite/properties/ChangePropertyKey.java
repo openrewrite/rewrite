@@ -20,23 +20,14 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.properties.tree.Properties;
-
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
 
-    private final String property;
-    private final String toProperty;
-
-    @Override
-    public Validated validate() {
-        return required("property", property)
-                .and(required("toProperty", toProperty));
-    }
+    private final String originalPropertyKey;
+    private final String newPropertyKey;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -50,8 +41,8 @@ public class ChangePropertyKey extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (entry.getKey().equals(property)) {
-                entry = entry.withKey(toProperty);
+            if (entry.getKey().equals(originalPropertyKey)) {
+                entry = entry.withKey(newPropertyKey);
             }
             return super.visitEntry(entry, p);
         }
