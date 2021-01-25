@@ -108,72 +108,77 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         J2 j;
         Space after;
 
-        int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+        if (right.getAfter().getWhitespace().contains("\n")) {
+            int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+            switch (type) {
+                case FOR_CONDITION:
+                case FOR_INIT:
+                case FOREACH_VARIABLE:
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    j = call(right.getElem(), p);
+                    getCursor().putMessage("indentType", IndentType.INDENT);
+                    after = indentTo(right.getAfter(), indent + style.getContinuationIndent());
+                    break;
+                case FOR_UPDATE:
+                case FOREACH_ITERABLE:
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    j = call(right.getElem(), p);
+                    getCursor().putMessage("indentType", IndentType.INDENT);
+                    after = indentTo(right.getAfter(), indent);
+                    break;
+                case ARRAY_INDEX:
+                case METHOD_DECL_ARGUMENT:
+                case METHOD_INVOCATION_ARGUMENT:
+                case NEW_CLASS_ARGS:
+                case PARENTHESES:
+                case TYPE_PARAMETER:
+                    j = call(right.getElem(), p);
+                    after = indentTo(right.getAfter(), indent);
+                    break;
+                case METHOD_SELECT:
+                    for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
+                        if (cursor.getValue() instanceof JRightPadded) {
+                            cursor = cursor.getParentOrThrow();
+                        }
+                        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+                            break;
+                        }
+                        Integer methodIndent = cursor.peekNearestMessage("lastIndent");
+                        if (methodIndent != null) {
+                            indent = methodIndent;
+                        }
+                    }
 
-        switch (type) {
-            case FOR_CONDITION:
-            case FOR_INIT:
-            case FOREACH_VARIABLE:
-                getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                j = call(right.getElem(), p);
-                getCursor().putMessage("indentType", IndentType.INDENT);
-                after = indentTo(right.getAfter(), indent + style.getContinuationIndent());
-                break;
-            case FOR_UPDATE:
-            case FOREACH_ITERABLE:
-                getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                j = call(right.getElem(), p);
-                getCursor().putMessage("indentType", IndentType.INDENT);
-                after = indentTo(right.getAfter(), indent);
-                break;
-            case ARRAY_INDEX:
-            case METHOD_DECL_ARGUMENT:
-            case METHOD_INVOCATION_ARGUMENT:
-            case NEW_CLASS_ARGS:
-            case PARENTHESES:
-            case TYPE_PARAMETER:
-                j = call(right.getElem(), p);
-                after = indentTo(right.getAfter(), indent);
-                break;
-            case METHOD_SELECT:
-                for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
-                    if (cursor.getValue() instanceof JRightPadded) {
-                        cursor = cursor.getParentOrThrow();
-                    }
-                    if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-                        break;
-                    }
-                    Integer methodIndent = cursor.peekNearestMessage("lastIndent");
-                    if (methodIndent != null) {
-                        indent = methodIndent;
-                    }
-                }
-
-                getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                j = call(right.getElem(), p);
-                after = visitSpace(right.getAfter(), p);
-                break;
-            case ANNOTATION_ARGUMENT:
-            case BLOCK_STATEMENT:
-            case CASE:
-            case CATCH_ALTERNATIVE:
-            case ENUM_VALUE:
-            case FOR_BODY:
-            case IF_ELSE:
-            case IF_THEN:
-            case IMPLEMENTS:
-            case IMPORT:
-            case INSTANCEOF:
-            case NAMED_VARIABLE:
-            case NEW_ARRAY_INITIALIZER:
-            case THROWS:
-            case TRY_RESOURCES:
-            case TYPE_BOUND:
-            case WHILE_BODY:
-            default:
-            case PACKAGE:
-                j = call(right.getElem(), p);
-                after = visitSpace(right.getAfter(), p);
+                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                    j = call(right.getElem(), p);
+                    after = visitSpace(right.getAfter(), p);
+                    getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    break;
+                case ANNOTATION_ARGUMENT:
+                case BLOCK_STATEMENT:
+                case CASE:
+                case CATCH_ALTERNATIVE:
+                case ENUM_VALUE:
+                case FOR_BODY:
+                case IF_ELSE:
+                case IF_THEN:
+                case IMPLEMENTS:
+                case IMPORT:
+                case INSTANCEOF:
+                case NAMED_VARIABLE:
+                case NEW_ARRAY_INITIALIZER:
+                case THROWS:
+                case TRY_RESOURCES:
+                case TYPE_BOUND:
+                case WHILE_BODY:
+                default:
+                case PACKAGE:
+                    j = call(right.getElem(), p);
+                    after = visitSpace(right.getAfter(), p);
+            }
+        } else {
+            j = call(right.getElem(), p);
+            after = right.getAfter();
         }
 
         setCursor(getCursor().getParent());
