@@ -62,6 +62,18 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
+    public J visitForControl(J.ForLoop.Control control, P p) {
+        // FIXME fix formatting of control sections
+        return control;
+    }
+
+    @Override
+    public J visitForEachControl(J.ForEachLoop.Control control, P p) {
+        // FIXME fix formatting of control sections
+        return control;
+    }
+
+    @Override
     public Space visitSpace(Space space, P p) {
         if (!space.getWhitespace().contains("\n") || getCursor().getParent() == null) {
             return space;
@@ -112,30 +124,30 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
             switch (type) {
                 case FOR_CONDITION:
-                case FOR_INIT:
-                case FOREACH_VARIABLE:
-                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    j = call(right.getElem(), p);
-                    getCursor().putMessage("indentType", IndentType.INDENT);
-                    after = indentTo(right.getAfter(), indent + style.getContinuationIndent());
+                case FOR_UPDATE: {
+                    J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
+                    Space initPrefix = control.getInit().getElem().getPrefix();
+                    if (!initPrefix.getWhitespace().contains("\n")) {
+                        int initIndent = forInitColumn();
+                        getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
+                        j = call(right.getElem(), p);
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                        after = indentTo(right.getAfter(), initIndent);
+                    } else {
+                        j = call(right.getElem(), p);
+                        after = visitSpace(right.getAfter(), p);
+                    }
                     break;
-                case FOR_UPDATE:
-                case FOREACH_ITERABLE:
-                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    j = call(right.getElem(), p);
-                    getCursor().putMessage("indentType", IndentType.INDENT);
-                    after = indentTo(right.getAfter(), indent);
-                    break;
+                }
                 case METHOD_DECL_ARGUMENT:
-                case NEW_CLASS_ARGS:
+                case NEW_CLASS_ARGS: {
                     JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
                     Expression firstArg = container.getElem().iterator().next().getElem();
-                    if(firstArg.getPrefix().getWhitespace().contains("\n")) {
+                    if (firstArg.getPrefix().getWhitespace().contains("\n")) {
                         // if the first argument is on its own line, align all arguments to be continuation indented
                         j = call(right.getElem(), p);
                         after = indentTo(right.getAfter(), indent);
-                    }
-                    else {
+                    } else {
                         // align to first argument when the first argument isn't on its own line
                         int firstArgIndent = findIndent(firstArg.getPrefix());
                         getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
@@ -144,14 +156,16 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         after = indentTo(right.getAfter(), firstArgIndent);
                     }
                     break;
+                }
                 case ARRAY_INDEX:
                 case METHOD_INVOCATION_ARGUMENT:
                 case PARENTHESES:
-                case TYPE_PARAMETER:
+                case TYPE_PARAMETER: {
                     j = call(right.getElem(), p);
                     after = indentTo(right.getAfter(), indent);
                     break;
-                case METHOD_SELECT:
+                }
+                case METHOD_SELECT: {
                     for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
                         if (cursor.getValue() instanceof JRightPadded) {
                             cursor = cursor.getParentOrThrow();
@@ -170,12 +184,15 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     after = visitSpace(right.getAfter(), p);
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                     break;
+                }
                 case ANNOTATION_ARGUMENT:
                 case BLOCK_STATEMENT:
                 case CASE:
                 case CATCH_ALTERNATIVE:
                 case ENUM_VALUE:
                 case FOR_BODY:
+                case FOR_INIT:
+                case FOREACH_VARIABLE:
                 case IF_ELSE:
                 case IF_THEN:
                 case IMPLEMENTS:
@@ -225,6 +242,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         int indent = findIndent(space);
+        if (!space.getComments().isEmpty()) {
+            indent = findIndent(Space.format(space.getComments().get(space.getComments().size() - 1).getSuffix()));
+        }
 
         if (indent != column) {
             int shift = column - indent;
@@ -294,6 +314,27 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         }
         return size;
+    }
+
+    private int forInitColumn() {
+        Cursor forCursor = getCursor().dropParentUntil(J.ForLoop.class::isInstance);
+        J.ForLoop forLoop = forCursor.getValue();
+        Object parent = forCursor.getParentOrThrow().getValue();
+        J alignTo = parent instanceof J.Label ?
+                ((J.Label) parent).withStatement(forLoop.withBody(null)) :
+                forLoop.withBody(null);
+
+        int column = 0;
+        boolean afterInitStart = false;
+        for (char c : alignTo.print().toCharArray()) {
+            if (c == '(') {
+                afterInitStart = true;
+            } else if (afterInitStart && !Character.isWhitespace(c)) {
+                return column - 1;
+            }
+            column++;
+        }
+        throw new IllegalStateException("For loops must have a control section");
     }
 
     private enum IndentType {

@@ -323,19 +323,31 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.ForEachLoop f = call(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withVariable(visitRightPadded(f.getControl().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p)));
-        f = f.withControl(f.getControl().withIterable(visitRightPadded(f.getControl().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p)));
+        f = f.withControl(call(f.getControl(), p));
         return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
+    }
+
+    public J visitForEachControl(J.ForEachLoop.Control control, P p) {
+        J.ForEachLoop.Control c = call(control, p, this::visitEach);
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withVariable(visitRightPadded(c.getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p));
+        return c.withIterable(visitRightPadded(c.getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p));
     }
 
     public J visitForLoop(J.ForLoop forLoop, P p) {
         J.ForLoop f = call(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withInit(visitRightPadded(f.getControl().getInit(), JRightPadded.Location.FOR_INIT, p)));
-        f = f.withControl(f.getControl().withCondition(visitRightPadded(f.getControl().getCondition(), JRightPadded.Location.FOR_CONDITION, p)));
-        f = f.withControl(f.getControl().withUpdate(ListUtils.map(f.getControl().getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p))));
+        f = f.withControl(call(f.getControl(), p));
         return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
+    }
+
+    public J visitForControl(J.ForLoop.Control control, P p) {
+        J.ForLoop.Control c = call(control, p, this::visitEach);
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withInit(visitRightPadded(c.getInit(), JRightPadded.Location.FOR_INIT, p));
+        c = c.withCondition(visitRightPadded(c.getCondition(), JRightPadded.Location.FOR_CONDITION, p));
+        return c.withUpdate(ListUtils.map(c.getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p)));
     }
 
     public J visitIdentifier(J.Ident ident, P p) {

@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -245,6 +246,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    @Disabled
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
@@ -257,17 +259,14 @@ interface TabsAndIndentsTest : RecipeTest {
                  ;
                  i < 5
                  ;
-                 i++, m++,
-                 n++
+                 i++, m++, n++
                 );
                 for (int i = 0;
                  i < 5;
-                 i++, m++,
-                 n++);
+                 i++, m++, n++);
                 labeled: for (int i = 0;
                  i < 5;
-                 i++, m++,
-                 n++);
+                 i++, m++, n++);
                 }
             }
         """,
@@ -281,17 +280,14 @@ interface TabsAndIndentsTest : RecipeTest {
                       ;
                       i < 5
                       ;
-                      i++, m++,
-                        n++
+                      i++, m++, n++
                     );
                     for (int i = 0;
                          i < 5;
-                         i++, m++,
-                           n++);
+                         i++, m++, n++);
                     labeled: for (int i = 0;
                                   i < 5;
-                                  i++, m++,
-                                    n++);
+                                  i++, m++, n++);
                 }
             }
         """
@@ -747,7 +743,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun failure2(jp: JavaParser) = assertUnchanged(
+    fun methodInvocationsNotContinuationIndentedWhenPartOfBinaryExpression(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             import java.util.stream.Stream;
@@ -755,9 +751,9 @@ interface TabsAndIndentsTest : RecipeTest {
                 boolean b;
                 public Stream<Test> method() {
                     if (b && method()
-                        .anyMatch(t -> b ||
-                                b
-                        )) {
+                            .anyMatch(t -> b ||
+                                    b
+                            )) {
                         // do nothing
                     }
                     return Stream.of(this);
