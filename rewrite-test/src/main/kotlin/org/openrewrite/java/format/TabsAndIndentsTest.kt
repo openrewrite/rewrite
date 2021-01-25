@@ -298,19 +298,9 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
-            public class Test {
-            public void test(int a,
-            int b) {}
-
-            public void test2(
-            int a,
-            int b) {}
-            }
-        """,
-        after = """
             public class Test {
                 public void test(int a,
                                  int b) {}

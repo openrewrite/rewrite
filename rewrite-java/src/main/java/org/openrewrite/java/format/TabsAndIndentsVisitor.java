@@ -108,7 +108,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         J2 j;
         Space after;
 
-        if (right.getAfter().getWhitespace().contains("\n")) {
+        if (right.getAfter().getWhitespace().contains("\n") || right.getElem().getPrefix().getWhitespace().contains("\n")) {
             int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
             switch (type) {
                 case FOR_CONDITION:
@@ -126,10 +126,26 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     getCursor().putMessage("indentType", IndentType.INDENT);
                     after = indentTo(right.getAfter(), indent);
                     break;
-                case ARRAY_INDEX:
                 case METHOD_DECL_ARGUMENT:
-                case METHOD_INVOCATION_ARGUMENT:
                 case NEW_CLASS_ARGS:
+                    JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
+                    Expression firstArg = container.getElem().iterator().next().getElem();
+                    if(firstArg.getPrefix().getWhitespace().contains("\n")) {
+                        // if the first argument is on its own line, align all arguments to be continuation indented
+                        j = call(right.getElem(), p);
+                        after = indentTo(right.getAfter(), indent);
+                    }
+                    else {
+                        // align to first argument when the first argument isn't on its own line
+                        int firstArgIndent = findIndent(firstArg.getPrefix());
+                        getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
+                        j = call(right.getElem(), p);
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                        after = indentTo(right.getAfter(), firstArgIndent);
+                    }
+                    break;
+                case ARRAY_INDEX:
+                case METHOD_INVOCATION_ARGUMENT:
                 case PARENTHESES:
                 case TYPE_PARAMETER:
                     j = call(right.getElem(), p);
