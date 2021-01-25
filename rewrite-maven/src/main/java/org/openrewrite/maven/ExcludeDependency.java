@@ -41,12 +41,6 @@ public class ExcludeDependency extends Recipe {
         return new ExcludeDependencyVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId));
-    }
-
     private class ExcludeDependencyVisitor extends MavenVisitor<ExecutionContext> {
 
         public ExcludeDependencyVisitor() {

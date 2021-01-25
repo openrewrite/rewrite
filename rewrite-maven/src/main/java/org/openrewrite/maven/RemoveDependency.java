@@ -42,11 +42,6 @@ public class RemoveDependency extends Recipe {
         return new RemoveDependencyVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId).and(required("artifactId", artifactId));
-    }
-
     private class RemoveDependencyVisitor extends MavenVisitor<ExecutionContext> {
 
         public RemoveDependencyVisitor() {

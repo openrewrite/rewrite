@@ -48,12 +48,6 @@ public class ChangeDependencyScope extends Recipe {
         return new ChangeDependencyScopeVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId));
-    }
-
     private class ChangeDependencyScopeVisitor extends MavenVisitor<ExecutionContext> {
 
         private ChangeDependencyScopeVisitor() {

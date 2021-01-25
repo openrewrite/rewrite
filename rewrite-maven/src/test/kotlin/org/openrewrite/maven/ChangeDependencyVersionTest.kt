@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import org.openrewrite.RecipeTest
@@ -312,4 +313,39 @@ class ChangeDependencyVersionTest : RecipeTest {
             </project>
         """
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = ChangeDependencyVersion(null, null, null)
+        var valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(3)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("groupId")
+        Assertions.assertThat(valid.failures()[2].property).isEqualTo("toVersion")
+
+        recipe = ChangeDependencyVersion(null, "rewrite-maven", "1.0.1")
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
+
+        recipe = ChangeDependencyVersion("org.openrewrite", null, "1.0.1")
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+
+        recipe = ChangeDependencyVersion("org.openrewrite", "rewrite-maven", null)
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isFalse()
+        Assertions.assertThat(valid.failures()).hasSize(1)
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("toVersion")
+
+        recipe = ChangeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.1")
+        valid = recipe.validate()
+        Assertions.assertThat(valid.isValid).isTrue()
+    }
+
 }
