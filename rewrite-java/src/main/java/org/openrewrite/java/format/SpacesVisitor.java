@@ -17,11 +17,11 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.*;
 
-public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
+public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
 
     /*
     TODO Finish support for SpacesStyle properties, from SpacesStyle.Within.groupingParentheses down
@@ -29,7 +29,7 @@ public class SpacesProcessor<P> extends JavaIsoProcessor<P> {
 
     private final SpacesStyle style;
 
-    public SpacesProcessor(SpacesStyle style) {
+    public SpacesVisitor(SpacesStyle style) {
         this.style = style;
         setCursoringOn();
     }

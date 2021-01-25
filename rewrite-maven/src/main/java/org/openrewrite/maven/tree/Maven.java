@@ -16,8 +16,9 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.openrewrite.maven.MavenSettings;
+import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.maven.MavenVisitor;
@@ -69,11 +70,12 @@ public class Maven extends Xml.Document {
         return settings;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     @Nullable
-    public <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    public <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         if (v instanceof MavenVisitor) {
-            return ((MavenVisitor<R, P>) v).visitMaven(this, p);
+            return (R) ((MavenVisitor<P>) v).visitMaven(this, p);
         } else if (v instanceof XmlVisitor) {
             return super.accept(v, p);
         }

@@ -21,7 +21,7 @@ import org.openrewrite.java.tree.J;
 
 import java.util.function.Function;
 
-public class ChangeLiteral<P> extends JavaIsoProcessor<P> {
+public class ChangeLiteral<P> extends JavaIsoVisitor<P> {
     private final Expression scope;
     private final Function<Object, Object> transform;
 

@@ -18,30 +18,30 @@ package org.openrewrite.java.format;
 import org.openrewrite.Cursor;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.style.*;
 import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
-public class AutoFormatProcessor<P> extends JavaProcessor<P> {
+public class AutoFormatVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
-        J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
                 .visit(tree, p, cursor);
 
-        t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+        t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
                 .visit(t, p, cursor);
 
-        t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()))
                 .visit(t, p, cursor);
 
-        t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()))
                 .visit(t, p, cursor);
 
@@ -50,19 +50,19 @@ public class AutoFormatProcessor<P> extends JavaProcessor<P> {
 
     @Override
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J t = new BlankLinesProcessor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
                 .visit(cu, p);
 
-        t = new SpacesProcessor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
+        t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
                 .visit(t, p);
 
-        t = new WrappingAndBracesProcessor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
+        t = new WrappingAndBracesVisitor<>(Optional.ofNullable(cu.getStyle(WrappingAndBracesStyle.class))
                 .orElse(IntelliJ.wrappingAndBraces()))
                 .visit(t, p);
 
-        t = new TabsAndIndentsProcessor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
+        t = new TabsAndIndentsVisitor<>(Optional.ofNullable(cu.getStyle(TabsAndIndentsStyle.class))
                 .orElse(IntelliJ.tabsAndIndents()))
                 .visit(t, p);
 

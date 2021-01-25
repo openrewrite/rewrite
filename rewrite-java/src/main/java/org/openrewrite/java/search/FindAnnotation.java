@@ -21,8 +21,8 @@ import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.tree.J;
@@ -47,21 +47,21 @@ public class FindAnnotation extends Recipe {
     private final String annotationPattern;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindAnnotationProcessor(annotationPattern);
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new FindAnnotationVisitor(annotationPattern);
     }
 
     public static Set<J.Annotation> find(J j, String clazz) {
         //noinspection ConstantConditions
-        return new FindAnnotationProcessor(clazz)
+        return new FindAnnotationVisitor(clazz)
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindAnnotationProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private static class FindAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final AnnotationMatcher matcher;
 
-        public FindAnnotationProcessor(String signature) {
+        public FindAnnotationVisitor(String signature) {
             this.matcher = new AnnotationMatcher(signature);
         }
 

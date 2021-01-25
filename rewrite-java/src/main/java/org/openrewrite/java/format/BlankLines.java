@@ -17,26 +17,26 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 
 public class BlankLines extends Recipe {
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new BlankLinesFromCompilationUnitStyle();
     }
 
-    private static class BlankLinesFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
+    private static class BlankLinesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             BlankLinesStyle style = cu.getStyle(BlankLinesStyle.class);
             if(style == null) {
                 style = IntelliJ.blankLines();
             }
-            doAfterVisit(new BlankLinesProcessor<>(style));
+            doAfterVisit(new BlankLinesVisitor<>(style));
             return cu;
         }
     }

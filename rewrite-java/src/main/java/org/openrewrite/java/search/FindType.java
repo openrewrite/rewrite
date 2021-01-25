@@ -19,8 +19,8 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.NameTree;
@@ -39,20 +39,20 @@ public final class FindType extends Recipe {
     private final String fullyQualifiedTypeName;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindTypeProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new FindTypeVisitor();
     }
 
     public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
         //noinspection ConstantConditions
-        return ((FindTypeProcessor) new FindType(fullyQualifiedClassName).getProcessor())
+        return ((FindTypeVisitor) new FindType(fullyQualifiedClassName).getVisitor())
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private class FindTypeProcessor extends JavaProcessor<ExecutionContext> {
+    private class FindTypeVisitor extends JavaVisitor<ExecutionContext> {
 
-        public FindTypeProcessor() {
+        public FindTypeVisitor() {
             setCursoringOn();
         }
 

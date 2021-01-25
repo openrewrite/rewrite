@@ -22,7 +22,7 @@ import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
 
 @ExtendWith(JavaParserResolver::class)
-abstract class JavaProcessorCompatibilityKit {
+abstract class JavaVisitorCompatibilityKit {
     abstract fun javaParser(): JavaParser.Builder<*, *>
 
     @Nested

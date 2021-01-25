@@ -13,27 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.java.internal;
+package org.openrewrite.xml;
 
-import org.openrewrite.java.JavaProcessor;
-import org.openrewrite.java.tree.J;
-import org.openrewrite.marker.Marker;
+import org.openrewrite.xml.tree.Content;
+import org.openrewrite.xml.tree.Xml;
 
-import java.util.Set;
+import java.util.List;
 
-public class JavaListMarkersProcessor<T> extends JavaProcessor<Set<T>> {
-    private final Class<? extends Marker> markerType;
+public class ChangeTagContentVisitor<P> extends XmlVisitor<P> {
+    private final Xml.Tag scope;
+    private final List<Content> content;
 
-    public JavaListMarkersProcessor(Class<? extends Marker> markerType) {
-        this.markerType = markerType;
+    public ChangeTagContentVisitor(Xml.Tag scope, List<Content> content) {
+        this.scope = scope;
+        this.content = content;
     }
 
     @Override
-    public J visitEach(J j, Set<T> ts) {
-        if (j.getMarkers().findFirst(markerType).isPresent()) {
-            //noinspection unchecked
-            ts.add((T) j);
+    public Xml visitTag(Xml.Tag tag, P p) {
+        Xml.Tag t = (Xml.Tag) super.visitTag(tag, p);
+        if (scope.isScope(tag)) {
+            t = t.withContent(content);
         }
-        return super.visitEach(j, ts);
+        return t;
     }
 }

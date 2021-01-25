@@ -19,9 +19,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
-import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -38,8 +38,8 @@ public class ChangeParentVersion extends Recipe {
     private final String toVersion;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeParentVersionProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeParentVersionVisitor();
     }
 
     @Override
@@ -49,9 +49,9 @@ public class ChangeParentVersion extends Recipe {
                 .and(required("toVersion", toVersion));
     }
 
-    private class ChangeParentVersionProcessor extends MavenProcessor<ExecutionContext> {
+    private class ChangeParentVersionVisitor extends MavenVisitor<ExecutionContext> {
 
-        private ChangeParentVersionProcessor() {
+        private ChangeParentVersionVisitor() {
             setCursoringOn();
         }
 
@@ -62,7 +62,7 @@ public class ChangeParentVersion extends Recipe {
                 if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
                         artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
                         !toVersion.equals(tag.getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueProcessor<>(tag, toVersion));
+                    doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
                 }
             }
             return super.visitTag(tag, ctx);

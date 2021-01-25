@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.yaml.search;
+package org.openrewrite.xml.search;
 
 import org.openrewrite.internal.StringUtils;
-import org.openrewrite.yaml.YamlProcessor;
-import org.openrewrite.yaml.tree.Yaml;
+import org.openrewrite.xml.XmlVisitor;
+import org.openrewrite.xml.tree.Xml;
 
 import java.util.Map;
 import java.util.SortedMap;
@@ -31,19 +31,19 @@ import static java.util.stream.Collectors.counting;
 /**
  * Discover the most common indentation level of a tree, and whether this indentation is built with spaces or tabs.
  */
-public class FindIndentYamlProcessor<P> extends YamlProcessor<P> {
+public class FindIndentXmlVisitor<P> extends XmlVisitor<P> {
     private final SortedMap<Integer, Long> indentFrequencies = new TreeMap<>();
     private final int enclosingIndent;
 
     private int linesWithSpaceIndents = 0;
     private int linesWithTabIndents = 0;
 
-    public FindIndentYamlProcessor(int enclosingIndent) {
+    public FindIndentXmlVisitor(int enclosingIndent) {
         this.enclosingIndent = enclosingIndent;
     }
 
     @Override
-    public Yaml visitEach(Yaml tree, P p) {
+    public Xml visitEach(Xml tree, P p) {
         String prefix = tree.getPrefix();
 
         AtomicBoolean takeWhile = new AtomicBoolean(true);

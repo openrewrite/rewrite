@@ -20,12 +20,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.XmlProcessor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.List;
 
-public class XmlPrinter<P> extends XmlProcessor<P> {
+public class XmlPrinter<P> extends XmlVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 

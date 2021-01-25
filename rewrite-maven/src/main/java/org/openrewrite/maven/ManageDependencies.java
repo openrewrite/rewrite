@@ -19,7 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
@@ -27,9 +27,9 @@ import org.openrewrite.maven.internal.Version;
 import org.openrewrite.maven.tree.GroupArtifact;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
-import org.openrewrite.xml.AddToTagProcessor;
-import org.openrewrite.xml.ChangeTagValueProcessor;
-import org.openrewrite.xml.RemoveContentProcessor;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
 
@@ -69,14 +69,14 @@ public class ManageDependencies extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ManageDependenciesProcessor(
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ManageDependenciesVisitor(
                 groupPattern == null ? null : Pattern.compile(groupPattern.replace("*", ".*")),
                 artifactPattern == null ? null : Pattern.compile(artifactPattern.replace("*", ".*"))
         );
     }
 
-    private class ManageDependenciesProcessor extends MavenProcessor<ExecutionContext> {
+    private class ManageDependenciesVisitor extends MavenVisitor<ExecutionContext> {
 
         @Nullable
         private final Pattern groupPattern;
@@ -86,7 +86,7 @@ public class ManageDependencies extends Recipe {
 
         private String selectedVersion;
 
-        private ManageDependenciesProcessor(Pattern groupPattern, @Nullable Pattern artifactPattern) {
+        private ManageDependenciesVisitor(Pattern groupPattern, @Nullable Pattern artifactPattern) {
             this.groupPattern = groupPattern;
             this.artifactPattern = artifactPattern;
             setCursoringOn();
@@ -118,7 +118,7 @@ public class ManageDependencies extends Recipe {
                 if (!requiresDependencyManagement.isEmpty()) {
                     Xml.Tag root = maven.getRoot();
                     if (!root.getChild("dependencyManagement").isPresent()) {
-                        doAfterVisit(new AddToTagProcessor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
+                        doAfterVisit(new AddToTagVisitor<>(root, Xml.Tag.build("<dependencyManagement>\n<dependencies/>\n</dependencyManagement>"),
                                 new MavenTagInsertionComparator(root.getChildren())));
                     }
 
@@ -134,13 +134,13 @@ public class ManageDependencies extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isManagedDependencyTag() && hasMatchingGroupArtifact(tag)) {
-                doAfterVisit(new ChangeTagValueProcessor<>(
+                doAfterVisit(new ChangeTagValueVisitor<>(
                         tag.getChild("version")
                                 .orElseThrow(() -> new IllegalStateException("Version tag must exist")),
                         selectedVersion
                 ));
             } else if (isDependencyTag() && hasMatchingGroupArtifact(tag)) {
-                tag.getChild("version").ifPresent(version -> doAfterVisit(new RemoveContentProcessor<>(version, false)));
+                tag.getChild("version").ifPresent(version -> doAfterVisit(new RemoveContentVisitor<>(version, false)));
                 return tag;
             }
 
@@ -153,7 +153,7 @@ public class ManageDependencies extends Recipe {
                             .orElse(model.getArtifactId())).matches());
         }
 
-        private class InsertDependencyInOrder extends MavenProcessor<ExecutionContext> {
+        private class InsertDependencyInOrder extends MavenVisitor<ExecutionContext> {
 
             private final String groupId;
             private final String artifactId;
@@ -178,7 +178,7 @@ public class ManageDependencies extends Recipe {
                                     "</dependency>"
                     );
 
-                    doAfterVisit(new AddToTagProcessor<>(tag, dependencyTag,
+                    doAfterVisit(new AddToTagVisitor<>(tag, dependencyTag,
                             new InsertDependencyComparator(tag.getChildren(), dependencyTag)));
 
                     return tag;

@@ -17,8 +17,8 @@ package org.openrewrite.yaml;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.yaml.search.FindIndentYamlProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.yaml.search.FindIndentYamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.ArrayList;
@@ -27,15 +27,15 @@ import java.util.List;
 public class CoalesceProperties extends Recipe {
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new CoalescePropertiesProcessor<>();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new CoalescePropertiesVisitor<>();
     }
 
-    public static class CoalescePropertiesProcessor<P> extends YamlProcessor<P> {
-        public CoalescePropertiesProcessor() {
+    public static class CoalescePropertiesVisitor<P> extends YamlVisitor<P> {
+        public CoalescePropertiesVisitor() {
         }
 
-        private final FindIndentYamlProcessor<P> findIndent = new FindIndentYamlProcessor<>(0);
+        private final FindIndentYamlVisitor<P> findIndent = new FindIndentYamlVisitor<>(0);
 
         @Override
         public Yaml visitDocument(Yaml.Document document, P p) {
@@ -62,7 +62,7 @@ public class CoalesceProperties extends Recipe {
 
                         int indentToUse = findIndent.getMostCommonIndent() > 0 ?
                                 findIndent.getMostCommonIndent() : 4;
-                        doAfterVisit(new ShiftFormatLeftProcessor<>(subEntry.getValue(), indentToUse));
+                        doAfterVisit(new ShiftFormatLeftVisitor<>(subEntry.getValue(), indentToUse));
 
                         changed = true;
                     } else {

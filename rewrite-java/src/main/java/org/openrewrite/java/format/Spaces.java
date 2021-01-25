@@ -17,8 +17,8 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.SpacesStyle;
 import org.openrewrite.java.tree.J;
@@ -26,18 +26,18 @@ import org.openrewrite.java.tree.J;
 public class Spaces extends Recipe {
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new SpacesFromCompilationUnitStyle();
     }
 
-    private static class SpacesFromCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
+    private static class SpacesFromCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext executionContext) {
             SpacesStyle style = cu.getStyle(SpacesStyle.class);
             if (style == null) {
                 style = IntelliJ.spaces();
             }
-            doAfterVisit(new SpacesProcessor<>(style));
+            doAfterVisit(new SpacesVisitor<>(style));
             return super.visitCompilationUnit(cu, executionContext);
         }
     }

@@ -20,17 +20,17 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.TreePrinter
 import org.openrewrite.xml.tree.Xml
 
-open class XmlProcessorTest {
+open class XmlVisitorTest {
 
     private val parser = XmlParser()
 
     fun assertChanged(
-            processorMapped: (Xml.Document) -> XmlProcessor<ExecutionContext>,
+            visitorMapped: (Xml.Document) -> XmlVisitor<ExecutionContext>,
             before: String,
             after: String
     ) {
         val source = parser.parse(*(arrayOf(before.trimIndent()))).first()
-        val result = processorMapped(source).visit(source,
+        val result = visitorMapped(source).visit(source,
                 ExecutionContext.builder()
                         .maxCycles(2)
                         .doOnError { t: Throwable? -> Assertions.fail<Any>("Visitor threw an exception", t) }

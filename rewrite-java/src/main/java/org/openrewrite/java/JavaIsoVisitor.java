@@ -27,7 +27,7 @@ import org.openrewrite.java.tree.Statement;
  * For visitors that do not need the extra flexibility of JavaRefactorVisitor, this constraint
  * makes for a more pleasant visitor authoring experience as less casting will be required.
  */
-public class JavaIsoProcessor<P> extends JavaProcessor<P> {
+public class JavaIsoVisitor<P> extends JavaVisitor<P> {
     @Override
     public Expression visitExpression(Expression expression, P p) {
         return (Expression) super.visitExpression(expression, p);

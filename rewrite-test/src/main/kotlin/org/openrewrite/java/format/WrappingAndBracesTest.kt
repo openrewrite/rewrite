@@ -24,7 +24,7 @@ import org.openrewrite.java.style.WrappingAndBracesStyle
 
 interface WrappingAndBracesTest : RecipeTest {
     override val recipe: Recipe
-        get() = WrappingAndBracesProcessor<ExecutionContext>(WrappingAndBracesStyle()).toRecipe()
+        get() = WrappingAndBracesVisitor<ExecutionContext>(WrappingAndBracesStyle()).toRecipe()
 
     @Test
     fun blockLevelStatements(jp: JavaParser) = assertChanged(

@@ -16,7 +16,7 @@
 package org.openrewrite.java.search;
 
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.Flag;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
@@ -33,14 +33,14 @@ public class FindInheritedField {
 
     public static Set<JavaType.Var> find(J j, String clazz) {
         Set<JavaType.Var> fields = new HashSet<>();
-        new FindInheritedFieldProcessor(clazz).visit(j, fields);
+        new FindInheritedFieldVisitor(clazz).visit(j, fields);
         return fields;
     }
 
-    private static class FindInheritedFieldProcessor extends JavaIsoProcessor<Set<JavaType.Var>> {
+    private static class FindInheritedFieldVisitor extends JavaIsoVisitor<Set<JavaType.Var>> {
         private final String fullyQualifiedName;
 
-        public FindInheritedFieldProcessor(String fullyQualifiedName) {
+        public FindInheritedFieldVisitor(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
         }
 

@@ -17,26 +17,26 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
-import org.openrewrite.java.JavaIsoProcessor;
+import org.openrewrite.TreeVisitor;
+import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
 
 public class WrappingAndBraces extends Recipe {
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new WrappingAndBracesCompilationUnitStyle();
     }
 
-    private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoProcessor<ExecutionContext> {
+    private static class WrappingAndBracesCompilationUnitStyle extends JavaIsoVisitor<ExecutionContext> {
         @Override
         public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, ExecutionContext ctx) {
             WrappingAndBracesStyle style = cu.getStyle(WrappingAndBracesStyle.class);
             if(style == null) {
                 style = IntelliJ.wrappingAndBraces();
             }
-            doAfterVisit(new WrappingAndBracesProcessor<>(style));
+            doAfterVisit(new WrappingAndBracesVisitor<>(style));
             return cu;
         }
     }

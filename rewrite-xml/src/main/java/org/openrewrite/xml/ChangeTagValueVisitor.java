@@ -21,12 +21,12 @@ import org.openrewrite.xml.tree.Xml;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 
-public class ChangeTagValueProcessor<P> extends XmlProcessor<P> {
+public class ChangeTagValueVisitor<P> extends XmlVisitor<P> {
 
     private final Xml.Tag scope;
     private final String value;
 
-    public ChangeTagValueProcessor(Xml.Tag scope, String value) {
+    public ChangeTagValueVisitor(Xml.Tag scope, String value) {
         this.scope = scope;
         this.value = value;
         setCursoringOn();

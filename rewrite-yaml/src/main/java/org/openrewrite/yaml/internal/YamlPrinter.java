@@ -20,12 +20,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.yaml.YamlProcessor;
+import org.openrewrite.yaml.YamlVisitor;
 import org.openrewrite.yaml.tree.Yaml;
 
 import java.util.List;
 
-public class YamlPrinter<P> extends YamlProcessor<P> {
+public class YamlPrinter<P> extends YamlVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 

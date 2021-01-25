@@ -18,12 +18,12 @@ package org.openrewrite.xml
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.tree.Xml
 
-class RemoveContentTest : XmlProcessorTest() {
+class RemoveContentTest : XmlVisitorTest() {
 
     @Test
     fun removeContent() = assertChanged(
-            processorMapped = { x ->
-                RemoveContentProcessor(x.root.content[1] as Xml.Tag, false)
+            visitorMapped = { x ->
+                RemoveContentVisitor(x.root.content[1] as Xml.Tag, false)
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -42,9 +42,9 @@ class RemoveContentTest : XmlProcessorTest() {
 
     @Test
     fun removeAncestorsThatBecomeEmpty() = assertChanged(
-            processorMapped = { x ->
+            visitorMapped = { x ->
                 val groupId = ((x.root.content[1] as Xml.Tag).content[0] as Xml.Tag).content[0] as Xml.Tag
-                RemoveContentProcessor(groupId, true)
+                RemoveContentVisitor(groupId, true)
             },
             before = """
                 <project>
@@ -65,9 +65,9 @@ class RemoveContentTest : XmlProcessorTest() {
 
     @Test
     fun rootChangedToEmptyTagIfLastRemainingTag() = assertChanged(
-            processorMapped = { x ->
+            visitorMapped = { x ->
                 val groupId = ((x.root.content[0] as Xml.Tag).content[0] as Xml.Tag).content[0] as Xml.Tag
-                RemoveContentProcessor(groupId, true)
+                RemoveContentVisitor(groupId, true)
             },
             before = """
                 <project>

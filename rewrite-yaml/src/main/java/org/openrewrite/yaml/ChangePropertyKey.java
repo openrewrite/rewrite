@@ -18,7 +18,7 @@ package org.openrewrite.yaml;
 import lombok.Data;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
@@ -52,13 +52,13 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyKeyProcessor<>();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangePropertyKeyVisitor<>();
     }
 
-    private class ChangePropertyKeyProcessor<P> extends YamlProcessor<P> {
+    private class ChangePropertyKeyVisitor<P> extends YamlVisitor<P> {
 
-        public ChangePropertyKeyProcessor() {
+        public ChangePropertyKeyVisitor() {
             setCursoringOn();
         }
 
@@ -83,12 +83,12 @@ public class ChangePropertyKey extends Recipe {
                     String value = propertyEntry.getKey().getValue();
 
                     if (!propertyToTest.startsWith(value)) {
-                        doAfterVisit(new InsertSubpropertyProcessor<>(
+                        doAfterVisit(new InsertSubpropertyVisitor<>(
                                 propertyEntry,
                                 propertyToTest,
                                 entry.getValue()
                         ));
-                        doAfterVisit(new DeletePropertyProcessor<>(entry));
+                        doAfterVisit(new DeletePropertyVisitor<>(entry));
                         if (coalesce) {
                             maybeCoalesceProperties();
                         }
@@ -104,12 +104,12 @@ public class ChangePropertyKey extends Recipe {
 
     }
 
-    private static class InsertSubpropertyProcessor<P> extends YamlProcessor<P> {
+    private static class InsertSubpropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
         private final String subproperty;
         private final Yaml.Block value;
 
-        private InsertSubpropertyProcessor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Block value) {
+        private InsertSubpropertyVisitor(Yaml.Mapping.Entry scope, String subproperty, Yaml.Block value) {
             this.scope = scope;
             this.subproperty = subproperty;
             this.value = value;
@@ -144,10 +144,10 @@ public class ChangePropertyKey extends Recipe {
         }
     }
 
-    private static class DeletePropertyProcessor<P> extends YamlProcessor<P> {
+    private static class DeletePropertyVisitor<P> extends YamlVisitor<P> {
         private final Yaml.Mapping.Entry scope;
 
-        private DeletePropertyProcessor(Yaml.Mapping.Entry scope) {
+        private DeletePropertyVisitor(Yaml.Mapping.Entry scope) {
             this.scope = scope;
             setCursoringOn();
         }

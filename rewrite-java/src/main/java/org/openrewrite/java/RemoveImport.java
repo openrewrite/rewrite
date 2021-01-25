@@ -29,7 +29,7 @@ import java.util.Set;
 import static org.openrewrite.Tree.randomId;
 
 @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-public class RemoveImport<P> extends JavaIsoProcessor<P> {
+public class RemoveImport<P> extends JavaIsoVisitor<P> {
     @EqualsAndHashCode.Include
     private final String type;
 

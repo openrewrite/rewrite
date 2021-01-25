@@ -20,7 +20,7 @@ import org.openrewrite.Validated;
 import org.openrewrite.ValidationException;
 import org.openrewrite.java.tree.J;
 
-public class RenameVariable<P> extends JavaIsoProcessor<P> {
+public class RenameVariable<P> extends JavaIsoVisitor<P> {
     private final Cursor scope;
     private final String toName;
 

@@ -19,7 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.properties.tree.Properties;
 
@@ -39,13 +39,13 @@ public class ChangePropertyKey extends Recipe {
     }
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyKeyProcessor<>();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangePropertyKeyVisitor<>();
     }
 
-    public class ChangePropertyKeyProcessor<P> extends PropertiesProcessor<P> {
+    public class ChangePropertyKeyVisitor<P> extends PropertiesVisitor<P> {
 
-        public ChangePropertyKeyProcessor() {
+        public ChangePropertyKeyVisitor() {
         }
 
         @Override

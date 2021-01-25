@@ -19,14 +19,14 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeProcessor
+import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.J
 
 interface UnwrapParenthesesTest : RecipeTest {
     override val recipe: Recipe?
         get() = object : Recipe() {
-            override fun getProcessor(): TreeProcessor<*, ExecutionContext> {
-                return object : JavaProcessor<ExecutionContext>() {
+            override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                return object : JavaVisitor<ExecutionContext>() {
                     override fun <T : J?> visitParentheses(parens: J.Parentheses<T>, p: ExecutionContext): J {
                         doAfterVisit(UnwrapParentheses(parens))
                         return super.visitParentheses(parens, p)

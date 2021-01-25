@@ -19,7 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
@@ -42,15 +42,15 @@ public class ChangeType extends Recipe {
     private final String replacementType;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeTypeProcessor(replacementType);
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeTypeVisitor(replacementType);
     }
 
 
-    private class ChangeTypeProcessor extends JavaProcessor<ExecutionContext> {
+    private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
         private JavaType targetType;
 
-        private ChangeTypeProcessor(String targetType) {
+        private ChangeTypeVisitor(String targetType) {
             JavaType type = JavaType.Primitive.fromKeyword(targetType);
             if (type == null) {
                 type = JavaType.Class.build(targetType);

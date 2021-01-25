@@ -19,7 +19,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -36,14 +36,14 @@ public class ChangeMethodTargetToStatic extends Recipe {
     private final String targetType;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeMethodTargetToStaticProcessor(new MethodMatcher(methodPattern));
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeMethodTargetToStaticVisitor(new MethodMatcher(methodPattern));
     }
 
-    private class ChangeMethodTargetToStaticProcessor extends JavaIsoProcessor<ExecutionContext> {
+    private class ChangeMethodTargetToStaticVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher methodMatcher;
 
-        public ChangeMethodTargetToStaticProcessor(MethodMatcher methodMatcher) {
+        public ChangeMethodTargetToStaticVisitor(MethodMatcher methodMatcher) {
             this.methodMatcher = methodMatcher;
         }
 

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.xml;
 
-import org.openrewrite.xml.search.FindIndentXmlProcessor;
+import org.openrewrite.xml.search.FindIndentXmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.stream.Collectors;
@@ -23,16 +23,16 @@ import java.util.stream.Collectors;
 import static java.util.Arrays.stream;
 import static java.util.stream.IntStream.range;
 
-public class AutoFormatProcessor<P> extends XmlProcessor<P> {
+public class AutoFormatVisitor<P> extends XmlVisitor<P> {
 
     private final Xml.Tag[] scope;
 
-    public AutoFormatProcessor(Xml.Tag... scope) {
+    public AutoFormatVisitor(Xml.Tag... scope) {
         this.scope = scope;
         setCursoringOn();
     }
 
-    private final FindIndentXmlProcessor<P> findIndent = new FindIndentXmlProcessor<>(0);
+    private final FindIndentXmlVisitor<P> findIndent = new FindIndentXmlVisitor<>(0);
 
     @Override
     public Xml visitDocument(Xml.Document document, P p) {

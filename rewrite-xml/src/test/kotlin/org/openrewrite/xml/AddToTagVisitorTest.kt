@@ -18,11 +18,11 @@ package org.openrewrite.xml
 import org.junit.jupiter.api.Test
 import org.openrewrite.xml.tree.Xml
 
-class AddToTagProcessorTest : XmlProcessorTest() {
+class AddToTagVisitorTest : XmlVisitorTest() {
 
     @Test
     fun addElement() = assertChanged(
-            processorMapped = { x -> AddToTagProcessor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")) },
+            visitorMapped = { x -> AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean2"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans >
@@ -39,7 +39,7 @@ class AddToTagProcessorTest : XmlProcessorTest() {
 
     @Test
     fun addElementToSlashClosedTag() = assertChanged(
-            processorMapped = { x -> AddToTagProcessor(x.root.content[0] as Xml.Tag, Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")) },
+            visitorMapped = { x -> AddToTagVisitor(x.root.content[0] as Xml.Tag, Xml.Tag.build("""<property name="myprop" ref="collaborator"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans >
@@ -58,7 +58,7 @@ class AddToTagProcessorTest : XmlProcessorTest() {
 
     @Test
     fun addElementToEmptyTagOnSameLine() = assertChanged(
-            processorMapped = { x -> AddToTagProcessor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")) },
+            visitorMapped = { x -> AddToTagVisitor(x.root, Xml.Tag.build("""<bean id="myBean"/>""")) },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <beans></beans>
@@ -73,9 +73,9 @@ class AddToTagProcessorTest : XmlProcessorTest() {
 
     @Test
     fun addElementInOrder() = assertChanged(
-            processorMapped = { x ->
-                AddToTagProcessor(x.root, Xml.Tag.build("""<apple/>"""),
-                    Comparator.comparing(Xml.Tag::getName))
+            visitorMapped = { x ->
+                AddToTagVisitor(x.root, Xml.Tag.build("""<apple/>"""),
+                        Comparator.comparing(Xml.Tag::getName))
             },
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>

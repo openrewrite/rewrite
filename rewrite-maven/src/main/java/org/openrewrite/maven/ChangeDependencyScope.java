@@ -19,12 +19,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.xml.AddToTagProcessor;
-import org.openrewrite.xml.ChangeTagValueProcessor;
-import org.openrewrite.xml.RemoveContentProcessor;
+import org.openrewrite.xml.AddToTagVisitor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
+import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
@@ -44,8 +44,8 @@ public class ChangeDependencyScope extends Recipe {
     private final String toScope;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangeDependencyScopeProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangeDependencyScopeVisitor();
     }
 
     @Override
@@ -54,9 +54,9 @@ public class ChangeDependencyScope extends Recipe {
                 .and(required("artifactId", artifactId));
     }
 
-    private class ChangeDependencyScopeProcessor extends MavenProcessor<ExecutionContext> {
+    private class ChangeDependencyScopeVisitor extends MavenVisitor<ExecutionContext> {
 
-        private ChangeDependencyScopeProcessor() {
+        private ChangeDependencyScopeVisitor() {
             setCursoringOn();
         }
 
@@ -68,12 +68,12 @@ public class ChangeDependencyScope extends Recipe {
                     Optional<Xml.Tag> scope = tag.getChild("scope");
                     if (scope.isPresent()) {
                         if (toScope == null) {
-                            doAfterVisit(new RemoveContentProcessor<>(scope.get(), false));
+                            doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
                         } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueProcessor<>(scope.get(), toScope));
+                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), toScope));
                         }
                     } else {
-                        doAfterVisit(new AddToTagProcessor<>(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
+                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
                     }
                 }
             }

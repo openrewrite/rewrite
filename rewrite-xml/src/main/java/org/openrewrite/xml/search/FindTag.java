@@ -19,11 +19,10 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.marker.SearchResult;
-import org.openrewrite.xml.AutoFormatProcessor;
 import org.openrewrite.xml.XPathMatcher;
-import org.openrewrite.xml.XmlProcessor;
+import org.openrewrite.xml.XmlVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Set;
@@ -35,21 +34,21 @@ public class FindTag extends Recipe {
     private final String path;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new FindTagProcessor(new XPathMatcher(path));
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new FindTagVisitor(new XPathMatcher(path));
     }
 
     public static Set<Xml.Tag> find(Xml x, String path) {
         //noinspection ConstantConditions
-        return new FindTagProcessor(new XPathMatcher(path)).visit(x, ExecutionContext.builder().build())
+        return new FindTagVisitor(new XPathMatcher(path)).visit(x, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindTagProcessor extends XmlProcessor<ExecutionContext> {
+    private static class FindTagVisitor extends XmlVisitor<ExecutionContext> {
 
         private final XPathMatcher xPathMatcher;
 
-        public FindTagProcessor(XPathMatcher xPathMatcher) {
+        public FindTagVisitor(XPathMatcher xPathMatcher) {
             this.xPathMatcher = xPathMatcher;
             setCursoringOn();
         }

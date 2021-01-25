@@ -66,14 +66,15 @@ public interface Yaml extends Serializable, Tree {
                 StringUtils.trimIndent(print.trim());
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof YamlVisitor ?
-                acceptYaml((YamlVisitor<R, P>) v, p) : v.defaultValue(null, p);
+                (R) acceptYaml((YamlVisitor<P>) v, p) : v.defaultValue(null, p);
     }
 
     @Nullable
-    default <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+    default <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -107,7 +108,7 @@ public interface Yaml extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitDocuments(this, p);
         }
 
@@ -142,7 +143,7 @@ public interface Yaml extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitDocument(this, p);
         }
 
@@ -203,7 +204,7 @@ public interface Yaml extends Serializable, Tree {
         }
 
         @Override
-        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitScalar(this, p);
         }
 
@@ -230,7 +231,7 @@ public interface Yaml extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitMapping(this, p);
         }
 
@@ -264,7 +265,7 @@ public interface Yaml extends Serializable, Tree {
             Markers markers;
 
             @Override
-            public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
                 return v.visitMappingEntry(this, p);
             }
 
@@ -292,7 +293,7 @@ public interface Yaml extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+        public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
             return v.visitSequence(this, p);
         }
 
@@ -319,7 +320,7 @@ public interface Yaml extends Serializable, Tree {
             Markers markers;
 
             @Override
-            public <R, P> R acceptYaml(YamlVisitor<R, P> v, P p) {
+            public <P> Yaml acceptYaml(YamlVisitor<P> v, P p) {
                 return v.visitSequenceEntry(this, p);
             }
 

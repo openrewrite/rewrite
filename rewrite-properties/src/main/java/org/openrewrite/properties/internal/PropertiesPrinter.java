@@ -20,12 +20,12 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.properties.PropertiesProcessor;
+import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
 import java.util.List;
 
-public class PropertiesPrinter<P> extends PropertiesProcessor<P> {
+public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 

@@ -49,14 +49,15 @@ public interface Properties extends Serializable, Tree {
         return new PropertiesPrinter<>(TreePrinter.identity()).print(this, p);
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    default <R, P> R accept(TreeVisitor<R, P> v, P p) {
+    default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v instanceof PropertiesVisitor ?
-                acceptProperties((PropertiesVisitor<R, P>) v, p) : v.defaultValue(null, p);
+                (R) acceptProperties((PropertiesVisitor<P>) v, p) : v.defaultValue(null, p);
     }
 
     @Nullable
-    default <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+    default <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
         return v.defaultValue(this, p);
     }
 
@@ -88,7 +89,7 @@ public interface Properties extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+        public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitFile(this, p);
         }
     }
@@ -119,7 +120,7 @@ public interface Properties extends Serializable, Tree {
         Markers markers;
 
         @Override
-        public <R, P> R acceptProperties(PropertiesVisitor<R, P> v, P p) {
+        public <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
             return v.visitEntry(this, p);
         }
     }

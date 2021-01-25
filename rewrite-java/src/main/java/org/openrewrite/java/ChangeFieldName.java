@@ -23,7 +23,7 @@ import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-public class ChangeFieldName<P> extends JavaIsoProcessor<P> {
+public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
     private final JavaType.Class classType;
     private final String hasName;
     private final String toName;
@@ -80,7 +80,7 @@ public class ChangeFieldName<P> extends JavaIsoProcessor<P> {
                 .getValue() instanceof J.ClassDecl;
     }
 
-    private static class FindVariableDefinition extends JavaIsoProcessor<AtomicReference<Cursor>> {
+    private static class FindVariableDefinition extends JavaIsoVisitor<AtomicReference<Cursor>> {
         private final J.Ident ident;
         private final Cursor referenceScope;
 

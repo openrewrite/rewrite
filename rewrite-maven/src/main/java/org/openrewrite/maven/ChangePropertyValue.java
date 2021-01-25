@@ -21,9 +21,9 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
-import org.openrewrite.xml.ChangeTagValueProcessor;
+import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import static org.openrewrite.Validated.required;
@@ -35,8 +35,8 @@ public class ChangePropertyValue extends Recipe {
     private final String toValue;
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new ChangePropertyValueProcessor();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new ChangePropertyValueVisitor();
     }
 
     @JsonCreator
@@ -53,9 +53,9 @@ public class ChangePropertyValue extends Recipe {
                 .and(required("toValue", toValue));
     }
 
-    private class ChangePropertyValueProcessor extends MavenProcessor<ExecutionContext> {
+    private class ChangePropertyValueVisitor extends MavenVisitor<ExecutionContext> {
 
-        public ChangePropertyValueProcessor() {
+        public ChangePropertyValueVisitor() {
             setCursoringOn();
         }
 
@@ -63,7 +63,7 @@ public class ChangePropertyValue extends Recipe {
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && key.equals(tag.getName()) &&
                     !toValue.equals(tag.getValue().orElse(null))) {
-                doAfterVisit(new ChangeTagValueProcessor<>(tag, toValue));
+                doAfterVisit(new ChangeTagValueVisitor<>(tag, toValue));
             }
             return super.visitTag(tag, ctx);
         }

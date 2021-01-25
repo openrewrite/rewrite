@@ -17,13 +17,13 @@ package org.openrewrite.xml;
 
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
-import org.openrewrite.TreeProcessor;
+import org.openrewrite.TreeVisitor;
 
 public class AutoFormat extends Recipe {
 
     @Override
-    protected TreeProcessor<?, ExecutionContext> getProcessor() {
-        return new AutoFormatProcessor<>();
+    protected TreeVisitor<?, ExecutionContext> getVisitor() {
+        return new AutoFormatVisitor<>();
     }
 
 }

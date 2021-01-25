@@ -18,7 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.format.AutoFormatProcessor;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.slf4j.Logger;
@@ -101,7 +101,7 @@ public class JavaTemplate {
         }
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateProcessor().visit(cu, insertionScope);
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor().visit(cu, insertionScope);
 
         String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
                 .print(pruned, printedTemplate);
@@ -118,7 +118,7 @@ public class JavaTemplate {
         Cursor formatScope = insertionScope.dropParentUntil(J.class::isInstance);
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
-                .map(snippet -> (J2) new AutoFormatProcessor<Void>().visit(snippet, null, formatScope))
+                .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
                 .collect(toList());
     }
 
@@ -151,12 +151,12 @@ public class JavaTemplate {
     }
 
     /**
-     * A java processor that prunes the original AST down to just the things needed to compile the template code.
+     * A java visitor that prunes the original AST down to just the things needed to compile the template code.
      * The typed Cursor represents the insertion point within the original AST.
      */
-    private static class TemplateProcessor extends JavaIsoProcessor<Cursor> {
+    private static class TemplateVisitor extends JavaIsoVisitor<Cursor> {
 
-        TemplateProcessor() {
+        TemplateVisitor() {
             setCursoringOn();
         }
 
@@ -304,7 +304,7 @@ public class JavaTemplate {
         }
     }
 
-    private static class ExtractTemplatedCode extends JavaProcessor<ExtractionContext> {
+    private static class ExtractTemplatedCode extends JavaVisitor<ExtractionContext> {
         public ExtractTemplatedCode() {
             setCursoringOn();
         }

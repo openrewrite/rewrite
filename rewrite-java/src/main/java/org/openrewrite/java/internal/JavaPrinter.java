@@ -20,14 +20,14 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.JavaProcessor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 
 import java.util.List;
 
 import static org.openrewrite.java.tree.J.Modifier.*;
 
-public class JavaPrinter<P> extends JavaProcessor<P> {
+public class JavaPrinter<P> extends JavaVisitor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
