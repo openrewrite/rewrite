@@ -544,11 +544,6 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         return elze;
     }
 
-//    @Override
-//    public J visitEmpty(Empty empty, P p) {
-//        return fmt(empty, "");
-//    }
-
     @Override
     public J visitEnumValue(EnumValue enoom, P p) {
 
@@ -935,14 +930,6 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visit("finally", tryable.getFinally(), p);
         return tryable;
     }
-
-//    @Override
-//    public J visitTypeCast(TypeCast typeCast, P p) {
-//        visitSpace(typeCast.getPrefix(), p);
-//        visit(typeCast.getClazz(), p);
-//        visit(typeCast.getExpr(), p);
-//        return typeCast;
-//    }
 
     @Override
     public J visitTypeParameter(TypeParameter typeParam, P p) {

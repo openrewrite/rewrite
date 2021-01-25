@@ -63,18 +63,6 @@ public class Recipe {
                         .append("]->");
             }
         }
-
-//        @Override
-//        public String doLast(Tree tree, String printed, ExecutionContext o) {
-//            String markerIds = tree.getMarkers().entries().stream()
-//                    .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
-//                    .map(marker -> String.valueOf(marker.hashCode()))
-//                    .collect(joining(","));
-//            if (!markerIds.isEmpty()) {
-//                return "markers[" + markerIds + "]->" + printed;
-//            }
-//            return printed;
-//        }
     };
 
     public static final TreeVisitor<?, ExecutionContext> NOOP = new TreeVisitor<Tree, ExecutionContext>() {
