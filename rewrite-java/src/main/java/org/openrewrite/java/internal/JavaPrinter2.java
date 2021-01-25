@@ -16,6 +16,8 @@
 package org.openrewrite.java.internal;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter2;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaProcessor;
@@ -29,7 +31,10 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
 
     private static final String PRINTER_ACC_KEY = "printed";
 
-    public JavaPrinter2() {
+    private final TreePrinter2<P> treePrinter;
+
+    public JavaPrinter2(TreePrinter2<P> treePrinter) {
+        this.treePrinter = treePrinter;
         setCursoringOn();
     }
 
@@ -37,6 +42,20 @@ public class JavaPrinter2<P> extends JavaProcessor<P> {
         setCursor(new Cursor(null, "EPSILON"));
         visit(j, p);
         return getPrinterAcc().toString();
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, P p) {
+
+        if (tree == null) {
+            return defaultValue(null, p);
+        }
+
+        StringBuilder printerAcc = getPrinterAcc();
+        treePrinter.doBefore(tree, printerAcc, p);
+        tree = super.visit(tree, p);
+        treePrinter.doAfter(tree, printerAcc, p);
+        return (J) tree;
     }
 
     protected void visit(@Nullable List<? extends J> nodes, P p) {
