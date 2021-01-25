@@ -62,7 +62,9 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
         StringBuilder printerAcc = getPrinterAcc();
         treePrinter.doBefore(tree, printerAcc, p);
         tree = super.visit(tree, p);
-        treePrinter.doAfter(tree, printerAcc, p);
+        if (tree != null) {
+            treePrinter.doAfter(tree, printerAcc, p);
+        }
         return (Yaml) tree;
     }
 

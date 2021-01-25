@@ -20,8 +20,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
-import org.openrewrite.marker.Marker;
-import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 

@@ -15,8 +15,6 @@
  */
 package org.openrewrite.marker;
 
-import org.eclipse.jgit.util.MutableInteger;
-import org.openrewrite.ExecutionContext;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
@@ -34,14 +32,14 @@ public class SearchResult implements Marker {
         private Integer mark = null;
 
         @Override
-        public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, Void unused) {
+        public void doBefore(Tree tree, StringBuilder printerAcc, Void unused) {
             if (tree.getMarkers().findFirst(SearchResult.class).isPresent()) {
                 mark = printerAcc.length();
             }
         }
 
         @Override
-        public void doAfter(@Nullable Tree tree, StringBuilder printerAcc, Void unused) {
+        public void doAfter(Tree tree, StringBuilder printerAcc, Void unused) {
             if (mark != null) {
                 for (int i = mark; i < printerAcc.length(); i++) {
                     if (!Character.isWhitespace(printerAcc.charAt(i))) {

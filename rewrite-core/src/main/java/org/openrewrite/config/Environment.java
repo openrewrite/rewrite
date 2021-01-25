@@ -43,7 +43,7 @@ public class Environment {
     }
 
     public Recipe activateRecipes(String... activeRecipes) {
-        Recipe root = new Recipe("environment");
+        Recipe root = new Recipe();
         List<String> activeRecipeList = Arrays.asList(activeRecipes);
         for (Recipe recipe : listRecipes()) {
             if (activeRecipeList.contains(recipe.getName())) {

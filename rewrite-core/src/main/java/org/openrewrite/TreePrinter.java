@@ -15,8 +15,6 @@
  */
 package org.openrewrite;
 
-import org.openrewrite.internal.lang.Nullable;
-
 public interface TreePrinter<P> {
 
     static <P> TreePrinter<P> identity() {
@@ -32,7 +30,7 @@ public interface TreePrinter<P> {
      *                   operation so far
      * @param p visit context
      */
-    default void doBefore(@Nullable Tree tree, StringBuilder printerAcc, P p) {}
+    default void doBefore(Tree tree, StringBuilder printerAcc, P p) {}
 
     /**
      * Called after tree has been printed, allows printing additional output after tree.
@@ -42,7 +40,7 @@ public interface TreePrinter<P> {
      *      *                   operation so far
      * @param p visit context
      */
-    default void doAfter(@Nullable Tree tree, StringBuilder printerAcc, P p) {}
+    default void doAfter(Tree tree, StringBuilder printerAcc, P p) {}
 
 
 }
