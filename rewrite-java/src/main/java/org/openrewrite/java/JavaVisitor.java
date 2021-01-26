@@ -243,6 +243,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (c.getTypeParameters() != null) {
             c = c.withTypeParameters(visitContainer(c.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         }
+        c = c.withKind(visitLeftPadded(c.getKind(), JLeftPadded.Location.CLASS_KIND, p));
         c = c.withName(call(c.getName(), p));
         if (c.getExtends() != null) {
             c = c.withExtends(visitLeftPadded(c.getExtends(), JLeftPadded.Location.EXTENDS, p));

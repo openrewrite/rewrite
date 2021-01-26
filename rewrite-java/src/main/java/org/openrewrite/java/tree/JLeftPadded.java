@@ -53,6 +53,7 @@ public class JLeftPadded<T> implements Markable {
     public enum Location {
         ASSIGNMENT,
         BINARY_OPERATOR,
+        CLASS_KIND,
         EXTENDS,
         FIELD_ACCESS_NAME,
         MEMBER_REFERENCE,

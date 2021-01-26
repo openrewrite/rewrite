@@ -38,8 +38,6 @@ interface TabsAndIndentsTest : RecipeTest {
     @Test
     fun methodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
-        // t -> 12
-        // ); -> 10
         before = """
             class Test {
                 void method(Test t) {
@@ -553,6 +551,18 @@ interface TabsAndIndentsTest : RecipeTest {
                     Supplier<Integer> ns = () ->
                             n;
                 }
+            }
+        """
+    )
+
+    @Test
+    fun fields(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            @Deprecated
+            class Test {
+                String groupId;
+                String artifactId;
             }
         """
     )
