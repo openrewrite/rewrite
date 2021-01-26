@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.*;
+import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 
 public class RawMavenResolver {
@@ -49,7 +50,6 @@ public class RawMavenResolver {
 
     private final Map<PartialTreeKey, Optional<Pom>> resolved = new HashMap<>();
     private final Map<ResolutionTask, PartialMaven> partialResults = new HashMap<>();
-    private final Map<RawPom.Parent, RawMaven> parentLookupCache = new HashMap<>();
 
     private final MavenDownloader downloader;
 
@@ -94,8 +94,14 @@ public class RawMavenResolver {
      */
     @Nullable
     public Pom resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories) {
+        return _resolve(rawMaven, scope, requestedVersion, repositories, null);
+    }
+
+    @Nullable
+    private Pom _resolve(RawMaven rawMaven, Scope scope, @Nullable String requestedVersion, List<RawRepositories.Repository> repositories,
+                         @Nullable LinkedHashSet<PartialTreeKey> seenParentPoms) {
         ResolutionTask rootTask = new ResolutionTask(scope, rawMaven, emptySet(),
-                false, null, requestedVersion, repositories);
+                false, null, requestedVersion, repositories, seenParentPoms);
 
         workQueue.add(rootTask);
 
@@ -305,7 +311,8 @@ public class RawMavenResolver {
                             dep.getOptional() != null && dep.getOptional(),
                             dep.getClassifier(),
                             dep.getVersion(),
-                            partialMaven.getRepositories()
+                            partialMaven.getRepositories(),
+                            null
                     );
 
                     if (!partialResults.containsKey(resolutionTask)) {
@@ -325,20 +332,40 @@ public class RawMavenResolver {
         Pom parent = null;
         if (pom.getParent() != null) {
             RawPom.Parent rawParent = pom.getParent();
-            RawMaven rawParentModel = parentLookupCache.computeIfAbsent(rawParent, (it) -> {
-                logger.debug("Downloading parent POM " + rawParent.getGroupId() + ":" + rawParent.getArtifactId() + ":" + rawParent.getVersion() + " with relativePath: " + rawParent.getRelativePath());
-                return downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
+            // With "->" indicating a "has parent" relationship, this code is meant to detect cycles like
+            // A -> B -> A
+            // And cut them off with a warning before the stack overflows
+            LinkedHashSet<PartialTreeKey> parentPomSightings;
+            if(task.getSeenParentPoms() == null) {
+                parentPomSightings = new LinkedHashSet<>();
+            } else {
+                parentPomSightings = new LinkedHashSet<>(task.getSeenParentPoms());
+            }
+
+            PartialTreeKey gav = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
+            if (parentPomSightings.contains(gav)) {
+                logger.warn("Cycle in parent poms detected: " + gav.getGroupId() + ":" + gav.getArtifactId() + ":" + gav.getVersion() + " is its own parent by way of these poms:\n" + parentPomSightings.stream()
+                        .map(it -> it.groupId + ":" + it.getArtifactId() + ":" + it.getVersion())
+                        .collect(joining("\n")));
+                return;
+            } else {
+                parentPomSightings.add(gav);
+            }
+
+            logger.debug("Downloading parent POM " + rawParent.getGroupId() + ":" + rawParent.getArtifactId() + ":" + rawParent.getVersion() + " with relativePath: " + rawParent.getRelativePath());
+            RawMaven rawParentModel = downloader.download(rawParent.getGroupId(), rawParent.getArtifactId(),
                         rawParent.getVersion(), null, rawParent.getRelativePath(), rawMaven,
                         partialMaven.getRepositories());
-            });
             if (rawParentModel != null) {
                 PartialTreeKey parentKey = new PartialTreeKey(rawParent.getGroupId(), rawParent.getArtifactId(), rawParent.getVersion());
                 Optional<Pom> maybeParent = resolved.get(parentKey);
 
                 //noinspection OptionalAssignedToNull
                 if (maybeParent == null) {
+
+
                     parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional)
-                            .resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories());
+                            ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
                     parent = maybeParent.orElse(null);
@@ -456,7 +483,7 @@ public class RawMavenResolver {
 
                             Pom conflictResolved = assembleResults(new ResolutionTask(scope, conflictResolvedRaw,
                                     ancestorDep.getExclusions(), ancestorDep.isOptional(), ancestorDep.getRequestedVersion(),
-                                    ancestorDep.getClassifier(), task.getRepositories()), nextAssemblyStack);
+                                    ancestorDep.getClassifier(), task.getRepositories(), null), nextAssemblyStack);
 
                             if (conflictResolved == null) {
                                 logger.debug(
@@ -557,6 +584,9 @@ public class RawMavenResolver {
         String requestedVersion;
 
         List<RawRepositories.Repository> repositories;
+
+        @Nullable
+        LinkedHashSet<PartialTreeKey> seenParentPoms;
 
         @JsonIgnore
         public Set<GroupArtifact> getExclusions() {

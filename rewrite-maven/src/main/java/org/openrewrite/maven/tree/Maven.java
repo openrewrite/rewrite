@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Formatting;
 import org.openrewrite.Metadata;
 import org.openrewrite.SourceVisitor;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.MavenSettings;
 import org.openrewrite.maven.MavenSourceVisitor;
 import org.openrewrite.xml.XmlSourceVisitor;
@@ -35,7 +36,7 @@ public class Maven extends Xml.Document {
     private final transient Collection<Pom> modules;
     private final transient MavenSettings settings;
 
-    public Maven(Xml.Document document, MavenSettings settings) {
+    public Maven(Xml.Document document, @Nullable MavenSettings settings) {
         super(
                 document.getId(),
                 document.getSourcePath(),
