@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 
 public class MethodDeclToString {
     public static String toString(J.MethodDecl method) {
@@ -27,9 +28,9 @@ public class MethodDeclToString {
     private static final JavaPrinter<Void> METHOD_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public J visitMethod(J.MethodDecl method, Void unused) {
-            visitModifiers(method.getModifiers(), unused);
+            visitModifiers(Space.formatFirstPrefix(method.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinterAcc();
-            if (method.getModifiers().isEmpty()) {
+            if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
             visit("<", method.getTypeParameters(), ",", ">", unused);

@@ -750,26 +750,22 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun variableWithAnnotation(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.build(),
+    fun variableWithAnnotation(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
-                public class Test {
-                    @Nullable
-                    Scope scope;
+            public class Test {
+                @Deprecated
+                final Scope scope;
             
-                    @Nullable
-                    String classifier;
-                    
-                    @With
-                    Collection<Dependency> dependencies;
-                }
-            """
+                @Deprecated
+                String classifier;
+            }
+        """
     )
 
     @Test
     fun lambdaMethodParameter(jp: JavaParser) = assertUnchanged(
         jp,
-        // FIXME c(f) sees its parent as the method invocation a(f)... not .b(...
         before = """
             import java.util.function.Function;
             abstract class Test {

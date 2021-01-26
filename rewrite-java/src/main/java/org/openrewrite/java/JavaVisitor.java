@@ -480,10 +480,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         J.VariableDecls m = call(multiVariable, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         m = call(m, p, this::visitStatement);
+        m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withModifiers(Objects.requireNonNull(call(m.getModifiers(), p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        m = m.withAnnotations(call(m.getAnnotations(), p));
         m = m.withTypeExpr(call(m.getTypeExpr(), p));
         m = m.withTypeExpr(m.getTypeExpr() == null ?
                 null :
