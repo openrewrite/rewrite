@@ -149,8 +149,9 @@ subprojects {
                                 (dependencyList.item(i) as org.w3c.dom.Element).let { dependency ->
                                     if ((dependency.getElementsByTagName("scope")
                                                     .item(0) as org.w3c.dom.Element).textContent == "provided"
-                                        || (dependency.getElementsByTagName("groupId")
-                                            .item(0) as org.w3c.dom.Element).textContent == "org.jetbrains.kotlin") {
+                                        || (project.name != "rewrite-test"
+                                                && (dependency.getElementsByTagName("groupId")
+                                            .item(0) as org.w3c.dom.Element).textContent == "org.jetbrains.kotlin")) {
                                         dependencies.removeChild(dependency)
                                         i--
                                         length--
