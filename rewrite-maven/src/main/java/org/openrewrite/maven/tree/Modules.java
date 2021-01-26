@@ -15,10 +15,12 @@
  */
 package org.openrewrite.maven.tree;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.marker.Marker;
 
 import java.util.Collection;
 
+@EqualsAndHashCode
 public class Modules implements Marker {
     private final Collection<Pom> modules;
 
