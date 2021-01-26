@@ -16,6 +16,7 @@
 package org.openrewrite.java.format;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Tree;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -31,6 +32,33 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     public TabsAndIndentsVisitor(TabsAndIndentsStyle style) {
         this.style = style;
         setCursoringOn();
+    }
+
+    @Override
+    public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
+        setCursor(parent);
+        for(Cursor c = parent; c != null; c = c.getParent()) {
+            Object v = c.getValue();
+            Space space = null;
+            if(v instanceof J) {
+                space = ((J) v).getPrefix();
+            } else if(v instanceof JRightPadded) {
+                space = ((JRightPadded<?>) v).getAfter();
+            } else if(v instanceof JLeftPadded) {
+                space = ((JLeftPadded<?>) v).getBefore();
+            } else if(v instanceof JContainer) {
+                space = ((JContainer<?>) v).getBefore();
+            }
+
+            if(space != null && space.getWhitespace().contains("\n")) {
+                int indent = findIndent(space);
+                if (indent != 0) {
+                    c.putMessage("lastIndent", indent);
+                }
+            }
+        }
+        visitEach(parent.getValue(), p);
+        return visit(tree, p);
     }
 
     @Override
@@ -57,12 +85,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         }
 
         return super.visitEach(tree, p);
-    }
-
-    @Override
-    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
-
-        return super.visitMethod(method, p);
     }
 
     @Override

@@ -533,6 +533,23 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    @Disabled
+    fun binaryExpressionsAsNestedMethodArgument(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.io.File;
+            class Test {
+                void method(int n, File f) {
+                    method(n, new File("test" +
+                                    "test"
+                            )
+                    );
+                }
+            }
+        """
+    )
+
+    @Test
     fun lambda(jp: JavaParser) = assertChanged(
         jp,
         before = """
