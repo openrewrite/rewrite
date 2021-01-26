@@ -49,8 +49,8 @@ public class Markers {
     private final Collection<Marker> markers;
 
     @JsonCreator
-    public Markers(@JsonProperty("markers") Collection<Marker> markers) {
-        this.markers = markers;
+    public Markers(@JsonProperty("markers") Collection<? extends Marker> markers) {
+        this.markers = (Collection<Marker>) markers;
     }
 
     /**
