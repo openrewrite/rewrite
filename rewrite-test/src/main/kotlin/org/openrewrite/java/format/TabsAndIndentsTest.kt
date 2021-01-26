@@ -556,6 +556,17 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun enums(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            enum Scope {
+                None, // the root of a resolution tree
+                Compile,
+            }
+        """
+    )
+
+    @Test
     fun twoThrows(jp: JavaParser) = assertUnchanged(
         jp,
         before = """

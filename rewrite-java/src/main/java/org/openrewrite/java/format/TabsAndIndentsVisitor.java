@@ -49,7 +49,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 tree instanceof J.ForLoop ||
                 tree instanceof J.ForEachLoop ||
                 tree instanceof J.WhileLoop ||
-                tree instanceof J.Case) {
+                tree instanceof J.Case ||
+                tree instanceof J.EnumValueSet) {
             getCursor().putMessage("indentType", IndentType.INDENT);
         } else {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
@@ -232,7 +233,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Space before;
         List<JRightPadded<J2>> js;
 
-        if(container.getBefore().getWhitespace().contains("\n")) {
+        if (container.getBefore().getWhitespace().contains("\n")) {
             int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
             switch (loc) {
                 case TYPE_PARAMETER:
@@ -248,7 +249,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
             }
         } else {
-            switch(loc) {
+            switch (loc) {
                 case IMPLEMENTS:
                 case TYPE_PARAMETER:
                 case THROWS:
