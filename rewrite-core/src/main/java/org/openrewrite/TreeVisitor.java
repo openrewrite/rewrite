@@ -129,35 +129,16 @@ public abstract class TreeVisitor<T extends Tree, P> {
         return (T) tree;
     }
 
-    protected <T2 extends Tree> T2 call(T2 t, P p, BiFunction<T2, P, Tree> callSuper) {
+    @Incubating(since = "7.0.0")
+    protected <T2 extends Tree> T2 visitAndCast(T2 t, P p, BiFunction<T2, P, Tree> callSuper) {
         //noinspection unchecked
         return (T2) callSuper.apply(t, p);
     }
 
+    @Incubating(since = "7.0.0")
     @Nullable
-    protected <T2 extends T> T2 call(@Nullable Tree tree, P p) {
+    protected <T2 extends T> T2 visitAndCast(@Nullable Tree tree, P p) {
         //noinspection unchecked
         return (T2) visit(tree, p);
-    }
-
-    @Nullable
-    protected <T2 extends T> List<T2> call(@Nullable List<T2> trees, P p) {
-        if (trees == null) {
-            return null;
-        }
-
-        List<T2> mutatedTrees = new ArrayList<>(trees.size());
-        boolean changed = false;
-        for (T2 tree : trees) {
-            @SuppressWarnings("unchecked") T2 mutated = (T2) visit(tree, p);
-            if (mutated != tree || mutated == null) {
-                changed = true;
-            }
-            if (mutated != null) {
-                mutatedTrees.add(mutated);
-            }
-        }
-
-        return changed ? mutatedTrees : trees;
     }
 }

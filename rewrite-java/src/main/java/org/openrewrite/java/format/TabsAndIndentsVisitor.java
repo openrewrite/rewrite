@@ -139,11 +139,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     if (!initPrefix.getWhitespace().contains("\n")) {
                         int initIndent = forInitColumn();
                         getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
-                        j = call(right.getElem(), p);
+                        j = visitAndCast(right.getElem(), p);
                         getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                         after = indentTo(right.getAfter(), initIndent);
                     } else {
-                        j = call(right.getElem(), p);
+                        j = visitAndCast(right.getElem(), p);
                         after = visitSpace(right.getAfter(), p);
                     }
                     break;
@@ -153,13 +153,13 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     Expression firstArg = container.getElem().iterator().next().getElem();
                     if (firstArg.getPrefix().getWhitespace().contains("\n")) {
                         // if the first argument is on its own line, align all arguments to be continuation indented
-                        j = call(right.getElem(), p);
+                        j = visitAndCast(right.getElem(), p);
                         after = indentTo(right.getAfter(), indent);
                     } else {
                         // align to first argument when the first argument isn't on its own line
                         int firstArgIndent = findIndent(firstArg.getPrefix());
                         getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
-                        j = call(right.getElem(), p);
+                        j = visitAndCast(right.getElem(), p);
                         getCursor().getParentOrThrow().putMessage("lastIndent", indent);
                         after = indentTo(right.getAfter(), firstArgIndent);
                     }
@@ -170,7 +170,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case NEW_CLASS_ARGS:
                 case PARENTHESES:
                 case TYPE_PARAMETER: {
-                    j = call(right.getElem(), p);
+                    j = visitAndCast(right.getElem(), p);
                     after = indentTo(right.getAfter(), indent);
                     break;
                 }
@@ -189,13 +189,13 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     }
 
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                    j = call(right.getElem(), p);
+                    j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                     break;
                 }
                 default:
-                    j = call(right.getElem(), p);
+                    j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);
             }
         } else {
@@ -203,11 +203,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case NEW_CLASS_ARGS:
                 case METHOD_INVOCATION_ARGUMENT:
                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
-                    j = call(right.getElem(), p);
+                    j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);
                     break;
                 default:
-                    j = call(right.getElem(), p);
+                    j = visitAndCast(right.getElem(), p);
                     after = right.getAfter();
             }
         }
