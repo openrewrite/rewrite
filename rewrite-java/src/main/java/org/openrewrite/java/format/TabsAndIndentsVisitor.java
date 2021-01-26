@@ -54,11 +54,13 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
         }
 
-        if (tree instanceof J.Annotation) {
-            getCursor().getParentOrThrow().putMessage("afterAnnotation", true);
-        }
-
         return super.visitEach(tree, p);
+    }
+
+    @Override
+    public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
+
+        return super.visitMethod(method, p);
     }
 
     @Override
@@ -75,7 +77,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, P p) {
-        if (!space.getWhitespace().contains("\n") || getCursor().getParent() == null) {
+        Cursor parent = getCursor().getParent();
+        if (parent != null && parent.getValue() instanceof J.Annotation) {
+            parent.getParentOrThrow().putMessage("afterAnnotation", true);
+        }
+
+        if (!space.getWhitespace().contains("\n") || parent == null) {
             return space;
         }
 

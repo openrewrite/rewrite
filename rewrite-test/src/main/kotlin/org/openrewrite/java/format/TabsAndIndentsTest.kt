@@ -563,6 +563,7 @@ interface TabsAndIndentsTest : RecipeTest {
         before = """
             class Test {
                 @Deprecated
+                @SuppressWarnings("all")
             String getOnError() {
                     return "uh oh";
                 }
@@ -571,6 +572,7 @@ interface TabsAndIndentsTest : RecipeTest {
         after = """
             class Test {
                 @Deprecated
+                @SuppressWarnings("all")
                 String getOnError() {
                     return "uh oh";
                 }
