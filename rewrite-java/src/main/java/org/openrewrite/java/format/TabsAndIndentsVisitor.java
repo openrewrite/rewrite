@@ -192,6 +192,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                     break;
                 }
+                case IMPLEMENTS:
+                    getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    j = call(right.getElem(), p);
+                    after = visitSpace(right.getAfter(), p);
+                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                    break;
                 case ANNOTATION_ARGUMENT:
                 case BLOCK_STATEMENT:
                 case CASE:
@@ -202,7 +208,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 case FOREACH_VARIABLE:
                 case IF_ELSE:
                 case IF_THEN:
-                case IMPLEMENTS:
                 case IMPORT:
                 case INSTANCEOF:
                 case NAMED_VARIABLE:
