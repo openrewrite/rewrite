@@ -70,7 +70,7 @@ public class ChangeType extends Recipe {
         @Override
         public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
             JavaType.Class oldTypeAsClass = TypeUtils.asClass(name.getType());
-            N n = call(name, ctx, super::visitTypeName);
+            N n = visitAndCast(name, ctx, super::visitTypeName);
             if (!(name instanceof TypeTree) && oldTypeAsClass != null && oldTypeAsClass.getFullyQualifiedName().equals(originalType)) {
                 n = n.withType(targetType);
             }
@@ -79,19 +79,19 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitAnnotation(J.Annotation annotation, ExecutionContext ctx) {
-            J.Annotation a = call(annotation, ctx, super::visitAnnotation);
+            J.Annotation a = visitAndCast(annotation, ctx, super::visitAnnotation);
             return a.withAnnotationType(transformName(a.getAnnotationType()));
         }
 
         @Override
         public J visitArrayType(J.ArrayType arrayType, ExecutionContext ctx) {
-            J.ArrayType a = call(arrayType, ctx, super::visitArrayType);
+            J.ArrayType a = visitAndCast(arrayType, ctx, super::visitArrayType);
             return a.withElementType(transformName(a.getElementType()));
         }
 
         @Override
         public J visitClassDecl(J.ClassDecl classDecl, ExecutionContext ctx) {
-            J.ClassDecl c = call(classDecl, ctx, super::visitClassDecl);
+            J.ClassDecl c = visitAndCast(classDecl, ctx, super::visitClassDecl);
 
             if (c.getExtends() != null) {
                 c = c.withExtends(c.getExtends().map(this::transformName));
@@ -106,7 +106,7 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitFieldAccess(J.FieldAccess fieldAccess, ExecutionContext ctx) {
-            J.FieldAccess f = call(fieldAccess, ctx, super::visitFieldAccess);
+            J.FieldAccess f = visitAndCast(fieldAccess, ctx, super::visitFieldAccess);
             if (f.isFullyQualifiedClassReference(originalType)) {
                 if (targetType instanceof JavaType.FullyQualified) {
                     return TypeTree.build(((JavaType.FullyQualified) targetType).getFullyQualifiedName())
@@ -127,7 +127,7 @@ public class ChangeType extends Recipe {
         public J visitIdentifier(J.Ident ident, ExecutionContext ctx) {
             // if the ident's type is equal to the type we're looking for, and the classname of the type we're looking for is equal to the ident's string representation
             // Then transform it, otherwise leave it alone
-            J.Ident i = call(ident, ctx, super::visitIdentifier);
+            J.Ident i = visitAndCast(ident, ctx, super::visitIdentifier);
             JavaType.Class original = JavaType.Class.build(originalType);
 
             if (TypeUtils.isOfClassType(i.getType(), originalType) && i.getSimpleName().equals(original.getClassName())) {
@@ -144,14 +144,14 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
-            J.MethodDecl m = call(method, ctx, super::visitMethod);
+            J.MethodDecl m = visitAndCast(method, ctx, super::visitMethod);
             m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
             return m.withThrows(m.getThrows() == null ? null : m.getThrows().map(this::transformName));
         }
 
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
-            J.MethodInvocation m = call(method, ctx, super::visitMethodInvocation);
+            J.MethodInvocation m = visitAndCast(method, ctx, super::visitMethodInvocation);
 
             if (m.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
                 m = m.withSelect(m.getSelect().map(this::transformName));
@@ -176,13 +176,13 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
-            J.MultiCatch m = call(multiCatch, ctx, super::visitMultiCatch);
+            J.MultiCatch m = visitAndCast(multiCatch, ctx, super::visitMultiCatch);
             return m.withAlternatives(ListUtils.map(m.getAlternatives(), a -> a.map(this::transformName)));
         }
 
         @Override
         public J visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-            J.VariableDecls m = call(multiVariable, ctx, super::visitMultiVariable);
+            J.VariableDecls m = visitAndCast(multiVariable, ctx, super::visitMultiVariable);
             if (!(multiVariable.getTypeExpr() instanceof J.MultiCatch)) {
                 m = m.withTypeExpr(transformName(m.getTypeExpr()));
             }
@@ -191,7 +191,7 @@ public class ChangeType extends Recipe {
 
         @Override
         public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, ExecutionContext ctx) {
-            J.VariableDecls.NamedVar v = call(variable, ctx, super::visitVariable);
+            J.VariableDecls.NamedVar v = visitAndCast(variable, ctx, super::visitVariable);
 
             JavaType.Class varType = TypeUtils.asClass(variable.getType());
             if (varType != null && varType.getFullyQualifiedName().equals(originalType)) {
@@ -203,32 +203,32 @@ public class ChangeType extends Recipe {
 
         @Override
         public J visitNewArray(J.NewArray newArray, ExecutionContext ctx) {
-            J.NewArray n = call(newArray, ctx, super::visitNewArray);
+            J.NewArray n = visitAndCast(newArray, ctx, super::visitNewArray);
             return n.withTypeExpr(transformName(n.getTypeExpr()));
         }
 
         @Override
         public J visitNewClass(J.NewClass newClass, ExecutionContext ctx) {
-            J.NewClass n = call(newClass, ctx, super::visitNewClass);
+            J.NewClass n = visitAndCast(newClass, ctx, super::visitNewClass);
             return n.withClazz(transformName(n.getClazz()));
         }
 
         @Override
         public J visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
-            J.TypeCast t = call(typeCast, ctx, super::visitTypeCast);
+            J.TypeCast t = visitAndCast(typeCast, ctx, super::visitTypeCast);
             return t.withClazz(t.getClazz().withTree(t.getClazz().getTree().map(this::transformName)));
         }
 
         @Override
         public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
-            J.TypeParameter t = call(typeParam, ctx, super::visitTypeParameter);
+            J.TypeParameter t = visitAndCast(typeParam, ctx, super::visitTypeParameter);
             t = t.withBounds(t.getBounds() == null ? null : t.getBounds().map(this::transformName));
             return t.withName(transformName(t.getName()));
         }
 
         @Override
         public J visitWildcard(J.Wildcard wildcard, ExecutionContext ctx) {
-            J.Wildcard w = call(wildcard, ctx, super::visitWildcard);
+            J.Wildcard w = visitAndCast(wildcard, ctx, super::visitWildcard);
             return w.withBoundedType(transformName(w.getBoundedType()));
         }
 

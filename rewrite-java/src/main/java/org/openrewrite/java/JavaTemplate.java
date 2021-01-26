@@ -165,10 +165,10 @@ public class JavaTemplate {
             Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
 
             if (parent != null && !(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
-                J.Block b = call(block, insertionScope, this::visitEach);
+                J.Block b = visitAndCast(block, insertionScope, this::visitEach);
                 b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), insertionScope) : null);
                 b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
-                b = call(b, insertionScope, this::visitStatement);
+                b = visitAndCast(b, insertionScope, this::visitStatement);
 
                 if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
                     //If a statement in the block is in insertion scope, then this will render each statement

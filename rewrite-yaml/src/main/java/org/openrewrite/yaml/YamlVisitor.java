@@ -16,26 +16,27 @@
 package org.openrewrite.yaml;
 
 import org.openrewrite.TreeVisitor;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.yaml.tree.Yaml;
 
 public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
 
     public Yaml visitDocuments(Yaml.Documents documents, P p) {
-        return documents.withDocuments(call(documents.getDocuments(), p));
+        return documents.withDocuments(ListUtils.map(documents.getDocuments(), d -> visitAndCast(d, p)));
     }
 
     public Yaml visitDocument(Yaml.Document document, P p) {
-        return document.withBlocks(call(document.getBlocks(), p));
+        return document.withBlocks(ListUtils.map(document.getBlocks(), b -> visitAndCast(b, p)));
     }
 
     public Yaml visitMapping(Yaml.Mapping mapping, P p) {
-        return mapping.withEntries(call(mapping.getEntries(), p));
+        return mapping.withEntries(ListUtils.map(mapping.getEntries(), e -> visitAndCast(e, p)));
     }
 
     public Yaml visitMappingEntry(Yaml.Mapping.Entry entry, P p) {
         Yaml.Mapping.Entry e = entry;
-        e = e.withKey(call(e.getKey(), p));
-        return e.withValue(call(e.getValue(), p));
+        e = e.withKey(visitAndCast(e.getKey(), p));
+        return e.withValue(visitAndCast(e.getValue(), p));
     }
 
     public Yaml visitScalar(Yaml.Scalar scalar, P p) {
@@ -43,11 +44,11 @@ public class YamlVisitor<P> extends TreeVisitor<Yaml, P> {
     }
 
     public Yaml visitSequence(Yaml.Sequence sequence, P p) {
-        return sequence.withEntries(call(sequence.getEntries(), p));
+        return sequence.withEntries(ListUtils.map(sequence.getEntries(), e -> visitAndCast(e, p)));
     }
 
     public Yaml visitSequenceEntry(Yaml.Sequence.Entry entry, P p) {
-        return entry.withBlock(call(entry.getBlock(), p));
+        return entry.withBlock(visitAndCast(entry.getBlock(), p));
     }
 
     public void maybeCoalesceProperties() {

@@ -44,6 +44,17 @@ public interface Tree extends Markable {
      */
     UUID getId();
 
+    /**
+     * Supports polymorphic visiting via {@link TreeVisitor#visit(Tree, Object)}. This is useful in cases where an AST
+     * type contains a field that is of a type with a hierarchy. The visitor doesn't have to figure out which visit
+     * method to call by using instanceof.
+     *
+     * @param v visitor
+     * @param p visit context
+     * @param <R> visitor return type
+     * @param <P> visit context type
+     * @return visitor result
+     */
     @Nullable
     default <R extends Tree, P> R accept(TreeVisitor<R, P> v, P p) {
         return v.defaultValue(this, p);
