@@ -24,7 +24,7 @@ import java.util.Collection;
 public class DeclarativeNamedStyles extends NamedStyles {
     private Validated validation = Validated.none();
 
-    public DeclarativeNamedStyles(String name, Collection<Style> styles) {
+    public DeclarativeNamedStyles(String name, Collection<? extends Style> styles) {
         super(name, styles);
     }
 

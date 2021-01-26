@@ -43,7 +43,7 @@ public class IntelliJ extends NamedStyles {
 
     @JsonIgnore
     @Override
-    public Collection<Style> getStyles() {
+    public Collection<? extends Style> getStyles() {
         return super.getStyles();
     }
 
