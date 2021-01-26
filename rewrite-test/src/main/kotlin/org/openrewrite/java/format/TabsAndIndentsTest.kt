@@ -556,7 +556,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun fields(jp: JavaParser) = assertUnchanged(
+    fun fieldsWhereClassHasAnnotation(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             @Deprecated
@@ -599,7 +599,9 @@ interface TabsAndIndentsTest : RecipeTest {
             import java.io.Serializable;
             @Deprecated
             (since = "1.0")
-            class Test
+            public
+            class
+            Test
             <T
             extends Object>
             implements
@@ -627,7 +629,9 @@ interface TabsAndIndentsTest : RecipeTest {
             import java.io.Serializable;
             @Deprecated
                     (since = "1.0")
-            class Test
+            public
+            class
+            Test
                     <T
                             extends Object>
                     implements

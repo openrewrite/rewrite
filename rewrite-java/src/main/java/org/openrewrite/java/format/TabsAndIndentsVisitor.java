@@ -40,7 +40,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 tree instanceof J.Import ||
                 tree instanceof J.Label ||
                 tree instanceof J.DoWhileLoop ||
-                tree instanceof J.ArrayDimension) {
+                tree instanceof J.ArrayDimension ||
+                tree instanceof J.ClassDecl) {
             getCursor().putMessage("indentType", IndentType.ALIGN);
         } else if (tree instanceof J.Block ||
                 tree instanceof J.If ||
@@ -192,12 +193,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                     break;
                 }
-                case IMPLEMENTS:
-                    getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
-                    j = call(right.getElem(), p);
-                    after = visitSpace(right.getAfter(), p);
-                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                    break;
                 case ANNOTATION_ARGUMENT:
                 case BLOCK_STATEMENT:
                 case CASE:
@@ -233,15 +228,30 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public <J2 extends J> JContainer<J2> visitContainer(JContainer<J2> container, JContainer.Location loc, P p) {
         setCursor(new Cursor(getCursor(), container));
-        Space before = visitSpace(container.getBefore(), p);
-        switch (loc) {
-            case IMPLEMENTS:
-            case THROWS:
-                getCursor().putMessage("indentType", IndentType.ALIGN);
-                break;
+
+        Space before;
+        List<JRightPadded<J2>> js;
+
+        if(container.getBefore().getWhitespace().contains("\n")) {
+            int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+            switch (loc) {
+                case TYPE_PARAMETER:
+                case IMPLEMENTS:
+                    before = indentTo(container.getBefore(), indent + style.getContinuationIndent());
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+                case THROWS:
+                    getCursor().putMessage("indentType", IndentType.ALIGN);
+                default:
+                    before = visitSpace(container.getBefore(), p);
+                    js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
+            }
+        } else {
+            before = visitSpace(container.getBefore(), p);
+            js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
         }
 
-        List<JRightPadded<J2>> js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
         setCursor(getCursor().getParent());
         return js == container.getElem() && before == container.getBefore() ?
                 container :
