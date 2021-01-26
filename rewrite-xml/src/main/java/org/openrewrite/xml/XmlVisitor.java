@@ -35,7 +35,9 @@ public class XmlVisitor<P> extends TreeVisitor<Xml, P> {
     public Xml visitTag(Xml.Tag tag, P p) {
         Xml.Tag t = visitAndCast(tag, p, this::visitEach);
         t = t.withAttributes(ListUtils.map(t.getAttributes(), a -> visitAndCast(a, p)));
-        t = t.withContent(ListUtils.map(t.getContent(), c -> visitAndCast(c, p)));
+        if(t.getContent() != null) {
+            t = t.withContent(ListUtils.map(t.getContent(), c -> visitAndCast(c, p)));
+        }
         return t.withClosing(visitAndCast(t.getClosing(), p));
     }
 
