@@ -70,9 +70,14 @@ public class Markers {
      * @return A new {@link Markers} with an added marker.
      */
     public Markers add(Marker marker) {
-        List<Marker> updatedmarker = new ArrayList<>(markers);
-        updatedmarker.add(marker);
-        return new Markers(updatedmarker);
+        if (markers.stream()
+                .anyMatch(marker::equals)) {
+            return this;
+        } else {
+            List<Marker> updatedmarker = new ArrayList<>(markers);
+            updatedmarker.add(marker);
+            return new Markers(updatedmarker);
+        }
     }
 
     /**

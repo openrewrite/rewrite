@@ -16,6 +16,7 @@
 package org.openrewrite.style;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Marker;
@@ -26,6 +27,7 @@ import java.util.Collection;
  * A collection of styles by name, e.g. IntelliJ or Google Java Format.
  */
 @Data
+@EqualsAndHashCode
 public class NamedStyles implements Marker {
     private final String name;
     private final Collection<Style> styles;

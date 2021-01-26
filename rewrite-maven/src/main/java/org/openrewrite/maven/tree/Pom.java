@@ -36,6 +36,7 @@ import java.util.stream.Stream;
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Getter
+@EqualsAndHashCode
 public class Pom implements Marker {
     Path sourcePath;
 

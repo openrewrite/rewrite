@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -52,15 +53,17 @@ public class Recipe {
     private static final TreePrinter<ExecutionContext> MARKER_ID_PRINTER = new TreePrinter<ExecutionContext>() {
         @Override
         public void doBefore(@Nullable Tree tree, StringBuilder printerAcc, ExecutionContext executionContext) {
-            String markerIds = tree.getMarkers().entries().stream()
-                    .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
-                    .map(marker -> String.valueOf(marker.hashCode()))
-                    .collect(joining(","));
-            if (!markerIds.isEmpty()) {
-                printerAcc
-                        .append("markers[")
-                        .append(markerIds)
-                        .append("]->");
+            if (tree != null) {
+                String markerIds = tree.getMarkers().entries().stream()
+                        .filter(marker -> !(marker instanceof RecipeThatMadeChanges))
+                        .map(marker -> String.valueOf(marker.hashCode()))
+                        .collect(joining(","));
+                if (!markerIds.isEmpty()) {
+                    printerAcc
+                            .append("markers[")
+                            .append(markerIds)
+                            .append("]->");
+                }
             }
         }
     };
@@ -271,6 +274,7 @@ public class Recipe {
         return getClass().getName();
     }
 
+    @EqualsAndHashCode
     private static class RecipeThatMadeChanges implements Marker {
         private final Set<String> names;
 
