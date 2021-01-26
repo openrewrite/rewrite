@@ -103,8 +103,8 @@ interface ChangeMethodTargetToStaticTest : RecipeTest {
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
-        assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-        assertThat(valid.failures()[1].property).isEqualTo("targetType")
+        assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTargetTypeName")
+        assertThat(valid.failures()[1].property).isEqualTo("methodPattern")
 
         recipe = ChangeMethodTargetToStatic(null, "java.lang.String")
         valid = recipe.validate()
@@ -116,7 +116,7 @@ interface ChangeMethodTargetToStaticTest : RecipeTest {
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("targetType")
+        assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTargetTypeName")
     }
 
 }
