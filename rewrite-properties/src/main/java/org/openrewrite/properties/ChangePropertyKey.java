@@ -26,7 +26,7 @@ import org.openrewrite.properties.tree.Properties;
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
 
-    private final String originalPropertyKey;
+    private final String oldPropertyKey;
     private final String newPropertyKey;
 
     @Override
@@ -41,7 +41,7 @@ public class ChangePropertyKey extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, P p) {
-            if (entry.getKey().equals(originalPropertyKey)) {
+            if (entry.getKey().equals(oldPropertyKey)) {
                 entry = entry.withKey(newPropertyKey);
             }
             return super.visitEntry(entry, p);

@@ -32,7 +32,15 @@ import org.openrewrite.java.tree.TypeTree;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodName extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method declarations/invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
+
+    /**
+     * The method name that will replace the existing name.
+     */
     private final String newMethodName;
 
     @Override

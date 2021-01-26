@@ -37,31 +37,30 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeParentVersion extends Recipe {
     private final String groupId;
     private final String artifactId;
-    private final String toVersion;
+    private final String newVersion;
 
     @Nullable
-    private final String metadataPattern;
+    private final String versionPattern;
 
     @Override
     public Validated validate() {
         Validated validated = super.validate();
         //noinspection ConstantConditions
-        if (toVersion != null) {
-            validated = validated.and(Semver.validate(toVersion, metadataPattern));
+        if (newVersion != null) {
+            validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         return validated;
     }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new UpgradeParentVersionVisitor(groupId, artifactId, toVersion, metadataPattern);
+        return new UpgradeParentVersionVisitor(groupId, artifactId, newVersion, versionPattern);
     }
 
     private class UpgradeParentVersionVisitor extends MavenVisitor<ExecutionContext> {
@@ -108,7 +107,7 @@ public class UpgradeParentVersion extends Recipe {
                     .collect(Collectors.toList());
         }
 
-            LatestRelease latestRelease = new LatestRelease(metadataPattern);
+            LatestRelease latestRelease = new LatestRelease(versionPattern);
             return availableVersions.stream()
                     .filter(v -> latestRelease.compare(currentVersion, v) < 0)
                     .max(versionComparator);

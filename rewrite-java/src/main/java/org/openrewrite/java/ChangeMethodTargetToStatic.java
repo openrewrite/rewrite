@@ -32,8 +32,16 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToStatic extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
-    private final String targetType;
+
+    /**
+     * A fully-qualified class name of the type upon which the static method is defined.
+     */
+    private final String fullyQualifiedTargetTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -51,7 +59,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
             if (methodMatcher.matches(method)) {
-                JavaType.FullyQualified classType = JavaType.Class.build(targetType);
+                JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
 
                 m = method.withSelect(
                         new JRightPadded<>(
@@ -67,7 +75,7 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         )
                 );
 
-                maybeAddImport(targetType);
+                maybeAddImport(fullyQualifiedTargetTypeName);
 
                 JavaType.Method transformedType = null;
                 if (method.getType() != null) {

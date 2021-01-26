@@ -40,23 +40,27 @@ import java.util.List;
 @AllArgsConstructor
 public class ReorderMethodArguments extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
 
     /**
      * An array of parameter names that indicates the new order in which those arguments should be arranged.
      */
-    private final String[] orderedArgumentNames;
+    private final String[] newParameterNames;
 
     /**
-     * If the original method signature has changed, this is an optional list that indicates the original order
+     * If the original method signature is not type-attributed, this is an optional list that indicates the original order
      * in which the arguments were arranged.
      */
     @Nullable
-    private String[] originalOrderedArgumentNames = new String[0];
+    private String[] oldParameterNames = new String[0];
 
     public ReorderMethodArguments(String methodPattern, String[] orderedArgumentNames) {
         this.methodPattern = methodPattern;
-        this.orderedArgumentNames = orderedArgumentNames;
+        this.newParameterNames = orderedArgumentNames;
     }
 
     @Override
@@ -76,8 +80,8 @@ public class ReorderMethodArguments extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (methodMatcher.matches(m) && m.getType() != null) {
-                List<String> paramNames = originalOrderedArgumentNames.length == 0 ? m.getType().getParamNames() :
-                        Arrays.asList(originalOrderedArgumentNames);
+                List<String> paramNames = oldParameterNames.length == 0 ? m.getType().getParamNames() :
+                        Arrays.asList(oldParameterNames);
 
                 if (paramNames == null) {
                     throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +
@@ -94,7 +98,7 @@ public class ReorderMethodArguments extends Recipe {
                 List<Space> formattings = new ArrayList<>(originalArgs.size());
                 List<Space> rightFormattings = new ArrayList<>(originalArgs.size());
 
-                for (String name : orderedArgumentNames) {
+                for (String name : newParameterNames) {
                     int fromPos = paramNames.indexOf(name);
                     if (originalArgs.size() > resolvedParamCount && fromPos == resolvedParamCount - 1) {
                         // this is a varargs argument

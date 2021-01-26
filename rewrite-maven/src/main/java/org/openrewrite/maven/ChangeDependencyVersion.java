@@ -20,22 +20,18 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
-import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
 
-import static org.openrewrite.Validated.required;
-
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
     private final String groupId;
     private final String artifactId;
-    private final String toVersion;
+    private final String newVersion;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -57,11 +53,11 @@ public class ChangeDependencyVersion extends Recipe {
                     String version = versionTag.get().getValue().orElse(null);
                     if (version != null) {
                         if (version.trim().startsWith("${") &&
-                                !toVersion.equals(model.getProperty(version.trim()))) {
-                            ChangePropertyValue changePropertyValue = new ChangePropertyValue(version, toVersion);
+                                !newVersion.equals(model.getProperty(version.trim()))) {
+                            ChangePropertyValue changePropertyValue = new ChangePropertyValue(version, newVersion);
                             doAfterVisit(changePropertyValue);
-                        } else if (!toVersion.equals(version)) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), toVersion));
+                        } else if (!newVersion.equals(version)) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(versionTag.get(), newVersion));
                         }
                     }
                 }
@@ -72,7 +68,7 @@ public class ChangeDependencyVersion extends Recipe {
                 for (Pom module : modules) {
                     for (Pom.Dependency dependency : module.getDependencies()) {
                         if (propertyKeyRef.equals(dependency.getRequestedVersion())) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
+                            doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
                             break OUTER;
                         }
                     }

@@ -40,7 +40,15 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class DeleteMethodArgument extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
+
+    /**
+     * A zero-based index that indicates which argument will be removed from the method invocation.
+     */
     private final Integer argumentIndex;
 
     @Override

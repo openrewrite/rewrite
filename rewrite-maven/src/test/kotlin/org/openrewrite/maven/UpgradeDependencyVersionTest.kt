@@ -194,7 +194,7 @@ class UpgradeDependencyVersionTest : RecipeTest {
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(2)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("groupId")
-        Assertions.assertThat(valid.failures()[1].property).isEqualTo("toVersion")
+        Assertions.assertThat(valid.failures()[1].property).isEqualTo("newVersion")
 
         recipe = UpgradeDependencyVersion(null, "rewrite-maven", "latest.release", null)
         valid = recipe.validate()
@@ -206,7 +206,7 @@ class UpgradeDependencyVersionTest : RecipeTest {
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("toVersion")
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("newVersion")
 
         recipe = UpgradeDependencyVersion("org.openrewrite", "rewrite-maven", "latest.release", null)
         valid = recipe.validate()

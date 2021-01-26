@@ -23,6 +23,7 @@ import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.tree.J;
@@ -39,11 +40,31 @@ import static java.util.stream.Collectors.toList;
 /**
  * This recipe will find all annotations matching the annotation pattern and mark those elements with a
  * {@link SearchResult} marker.
+ *
+ * The annotation pattern, expressed as a pointcut expression, is used to find matching annotations. The format of the
+ * expression is as follows:
+ * <P><P><B>
+ * {@literal @}#annotationClass#(#parameterName#=#parameterValue#, #parameterName#=#parameterValue#...)
+ * </B><P>
+ * <li>The annotationClass must be fully qualified.</li>
+ * <li>The parameter name/value pairs can be in any order</li>
+ *
+ * <P><PRE>
+ * EXAMPLES:
+ *
+ * {@literal @}java.lang.SuppressWarnings                                 - Matches java.lang.SuppressWarnings with no parameters.
+ * {@literal @}myhttp.Get(serviceName="payments", path="recentPayments")  - Matches references to myhttp.Get where the parameters are also matched.
+ * {@literal @}myhttp.Get(path="recentPayments", serviceName="payments")  - Exaclty the same results from the previous example, order of parameters does not matter.
+ * {@literal @}java.lang.SuppressWarnings("deprecation")                  - Matches java.langSupressWarning with a single parameter.
+ * </PRE>
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindAnnotation extends Recipe {
 
+    /**
+     * An annotation pattern, expressed as a pointcut expression. See {@link FindAnnotation} for syntax.
+     */
     private final String annotationPattern;
 
     @Override

@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.AddToTagVisitor;
 import org.openrewrite.xml.ChangeTagValueVisitor;
@@ -28,8 +27,6 @@ import org.openrewrite.xml.RemoveContentVisitor;
 import org.openrewrite.xml.tree.Xml;
 
 import java.util.Optional;
-
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -41,7 +38,7 @@ public class ChangeDependencyScope extends Recipe {
      * If null, strips the scope from an existing dependency.
      */
     @Nullable
-    private final String toScope;
+    private final String newScope;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -61,13 +58,13 @@ public class ChangeDependencyScope extends Recipe {
                         artifactId.equals(tag.getChildValue("artifactId").orElse(null))) {
                     Optional<Xml.Tag> scope = tag.getChild("scope");
                     if (scope.isPresent()) {
-                        if (toScope == null) {
+                        if (newScope == null) {
                             doAfterVisit(new RemoveContentVisitor<>(scope.get(), false));
-                        } else if (!toScope.equals(scope.get().getValue().orElse(null))) {
-                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), toScope));
+                        } else if (!newScope.equals(scope.get().getValue().orElse(null))) {
+                            doAfterVisit(new ChangeTagValueVisitor<>(scope.get(), newScope));
                         }
                     } else {
-                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + toScope + "</scope>")));
+                        doAfterVisit(new AddToTagVisitor<>(tag, Xml.Tag.build("<scope>" + newScope + "</scope>")));
                     }
                 }
             }

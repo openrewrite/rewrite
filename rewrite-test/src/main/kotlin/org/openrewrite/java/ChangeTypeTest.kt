@@ -375,20 +375,20 @@ interface ChangeTypeTest : RecipeTest {
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
-        assertThat(valid.failures()[0].property).isEqualTo("originalType")
-        assertThat(valid.failures()[1].property).isEqualTo("replacementType")
+        assertThat(valid.failures()[0].property).isEqualTo("newFullyQualifiedTypeName")
+        assertThat(valid.failures()[1].property).isEqualTo("oldFullyQualifiedTypeName")
 
         recipe = ChangeType(null, "java.lang.String")
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("originalType")
+        assertThat(valid.failures()[0].property).isEqualTo("oldFullyQualifiedTypeName")
 
         recipe = ChangeType("java.lang.String", null)
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("replacementType")
+        assertThat(valid.failures()[0].property).isEqualTo("newFullyQualifiedTypeName")
     }
 
 }

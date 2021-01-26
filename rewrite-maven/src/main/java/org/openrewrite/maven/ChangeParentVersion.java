@@ -20,12 +20,9 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.XPathMatcher;
 import org.openrewrite.xml.tree.Xml;
-
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -35,7 +32,7 @@ public class ChangeParentVersion extends Recipe {
 
     private final String groupId;
     private final String artifactId;
-    private final String toVersion;
+    private final String newVersion;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -54,8 +51,8 @@ public class ChangeParentVersion extends Recipe {
                 Xml.Tag parent = getCursor().getParentOrThrow().getValue();
                 if (groupId.equals(parent.getChildValue("groupId").orElse(null)) &&
                         artifactId.equals(parent.getChildValue("artifactId").orElse(null)) &&
-                        !toVersion.equals(tag.getValue().orElse(null))) {
-                    doAfterVisit(new ChangeTagValueVisitor<>(tag, toVersion));
+                        !newVersion.equals(tag.getValue().orElse(null))) {
+                    doAfterVisit(new ChangeTagValueVisitor<>(tag, newVersion));
                 }
             }
             return super.visitTag(tag, ctx);

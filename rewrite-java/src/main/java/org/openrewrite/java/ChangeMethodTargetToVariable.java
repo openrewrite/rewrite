@@ -32,6 +32,10 @@ import static org.openrewrite.Tree.randomId;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeMethodTargetToVariable extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
     private final String variableName;
     private final String variableType;

@@ -74,7 +74,7 @@ class UpgradeParentVersionTest : RecipeTest {
         assertThat(valid.failures()).hasSize(3)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("groupId")
-        assertThat(valid.failures()[2].property).isEqualTo("toVersion")
+        assertThat(valid.failures()[2].property).isEqualTo("newVersion")
 
         recipe = UpgradeParentVersion(null, "rewrite-maven", "latest.release", null)
         valid = recipe.validate()
@@ -87,7 +87,7 @@ class UpgradeParentVersionTest : RecipeTest {
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
-        assertThat(valid.failures()[1].property).isEqualTo("toVersion")
+        assertThat(valid.failures()[1].property).isEqualTo("newVersion")
 
         recipe = UpgradeParentVersion("org.openrewrite", "rewrite-maven", "latest.release", null)
         valid = recipe.validate()

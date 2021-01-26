@@ -39,7 +39,6 @@ import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static org.openrewrite.Validated.required;
 
 /**
  * Upgrade the version a group or group and artifact using Node Semver
@@ -58,22 +57,22 @@ public class UpgradeDependencyVersion extends Recipe {
     /**
      * Node Semver range syntax.
      */
-    private final String toVersion;
+    private final String newVersion;
 
     /**
      * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     * The {@link HyphenRange} of "25-29" can be paired with a metadata pattern of "-jre" to select
+     * The {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
      * Guava 29.0-jre
      */
     @Nullable
-    private final String metadataPattern;
+    private final String versionPattern;
 
     @SuppressWarnings("ConstantConditions")
     @Override
     public Validated validate() {
         Validated validated = super.validate();
-        if (toVersion != null) {
-            validated = validated.and(Semver.validate(toVersion, metadataPattern));
+        if (newVersion != null) {
+            validated = validated.and(Semver.validate(newVersion, versionPattern));
         }
         return validated;
     }
@@ -93,7 +92,7 @@ public class UpgradeDependencyVersion extends Recipe {
 
         public UpgradeDependencyVersionVisitor() {
             //noinspection ConstantConditions
-            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
+            versionComparator = Semver.validate(newVersion, versionPattern).getValue();
             setCursoringOn();
         }
 
@@ -139,7 +138,7 @@ public class UpgradeDependencyVersion extends Recipe {
                     .collect(Collectors.toList());
         }
 
-            LatestRelease latestRelease = new LatestRelease(metadataPattern);
+            LatestRelease latestRelease = new LatestRelease(versionPattern);
             return availableVersions.stream()
                     .filter(v -> latestRelease.compare(currentVersion, v) < 0)
                     .max(versionComparator);

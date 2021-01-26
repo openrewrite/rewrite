@@ -31,16 +31,16 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public class FindTag extends Recipe {
 
-    private final String path;
+    private final String xPath;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindTagVisitor(new XPathMatcher(path));
+        return new FindTagVisitor(new XPathMatcher(xPath));
     }
 
-    public static Set<Xml.Tag> find(Xml x, String path) {
+    public static Set<Xml.Tag> find(Xml x, String xPath) {
         //noinspection ConstantConditions
-        return new FindTagVisitor(new XPathMatcher(path)).visit(x, ExecutionContext.builder().build())
+        return new FindTagVisitor(new XPathMatcher(xPath)).visit(x, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 

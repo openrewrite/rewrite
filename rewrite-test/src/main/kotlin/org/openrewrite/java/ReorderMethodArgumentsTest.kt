@@ -177,14 +177,14 @@ interface ReorderMethodArgumentsTest : RecipeTest {
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-        assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.failures()[1].property).isEqualTo("newParameterNames")
 
         cm = ReorderMethodArguments(null, null, arrayOf("a"))
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
-        assertThat(valid.failures()[1].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.failures()[1].property).isEqualTo("newParameterNames")
 
         cm = ReorderMethodArguments(null, arrayOf("a"),null)
         valid = cm.validate()
@@ -196,6 +196,6 @@ interface ReorderMethodArgumentsTest : RecipeTest {
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("orderedArgumentNames")
+        assertThat(valid.failures()[0].property).isEqualTo("newParameterNames")
     }
 }

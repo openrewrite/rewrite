@@ -22,17 +22,14 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.xml.ChangeTagValueVisitor;
 import org.openrewrite.xml.tree.Xml;
-
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyValue extends Recipe {
     private final String key;
-    private final String toValue;
+    private final String newValue;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -40,14 +37,14 @@ public class ChangePropertyValue extends Recipe {
     }
 
     @JsonCreator
-    public ChangePropertyValue(@JsonProperty("key") String key, @JsonProperty("toValue") String toValue) {
+    public ChangePropertyValue(@JsonProperty("key") String key, @JsonProperty("newValue") String newValue) {
         //Customizing lombok constructor to replace the property markers.
         //noinspection ConstantConditions
         if (key != null) {
             key = key.replace("${", "").replace("}", "");
         }
         this.key = key;
-        this.toValue = toValue;
+        this.newValue = newValue;
     }
 
     private class ChangePropertyValueVisitor extends MavenVisitor<ExecutionContext> {
@@ -59,8 +56,8 @@ public class ChangePropertyValue extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (isPropertyTag() && key.equals(tag.getName()) &&
-                    !toValue.equals(tag.getValue().orElse(null))) {
-                doAfterVisit(new ChangeTagValueVisitor<>(tag, toValue));
+                    !newValue.equals(tag.getValue().orElse(null))) {
+                doAfterVisit(new ChangeTagValueVisitor<>(tag, newValue));
             }
             return super.visitTag(tag, ctx);
         }

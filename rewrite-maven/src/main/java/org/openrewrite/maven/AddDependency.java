@@ -30,12 +30,13 @@ import java.util.regex.Pattern;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class AddDependency extends Recipe {
+
     private final String groupId;
     private final String artifactId;
 
     /**
-     * When other modules exist from the same dependency family, defined as those dependencies whose
-     * groupId matches {@link #familyPattern}, we ignore version and attempt to align the new dependency
+     * When other modules exist from the same dependency family, defined as those dependencies whose groupId matches
+     * {@link #familyPattern}, this recipe will ignore the version attribute and attempt to align the new dependency
      * with the highest version already in use.
      * <p>
      * To pull the whole family up to a later version, use {@link UpgradeDependencyVersion}.
@@ -44,11 +45,11 @@ public class AddDependency extends Recipe {
 
     /**
      * Allows version selection to be extended beyond the original Node Semver semantics. So for example,
-     * A {@link HyphenRange} of "25-29" can be paried with a metadata pattern of "-jre" to select
+     * A {@link HyphenRange} of "25-29" can be paired with a metadata pattern of "-jre" to select
      * Guava 29.0-jre
      */
     @Nullable
-    private String metadataPattern;
+    private String versionPattern;
 
     private boolean releasesOnly = true;
 
@@ -67,14 +68,14 @@ public class AddDependency extends Recipe {
     private String familyPattern;
 
     /**
-     * Allows us to extend version selection beyond the original Node Semver semantics. So for example,
-     * We can pair a {@link HyphenRange} of "25-29" with a metadata pattern of "-jre" to select
+     * Allows the version selection to be extended beyond the original Node Semver semantics. So for example,
+     * a {@link HyphenRange} of "25-29" can be paired with a version pattern of "-jre" to select
      * Guava 29.0-jre
      *
-     * @param metadataPattern The metadata pattern extending semver selection.
+     * @param versionPattern The version pattern extending semver selection.
      */
-    public void setMetadataPattern(@Nullable String metadataPattern) {
-        this.metadataPattern = metadataPattern;
+    public void setVersionPattern(@Nullable String versionPattern) {
+        this.versionPattern = versionPattern;
     }
 
     public void setClassifier(@Nullable String classifier) {
@@ -104,8 +105,9 @@ public class AddDependency extends Recipe {
     @Override
     public Validated validate() {
         Validated validated = super.validate();
+        //noinspection ConstantConditions
         if (version != null) {
-            validated = validated.or(Semver.validate(version, metadataPattern));
+            validated = validated.or(Semver.validate(version, versionPattern));
         }
         return validated;
     }
@@ -116,7 +118,7 @@ public class AddDependency extends Recipe {
                 groupId,
                 artifactId,
                 version,
-                metadataPattern,
+                versionPattern,
                 releasesOnly,
                 classifier,
                 scope,

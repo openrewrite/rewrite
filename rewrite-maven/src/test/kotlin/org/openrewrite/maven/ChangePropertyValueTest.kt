@@ -63,7 +63,7 @@ class ChangePropertyValueTest : RecipeTest {
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("key")
-        assertThat(valid.failures()[1].property).isEqualTo("toValue")
+        assertThat(valid.failures()[1].property).isEqualTo("newValue")
 
         recipe = ChangePropertyValue(null, "8")
         valid = recipe.validate()
@@ -75,7 +75,7 @@ class ChangePropertyValueTest : RecipeTest {
         valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("toValue")
+        assertThat(valid.failures()[0].property).isEqualTo("newValue")
 
         recipe = ChangePropertyValue("java.version", "8")
         valid = recipe.validate()

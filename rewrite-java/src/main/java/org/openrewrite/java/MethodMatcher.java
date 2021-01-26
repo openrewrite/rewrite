@@ -34,6 +34,28 @@ import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.joining;
 
+/**
+ * This class accepts an AspectJ pointcut expression and is used to identify methods that match the expression. The
+ * format of the pointcut expression is as follows:
+ * <P><P><B>
+ * #declaring class# #method name#(#argument list#)
+ * </B><P>
+ * <li>The declaring class must be fully qualified.</li>
+ * <li>A wildcard character, "*", may be used in either the declaring class or method name.</li>
+ * <li>The argument list is expressed as a comma-separated list of the argument types</li>
+ * <li>".." can be used in the argument list to match zero or more arguments of any type.</li>
+ * <P><PRE>
+ * EXAMPLES:
+ *
+ *      * *(..)                                 - All method invocations
+ *      java.util.* *(..)                       - All method invocations to classes belonging to java.util (including sub-packages)
+ *      java.util.Collections *(..)             - All method invocations on java.util.Collections class
+ *      java.util.Collections unmodifiable*(..) - All method invocations starting with "unmodifiable" on java.util.Collections
+ *      java.util.Collections min(..)           - All method invocations for all overloads of "min"
+ *      java.util.Collections emptyList()       - All method invocations on java.util.Collections.emptyList()
+ *      my.org.MyClass *(boolean, ..)           - All method invocations where the first arg is a boolean in my.org.MyClass
+ * </PRE>
+ */
 @Getter
 public class MethodMatcher {
     private Pattern targetTypePattern;

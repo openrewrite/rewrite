@@ -323,7 +323,7 @@ class ChangeDependencyVersionTest : RecipeTest {
         Assertions.assertThat(valid.failures()).hasSize(3)
         Assertions.assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         Assertions.assertThat(valid.failures()[1].property).isEqualTo("groupId")
-        Assertions.assertThat(valid.failures()[2].property).isEqualTo("toVersion")
+        Assertions.assertThat(valid.failures()[2].property).isEqualTo("newVersion")
 
         recipe = ChangeDependencyVersion(null, "rewrite-maven", "1.0.1")
         valid = recipe.validate()
@@ -341,7 +341,7 @@ class ChangeDependencyVersionTest : RecipeTest {
         valid = recipe.validate()
         Assertions.assertThat(valid.isValid).isFalse()
         Assertions.assertThat(valid.failures()).hasSize(1)
-        Assertions.assertThat(valid.failures()[0].property).isEqualTo("toVersion")
+        Assertions.assertThat(valid.failures()[0].property).isEqualTo("newVersion")
 
         recipe = ChangeDependencyVersion("org.openrewrite", "rewrite-maven", "1.0.1")
         valid = recipe.validate()

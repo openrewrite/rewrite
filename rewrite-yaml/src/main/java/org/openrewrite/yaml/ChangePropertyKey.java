@@ -41,7 +41,7 @@ import static org.openrewrite.Tree.randomId;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
-    private final String originalPropertyKey;
+    private final String oldPropertyKey;
     private final String newPropertyKey;
     private final boolean coalesce = true;
 
@@ -70,7 +70,7 @@ public class ChangePropertyKey extends Recipe {
                     .collect(Collectors.joining("."));
 
             String propertyToTest = newPropertyKey;
-            if (prop.equals(originalPropertyKey)) {
+            if (prop.equals(oldPropertyKey)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();

@@ -31,6 +31,10 @@ import org.openrewrite.java.tree.JavaType;
 @EqualsAndHashCode(callSuper = true)
 public class UseStaticImport extends Recipe {
 
+    /**
+     * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
+     * See {@link  MethodMatcher} for details on the expression's syntax.
+     */
     private final String methodPattern;
 
     @Override

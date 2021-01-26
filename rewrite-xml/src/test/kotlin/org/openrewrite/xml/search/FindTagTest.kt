@@ -108,7 +108,7 @@ class FindTagTest : RecipeTest {
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
-        assertThat(valid.failures()[0].property).isEqualTo("path")
+        assertThat(valid.failures()[0].property).isEqualTo("xPath")
 
         recipe = FindTag("/dependencies/dependency")
         valid = recipe.validate()
