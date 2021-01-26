@@ -75,8 +75,8 @@ public class Environment {
         return activated;
     }
 
-    public Environment(Collection<ResourceLoader> resourceLoaders) {
-        this.resourceLoaders = resourceLoaders;
+    public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
+        this.resourceLoaders = (Collection<ResourceLoader>) resourceLoaders;
     }
 
     public static Builder builder(Properties properties) {
