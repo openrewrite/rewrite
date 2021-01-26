@@ -57,7 +57,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 }
             }
         }
-        visitEach(parent.getValue(), p);
+        visitEach((J) parent.getPath(J.class::isInstance).next(), p);
         return visit(tree, p);
     }
 
@@ -106,6 +106,10 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
         }
 
+        // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
+        boolean alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
+                !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
+
         if (!space.getWhitespace().contains("\n") || parent == null) {
             return space;
         }
@@ -117,10 +121,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
         // block spaces are always aligned to their parent
         boolean alignBlockToParent = getCursor().getValue() instanceof J.Block;
-
-        // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
-        boolean alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
-                !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
 
         if (alignBlockToParent || alignToAnnotation) {
             indentType = IndentType.ALIGN;
@@ -187,9 +187,28 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     }
                     break;
                 }
-                case ARRAY_INDEX:
                 case METHOD_INVOCATION_ARGUMENT:
                 case NEW_CLASS_ARGS:
+                    JContainer<J> args = getCursor().getParentOrThrow().getValue();
+//                    boolean seenArg = false;
+//                    boolean anyOtherArgOnOwnLine = false;
+//                    for (JRightPadded<J> arg : args.getElem()) {
+//                        if(arg == getCursor().getValue()) {
+//                            seenArg = true;
+//                            continue;
+//                        }
+//                        if(seenArg && arg.getElem().getPrefix().getWhitespace().contains("\n")) {
+//                            anyOtherArgOnOwnLine = true;
+//                            break;
+//                        }
+//                    }
+//                    if(!anyOtherArgOnOwnLine) {
+//                        getCursor().putMessage("lastIndent", indent - style.getContinuationIndent());
+//                    }
+                    j = visitAndCast(right.getElem(), p);
+                    after = indentTo(right.getAfter(), indent);
+                    break;
+                case ARRAY_INDEX:
                 case PARENTHESES:
                 case TYPE_PARAMETER: {
                     j = visitAndCast(right.getElem(), p);
@@ -263,8 +282,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             }
         } else {
             switch (loc) {
-                case METHOD_INVOCATION_ARGUMENT:
                 case IMPLEMENTS:
+                case METHOD_INVOCATION_ARGUMENT:
                 case NEW_CLASS_ARGS:
                 case TYPE_PARAMETER:
                 case THROWS:

@@ -17,11 +17,14 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
+import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
+import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.java.style.TabsAndIndentsStyle
+import org.openrewrite.java.tree.J
 import org.openrewrite.style.NamedStyles
 
 interface TabsAndIndentsTest : RecipeTest {
@@ -43,7 +46,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 void method(Test t) {
                     this
                       .method(
-                        t
+                          t
                       );
                 }
             }
@@ -533,17 +536,49 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun annotationOnSameLine(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test { 
+                @Bean int method() {
+                    return 1;
+                }
+            }
+        """
+    )
+
+    @Test
     @Disabled
-    fun binaryExpressionsAsNestedMethodArgument(jp: JavaParser) = assertUnchanged(
+    fun methodArgumentsThatDontStartOnNewLine(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             import java.io.File;
             class Test {
-                void method(int n, File f) {
-                    method(n, new File("test" +
+                void method(int n, File f, int m, int l) {
+                    method(n, new File(
                                     "test"
-                            )
-                    );
+                            ),
+                            m,
+                            l);
+                }
+            
+                void method2(int n, File f, int m) {
+                    method(n, new File(
+                                    "test"
+                            ), m,
+                            0);
+                }
+            
+                void method3(int n, File f) {
+                    method2(n, new File(
+                            "test"
+                    ), 0);
+                }
+            
+                void method4(int n) {
+                    method3(n, new File(
+                            "test"
+                    ));
                 }
             }
         """
@@ -796,6 +831,28 @@ interface TabsAndIndentsTest : RecipeTest {
                 String classifier;
             }
         """
+    )
+
+    @Test
+    fun lambdaMethodParameter2(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Function;
+
+            abstract class Test {
+                abstract Test a(Function<Test, Test> f);
+                abstract Test b(Function<Test, Test> f);
+                abstract Test c(Function<Test, Test> f);
+
+                Test method(Function<Test, Test> f) {
+                    return a(f)
+                            .b(
+                                    t ->
+                                            c(f)
+                            );
+                }
+            }
+        """.trimIndent()
     )
 
     @Test
