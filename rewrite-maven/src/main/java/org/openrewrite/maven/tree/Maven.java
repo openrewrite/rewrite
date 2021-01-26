@@ -34,7 +34,7 @@ public class Maven extends Xml.Document {
     private final transient Collection<Pom> modules;
     private final transient MavenSettings settings;
 
-    public Maven(Xml.Document document, MavenSettings settings) {
+    public Maven(Xml.Document document, @Nullable MavenSettings settings) {
         super(
                 document.getId(),
                 document.getSourcePath(),
