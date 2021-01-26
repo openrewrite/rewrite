@@ -28,13 +28,17 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.internal.PropertiesPrinter;
+import org.openrewrite.properties.internal.PropertyListMarkerVisitor;
 
 import java.io.Serializable;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
@@ -59,6 +63,19 @@ public interface Properties extends Serializable, Tree {
     @Nullable
     default <P> Properties acceptProperties(PropertiesVisitor<P> v, P p) {
         return v.defaultValue(this, p);
+    }
+
+    /**
+     * Find all subtrees marked with a particular marker rooted at this tree.
+     *
+     * @param markerType The marker type to look for
+     * @param <P2>       The expected supertype common to all subtrees that could be found.
+     * @return The set of matching subtrees.
+     */
+    default <P2 extends Properties> Set<P2> findMarkedWith(Class<? extends Marker> markerType) {
+        Set<P2> trees = new HashSet<>();
+        new PropertyListMarkerVisitor<P2>(markerType).visit(this, trees);
+        return trees;
     }
 
     String getPrefix();

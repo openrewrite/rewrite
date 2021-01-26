@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.RecipeTest
@@ -139,4 +140,30 @@ class ExcludeDependencyTest : RecipeTest {
             </project>
         """
     )
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = ExcludeDependency(null, null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        assertThat(valid.failures()[1].property).isEqualTo("groupId")
+
+        recipe = ExcludeDependency(null, "rewrite-maven")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("groupId")
+
+        recipe = ExcludeDependency("org.openrewrite", null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+
+        recipe = ExcludeDependency("org.openrewrite", "rewrite-maven")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

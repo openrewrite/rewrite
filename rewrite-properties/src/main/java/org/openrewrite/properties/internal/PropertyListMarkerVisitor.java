@@ -13,24 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.openrewrite.properties;
+package org.openrewrite.properties.internal;
 
-import org.openrewrite.TreeVisitor;
-import org.openrewrite.internal.ListUtils;
+
+import org.openrewrite.marker.Marker;
+import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
-public class PropertiesVisitor<P> extends TreeVisitor<Properties, P> {
+import java.util.Set;
 
-    public Properties visitFile(Properties.File file, P p) {
-        Properties.File f = visitAndCast(file, p, this::visitEach);
-        return f.withContent(ListUtils.map(file.getContent(), c -> visitAndCast(c, p)));
+public class PropertyListMarkerVisitor<T> extends PropertiesVisitor<Set<T>> {
+
+    private final Class<? extends Marker> markerType;
+
+    public PropertyListMarkerVisitor(Class<? extends Marker> markerType) {
+        this.markerType = markerType;
     }
 
-    public Properties visitEntry(Properties.Entry entry, P p) {
-        return visitAndCast(entry, p, this::visitEach);
-    }
-
-    public Properties visitComment(Properties.Comment comment, P p) {
-        return visitAndCast(comment, p, this::visitEach);
+    @Override
+    public Properties visitEach(Properties p, Set<T> ts) {
+        if (p.getMarkers().findFirst(markerType).isPresent()) {
+            //noinspection unchecked
+            ts.add((T) p);
+        }
+        return super.visitEach(p, ts);
     }
 }

@@ -15,7 +15,7 @@
  */
 package org.openrewrite.maven
 
-import org.junit.jupiter.api.Assertions.assertEquals
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 import org.openrewrite.maven.cache.InMemoryCache
@@ -76,7 +76,7 @@ class RemoveDependencyTest : RecipeTest {
             </project>
         """,
         afterConditions = { maven: Maven ->
-            assertEquals(1, maven.model.dependencies.size)
+            assertThat(maven.model.dependencies).hasSize(1)
         }
     )
 
@@ -100,4 +100,31 @@ class RemoveDependencyTest : RecipeTest {
             </project>
         """
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = RemoveDependency(null, null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        assertThat(valid.failures()[1].property).isEqualTo("groupId")
+
+        recipe = RemoveDependency(null, "rewrite-maven")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("groupId")
+
+        recipe = RemoveDependency("org.openrewrite", null)
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+
+        recipe = RemoveDependency("org.openrewrite", "rewrite-maven")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

@@ -34,10 +34,7 @@ import static org.openrewrite.Validated.required;
 @EqualsAndHashCode(callSuper = true)
 public class ChangeDependencyVersion extends Recipe {
     private final String groupId;
-
-    @Nullable
     private final String artifactId;
-
     private final String toVersion;
 
     @Override
@@ -45,12 +42,6 @@ public class ChangeDependencyVersion extends Recipe {
         return new ChangeDependencyVersionVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId))
-                .and(required("toVersion", toVersion));
-    }
 
     private class ChangeDependencyVersionVisitor extends MavenVisitor<ExecutionContext> {
 

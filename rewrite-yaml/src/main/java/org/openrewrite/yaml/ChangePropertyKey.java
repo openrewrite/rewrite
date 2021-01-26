@@ -16,10 +16,10 @@
 package org.openrewrite.yaml;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.yaml.tree.Yaml;
@@ -32,7 +32,6 @@ import static java.util.Spliterators.spliteratorUnknownSize;
 import static java.util.stream.Collectors.toList;
 import static java.util.stream.StreamSupport.stream;
 import static org.openrewrite.Tree.randomId;
-import static org.openrewrite.Validated.required;
 
 /**
  * When nested YAML mappings are interpreted as dot
@@ -40,16 +39,11 @@ import static org.openrewrite.Validated.required;
  * interprets application.yml files.
  */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class ChangePropertyKey extends Recipe {
-    private final String property;
-    private final String toProperty;
+    private final String originalPropertyKey;
+    private final String newPropertyKey;
     private final boolean coalesce = true;
-
-    @Override
-    public Validated validate() {
-        return required("property", property)
-                .and(required("toProperty", toProperty));
-    }
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
@@ -75,8 +69,8 @@ public class ChangePropertyKey extends Recipe {
                     .map(e2 -> e2.getKey().getValue())
                     .collect(Collectors.joining("."));
 
-            String propertyToTest = toProperty;
-            if (prop.equals(property)) {
+            String propertyToTest = newPropertyKey;
+            if (prop.equals(originalPropertyKey)) {
                 Iterator<Yaml.Mapping.Entry> propertyEntriesLeftToRight = propertyEntries.descendingIterator();
                 while (propertyEntriesLeftToRight.hasNext()) {
                     Yaml.Mapping.Entry propertyEntry = propertyEntriesLeftToRight.next();

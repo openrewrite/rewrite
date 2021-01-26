@@ -63,11 +63,7 @@ public class ManageDependencies extends Recipe {
     @Nullable
     private final String version;
 
-    @Override
-    public Validated validate() {
-        return required("groupPattern", groupPattern);
-    }
-
+    @SuppressWarnings("ConstantConditions")
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ManageDependenciesVisitor(
@@ -78,12 +74,12 @@ public class ManageDependencies extends Recipe {
 
     private class ManageDependenciesVisitor extends MavenVisitor<ExecutionContext> {
 
-        @Nullable
         private final Pattern groupPattern;
 
         @Nullable
         private final Pattern artifactPattern;
 
+        @Nullable
         private String selectedVersion;
 
         private ManageDependenciesVisitor(Pattern groupPattern, @Nullable Pattern artifactPattern) {
@@ -173,8 +169,7 @@ public class ManageDependencies extends Recipe {
                             "\n<dependency>\n" +
                                     "<groupId>" + groupId + "</groupId>\n" +
                                     "<artifactId>" + artifactId + "</artifactId>\n" +
-                                    (version == null ? "" :
-                                            "<version>" + version + "</version>\n") +
+                                    "<version>" + version + "</version>\n" +
                                     "</dependency>"
                     );
 

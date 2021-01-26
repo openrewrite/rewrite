@@ -136,6 +136,30 @@ interface RecipeTest {
         }
     }
 
+    fun assertUnchanged(
+        parser: Parser<*>? = this.parser,
+        recipe: Recipe? = this.recipe,
+        before: File,
+        dependsOn: Array<File> = emptyArray()
+    ) {
+        assertThat(recipe).`as`("A recipe must be specified").isNotNull
+
+        val source = parser!!.parse((listOf(before) + dependsOn).map { it.toPath() }, null).first()
+        val results = recipe!!.run(listOf(source))
+
+        results.forEach { result ->
+            if (result.diff().isEmpty()) {
+                fail("An empty diff was generated. The recipe incorrectly changed a reference without changing its contents.")
+            }
+        }
+
+        for (result in results) {
+            assertThat(result.after?.print())
+                .`as`("The recipe must not make changes")
+                .isEqualTo(result.before?.print())
+        }
+    }
+
     fun JavaVisitor<ExecutionContext>.toRecipe(cursored: Boolean = false) = object : Recipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
             if(cursored) {

@@ -218,12 +218,7 @@ public class Space implements Markable {
         return trees;
     }
 
-    @Nullable
-    public static <J2 extends J> List<J2> formatFirstPrefix(@Nullable List<J2> trees, Space prefix) {
-        if (trees == null) {
-            return null;
-        }
-
+    public static <J2 extends J> List<J2> formatFirstPrefix(List<J2> trees, Space prefix) {
         if (!trees.isEmpty()) {
             List<J2> formattedTrees = new ArrayList<>(trees);
             formattedTrees.set(0, formattedTrees.get(0).withPrefix(prefix));

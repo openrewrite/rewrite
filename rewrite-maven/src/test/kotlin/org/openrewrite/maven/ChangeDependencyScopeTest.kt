@@ -15,6 +15,7 @@
  */
 package org.openrewrite.maven
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.RecipeTest
 
@@ -142,4 +143,31 @@ class ChangeDependencyScopeTest : RecipeTest {
             </project>
         """
     )
+
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = ChangeDependencyScope(null, null, null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(2)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+        assertThat(valid.failures()[1].property).isEqualTo("groupId")
+
+        recipe = ChangeDependencyScope(null, "rewrite-maven", "test")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("groupId")
+
+        recipe = ChangeDependencyScope("org.openrewrite", null, "test")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("artifactId")
+
+        recipe = ChangeDependencyScope("org.openrewrite", "rewrite-maven", "test")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

@@ -42,13 +42,6 @@ public class ChangeParentVersion extends Recipe {
         return new ChangeParentVersionVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId))
-                .and(required("toVersion", toVersion));
-    }
-
     private class ChangeParentVersionVisitor extends MavenVisitor<ExecutionContext> {
 
         private ChangeParentVersionVisitor() {

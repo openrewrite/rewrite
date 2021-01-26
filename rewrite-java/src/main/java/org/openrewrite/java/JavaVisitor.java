@@ -121,129 +121,130 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitAnnotatedType(J.AnnotatedType annotatedType, P p) {
-        J.AnnotatedType a = call(annotatedType, p, this::visitEach);
+        J.AnnotatedType a = visitAndCast(annotatedType, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitExpression);
-        a = a.withAnnotations(call(a.getAnnotations(), p));
-        a = a.withTypeExpr(call(a.getTypeExpr(), p));
+        a = visitAndCast(a, p, this::visitExpression);
+        a = a.withAnnotations(ListUtils.map(a.getAnnotations(), e -> visitAndCast(e, p)));
+        a = a.withTypeExpr(visitAndCast(a.getTypeExpr(), p));
         return a.withTypeExpr(visitTypeName(a.getTypeExpr(), p));
     }
 
     public J visitAnnotation(J.Annotation annotation, P p) {
-        J.Annotation a = call(annotation, p, this::visitEach);
+        J.Annotation a = visitAndCast(annotation, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitExpression);
+        a = visitAndCast(a, p, this::visitExpression);
         if (a.getArgs() != null) {
             a = a.withArgs(visitContainer(a.getArgs(), JContainer.Location.ANNOTATION_ARGUMENT, p));
         }
-        a = a.withAnnotationType(call(a.getAnnotationType(), p));
+        a = a.withAnnotationType(visitAndCast(a.getAnnotationType(), p));
         return a.withAnnotationType(visitTypeName(a.getAnnotationType(), p));
     }
 
     public J visitArrayAccess(J.ArrayAccess arrayAccess, P p) {
-        J.ArrayAccess a = call(arrayAccess, p, this::visitEach);
+        J.ArrayAccess a = visitAndCast(arrayAccess, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitExpression);
-        a = a.withIndexed(call(a.getIndexed(), p));
-        a = a.withDimension(call(a.getDimension(), p));
+        a = visitAndCast(a, p, this::visitExpression);
+        a = a.withIndexed(visitAndCast(a.getIndexed(), p));
+        a = a.withDimension(visitAndCast(a.getDimension(), p));
         return a;
     }
 
     public J visitArrayDimension(J.ArrayDimension arrayDimension, P p) {
-        J.ArrayDimension a = call(arrayDimension, p, this::visitEach);
+        J.ArrayDimension a = visitAndCast(arrayDimension, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
         a = a.withIndex(visitRightPadded(a.getIndex(), JRightPadded.Location.ARRAY_INDEX, p));
         return a;
     }
 
     public J visitArrayType(J.ArrayType arrayType, P p) {
-        J.ArrayType a = call(arrayType, p, this::visitEach);
+        J.ArrayType a = visitAndCast(arrayType, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitExpression);
-        a.withElementType(call(a.getElementType(), p));
+        a = visitAndCast(a, p, this::visitExpression);
+        a.withElementType(visitAndCast(a.getElementType(), p));
         return a.withElementType(visitTypeName(a.getElementType(), p));
     }
 
     public J visitAssert(J.Assert azzert, P p) {
-        J.Assert a = call(azzert, p, this::visitEach);
+        J.Assert a = visitAndCast(azzert, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitStatement);
-        return a.withCondition(call(a.getCondition(), p));
+        a = visitAndCast(a, p, this::visitStatement);
+        return a.withCondition(visitAndCast(a.getCondition(), p));
     }
 
     public J visitAssign(J.Assign assign, P p) {
-        J.Assign a = call(assign, p, this::visitEach);
+        J.Assign a = visitAndCast(assign, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitStatement);
-        a = call(a, p, this::visitExpression);
-        a = a.withVariable(call(a.getVariable(), p));
+        a = visitAndCast(a, p, this::visitStatement);
+        a = visitAndCast(a, p, this::visitExpression);
+        a = a.withVariable(visitAndCast(a.getVariable(), p));
         return a.withAssignment(visitLeftPadded(a.getAssignment(), JLeftPadded.Location.ASSIGNMENT, p));
     }
 
     public J visitAssignOp(J.AssignOp assignOp, P p) {
-        J.AssignOp a = call(assignOp, p, this::visitEach);
+        J.AssignOp a = visitAndCast(assignOp, p, this::visitEach);
         a = a.withPrefix(visitSpace(a.getPrefix(), p));
-        a = call(a, p, this::visitStatement);
-        a = call(a, p, this::visitExpression);
-        a = a.withVariable(call(a.getVariable(), p));
-        return a.withAssignment(call(a.getAssignment(), p));
+        a = visitAndCast(a, p, this::visitStatement);
+        a = visitAndCast(a, p, this::visitExpression);
+        a = a.withVariable(visitAndCast(a.getVariable(), p));
+        return a.withAssignment(visitAndCast(a.getAssignment(), p));
     }
 
     public J visitBinary(J.Binary binary, P p) {
-        J.Binary b = call(binary, p, this::visitEach);
+        J.Binary b = visitAndCast(binary, p, this::visitEach);
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
-        b = call(b, p, this::visitExpression);
-        b = b.withLeft(call(b.getLeft(), p));
+        b = visitAndCast(b, p, this::visitExpression);
+        b = b.withLeft(visitAndCast(b.getLeft(), p));
         b = b.withOperator(visitLeftPadded(b.getOperator(), JLeftPadded.Location.BINARY_OPERATOR, p));
-        return b.withRight(call(b.getRight(), p));
+        return b.withRight(visitAndCast(b.getRight(), p));
     }
 
     public J visitBlock(J.Block block, P p) {
-        J.Block b = call(block, p, this::visitEach);
+        J.Block b = visitAndCast(block, p, this::visitEach);
         b = b.withStatik(b.getStatic() == null ?
                 null :
                 visitSpace(b.getStatic(), p));
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
-        b = call(b, p, this::visitStatement);
+        b = visitAndCast(b, p, this::visitStatement);
         b = b.withStatements(ListUtils.map(b.getStatements(), t ->
                 visitRightPadded(t, JRightPadded.Location.BLOCK_STATEMENT, p)));
         return b.withEnd(visitSpace(b.getEnd(), p));
     }
 
     public J visitBreak(J.Break breakStatement, P p) {
-        J.Break b = call(breakStatement, p, this::visitEach);
+        J.Break b = visitAndCast(breakStatement, p, this::visitEach);
         b = b.withPrefix(visitSpace(b.getPrefix(), p));
-        b = call(b, p, this::visitStatement);
-        return b.withLabel(call(b.getLabel(), p));
+        b = visitAndCast(b, p, this::visitStatement);
+        return b.withLabel(visitAndCast(b.getLabel(), p));
     }
 
     public J visitCase(J.Case caze, P p) {
-        J.Case c = call(caze, p, this::visitEach);
+        J.Case c = visitAndCast(caze, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = call(c, p, this::visitStatement);
-        c = c.withPattern(call(c.getPattern(), p));
+        c = visitAndCast(c, p, this::visitStatement);
+        c = c.withPattern(visitAndCast(c.getPattern(), p));
         return c.withStatements(visitContainer(c.getStatements(), JContainer.Location.CASE, p));
     }
 
     public J visitCatch(J.Try.Catch catzh, P p) {
-        J.Try.Catch c = call(catzh, p, this::visitEach);
+        J.Try.Catch c = visitAndCast(catzh, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = c.withParam(call(c.getParam(), p));
-        return c.withBody(call(c.getBody(), p));
+        c = c.withParam(visitAndCast(c.getParam(), p));
+        return c.withBody(visitAndCast(c.getBody(), p));
     }
 
     public J visitClassDecl(J.ClassDecl classDecl, P p) {
-        J.ClassDecl c = call(classDecl, p, this::visitEach);
+        J.ClassDecl c = visitAndCast(classDecl, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = call(c, p, this::visitStatement);
-        c = c.withAnnotations(call(c.getAnnotations(), p));
-        c = c.withModifiers(call(c.getModifiers(), p));
+        c = visitAndCast(c, p, this::visitStatement);
+        c = c.withAnnotations(ListUtils.map(c.getAnnotations(), a -> visitAndCast(a, p)));
+        c = c.withModifiers(ListUtils.map(c.getModifiers(), m -> visitAndCast(m, p)));
         c = c.withModifiers(ListUtils.map(c.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         if (c.getTypeParameters() != null) {
             c = c.withTypeParameters(visitContainer(c.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         }
-        c = c.withName(call(c.getName(), p));
+        c = c.withKind(visitLeftPadded(c.getKind(), JLeftPadded.Location.CLASS_KIND, p));
+        c = c.withName(visitAndCast(c.getName(), p));
         if (c.getExtends() != null) {
             c = c.withExtends(visitLeftPadded(c.getExtends(), JLeftPadded.Location.EXTENDS, p));
         }
@@ -252,156 +253,168 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             c = c.withImplements(visitContainer(c.getImplements(), JContainer.Location.IMPLEMENTS, p));
         }
         c = c.withImplements(visitTypeNames(c.getImplements(), p));
-        return c.withBody(call(c.getBody(), p));
+        return c.withBody(visitAndCast(c.getBody(), p));
     }
 
     public J visitCompilationUnit(J.CompilationUnit cu, P p) {
-        J.CompilationUnit c = call(cu, p, this::visitEach);
+        J.CompilationUnit c = visitAndCast(cu, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
         if (c.getPackageDecl() != null) {
             c = c.withPackageDecl(visitRightPadded(c.getPackageDecl(), JRightPadded.Location.PACKAGE, p));
         }
         c = c.withImports(ListUtils.map(c.getImports(), t -> visitRightPadded(t, JRightPadded.Location.IMPORT, p)));
-        c = c.withClasses(call(c.getClasses(), p));
+        c = c.withClasses(ListUtils.map(c.getClasses(), e -> visitAndCast(e, p)));
         return c.withEof(visitSpace(c.getEof(), p));
     }
 
     public J visitContinue(J.Continue continueStatement, P p) {
-        J.Continue c = call(continueStatement, p, this::visitEach);
+        J.Continue c = visitAndCast(continueStatement, p, this::visitEach);
         c = c.withPrefix(visitSpace(c.getPrefix(), p));
-        c = call(c, p, this::visitStatement);
-        return c.withLabel(call(c.getLabel(), p));
+        c = visitAndCast(c, p, this::visitStatement);
+        return c.withLabel(visitAndCast(c.getLabel(), p));
     }
 
     public <T extends J> J visitControlParentheses(J.ControlParentheses<T> controlParens, P p) {
-        J.ControlParentheses<T> cpa = call(controlParens, p, this::visitEach);
+        J.ControlParentheses<T> cpa = visitAndCast(controlParens, p, this::visitEach);
         cpa = cpa.withPrefix(visitSpace(cpa.getPrefix(), p));
-        cpa = call(cpa, p, this::visitExpression);
+        cpa = visitAndCast(cpa, p, this::visitExpression);
         return cpa.withTree(visitRightPadded(cpa.getTree(), JRightPadded.Location.PARENTHESES, p));
     }
 
     public J visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
-        J.DoWhileLoop d = call(doWhileLoop, p, this::visitEach);
+        J.DoWhileLoop d = visitAndCast(doWhileLoop, p, this::visitEach);
         d = d.withPrefix(visitSpace(d.getPrefix(), p));
-        d = call(d, p, this::visitStatement);
+        d = visitAndCast(d, p, this::visitStatement);
         d = d.withWhileCondition(visitLeftPadded(d.getWhileCondition(), JLeftPadded.Location.WHILE_CONDITION, p));
         return d.withBody(visitRightPadded(d.getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     public J visitEmpty(J.Empty empty, P p) {
-        J.Empty e = call(empty, p, this::visitEach);
+        J.Empty e = visitAndCast(empty, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        e = call(e, p, this::visitStatement);
-        e = call(e, p, this::visitExpression);
+        e = visitAndCast(e, p, this::visitStatement);
+        e = visitAndCast(e, p, this::visitExpression);
         return e;
     }
 
     public J visitEnumValue(J.EnumValue enoom, P p) {
-        J.EnumValue e = call(enoom, p, this::visitEach);
+        J.EnumValue e = visitAndCast(enoom, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        e = e.withName(call(e.getName(), p));
-        return e.withInitializer(call(e.getInitializer(), p));
+        e = e.withName(visitAndCast(e.getName(), p));
+        return e.withInitializer(visitAndCast(e.getInitializer(), p));
     }
 
     public J visitEnumValueSet(J.EnumValueSet enums, P p) {
-        J.EnumValueSet e = call(enums, p, this::visitEach);
+        J.EnumValueSet e = visitAndCast(enums, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
-        e = call(e, p, this::visitStatement);
+        e = visitAndCast(e, p, this::visitStatement);
         return e.withEnums(ListUtils.map(e.getEnums(), t -> visitRightPadded(t, JRightPadded.Location.ENUM_VALUE, p)));
     }
 
     public J visitFieldAccess(J.FieldAccess fieldAccess, P p) {
-        J.FieldAccess f = call(fieldAccess, p, this::visitEach);
+        J.FieldAccess f = visitAndCast(fieldAccess, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
         f = visitTypeName(f, p);
-        f = call(f, p, this::visitExpression);
-        f = f.withTarget(call(f.getTarget(), p));
+        f = visitAndCast(f, p, this::visitExpression);
+        f = f.withTarget(visitAndCast(f.getTarget(), p));
         return f.withName(visitLeftPadded(f.getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p));
     }
 
     public J visitForEachLoop(J.ForEachLoop forLoop, P p) {
-        J.ForEachLoop f = call(forLoop, p, this::visitEach);
+        J.ForEachLoop f = visitAndCast(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
-        f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withVariable(visitRightPadded(f.getControl().getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p)));
-        f = f.withControl(f.getControl().withIterable(visitRightPadded(f.getControl().getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p)));
+        f = visitAndCast(f, p, this::visitStatement);
+        f = f.withControl(visitAndCast(f.getControl(), p));
         return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
+    }
+
+    public J visitForEachControl(J.ForEachLoop.Control control, P p) {
+        J.ForEachLoop.Control c = visitAndCast(control, p, this::visitEach);
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withVariable(visitRightPadded(c.getVariable(), JRightPadded.Location.FOREACH_VARIABLE, p));
+        return c.withIterable(visitRightPadded(c.getIterable(), JRightPadded.Location.FOREACH_ITERABLE, p));
     }
 
     public J visitForLoop(J.ForLoop forLoop, P p) {
-        J.ForLoop f = call(forLoop, p, this::visitEach);
+        J.ForLoop f = visitAndCast(forLoop, p, this::visitEach);
         f = f.withPrefix(visitSpace(f.getPrefix(), p));
-        f = call(f, p, this::visitStatement);
-        f = f.withControl(f.getControl().withInit(visitRightPadded(f.getControl().getInit(), JRightPadded.Location.FOR_INIT, p)));
-        f = f.withControl(f.getControl().withCondition(visitRightPadded(f.getControl().getCondition(), JRightPadded.Location.FOR_CONDITION, p)));
-        f = f.withControl(f.getControl().withUpdate(ListUtils.map(f.getControl().getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p))));
+        f = visitAndCast(f, p, this::visitStatement);
+        f = f.withControl(visitAndCast(f.getControl(), p));
         return f.withBody(visitRightPadded(f.getBody(), JRightPadded.Location.FOR_BODY, p));
     }
 
+    public J visitForControl(J.ForLoop.Control control, P p) {
+        J.ForLoop.Control c = visitAndCast(control, p, this::visitEach);
+        c = c.withPrefix(visitSpace(c.getPrefix(), p));
+        c = c.withInit(visitRightPadded(c.getInit(), JRightPadded.Location.FOR_INIT, p));
+        c = c.withCondition(visitRightPadded(c.getCondition(), JRightPadded.Location.FOR_CONDITION, p));
+        return c.withUpdate(ListUtils.map(c.getUpdate(), t -> visitRightPadded(t, JRightPadded.Location.FOR_UPDATE, p)));
+    }
+
     public J visitIdentifier(J.Ident ident, P p) {
-        J.Ident i = call(ident, p, this::visitEach);
+        J.Ident i = visitAndCast(ident, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        return call(i, p, this::visitExpression);
+        return visitAndCast(i, p, this::visitExpression);
     }
 
     public J visitElse(J.If.Else elze, P p) {
-        J.If.Else e = call(elze, p, this::visitEach);
+        J.If.Else e = visitAndCast(elze, p, this::visitEach);
         e = e.withPrefix(visitSpace(e.getPrefix(), p));
         return e.withBody(visitRightPadded(e.getBody(), JRightPadded.Location.IF_ELSE, p));
     }
 
     public J visitIf(J.If iff, P p) {
-        J.If i = call(iff, p, this::visitEach);
+        J.If i = visitAndCast(iff, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = call(i, p, this::visitStatement);
-        i = i.withIfCondition(call(i.getIfCondition(), p));
+        i = visitAndCast(i, p, this::visitStatement);
+        i = i.withIfCondition(visitAndCast(i.getIfCondition(), p));
         i = i.withThenPart(visitRightPadded(i.getThenPart(), JRightPadded.Location.IF_THEN, p));
-        i = i.withElsePart(call(i.getElsePart(), p));
+        i = i.withElsePart(visitAndCast(i.getElsePart(), p));
         return i;
     }
 
     public J visitImport(J.Import impoort, P p) {
-        J.Import i = call(impoort, p, this::visitEach);
+        J.Import i = visitAndCast(impoort, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
         i = i.withStatik(i.getStatic() == null ? null :
                 visitSpace(i.getStatic(), p));
-        return i.withQualid(call(i.getQualid(), p));
+        return i.withQualid(visitAndCast(i.getQualid(), p));
     }
 
     public J visitInstanceOf(J.InstanceOf instanceOf, P p) {
-        J.InstanceOf i = call(instanceOf, p, this::visitEach);
+        J.InstanceOf i = visitAndCast(instanceOf, p, this::visitEach);
         i = i.withPrefix(visitSpace(i.getPrefix(), p));
-        i = call(i, p, this::visitExpression);
+        i = visitAndCast(i, p, this::visitExpression);
         i = i.withExpr(visitRightPadded(i.getExpr(), JRightPadded.Location.INSTANCEOF, p));
-        return i.withClazz(call(i.getClazz(), p));
+        return i.withClazz(visitAndCast(i.getClazz(), p));
     }
 
     public J visitLabel(J.Label label, P p) {
-        J.Label l = call(label, p, this::visitEach);
+        J.Label l = visitAndCast(label, p, this::visitEach);
         l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        l = call(l, p, this::visitStatement);
-        return l.withStatement(call(l.getStatement(), p));
+        l = visitAndCast(l, p, this::visitStatement);
+        return l.withStatement(visitAndCast(l.getStatement(), p));
     }
 
     public J visitLambda(J.Lambda lambda, P p) {
-        J.Lambda l = call(lambda, p, this::visitEach);
+        J.Lambda l = visitAndCast(lambda, p, this::visitEach);
         l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        l = call(l, p, this::visitExpression);
-        l = l.withParameters(call(l.getParameters(), p));
+        l = visitAndCast(l, p, this::visitExpression);
+        l = l.withParameters(visitAndCast(l.getParameters(), p));
         l = l.withArrow(visitSpace(l.getArrow(), p));
-        return l.withBody(call(l.getBody(), p));
+        return l.withBody(visitAndCast(l.getBody(), p));
     }
 
     public J visitLiteral(J.Literal literal, P p) {
-        J.Literal l = call(literal, p, this::visitEach);
+        J.Literal l = visitAndCast(literal, p, this::visitEach);
         l = l.withPrefix(visitSpace(l.getPrefix(), p));
-        return call(l, p, this::visitExpression);
+        return visitAndCast(l, p, this::visitExpression);
     }
 
     public J visitMemberReference(J.MemberReference memberRef, P p) {
-        J.MemberReference m = call(memberRef, p, this::visitEach);
+        J.MemberReference m = visitAndCast(memberRef, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        m = m.withContaining(call(m.getContaining(), p));
+        m = m.withContaining(visitAndCast(m.getContaining(), p));
         if (m.getTypeParameters() != null) {
             m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         }
@@ -409,35 +422,35 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitMethod(J.MethodDecl method, P p) {
-        J.MethodDecl m = call(method, p, this::visitEach);
+        J.MethodDecl m = visitAndCast(method, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        m = call(m, p, this::visitStatement);
-        m = m.withAnnotations(call(m.getAnnotations(), p));
-        m = m.withModifiers(call(m.getModifiers(), p));
+        m = visitAndCast(m, p, this::visitStatement);
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        m = m.withModifiers(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p)));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
         if (m.getTypeParameters() != null) {
             m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         }
-        m = m.withReturnTypeExpr(call(m.getReturnTypeExpr(), p));
+        m = m.withReturnTypeExpr(visitAndCast(m.getReturnTypeExpr(), p));
         m = m.withReturnTypeExpr(
                 m.getReturnTypeExpr() == null ?
                         null :
                         visitTypeName(m.getReturnTypeExpr(), p));
-        m = m.withName(call(m.getName(), p));
+        m = m.withName(visitAndCast(m.getName(), p));
         m = m.withParams(visitContainer(m.getParams(), JContainer.Location.METHOD_DECL_ARGUMENT, p));
         if (m.getThrows() != null) {
             m = m.withThrows(visitContainer(m.getThrows(), JContainer.Location.THROWS, p));
         }
         m = m.withThrows(visitTypeNames(m.getThrows(), p));
-        return m.withBody(call(m.getBody(), p));
+        return m.withBody(visitAndCast(m.getBody(), p));
     }
 
     public J visitMethodInvocation(J.MethodInvocation method, P p) {
-        J.MethodInvocation m = call(method, p, this::visitEach);
+        J.MethodInvocation m = visitAndCast(method, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        m = call(m, p, this::visitStatement);
-        m = call(m, p, this::visitExpression);
+        m = visitAndCast(m, p, this::visitStatement);
+        m = visitAndCast(m, p, this::visitExpression);
         if (m.getSelect() != null && m.getSelect().getElem() instanceof NameTree &&
                 method.getType() != null && method.getType().hasFlags(Flag.Static)) {
             //noinspection unchecked
@@ -452,26 +465,26 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             m = m.withTypeParameters(visitContainer(m.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
         }
         m = m.withTypeParameters(visitTypeNames(m.getTypeParameters(), p));
-        m = m.withName(call(m.getName(), p));
+        m = m.withName(visitAndCast(m.getName(), p));
         return m.withArgs(visitContainer(m.getArgs(), JContainer.Location.METHOD_INVOCATION_ARGUMENT, p));
     }
 
     public J visitMultiCatch(J.MultiCatch multiCatch, P p) {
-        J.MultiCatch m = call(multiCatch, p, this::visitEach);
+        J.MultiCatch m = visitAndCast(multiCatch, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
         return m.withAlternatives(ListUtils.map(m.getAlternatives(), t ->
                 visitTypeName(visitRightPadded(t, JRightPadded.Location.CATCH_ALTERNATIVE, p), p)));
     }
 
     public J visitMultiVariable(J.VariableDecls multiVariable, P p) {
-        J.VariableDecls m = call(multiVariable, p, this::visitEach);
+        J.VariableDecls m = visitAndCast(multiVariable, p, this::visitEach);
         m = m.withPrefix(visitSpace(m.getPrefix(), p));
-        m = call(m, p, this::visitStatement);
-        m = m.withModifiers(Objects.requireNonNull(call(m.getModifiers(), p)));
+        m = visitAndCast(m, p, this::visitStatement);
+        m = m.withAnnotations(ListUtils.map(m.getAnnotations(), a -> visitAndCast(a, p)));
+        m = m.withModifiers(Objects.requireNonNull(ListUtils.map(m.getModifiers(), e -> visitAndCast(e, p))));
         m = m.withModifiers(ListUtils.map(m.getModifiers(),
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), p))));
-        m = m.withAnnotations(call(m.getAnnotations(), p));
-        m = m.withTypeExpr(call(m.getTypeExpr(), p));
+        m = m.withTypeExpr(visitAndCast(m.getTypeExpr(), p));
         m = m.withTypeExpr(m.getTypeExpr() == null ?
                 null :
                 visitTypeName(m.getTypeExpr(), p));
@@ -482,14 +495,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitNewArray(J.NewArray newArray, P p) {
-        J.NewArray n = call(newArray, p, this::visitEach);
+        J.NewArray n = visitAndCast(newArray, p, this::visitEach);
         n = n.withPrefix(visitSpace(n.getPrefix(), p));
-        n = call(n, p, this::visitExpression);
-        n = n.withTypeExpr(call(n.getTypeExpr(), p));
+        n = visitAndCast(n, p, this::visitExpression);
+        n = n.withTypeExpr(visitAndCast(n.getTypeExpr(), p));
         n = n.withTypeExpr(n.getTypeExpr() == null ?
                 null :
                 visitTypeName(n.getTypeExpr(), p));
-        n = n.withDimensions(call(n.getDimensions(), p));
+        n = n.withDimensions(ListUtils.map(n.getDimensions(), d -> visitAndCast(d, p)));
         if (n.getInitializer() != null) {
             n = n.withInitializer(visitContainer(n.getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, p));
         }
@@ -497,32 +510,32 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitNewClass(J.NewClass newClass, P p) {
-        J.NewClass n = call(newClass, p, this::visitEach);
+        J.NewClass n = visitAndCast(newClass, p, this::visitEach);
         n = n.withPrefix(visitSpace(n.getPrefix(), p));
-        n = call(n, p, this::visitStatement);
-        n = call(n, p, this::visitExpression);
+        n = visitAndCast(n, p, this::visitStatement);
+        n = visitAndCast(n, p, this::visitExpression);
         n = n.withNew(visitSpace(n.getNew(), p));
-        n = n.withClazz(call(n.getClazz(), p));
+        n = n.withClazz(visitAndCast(n.getClazz(), p));
         n = n.withClazz(n.getClazz() == null ?
                 null :
                 visitTypeName(n.getClazz(), p));
         if (n.getArgs() != null) {
             n = n.withArgs(visitContainer(n.getArgs(), JContainer.Location.NEW_CLASS_ARGS, p));
         }
-        return n.withBody(call(n.getBody(), p));
+        return n.withBody(visitAndCast(n.getBody(), p));
     }
 
     public J visitPackage(J.Package pkg, P p) {
-        J.Package pa = call(pkg, p, this::visitEach);
+        J.Package pa = visitAndCast(pkg, p, this::visitEach);
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), p));
-        return pa.withExpr(call(pa.getExpr(), p));
+        return pa.withExpr(visitAndCast(pa.getExpr(), p));
     }
 
     public J visitParameterizedType(J.ParameterizedType type, P p) {
-        J.ParameterizedType pt = call(type, p, this::visitEach);
+        J.ParameterizedType pt = visitAndCast(type, p, this::visitEach);
         pt = pt.withPrefix(visitSpace(pt.getPrefix(), p));
-        pt = call(pt, p, this::visitExpression);
-        pt = pt.withClazz(call(pt.getClazz(), p));
+        pt = visitAndCast(pt, p, this::visitExpression);
+        pt = pt.withClazz(visitAndCast(pt.getClazz(), p));
         pt = pt.withClazz(visitTypeName(pt.getClazz(), p));
         if (pt.getTypeParameters() != null) {
             pt = pt.withTypeParameters(visitContainer(pt.getTypeParameters(), JContainer.Location.TYPE_PARAMETER, p));
@@ -531,66 +544,66 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
-        J.Parentheses<T> pa = call(parens, p, this::visitEach);
+        J.Parentheses<T> pa = visitAndCast(parens, p, this::visitEach);
         pa = pa.withPrefix(visitSpace(pa.getPrefix(), p));
-        pa = call(pa, p, this::visitExpression);
+        pa = visitAndCast(pa, p, this::visitExpression);
         return pa.withTree(visitRightPadded(pa.getTree(), JRightPadded.Location.PARENTHESES, p));
     }
 
     public J visitPrimitive(J.Primitive primitive, P p) {
-        J.Primitive pr = call(primitive, p, this::visitEach);
+        J.Primitive pr = visitAndCast(primitive, p, this::visitEach);
         pr = pr.withPrefix(visitSpace(pr.getPrefix(), p));
-        return call(pr, p, this::visitExpression);
+        return visitAndCast(pr, p, this::visitExpression);
     }
 
     public J visitReturn(J.Return retrn, P p) {
-        J.Return r = call(retrn, p, this::visitEach);
+        J.Return r = visitAndCast(retrn, p, this::visitEach);
         r = r.withPrefix(visitSpace(r.getPrefix(), p));
-        r = call(r, p, this::visitStatement);
-        return r.withExpr(call(r.getExpr(), p));
+        r = visitAndCast(r, p, this::visitStatement);
+        return r.withExpr(visitAndCast(r.getExpr(), p));
     }
 
     public J visitSwitch(J.Switch switzh, P p) {
-        J.Switch s = call(switzh, p, this::visitEach);
+        J.Switch s = visitAndCast(switzh, p, this::visitEach);
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
-        s = call(s, p, this::visitStatement);
-        s = s.withSelector(call(s.getSelector(), p));
-        return s.withCases(call(s.getCases(), p));
+        s = visitAndCast(s, p, this::visitStatement);
+        s = s.withSelector(visitAndCast(s.getSelector(), p));
+        return s.withCases(visitAndCast(s.getCases(), p));
     }
 
     public J visitSynchronized(J.Synchronized synch, P p) {
-        J.Synchronized s = call(synch, p, this::visitEach);
+        J.Synchronized s = visitAndCast(synch, p, this::visitEach);
         s = s.withPrefix(visitSpace(s.getPrefix(), p));
-        s = call(s, p, this::visitStatement);
-        s = s.withLock(call(s.getLock(), p));
-        return s.withBody(call(s.getBody(), p));
+        s = visitAndCast(s, p, this::visitStatement);
+        s = s.withLock(visitAndCast(s.getLock(), p));
+        return s.withBody(visitAndCast(s.getBody(), p));
     }
 
     public J visitTernary(J.Ternary ternary, P p) {
-        J.Ternary t = call(ternary, p, this::visitEach);
+        J.Ternary t = visitAndCast(ternary, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
-        t = call(t, p, this::visitExpression);
-        t = t.withCondition(call(t.getCondition(), p));
+        t = visitAndCast(t, p, this::visitExpression);
+        t = t.withCondition(visitAndCast(t.getCondition(), p));
         t = t.withTruePart(visitLeftPadded(t.getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p));
         return t.withFalsePart(visitLeftPadded(t.getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p));
     }
 
     public J visitThrow(J.Throw thrown, P p) {
-        J.Throw t = call(thrown, p, this::visitEach);
+        J.Throw t = visitAndCast(thrown, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
-        t = call(t, p, this::visitStatement);
-        return t.withException(call(t.getException(), p));
+        t = visitAndCast(t, p, this::visitStatement);
+        return t.withException(visitAndCast(t.getException(), p));
     }
 
     public J visitTry(J.Try tryable, P p) {
-        J.Try t = call(tryable, p, this::visitEach);
+        J.Try t = visitAndCast(tryable, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
-        t = call(t, p, this::visitStatement);
+        t = visitAndCast(t, p, this::visitStatement);
         if (t.getResources() != null) {
             t = t.withResources(visitContainer(t.getResources(), JContainer.Location.TRY_RESOURCES, p));
         }
-        t = t.withBody(call(t.getBody(), p));
-        t = t.withCatches(call(t.getCatches(), p));
+        t = t.withBody(visitAndCast(t.getBody(), p));
+        t = t.withCatches(ListUtils.map(t.getCatches(), c -> visitAndCast(c, p)));
         if (t.getFinally() != null) {
             t = t.withFinally(visitLeftPadded(t.getFinally(), JLeftPadded.Location.TRY_FINALLY, p));
         }
@@ -598,19 +611,19 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitTypeCast(J.TypeCast typeCast, P p) {
-        J.TypeCast t = call(typeCast, p, this::visitEach);
+        J.TypeCast t = visitAndCast(typeCast, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
-        t = call(t, p, this::visitExpression);
-        t = t.withClazz(call(t.getClazz(), p));
+        t = visitAndCast(t, p, this::visitExpression);
+        t = t.withClazz(visitAndCast(t.getClazz(), p));
         t = t.withClazz(t.getClazz().withTree(visitTypeName(t.getClazz().getTree(), p)));
-        return t.withExpr(call(t.getExpr(), p));
+        return t.withExpr(visitAndCast(t.getExpr(), p));
     }
 
     public J visitTypeParameter(J.TypeParameter typeParam, P p) {
-        J.TypeParameter t = call(typeParam, p, this::visitEach);
+        J.TypeParameter t = visitAndCast(typeParam, p, this::visitEach);
         t = t.withPrefix(visitSpace(t.getPrefix(), p));
-        t = t.withAnnotations(call(t.getAnnotations(), p));
-        t = t.withName(call(t.getName(), p));
+        t = t.withAnnotations(ListUtils.map(t.getAnnotations(), a -> visitAndCast(a, p)));
+        t = t.withName(visitAndCast(t.getName(), p));
         if (t.getName() instanceof NameTree) {
             t = t.withName((Expression) visitTypeName((NameTree) t.getName(), p));
         }
@@ -621,18 +634,18 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitUnary(J.Unary unary, P p) {
-        J.Unary u = call(unary, p, this::visitEach);
+        J.Unary u = visitAndCast(unary, p, this::visitEach);
         u = u.withPrefix(visitSpace(u.getPrefix(), p));
-        u = call(u, p, this::visitStatement);
-        u = call(u, p, this::visitExpression);
+        u = visitAndCast(u, p, this::visitStatement);
+        u = visitAndCast(u, p, this::visitExpression);
         u = u.withOperator(visitLeftPadded(u.getOperator(), JLeftPadded.Location.UNARY_OPERATOR, p));
-        return u.withExpr(call(u.getExpr(), p));
+        return u.withExpr(visitAndCast(u.getExpr(), p));
     }
 
     public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
-        J.VariableDecls.NamedVar v = call(variable, p, this::visitEach);
+        J.VariableDecls.NamedVar v = visitAndCast(variable, p, this::visitEach);
         v = v.withPrefix(visitSpace(v.getPrefix(), p));
-        v = v.withName(call(v.getName(), p));
+        v = v.withName(visitAndCast(v.getName(), p));
         if (v.getInitializer() != null) {
             v = v.withInitializer(visitLeftPadded(v.getInitializer(),
                     JLeftPadded.Location.VARIABLE_INITIALIZER, p));
@@ -641,18 +654,18 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
     }
 
     public J visitWhileLoop(J.WhileLoop whileLoop, P p) {
-        J.WhileLoop w = call(whileLoop, p, this::visitEach);
+        J.WhileLoop w = visitAndCast(whileLoop, p, this::visitEach);
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
-        w = call(w, p, this::visitStatement);
-        w = w.withCondition(call(w.getCondition(), p));
+        w = visitAndCast(w, p, this::visitStatement);
+        w = w.withCondition(visitAndCast(w.getCondition(), p));
         return w.withBody(visitRightPadded(w.getBody(), JRightPadded.Location.WHILE_BODY, p));
     }
 
     public J visitWildcard(J.Wildcard wildcard, P p) {
-        J.Wildcard w = call(wildcard, p, this::visitEach);
+        J.Wildcard w = visitAndCast(wildcard, p, this::visitEach);
         w = w.withPrefix(visitSpace(w.getPrefix(), p));
-        w = call(w, p, this::visitExpression);
-        w = w.withBoundedType(call(w.getBoundedType(), p));
+        w = visitAndCast(w, p, this::visitExpression);
+        w = w.withBoundedType(visitAndCast(w.getBoundedType(), p));
         if (w.getBoundedType() != null) {
             // i.e. not a "wildcard" type
             w = w.withBoundedType(visitTypeName(w.getBoundedType(), p));
@@ -666,7 +679,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             setCursor(new Cursor(getCursor(), right));
         }
 
-        J2 j = call(right.getElem(), p);
+        J2 j = visitAndCast(right.getElem(), p);
         Space after = visitSpace(right.getAfter(), p);
 
         if (cursored) {
@@ -687,7 +700,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
         if (t instanceof J) {
             //noinspection unchecked
-            t = call((J) left.getElem(), p);
+            t = visitAndCast((J) left.getElem(), p);
         }
 
         if (cursored) {

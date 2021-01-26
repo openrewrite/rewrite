@@ -16,23 +16,33 @@
 package org.openrewrite.properties.search;
 
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.Validated;
+import org.openrewrite.marker.SearchResult;
 import org.openrewrite.properties.PropertiesVisitor;
 import org.openrewrite.properties.tree.Properties;
 
+import java.util.Set;
+
 import static org.openrewrite.Validated.required;
 
+/**
+ * This recipe will find all occurrences of the property key and mark those properties with {@link SearchResult} markers.
+ */
 @Data
+@EqualsAndHashCode(callSuper = true)
 public class FindProperty extends Recipe {
 
-    private final String key;
+    private final String propertyKey;
 
-    @Override
-    public Validated validate() {
-        return required("key", key);
+    public static Set<Properties> find(Properties p, String propertyKey) {
+        //noinspection ConstantConditions
+        return ((FindPropertyVisitor) new FindProperty(propertyKey).getVisitor())
+                .visit(p, ExecutionContext.builder().build())
+                .findMarkedWith(SearchResult.class);
     }
 
     @Override
@@ -44,12 +54,12 @@ public class FindProperty extends Recipe {
 
         @Override
         public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
-            if (entry.getKey().equals(key)) {
-                return entry;
+            Properties p = super.visitEntry(entry, ctx);
+            if (entry.getKey().equals(propertyKey)) {
+                p = p.mark(new SearchResult());
             }
-            return super.visitEntry(entry, ctx);
+            return p;
         }
     }
-
 }
 

@@ -963,6 +963,11 @@ public interface J extends Serializable, Tree {
 
             @With
             JRightPadded<Expression> iterable;
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitForEachControl(this, p);
+            }
         }
     }
 
@@ -1011,6 +1016,11 @@ public interface J extends Serializable, Tree {
 
             @With
             List<JRightPadded<Statement>> update;
+
+            @Override
+            public <P> J acceptJava(JavaVisitor<P> v, P p) {
+                return v.visitForControl(this, p);
+            }
         }
     }
 

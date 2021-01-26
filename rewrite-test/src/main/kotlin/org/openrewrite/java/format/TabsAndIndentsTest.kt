@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format
 
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
@@ -35,15 +36,15 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodChain(jp: JavaParser) = assertUnchanged(
-        jp,
+    fun methodChain(jp: JavaParser.Builder<*, *>) = assertUnchanged(
+        jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
             class Test {
-                Test method(Test t) {
-                    return this
-                            .method(
-                                    t
-                            );
+                void method(Test t) {
+                    this
+                      .method(
+                        t
+                      );
                 }
             }
         """
@@ -243,6 +244,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    @Disabled
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
@@ -255,17 +257,14 @@ interface TabsAndIndentsTest : RecipeTest {
                  ;
                  i < 5
                  ;
-                 i++, m++,
-                 n++
+                 i++, m++, n++
                 );
                 for (int i = 0;
                  i < 5;
-                 i++, m++,
-                 n++);
+                 i++, m++, n++);
                 labeled: for (int i = 0;
                  i < 5;
-                 i++, m++,
-                 n++);
+                 i++, m++, n++);
                 }
             }
         """,
@@ -279,36 +278,23 @@ interface TabsAndIndentsTest : RecipeTest {
                       ;
                       i < 5
                       ;
-                      i++, m++,
-                        n++
+                      i++, m++, n++
                     );
                     for (int i = 0;
                          i < 5;
-                         i++, m++,
-                           n++);
+                         i++, m++, n++);
                     labeled: for (int i = 0;
                                   i < 5;
-                                  i++, m++,
-                                    n++);
+                                  i++, m++, n++);
                 }
             }
         """
     )
 
     @Test
-    fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertChanged(
+    fun methodDeclaration(jp: JavaParser.Builder<*, *>) = assertUnchanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
-            public class Test {
-            public void test(int a,
-            int b) {}
-
-            public void test2(
-            int a,
-            int b) {}
-            }
-        """,
-        after = """
             public class Test {
                 public void test(int a,
                                  int b) {}
@@ -570,11 +556,75 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun enums(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            enum Scope {
+                None, // the root of a resolution tree
+                Compile,
+            }
+        """
+    )
+
+    @Test
+    fun twoThrows(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+           import java.io.IOException;
+           class Test {
+               void method() throws IOException,
+                       Exception {
+               }
+               
+               void method2()
+                       throws IOException,
+                       Exception {
+               }
+           }
+        """
+    )
+
+    @Test
+    fun twoTypeParameters(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test<A,
+                    B> {
+            }
+        """,
+        dependsOn = arrayOf("interface A {}", "interface B{}")
+    )
+
+    @Test
+    fun twoImplements(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test implements A,
+                    B {
+            }
+        """,
+        dependsOn = arrayOf("interface A {}", "interface B{}")
+    )
+
+    @Test
+    fun fieldsWhereClassHasAnnotation(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            @Deprecated
+            class Test {
+                String groupId;
+                String artifactId;
+            }
+        """
+    )
+
+    @Test
     fun methodWithAnnotation(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.build(),
         before = """
             class Test {
                 @Deprecated
+                @SuppressWarnings("all")
             String getOnError() {
                     return "uh oh";
                 }
@@ -583,6 +633,7 @@ interface TabsAndIndentsTest : RecipeTest {
         after = """
             class Test {
                 @Deprecated
+                @SuppressWarnings("all")
                 String getOnError() {
                     return "uh oh";
                 }
@@ -599,7 +650,9 @@ interface TabsAndIndentsTest : RecipeTest {
             import java.io.Serializable;
             @Deprecated
             (since = "1.0")
-            class Test
+            public
+            class
+            Test
             <T
             extends Object>
             implements
@@ -627,7 +680,9 @@ interface TabsAndIndentsTest : RecipeTest {
             import java.io.Serializable;
             @Deprecated
                     (since = "1.0")
-            class Test
+            public
+            class
+            Test
                     <T
                             extends Object>
                     implements
@@ -652,24 +707,9 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodInvocations(jp: JavaParser) = assertChanged(
+    fun methodInvocations(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
-            class Test {
-                Test method(int n) {
-                    return method(n)
-                        .method(n)
-                        .method(n);
-                }
-            
-                Test method2() {
-                    return method2().
-                        method2().
-                        method2();
-                }
-            }
-        """,
-        after = """
             class Test {
                 Test method(int n) {
                     return method(n)
@@ -710,26 +750,40 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun variableWithAnnotation(jp: JavaParser.Builder<*, *>) = assertUnchanged(
-        jp.build(),
+    fun newClassAsArgument(jp: JavaParser) = assertUnchanged(
+        jp,
         before = """
-                public class Test {
-                    @Nullable
-                    Scope scope;
-            
-                    @Nullable
-                    String classifier;
-                    
-                    @With
-                    Collection<Dependency> dependencies;
+            import java.io.File;
+            class Test {
+                void method(int m, File f, File f2) {
+                    method(m, new File(
+                                    "test"
+                            ),
+                            new File("test",
+                                    "test"
+                            ));
                 }
-            """
+            }
+        """
+    )
+
+    @Test
+    fun variableWithAnnotation(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            public class Test {
+                @Deprecated
+                final Scope scope;
+            
+                @Deprecated
+                String classifier;
+            }
+        """
     )
 
     @Test
     fun lambdaMethodParameter(jp: JavaParser) = assertUnchanged(
         jp,
-        // FIXME c(f) sees its parent as the method invocation a(f)... not .b(...
         before = """
             import java.util.function.Function;
             abstract class Test {
@@ -770,7 +824,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun failure2(jp: JavaParser) = assertUnchanged(
+    fun methodInvocationsNotContinuationIndentedWhenPartOfBinaryExpression(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             import java.util.stream.Stream;
@@ -778,9 +832,9 @@ interface TabsAndIndentsTest : RecipeTest {
                 boolean b;
                 public Stream<Test> method() {
                     if (b && method()
-                        .anyMatch(t -> b ||
-                                b
-                        )) {
+                            .anyMatch(t -> b ||
+                                    b
+                            )) {
                         // do nothing
                     }
                     return Stream.of(this);

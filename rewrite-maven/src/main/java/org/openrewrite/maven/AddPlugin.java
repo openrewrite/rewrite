@@ -46,13 +46,6 @@ public class AddPlugin extends Recipe {
         return new AddPluginVisitor();
     }
 
-    @Override
-    public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId)
-                        .and(required("version", version)));
-    }
-
     private class AddPluginVisitor extends MavenVisitor<ExecutionContext> {
 
         public AddPluginVisitor() {

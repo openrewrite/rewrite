@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 
 public class ClassDeclToString {
     public static String toString(J.ClassDecl clazz) {
@@ -27,7 +28,7 @@ public class ClassDeclToString {
     private static final JavaPrinter<Void> CLASS_DECL_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public J visitClassDecl(J.ClassDecl classDecl, Void unused) {
-            visitModifiers(classDecl.getModifiers(), unused);
+            visitModifiers(Space.formatFirstPrefix(classDecl.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinterAcc();
             if (!classDecl.getModifiers().isEmpty()) {
                 acc.append(' ');

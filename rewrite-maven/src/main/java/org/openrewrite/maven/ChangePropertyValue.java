@@ -42,15 +42,12 @@ public class ChangePropertyValue extends Recipe {
     @JsonCreator
     public ChangePropertyValue(@JsonProperty("key") String key, @JsonProperty("toValue") String toValue) {
         //Customizing lombok constructor to replace the property markers.
-        this.key = key.replace("${", "").replace("}", "");
+        //noinspection ConstantConditions
+        if (key != null) {
+            key = key.replace("${", "").replace("}", "");
+        }
+        this.key = key;
         this.toValue = toValue;
-    }
-
-
-    @Override
-    public Validated validate() {
-        return required("key", key)
-                .and(required("toValue", toValue));
     }
 
     private class ChangePropertyValueVisitor extends MavenVisitor<ExecutionContext> {

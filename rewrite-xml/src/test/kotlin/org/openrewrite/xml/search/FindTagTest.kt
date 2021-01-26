@@ -101,4 +101,17 @@ class FindTagTest : RecipeTest {
         assertThat(matchingTags).isNotNull.isNotEmpty
     }
 
+    @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
+    @Test
+    fun checkValidation() {
+        var recipe = FindTag(null)
+        var valid = recipe.validate()
+        assertThat(valid.isValid).isFalse()
+        assertThat(valid.failures()).hasSize(1)
+        assertThat(valid.failures()[0].property).isEqualTo("path")
+
+        recipe = FindTag("/dependencies/dependency")
+        valid = recipe.validate()
+        assertThat(valid.isValid).isTrue()
+    }
 }

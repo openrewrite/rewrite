@@ -18,6 +18,7 @@ package org.openrewrite.java.internal;
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
+import org.openrewrite.java.tree.Space;
 
 import java.util.stream.Collectors;
 
@@ -30,9 +31,9 @@ public class VariableDeclsToString {
     private static final JavaPrinter<Void> VARIABLE_PRINTER = new JavaPrinter<Void>(TreePrinter.identity()) {
         @Override
         public J visitMultiVariable(J.VariableDecls multiVariable, Void unused) {
-            visitModifiers(multiVariable.getModifiers(), unused);
+            visitModifiers(Space.formatFirstPrefix(multiVariable.getModifiers(), Space.EMPTY), unused);
             StringBuilder acc = getPrinterAcc();
-            if (multiVariable.getModifiers().isEmpty()) {
+            if (!multiVariable.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
             if (multiVariable.getTypeExpr() != null) {

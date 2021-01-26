@@ -49,6 +49,7 @@ import static org.openrewrite.Validated.required;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class UpgradeDependencyVersion extends Recipe {
+
     private final String groupId;
 
     @Nullable
@@ -67,11 +68,14 @@ public class UpgradeDependencyVersion extends Recipe {
     @Nullable
     private final String metadataPattern;
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion, metadataPattern));
+        Validated validated = super.validate();
+        if (toVersion != null) {
+            validated = validated.and(Semver.validate(toVersion, metadataPattern));
+        }
+        return validated;
     }
 
     @Override
@@ -88,12 +92,13 @@ public class UpgradeDependencyVersion extends Recipe {
         private VersionComparator versionComparator;
 
         public UpgradeDependencyVersionVisitor() {
+            //noinspection ConstantConditions
+            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
             setCursoringOn();
         }
 
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
             settings = maven.getSettings();
 
             maybeChangeDependencyVersion(maven.getModel());

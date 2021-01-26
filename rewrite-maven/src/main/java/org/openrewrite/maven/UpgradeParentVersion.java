@@ -51,10 +51,12 @@ public class UpgradeParentVersion extends Recipe {
 
     @Override
     public Validated validate() {
-        return required("groupId", groupId)
-                .and(required("artifactId", artifactId))
-                .and(required("toVersion", toVersion))
-                .and(Semver.validate(toVersion, metadataPattern));
+        Validated validated = super.validate();
+        //noinspection ConstantConditions
+        if (toVersion != null) {
+            validated = validated.and(Semver.validate(toVersion, metadataPattern));
+        }
+        return validated;
     }
 
     @Override
@@ -70,12 +72,13 @@ public class UpgradeParentVersion extends Recipe {
         private VersionComparator versionComparator;
 
         public UpgradeParentVersionVisitor(String groupId, String artifactId, String toVersion, @Nullable String metadataPattern) {
+            //noinspection ConstantConditions
+            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
             setCursoringOn();
         }
 
         @Override
         public Maven visitMaven(Maven maven, ExecutionContext ctx) {
-            versionComparator = Semver.validate(toVersion, metadataPattern).getValue();
             return super.visitMaven(maven, ctx);
         }
 
