@@ -556,6 +556,46 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun twoThrows(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+           import java.io.IOException;
+           class Test {
+               void method() throws IOException,
+                       Exception {
+               }
+               
+               void method2()
+                       throws IOException,
+                       Exception {
+               }
+           }
+        """
+    )
+
+    @Test
+    fun twoTypeParameters(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test<A,
+                    B> {
+            }
+        """,
+        dependsOn = arrayOf("interface A {}", "interface B{}")
+    )
+
+    @Test
+    fun twoImplements(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test implements A,
+                    B {
+            }
+        """,
+        dependsOn = arrayOf("interface A {}", "interface B{}")
+    )
+
+    @Test
     fun fieldsWhereClassHasAnnotation(jp: JavaParser) = assertUnchanged(
         jp,
         before = """

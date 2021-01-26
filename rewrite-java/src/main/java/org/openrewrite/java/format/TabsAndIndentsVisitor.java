@@ -237,17 +237,24 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             switch (loc) {
                 case TYPE_PARAMETER:
                 case IMPLEMENTS:
+                case THROWS:
                     before = indentTo(container.getBefore(), indent + style.getContinuationIndent());
-                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    getCursor().putMessage("indentType", IndentType.ALIGN);
                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
-                case THROWS:
-                    getCursor().putMessage("indentType", IndentType.ALIGN);
+                    break;
                 default:
                     before = visitSpace(container.getBefore(), p);
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
             }
         } else {
+            switch(loc) {
+                case IMPLEMENTS:
+                case TYPE_PARAMETER:
+                case THROWS:
+                    getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
+                    break;
+            }
             before = visitSpace(container.getBefore(), p);
             js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
         }
