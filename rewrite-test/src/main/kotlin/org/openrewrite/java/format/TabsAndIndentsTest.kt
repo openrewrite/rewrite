@@ -750,6 +750,24 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun newClassAsArgument(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.io.File;
+            class Test {
+                void method(int m, File f, File f2) {
+                    method(m, new File(
+                                    "test"
+                            ),
+                            new File("test",
+                                    "test"
+                            ));
+                }
+            }
+        """
+    )
+
+    @Test
     fun variableWithAnnotation(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
