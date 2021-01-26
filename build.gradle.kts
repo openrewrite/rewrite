@@ -155,12 +155,6 @@ subprojects {
                                         i--
                                         length--
                                     }
-                                    if(project.name != "rewrite-test" && (dependency.getElementsByTagName("groupId")
-                                            .item(0) as org.w3c.dom.Element).textContent == "org.jetbrains.kotlin") {
-                                        dependencies.removeChild(dependency)
-                                        i--
-                                        length--
-                                    }
                                 }
                                 i++
                             }
