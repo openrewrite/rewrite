@@ -104,22 +104,28 @@ public class JContainer<T> implements Markable {
     }
 
     public enum Location {
-        ANNOTATION_ARGUMENT(JRightPadded.Location.ANNOTATION_ARGUMENT),
-        CASE(JRightPadded.Location.CASE),
-        IMPLEMENTS(JRightPadded.Location.IMPLEMENTS),
-        METHOD_DECL_ARGUMENT(JRightPadded.Location.METHOD_DECL_ARGUMENT),
-        METHOD_INVOCATION_ARGUMENT(JRightPadded.Location.METHOD_INVOCATION_ARGUMENT),
-        NEW_ARRAY_INITIALIZER(JRightPadded.Location.NEW_ARRAY_INITIALIZER),
-        NEW_CLASS_ARGS(JRightPadded.Location.NEW_CLASS_ARGS),
-        THROWS(JRightPadded.Location.THROWS),
-        TRY_RESOURCES(JRightPadded.Location.TRY_RESOURCES),
-        TYPE_BOUND(JRightPadded.Location.TYPE_BOUND),
-        TYPE_PARAMETER(JRightPadded.Location.TYPE_PARAMETER);
+        ANNOTATION_ARGUMENTS(Space.Location.ANNOTATION_ARGUMENTS, JRightPadded.Location.ANNOTATION_ARGUMENT),
+        CASE(Space.Location.CASE, JRightPadded.Location.CASE),
+        IMPLEMENTS(Space.Location.IMPLEMENTS, JRightPadded.Location.IMPLEMENTS),
+        METHOD_DECL_ARGUMENTS(Space.Location.METHOD_DECL_ARGUMENTS, JRightPadded.Location.METHOD_DECL_ARGUMENT),
+        METHOD_INVOCATION_ARGUMENTS(Space.Location.METHOD_INVOCATION_ARGUMENTS, JRightPadded.Location.METHOD_INVOCATION_ARGUMENT),
+        NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER),
+        NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS, JRightPadded.Location.NEW_CLASS_ARGS),
+        THROWS(Space.Location.THROWS, JRightPadded.Location.THROWS),
+        TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCES),
+        TYPE_BOUNDS(Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND),
+        TYPE_PARAMETERS(Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER);
 
+        private final Space.Location beforeLocation;
         private final JRightPadded.Location elemLocation;
 
-        Location(JRightPadded.Location elemLocation) {
+        Location(Space.Location beforeLocation, JRightPadded.Location elemLocation) {
+            this.beforeLocation = beforeLocation;
             this.elemLocation = elemLocation;
+        }
+
+        public Space.Location getBeforeLocation() {
+            return beforeLocation;
         }
 
         public JRightPadded.Location getElemLocation() {

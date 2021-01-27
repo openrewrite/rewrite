@@ -425,20 +425,20 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-        /**
-         * These comments and whitespace are AFTER the static keyword
-         */
-        @Nullable
         @With
-        Space statik;
+        JRightPadded<Boolean> statik;
 
         @JsonProperty("statik")
-        @Nullable
-        public Space getStatic() {
+        public JRightPadded<Boolean> getStatic() {
             return statik;
         }
 
-        public Block withStatic(@Nullable Space statik) {
+        @JsonIgnore
+        public boolean isStatic() {
+            return statik.getElem();
+        }
+
+        public Block withStatic(@Nullable JRightPadded<Boolean> statik) {
             return new Block(id, prefix, markers, statik, statements, end);
         }
 
@@ -1196,20 +1196,19 @@ public interface J extends Serializable, Tree {
         Markers markers;
 
         @With
-        @Nullable
-        Space statik;
+        JLeftPadded<Boolean> statik;
 
         @With
         @Getter
         FieldAccess qualid;
 
+        @JsonIgnore
         public boolean isStatic() {
-            return statik != null;
+            return statik.getElem();
         }
 
         @JsonProperty("statik")
-        @Nullable
-        public Space getStatic() {
+        public JLeftPadded<Boolean> getStatic() {
             return statik;
         }
 

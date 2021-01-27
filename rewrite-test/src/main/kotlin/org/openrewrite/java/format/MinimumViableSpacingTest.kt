@@ -26,7 +26,7 @@ import org.openrewrite.java.tree.Space
 interface MinimumViableSpacingTest : RecipeTest {
     override val recipe: Recipe
         get() = object : JavaVisitor<ExecutionContext>() {
-            override fun visitSpace(space: Space, p: ExecutionContext): Space {
+            override fun visitSpace(space: Space, loc: Space.Location, p: ExecutionContext): Space {
                 return space.withWhitespace("")
             }
         }.toRecipe().doNext(MinimumViableSpacingVisitor<ExecutionContext>().toRecipe())

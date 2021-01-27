@@ -54,6 +54,12 @@ import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.EMPTY;
 import static org.openrewrite.java.tree.Space.format;
 
+/**
+ * Maps the compiler internal AST to the the Rewrite {@link J} AST.
+ *
+ * This visitor is not thread safe, as it maintains a {@link #cursor} and {@link #endPosTable}
+ * for each compilation unit visited.
+ */
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
@@ -63,7 +69,9 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private final Collection<NamedStyles> styles;
     private final Map<String, JavaType.Class> sharedClassTypes;
 
+    @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
+
     private int cursor = 0;
 
     private static final Pattern whitespacePrefixPattern = Pattern.compile("^\\s*");
@@ -267,13 +275,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitBlock(BlockTree node, Space fmt) {
-        Space stat = null;
+        JRightPadded<Boolean> stat;
 
         if ((((JCBlock) node).flags & (long) Flags.STATIC) != 0L) {
             skip("static");
-            stat = sourceBefore("{");
+            stat = new JRightPadded<>(true, sourceBefore("{"), Markers.EMPTY);
         } else {
             skip("{");
+            stat = new JRightPadded<>(false, EMPTY, Markers.EMPTY);
         }
 
         // filter out synthetic super() invocations and the like
@@ -414,7 +423,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         }
         members.addAll(convertStatements(membersMultiVariablesSeparated));
 
-        J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, null, members, sourceBefore("}"));
+        J.Block body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
+                members, sourceBefore("}"));
 
         return new J.ClassDecl(randomId(), fmt, Markers.EMPTY, annotations, modifiers, kind, name, typeParams, extendings, implementings, body, (JavaType.Class) type(node));
     }
@@ -613,7 +623,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     public J visitImport(ImportTree node, Space fmt) {
         skip("import");
         return new J.Import(randomId(), fmt, Markers.EMPTY,
-                node.isStatic() ? sourceBefore("static") : null,
+                new JLeftPadded<>(node.isStatic() ? sourceBefore("static") : EMPTY,
+                        node.isStatic(), Markers.EMPTY),
                 convert(node.getQualifiedIdentifier()));
     }
 
@@ -889,7 +900,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 }
             }
 
-            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, null,
+            body = new J.Block(randomId(), bodyPrefix, Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                     convertAll(members, noDelim, noDelim), sourceBefore("}"));
         }
 
@@ -973,7 +984,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
         skip("switch");
         return new J.Switch(randomId(), fmt, Markers.EMPTY,
                 convert(node.getExpression()),
-                new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, null,
+                new J.Block(randomId(), sourceBefore("{"), Markers.EMPTY, new JRightPadded<>(false, EMPTY, Markers.EMPTY),
                         convertAll(node.getCases(), noDelim, noDelim), sourceBefore("}")));
     }
 

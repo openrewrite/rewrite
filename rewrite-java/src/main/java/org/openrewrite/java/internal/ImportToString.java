@@ -30,11 +30,7 @@ public class ImportToString {
         public J visitImport(J.Import impoort, Void unused) {
             J.Import i = impoort.withPrefix(Space.EMPTY);
             i = i.withQualid(i.getQualid().withPrefix(i.getQualid().getPrefix().withWhitespace(" ")));
-
-            if (i.getStatic() != null) {
-                i = i.withStatik(i.getStatic().withWhitespace(" "));
-            }
-
+            i = i.withStatik(i.getStatic().withBefore(i.getStatic().getBefore().withWhitespace(" ")));
             return super.visitImport(i, unused);
         }
     };

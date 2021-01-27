@@ -63,7 +63,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    @Nullable public J visitEach(J tree, P p) {
+    @Nullable
+    public J visitEach(J tree, P p) {
         if (tree instanceof J.CompilationUnit ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
@@ -101,12 +102,12 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public Space visitSpace(Space space, P p) {
+    public Space visitSpace(Space space, Space.Location loc, P p) {
         boolean alignToAnnotation = false;
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
-        } else if(parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
+        } else if (parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
@@ -122,7 +123,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 <IndentType>peekNearestMessage("indentType")).orElse(IndentType.ALIGN);
 
         // block spaces are always aligned to their parent
-        boolean alignBlockToParent = getCursor().getValue() instanceof J.Block;
+        boolean alignBlockToParent = loc.equals(Space.Location.BLOCK_END);
 
         if (alignBlockToParent || alignToAnnotation) {
             indentType = IndentType.ALIGN;
@@ -147,129 +148,141 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public <J2 extends J> JRightPadded<J2> visitRightPadded(JRightPadded<J2> right, JRightPadded.Location loc, P p) {
+    public <T> JRightPadded<T> visitRightPadded(JRightPadded<T> right, JRightPadded.Location loc, P p) {
         setCursor(new Cursor(getCursor(), right));
 
-        J2 j;
+        T t = right.getElem();
         Space after;
 
         int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
-        if (right.getAfter().getWhitespace().contains("\n") || right.getElem().getPrefix().getWhitespace().contains("\n")) {
-            switch (loc) {
-                case FOR_CONDITION:
-                case FOR_UPDATE: {
-                    J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
-                    Space initPrefix = control.getInit().getElem().getPrefix();
-                    if (!initPrefix.getWhitespace().contains("\n")) {
-                        int initIndent = forInitColumn();
-                        getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
-                        j = visitAndCast(right.getElem(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                        after = indentTo(right.getAfter(), initIndent);
-                    } else {
-                        j = visitAndCast(right.getElem(), p);
-                        after = visitSpace(right.getAfter(), p);
+        if (right.getElem() instanceof J) {
+            J elem = (J) right.getElem();
+            if ((right.getAfter().getWhitespace().contains("\n") ||
+                    ((J) right.getElem()).getPrefix().getWhitespace().contains("\n"))) {
+                switch (loc) {
+                    case FOR_CONDITION:
+                    case FOR_UPDATE: {
+                        J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
+                        Space initPrefix = control.getInit().getElem().getPrefix();
+                        if (!initPrefix.getWhitespace().contains("\n")) {
+                            int initIndent = forInitColumn();
+                            getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
+                            elem = visitAndCast(elem, p);
+                            getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                            after = indentTo(right.getAfter(), initIndent);
+                        } else {
+                            elem = visitAndCast(elem, p);
+                            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        }
+                        break;
                     }
-                    break;
-                }
-                case METHOD_DECL_ARGUMENT: {
-                    JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
-                    Expression firstArg = container.getElem().iterator().next().getElem();
-                    if (firstArg.getPrefix().getWhitespace().contains("\n")) {
-                        // if the first argument is on its own line, align all arguments to be continuation indented
-                        j = visitAndCast(right.getElem(), p);
+                    case METHOD_DECL_ARGUMENT: {
+                        JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
+                        Expression firstArg = container.getElem().iterator().next().getElem();
+                        if (firstArg.getPrefix().getWhitespace().contains("\n")) {
+                            // if the first argument is on its own line, align all arguments to be continuation indented
+                            elem = visitAndCast(elem, p);
+                            after = indentTo(right.getAfter(), indent);
+                        } else {
+                            // align to first argument when the first argument isn't on its own line
+                            int firstArgIndent = findIndent(firstArg.getPrefix());
+                            getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
+                            elem = visitAndCast(elem, p);
+                            getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                            after = indentTo(right.getAfter(), firstArgIndent);
+                        }
+                        break;
+                    }
+                    case METHOD_INVOCATION_ARGUMENT:
+                    case NEW_CLASS_ARGS:
+                    case ARRAY_INDEX:
+                    case PARENTHESES:
+                    case TYPE_PARAMETER: {
+                        elem = visitAndCast(elem, p);
                         after = indentTo(right.getAfter(), indent);
-                    } else {
-                        // align to first argument when the first argument isn't on its own line
-                        int firstArgIndent = findIndent(firstArg.getPrefix());
-                        getCursor().getParentOrThrow().putMessage("lastIndent", firstArgIndent);
-                        j = visitAndCast(right.getElem(), p);
-                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                        after = indentTo(right.getAfter(), firstArgIndent);
+                        break;
                     }
-                    break;
-                }
-                case METHOD_INVOCATION_ARGUMENT:
-                case NEW_CLASS_ARGS:
-                case ARRAY_INDEX:
-                case PARENTHESES:
-                case TYPE_PARAMETER: {
-                    j = visitAndCast(right.getElem(), p);
-                    after = indentTo(right.getAfter(), indent);
-                    break;
-                }
-                case METHOD_SELECT: {
-                    for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
-                        if (cursor.getValue() instanceof JRightPadded) {
-                            cursor = cursor.getParentOrThrow();
-                        }
-                        if (!(cursor.getValue() instanceof J.MethodInvocation)) {
-                            break;
-                        }
-                        Integer methodIndent = cursor.peekNearestMessage("lastIndent");
-                        if (methodIndent != null) {
-                            indent = methodIndent;
-                        }
-                    }
-
-                    getCursor().getParentOrThrow().putMessage("lastIndent", indent);
-                    j = visitAndCast(right.getElem(), p);
-                    after = visitSpace(right.getAfter(), p);
-                    getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
-                    break;
-                }
-                case ANNOTATION_ARGUMENT:
-                    JContainer<J> args = getCursor().getParentOrThrow().getValue();
-                    j = visitAndCast(right.getElem(), p);
-                    if(args.getElem().get(args.getElem().size() - 1) == right) {
-                        getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
-                    }
-                    after = visitSpace(right.getAfter(), p);
-                    break;
-                default:
-                    j = visitAndCast(right.getElem(), p);
-                    after = visitSpace(right.getAfter(), p);
-            }
-        } else {
-            switch (loc) {
-                case NEW_CLASS_ARGS:
-                case METHOD_INVOCATION_ARGUMENT:
-                    if (!right.getElem().getPrefix().getWhitespace().contains("\n")) {
-                        JContainer<J> args = getCursor().getParentOrThrow().getValue();
-                        boolean seenArg = false;
-                        boolean anyOtherArgOnOwnLine = false;
-                        for (JRightPadded<J> arg : args.getElem()) {
-                            if (arg == getCursor().getValue()) {
-                                seenArg = true;
-                                continue;
+                    case METHOD_SELECT: {
+                        for (Cursor cursor = getCursor(); ; cursor = cursor.getParentOrThrow()) {
+                            if (cursor.getValue() instanceof JRightPadded) {
+                                cursor = cursor.getParentOrThrow();
                             }
-                            if (seenArg) {
-                                if (arg.getElem().getPrefix().getWhitespace().contains("\n")) {
-                                    anyOtherArgOnOwnLine = true;
-                                    break;
+                            if (!(cursor.getValue() instanceof J.MethodInvocation)) {
+                                break;
+                            }
+                            Integer methodIndent = cursor.peekNearestMessage("lastIndent");
+                            if (methodIndent != null) {
+                                indent = methodIndent;
+                            }
+                        }
+
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent);
+                        elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
+                        break;
+                    }
+                    case ANNOTATION_ARGUMENT:
+                        JContainer<J> args = getCursor().getParentOrThrow().getValue();
+                        elem = visitAndCast(elem, p);
+
+                        // the end parentheses on an annotation is aligned to the annotation
+                        if (args.getElem().get(args.getElem().size() - 1) == right) {
+                            getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
+                        }
+
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    default:
+                        elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                }
+            } else {
+                switch (loc) {
+                    case NEW_CLASS_ARGS:
+                    case METHOD_INVOCATION_ARGUMENT:
+                        if (!elem.getPrefix().getWhitespace().contains("\n")) {
+                            JContainer<J> args = getCursor().getParentOrThrow().getValue();
+                            boolean seenArg = false;
+                            boolean anyOtherArgOnOwnLine = false;
+                            for (JRightPadded<J> arg : args.getElem()) {
+                                if (arg == getCursor().getValue()) {
+                                    seenArg = true;
+                                    continue;
+                                }
+                                if (seenArg) {
+                                    if (arg.getElem().getPrefix().getWhitespace().contains("\n")) {
+                                        anyOtherArgOnOwnLine = true;
+                                        break;
+                                    }
                                 }
                             }
+                            if (!anyOtherArgOnOwnLine) {
+                                elem = visitAndCast(elem, p);
+                                after = indentTo(right.getAfter(), indent);
+                                break;
+                            }
                         }
-                        if (!anyOtherArgOnOwnLine) {
-                            j = visitAndCast(right.getElem(), p);
-                            after = indentTo(right.getAfter(), indent);
-                            break;
+                        if (!(right.getElem() instanceof J.Binary)) {
+                            getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                         }
-                    }
-                    if(!(right.getElem() instanceof J.Binary)) {
-                        getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
-                    }
-                    j = visitAndCast(right.getElem(), p);
-                    after = visitSpace(right.getAfter(), p);
-                    break;
-                default:
-                    j = visitAndCast(right.getElem(), p);
-                    after = right.getAfter();
+                        elem = visitAndCast(elem, p);
+                        after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
+                        break;
+                    default:
+                        elem = visitAndCast(elem, p);
+                        after = right.getAfter();
+                }
             }
+
+            //noinspection unchecked
+            t = (T) elem;
+        } else {
+            after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);
         }
 
         setCursor(getCursor().getParent());
-        return (after == right.getAfter() && j == right.getElem()) ? right : new JRightPadded<>(j, after, right.getMarkers());
+        return (after == right.getAfter() && t == right.getElem()) ? right : new JRightPadded<>(t, after, right.getMarkers());
     }
 
     @Override
@@ -282,7 +295,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
         if (container.getBefore().getWhitespace().contains("\n")) {
             switch (loc) {
-                case TYPE_PARAMETER:
+                case TYPE_PARAMETERS:
                 case IMPLEMENTS:
                 case THROWS:
                 case NEW_CLASS_ARGS:
@@ -292,22 +305,22 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
                     break;
                 default:
-                    before = visitSpace(container.getBefore(), p);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
             }
         } else {
             switch (loc) {
                 case IMPLEMENTS:
-                case METHOD_INVOCATION_ARGUMENT:
+                case METHOD_INVOCATION_ARGUMENTS:
                 case NEW_CLASS_ARGS:
-                case TYPE_PARAMETER:
+                case TYPE_PARAMETERS:
                 case THROWS:
                     getCursor().putMessage("indentType", IndentType.CONTINUATION_INDENT);
-                    before = visitSpace(container.getBefore(), p);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
                     break;
                 default:
-                    before = visitSpace(container.getBefore(), p);
+                    before = visitSpace(container.getBefore(), loc.getBeforeLocation(), p);
                     js = ListUtils.map(container.getElem(), t -> visitRightPadded(t, loc.getElemLocation(), p));
             }
         }

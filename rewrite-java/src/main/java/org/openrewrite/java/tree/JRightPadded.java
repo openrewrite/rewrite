@@ -48,35 +48,46 @@ public class JRightPadded<T> implements Markable {
     }
 
     public enum Location {
-        ANNOTATION_ARGUMENT,
-        ARRAY_INDEX,
-        BLOCK_STATEMENT,
-        CASE,
-        CATCH_ALTERNATIVE,
-        ENUM_VALUE,
-        FOR_BODY,
-        FOR_CONDITION,
-        FOR_INIT,
-        FOR_UPDATE,
-        FOREACH_VARIABLE,
-        FOREACH_ITERABLE,
-        IF_ELSE,
-        IF_THEN,
-        IMPLEMENTS,
-        IMPORT,
-        INSTANCEOF,
-        METHOD_DECL_ARGUMENT,
-        METHOD_INVOCATION_ARGUMENT,
-        METHOD_SELECT,
-        NAMED_VARIABLE,
-        NEW_ARRAY_INITIALIZER,
-        NEW_CLASS_ARGS,
-        PACKAGE,
-        PARENTHESES,
-        THROWS,
-        TRY_RESOURCES,
-        TYPE_PARAMETER,
-        TYPE_BOUND,
-        WHILE_BODY
+        ANNOTATION_ARGUMENT(Space.Location.ANNOTATION_ARGUMENT_SUFFIX),
+        ARRAY_INDEX(Space.Location.ARRAY_INDEX_SUFFIX),
+        BLOCK_STATEMENT(Space.Location.BLOCK_STATEMENT_SUFFIX),
+        CASE(Space.Location.CASE_SUFFIX),
+        CATCH_ALTERNATIVE(Space.Location.CATCH_ALTERNATIVE_SUFFIX),
+        ENUM_VALUE(Space.Location.ENUM_VALUE_SUFFIX),
+        FOR_BODY(Space.Location.FOR_BODY_SUFFIX),
+        FOR_CONDITION(Space.Location.FOR_CONDITION_SUFFIX),
+        FOR_INIT(Space.Location.FOR_INIT_SUFFIX),
+        FOR_UPDATE(Space.Location.FOR_UPDATE_SUFFIX),
+        FOREACH_VARIABLE(Space.Location.FOREACH_VARIABLE_SUFFIX),
+        FOREACH_ITERABLE(Space.Location.FOREACH_ITERABLE_SUFFIX),
+        IF_ELSE(Space.Location.IF_ELSE_SUFFIX),
+        IF_THEN(Space.Location.IF_THEN_SUFFIX),
+        IMPLEMENTS(Space.Location.IMPLEMENTS_SUFFIX),
+        IMPORT(Space.Location.IMPORT_SUFFIX),
+        INSTANCEOF(Space.Location.INSTANCEOF_SUFFIX),
+        METHOD_DECL_ARGUMENT(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX),
+        METHOD_INVOCATION_ARGUMENT(Space.Location.METHOD_INVOCATION_ARGUMENT_SUFFIX),
+        METHOD_SELECT(Space.Location.METHOD_SELECT_SUFFIX),
+        NAMED_VARIABLE(Space.Location.NAMED_VARIABLE_SUFFIX),
+        NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER_SUFFIX),
+        NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS_SUFFIX),
+        PACKAGE(Space.Location.PACKAGE_SUFFIX),
+        PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
+        STATIC_INIT(Space.Location.STATIC_INIT_SUFFIX),
+        THROWS(Space.Location.THROWS_SUFFIX),
+        TRY_RESOURCES(Space.Location.TRY_RESOURCES_SUFFIX),
+        TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
+        TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
+        WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);
+
+        private final Space.Location afterLocation;
+
+        Location(Space.Location afterLocation) {
+            this.afterLocation = afterLocation;
+        }
+
+        public Space.Location getAfterLocation() {
+            return afterLocation;
+        }
     }
 }

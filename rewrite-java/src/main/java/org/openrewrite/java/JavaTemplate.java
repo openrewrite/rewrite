@@ -166,8 +166,8 @@ public class JavaTemplate {
 
             if (!(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
                 J.Block b = visitAndCast(block, insertionScope, this::visitEach);
-                b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), insertionScope) : null);
-                b = b.withPrefix(visitSpace(b.getPrefix(), insertionScope));
+                b = b.withStatik(visitRightPadded(b.getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
+                b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, insertionScope));
                 b = visitAndCast(b, insertionScope, this::visitStatement);
 
                 if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
@@ -310,7 +310,7 @@ public class JavaTemplate {
         }
 
         @Override
-        public Space visitSpace(Space space, ExtractionContext context) {
+        public Space visitSpace(Space space, Space.Location loc, ExtractionContext context) {
 
             long templateDepth = getCursor().getPathAsStream(v -> v instanceof J).count();
             if (findMarker(space, SNIPPET_MARKER_END) != null) {

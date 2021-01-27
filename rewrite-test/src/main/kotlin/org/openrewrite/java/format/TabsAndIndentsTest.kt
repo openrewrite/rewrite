@@ -343,6 +343,21 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun initBlocks(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                static {
+                    System.out.println("hi");
+                }
+                
+                {
+                }
+            }
+        """
+    )
+
+    @Test
     fun moreAnnotations(jp: JavaParser) = assertUnchanged(
         jp,
         before = """

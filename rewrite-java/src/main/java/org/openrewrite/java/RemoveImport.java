@@ -36,8 +36,13 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     private final JavaType.Class classType;
     private final MethodMatcher methodMatcher;
 
+    @Nullable
     private J.Import namedImport;
+
+    @Nullable
     private J.Import starImport;
+
+    @Nullable
     private J.Import staticStarImport;
 
     private final Set<String> referencedTypes = new HashSet<>();
@@ -147,7 +152,7 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
                             new J.Import(randomId(),
                                     i.getPrefix(),
                                     Markers.EMPTY,
-                                    null,
+                                    new JLeftPadded<>(Space.EMPTY, false, Markers.EMPTY),
                                     TypeTree.build(referencedTypes.iterator().next())
                                             .withPrefix(Space.format(" "))) :
                             i)

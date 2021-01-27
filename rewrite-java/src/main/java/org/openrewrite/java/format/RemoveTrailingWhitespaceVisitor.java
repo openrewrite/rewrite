@@ -32,7 +32,7 @@ public class RemoveTrailingWhitespaceVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public Space visitSpace(Space space, P p) {
+    public Space visitSpace(Space space, Space.Location loc, P p) {
         Space s = space;
         int lastNewline = s.getWhitespace().lastIndexOf('\n');
         if (lastNewline > 0) {

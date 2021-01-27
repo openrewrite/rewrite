@@ -51,17 +51,28 @@ public class JLeftPadded<T> implements Markable {
     }
 
     public enum Location {
-        ASSIGNMENT,
-        BINARY_OPERATOR,
-        CLASS_KIND,
-        EXTENDS,
-        FIELD_ACCESS_NAME,
-        MEMBER_REFERENCE,
-        TERNARY_TRUE,
-        TERNARY_FALSE,
-        TRY_FINALLY,
-        UNARY_OPERATOR,
-        VARIABLE_INITIALIZER,
-        WHILE_CONDITION
+        ASSIGNMENT(Space.Location.ASSIGNMENT),
+        BINARY_OPERATOR(Space.Location.BINARY_OPERATOR),
+        CLASS_KIND(Space.Location.CLASS_KIND),
+        EXTENDS(Space.Location.EXTENDS),
+        FIELD_ACCESS_NAME(Space.Location.FIELD_ACCESS_NAME),
+        MEMBER_REFERENCE_NAME(Space.Location.MEMBER_REFERENCE_NAME),
+        STATIC_IMPORT(Space.Location.STATIC_IMPORT),
+        TERNARY_TRUE(Space.Location.TERNARY_TRUE),
+        TERNARY_FALSE(Space.Location.TERNARY_FALSE),
+        TRY_FINALLY(Space.Location.TRY_FINALLY),
+        UNARY_OPERATOR(Space.Location.UNARY_OPERATOR),
+        VARIABLE_INITIALIZER(Space.Location.VARIABLE_INITIALIZER),
+        WHILE_CONDITION(Space.Location.WHILE_CONDITION);
+        
+        private final Space.Location beforeLocation;
+
+        Location(Space.Location beforeLocation) {
+            this.beforeLocation = beforeLocation;
+        }
+
+        public Space.Location getBeforeLocation() {
+            return beforeLocation;
+        }
     }
 }

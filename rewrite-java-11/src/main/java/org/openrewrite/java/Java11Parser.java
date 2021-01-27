@@ -280,6 +280,7 @@ public class Java11Parser implements JavaParser {
     }
 
     private static class TimedTodo extends Todo {
+        @Nullable
         private Timer.Sample sample;
 
         private TimedTodo(Context context) {

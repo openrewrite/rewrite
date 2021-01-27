@@ -92,7 +92,8 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         J.Import importToAdd = new J.Import(randomId(),
                 Space.EMPTY,
                 Markers.EMPTY,
-                statik == null ? null : Space.format(" "),
+                new JLeftPadded<>(statik == null ? Space.EMPTY : Space.format(" "),
+                        statik != null, Markers.EMPTY),
                 TypeTree.build(classType.getFullyQualifiedName() +
                         (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")));
 

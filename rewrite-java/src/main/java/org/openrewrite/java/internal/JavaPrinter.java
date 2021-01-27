@@ -102,8 +102,13 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         acc.append(after == null ? "" : after);
     }
 
+    public void visitSpace(Space space, P p) {
+        //noinspection ConstantConditions
+        visitSpace(space, null, p);
+    }
+
     @Override
-    public Space visitSpace(Space space, P p) {
+    public Space visitSpace(Space space, Space.Location loc, P p) {
         StringBuilder acc = getPrinterAcc();
         acc.append(space.getWhitespace());
 
@@ -368,9 +373,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
         StringBuilder acc = getPrinterAcc();
 
-        if (block.getStatic() != null) {
+        if(block.getStatic().getElem()) {
             acc.append("static");
-            visitSpace(block.getStatic(), p);
+            visitRightPadded(block.getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
         acc.append('{');
@@ -636,9 +641,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         visitSpace(impoort.getPrefix(), p);
         acc.append("import");
         if (impoort.isStatic()) {
-            if (impoort.getStatic() != null) {
-                visitSpace(impoort.getStatic(), p);
-            }
+            visitSpace(impoort.getStatic().getBefore(), p);
             acc.append("static");
         }
         visit(impoort.getQualid(), p);
