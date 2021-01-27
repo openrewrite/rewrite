@@ -545,6 +545,23 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun newClassAsMethodArgument(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                Test(String s, int m) {
+                }
+            
+                void method(Test t) {
+                    method(new Test("hello" +
+                            "world",
+                            1));
+                }
+            }
+        """
+    )
+
+    @Test
     fun methodArgumentsThatDontStartOnNewLine(jp: JavaParser) = assertUnchanged(
         jp,
         before = """

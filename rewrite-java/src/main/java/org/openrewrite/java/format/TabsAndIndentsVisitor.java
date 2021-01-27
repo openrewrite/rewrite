@@ -247,7 +247,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             break;
                         }
                     }
-                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    if(!(right.getElem() instanceof J.Binary)) {
+                        getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                    }
                     j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);
                     break;
