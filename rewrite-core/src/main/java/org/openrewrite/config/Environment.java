@@ -28,7 +28,7 @@ import java.util.*;
 import static java.util.stream.Collectors.toList;
 
 public class Environment {
-    private final Collection<ResourceLoader> resourceLoaders;
+    private final Collection<? extends ResourceLoader> resourceLoaders;
 
     public Collection<Recipe> listRecipes() {
         List<Recipe> recipes = resourceLoaders.stream()
@@ -76,7 +76,7 @@ public class Environment {
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
-        this.resourceLoaders = (Collection<ResourceLoader>) resourceLoaders;
+        this.resourceLoaders = resourceLoaders;
     }
 
     public static Builder builder(Properties properties) {

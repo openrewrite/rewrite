@@ -30,7 +30,7 @@ import java.util.Collection;
 @EqualsAndHashCode
 public class NamedStyles implements Marker {
     private final String name;
-    private final Collection<? extends Style> styles;
+    private final Collection<Style> styles;
 
     @SuppressWarnings("unchecked")
     @Nullable
