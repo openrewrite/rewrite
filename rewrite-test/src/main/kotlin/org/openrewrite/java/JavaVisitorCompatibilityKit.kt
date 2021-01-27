@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.extension.ExtendWith
+import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
 import org.openrewrite.java.tree.TypeTreeTest
@@ -111,6 +112,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class TypeTreeTck : TypeTreeTest
+
+    @Nested
+    inner class UnnecessaryParenthesesTck : UnnecessaryParenthesesTest
 
     @Nested
     inner class UnwrapParenthesesTck : UnwrapParenthesesTest

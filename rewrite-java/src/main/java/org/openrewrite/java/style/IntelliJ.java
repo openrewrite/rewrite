@@ -31,7 +31,8 @@ public class IntelliJ extends NamedStyles {
                 blankLines(),
                 tabsAndIndents(),
                 spaces(),
-                wrappingAndBraces())
+                wrappingAndBraces(),
+                unnecessaryParentheses())
         );
     }
 
@@ -84,5 +85,9 @@ public class IntelliJ extends NamedStyles {
 
     public static WrappingAndBracesStyle wrappingAndBraces() {
         return new WrappingAndBracesStyle();
+    }
+
+    public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
+        return new UnnecessaryParenthesesStyle(new UnnecessaryParenthesesStyle.ParenthesesTokens(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true));
     }
 }
