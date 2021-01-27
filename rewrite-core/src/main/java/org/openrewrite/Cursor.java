@@ -61,11 +61,11 @@ public class Cursor {
     }
 
     public Stream<Object> getPathAsStream(Predicate<Object> filter) {
-        return stream(Spliterators.spliteratorUnknownSize(getPath(filter), 0), false);
+        return stream(Spliterators.spliteratorUnknownSize(getPath(filter),
+                Spliterator.IMMUTABLE), false);
     }
 
     private static class CursorIterator implements Iterator<Object> {
-
         private Cursor cursor;
 
         private Predicate<Object> filter = (v) -> true;
@@ -81,23 +81,24 @@ public class Cursor {
 
         @Override
         public boolean hasNext() {
-            return cursor != null;
+            for(Cursor c = cursor; c != null; c = c.parent) {
+                if(filter.test(c.value)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
         public Object next() {
-            Object v = cursor.value;
-            cursor = cursor.parent;
-            if (cursor != null) {
-                Object nextValue = cursor.value;
-                while (!filter.test(nextValue)) {
+            for(; cursor != null; cursor = cursor.parent) {
+                Object v = cursor.value;
+                if(filter.test(v)) {
                     cursor = cursor.parent;
-                    if (cursor != null) {
-                        nextValue = cursor.value;
-                    }
+                    return v;
                 }
             }
-            return v;
+            throw new NoSuchElementException();
         }
     }
 

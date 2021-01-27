@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.openrewrite.Tree.randomId
 import org.openrewrite.marker.Markers
 import org.openrewrite.text.PlainText
+import kotlin.streams.toList
 
 class CursorTest {
     @Test
@@ -48,5 +49,19 @@ class CursorTest {
         cursor.putMessage("key", 1)
         val child = Cursor(cursor, t)
         assertThat(child.peekNearestMessage<Int>("key")!!).isEqualTo(1)
+    }
+
+    @Test
+    fun pathPredicates() {
+        val t = PlainText(randomId(), Markers.EMPTY, "test")
+        val cursor = Cursor(Cursor(Cursor(null, 1), t), 2)
+        assertThat(cursor.getPath { it is PlainText }.next()).isSameAs(t)
+    }
+
+    @Test
+    fun pathAsStreamPredicates() {
+        val t = PlainText(randomId(), Markers.EMPTY, "test")
+        val cursor = Cursor(Cursor(Cursor(null, 1), t), 2)
+        assertThat(cursor.getPathAsStream { it is PlainText }.toList()).containsExactly(t)
     }
 }

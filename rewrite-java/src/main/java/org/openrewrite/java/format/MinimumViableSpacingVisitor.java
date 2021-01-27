@@ -76,6 +76,7 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
         if (!first) {
             m = m.withName(m.getName().withPrefix(m.getName().getPrefix().withWhitespace(" ")));
         }
+
         return m;
     }
 }

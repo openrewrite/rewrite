@@ -247,7 +247,6 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """

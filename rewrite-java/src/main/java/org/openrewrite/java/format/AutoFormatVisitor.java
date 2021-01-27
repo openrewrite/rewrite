@@ -29,7 +29,11 @@ public class AutoFormatVisitor<P> extends JavaVisitor<P> {
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {
         J.CompilationUnit cu = cursor.firstEnclosingOrThrow(J.CompilationUnit.class);
 
-        J t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
+        J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor);
+
+        t = new RemoveTrailingWhitespaceVisitor<>().visit(tree, p, cursor);
+
+        t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
                 .visit(tree, p, cursor);
 

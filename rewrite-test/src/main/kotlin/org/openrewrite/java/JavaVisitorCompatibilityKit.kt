@@ -83,6 +83,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class MinimumViableSpacingTck : MinimumViableSpacingTest
 
     @Nested
+    inner class NormalizeFormatTck : NormalizeFormatTest
+
+    @Nested
     inner class OrderImportsTck : OrderImportsTest
 
     @Nested
@@ -93,6 +96,9 @@ abstract class JavaVisitorCompatibilityKit {
 
     @Nested
     inner class ReorderMethodArgumentsTck : ReorderMethodArgumentsTest
+
+    @Nested
+    inner class RemoveTrailingWhitespaceTck : RemoveTrailingWhitespaceTest
 
     @Nested
     inner class SemanticallyEqualTck : SemanticallyEqualTest
