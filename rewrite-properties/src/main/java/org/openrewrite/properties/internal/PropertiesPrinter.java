@@ -53,7 +53,8 @@ public class PropertiesPrinter<P> extends PropertiesVisitor<P> {
     }
 
     @Override
-    public @Nullable Properties visit(@Nullable Tree tree, P p) {
+    @Nullable
+    public Properties visit(@Nullable Tree tree, P p) {
 
         if (tree == null) {
             return defaultValue(null, p);

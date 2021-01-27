@@ -53,7 +53,8 @@ public class YamlPrinter<P> extends YamlVisitor<P> {
     }
 
     @Override
-    public @Nullable Yaml visit(@Nullable Tree tree, P p) {
+    @Nullable
+    public Yaml visit(@Nullable Tree tree, P p) {
 
         if (tree == null) {
             return defaultValue(null, p);

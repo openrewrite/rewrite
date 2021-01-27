@@ -53,7 +53,8 @@ public class XmlPrinter<P> extends XmlVisitor<P> {
     }
 
     @Override
-    public @Nullable Xml visit(@Nullable Tree tree, P p) {
+    @Nullable
+    public Xml visit(@Nullable Tree tree, P p) {
 
         if (tree == null) {
             return defaultValue(null, p);

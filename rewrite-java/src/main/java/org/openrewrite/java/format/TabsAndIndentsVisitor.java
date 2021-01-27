@@ -35,7 +35,8 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
+    @Nullable
+    public J visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
         for (Cursor c = parent; c != null; c = c.getParent()) {
             Object v = c.getValue();
@@ -62,7 +63,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     @Override
-    public @Nullable J visitEach(J tree, P p) {
+    @Nullable public J visitEach(J tree, P p) {
         if (tree instanceof J.CompilationUnit ||
                 tree instanceof J.Package ||
                 tree instanceof J.Import ||
