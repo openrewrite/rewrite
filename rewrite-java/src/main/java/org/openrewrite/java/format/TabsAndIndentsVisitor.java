@@ -37,20 +37,20 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public @Nullable J visit(@Nullable Tree tree, P p, Cursor parent) {
         setCursor(parent);
-        for(Cursor c = parent; c != null; c = c.getParent()) {
+        for (Cursor c = parent; c != null; c = c.getParent()) {
             Object v = c.getValue();
             Space space = null;
-            if(v instanceof J) {
+            if (v instanceof J) {
                 space = ((J) v).getPrefix();
-            } else if(v instanceof JRightPadded) {
+            } else if (v instanceof JRightPadded) {
                 space = ((JRightPadded<?>) v).getAfter();
-            } else if(v instanceof JLeftPadded) {
+            } else if (v instanceof JLeftPadded) {
                 space = ((JLeftPadded<?>) v).getBefore();
-            } else if(v instanceof JContainer) {
+            } else if (v instanceof JContainer) {
                 space = ((JContainer<?>) v).getBefore();
             }
 
-            if(space != null && space.getWhitespace().contains("\n")) {
+            if (space != null && space.getWhitespace().contains("\n")) {
                 int indent = findIndent(space);
                 if (indent != 0) {
                     c.putMessage("lastIndent", indent);
@@ -101,14 +101,15 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
 
     @Override
     public Space visitSpace(Space space, P p) {
+        boolean alignToAnnotation = false;
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
+        } else {
+            // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
+            alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
+                    !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
-
-        // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
-        boolean alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
-                !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
 
         if (!space.getWhitespace().contains("\n") || parent == null) {
             return space;
@@ -189,25 +190,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 }
                 case METHOD_INVOCATION_ARGUMENT:
                 case NEW_CLASS_ARGS:
-                    JContainer<J> args = getCursor().getParentOrThrow().getValue();
-//                    boolean seenArg = false;
-//                    boolean anyOtherArgOnOwnLine = false;
-//                    for (JRightPadded<J> arg : args.getElem()) {
-//                        if(arg == getCursor().getValue()) {
-//                            seenArg = true;
-//                            continue;
-//                        }
-//                        if(seenArg && arg.getElem().getPrefix().getWhitespace().contains("\n")) {
-//                            anyOtherArgOnOwnLine = true;
-//                            break;
-//                        }
-//                    }
-//                    if(!anyOtherArgOnOwnLine) {
-//                        getCursor().putMessage("lastIndent", indent - style.getContinuationIndent());
-//                    }
-                    j = visitAndCast(right.getElem(), p);
-                    after = indentTo(right.getAfter(), indent);
-                    break;
                 case ARRAY_INDEX:
                 case PARENTHESES:
                 case TYPE_PARAMETER: {
@@ -243,6 +225,28 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
             switch (loc) {
                 case NEW_CLASS_ARGS:
                 case METHOD_INVOCATION_ARGUMENT:
+                    if (!right.getElem().getPrefix().getWhitespace().contains("\n")) {
+                        JContainer<J> args = getCursor().getParentOrThrow().getValue();
+                        boolean seenArg = false;
+                        boolean anyOtherArgOnOwnLine = false;
+                        for (JRightPadded<J> arg : args.getElem()) {
+                            if (arg == getCursor().getValue()) {
+                                seenArg = true;
+                                continue;
+                            }
+                            if (seenArg) {
+                                if (arg.getElem().getPrefix().getWhitespace().contains("\n")) {
+                                    anyOtherArgOnOwnLine = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!anyOtherArgOnOwnLine) {
+                            j = visitAndCast(right.getElem(), p);
+                            after = indentTo(right.getAfter(), indent);
+                            break;
+                        }
+                    }
                     getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
                     j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);

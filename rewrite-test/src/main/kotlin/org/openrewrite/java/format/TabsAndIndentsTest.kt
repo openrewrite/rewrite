@@ -17,14 +17,11 @@ package org.openrewrite.java.format
 
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.ExecutionContext
 import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.JavaIsoVisitor
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.style.IntelliJ
 import org.openrewrite.java.style.TabsAndIndentsStyle
-import org.openrewrite.java.tree.J
 import org.openrewrite.style.NamedStyles
 
 interface TabsAndIndentsTest : RecipeTest {
@@ -46,7 +43,7 @@ interface TabsAndIndentsTest : RecipeTest {
                 void method(Test t) {
                     this
                       .method(
-                          t
+                        t
                       );
                 }
             }
@@ -247,6 +244,7 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    @Disabled
     fun forLoop(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents { withContinuationIndent(2) }).build(),
         before = """
@@ -547,7 +545,6 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    @Disabled
     fun methodArgumentsThatDontStartOnNewLine(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
