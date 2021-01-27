@@ -61,11 +61,12 @@ public class OrderImports extends Recipe {
 
             if (orderedImports.size() != cu.getImports().size()) {
                 cu = cu.withImports(orderedImports);
-            }
-
-            for (int i = 0; i < orderedImports.size(); i++) {
-                if (orderedImports.get(i) != cu.getImports().get(i)) {
-                    cu = cu.withImports(orderedImports);
+            } else {
+                for (int i = 0; i < orderedImports.size(); i++) {
+                    if (orderedImports.get(i) != cu.getImports().get(i)) {
+                        cu = cu.withImports(orderedImports);
+                        break;
+                    }
                 }
             }
 
