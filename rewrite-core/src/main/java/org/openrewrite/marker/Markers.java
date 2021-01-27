@@ -46,10 +46,10 @@ public class Markers {
         }
     };
 
-    private final Collection<Marker> markers;
+    private final Collection<? extends Marker> markers;
 
     @JsonCreator
-    public Markers(@JsonProperty("markers") Collection<Marker> markers) {
+    public Markers(@JsonProperty("markers") Collection<? extends Marker> markers) {
         this.markers = markers;
     }
 
@@ -59,7 +59,7 @@ public class Markers {
      *
      * @return A marker collection containing any additional context about the containing {@link Tree} element.
      */
-    public Collection<Marker> entries() {
+    public Collection<? extends Marker> entries() {
         return markers;
     }
 
