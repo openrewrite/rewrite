@@ -60,12 +60,13 @@ public class RawMavenResolver {
 
     private final Collection<String> activeProfiles;
     private final boolean resolveOptional;
+    private final boolean continueOnError;
 
     @Nullable
     private final MavenSettings mavenSettings;
 
     public RawMavenResolver(MavenDownloader downloader, boolean forParent, Collection<String> activeProfiles,
-                            @Nullable MavenSettings mavenSettings, boolean resolveOptional) {
+                            @Nullable MavenSettings mavenSettings, boolean resolveOptional, boolean continueOnError) {
         this.versionSelection = new TreeMap<>();
         for (Scope scope : Scope.values()) {
             versionSelection.putIfAbsent(scope, new HashMap<>());
@@ -75,6 +76,7 @@ public class RawMavenResolver {
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
+        this.continueOnError = continueOnError;
     }
 
     @Nullable
@@ -163,7 +165,7 @@ public class RawMavenResolver {
                     RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
                             partialMaven.getRepositories());
                     if (rawMaven != null) {
-                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional)
+                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError)
                                 .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
                         if (maven != null) {
@@ -208,9 +210,29 @@ public class RawMavenResolver {
 
                     // for debugging...
                     if (groupId == null || artifactId == null) {
-                        assert groupId != null;
-                        //noinspection ConstantConditions
-                        assert artifactId != null;
+                        try {
+                            assert groupId != null;
+                        } catch (Exception e) {
+                            if(continueOnError) {
+                                logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine groupId. Omitting the problematic dependency and continuing.",
+                                        rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
+                                return null;
+                            } else {
+                                throw e;
+                            }
+                        }
+                        try {
+                            //noinspection ConstantConditions
+                            assert artifactId != null;
+                        } catch (Exception e) {
+                            if(continueOnError) {
+                                logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine artifactId. Omitting the problematic dependency and continuing.",
+                                        rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
+                                return null;
+                            } else {
+                                throw e;
+                            }
+                        }
                     }
 
                     // excluded
@@ -268,11 +290,30 @@ public class RawMavenResolver {
                                 groupId, artifactId, dep.getVersion(),
                                 rawMaven.getSourcePath());
 
-                        //noinspection ConstantConditions
-                        assert version != null;
+                        try {
+                            //noinspection ConstantConditions
+                            assert version != null;
+                        } catch (AssertionError e) {
+                            if(continueOnError) {
+                                return null;
+                            } else {
+                                throw e;
+                            }
+                        }
                     }
 
-                    Scope requestedScope = Scope.fromName(partialMaven.getScope(dep.getScope()));
+                    Scope requestedScope;
+                    try {
+                        requestedScope = Scope.fromName(partialMaven.getScope(dep.getScope()));
+                    } catch (Exception e) {
+                        if(continueOnError) {
+                            logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine scope for {}, continuing assuming the scope is 'compile'",
+                                    rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion(), dep.gavCoordinates());
+                            requestedScope = Scope.Compile;
+                        } else {
+                            throw e;
+                        }
+                    }
                     Scope effectiveScope = requestedScope.transitiveOf(task.getScope());
 
                     if (effectiveScope == null) {
@@ -367,7 +408,7 @@ public class RawMavenResolver {
                 if (maybeParent == null) {
 
 
-                    parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional)
+                    parent = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError)
                             ._resolve(rawParentModel, Scope.Compile, rawParent.getVersion(), partialMaven.getRepositories(), parentPomSightings);
                     resolved.put(parentKey, Optional.ofNullable(parent));
                 } else {
