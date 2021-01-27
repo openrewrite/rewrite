@@ -343,10 +343,13 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun equalsAndHashCodeInclude(jp: JavaParser) = assertUnchanged(
+    fun moreAnnotations(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
             class Test {
+                @Incubating(
+                        since = "7.0.0"
+                )
                 @SuppressWarnings("unchecked")
                 @EqualsAndHashCode.Include
                 UUID id;

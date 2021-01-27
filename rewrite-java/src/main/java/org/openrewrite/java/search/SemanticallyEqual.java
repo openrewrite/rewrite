@@ -30,7 +30,8 @@ import java.util.Objects;
 @Incubating(since = "6.0.0")
 public class SemanticallyEqual {
 
-    private SemanticallyEqual() {}
+    private SemanticallyEqual() {
+    }
 
     public static boolean areEqual(J firstElem, J secondElem) {
         SemanticallyEqualVisitor sep = new SemanticallyEqualVisitor();
@@ -69,8 +70,7 @@ public class SemanticallyEqual {
                     for (int i = 0; i < firstArgs.size(); i++) {
                         this.visit(firstArgs.get(i).getElem(), secondArgs.get(i).getElem());
                     }
-                }
-                else {
+                } else {
                     isEqual = false;
                     return null;
                 }
@@ -108,8 +108,7 @@ public class SemanticallyEqual {
                 if (!secondFieldAccess.getSimpleName().equals("class")) {
                     isEqual = false;
                     return null;
-                }
-                else {
+                } else {
                     isEqual = isEqual &&
                             typeEquals(firstFieldAccess.getType(), secondFieldAccess.getType()) &&
                             typeEquals(firstFieldAccess.getTarget().getType(), secondFieldAccess.getTarget().getType());

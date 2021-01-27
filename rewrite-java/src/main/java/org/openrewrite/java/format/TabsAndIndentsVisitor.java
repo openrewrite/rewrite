@@ -218,6 +218,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     getCursor().getParentOrThrow().putMessage("lastIndent", indent + style.getContinuationIndent());
                     break;
                 }
+                case ANNOTATION_ARGUMENT:
+                    JContainer<J> args = getCursor().getParentOrThrow().getValue();
+                    j = visitAndCast(right.getElem(), p);
+                    if(args.getElem().get(args.getElem().size() - 1) == right) {
+                        getCursor().getParentOrThrow().putMessage("indentType", IndentType.ALIGN);
+                    }
+                    after = visitSpace(right.getAfter(), p);
+                    break;
                 default:
                     j = visitAndCast(right.getElem(), p);
                     after = visitSpace(right.getAfter(), p);
