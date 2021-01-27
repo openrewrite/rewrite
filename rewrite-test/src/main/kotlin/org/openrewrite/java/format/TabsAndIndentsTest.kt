@@ -343,6 +343,18 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun equalsAndHashCodeInclude(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                @SuppressWarnings("unchecked")
+                @EqualsAndHashCode.Include
+                UUID id;
+            }
+        """
+    )
+
+    @Test
     fun annotations(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(tabsAndIndents()).build(),
         before = """

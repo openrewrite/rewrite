@@ -105,7 +105,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         Cursor parent = getCursor().getParent();
         if (parent != null && parent.getValue() instanceof J.Annotation) {
             parent.getParentOrThrow().putMessage("afterAnnotation", true);
-        } else {
+        } else if(parent != null && !getCursor().getParentOrThrow().getPath(J.Annotation.class::isInstance).hasNext()) {
             // when annotations are on their own line, other parts of the declaration that follow are aligned left to it
             alignToAnnotation = getCursor().pollNearestMessage("afterAnnotation") != null &&
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);

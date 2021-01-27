@@ -107,7 +107,7 @@ public class RemoveUnusedImports extends Recipe {
                         ListUtils.mapFirst(cu.getClasses(),
                                 cl -> cl.withPrefix(
                                         cl.getPrefix().withWhitespace(
-                                            cl.getPrefix().getWhitespace().replace("\n\n", "")
+                                                cl.getPrefix().getWhitespace().replace("\n\n", "")
                                         )
                                 )
                         )
