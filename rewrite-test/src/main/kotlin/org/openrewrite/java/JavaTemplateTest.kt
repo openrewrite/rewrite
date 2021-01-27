@@ -78,12 +78,7 @@ interface JavaTemplateTest : RecipeTest {
                         .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
-                    return block.withStatements(
-                        ListUtils.concat(
-                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY, Markers.EMPTY),
-                            block.statements
-                        )
-                    )
+                    return block.insertStatement(0, generatedMethodInvocations[0])
                 }
                 return super.visitBlock(block, p)
             }
@@ -148,12 +143,7 @@ interface JavaTemplateTest : RecipeTest {
                         .hasSize(1)
                     assertThat(generatedMethodInvocations[0].type).isNotNull
 
-                    return block.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY, Markers.EMPTY)
-                        )
-                    )
+                    return block.addStatement(generatedMethodInvocations[0])
                 }
                 return super.visitBlock(block, p)
             }
@@ -220,12 +210,7 @@ interface JavaTemplateTest : RecipeTest {
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
-                    b = b.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY, Markers.EMPTY)
-                        )
-                    )
+                    b = b.addStatement(generatedMethodDeclarations[0])
                 }
                 return b
             }
@@ -298,12 +283,7 @@ interface JavaTemplateTest : RecipeTest {
                         .hasSize(1)
                     assertThat(generatedMethodDeclarations[0].type).isNotNull
 
-                    b = b.withStatements(
-                        ListUtils.concat(
-                            block.statements,
-                            JRightPadded(generatedMethodDeclarations[0], Space.EMPTY, Markers.EMPTY)
-                        )
-                    )
+                    b = b.addStatement(generatedMethodDeclarations[0])
                 }
                 return b
             }

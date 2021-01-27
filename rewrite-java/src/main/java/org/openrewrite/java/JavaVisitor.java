@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
+
     /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
      * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent

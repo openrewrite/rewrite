@@ -22,8 +22,11 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
 
@@ -83,6 +86,37 @@ public class JContainer<T> implements Markable {
 
     public List<JRightPadded<T>> getElem() {
         return elem;
+    }
+
+
+    public JContainer<T> addElement(T newElements) {
+        return addElements(Collections.singletonList(newElements));
+    }
+
+    public JContainer<T> insertElement(int index, T newElements) {
+        return insertElements(index, Collections.singletonList(newElements));
+    }
+
+    public JContainer<T> addElements(List<T> newElements) {
+
+        return withElem(
+                ListUtils.concatAll(elem,
+                        newElements.stream()
+                                .map(e -> new JRightPadded<>(e, Space.EMPTY, Markers.EMPTY))
+                                .collect(Collectors.toList())
+                )
+        );
+    }
+
+    public JContainer<T> insertElements(int index, List<T> newElements) {
+
+        return withElem(
+                ListUtils.insertAll(elem, index,
+                        newElements.stream()
+                                .map(e -> new JRightPadded<>(e, Space.EMPTY, Markers.EMPTY))
+                                .collect(Collectors.toList())
+                )
+        );
     }
 
     public Space getBefore() {

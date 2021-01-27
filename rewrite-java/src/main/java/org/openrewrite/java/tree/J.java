@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.*;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
@@ -445,6 +446,36 @@ public interface J extends Serializable, Tree {
         @Getter
         @With
         List<JRightPadded<Statement>> statements;
+
+        public Block addStatement(Statement newStatements) {
+            return addStatements(singletonList(newStatements));
+        }
+
+        public Block insertStatement(int index, Statement newStatements) {
+            return insertStatements(index, singletonList(newStatements));
+        }
+
+        public Block addStatements(List<Statement> newStatements) {
+
+            return withStatements(
+                    ListUtils.concatAll(statements,
+                            newStatements.stream()
+                                    .map(s -> new JRightPadded<>(s, Space.EMPTY, Markers.EMPTY))
+                                    .collect(Collectors.toList())
+                    )
+            );
+        }
+
+        public Block insertStatements(int index, List<Statement> newStatements) {
+
+            return withStatements(
+                    ListUtils.insertAll(statements, index,
+                            newStatements.stream()
+                                    .map(s -> new JRightPadded<>(s, Space.EMPTY, Markers.EMPTY))
+                                    .collect(Collectors.toList())
+                    )
+            );
+        }
 
         @Getter
         @With

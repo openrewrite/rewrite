@@ -21,6 +21,7 @@ import org.openrewrite.marker.Markers;
 import java.util.ArrayList;
 import java.util.List;
 
+import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
@@ -45,31 +46,19 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
                 c.getImplements().getElem().stream().noneMatch(f -> interfaceType.equals(f.getElem().getType())))) {
             maybeAddImport(interfaceType);
 
-            JRightPadded<TypeTree> lifeCycle = new JRightPadded<>(
-                    J.Ident.build(
-                            randomId(),
-                            format(" "),
-                            Markers.EMPTY,
-                            interfaceType.getClassName(),
-                            interfaceType
-                    ),
-                    Space.EMPTY,
-                    Markers.EMPTY
+            J.Ident implementElement = J.Ident.build(
+                    randomId(),
+                    format(" "),
+                    Markers.EMPTY,
+                    interfaceType.getClassName(),
+                    interfaceType
             );
 
-            if (c.getImplements() == null) {
-                c = c.withImplements(
-                        JContainer.build(
-                                format(" "),
-                                singletonList(lifeCycle),
-                                Markers.EMPTY
-                        )
-                );
-            } else {
-                List<JRightPadded<TypeTree>> implementings = new ArrayList<>(c.getImplements().getElem());
-                implementings.add(0, lifeCycle);
-                c = c.withImplements(c.getImplements().withElem(implementings));
+            JContainer<TypeTree> implementsClause = c.getImplements();
+            if (implementsClause == null) {
+                implementsClause = JContainer.build(format(" "), emptyList(), Markers.EMPTY);
             }
+            c = c.withImplements(implementsClause.insertElement(0, implementElement));
         }
 
         return c;
