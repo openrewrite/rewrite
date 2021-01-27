@@ -31,11 +31,11 @@ public class AutoFormatVisitor<P> extends JavaVisitor<P> {
 
         J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor);
 
-        t = new RemoveTrailingWhitespaceVisitor<>().visit(tree, p, cursor);
+        t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor);
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))
                 .orElse(IntelliJ.blankLines()))
-                .visit(tree, p, cursor);
+                .visit(t, p, cursor);
 
         t = new SpacesVisitor<>(Optional.ofNullable(cu.getStyle(SpacesStyle.class))
                 .orElse(IntelliJ.spaces()))
