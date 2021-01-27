@@ -17,7 +17,9 @@ package org.openrewrite.maven
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.Issue
 import org.openrewrite.maven.tree.Pom
+import org.openrewrite.maven.tree.Scope
 
 class MavenParserTest {
 
@@ -119,5 +121,35 @@ class MavenParserTest {
             </project>
 
         """)
+    }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/198")
+    @Test
+    fun handlesPropertiesInDependencyScope() {
+        val maven = MavenParser.builder().build().parse("""
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>org.openrewrite.maven</groupId>
+                <artifactId>single-project</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+
+                <properties>
+                    <dependency.scope>compile</dependency.scope>
+                </properties>
+
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>29.0-jre</version>
+                        <scope>${"$"}{dependency.scope}</scope>
+                    </dependency>
+                </dependencies>
+            </project>
+
+        """).first()
+        assertThat(maven.model.dependencies).hasSize(1)
+        assertThat(maven.model.dependencies.first()).matches{ it.scope == Scope.Compile}
     }
 }

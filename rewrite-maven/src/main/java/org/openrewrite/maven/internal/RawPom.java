@@ -207,6 +207,13 @@ public class RawPom {
 
         @Nullable
         Set<GroupArtifact> exclusions;
+
+        /**
+         * @return the groupId, artifactId, and version concatenated with ":" as the delimiter between them.
+         */
+        public String gavCoordinates() {
+            return groupId + ":" + artifactId + ":" + version;
+        }
     }
 
     @FieldDefaults(level = AccessLevel.PRIVATE)
