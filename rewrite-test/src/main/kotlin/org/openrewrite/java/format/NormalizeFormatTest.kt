@@ -30,7 +30,7 @@ interface NormalizeFormatTest : RecipeTest {
         }.toRecipe()
 
     @Test
-    fun removeAnnotation(jp: JavaParser) = assertChanged(
+    fun removeAnnotationFromMethod(jp: JavaParser) = assertChanged(
         jp,
         recipe = removeAnnotation
             .doNext(NormalizeFormat())
@@ -48,6 +48,50 @@ interface NormalizeFormatTest : RecipeTest {
             
                 public void method(Test t) {
                 }
+            }
+        """
+    )
+
+    @Test
+    fun removeAnnotationFromClass(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeAnnotation
+            .doNext(NormalizeFormat())
+            .doNext(RemoveTrailingWhitespace())
+            .doNext(TabsAndIndents()),
+        before = """
+            class Test {
+                @Deprecated
+                class A {
+                }
+            }
+        """,
+        after = """
+            class Test {
+            
+                class A {
+                }
+            }
+        """
+    )
+
+    @Test
+    fun removeAnnotationFromVariable(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = removeAnnotation
+            .doNext(NormalizeFormat())
+            .doNext(RemoveTrailingWhitespace())
+            .doNext(TabsAndIndents()),
+        before = """
+            class Test {
+                @Deprecated
+                public String s;
+            }
+        """,
+        after = """
+            class Test {
+            
+                public String s;
             }
         """
     )
