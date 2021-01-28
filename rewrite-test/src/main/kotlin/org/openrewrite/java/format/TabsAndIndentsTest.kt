@@ -651,17 +651,32 @@ interface TabsAndIndentsTest : RecipeTest {
                 int method5(int n, int m) {
                     method5(1,
                             2);
-                    return method5(method5(3,
+                    method5(method5(3,
                             4),
                             5);
+                    return method5(method5(6,
+                            7
+                            ),
+                            8);
                 }
             }
         """
-        // FIXME
-//        return method5(method5(6,
-//                7
-//                ),
-//                8);
+    )
+
+    @Test
+    fun methodInvocationsAllTheWayDown(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.stream.Stream;
+            class Test {
+                void method(long n, int m) {
+                    method(Stream.of("a")
+                                    .count(),
+                            1
+                    );
+                }
+            }
+        """
     )
 
     @Test

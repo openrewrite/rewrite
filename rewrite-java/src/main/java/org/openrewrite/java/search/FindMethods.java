@@ -36,7 +36,6 @@ import java.util.Set;
 @EqualsAndHashCode(callSuper = true)
 public final class FindMethods extends Recipe {
 
-
     /**
      * A method pattern, expressed as a pointcut expression, that is used to find matching method invocations.
      * See {@link  MethodMatcher} for details on the expression's syntax.
