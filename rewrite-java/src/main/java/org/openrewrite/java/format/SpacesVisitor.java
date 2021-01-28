@@ -277,21 +277,26 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
             case GreaterThan:
             case GreaterThanOrEqual:
                 binary1 = applyBinarySpaceAround(binary1, style.getAroundOperators().isRelational());
+                break;
             case BitAnd:
             case BitOr:
             case BitXor:
                 binary1 = applyBinarySpaceAround(binary1, style.getAroundOperators().isBitwise());
+                break;
             case Addition:
             case Subtraction:
                 binary1 = applyBinarySpaceAround(binary1, style.getAroundOperators().isAdditive());
+                break;
             case Multiplication:
             case Division:
             case Modulo:
                 binary1 = applyBinarySpaceAround(binary1, style.getAroundOperators().isMultiplicative());
+                break;
             case LeftShift:
             case RightShift:
             case UnsignedRightShift:
                 binary1 = applyBinarySpaceAround(binary1, style.getAroundOperators().isShift());
+                break;
         }
         return binary1;
     }
