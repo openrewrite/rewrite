@@ -28,6 +28,23 @@ import java.util.List;
 import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
+
+    /**
+     * This overload can be used to generate a template's contents as the last statement in a block.
+     *
+     * @param template A template instance
+     * @param parameters Template parameters
+     * @param <J2> Expected type returned from the template.
+     * @return A list of generated elements
+     */
+    public <J2 extends J> List<J2> generateLastInBlock(JavaTemplate template, Cursor blockCursor, Object... parameters) {
+        if (blockCursor.getValue() instanceof J.Block) {
+            return template.generate(new Cursor(blockCursor, ((J.Block)blockCursor.getValue()).getEnd()), parameters);
+        } else {
+            throw new IllegalArgumentException("The cursor must reference a J.Block");
+        }
+    }
+
     /**
      * This method will add an import to the compilation unit if there is a reference to the type. It adds an additional
      * visitor which means the "add import" is deferred and does not complete immediately. This operation is idempotent

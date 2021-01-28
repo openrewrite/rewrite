@@ -2497,7 +2497,9 @@ public interface J extends Serializable, Tree {
             @JsonIgnore
             public boolean isField(Cursor cursor) {
                 return cursor
+                        .getParentOrThrow() // JRightPadded
                         .getParentOrThrow() // J.VariableDecls
+                        .getParentOrThrow() // JRightPadded
                         .getParentOrThrow() // J.Block
                         .getParentOrThrow() // maybe J.ClassDecl
                         .getValue() instanceof J.ClassDecl;
