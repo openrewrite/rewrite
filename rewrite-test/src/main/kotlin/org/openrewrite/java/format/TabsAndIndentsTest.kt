@@ -644,6 +644,27 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun methodArgumentsThatDontStartOnNewLine2(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                int method5(int n, int m) {
+                    method5(1,
+                            2);
+                    return method5(method5(3,
+                            4),
+                            5);
+                }
+            }
+        """
+        // FIXME
+//        return method5(method5(6,
+//                7
+//                ),
+//                8);
+    )
+
+    @Test
     fun lambda(jp: JavaParser) = assertChanged(
         jp,
         before = """
@@ -661,6 +682,22 @@ interface TabsAndIndentsTest : RecipeTest {
                 public void method(int n) {
                     Supplier<Integer> ns = () ->
                             n;
+                }
+            }
+        """
+    )
+
+    @Test
+    fun lambdaWithBlock(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            import java.util.function.Supplier;
+            class Test {
+                void method(Supplier<String> s, int n) {
+                    method(() -> {
+                                return "hi";
+                            },
+                            n);
                 }
             }
         """
