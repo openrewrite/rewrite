@@ -22,9 +22,9 @@ import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.SearchResult
 
-interface FindTypeTest : RecipeTest {
-    override val recipe: FindType
-        get() = FindType("a.A1")
+interface FindTypesTest : RecipeTest {
+    override val recipe: FindTypes
+        get() = FindTypes("a.A1")
 
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
@@ -63,7 +63,7 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun annotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindType("A1"),
+        recipe = FindTypes("A1"),
         before = "@A1 public class B {}",
         after = "@~~>A1 public class B {}",
         dependsOn = arrayOf("public @interface A1 {}")
@@ -90,7 +90,7 @@ interface FindTypeTest : RecipeTest {
     @Test
     fun classDecl(jp: JavaParser) = assertChanged(
         jp,
-        recipe = recipe.doNext(FindType("I1")),
+        recipe = recipe.doNext(FindTypes("I1")),
         before = """
             import a.A1;
             public class B extends A1 implements I1 {}
@@ -249,13 +249,13 @@ interface FindTypeTest : RecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindType(null)
+        var recipe = FindTypes(null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTypeName")
 
-        recipe = FindType("com.foo.Foo")
+        recipe = FindTypes("com.foo.Foo")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

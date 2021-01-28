@@ -34,7 +34,7 @@ import java.util.Set;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public final class FindMethod extends Recipe {
+public final class FindMethods extends Recipe {
 
 
     /**
@@ -45,25 +45,25 @@ public final class FindMethod extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindMethodVisitor(methodPattern);
+        return new FindMethodsVisitor(methodPattern);
     }
 
     public static Set<J.MethodInvocation> find(J j, String methodPattern) {
         //noinspection ConstantConditions
-        return new FindMethodVisitor(methodPattern)
+        return new FindMethodsVisitor(methodPattern)
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindMethodVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class FindMethodsVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final MethodMatcher matcher;
 
         /**
-         * See {@link FindMethod} for details on how the signature should be formatted.
+         * See {@link FindMethods} for details on how the signature should be formatted.
          *
          * @param signature Pointcut expression for matching methods.
          */
-        public FindMethodVisitor(String signature) {
+        public FindMethodsVisitor(String signature) {
             this.matcher = new MethodMatcher(signature);
         }
 

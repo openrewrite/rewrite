@@ -22,7 +22,7 @@ import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.SearchResult
 
-interface FindAnnotationTest: RecipeTest {
+interface FindAnnotationsTest: RecipeTest {
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
 
@@ -39,7 +39,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesSimpleFullyQualifiedAnnotation(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated"),
         before = "@Deprecated public class A {}",
         after = "~~>@Deprecated public class A {}"
     )
@@ -47,7 +47,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesAnnotationOnMethod(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated"),
         before = """
             public class A {
                 @Deprecated
@@ -65,7 +65,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesAnnotationOnField(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("@java.lang.Deprecated"),
+        recipe = FindAnnotations("@java.lang.Deprecated"),
         before = """
             public class A {
                 @Deprecated String s;
@@ -81,14 +81,14 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchNotFullyQualifiedAnnotations(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation("@Deprecated"),
+        recipe = FindAnnotations("@Deprecated"),
         before = "@Deprecated public class A {}"
     )
 
     @Test
     fun matchesSingleAnnotationParameter(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("""@java.lang.SuppressWarnings("deprecation")"""),
+        recipe = FindAnnotations("""@java.lang.SuppressWarnings("deprecation")"""),
         before = "@SuppressWarnings(\"deprecation\") public class A {}",
         after = "~~>@SuppressWarnings(\"deprecation\") public class A {}"
     )
@@ -96,14 +96,14 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchDifferentSingleAnnotationParameter(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation("""@java.lang.SuppressWarnings("foo")"""),
+        recipe = FindAnnotations("""@java.lang.SuppressWarnings("foo")"""),
         before = "@SuppressWarnings(\"deprecation\") public class A {}"
     )
 
     @Test
     fun matchesNamedParameters(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("""@com.netflix.foo.Foo(bar="quux",baz="bar")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="quux",baz="bar")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -120,7 +120,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun doesNotMatchDifferentNamedParameters(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = FindAnnotation("""@com.netflix.foo.Foo(bar="qux",baz="baz")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(bar="qux",baz="baz")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -132,7 +132,7 @@ interface FindAnnotationTest: RecipeTest {
     @Test
     fun matchesNamedParametersRegardlessOfOrder(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindAnnotation("""@com.netflix.foo.Foo(baz="bar",bar="quux")"""),
+        recipe = FindAnnotations("""@com.netflix.foo.Foo(baz="bar",bar="quux")"""),
         before = """
             import com.netflix.foo.Foo;
             @Foo(bar="quux", baz="bar")
@@ -149,13 +149,13 @@ interface FindAnnotationTest: RecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindAnnotation(null)
+        var recipe = FindAnnotations(null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("annotationPattern")
 
-        recipe = FindAnnotation("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")")
+        recipe = FindAnnotations("@com.netflix.foo.Foo(baz=\"bar\",bar=\"quux\")")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

@@ -68,23 +68,23 @@ class Java11DeleteStatementTest : Java11Test, DeleteStatementTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindAnnotationTest : Java11Test, FindAnnotationTest
+class Java11FindAnnotationsTest : Java11Test, FindAnnotationsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindFieldTest : Java11Test, FindFieldTest
+class Java11FindFieldsTest : Java11Test, FindFieldsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindInheritedFieldTest : Java11Test, FindInheritedFieldTest
+class Java11FindInheritedFieldsTest : Java11Test, FindInheritedFieldsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindMethodTest : Java11Test, FindMethodTest
+class Java11FindMethodsTest : Java11Test, FindMethodsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
-class Java11FindTypeTest : Java11Test, FindTypeTest
+class Java11FindTypesTest : Java11Test, FindTypesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)

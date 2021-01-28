@@ -17,26 +17,15 @@ package org.openrewrite.java.search;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
-import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.CommonTokenStream;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.AnnotationMatcher;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.MethodMatcher;
-import org.openrewrite.java.internal.grammar.AnnotationSignatureParser;
-import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
-import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
-import java.util.List;
 import java.util.Set;
-
-import static java.util.stream.Collectors.toList;
 
 /**
  * This recipe will find all annotations matching the annotation pattern and mark those elements with a
@@ -48,29 +37,29 @@ import static java.util.stream.Collectors.toList;
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class FindAnnotation extends Recipe {
+public class FindAnnotations extends Recipe {
 
     /**
-     * An annotation pattern, expressed as a pointcut expression. See {@link FindAnnotation} for syntax.
+     * An annotation pattern, expressed as a pointcut expression. See {@link FindAnnotations} for syntax.
      */
     private final String annotationPattern;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindAnnotationVisitor(annotationPattern);
+        return new FindAnnotationsVisitor(annotationPattern);
     }
 
     public static Set<J.Annotation> find(J j, String clazz) {
         //noinspection ConstantConditions
-        return new FindAnnotationVisitor(clazz)
+        return new FindAnnotationsVisitor(clazz)
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindAnnotationVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private static class FindAnnotationsVisitor extends JavaIsoVisitor<ExecutionContext> {
         private final AnnotationMatcher matcher;
 
-        public FindAnnotationVisitor(String signature) {
+        public FindAnnotationsVisitor(String signature) {
             this.matcher = new AnnotationMatcher(signature);
         }
 

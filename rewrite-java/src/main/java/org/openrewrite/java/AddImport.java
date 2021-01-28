@@ -17,8 +17,8 @@ package org.openrewrite.java;
 
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
-import org.openrewrite.java.search.FindMethod;
-import org.openrewrite.java.search.FindType;
+import org.openrewrite.java.search.FindMethods;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -141,7 +141,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
     private boolean hasReference(J.CompilationUnit compilationUnit) {
         if (statik == null) {
             //Non-static imports, we just look for field accesses.
-            for (NameTree t : FindType.find(compilationUnit, type)) {
+            for (NameTree t : FindTypes.find(compilationUnit, type)) {
                 if (!(t instanceof J.FieldAccess) || !((J.FieldAccess) t).isFullyQualifiedClassReference(type)) {
                     return true;
                 }
@@ -150,7 +150,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         }
 
         //For static imports, we are either looking for a specific method or a wildcard.
-        for (J.MethodInvocation invocation : FindMethod.find(compilationUnit, type + " *(..)")) {
+        for (J.MethodInvocation invocation : FindMethods.find(compilationUnit, type + " *(..)")) {
             if (invocation.getSelect() == null &&
                     (statik.equals("*") || invocation.getName().getSimpleName().equals(statik))) {
                 return true;

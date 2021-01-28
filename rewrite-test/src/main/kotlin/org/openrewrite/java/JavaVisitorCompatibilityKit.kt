@@ -59,19 +59,19 @@ abstract class JavaVisitorCompatibilityKit {
     inner class DeleteStatementTck : DeleteStatementTest
 
     @Nested
-    inner class FindAnnotationTck : FindAnnotationTest
+    inner class FindAnnotationsTck : FindAnnotationsTest
 
     @Nested
-    inner class FindFieldTck : FindFieldTest
+    inner class FindFieldsTck : FindFieldsTest
 
     @Nested
-    inner class FindInheritedFieldTck : FindInheritedFieldTest
+    inner class FindInheritedFieldsTck : FindInheritedFieldsTest
 
     @Nested
-    inner class FindMethodTck : FindMethodTest
+    inner class FindMethodsTck : FindMethodsTest
 
     @Nested
-    inner class FindTypeTck : FindTypeTest
+    inner class FindTypesTck : FindTypesTest
 
     @Nested
     inner class ImplementInterfaceTck : ImplementInterfaceTest

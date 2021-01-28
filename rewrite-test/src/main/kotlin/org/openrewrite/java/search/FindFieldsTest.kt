@@ -22,14 +22,14 @@ import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.SearchResult
 
-interface FindFieldTest : RecipeTest {
+interface FindFieldsTest : RecipeTest {
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
 
     @Test
     fun findPrivateNonInheritedField(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField("java.util.List"),
+        recipe = FindFields("java.util.List"),
         before = """
             import java.util.*;
             public class A {
@@ -49,7 +49,7 @@ interface FindFieldTest : RecipeTest {
     @Test
     fun findArrayOfType(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField("java.lang.String"),
+        recipe = FindFields("java.lang.String"),
         before = """
             import java.util.*;
             public class A {
@@ -67,7 +67,7 @@ interface FindFieldTest : RecipeTest {
     @Test
     fun skipsMultiCatches(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindField("java.io.File"),
+        recipe = FindFields("java.io.File"),
         before = """
             import java.io.*;
             public class A {
@@ -93,13 +93,13 @@ interface FindFieldTest : RecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindField(null)
+        var recipe = FindFields(null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("fullyQualifiedTypeName")
 
-        recipe = FindField("com.foo.Foo")
+        recipe = FindFields("com.foo.Foo")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

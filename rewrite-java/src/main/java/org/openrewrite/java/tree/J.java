@@ -24,7 +24,7 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
-import org.openrewrite.java.search.FindType;
+import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -680,7 +680,7 @@ public interface J extends Serializable, Tree {
         }
 
         public Set<NameTree> findType(String clazz) {
-            return FindType.find(this, clazz);
+            return FindTypes.find(this, clazz);
         }
 
         @JsonIgnore

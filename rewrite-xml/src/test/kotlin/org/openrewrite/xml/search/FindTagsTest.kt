@@ -22,7 +22,7 @@ import org.openrewrite.TreePrinter
 import org.openrewrite.marker.SearchResult
 import org.openrewrite.xml.XmlParser
 
-class FindTagTest : RecipeTest {
+class FindTagsTest : RecipeTest {
     override val parser = XmlParser()
 
     override val treePrinter: TreePrinter<*>?
@@ -31,7 +31,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun simpleElement() = assertChanged(
             parser,
-            FindTag("/dependencies/dependency"),
+            FindTags("/dependencies/dependency"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
@@ -53,7 +53,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun wildcard() = assertChanged(
             parser,
-            FindTag("/dependencies/*"),
+            FindTags("/dependencies/*"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
@@ -75,7 +75,7 @@ class FindTagTest : RecipeTest {
     @Test
     fun noMatch() = assertUnchanged(
             parser,
-            FindTag("/dependencies/dne"),
+            FindTags("/dependencies/dne"),
             before = """
                 <?xml version="1.0" encoding="UTF-8"?>
                 <dependencies>
@@ -97,20 +97,20 @@ class FindTagTest : RecipeTest {
                 </dependency>
             """
         val source = parser.parse(*(arrayOf(before.trimIndent()))).iterator().next()
-        val matchingTags = FindTag.find(source, "/dependencies/dependency")
+        val matchingTags = FindTags.find(source, "/dependencies/dependency")
         assertThat(matchingTags).isNotNull.isNotEmpty
     }
 
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindTag(null)
+        var recipe = FindTags(null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("xPath")
 
-        recipe = FindTag("/dependencies/dependency")
+        recipe = FindTags("/dependencies/dependency")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

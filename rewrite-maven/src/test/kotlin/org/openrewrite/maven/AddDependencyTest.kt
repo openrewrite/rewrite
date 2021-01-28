@@ -19,7 +19,6 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.Parser
 import org.openrewrite.RecipeTest
-import org.openrewrite.java.search.FindField
 import org.openrewrite.maven.cache.InMemoryCache
 import org.openrewrite.maven.tree.Maven
 

@@ -20,47 +20,51 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.java.JavaIsoVisitor;
+import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.SearchResult;
 
 import java.util.Set;
 
 /**
- * This recipe will find all fields that have a type matching the fully qualified type name and mark those fields with
+ * This recipe will find all references to a type matching the fully qualified type name and mark those fields with
  * {@link SearchResult} markers.
  */
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class FindField extends Recipe {
-
+public final class FindTypes extends Recipe {
     private final String fullyQualifiedTypeName;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindFieldVisitor();
+        return new FindTypesVisitor();
     }
 
-    public static Set<J.VariableDecls> find(J j, String clazz) {
+    public static Set<NameTree> find(J j, String fullyQualifiedClassName) {
         //noinspection ConstantConditions
-        return ((FindFieldVisitor) new FindField(clazz).getVisitor())
+        return ((FindTypesVisitor) new FindTypes(fullyQualifiedClassName).getVisitor())
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private final class FindFieldVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private class FindTypesVisitor extends JavaVisitor<ExecutionContext> {
+
+        public FindTypesVisitor() {
+            setCursoringOn();
+        }
 
         @Override
-        public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {
-            if (multiVariable.getTypeExpr() instanceof J.MultiCatch) {
-                return multiVariable;
+        public <N extends NameTree> N visitTypeName(N name, ExecutionContext ctx) {
+            N n = super.visitTypeName(name, ctx);
+            JavaType.Class asClass = TypeUtils.asClass(n.getType());
+            if (asClass != null && asClass.getFullyQualifiedName().equals(fullyQualifiedTypeName) &&
+                    getCursor().firstEnclosing(J.Import.class) == null) {
+                return n.mark(new SearchResult());
             }
-            if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
-                    .getType(), fullyQualifiedTypeName)) {
-                return multiVariable.mark(new SearchResult());
-            }
-            return multiVariable;
+            return n;
         }
     }
 }

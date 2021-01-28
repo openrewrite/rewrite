@@ -19,7 +19,7 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 
-interface FindInheritedFieldTest {
+interface FindInheritedFieldsTest {
 
     @Test
     fun findInheritedField(jp: JavaParser) {
@@ -33,11 +33,11 @@ interface FindInheritedFieldTest {
 
         val b = jp.parse("public class B extends A { }", a)[0]
 
-        assertThat(FindInheritedField.find(b.classes[0], "java.util.List").firstOrNull()?.name)
+        assertThat(FindInheritedFields.find(b.classes[0], "java.util.List").firstOrNull()?.name)
             .isEqualTo("list")
 
         // the Set field is not considered to be inherited because it is private
-        assertThat(FindInheritedField.find(b.classes[0], "java.util.Set")).isEmpty()
+        assertThat(FindInheritedFields.find(b.classes[0], "java.util.Set")).isEmpty()
     }
 
     @Test
@@ -50,9 +50,9 @@ interface FindInheritedFieldTest {
 
         val b = jp.parse("public class B extends A { }", a)[0]
 
-        assertThat(FindInheritedField.find(b.classes[0], "java.lang.String").firstOrNull()?.name)
+        assertThat(FindInheritedFields.find(b.classes[0], "java.lang.String").firstOrNull()?.name)
             .isEqualTo("s")
 
-        assertThat(FindInheritedField.find(b.classes[0], "java.util.Set")).isEmpty()
+        assertThat(FindInheritedFields.find(b.classes[0], "java.util.Set")).isEmpty()
     }
 }

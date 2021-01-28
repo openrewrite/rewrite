@@ -22,14 +22,14 @@ import org.openrewrite.TreePrinter
 import org.openrewrite.java.JavaParser
 import org.openrewrite.marker.SearchResult
 
-interface FindMethodTest : RecipeTest {
+interface FindMethodsTest : RecipeTest {
     override val treePrinter: TreePrinter<*>?
         get() = SearchResult.PRINTER
 
     @Test
     fun findStaticMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod("java.util.Collections emptyList()") ,
+        recipe = FindMethods("java.util.Collections emptyList()"),
         before = """
             import java.util.Collections;
             public class A {
@@ -47,7 +47,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun findStaticallyImportedMethodCalls(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod("java.util.Collections emptyList()"),
+        recipe = FindMethods("java.util.Collections emptyList()"),
         before = """
             import static java.util.Collections.emptyList;
             public class A {
@@ -65,7 +65,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun matchVarargs(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod("A foo(String, Object...)"),
+        recipe = FindMethods("A foo(String, Object...)"),
         before = """
             public class B {
                public void test() {
@@ -90,7 +90,7 @@ interface FindMethodTest : RecipeTest {
     @Test
     fun matchOnInnerClass(jp: JavaParser) = assertChanged(
         jp,
-        recipe = FindMethod("B.C foo()"),
+        recipe = FindMethods("B.C foo()"),
         before = """
             public class A {
                void test() {
@@ -117,13 +117,13 @@ interface FindMethodTest : RecipeTest {
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
-        var recipe = FindMethod(null)
+        var recipe = FindMethods(null)
         var valid = recipe.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        recipe = FindMethod("com.foo.Foo bar()")
+        recipe = FindMethods("com.foo.Foo bar()")
         valid = recipe.validate()
         assertThat(valid.isValid).isTrue()
     }

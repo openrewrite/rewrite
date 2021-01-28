@@ -27,20 +27,20 @@ import java.util.Set;
 
 import static java.util.Collections.emptySet;
 
-public class FindInheritedField {
-    private FindInheritedField() {
+public class FindInheritedFields {
+    private FindInheritedFields() {
     }
 
     public static Set<JavaType.Var> find(J j, String clazz) {
         Set<JavaType.Var> fields = new HashSet<>();
-        new FindInheritedFieldVisitor(clazz).visit(j, fields);
+        new FindInheritedFieldsVisitor(clazz).visit(j, fields);
         return fields;
     }
 
-    private static class FindInheritedFieldVisitor extends JavaIsoVisitor<Set<JavaType.Var>> {
+    private static class FindInheritedFieldsVisitor extends JavaIsoVisitor<Set<JavaType.Var>> {
         private final String fullyQualifiedName;
 
-        public FindInheritedFieldVisitor(String fullyQualifiedName) {
+        public FindInheritedFieldsVisitor(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
         }
 

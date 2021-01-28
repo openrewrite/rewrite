@@ -29,26 +29,26 @@ import java.util.Set;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class FindTag extends Recipe {
+public class FindTags extends Recipe {
 
     private final String xPath;
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindTagVisitor(new XPathMatcher(xPath));
+        return new FindTagsVisitor(new XPathMatcher(xPath));
     }
 
     public static Set<Xml.Tag> find(Xml x, String xPath) {
         //noinspection ConstantConditions
-        return new FindTagVisitor(new XPathMatcher(xPath)).visit(x, ExecutionContext.builder().build())
+        return new FindTagsVisitor(new XPathMatcher(xPath)).visit(x, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private static class FindTagVisitor extends XmlVisitor<ExecutionContext> {
+    private static class FindTagsVisitor extends XmlVisitor<ExecutionContext> {
 
         private final XPathMatcher xPathMatcher;
 
-        public FindTagVisitor(XPathMatcher xPathMatcher) {
+        public FindTagsVisitor(XPathMatcher xPathMatcher) {
             this.xPathMatcher = xPathMatcher;
             setCursoringOn();
         }
