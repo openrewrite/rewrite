@@ -16,11 +16,13 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
+import org.openrewrite.marker.Markers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,17 +56,7 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-    public <J2 extends J> List<J2> generateBefore(Cursor insertionScope, Object... parameters) {
-        return generate(false, insertionScope, parameters);
-    }
-
-    public <J2 extends J> List<J2> generateAfter(Cursor insertionScope, Object... parameters) {
-        return generate(true, insertionScope, parameters);
-    }
-
-    private <J2 extends J> List<J2> generate(boolean after,
-                                             Cursor insertionScope,
-                                             Object... parameters) {
+    public <J2 extends J> List<J2> generate(Cursor insertionScope, Object... parameters) {
 
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
@@ -103,7 +95,15 @@ public class JavaTemplate {
         //Prune down the original AST to just the elements in scope at the insertion point.
         J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor().visit(cu, insertionScope);
 
-        String generatedSource = new TemplatePrinter(after, memberVariableInitializer, insertionScope, imports)
+        //To solve for cases where a template should be generated as the last statement of a block or the last element
+        //of a JContainer, the pruned tree may insert an J.Empty as an insertion point for this use case. The inserted
+        //element is passed via the message cursor.
+        J.Empty newInsertionPoint = insertionScope.pollMessage("newInsertionPoint");
+        if (newInsertionPoint != null) {
+            insertionScope = new Cursor(insertionScope, newInsertionPoint);
+        }
+
+        String generatedSource = new TemplatePrinter(memberVariableInitializer, insertionScope, imports)
                 .print(pruned, printedTemplate);
 
         logger.trace("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
@@ -115,7 +115,9 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        Cursor formatScope = insertionScope.dropParentUntil(J.class::isInstance);
+        final Cursor formatScope = extractionContext.formatCursor != null ? extractionContext.formatCursor :
+                insertionScope.dropParentUntil(J.class::isInstance);
+
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
                 .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
@@ -163,9 +165,13 @@ public class JavaTemplate {
         @Override
         public J.Block visitBlock(J.Block block, Cursor insertionScope) {
             Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
+            if (!insertionScope.isScopeInPath(block) && !(parent.getValue() instanceof J.ClassDecl)) {
+                return block.withStatements(emptyList());
+            }
 
-            if (!(parent.getValue() instanceof J.ClassDecl) && insertionScope.isScopeInPath(block)) {
-                J.Block b = visitAndCast(block, insertionScope, this::visitEach);
+            J.Block b;
+            if (!(parent.getValue() instanceof J.ClassDecl)) {
+                b = visitAndCast(block, insertionScope, this::visitEach);
                 b = b.withStatik(visitRightPadded(b.getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
                 b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, insertionScope));
                 b = visitAndCast(b, insertionScope, this::visitStatement);
@@ -180,12 +186,23 @@ public class JavaTemplate {
                             break;
                         }
                     }
-                    return b.withStatements(statementsInScope);
+                    b = b.withStatements(statementsInScope);
                 }
-            } else if (parent.getValue() instanceof J.ClassDecl) {
-                return super.visitBlock(block, insertionScope);
+            } else {
+                b = super.visitBlock(block, insertionScope);
             }
-            return block.withStatements(emptyList());
+
+            if (insertionScope.isScopeInPath(b)
+                    && b.getStatements().stream().noneMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
+                //This can happen if the insertion scope was targeted to the block's end element. In this case,
+                //a new, empty element is inserted as the last statement in the block and will act as an insert
+                //point for those cases where a template should be generated as the last statement of a block.
+                J.Empty newInsertionPoint = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY );
+                b = b.withStatements(ListUtils.concat(b.getStatements(),
+                        new JRightPadded<>(newInsertionPoint, Space.EMPTY, Markers.EMPTY)));
+                insertionScope.putMessage("newInsertionPoint", newInsertionPoint);
+            }
+            return b;
         }
 
         @Override
@@ -219,7 +236,7 @@ public class JavaTemplate {
 
         private final Set<String> imports;
 
-        private TemplatePrinter(boolean after, boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
+        private TemplatePrinter(boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
             super(new TreePrinter<String>() {
 
                 //Note: A block is added around the template and markers when the insertion point is within a
@@ -230,29 +247,12 @@ public class JavaTemplate {
 
                 @Override
                 public void doBefore(Tree tree, StringBuilder printerAcc, String printedTemplate) {
-                    if (!after) {
-                        // individual statement, but block doLast which is invoking this adds the ;
-                        if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
-                            String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
-                                    printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
+                    // individual statement, but block doLast which is invoking this adds the ;
+                    if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
+                        String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
+                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
 
-                            printerAcc.append(templateCode);
-                        }
-                    }
-                }
-
-                @Override
-                public void doAfter(Tree tree, StringBuilder printerAcc, String printedTemplate) {
-                    if (after) {
-                        // individual statement, but block doLast which is invoking this adds the ;
-                        if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
-                            String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
-                                    printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
-                            // since the visit method on J.Block is responsible for adding the ';', we
-                            // add it pre-emptively here before concatenating the template.
-                            printerAcc.append(((insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block) ?
-                                    ";" : "")).append(templateCode);
-                        }
+                        printerAcc.append(templateCode);
                     }
                 }
             });
@@ -281,8 +281,11 @@ public class JavaTemplate {
         private final Set<UUID> collectedIds = new HashSet<>();
         private long startDepth = 0;
 
+        @Nullable
+        private Cursor formatCursor;
+
         @SuppressWarnings("unchecked")
-        public <J2 extends J> List<J2> getSnippets() {
+        private <J2 extends J> List<J2> getSnippets() {
             //This returns all elements that have the same depth as the starting element.
             return collectedElements.stream()
                     .filter(e -> e.depth == startDepth)
@@ -341,7 +344,10 @@ public class JavaTemplate {
                     //the first class declaration (with no imports). Do not add the compilation unit to the collected
                     //elements
                     context.startDepth++;
+                    context.formatCursor = getCursor();
                     return space;
+                } else {
+                    context.formatCursor = getCursor().dropParentUntil(J.class::isInstance);
                 }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);

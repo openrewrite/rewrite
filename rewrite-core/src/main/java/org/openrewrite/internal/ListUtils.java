@@ -141,4 +141,15 @@ public final class ListUtils {
         newLs.addAll(ls);
         return newLs;
     }
+    public static <T> List<T> concatAll(List<T> ls, List<T> t) {
+        List<T> newLs = new ArrayList<>(ls);
+        newLs.addAll(t);
+        return newLs;
+    }
+
+    public static <T> List<T> insertAll(List<T> ls, int index, List<T> t) {
+        List<T> newLs = new ArrayList<>(ls);
+        newLs.addAll(index, t);
+        return newLs;
+    }
 }

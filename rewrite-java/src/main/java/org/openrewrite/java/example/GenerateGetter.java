@@ -31,6 +31,8 @@ import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
+import java.util.List;
+
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class GenerateGetter extends Recipe {
@@ -69,15 +71,14 @@ public class GenerateGetter extends Recipe {
             if (varCursor != null) {
                 J.VariableDecls.NamedVar var = varCursor.getValue();
                 J.Block body = c.getBody();
-                J.MethodDecl generatedMethodDecl =
-                        (J.MethodDecl) GETTER.generateAfter(varCursor,
-                                TypeUtils.asClass(var.getType()).getClassName(),
-                                StringUtils.capitalize(var.getSimpleName()),
-                                var.getSimpleName()).iterator().next();
+                List<J.MethodDecl> generatedMethodDecls = generateLastInBlock(GETTER, new Cursor(getCursor(), body),
+                    TypeUtils.asClass(var.getType()).getClassName(),
+                    StringUtils.capitalize(var.getSimpleName()),
+                    var.getSimpleName());
                 c = c.withBody(body.withStatements(
                         ListUtils.concat(
                                 body.getStatements(),
-                                new JRightPadded<>(generatedMethodDecl, Space.EMPTY, Markers.EMPTY)
+                                new JRightPadded<>(generatedMethodDecls.get(0), Space.EMPTY, Markers.EMPTY)
                         )));
             }
             return c;
