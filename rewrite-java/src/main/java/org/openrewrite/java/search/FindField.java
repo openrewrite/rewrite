@@ -39,17 +39,17 @@ public class FindField extends Recipe {
 
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
-        return new FindFieldsVisitor();
+        return new FindFieldVisitor();
     }
 
     public static Set<J.VariableDecls> find(J j, String clazz) {
         //noinspection ConstantConditions
-        return ((FindFieldsVisitor) new FindField(clazz).getVisitor())
+        return ((FindFieldVisitor) new FindField(clazz).getVisitor())
                 .visit(j, ExecutionContext.builder().build())
                 .findMarkedWith(SearchResult.class);
     }
 
-    private final class FindFieldsVisitor extends JavaIsoVisitor<ExecutionContext> {
+    private final class FindFieldVisitor extends JavaIsoVisitor<ExecutionContext> {
 
         @Override
         public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, ExecutionContext ctx) {

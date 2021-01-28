@@ -28,11 +28,11 @@ public final class FindTypesInNameScope {
 
     public static Set<JavaType> find(J j) {
         Set<JavaType> types = new HashSet<>();
-        new FindReferencedTypesVisitor().visit(j, types);
+        new FindTypesInNameScopeVisitor().visit(j, types);
         return types;
     }
 
-    private static class FindReferencedTypesVisitor extends JavaVisitor<Set<JavaType>> {
+    private static class FindTypesInNameScopeVisitor extends JavaVisitor<Set<JavaType>> {
         @Override
         public J visitMethodInvocation(J.MethodInvocation method, Set<JavaType> ctx) {
             if (method.getType() != null) {
