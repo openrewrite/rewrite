@@ -19,16 +19,14 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
-import org.openrewrite.java.tree.J
-import org.openrewrite.java.tree.JRightPadded
-import org.openrewrite.java.tree.Space
-import org.openrewrite.java.tree.Statement
+import org.openrewrite.java.tree.*
 import org.openrewrite.marker.Markers
 import org.slf4j.LoggerFactory
 import kotlin.streams.toList
@@ -172,6 +170,107 @@ interface JavaTemplateTest : RecipeTest {
                     n++;
                     others.add(m);
                 }
+            }
+        """
+    )
+
+    @Test
+    fun addToEmptyMethodBody(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaVisitor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitBlock(block: J.Block, p: ExecutionContext): J {
+                val parent = cursor.dropParentUntil { it is J }.getValue<J>()
+                if (parent is J.MethodDecl) {
+                    val template = JavaTemplate.builder("others.add(#{});").build()
+                    //Test to make sure the template extraction is working correctly. Both of these calls should return
+                    //a single template element and should have type attribution
+
+                    //Test when insertion scope is between two statements in a block
+                    var generatedMethodInvocations = generateLastInBlock<J.MethodInvocation>(template,
+                        Cursor(getCursor(), block),
+                        (parent.params.elem[0].elem as J.VariableDecls).vars[0])
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
+                    //Test when insertion scope is after the last statements in a block
+                    generatedMethodInvocations = generateLastInBlock<J.MethodInvocation>(template,
+                        Cursor(getCursor(), block),
+                        (parent.params.elem[0].elem as J.VariableDecls).vars[0])
+                    assertThat(generatedMethodInvocations).`as`("The list of generated statements should be 1.")
+                        .hasSize(1)
+                    assertThat(generatedMethodInvocations[0].type).isNotNull
+
+                    return block.withStatements(
+                        ListUtils.concat(
+                            block.statements,
+                            JRightPadded(generatedMethodInvocations[0], Space.EMPTY, Markers.EMPTY)
+                        )
+                    )
+                }
+                return super.visitBlock(block, p)
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                }
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class A {
+                int n = 0;
+                void foo(String m, List<String> others) {
+                    others.add(m);
+                }
+            }
+        """
+    )
+
+    @Test
+    @Disabled
+    fun addToEmptyClassBody(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitClassDecl(classDecl: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
+
+                val c = super.visitClassDecl(classDecl, p)
+
+                val template = JavaTemplate.builder("private String name = null;").build()
+
+                //Test when insertion scope is between two statements in a block
+                val generatedVariabelDecls = generateLastInBlock<J.VariableDecls>(template, Cursor(getCursor(), c.body))
+                assertThat(generatedVariabelDecls).`as`("The list of generated statements should be 1.")
+                    .hasSize(1)
+                assertThat(generatedVariabelDecls[0].typeAsClass).isNotNull
+
+                return c.withBody(c.body.withStatements(
+                    ListUtils.concat(
+                        c.body.statements,
+                        JRightPadded(generatedVariabelDecls[0], Space.EMPTY, Markers.EMPTY)
+                    )))
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.List;
+            public class A {
+            }
+        """,
+        after = """
+            import java.util.List;
+            public class A {
+                private String name = null;
             }
         """
     )
