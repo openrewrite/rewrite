@@ -115,7 +115,9 @@ public class JavaTemplate {
         ExtractionContext extractionContext = new ExtractionContext();
         new ExtractTemplatedCode().visit(synthetic, extractionContext);
 
-        Cursor formatScope = insertionScope.dropParentUntil(J.class::isInstance);
+        final Cursor formatScope = extractionContext.formatCursor != null ? extractionContext.formatCursor :
+                insertionScope.dropParentUntil(J.class::isInstance);
+
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
                 .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
@@ -279,8 +281,11 @@ public class JavaTemplate {
         private final Set<UUID> collectedIds = new HashSet<>();
         private long startDepth = 0;
 
+        @Nullable
+        private Cursor formatCursor;
+
         @SuppressWarnings("unchecked")
-        public <J2 extends J> List<J2> getSnippets() {
+        private <J2 extends J> List<J2> getSnippets() {
             //This returns all elements that have the same depth as the starting element.
             return collectedElements.stream()
                     .filter(e -> e.depth == startDepth)
@@ -339,7 +344,10 @@ public class JavaTemplate {
                     //the first class declaration (with no imports). Do not add the compilation unit to the collected
                     //elements
                     context.startDepth++;
+                    context.formatCursor = getCursor();
                     return space;
+                } else {
+                    context.formatCursor = getCursor().dropParentUntil(J.class::isInstance);
                 }
                 List<Comment> comments = new ArrayList<>(space.getComments());
                 comments.remove(startToken);

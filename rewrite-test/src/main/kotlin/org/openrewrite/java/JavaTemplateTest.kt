@@ -19,7 +19,6 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
@@ -235,7 +234,6 @@ interface JavaTemplateTest : RecipeTest {
     )
 
     @Test
-    @Disabled
     fun addToEmptyClassBody(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
