@@ -170,7 +170,7 @@ public class JavaTemplate {
             J.Block b;
             if (!(parent.getValue() instanceof J.ClassDecl)) {
                 b = visitAndCast(block, insertionScope, this::visitEach);
-                b = b.withStatik(b.getStatic() != null ? visitSpace(b.getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope) : null);
+                b = b.withStatik(visitRightPadded(b.getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
                 b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, insertionScope));
                 b = visitAndCast(b, insertionScope, this::visitStatement);
 
