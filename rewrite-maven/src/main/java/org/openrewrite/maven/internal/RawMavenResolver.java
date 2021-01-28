@@ -212,7 +212,7 @@ public class RawMavenResolver {
                     if (groupId == null || artifactId == null) {
                         try {
                             assert groupId != null;
-                        } catch (Exception e) {
+                        } catch (AssertionError e) {
                             if(continueOnError) {
                                 logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine groupId. Omitting the problematic dependency and continuing.",
                                         rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
@@ -224,7 +224,7 @@ public class RawMavenResolver {
                         try {
                             //noinspection ConstantConditions
                             assert artifactId != null;
-                        } catch (Exception e) {
+                        } catch (AssertionError e) {
                             if(continueOnError) {
                                 logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine artifactId. Omitting the problematic dependency and continuing.",
                                         rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
@@ -667,7 +667,10 @@ public class RawMavenResolver {
         Map<String, String> properties = emptyMap();
 
         @Nullable
-        String getGroupId(String g) {
+        String getGroupId(@Nullable String g) {
+            if(g == null) {
+                return null;
+            }
             if (g.equals("${project.groupId}") || g.equals("${pom.groupId}")) {
                 String groupId = rawPom.getGroupId();
                 if (groupId != null) {
@@ -681,7 +684,10 @@ public class RawMavenResolver {
         }
 
         @Nullable
-        String getArtifactId(String a) {
+        String getArtifactId(@Nullable String a) {
+            if(a == null) {
+                return null;
+            }
             if (a.equals("${project.artifactId}") || a.equals("${pom.artifactId}")) {
                 return rawPom.getArtifactId(); // cannot be inherited from parent
             } else if (a.equals("${project.parent.artifactId}")) {
