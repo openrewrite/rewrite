@@ -1594,6 +1594,10 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
         }
+
+        public MethodCoordinates coordinates() {
+            return new MethodCoordinates(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
