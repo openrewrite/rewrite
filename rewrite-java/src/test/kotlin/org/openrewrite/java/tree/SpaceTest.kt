@@ -17,6 +17,7 @@ package org.openrewrite.java.tree
 
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import org.openrewrite.marker.Markers
 
 class SpaceTest {
     @Test
@@ -93,5 +94,20 @@ class SpaceTest {
     fun stringify() {
         assertThat(Space.format("\n  \n\t \t").toString())
             .isEqualTo("Space(comments=<0 comments>, whitespace='\\n·₁·₂\\n-₁·₂-₃')")
+    }
+
+    @Test
+    fun findIndent() {
+        assertThat(Space.build(" ", listOf(Comment(Comment.Style.LINE, "hi", "\n   ")), Markers.EMPTY).indent)
+            .isEqualTo("   ")
+
+        assertThat(Space.build("   ", emptyList(), Markers.EMPTY).indent)
+            .isEqualTo("   ")
+
+        assertThat(Space.build("  \n ", emptyList(), Markers.EMPTY).indent)
+            .isEqualTo(" ")
+
+        assertThat(Space.build("  \n   \n    ", emptyList(), Markers.EMPTY).indent)
+            .isEqualTo("    ")
     }
 }

@@ -61,6 +61,21 @@ public class Space implements Markable {
 
     @JsonIgnore
     public String getIndent() {
+        if (!comments.isEmpty()) {
+            return getWhitespaceIndent(comments.get(comments.size() - 1).getSuffix());
+        }
+        return getWhitespaceIndent(whitespace);
+    }
+
+    @JsonIgnore
+    public String getLastWhitespace() {
+        if (!comments.isEmpty()) {
+            return comments.get(comments.size() - 1).getSuffix();
+        }
+        return whitespace;
+    }
+
+    private String getWhitespaceIndent(String whitespace) {
         int lastNewline = whitespace.lastIndexOf('\n');
         if (lastNewline >= 0) {
             return whitespace.substring(lastNewline + 1);

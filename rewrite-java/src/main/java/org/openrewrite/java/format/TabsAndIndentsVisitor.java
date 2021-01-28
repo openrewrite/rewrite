@@ -51,7 +51,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 space = ((JContainer<?>) v).getBefore();
             }
 
-            if (space != null && space.getWhitespace().contains("\n")) {
+            if (space != null && space.getLastWhitespace().contains("\n")) {
                 int indent = findIndent(space);
                 if (indent != 0) {
                     c.putMessage("lastIndent", indent);
@@ -113,7 +113,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     !(getCursor().getParentOrThrow().getValue() instanceof J.Annotation);
         }
 
-        if (!space.getWhitespace().contains("\n") || parent == null) {
+        if (!space.getLastWhitespace().contains("\n") || parent == null) {
             return space;
         }
 
@@ -157,14 +157,14 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
         if (right.getElem() instanceof J) {
             J elem = (J) right.getElem();
-            if ((right.getAfter().getWhitespace().contains("\n") ||
-                    ((J) right.getElem()).getPrefix().getWhitespace().contains("\n"))) {
+            if ((right.getAfter().getLastWhitespace().contains("\n") ||
+                    ((J) right.getElem()).getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
                         J.ForLoop.Control control = getCursor().getParentOrThrow().getValue();
                         Space initPrefix = control.getInit().getElem().getPrefix();
-                        if (!initPrefix.getWhitespace().contains("\n")) {
+                        if (!initPrefix.getLastWhitespace().contains("\n")) {
                             int initIndent = forInitColumn();
                             getCursor().getParentOrThrow().putMessage("lastIndent", initIndent - style.getContinuationIndent());
                             elem = visitAndCast(elem, p);
@@ -179,7 +179,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                     case METHOD_DECL_ARGUMENT: {
                         JContainer<Expression> container = getCursor().getParentOrThrow().getValue();
                         Expression firstArg = container.getElem().iterator().next().getElem();
-                        if (firstArg.getPrefix().getWhitespace().contains("\n")) {
+                        if (firstArg.getPrefix().getLastWhitespace().contains("\n")) {
                             // if the first argument is on its own line, align all arguments to be continuation indented
                             elem = visitAndCast(elem, p);
                             after = indentTo(right.getAfter(), indent);
@@ -241,7 +241,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                 switch (loc) {
                     case NEW_CLASS_ARGS:
                     case METHOD_INVOCATION_ARGUMENT:
-                        if (!elem.getPrefix().getWhitespace().contains("\n")) {
+                        if (!elem.getPrefix().getLastWhitespace().contains("\n")) {
                             JContainer<J> args = getCursor().getParentOrThrow().getValue();
                             boolean seenArg = false;
                             boolean anyOtherArgOnOwnLine = false;
@@ -251,7 +251,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                     continue;
                                 }
                                 if (seenArg) {
-                                    if (arg.getElem().getPrefix().getWhitespace().contains("\n")) {
+                                    if (arg.getElem().getPrefix().getLastWhitespace().contains("\n")) {
                                         anyOtherArgOnOwnLine = true;
                                         break;
                                     }
@@ -293,7 +293,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         List<JRightPadded<J2>> js;
 
         int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
-        if (container.getBefore().getWhitespace().contains("\n")) {
+        if (container.getBefore().getLastWhitespace().contains("\n")) {
             switch (loc) {
                 case TYPE_PARAMETERS:
                 case IMPLEMENTS:
@@ -332,7 +332,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
     }
 
     private Space indentTo(Space space, int column) {
-        if (!space.getWhitespace().contains("\n")) {
+        if (!space.getLastWhitespace().contains("\n")) {
             return space;
         }
 

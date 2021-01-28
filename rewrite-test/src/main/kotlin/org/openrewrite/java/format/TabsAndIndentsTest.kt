@@ -563,6 +563,22 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
+    fun nestedIfElse(jp: JavaParser) = assertUnchanged(
+        jp,
+        before = """
+            class Test {
+                void method() {
+                    if (true) { // comment
+                        if (true) {
+                        } else {
+                        }
+                    }
+                }
+            }
+        """
+    )
+
+    @Test
     fun annotationOnSameLine(jp: JavaParser) = assertUnchanged(
         jp,
         before = """
