@@ -15,12 +15,18 @@
  */
 package org.openrewrite.java.format;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
+import java.util.List;
+
 public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
+
+    @SuppressWarnings({"FieldCanBeLocal", "unused"})
     private final WrappingAndBracesStyle style;
 
     public WrappingAndBracesVisitor(WrappingAndBracesStyle style) {
@@ -32,12 +38,99 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
         J parentTree = getCursor().dropParentUntil(J.class::isInstance).getValue();
-        if(parentTree instanceof J.Block) {
-            if(!j.getPrefix().getWhitespace().contains("\n")) {
-                j = j.withPrefix(j.getPrefix().withWhitespace("\n" + j.getPrefix().getWhitespace()));
+        if (parentTree instanceof J.Block) {
+            if (!j.getPrefix().getWhitespace().contains("\n")) {
+                j = j.withPrefix(withNewline(j.getPrefix()));
             }
         }
 
         return j;
     }
+
+    @Override public J.MethodDecl visitMethod(J.MethodDecl method, P p) {
+        J.MethodDecl m = super.visitMethod(method, p);
+        // TODO make annotation wrapping configurable
+        m = m.withAnnotations(withNewlines(m.getAnnotations()));
+        if (!m.getAnnotations().isEmpty()) {
+            if (!m.getModifiers().isEmpty()) {
+                m = m.withModifiers(withNewline(m.getModifiers()));
+            } else if (m.getTypeParameters() != null) {
+                if (!m.getTypeParameters().getBefore().getWhitespace().contains("\n")) {
+                    m = m.withTypeParameters(
+                            m.getTypeParameters().withBefore(
+                                    withNewline(m.getTypeParameters().getBefore())
+                            )
+                    );
+                }
+            } else if (m.getReturnTypeExpr() != null) {
+                if (!m.getReturnTypeExpr().getPrefix().getWhitespace().contains("\n")) {
+                    m = m.withReturnTypeExpr(
+                            m.getReturnTypeExpr().withPrefix(
+                                    withNewline(m.getReturnTypeExpr().getPrefix())
+                            )
+                    );
+                }
+            } else {
+                if (!m.getName().getPrefix().getWhitespace().contains("\n")) {
+                    m = m.withName(
+                            m.getName().withPrefix(
+                                    withNewline(m.getName().getPrefix())
+                            )
+                    );
+                }
+            }
+        }
+        return m;
+    }
+
+    @Override public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
+        J.ClassDecl j = super.visitClassDecl(classDecl, p);
+        // TODO make annotation wrapping configurable
+        j = j.withAnnotations(withNewlines(j.getAnnotations()));
+        if (!j.getAnnotations().isEmpty()) {
+            if (!j.getModifiers().isEmpty()) {
+                j = j.withModifiers(withNewline(j.getModifiers()));
+            } else {
+                j = j.withKind(
+                        j.getKind().withBefore(
+                                j.getKind().getBefore().withWhitespace(
+                                        "\n" + j.getKind().getBefore().getWhitespace()
+                                )
+                        )
+                );
+            }
+
+        }
+        return j;
+    }
+
+    private List<J.Annotation> withNewlines(List<J.Annotation> annotations) {
+        if (annotations.isEmpty()) {
+            return annotations;
+        }
+        return ListUtils.map(annotations, (index, a) -> {
+            if (index != 0 && !a.getPrefix().getWhitespace().contains("\n")) {
+                a = a.withPrefix(withNewline(a.getPrefix()));
+            }
+            return a;
+        });
+    }
+
+    private Space withNewline(Space space) {
+        return space.withWhitespace("\n" + space.getWhitespace());
+    }
+
+    private List<J.Modifier> withNewline(List<J.Modifier> modifiers) {
+        J.Modifier firstModifier = modifiers.iterator().next();
+        if (!firstModifier.getPrefix().getWhitespace().contains("\n")) {
+            return ListUtils.mapFirst(modifiers,
+                    mod -> mod.withPrefix(
+                            withNewline(mod.getPrefix())
+                    )
+            );
+        }
+        return modifiers;
+    }
+
+
 }

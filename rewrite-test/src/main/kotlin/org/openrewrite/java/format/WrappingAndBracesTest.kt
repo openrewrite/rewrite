@@ -28,21 +28,169 @@ interface WrappingAndBracesTest : RecipeTest {
 
     @Test
     fun blockLevelStatements(jp: JavaParser) = assertChanged(
-        jp,
-        before = """
-            public class Test {
-                {        int n = 0;
-                    n++;
+            jp,
+            before = """
+                public class Test {
+                    {        int n = 0;
+                        n++;
+                    }
                 }
-            }
-        """,
-        after = """
-            public class Test {
-                {
-                    int n = 0;
-                    n++;
+            """,
+            after = """
+                public class Test {
+                    {
+                        int n = 0;
+                        n++;
+                    }
                 }
-            }
-        """
+            """
+    )
+
+    @Test
+    fun annotatedMethod(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) Object method() {
+                        return new Object();
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 Object method() {
+                        return new Object();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun annotatedMethodWithModifier(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) public Object method() {
+                        return new Object();
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 public Object method() {
+                        return new Object();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun annotatedMethodWithModifiers(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) public final Object method() {
+                        return new Object();
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 public final Object method() {
+                        return new Object();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun annotatedMethodWithTypeParameter(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) <T> T method() {
+                        return null;
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 <T> T method() {
+                        return null;
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun multipleAnnotatedMethod(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) @Deprecated Object method() {
+                        return new Object();
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 @Deprecated
+                 Object method() {
+                        return new Object();
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun annotatedConstructor(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                public class Test {
+                    @SuppressWarnings({"ALL"}) @Deprecated Test() {
+                    }
+                }
+            """,
+            after = """
+                public class Test {
+                    @SuppressWarnings({"ALL"})
+                 @Deprecated
+                 Test() {
+                    }
+                }
+            """
+    )
+
+    @Test
+    fun annotatedClassDecl(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                @SuppressWarnings({"ALL"}) class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings({"ALL"})
+                 class Test {
+                }
+            """
+    )
+
+    @Test
+    fun annotatedClassDeclWithModifiers(jp: JavaParser) = assertChanged(
+            jp,
+            before = """
+                @SuppressWarnings({"ALL"}) public class Test {
+                }
+            """,
+            after = """
+                @SuppressWarnings({"ALL"})
+                 public class Test {
+                }
+            """
     )
 }
