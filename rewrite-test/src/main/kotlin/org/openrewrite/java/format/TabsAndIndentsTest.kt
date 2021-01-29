@@ -662,16 +662,25 @@ interface TabsAndIndentsTest : RecipeTest {
     )
 
     @Test
-    fun methodInvocationsAllTheWayDown(jp: JavaParser) = assertUnchanged(
+    fun identAndFieldAccess(jp: JavaParser) = assertUnchanged(
         jp,
+
         before = """
             import java.util.stream.Stream;
             class Test {
-                void method(long n, int m) {
-                    method(Stream.of("a")
-                                    .count(),
-                            1
+                Test t = this;
+                Test method(Stream n, int m) {
+                    this.t.t
+                            .method(null, 1)
+                            .t
+                            .method(null, 2);
+                    Stream
+                            .of("a");
+                    method(Stream
+                                    .of("a"),
+                            3
                     );
+                    return this;
                 }
             }
         """

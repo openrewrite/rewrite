@@ -101,15 +101,6 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return control;
     }
 
-//    @Override
-//    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
-//        if(!method.getPrefix().getLastWhitespace().contains("\n")) {
-//            int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
-//            getCursor().putMessage("lastIndent", indent);
-//        }
-//        return super.visitMethodInvocation(method, p);
-//    }
-
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         boolean alignToAnnotation = false;
@@ -276,9 +267,17 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                             }
                         }
                         if (!(elem instanceof J.Binary)) {
-                            if (!(elem instanceof J.MethodInvocation) ||
-                                    elem.getPrefix().getLastWhitespace().contains("\n")) {
+                            if (!(elem instanceof J.MethodInvocation)) {
                                 getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                            } else if (elem.getPrefix().getLastWhitespace().contains("\n")) {
+                                getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                            } else {
+                                J.MethodInvocation methodInvocation = (J.MethodInvocation) elem;
+                                JRightPadded<Expression> select = methodInvocation.getSelect();
+                                if (select != null &&
+                                        (select.getElem() instanceof J.FieldAccess || select.getElem() instanceof J.Ident)) {
+                                    getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                                }
                             }
                         }
                         elem = visitAndCast(elem, p);
