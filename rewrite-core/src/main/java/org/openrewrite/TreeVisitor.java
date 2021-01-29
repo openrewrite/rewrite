@@ -45,6 +45,7 @@ public abstract class TreeVisitor<T extends Tree, P> {
 
     protected final void setCursoringOn() {
         this.cursored = true;
+        cursor.set(new Cursor(null, "root"));
     }
 
     protected void setCursor(@Nullable Cursor cursor) {

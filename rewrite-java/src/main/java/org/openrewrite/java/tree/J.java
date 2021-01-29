@@ -27,6 +27,7 @@ import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.java.tree.Coordinates.*;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -93,6 +94,10 @@ public interface J extends Serializable, Tree {
         Set<J2> trees = new HashSet<>();
         new JavaListMarkersVisitor<J2>(markerType).visit(this, trees);
         return trees;
+    }
+
+    default Coordinates coordinates() {
+        throw new UnsupportedOperationException("Not Implemented");
     }
 
     @SuppressWarnings("unchecked")
@@ -643,6 +648,8 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
+
+        public ClassDeclCoordinates coordinates() {return new ClassDeclCoordinates(this); }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1599,6 +1606,12 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
         }
+
+        @Override
+        public MethodDeclCoordinates coordinates() {
+            return new MethodDeclCoordinates(this);
+        }
+
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
