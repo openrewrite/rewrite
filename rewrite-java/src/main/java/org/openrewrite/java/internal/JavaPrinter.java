@@ -79,32 +79,27 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         }
     }
 
-    protected void visit(List<? extends JRightPadded<? extends J>> nodes, String suffixBetween, P p) {
+    protected void visitRightPadded(List<? extends JRightPadded<? extends J>> nodes, JRightPadded.Location location, String suffixBetween, P p) {
         StringBuilder acc = getPrinterAcc();
         for (int i = 0; i < nodes.size(); i++) {
             JRightPadded<? extends J> node = nodes.get(i);
             visit(node.getElem(), p);
-            visitSpace(node.getAfter(), p);
+            visitSpace(node.getAfter(), location.getAfterLocation(), p);
             if (i < nodes.size() - 1) {
                 acc.append(suffixBetween);
             }
         }
     }
 
-    protected void visit(String before, @Nullable JContainer<? extends J> container, String suffixBetween, @Nullable String after, P p) {
+    protected void visitContainer(String before, @Nullable JContainer<? extends J> container, JContainer.Location location, String suffixBetween, @Nullable String after, P p) {
         if (container == null) {
             return;
         }
         StringBuilder acc = getPrinterAcc();
-        visitSpace(container.getBefore(), p);
+        visitSpace(container.getBefore(), location.getBeforeLocation(), p);
         acc.append(before);
-        visit(container.getElem(), suffixBetween, p);
+        visitRightPadded(container.getElem(), location.getElemLocation(), suffixBetween, p);
         acc.append(after == null ? "" : after);
-    }
-
-    public void visitSpace(Space space, P p) {
-        //noinspection ConstantConditions
-        visitSpace(space, null, p);
     }
 
     @Override
@@ -129,10 +124,10 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         return space;
     }
 
-    protected void visit(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, P p) {
+    protected void visitLeftPadded(@Nullable String prefix, @Nullable JLeftPadded<? extends J> leftPadded, JLeftPadded.Location location, P p) {
         if (leftPadded != null) {
             StringBuilder acc = getPrinterAcc();
-            visitSpace(leftPadded.getBefore(), p);
+            visitSpace(leftPadded.getBefore(), location.getBeforeLocation(), p);
             if (prefix != null) {
                 acc.append(prefix);
             }
@@ -140,11 +135,11 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
         }
     }
 
-    protected void visit(@Nullable JRightPadded<? extends J> rightPadded, @Nullable String suffix, P p) {
+    protected void visitRightPadded(@Nullable JRightPadded<? extends J> rightPadded, JRightPadded.Location location, @Nullable String suffix, P p) {
         if (rightPadded != null) {
             StringBuilder acc = getPrinterAcc();
             visit(rightPadded.getElem(), p);
-            visitSpace(rightPadded.getAfter(), p);
+            visitSpace(rightPadded.getAfter(), location.getAfterLocation(), p);
             if (suffix != null) {
                 acc.append(suffix);
             }
@@ -193,39 +188,39 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                     keyword = "volatile";
                     break;
             }
-            visitSpace(mod.getPrefix(), p);
+            visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p);
             acc.append(keyword);
         }
     }
 
     @Override
     public J visitAnnotation(Annotation annotation, P p) {
-        visitSpace(annotation.getPrefix(), p);
+        visitSpace(annotation.getPrefix(), Space.Location.ANNOTATION_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("@");
         visit(annotation.getAnnotationType(), p);
-        visit("(", annotation.getArgs(), ",", ")", p);
+        visitContainer("(", annotation.getArgs(), JContainer.Location.ANNOTATION_ARGUMENTS, ",", ")", p);
         return annotation;
     }
 
     @Override
     public J visitArrayDimension(ArrayDimension arrayDimension, P p) {
-        visitSpace(arrayDimension.getPrefix(), p);
+        visitSpace(arrayDimension.getPrefix(), Space.Location.DIMENSION_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("[");
-        visit(arrayDimension.getIndex(), "]", p);
+        visitRightPadded(arrayDimension.getIndex(), JRightPadded.Location.ARRAY_INDEX, "]", p);
         return arrayDimension;
     }
 
     @Override
     public J visitArrayType(ArrayType arrayType, P p) {
-        visitSpace(arrayType.getPrefix(), p);
+        visitSpace(arrayType.getPrefix(), Space.Location.ARRAY_TYPE_PREFIX, p);
         visit(arrayType.getElementType(), p);
         StringBuilder acc = getPrinterAcc();
         for (JRightPadded<Space> d : arrayType.getDimensions()) {
-            visitSpace(d.getElem(), p);
+            visitSpace(d.getElem(), Space.Location.DIMENSION, p);
             acc.append('[');
-            visitSpace(d.getAfter(), p);
+            visitSpace(d.getAfter(), Space.Location.DIMENSION_SUFFIX, p);
             acc.append(']');
         }
         return arrayType;
@@ -233,7 +228,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitAssert(Assert azzert, P p) {
-        visitSpace(azzert.getPrefix(), p);
+        visitSpace(azzert.getPrefix(), Space.Location.ASSERT_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("assert");
         visit(azzert.getCondition(), p);
@@ -242,9 +237,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitAssign(Assign assign, P p) {
-        visitSpace(assign.getPrefix(), p);
+        visitSpace(assign.getPrefix(), Space.Location.ASSIGN_PREFIX, p);
         visit(assign.getVariable(), p);
-        visit("=", assign.getAssignment(), p);
+        visitLeftPadded("=", assign.getAssignment(), JLeftPadded.Location.ASSIGNMENT, p);
         return assign;
     }
 
@@ -287,9 +282,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 break;
         }
 
-        visitSpace(assignOp.getPrefix(), p);
+        visitSpace(assignOp.getPrefix(), Space.Location.ASSIGN_OP_PREFIX, p);
         visit(assignOp.getVariable(), p);
-        visitSpace(assignOp.getOperator().getBefore(), p);
+        visitSpace(assignOp.getOperator().getBefore(), Space.Location.ASSIGN_OP_OPERATOR, p);
         StringBuilder acc = getPrinterAcc();
         acc.append(keyword);
         visit(assignOp.getAssignment(), p);
@@ -358,9 +353,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 keyword = "&&";
                 break;
         }
-        visitSpace(binary.getPrefix(), p);
+        visitSpace(binary.getPrefix(), Space.Location.BINARY_PREFIX, p);
         visit(binary.getLeft(), p);
-        visitSpace(binary.getOperator().getBefore(), p);
+        visitSpace(binary.getOperator().getBefore(), Space.Location.BINARY_OPERATOR, p);
         StringBuilder acc = getPrinterAcc();
         acc.append(keyword);
         visit(binary.getRight(), p);
@@ -369,35 +364,35 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitBlock(Block block, P p) {
-        visitSpace(block.getPrefix(), p);
+        visitSpace(block.getPrefix(), Space.Location.BLOCK_PREFIX, p);
 
         StringBuilder acc = getPrinterAcc();
 
-        if(block.getStatic().getElem()) {
+        if (block.getStatic().getElem()) {
             acc.append("static");
             visitRightPadded(block.getStatic(), JRightPadded.Location.STATIC_INIT, p);
         }
 
         acc.append('{');
-        visitStatements(block.getStatements(), p);
-        visitSpace(block.getEnd(), p);
+        visitStatements(block.getStatements(), JRightPadded.Location.BLOCK_STATEMENT, p);
+        visitSpace(block.getEnd(), Space.Location.BLOCK_END, p);
         acc.append('}');
         return block;
     }
 
-    private void visitStatements(List<JRightPadded<Statement>> statements, P p) {
+    private void visitStatements(List<JRightPadded<Statement>> statements, JRightPadded.Location location, P p) {
         for (JRightPadded<Statement> paddedStat : statements) {
-            visitStatement(paddedStat, p);
+            visitStatement(paddedStat, location, p);
         }
     }
 
-    private void visitStatement(@Nullable JRightPadded<Statement> paddedStat, P p) {
+    private void visitStatement(@Nullable JRightPadded<Statement> paddedStat, JRightPadded.Location location, P p) {
         if (paddedStat == null) {
             return;
         }
 
         visit(paddedStat.getElem(), p);
-        visitSpace(paddedStat.getAfter(), p);
+        visitSpace(paddedStat.getAfter(), location.getAfterLocation(), p);
 
         StringBuilder acc = getPrinterAcc();
         Statement s = paddedStat.getElem();
@@ -434,7 +429,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitBreak(Break breakStatement, P p) {
-        visitSpace(breakStatement.getPrefix(), p);
+        visitSpace(breakStatement.getPrefix(), Space.Location.BREAK_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("break");
         visit(breakStatement.getLabel(), p);
@@ -443,7 +438,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitCase(Case caze, P p) {
-        visitSpace(caze.getPrefix(), p);
+        visitSpace(caze.getPrefix(), Space.Location.CASE_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         Expression elem = caze.getPattern();
         if (elem instanceof Ident && ((Ident) elem).getSimpleName().equals("default")) {
@@ -452,15 +447,15 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
             acc.append("case");
             visit(elem, p);
         }
-        visitSpace(caze.getStatements().getBefore(), p);
+        visitSpace(caze.getStatements().getBefore(), Space.Location.CASE, p);
         acc.append(':');
-        visitStatements(caze.getStatements().getElem(), p);
+        visitStatements(caze.getStatements().getElem(), JRightPadded.Location.CASE, p);
         return caze;
     }
 
     @Override
     public J visitCatch(Try.Catch catzh, P p) {
-        visitSpace(catzh.getPrefix(), p);
+        visitSpace(catzh.getPrefix(), Space.Location.CATCH_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("catch");
         visit(catzh.getParam(), p);
@@ -486,38 +481,38 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 break;
         }
 
-        visitSpace(classDecl.getPrefix(), p);
+        visitSpace(classDecl.getPrefix(), Space.Location.CLASS_DECL_PREFIX, p);
         visit(classDecl.getAnnotations(), p);
         visitModifiers(classDecl.getModifiers(), p);
-        visitSpace(classDecl.getKind().getBefore(), p);
+        visitSpace(classDecl.getKind().getBefore(), Space.Location.CLASS_KIND, p);
         StringBuilder acc = getPrinterAcc();
         acc.append(kind);
         visit(classDecl.getName(), p);
-        visit("<", classDecl.getTypeParameters(), ",", ">", p);
-        visit("extends", classDecl.getExtends(), p);
-        visit(classDecl.getKind().getElem().equals(ClassDecl.Kind.Interface) ? "extends" : "implements",
-                classDecl.getImplements(), ",", null, p);
+        visitContainer("<", classDecl.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+        visitLeftPadded("extends", classDecl.getExtends(), JLeftPadded.Location.EXTENDS, p);
+        visitContainer(classDecl.getKind().getElem().equals(ClassDecl.Kind.Interface) ? "extends" : "implements",
+                classDecl.getImplements(), JContainer.Location.IMPLEMENTS, ",", null, p);
         visit(classDecl.getBody(), p);
         return classDecl;
     }
 
     @Override
     public J visitCompilationUnit(CompilationUnit cu, P p) {
-        visitSpace(cu.getPrefix(), p);
-        visit(cu.getPackageDecl(), ";", p);
-        visit(cu.getImports(), ";", p);
+        visitSpace(cu.getPrefix(), Space.Location.COMPILATION_UNIT_PREFIX, p);
+        visitRightPadded(cu.getPackageDecl(), JRightPadded.Location.PACKAGE, ";", p);
+        visitRightPadded(cu.getImports(), JRightPadded.Location.IMPORT, ";", p);
         StringBuilder acc = getPrinterAcc();
         if (!cu.getImports().isEmpty()) {
             acc.append(";");
         }
         visit(cu.getClasses(), p);
-        visitSpace(cu.getEof(), p);
+        visitSpace(cu.getEof(), Space.Location.COMPILATION_UNIT_EOF, p);
         return cu;
     }
 
     @Override
     public J visitContinue(Continue continueStatement, P p) {
-        visitSpace(continueStatement.getPrefix(), p);
+        visitSpace(continueStatement.getPrefix(), Space.Location.CONTINUE_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("continue");
         visit(continueStatement.getLabel(), p);
@@ -526,41 +521,41 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public <T extends J> J visitControlParentheses(ControlParentheses<T> controlParens, P p) {
-        visitSpace(controlParens.getPrefix(), p);
+        visitSpace(controlParens.getPrefix(), Space.Location.CONTROL_PARENTHESES_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append('(');
-        visit(controlParens.getTree(), ")", p);
+        visitRightPadded(controlParens.getTree(), JRightPadded.Location.PARENTHESES, ")", p);
         return controlParens;
     }
 
     @Override
     public J visitDoWhileLoop(DoWhileLoop doWhileLoop, P p) {
-        visitSpace(doWhileLoop.getPrefix(), p);
+        visitSpace(doWhileLoop.getPrefix(), Space.Location.DO_WHILE_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("do");
-        visitStatement(doWhileLoop.getBody(), p);
-        visit("while", doWhileLoop.getWhileCondition(), p);
+        visitStatement(doWhileLoop.getBody(), JRightPadded.Location.WHILE_BODY, p);
+        visitLeftPadded("while", doWhileLoop.getWhileCondition(), JLeftPadded.Location.WHILE_CONDITION, p);
         return doWhileLoop;
     }
 
     @Override
     public J visitElse(If.Else elze, P p) {
-        visitSpace(elze.getPrefix(), p);
+        visitSpace(elze.getPrefix(), Space.Location.ELSE_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("else");
-        visitStatement(elze.getBody(), p);
+        visitStatement(elze.getBody(), JRightPadded.Location.IF_ELSE, p);
         return elze;
     }
 
     @Override
     public J visitEnumValue(EnumValue enoom, P p) {
-
-        visitSpace(enoom.getPrefix(), p);
+        visitSpace(enoom.getPrefix(), Space.Location.ENUM_VALUE_PREFIX, p);
         visit(enoom.getName(), p);
         NewClass initializer = enoom.getInitializer();
         if (enoom.getInitializer() != null) {
-            visitSpace(initializer.getPrefix(), p);
-            visit("(", initializer.getArgs(), ",", ")", p);
+            visitSpace(initializer.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
+            visitSpace(initializer.getNew(), Space.Location.NEW_PREFIX, p);
+            visitContainer("(", initializer.getArgs(), JContainer.Location.NEW_CLASS_ARGS, ",", ")", p);
             visit(initializer.getBody(), p);
         }
         return enoom;
@@ -568,8 +563,8 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitEnumValueSet(EnumValueSet enums, P p) {
-        visitSpace(enums.getPrefix(), p);
-        visit(enums.getEnums(), ",", p);
+        visitSpace(enums.getPrefix(), Space.Location.ENUM_VALUE_SET_PREFIX, p);
+        visitRightPadded(enums.getEnums(), JRightPadded.Location.ENUM_VALUE, ",", p);
         StringBuilder acc = getPrinterAcc();
         if (enums.isTerminatedWithSemicolon()) {
             acc.append(';');
@@ -579,46 +574,46 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitFieldAccess(FieldAccess fieldAccess, P p) {
-        visitSpace(fieldAccess.getPrefix(), p);
+        visitSpace(fieldAccess.getPrefix(), Space.Location.FIELD_ACCESS_PREFIX, p);
         visit(fieldAccess.getTarget(), p);
-        visit(".", fieldAccess.getName(), p);
+        visitLeftPadded(".", fieldAccess.getName(), JLeftPadded.Location.FIELD_ACCESS_NAME, p);
         return fieldAccess;
     }
 
     @Override
     public J visitForLoop(ForLoop forLoop, P p) {
-        visitSpace(forLoop.getPrefix(), p);
+        visitSpace(forLoop.getPrefix(), Space.Location.FOR_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("for");
         ForLoop.Control ctrl = forLoop.getControl();
-        visitSpace(ctrl.getPrefix(), p);
+        visitSpace(ctrl.getPrefix(), Space.Location.FOR_CONTROL_PREFIX, p);
         acc.append('(');
-        visit(ctrl.getInit(), ";", p);
-        visit(ctrl.getCondition(), ";", p);
-        visit(ctrl.getUpdate(), ",", p);
+        visitRightPadded(ctrl.getInit(), JRightPadded.Location.FOR_INIT, ";", p);
+        visitRightPadded(ctrl.getCondition(), JRightPadded.Location.FOR_CONDITION, ";", p);
+        visitRightPadded(ctrl.getUpdate(), JRightPadded.Location.FOR_UPDATE, ",", p);
         acc.append(')');
-        visitStatement(forLoop.getBody(), p);
+        visitStatement(forLoop.getBody(), JRightPadded.Location.FOR_BODY, p);
         return forLoop;
     }
 
     @Override
     public J visitForEachLoop(ForEachLoop forEachLoop, P p) {
-        visitSpace(forEachLoop.getPrefix(), p);
+        visitSpace(forEachLoop.getPrefix(), Space.Location.FOR_EACH_LOOP_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("for");
         ForEachLoop.Control ctrl = forEachLoop.getControl();
-        visitSpace(ctrl.getPrefix(), p);
+        visitSpace(ctrl.getPrefix(), Space.Location.FOR_EACH_CONTROL_PREFIX, p);
         acc.append('(');
-        visit(ctrl.getVariable(), ":", p);
-        visit(ctrl.getIterable(), "", p);
+        visitRightPadded(ctrl.getVariable(), JRightPadded.Location.FOREACH_VARIABLE, ":", p);
+        visitRightPadded(ctrl.getIterable(), JRightPadded.Location.FOREACH_ITERABLE, "", p);
         acc.append(')');
-        visitStatement(forEachLoop.getBody(), p);
+        visitStatement(forEachLoop.getBody(), JRightPadded.Location.FOR_BODY, p);
         return forEachLoop;
     }
 
     @Override
     public J visitIdentifier(Ident ident, P p) {
-        visitSpace(ident.getPrefix(), p);
+        visitSpace(ident.getPrefix(), Space.Location.IDENTIFIER_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append(ident.getSimpleName());
         return ident;
@@ -626,11 +621,11 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitIf(If iff, P p) {
-        visitSpace(iff.getPrefix(), p);
+        visitSpace(iff.getPrefix(), Space.Location.IF_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append("if");
         visit(iff.getIfCondition(), p);
-        visitStatement(iff.getThenPart(), p);
+        visitStatement(iff.getThenPart(), JRightPadded.Location.IF_THEN, p);
         visit(iff.getElsePart(), p);
         return iff;
     }
@@ -638,34 +633,28 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitImport(Import impoort, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(impoort.getPrefix(), p);
+        visitSpace(impoort.getPrefix(), Space.Location.IMPORT_PREFIX, p);
         acc.append("import");
         if (impoort.isStatic()) {
-            visitSpace(impoort.getStatic().getBefore(), p);
+            visitSpace(impoort.getStatic().getBefore(), Space.Location.STATIC_IMPORT, p);
             acc.append("static");
         }
         visit(impoort.getQualid(), p);
         return impoort;
     }
 
-    /*
-    return fmt(impoort, "import" +
-                (impoort.isStatic() ? visit(impoort.getStatic()) + "static" : "") +
-                visit(impoort.getQualid(), p));
-     */
-
     @Override
     public J visitInstanceOf(InstanceOf instanceOf, P p) {
-        visitSpace(instanceOf.getPrefix(), p);
-        visit(instanceOf.getExpr(), "instanceof", p);
+        visitSpace(instanceOf.getPrefix(), Space.Location.INSTANCEOF_PREFIX, p);
+        visitRightPadded(instanceOf.getExpr(), JRightPadded.Location.INSTANCEOF, "instanceof", p);
         visit(instanceOf.getClazz(), p);
         return instanceOf;
     }
 
     @Override
     public J visitLabel(Label label, P p) {
-        visitSpace(label.getPrefix(), p);
-        visit(label.getLabel(), ":", p);
+        visitSpace(label.getPrefix(), Space.Location.LABEL_PREFIX, p);
+        visitRightPadded(label.getLabel(), JRightPadded.Location.LABEL, ":", p);
         visit(label.getStatement(), p);
         return label;
     }
@@ -673,16 +662,16 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitLambda(Lambda lambda, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(lambda.getPrefix(), p);
-        visitSpace(lambda.getParameters().getPrefix(), p);
+        visitSpace(lambda.getPrefix(), Space.Location.LAMBDA_PREFIX, p);
+        visitSpace(lambda.getParameters().getPrefix(), Space.Location.LAMBDA_PARAMETERS_PREFIX, p);
         if (lambda.getParameters().isParenthesized()) {
             acc.append('(');
-            visit(lambda.getParameters().getParams(), ",", p);
+            visitRightPadded(lambda.getParameters().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
             acc.append(')');
         } else {
-            visit(lambda.getParameters().getParams(), ",", p);
+            visitRightPadded(lambda.getParameters().getParams(), JRightPadded.Location.LAMBDA_PARAM, ",", p);
         }
-        visitSpace(lambda.getArrow(), p);
+        visitSpace(lambda.getArrow(), Space.Location.LAMBDA_ARROW_PREFIX, p);
         acc.append("->");
         visit(lambda.getBody(), p);
         return lambda;
@@ -690,7 +679,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitLiteral(Literal literal, P p) {
-        visitSpace(literal.getPrefix(), p);
+        visitSpace(literal.getPrefix(), Space.Location.LITERAL_PREFIX, p);
         StringBuilder acc = getPrinterAcc();
         acc.append(literal.getValueSource());
         return literal;
@@ -698,88 +687,88 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitMemberReference(MemberReference memberRef, P p) {
-        visitSpace(memberRef.getPrefix(), p);
+        visitSpace(memberRef.getPrefix(), Space.Location.MEMBER_REFERENCE_PREFIX, p);
         visit(memberRef.getContaining(), p);
-        visit("<", memberRef.getTypeParameters(), ",", ">", p);
-        visit("::", memberRef.getReference(), p);
+        visitContainer("<", memberRef.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
+        visitLeftPadded("::", memberRef.getReference(), JLeftPadded.Location.MEMBER_REFERENCE_NAME, p);
         return memberRef;
     }
 
     @Override
     public J visitMethod(MethodDecl method, P p) {
-        visitSpace(method.getPrefix(), p);
+        visitSpace(method.getPrefix(), Space.Location.METHOD_DECL_PREFIX, p);
         visit(method.getAnnotations(), p);
         visitModifiers(method.getModifiers(), p);
-        visit("<", method.getTypeParameters(), ",", ">", p);
+        visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         visit(method.getReturnTypeExpr(), p);
         visit(method.getName(), p);
-        visit("(", method.getParams(), ",", ")", p);
-        visit("throws", method.getThrows(), ",", null, p);
+        visitContainer("(", method.getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", p);
+        visitContainer("throws", method.getThrows(), JContainer.Location.THROWS, ",", null, p);
         visit(method.getBody(), p);
-        visit("default", method.getDefaultValue(), p);
+        visitLeftPadded("default", method.getDefaultValue(), JLeftPadded.Location.METHOD_DECL_DEFAULT_VALUE, p);
         return method;
     }
 
     @Override
     public J visitMethodInvocation(MethodInvocation method, P p) {
-        visitSpace(method.getPrefix(), p);
-        visit(method.getSelect(), ".", p);
-        visit("<", method.getTypeParameters(), ",", ">", p);
+        visitSpace(method.getPrefix(), Space.Location.METHOD_INVOCATION_PREFIX, p);
+        visitRightPadded(method.getSelect(), JRightPadded.Location.METHOD_SELECT, ".", p);
+        visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         visit(method.getName(), p);
-        visit("(", method.getArgs(), ",", ")", p);
+        visitContainer("(", method.getArgs(), JContainer.Location.METHOD_INVOCATION_ARGUMENTS, ",", ")", p);
         return method;
     }
 
     @Override
     public J visitMultiCatch(MultiCatch multiCatch, P p) {
-        visitSpace(multiCatch.getPrefix(), p);
-        visit(multiCatch.getAlternatives(), "|", p);
+        visitSpace(multiCatch.getPrefix(), Space.Location.MULTI_CATCH_PREFIX, p);
+        visitRightPadded(multiCatch.getAlternatives(), JRightPadded.Location.CATCH_ALTERNATIVE, "|", p);
         return multiCatch;
     }
 
     @Override
     public J visitMultiVariable(VariableDecls multiVariable, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(multiVariable.getPrefix(), p);
+        visitSpace(multiVariable.getPrefix(), Space.Location.MULTI_VARIABLE_PREFIX, p);
         visit(multiVariable.getAnnotations(), p);
         visitModifiers(multiVariable.getModifiers(), p);
         visit(multiVariable.getTypeExpr(), p);
         for (JLeftPadded<Space> dim : multiVariable.getDimensionsBeforeName()) {
-            visitSpace(dim.getBefore(), p);
+            visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p);
             acc.append('[');
-            visitSpace(dim.getElem(), p);
+            visitSpace(dim.getElem(), Space.Location.DIMENSION, p);
             acc.append(']');
         }
         if (multiVariable.getVarargs() != null) {
-            visitSpace(multiVariable.getVarargs(), p);
+            visitSpace(multiVariable.getVarargs(), Space.Location.VARARGS, p);
             acc.append("...");
         }
-        visit(multiVariable.getVars(), ",", p);
+        visitRightPadded(multiVariable.getVars(), JRightPadded.Location.NAMED_VARIABLE, ",", p);
         return multiVariable;
     }
 
     @Override
     public J visitNewArray(NewArray newArray, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(newArray.getPrefix(), p);
+        visitSpace(newArray.getPrefix(), Space.Location.NEW_ARRAY_PREFIX, p);
         if (newArray.getTypeExpr() != null) {
             acc.append("new");
         }
         visit(newArray.getTypeExpr(), p);
         visit(newArray.getDimensions(), p);
-        visit("{", newArray.getInitializer(), ",", "}", p);
+        visitContainer("{", newArray.getInitializer(), JContainer.Location.NEW_ARRAY_INITIALIZER, ",", "}", p);
         return newArray;
     }
 
     @Override
     public J visitNewClass(NewClass newClass, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(newClass.getPrefix(), p);
-        visit(newClass.getEncl(), ".", p);
-        visitSpace(newClass.getNew(), p);
+        visitSpace(newClass.getPrefix(), Space.Location.NEW_CLASS_PREFIX, p);
+        visitRightPadded(newClass.getEncl(), JRightPadded.Location.NEW_CLASS_ENCL, ".", p);
+        visitSpace(newClass.getNew(), Space.Location.NEW_PREFIX, p);
         acc.append("new");
         visit(newClass.getClazz(), p);
-        visit("(", newClass.getArgs(), ",", ")", p);
+        visitContainer("(", newClass.getArgs(), JContainer.Location.NEW_CLASS_ARGS, ",", ")", p);
         visit(newClass.getBody(), p);
         return newClass;
     }
@@ -787,7 +776,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitPackage(J.Package pkg, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(pkg.getPrefix(), p);
+        visitSpace(pkg.getPrefix(), Space.Location.PACKAGE_PREFIX, p);
         acc.append("package");
         visit(pkg.getExpr(), p);
         return pkg;
@@ -795,9 +784,9 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitParameterizedType(ParameterizedType type, P p) {
-        visitSpace(type.getPrefix(), p);
+        visitSpace(type.getPrefix(), Space.Location.PARAMETERIZED_TYPE_PREFIX, p);
         visit(type.getClazz(), p);
-        visit("<", type.getTypeParameters(), ",", ">", p);
+        visitContainer("<", type.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", p);
         return type;
     }
 
@@ -846,7 +835,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 throw new IllegalStateException("Unable to print non-primitive type");
         }
         StringBuilder acc = getPrinterAcc();
-        visitSpace(primitive.getPrefix(), p);
+        visitSpace(primitive.getPrefix(), Space.Location.PRIMITIVE_PREFIX, p);
         acc.append(keyword);
         return primitive;
     }
@@ -854,16 +843,16 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J visitParentheses(Parentheses<T> parens, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(parens.getPrefix(), p);
+        visitSpace(parens.getPrefix(), Space.Location.PARENTHESES_PREFIX, p);
         acc.append("(");
-        visit(parens.getTree(), ")", p);
+        visitRightPadded(parens.getTree(), JRightPadded.Location.PARENTHESES, ")", p);
         return parens;
     }
 
     @Override
     public J visitReturn(Return retrn, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(retrn.getPrefix(), p);
+        visitSpace(retrn.getPrefix(), Space.Location.RETURN_PREFIX, p);
         acc.append("return");
         visit(retrn.getExpr(), p);
         return retrn;
@@ -872,7 +861,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitSwitch(Switch switzh, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(switzh.getPrefix(), p);
+        visitSpace(switzh.getPrefix(), Space.Location.SWITCH_PREFIX, p);
         acc.append("switch");
         visit(switzh.getSelector(), p);
         visit(switzh.getCases(), p);
@@ -882,7 +871,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitSynchronized(J.Synchronized synch, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(synch.getPrefix(), p);
+        visitSpace(synch.getPrefix(), Space.Location.SYNCHRONIZED_PREFIX, p);
         acc.append("synchronized");
         visit(synch.getLock(), p);
         visit(synch.getBody(), p);
@@ -891,17 +880,17 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
 
     @Override
     public J visitTernary(Ternary ternary, P p) {
-        visitSpace(ternary.getPrefix(), p);
+        visitSpace(ternary.getPrefix(), Space.Location.TERNARY_PREFIX, p);
         visit(ternary.getCondition(), p);
-        visit("?", ternary.getTruePart(), p);
-        visit(":", ternary.getFalsePart(), p);
+        visitLeftPadded("?", ternary.getTruePart(), JLeftPadded.Location.TERNARY_TRUE, p);
+        visitLeftPadded(":", ternary.getFalsePart(), JLeftPadded.Location.TERNARY_FALSE, p);
         return ternary;
     }
 
     @Override
     public J visitThrow(Throw thrown, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(thrown.getPrefix(), p);
+        visitSpace(thrown.getPrefix(), Space.Location.THROW_PREFIX, p);
         acc.append("throw");
         visit(thrown.getException(), p);
         return thrown;
@@ -910,46 +899,46 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitTry(Try tryable, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(tryable.getPrefix(), p);
+        visitSpace(tryable.getPrefix(), Space.Location.TRY_PREFIX, p);
         acc.append("try");
         if (tryable.getResources() != null) {
-            visitSpace(tryable.getResources().getBefore(), p);
+            visitSpace(tryable.getResources().getBefore(), Space.Location.TRY_RESOURCES, p);
             acc.append('(');
             List<JRightPadded<Try.Resource>> resources = tryable.getResources().getElem();
             for (int i = 0; i < resources.size(); i++) {
                 JRightPadded<Try.Resource> resource = resources.get(i);
 
-                visitSpace(resource.getElem().getPrefix(), p);
+                visitSpace(resource.getElem().getPrefix(), Space.Location.TRY_RESOURCE, p);
                 visit(resource.getElem().getVariableDecls(), p);
 
                 if (i < resources.size() - 1 || resource.getElem().isTerminatedWithSemicolon()) {
                     acc.append(';');
                 }
 
-                visitSpace(resource.getAfter(), p);
+                visitSpace(resource.getAfter(), Space.Location.TRY_RESOURCES_SUFFIX,  p);
             }
             acc.append(')');
         }
 
         visit(tryable.getBody(), p);
         visit(tryable.getCatches(), p);
-        visit("finally", tryable.getFinally(), p);
+        visitLeftPadded("finally", tryable.getFinally(), JLeftPadded.Location.TRY_FINALLY, p);
         return tryable;
     }
 
     @Override
     public J visitTypeParameter(TypeParameter typeParam, P p) {
-        visitSpace(typeParam.getPrefix(), p);
+        visitSpace(typeParam.getPrefix(), Space.Location.TYPE_PARAMETERS_PREFIX, p);
         visit(typeParam.getAnnotations(), p);
         visit(typeParam.getName(), p);
-        visit("extends", typeParam.getBounds(), "&", "", p);
+        visitContainer("extends", typeParam.getBounds(), JContainer.Location.TYPE_BOUNDS, "&", "", p);
         return typeParam;
     }
 
     @Override
     public J visitUnary(Unary unary, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(unary.getPrefix(), p);
+        visitSpace(unary.getPrefix(), Space.Location.UNARY_PREFIX, p);
         switch (unary.getOperator().getElem()) {
             case PreIncrement:
                 acc.append("++");
@@ -961,12 +950,12 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                 break;
             case PostIncrement:
                 visit(unary.getExpr(), p);
-                visitSpace(unary.getOperator().getBefore(), p);
+                visitSpace(unary.getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
                 acc.append("++");
                 break;
             case PostDecrement:
                 visit(unary.getExpr(), p);
-                visitSpace(unary.getOperator().getBefore(), p);
+                visitSpace(unary.getOperator().getBefore(), Space.Location.UNARY_OPERATOR, p);
                 acc.append("--");
                 break;
             case Positive:
@@ -992,41 +981,41 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(VariableDecls.NamedVar variable, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(variable.getPrefix(), p);
+        visitSpace(variable.getPrefix(), Space.Location.VARIABLE_PREFIX, p);
         visit(variable.getName(), p);
         for (JLeftPadded<Space> dimension : variable.getDimensionsAfterName()) {
-            visitSpace(dimension.getBefore(), p);
+            visitSpace(dimension.getBefore(), Space.Location.DIMENSION_PREFIX, p);
             acc.append('[');
-            visitSpace(dimension.getElem(), p);
+            visitSpace(dimension.getElem(), Space.Location.DIMENSION, p);
             acc.append(']');
         }
-        visit("=", variable.getInitializer(), p);
+        visitLeftPadded("=", variable.getInitializer(), JLeftPadded.Location.VARIABLE_INITIALIZER, p);
         return variable;
     }
 
     @Override
     public J visitWhileLoop(WhileLoop whileLoop, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(whileLoop.getPrefix(), p);
+        visitSpace(whileLoop.getPrefix(), Space.Location.WHILE_PREFIX, p);
         acc.append("while");
         visit(whileLoop.getCondition(), p);
-        visitStatement(whileLoop.getBody(), p);
+        visitStatement(whileLoop.getBody(), JRightPadded.Location.WHILE_BODY, p);
         return whileLoop;
     }
 
     @Override
     public J visitWildcard(Wildcard wildcard, P p) {
         StringBuilder acc = getPrinterAcc();
-        visitSpace(wildcard.getPrefix(), p);
+        visitSpace(wildcard.getPrefix(), Space.Location.WILDCARD_PREFIX, p);
         acc.append('?');
         if (wildcard.getBound() != null) {
             switch (wildcard.getBound().getElem()) {
                 case Extends:
-                    visitSpace(wildcard.getBound().getBefore(), p);
+                    visitSpace(wildcard.getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
                     acc.append("extends");
                     break;
                 case Super:
-                    visitSpace(wildcard.getBound().getBefore(), p);
+                    visitSpace(wildcard.getBound().getBefore(), Space.Location.WILDCARD_BOUND, p);
                     acc.append("super");
                     break;
             }

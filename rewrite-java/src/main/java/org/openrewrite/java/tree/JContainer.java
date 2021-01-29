@@ -73,7 +73,7 @@ public class JContainer<T> implements Markable {
     }
 
     public JContainer<T> withElem(List<JRightPadded<T>> elem) {
-        return build(getBefore(), elem, markers);
+        return this.elem == elem ? this : build(getBefore(), elem, markers);
     }
 
     @SuppressWarnings("unchecked")

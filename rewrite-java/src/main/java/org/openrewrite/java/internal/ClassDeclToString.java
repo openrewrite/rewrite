@@ -17,6 +17,8 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 
 public class ClassDeclToString {
@@ -49,10 +51,10 @@ public class ClassDeclToString {
             }
             acc.append(classDecl.getName().printTrimmed());
             if (classDecl.getTypeParameters() != null) {
-                visit("<", classDecl.getTypeParameters(), ",", ">", unused);
+                visitContainer("<", classDecl.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
                 acc.append(' ');
             }
-            visit("extends", classDecl.getExtends(), unused);
+            visitLeftPadded("extends", classDecl.getExtends(), JLeftPadded.Location.EXTENDS, unused);
             if (classDecl.getImplements() != null) {
                 if (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem())) {
                     acc.append("extends");
@@ -60,7 +62,7 @@ public class ClassDeclToString {
                     acc.append("implements");
                 }
             }
-            visit("", classDecl.getImplements(), ",", "", unused);
+            visitContainer("", classDecl.getImplements(), JContainer.Location.IMPLEMENTS, ",", "", unused);
             return classDecl;
         }
     };
