@@ -18,6 +18,7 @@ package org.openrewrite.java;
 import org.openrewrite.Cursor;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 
@@ -37,11 +38,15 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
-        J.VariableDecls.NamedVar v = super.visitVariable(variable, p);
+        J.VariableDecls.NamedVar v = variable;
         J.ClassDecl enclosingClass = getCursor().firstEnclosingOrThrow(J.ClassDecl.class);
         if (variable.isField(getCursor()) && matchesClass(enclosingClass.getType()) &&
                 variable.getSimpleName().equals(hasName)) {
             v = v.withName(v.getName().withName(toName));
+        }
+        if (variable.getInitializer() != null) {
+            v = v.withInitializer(visitLeftPadded(variable.getInitializer(),
+                    JLeftPadded.Location.VARIABLE_INITIALIZER, p));
         }
         return v;
     }
