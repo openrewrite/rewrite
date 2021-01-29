@@ -95,6 +95,10 @@ public interface J extends Serializable, Tree {
         return trees;
     }
 
+    default JavaCoordinatesMap<?> coordinates() {
+        throw new UnsupportedOperationException("Not Implemented");
+    }
+
     @SuppressWarnings("unchecked")
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -643,6 +647,22 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
+
+        public ClassCoordinatesMap coordinates() {
+            return new ClassCoordinatesMap(this);
+        }
+
+        public class ClassCoordinatesMap extends JavaCoordinatesMap<J.ClassDecl> {
+
+            protected ClassCoordinatesMap(J.ClassDecl tree) {super(tree); }
+
+            @Override
+            public JavaTreeCoordinates before() { return create(Space.Location.CLASS_DECL_PREFIX); }
+            public JavaTreeCoordinates extending() {return create(Space.Location.EXTENDS); }
+
+            //TODO MOAR!
+        }
+
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1595,8 +1615,19 @@ public interface J extends Serializable, Tree {
             return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
         }
 
-        public MethodCoordinates coordinates() {
-            return new MethodCoordinates(this);
+        public MethodCoordinatesMap coordinates() {
+            return new MethodCoordinatesMap(this);
+        }
+
+        public class MethodCoordinatesMap extends JavaCoordinatesMap<J.MethodDecl> {
+
+            protected MethodCoordinatesMap(J.MethodDecl tree) {super(tree); }
+
+            @Override
+            public JavaTreeCoordinates before() { return create(Space.Location.METHOD_DECL_PREFIX); }
+            public JavaTreeCoordinates arguments() {return create(Space.Location.METHOD_DECL_ARGUMENTS); }
+
+            //TODO MOAR!
         }
     }
 

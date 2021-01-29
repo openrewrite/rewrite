@@ -29,6 +29,11 @@ import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
+
+    public <J2 extends J> J2 generate(JavaTemplate template, JavaTreeCoordinates coordinates, Object... parameters ) {
+        //TODO Not Implemented.
+        return null;
+    }
     /**
      * This overload can be used to generate a template's contents as the last statement in a block.
      *

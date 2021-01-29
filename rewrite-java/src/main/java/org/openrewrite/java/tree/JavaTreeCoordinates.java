@@ -8,7 +8,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 @Data
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class TreeCoordinates {
+public class JavaTreeCoordinates {
 
     @With
     J tree;

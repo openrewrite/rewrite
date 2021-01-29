@@ -594,20 +594,13 @@ interface JavaTemplateTest : RecipeTest {
                 setCursoringOn()
             }
 
+            val template = JavaTemplate.builder("@Deprecated").build()
+
             override fun visitClassDecl(clazz: J.ClassDecl, p: ExecutionContext): J.ClassDecl {
                 var c = super.visitClassDecl(clazz, p)
-
-                val generatedAnnotations = JavaTemplate.builder("@Deprecated").build()
-                    .generate<J.Annotation>(Cursor(cursor, clazz))
-
-                assertThat(generatedAnnotations).`as`("The list of generated annotations should be 1.").hasSize(1)
-                assertThat(generatedAnnotations[0].type).isNotNull
-
-                c = c.withAnnotations(ListUtils.concat(c.annotations, generatedAnnotations[0]))
-                c = MinimumViableSpacingVisitor<ExecutionContext>().visitClassDecl(
-                    c,
-                    ExecutionContext.builder().build()
-                )
+                c = generate(template, c.coordinates().before())
+                assertThat(c.annotations).`as`("The list of generated annotations should be 1.").hasSize(1)
+                assertThat(c.annotations[0].type).isNotNull
                 return c
             }
         }.toRecipe(),
