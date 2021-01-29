@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
 public class MethodDeclToString {
@@ -33,13 +34,13 @@ public class MethodDeclToString {
             if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
-            visit("<", method.getTypeParameters(), ",", ">", unused);
+            visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
             if (method.getReturnTypeExpr() != null) {
                 acc.append(method.getReturnTypeExpr().printTrimmed()).append(' ');
             }
             acc.append(method.getSimpleName());
-            visit("(", method.getParams(), ",", ")", unused);
-            visit("throws", method.getThrows(), ",", "", unused);
+            visitContainer("(", method.getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", unused);
+            visitContainer("throws", method.getThrows(), JContainer.Location.THROWS, ",", "", unused);
             return method;
         }
     };
