@@ -143,7 +143,17 @@ public class RawMavenResolver {
         RawPom.DependencyManagement dependencyManagement = pom.getDependencyManagement();
         if (dependencyManagement != null && dependencyManagement.getDependencies() != null) {
             for (RawPom.Dependency d : dependencyManagement.getDependencies().getDependencies()) {
-                assert d.getVersion() != null;
+                try {
+                    assert d.getVersion() != null;
+                } catch (AssertionError e) {
+                    if(continueOnError) {
+                        logger.warn("Problem with dependencyManagement section of {}:{}:{}. Unable to determine version of managed dependency {}:{}. Omitting the problematic entry and continuing.",
+                                pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId());
+                        continue;
+                    } else {
+                        throw e;
+                    }
+                }
 
                 String groupId = partialMaven.getGroupId(d.getGroupId());
                 String artifactId = partialMaven.getArtifactId(d.getArtifactId());
@@ -151,30 +161,59 @@ public class RawMavenResolver {
 
                 // for debugging...
                 if (groupId == null || artifactId == null || version == null) {
-                    assert groupId != null;
-                    assert artifactId != null;
-                    //noinspection ConstantConditions
-                    assert version != null;
+                    try {
+                        assert groupId != null;
+                        assert artifactId != null;
+                        //noinspection ConstantConditions
+                        assert version != null;
+                    } catch (AssertionError e) {
+                        if(continueOnError) {
+                            logger.warn("Problem with dependencyManagement section of {}:{}:{}. Unable to determine groupId, artifactId, " +
+                                            "or version of managed dependency {}:{}. Omitting the problematic entry and continuing.",
+                                    pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId());
+                            continue;
+                        } else {
+                            throw e;
+                        }
+                    }
                 }
 
                 // https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html#importing-dependencies
                 if (Objects.equals(d.getType(), "pom") && Objects.equals(d.getScope(), "import")) {
-                    RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
-                            partialMaven.getRepositories());
-                    if (rawMaven != null) {
-                        Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError)
-                                .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
+                    try {
+                        RawMaven rawMaven = downloader.download(groupId, artifactId, version, null, null, null,
+                                partialMaven.getRepositories());
+                        if (rawMaven != null) {
+                            Pom maven = new RawMavenResolver(downloader, true, activeProfiles, mavenSettings, resolveOptional, continueOnError)
+                                    .resolve(rawMaven, Scope.Compile, d.getVersion(), partialMaven.getRepositories());
 
-                        if (maven != null) {
-                            managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
-                                    version, d.getVersion(), maven));
+                            if (maven != null) {
+                                managedDependencies.add(new DependencyManagementDependency.Imported(groupId, artifactId,
+                                        version, d.getVersion(), maven));
+                            }
+                        }
+                    } catch (Exception e) {
+                        if(continueOnError) {
+                            logger.warn("Problem with dependencyManagement section of {}:{}:{}. Unable to process BOM. {}:{}:{}",
+                                    pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId(), d.getVersion());
+                        } else {
+                            throw e;
                         }
                     }
                 } else {
-                    managedDependencies.add(new DependencyManagementDependency.Defined(
-                            groupId, artifactId, version, d.getVersion(),
-                            d.getScope() == null ? null : Scope.fromName(d.getScope()),
-                            d.getClassifier(), d.getExclusions()));
+                    try {
+                        managedDependencies.add(new DependencyManagementDependency.Defined(
+                                groupId, artifactId, version, d.getVersion(),
+                                d.getScope() == null ? null : Scope.fromName(d.getScope()),
+                                d.getClassifier(), d.getExclusions()));
+                    } catch (Exception e) {
+                        if(continueOnError) {
+                            logger.warn("Problem with dependencyManagement section of {}:{}:{}. Unable to apply dependency management entry for {}:{}:{}",
+                                    pom.getGroupId(), pom.getArtifactId(), pom.getVersion(), d.getGroupId(), d.getArtifactId(), d.getVersion());
+                        } else {
+                            throw e;
+                        }
+                    }
                 }
             }
         }
