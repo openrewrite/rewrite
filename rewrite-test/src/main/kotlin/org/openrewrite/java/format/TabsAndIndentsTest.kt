@@ -651,13 +651,11 @@ interface TabsAndIndentsTest : RecipeTest {
                 int method5(int n, int m) {
                     method5(1,
                             2);
-                    method5(method5(3,
+                    return method5(method5(method5(method5(3,
                             4),
-                            5);
-                    return method5(method5(6,
-                            7
-                            ),
-                            8);
+                            5),
+                            6),
+                            7);
                 }
             }
         """

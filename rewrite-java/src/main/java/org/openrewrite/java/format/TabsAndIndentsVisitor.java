@@ -101,6 +101,15 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         return control;
     }
 
+//    @Override
+//    public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, P p) {
+//        if(!method.getPrefix().getLastWhitespace().contains("\n")) {
+//            int indent = Optional.ofNullable(getCursor().<Integer>peekNearestMessage("lastIndent")).orElse(0);
+//            getCursor().putMessage("lastIndent", indent);
+//        }
+//        return super.visitMethodInvocation(method, p);
+//    }
+
     @Override
     public Space visitSpace(Space space, Space.Location loc, P p) {
         boolean alignToAnnotation = false;
@@ -158,7 +167,7 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
         if (right.getElem() instanceof J) {
             J elem = (J) right.getElem();
             if ((right.getAfter().getLastWhitespace().contains("\n") ||
-                    ((J) right.getElem()).getPrefix().getLastWhitespace().contains("\n"))) {
+                    elem.getPrefix().getLastWhitespace().contains("\n"))) {
                 switch (loc) {
                     case FOR_CONDITION:
                     case FOR_UPDATE: {
@@ -194,6 +203,9 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                         break;
                     }
                     case METHOD_INVOCATION_ARGUMENT:
+                        elem = visitAndCast(elem, p);
+                        after = indentTo(right.getAfter(), indent);
+                        break;
                     case NEW_CLASS_ARGS:
                     case ARRAY_INDEX:
                     case PARENTHESES:
@@ -263,8 +275,11 @@ class TabsAndIndentsVisitor<P> extends JavaIsoVisitor<P> {
                                 break;
                             }
                         }
-                        if (!(right.getElem() instanceof J.Binary)) {
-                            getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                        if (!(elem instanceof J.Binary)) {
+                            if (!(elem instanceof J.MethodInvocation) ||
+                                    elem.getPrefix().getLastWhitespace().contains("\n")) {
+                                getCursor().putMessage("lastIndent", indent + style.getContinuationIndent());
+                            }
                         }
                         elem = visitAndCast(elem, p);
                         after = visitSpace(right.getAfter(), loc.getAfterLocation(), p);

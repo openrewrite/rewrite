@@ -1448,6 +1448,11 @@ public interface J extends Serializable, Tree {
             }
             throw new IllegalStateException("Encountered a literal `" + this + "` that could not be transformed");
         }
+
+        @Override
+        public String toString() {
+            return "Literal(" + LiteralToString.toString(this) + ")";
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1670,6 +1675,11 @@ public interface J extends Serializable, Tree {
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
+        }
+
+        @Override
+        public String toString() {
+            return "MethodInvocation(" + MethodInvocationToString.toString(this) + ")";
         }
     }
 
