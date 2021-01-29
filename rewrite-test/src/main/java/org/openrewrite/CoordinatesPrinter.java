@@ -1,6 +1,22 @@
+/*
+ * Copyright 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite;
 
 import org.junit.jupiter.api.parallel.Execution;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.J;
@@ -9,6 +25,10 @@ import org.openrewrite.java.tree.Space;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Utility to print a compilation unit with tree coordinates embedded in the output.
+ * This can be useful
+ */
 public class CoordinatesPrinter {
 
     public static final String ANSI_RESET = "\u001B[0m";
@@ -17,11 +37,31 @@ public class CoordinatesPrinter {
     public static final String ANSI_BACKGROUND_GREEN = "\u001B[42m";
 
 
-    public static String printCoordinates(J.CompilationUnit cu, Class<? extends J> cursorFilter) {
+    /**
+     * This will print out the compilation unit and embed the tree coordinates (at each Space position). If a filter
+     * is supplied, the printer will only print coordinates for the tree elements of that given type.
+     *
+     * See {@link CoordinatesPrinter#printCoordinatesWithColor(J.CompilationUnit, Class)} for a variant of this method
+     * that will output the string with ASCII color codes.
+     *
+     * @param cu The compilation unit to print
+     * @param cursorFilter An optional cursor filter.
+     * @return The printed tree.
+     */
+    public static String printCoordinates(J.CompilationUnit cu, @Nullable Class<? extends J> cursorFilter) {
         cu = new MapSpaces(cursorFilter, false).visitCompilationUnit(cu, ExecutionContext.builder().build());
         return cu.print();
     }
 
+    /**
+     * This will print out the compilation unit and embed the tree coordinates (at each Space position). If a filter
+     * is supplied, the printer will only print coordinates for the tree elements of that given type. This variant also
+     * uses ANSI Color codes to better highlight the differences between the coordinates and the actual source code.
+     *
+     * @param cu The compilation unit to print
+     * @param cursorFilter An optional cursor filter.
+     * @return The printed tree.
+     */
     public static String printCoordinatesWithColor(J.CompilationUnit cu, Class<? extends J> cursorFilter) {
         cu = new MapSpaces(cursorFilter, true).visitCompilationUnit(cu, ExecutionContext.builder().build());
         return cu.print();
