@@ -25,34 +25,27 @@ import org.openrewrite.java.JavaStyle;
 @Data
 @With
 public class UnnecessaryParenthesesStyle implements JavaStyle {
-    ParenthesesTokens parenthesesTokens;
-
-    @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
-    @With
-    public static class ParenthesesTokens {
-        boolean expr;
-        boolean ident;
-        boolean numDouble;
-        boolean numFloat;
-        boolean numInt;
-        boolean numLong;
-        boolean stringLiteral;
-        boolean literalNull;
-        boolean literalFalse;
-        boolean literalTrue;
-        boolean assign;
-        boolean bandAssign;
-        boolean borAssign;
-        boolean bsrAssign;
-        boolean bxorAssign;
-        boolean divAssign;
-        boolean minusAssign;
-        boolean modAssign;
-        boolean plusAssign;
-        boolean slAssign;
-        boolean srAssign;
-        boolean starAssign;
-        boolean lambda;
-    }
+    boolean expr;
+    boolean ident;
+    boolean numDouble;
+    boolean numFloat;
+    boolean numInt;
+    boolean numLong;
+    boolean stringLiteral;
+    boolean literalNull;
+    boolean literalFalse;
+    boolean literalTrue;
+    boolean assign;
+    boolean bandAssign;
+    boolean borAssign;
+    boolean bsrAssign;
+    boolean bxorAssign;
+    boolean divAssign;
+    boolean minusAssign;
+    boolean modAssign;
+    boolean plusAssign;
+    boolean slAssign;
+    boolean srAssign;
+    boolean starAssign;
+    boolean lambda;
 }

@@ -16,11 +16,13 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.ExecutionContext;
+import org.openrewrite.Incubating;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
 
+@Incubating(since = "7.0.0")
 public class AutoCleanup extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

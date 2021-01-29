@@ -88,6 +88,6 @@ public class IntelliJ extends NamedStyles {
     }
 
     public static UnnecessaryParenthesesStyle unnecessaryParentheses() {
-        return new UnnecessaryParenthesesStyle(new UnnecessaryParenthesesStyle.ParenthesesTokens(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true));
+        return new UnnecessaryParenthesesStyle(true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true);
     }
 }

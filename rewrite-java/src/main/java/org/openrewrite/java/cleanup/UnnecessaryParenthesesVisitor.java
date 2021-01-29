@@ -34,7 +34,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J par = super.visitParentheses(parens, p);
-        if (style.getParenthesesTokens().isIdent() && ((J.Parentheses<T>) par).getTree().getElem() instanceof J.Ident) {
+        if (style.isIdent() && ((J.Parentheses<T>) par).getTree().getElem() instanceof J.Ident) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
         return par;
@@ -44,13 +44,13 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitLiteral(J.Literal literal, P p) {
         J.Literal l = visitAndCast(literal, p, super::visitLiteral);
         JavaType.Primitive type = l.getType();
-        if ((style.getParenthesesTokens().isNumInt() && type == JavaType.Primitive.Int) ||
-                (style.getParenthesesTokens().isNumDouble() && type == JavaType.Primitive.Double) ||
-                (style.getParenthesesTokens().isNumLong() && type == JavaType.Primitive.Long) ||
-                (style.getParenthesesTokens().isNumFloat() && type == JavaType.Primitive.Float) ||
-                (style.getParenthesesTokens().isStringLiteral() && type == JavaType.Primitive.String) ||
-                (style.getParenthesesTokens().isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-                (style.getParenthesesTokens().isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
+                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
+                (style.isNumLong() && type == JavaType.Primitive.Long) ||
+                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
+                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
+                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
 //            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) l).visit(l, p, getCursor()); // TODO
         }
         return l;
@@ -62,17 +62,17 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
         Expression assignment = a.getAssignment();
         J.AssignOp.Type op = a.getOperator().getElem();
-        if (assignment instanceof J.Parentheses && ((style.getParenthesesTokens().isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
-                (style.getParenthesesTokens().isBorAssign() && op == J.AssignOp.Type.BitOr) ||
-                (style.getParenthesesTokens().isBsrAssign() && op == J.AssignOp.Type.UnsignedRightShift) ||
-                (style.getParenthesesTokens().isBxorAssign() && op == J.AssignOp.Type.BitXor) ||
-                (style.getParenthesesTokens().isSrAssign() && op == J.AssignOp.Type.RightShift) ||
-                (style.getParenthesesTokens().isSlAssign() && op == J.AssignOp.Type.LeftShift) ||
-                (style.getParenthesesTokens().isMinusAssign() && op == J.AssignOp.Type.Subtraction) ||
-                (style.getParenthesesTokens().isDivAssign() && op == J.AssignOp.Type.Division) ||
-                (style.getParenthesesTokens().isPlusAssign() && op == J.AssignOp.Type.Addition) ||
-                (style.getParenthesesTokens().isStarAssign() && op == J.AssignOp.Type.Multiplication) ||
-                (style.getParenthesesTokens().isModAssign() && op == J.AssignOp.Type.Modulo))) {
+        if (assignment instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
+                (style.isBorAssign() && op == J.AssignOp.Type.BitOr) ||
+                (style.isBsrAssign() && op == J.AssignOp.Type.UnsignedRightShift) ||
+                (style.isBxorAssign() && op == J.AssignOp.Type.BitXor) ||
+                (style.isSrAssign() && op == J.AssignOp.Type.RightShift) ||
+                (style.isSlAssign() && op == J.AssignOp.Type.LeftShift) ||
+                (style.isMinusAssign() && op == J.AssignOp.Type.Subtraction) ||
+                (style.isDivAssign() && op == J.AssignOp.Type.Division) ||
+                (style.isPlusAssign() && op == J.AssignOp.Type.Addition) ||
+                (style.isStarAssign() && op == J.AssignOp.Type.Multiplication) ||
+                (style.isModAssign() && op == J.AssignOp.Type.Modulo))) {
             a = (J.AssignOp) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
@@ -81,7 +81,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitAssign(J.Assign assign, P p) {
         J.Assign a = visitAndCast(assign, p, super::visitAssign);
-        if (style.getParenthesesTokens().isAssign()) {
+        if (style.isAssign()) {
             a = (J.Assign) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment().getElem()).visit(a, p, getCursor());
         }
         return a;
@@ -90,7 +90,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
         J.VariableDecls.NamedVar v = visitAndCast(variable, p, super::visitVariable);
-        if (style.getParenthesesTokens().isAssign() && v.getInitializer() != null && v.getInitializer().getElem() instanceof J.Parentheses) {
+        if (style.isAssign() && v.getInitializer() != null && v.getInitializer().getElem() instanceof J.Parentheses) {
             v = (J.VariableDecls.NamedVar) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer().getElem()).visit(v, p, getCursor());
         }
         return v;

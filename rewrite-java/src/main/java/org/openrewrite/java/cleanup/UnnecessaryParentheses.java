@@ -23,6 +23,9 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.J;
 
+/**
+ * Removes unnecessary parentheses around AST elements as configured in {@link UnnecessaryParenthesesStyle}.
+ */
 public class UnnecessaryParentheses extends Recipe {
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {

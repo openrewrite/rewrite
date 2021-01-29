@@ -87,9 +87,7 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             // a bit peculiar to have this test "inverted", but since default is 'on',
             // leaving this here as both a test and an example of having assign 'off'
             jp.styles(unnecessaryParentheses {
-                withParenthesesTokens(parenthesesTokens
-                        .withAssign(false)
-                )
+                withAssign(false)
             }).build(),
             before = """
                 public class A {
