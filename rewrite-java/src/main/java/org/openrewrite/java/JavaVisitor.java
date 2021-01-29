@@ -16,6 +16,7 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
@@ -30,6 +31,7 @@ import java.util.Objects;
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
 
+    @Incubating(since="7.0.0")
     public <J2 extends J> J2 generate(JavaTemplate template, JavaTreeCoordinates coordinates, Object... parameters ) {
         //TODO Not Implemented.
         return null;
@@ -41,7 +43,10 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * @param parameters Template parameters
      * @param <J2> Expected type returned from the template.
      * @return A list of generated elements
+     *
+     * @deprecated This method is deprecated and will be removed in 7.0.
      */
+    @Deprecated
     public <J2 extends J> List<J2> generateLastInBlock(JavaTemplate template, Cursor blockCursor, Object... parameters) {
         if (blockCursor.getValue() instanceof J.Block) {
             return template.generate(new Cursor(blockCursor, ((J.Block)blockCursor.getValue()).getEnd()), parameters);
