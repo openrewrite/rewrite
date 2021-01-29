@@ -16,6 +16,7 @@
 package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaVisitor;
@@ -25,6 +26,7 @@ import org.openrewrite.java.tree.J;
 
 import java.util.Optional;
 
+@Incubating(since = "7.0.0")
 public class AutoCleanupVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visit(@Nullable Tree tree, P p, Cursor cursor) {

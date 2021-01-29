@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
@@ -22,6 +23,7 @@ import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
+@Incubating(since = "7.0.0")
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
     private final UnnecessaryParenthesesStyle style;
@@ -40,21 +42,21 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         return par;
     }
 
-    @Override
-    public J visitLiteral(J.Literal literal, P p) {
-        J.Literal l = visitAndCast(literal, p, super::visitLiteral);
-        JavaType.Primitive type = l.getType();
-        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
-                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
-                (style.isNumLong() && type == JavaType.Primitive.Long) ||
-                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
-                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
-                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
-//            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) l).visit(l, p, getCursor()); // TODO
-        }
-        return l;
-    }
+//    @Override
+//    public J visitLiteral(J.Literal literal, P p) {
+//        J.Literal l = visitAndCast(literal, p, super::visitLiteral);
+//        JavaType.Primitive type = l.getType();
+//        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
+//                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
+//                (style.isNumLong() && type == JavaType.Primitive.Long) ||
+//                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
+//                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
+//                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+//                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+////            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) l).visit(l, p, getCursor()); // TODO
+//        }
+//        return l;
+//    }
 
     @Override
     public J visitAssignOp(J.AssignOp assignOp, P p) {

@@ -19,8 +19,10 @@ import lombok.AccessLevel;
 import lombok.Data;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaStyle;
 
+@Incubating(since = "7.0.0")
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @Data
 @With
