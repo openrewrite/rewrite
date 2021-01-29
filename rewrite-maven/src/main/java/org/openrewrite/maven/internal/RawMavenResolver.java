@@ -356,10 +356,20 @@ public class RawMavenResolver {
                         return null;
                     }
 
-                    RequestedVersion requestedVersion = selectVersion(effectiveScope, groupId, artifactId, version);
-                    versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
+                    try {
+                        RequestedVersion requestedVersion = selectVersion(effectiveScope, groupId, artifactId, version);
+                        versionSelection.get(effectiveScope).put(new GroupArtifact(groupId, artifactId), requestedVersion);
 
-                    version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
+                        version = requestedVersion.resolve(downloader, partialMaven.getRepositories());
+                    } catch (Exception e) {
+                        if(continueOnError) {
+                            logger.warn("Problem resolving dependency of {}:{}:{}. Unable to resolve requested version for {}:{}:{}, continuing omitting this dependency",
+                                    rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion(), groupId, artifactId, version);
+                            return null;
+                        } else {
+                            throw e;
+                        }
+                    }
 
                     if (version.contains("${")) {
                         logger.debug("Unable to download {}:{}:{}. Including POM is at {}",
