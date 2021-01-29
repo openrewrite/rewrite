@@ -27,7 +27,7 @@ import java.util.Map;
 
 /**
  * Utility to print a compilation unit with tree coordinates embedded in the output.
- * This can be useful
+ * This can be useful to discover the location within the source code that the coordinate represents.
  */
 public class CoordinatesPrinter {
 
