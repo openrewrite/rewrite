@@ -25,22 +25,22 @@ public abstract class Coordinates {
         this.tree = tree;
     }
 
-    protected JavaTreeCoordinates create(@Nullable Space.Location location) {
-        return new JavaTreeCoordinates(tree, location);
+    protected JavaCoordinates create(@Nullable Space.Location location) {
+        return new JavaCoordinates(tree, location);
     }
 
-    public JavaTreeCoordinates around() {
+    public JavaCoordinates around() {
         return create(null);
     }
 
-    public abstract JavaTreeCoordinates before();
+    public abstract JavaCoordinates before();
 
     public static class AnnotatedTypeCoordinates extends Coordinates {
 
         protected AnnotatedTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -49,7 +49,7 @@ public abstract class Coordinates {
         protected AnnotationCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -58,7 +58,7 @@ public abstract class Coordinates {
         protected ArrayAccessCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -67,7 +67,7 @@ public abstract class Coordinates {
         protected ArrayDimensionCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -76,7 +76,7 @@ public abstract class Coordinates {
         protected ArrayTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -85,7 +85,7 @@ public abstract class Coordinates {
         protected AssertCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -94,7 +94,7 @@ public abstract class Coordinates {
         protected AssignCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -103,7 +103,7 @@ public abstract class Coordinates {
         protected AssignOpCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -112,7 +112,7 @@ public abstract class Coordinates {
         protected BinaryCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -121,7 +121,7 @@ public abstract class Coordinates {
         protected BlockCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -130,7 +130,7 @@ public abstract class Coordinates {
         protected BreakCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -139,7 +139,7 @@ public abstract class Coordinates {
         protected CaseCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -148,8 +148,8 @@ public abstract class Coordinates {
         protected ClassDeclCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { return create(Space.Location.CLASS_DECL_PREFIX); }
-        public JavaTreeCoordinates extending() {return create(Space.Location.EXTENDS); }
+        public JavaCoordinates before() { return create(Space.Location.CLASS_DECL_PREFIX); }
+        public JavaCoordinates extending() {return create(Space.Location.EXTENDS); }
 
         //TODO MOAR!
     }
@@ -158,7 +158,7 @@ public abstract class Coordinates {
         protected CompilationUnitCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -167,7 +167,7 @@ public abstract class Coordinates {
         protected ContinueCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -176,7 +176,7 @@ public abstract class Coordinates {
         protected ControlParenthesesCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -185,7 +185,7 @@ public abstract class Coordinates {
         protected DoWhileLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -194,7 +194,7 @@ public abstract class Coordinates {
         protected EmptyCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -203,7 +203,7 @@ public abstract class Coordinates {
         protected EnumValueCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -212,7 +212,7 @@ public abstract class Coordinates {
         protected EnumValueSetCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -221,7 +221,7 @@ public abstract class Coordinates {
         protected FieldAccessCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -230,7 +230,7 @@ public abstract class Coordinates {
         protected ForEachLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -239,7 +239,7 @@ public abstract class Coordinates {
         protected ForLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -248,7 +248,7 @@ public abstract class Coordinates {
         protected IdentCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -257,7 +257,7 @@ public abstract class Coordinates {
         protected IfCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -266,7 +266,7 @@ public abstract class Coordinates {
         protected ImportCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -283,7 +283,7 @@ public abstract class Coordinates {
         protected InstanceOfCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -292,7 +292,7 @@ public abstract class Coordinates {
         protected LabelCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -301,7 +301,7 @@ public abstract class Coordinates {
         protected LambdaCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -310,7 +310,7 @@ public abstract class Coordinates {
         protected LiteralCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -319,7 +319,7 @@ public abstract class Coordinates {
         protected MemberReferenceCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -328,8 +328,8 @@ public abstract class Coordinates {
         protected MethodDeclCoordinates(J.MethodDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { return create(Space.Location.METHOD_DECL_PREFIX); }
-        public JavaTreeCoordinates arguments() {return create(Space.Location.METHOD_DECL_ARGUMENTS); }
+        public JavaCoordinates before() { return create(Space.Location.METHOD_DECL_PREFIX); }
+        public JavaCoordinates arguments() {return create(Space.Location.METHOD_DECL_ARGUMENTS); }
 
         //TODO MOAR!
     }
@@ -338,7 +338,7 @@ public abstract class Coordinates {
         protected MethodInvocationCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -347,7 +347,7 @@ public abstract class Coordinates {
         protected ModifierCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -356,7 +356,7 @@ public abstract class Coordinates {
         protected MultiCatchCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -365,7 +365,7 @@ public abstract class Coordinates {
         protected NewArrayCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -374,7 +374,7 @@ public abstract class Coordinates {
         protected NewClassCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -383,7 +383,7 @@ public abstract class Coordinates {
         protected PackageCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -392,7 +392,7 @@ public abstract class Coordinates {
         protected ParameterizedTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -401,7 +401,7 @@ public abstract class Coordinates {
         protected ParenthesesCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -410,7 +410,7 @@ public abstract class Coordinates {
         protected PrimitiveCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -419,7 +419,7 @@ public abstract class Coordinates {
         protected ReturnCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -428,7 +428,7 @@ public abstract class Coordinates {
         protected SwitchCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -437,7 +437,7 @@ public abstract class Coordinates {
         protected SynchronizedCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -446,7 +446,7 @@ public abstract class Coordinates {
         protected TernaryCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -455,7 +455,7 @@ public abstract class Coordinates {
         protected ThrowCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -464,7 +464,7 @@ public abstract class Coordinates {
         protected TryCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -473,7 +473,7 @@ public abstract class Coordinates {
         protected TypeCastCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -482,7 +482,7 @@ public abstract class Coordinates {
         protected TypeParameterCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -491,7 +491,7 @@ public abstract class Coordinates {
         protected UnaryCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -500,7 +500,7 @@ public abstract class Coordinates {
         protected VariableDeclsCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -509,7 +509,7 @@ public abstract class Coordinates {
         protected WhileLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }
@@ -518,7 +518,7 @@ public abstract class Coordinates {
         protected WildcardCoordinates(J.ClassDecl tree) {super(tree); }
 
         @Override
-        public JavaTreeCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
 
         //TODO MOAR!
     }

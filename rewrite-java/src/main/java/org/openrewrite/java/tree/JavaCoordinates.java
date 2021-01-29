@@ -23,7 +23,7 @@ import org.openrewrite.internal.lang.Nullable;
 
 @Data
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class JavaTreeCoordinates {
+public class JavaCoordinates {
 
     J tree;
 
