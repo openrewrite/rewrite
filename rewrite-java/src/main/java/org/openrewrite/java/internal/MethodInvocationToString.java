@@ -17,6 +17,7 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 
@@ -41,7 +42,7 @@ public class MethodInvocationToString {
                 acc.append(type.getDeclaringType().getFullyQualifiedName()
                         .replaceFirst("^java\\.lang\\.", ""));
                 acc.append('.');
-                visit("<", method.getTypeParameters(), ",", ">", unused);
+                visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
                 acc.append(type.getName());
                 acc.append('(');
                 acc.append(String.join(",", type.getParamNames()));
