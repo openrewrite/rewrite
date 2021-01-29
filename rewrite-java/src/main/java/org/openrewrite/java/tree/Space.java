@@ -23,9 +23,9 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+
+import static java.util.Collections.emptyList;
 
 /**
  * Wherever whitespace can occur in Java, so can comments (at least block and javadoc style comments).
@@ -33,7 +33,13 @@ import java.util.List;
  */
 @EqualsAndHashCode
 public class Space implements Markable {
-    public static final Space EMPTY = new Space("", Collections.emptyList(), Markers.EMPTY);
+    public static final Space EMPTY = new Space("", emptyList(), Markers.EMPTY);
+
+    /**
+     * Most occurrences of spaces will have no comments or markers, and there is a lot of repetition
+     * of occurrences of, for example, the single space between elements.
+     */
+    private static final Map<String, Space> flyweights = new HashMap<>();
 
     private final List<Comment> comments;
     private final String whitespace;
@@ -53,8 +59,13 @@ public class Space implements Markable {
             @JsonProperty("whitespace") String whitespace,
             @JsonProperty("comments") List<Comment> comments,
             @JsonProperty("markers") Markers markers) {
-        if (whitespace.isEmpty() && comments.isEmpty()) {
-            return Space.EMPTY;
+        if (comments.isEmpty()) {
+            if (whitespace.isEmpty()) {
+                if (markers == Markers.EMPTY) {
+                    return Space.EMPTY;
+                }
+                return flyweights.computeIfAbsent(whitespace, ws -> new Space(ws, emptyList(), Markers.EMPTY));
+            }
         }
         return new Space(whitespace, comments, markers);
     }

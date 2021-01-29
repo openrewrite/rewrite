@@ -48,9 +48,13 @@ public class Markers {
 
     private final Collection<? extends Marker> markers;
 
-    @JsonCreator
-    public Markers(@JsonProperty("markers") Collection<? extends Marker> markers) {
+    private Markers(Collection<? extends Marker> markers) {
         this.markers = markers;
+    }
+
+    @JsonCreator
+    public static Markers build(@JsonProperty("markers") Collection<? extends Marker> markers) {
+        return markers.isEmpty() ? EMPTY : new Markers(markers);
     }
 
     /**
