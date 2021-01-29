@@ -649,7 +649,7 @@ public interface J extends Serializable, Tree {
             return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
 
-        public ClassCoordinates coordinates() {return new ClassCoordinates(this); }
+        public ClassDeclCoordinates coordinates() {return new ClassDeclCoordinates(this); }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1603,8 +1603,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public MethodCoordinates coordinates() {
-            return new MethodCoordinates(this);
+        public MethodDeclCoordinates coordinates() {
+            return new MethodDeclCoordinates(this);
         }
 
     }
