@@ -17,12 +17,25 @@ package org.openrewrite.java.tree;
 
 import org.openrewrite.internal.lang.Nullable;
 
-public interface Coordinates {
+public abstract class Coordinates {
 
-    JavaTreeCoordinates around();
-    JavaTreeCoordinates before();
+    private J tree;
 
-    class AnnotatedTypeCoordinates extends AbstractCoordinates {
+    protected Coordinates(J tree) {
+        this.tree = tree;
+    }
+
+    protected JavaTreeCoordinates create(@Nullable Space.Location location) {
+        return new JavaTreeCoordinates(tree, location);
+    }
+
+    public JavaTreeCoordinates around() {
+        return create(null);
+    }
+
+    public abstract JavaTreeCoordinates before();
+
+    class AnnotatedTypeCoordinates extends Coordinates {
 
         protected AnnotatedTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -31,7 +44,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class AnnotationCoordinates extends AbstractCoordinates {
+    class AnnotationCoordinates extends Coordinates {
 
         protected AnnotationCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -40,7 +53,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ArrayAccessCoordinates extends AbstractCoordinates {
+    class ArrayAccessCoordinates extends Coordinates {
 
         protected ArrayAccessCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -49,7 +62,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ArrayDimensionCoordinates extends AbstractCoordinates {
+    class ArrayDimensionCoordinates extends Coordinates {
 
         protected ArrayDimensionCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -58,7 +71,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ArrayTypeCoordinates extends AbstractCoordinates {
+    class ArrayTypeCoordinates extends Coordinates {
 
         protected ArrayTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -67,7 +80,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class AssertCoordinates extends AbstractCoordinates {
+    class AssertCoordinates extends Coordinates {
 
         protected AssertCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -76,7 +89,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class AssignCoordinates extends AbstractCoordinates {
+    class AssignCoordinates extends Coordinates {
 
         protected AssignCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -85,7 +98,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class AssignOpCoordinates extends AbstractCoordinates {
+    class AssignOpCoordinates extends Coordinates {
 
         protected AssignOpCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -94,7 +107,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class BinaryCoordinates extends AbstractCoordinates {
+    class BinaryCoordinates extends Coordinates {
 
         protected BinaryCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -103,7 +116,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class BlockCoordinates extends AbstractCoordinates {
+    class BlockCoordinates extends Coordinates {
 
         protected BlockCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -112,7 +125,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class BreakCoordinates extends AbstractCoordinates {
+    class BreakCoordinates extends Coordinates {
 
         protected BreakCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -121,7 +134,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class CaseCoordinates extends AbstractCoordinates {
+    class CaseCoordinates extends Coordinates {
 
         protected CaseCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -130,7 +143,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ClassDeclCoordinates extends AbstractCoordinates {
+    class ClassDeclCoordinates extends Coordinates {
 
         protected ClassDeclCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -140,7 +153,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class CompilationUnitCoordinates extends AbstractCoordinates {
+    class CompilationUnitCoordinates extends Coordinates {
 
         protected CompilationUnitCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -149,7 +162,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ContinueCoordinates extends AbstractCoordinates {
+    class ContinueCoordinates extends Coordinates {
 
         protected ContinueCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -158,7 +171,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ControlParenthesesCoordinates extends AbstractCoordinates {
+    class ControlParenthesesCoordinates extends Coordinates {
 
         protected ControlParenthesesCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -167,7 +180,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class DoWhileLoopCoordinates extends AbstractCoordinates {
+    class DoWhileLoopCoordinates extends Coordinates {
 
         protected DoWhileLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -176,7 +189,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class EmptyCoordinates extends AbstractCoordinates {
+    class EmptyCoordinates extends Coordinates {
 
         protected EmptyCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -185,7 +198,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class EnumValueCoordinates extends AbstractCoordinates {
+    class EnumValueCoordinates extends Coordinates {
 
         protected EnumValueCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -194,7 +207,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class EnumValueSetCoordinates extends AbstractCoordinates {
+    class EnumValueSetCoordinates extends Coordinates {
 
         protected EnumValueSetCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -203,7 +216,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class FieldAccessCoordinates extends AbstractCoordinates {
+    class FieldAccessCoordinates extends Coordinates {
 
         protected FieldAccessCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -212,7 +225,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ForEachLoopCoordinates extends AbstractCoordinates {
+    class ForEachLoopCoordinates extends Coordinates {
 
         protected ForEachLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -221,7 +234,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ForLoopCoordinates extends AbstractCoordinates {
+    class ForLoopCoordinates extends Coordinates {
 
         protected ForLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -230,7 +243,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class IdentCoordinates extends AbstractCoordinates {
+    class IdentCoordinates extends Coordinates {
 
         protected IdentCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -239,7 +252,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class IfCoordinates extends AbstractCoordinates {
+    class IfCoordinates extends Coordinates {
 
         protected IfCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -248,7 +261,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ImportCoordinates extends AbstractCoordinates {
+    class ImportCoordinates extends Coordinates {
 
         protected ImportCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -265,7 +278,7 @@ public interface Coordinates {
 // --------------------------------
 // --------------------------------
 
-    class InstanceOfCoordinates extends AbstractCoordinates {
+    class InstanceOfCoordinates extends Coordinates {
 
         protected InstanceOfCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -274,7 +287,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class LabelCoordinates extends AbstractCoordinates {
+    class LabelCoordinates extends Coordinates {
 
         protected LabelCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -283,7 +296,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class LambdaCoordinates extends AbstractCoordinates {
+    class LambdaCoordinates extends Coordinates {
 
         protected LambdaCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -292,7 +305,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class LiteralCoordinates extends AbstractCoordinates {
+    class LiteralCoordinates extends Coordinates {
 
         protected LiteralCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -301,7 +314,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class MemberReferenceCoordinates extends AbstractCoordinates {
+    class MemberReferenceCoordinates extends Coordinates {
 
         protected MemberReferenceCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -310,7 +323,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class MethodDeclCoordinates extends AbstractCoordinates {
+    class MethodDeclCoordinates extends Coordinates {
 
         protected MethodDeclCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -320,7 +333,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class MethodInvocationCoordinates extends AbstractCoordinates {
+    class MethodInvocationCoordinates extends Coordinates {
 
         protected MethodInvocationCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -329,7 +342,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ModifierCoordinates extends AbstractCoordinates {
+    class ModifierCoordinates extends Coordinates {
 
         protected ModifierCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -338,7 +351,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class MultiCatchCoordinates extends AbstractCoordinates {
+    class MultiCatchCoordinates extends Coordinates {
 
         protected MultiCatchCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -347,7 +360,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class NewArrayCoordinates extends AbstractCoordinates {
+    class NewArrayCoordinates extends Coordinates {
 
         protected NewArrayCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -356,7 +369,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class NewClassCoordinates extends AbstractCoordinates {
+    class NewClassCoordinates extends Coordinates {
 
         protected NewClassCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -365,7 +378,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class PackageCoordinates extends AbstractCoordinates {
+    class PackageCoordinates extends Coordinates {
 
         protected PackageCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -374,7 +387,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ParameterizedTypeCoordinates extends AbstractCoordinates {
+    class ParameterizedTypeCoordinates extends Coordinates {
 
         protected ParameterizedTypeCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -383,7 +396,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ParenthesesCoordinates extends AbstractCoordinates {
+    class ParenthesesCoordinates extends Coordinates {
 
         protected ParenthesesCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -392,7 +405,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class PrimitiveCoordinates extends AbstractCoordinates {
+    class PrimitiveCoordinates extends Coordinates {
 
         protected PrimitiveCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -401,7 +414,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ReturnCoordinates extends AbstractCoordinates {
+    class ReturnCoordinates extends Coordinates {
 
         protected ReturnCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -410,7 +423,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class SwitchCoordinates extends AbstractCoordinates {
+    class SwitchCoordinates extends Coordinates {
 
         protected SwitchCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -419,7 +432,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class SynchronizedCoordinates extends AbstractCoordinates {
+    class SynchronizedCoordinates extends Coordinates {
 
         protected SynchronizedCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -428,7 +441,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class TernaryCoordinates extends AbstractCoordinates {
+    class TernaryCoordinates extends Coordinates {
 
         protected TernaryCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -437,7 +450,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class ThrowCoordinates extends AbstractCoordinates {
+    class ThrowCoordinates extends Coordinates {
 
         protected ThrowCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -446,7 +459,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class TryCoordinates extends AbstractCoordinates {
+    class TryCoordinates extends Coordinates {
 
         protected TryCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -455,7 +468,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class TypeCastCoordinates extends AbstractCoordinates {
+    class TypeCastCoordinates extends Coordinates {
 
         protected TypeCastCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -464,7 +477,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class TypeParameterCoordinates extends AbstractCoordinates {
+    class TypeParameterCoordinates extends Coordinates {
 
         protected TypeParameterCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -473,7 +486,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class UnaryCoordinates extends AbstractCoordinates {
+    class UnaryCoordinates extends Coordinates {
 
         protected UnaryCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -482,7 +495,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class VariableDeclsCoordinates extends AbstractCoordinates {
+    class VariableDeclsCoordinates extends Coordinates {
 
         protected VariableDeclsCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -491,7 +504,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class WhileLoopCoordinates extends AbstractCoordinates {
+    class WhileLoopCoordinates extends Coordinates {
 
         protected WhileLoopCoordinates(J.ClassDecl tree) {super(tree); }
 
@@ -500,7 +513,7 @@ public interface Coordinates {
 
         //TODO MOAR!
     }
-    class WildcardCoordinates extends AbstractCoordinates {
+    class WildcardCoordinates extends Coordinates {
 
         protected WildcardCoordinates(J.ClassDecl tree) {super(tree); }
 
