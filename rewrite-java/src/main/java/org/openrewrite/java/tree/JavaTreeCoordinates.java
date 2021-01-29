@@ -10,10 +10,8 @@ import org.openrewrite.internal.lang.Nullable;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 public class JavaTreeCoordinates {
 
-    @With
     J tree;
 
     @Nullable
-    @With
     Space.Location spaceLocation;
 }

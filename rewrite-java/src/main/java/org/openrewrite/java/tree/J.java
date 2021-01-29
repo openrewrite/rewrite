@@ -27,6 +27,7 @@ import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
+import org.openrewrite.java.tree.Coordinates.*;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -95,7 +96,7 @@ public interface J extends Serializable, Tree {
         return trees;
     }
 
-    default JavaCoordinatesMap<?> coordinates() {
+    default Coordinates coordinates() {
         throw new UnsupportedOperationException("Not Implemented");
     }
 
@@ -648,21 +649,7 @@ public interface J extends Serializable, Tree {
             return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
 
-        public ClassCoordinatesMap coordinates() {
-            return new ClassCoordinatesMap(this);
-        }
-
-        public class ClassCoordinatesMap extends JavaCoordinatesMap<J.ClassDecl> {
-
-            protected ClassCoordinatesMap(J.ClassDecl tree) {super(tree); }
-
-            @Override
-            public JavaTreeCoordinates before() { return create(Space.Location.CLASS_DECL_PREFIX); }
-            public JavaTreeCoordinates extending() {return create(Space.Location.EXTENDS); }
-
-            //TODO MOAR!
-        }
-
+        public ClassCoordinates coordinates() {return new ClassCoordinates(this); }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -1615,20 +1602,11 @@ public interface J extends Serializable, Tree {
             return "MethodDecl(" + MethodDeclToString.toString(this) + ")";
         }
 
-        public MethodCoordinatesMap coordinates() {
-            return new MethodCoordinatesMap(this);
+        @Override
+        public MethodCoordinates coordinates() {
+            return new MethodCoordinates(this);
         }
 
-        public class MethodCoordinatesMap extends JavaCoordinatesMap<J.MethodDecl> {
-
-            protected MethodCoordinatesMap(J.MethodDecl tree) {super(tree); }
-
-            @Override
-            public JavaTreeCoordinates before() { return create(Space.Location.METHOD_DECL_PREFIX); }
-            public JavaTreeCoordinates arguments() {return create(Space.Location.METHOD_DECL_ARGUMENTS); }
-
-            //TODO MOAR!
-        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
