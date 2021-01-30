@@ -88,7 +88,7 @@ public class ReorderMethodArguments extends Recipe {
                             "." + m.getSimpleName() + "(..). Provide a reference for original parameter names by calling setOriginalParamNames(..)");
                 }
 
-                List<JRightPadded<Expression>> originalArgs = m.getArgs().getElem();
+                List<JRightPadded<Expression>> originalArgs = m.getPadding().getArgs().getPadding().getElems();
 
                 int resolvedParamCount = m.getType().getResolvedSignature() == null ? originalArgs.size() :
                         m.getType().getResolvedSignature().getParamTypes().size();
@@ -129,7 +129,7 @@ public class ReorderMethodArguments extends Recipe {
                 }
 
                 if (changed) {
-                    m = m.withArgs(m.getArgs().withElem(reordered));
+                    m = m.getPadding().withArgs(m.getPadding().getArgs().getPadding().withElems(reordered));
                 }
             }
             return m;

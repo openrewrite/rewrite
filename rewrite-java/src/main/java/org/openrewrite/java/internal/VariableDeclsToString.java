@@ -47,7 +47,6 @@ public class VariableDeclsToString {
                 acc.append("...");
             }
             acc.append(multiVariable.getVars().stream()
-                    .map(JRightPadded::getElem)
                     .map(J.VariableDecls.NamedVar::getSimpleName)
                     .collect(Collectors.joining(", ")));
             return multiVariable;

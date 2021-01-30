@@ -25,7 +25,7 @@ interface RenameVariableTest : RecipeTest {
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
             override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
-                val varCursor = Cursor(cursor, multiVariable.vars[0].elem)
+                val varCursor = Cursor(cursor, multiVariable.vars[0])
                 if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDecl) {
                     doAfterVisit(RenameVariable(varCursor, "n2"))
                 } else if (cursor

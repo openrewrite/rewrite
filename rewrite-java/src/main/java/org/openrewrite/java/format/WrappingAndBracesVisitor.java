@@ -19,6 +19,7 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.WrappingAndBracesStyle;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
@@ -54,11 +55,11 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
         if (!m.getAnnotations().isEmpty()) {
             if (!m.getModifiers().isEmpty()) {
                 m = m.withModifiers(withNewline(m.getModifiers()));
-            } else if (m.getTypeParameters() != null) {
-                if (!m.getTypeParameters().getBefore().getWhitespace().contains("\n")) {
-                    m = m.withTypeParameters(
-                            m.getTypeParameters().withBefore(
-                                    withNewline(m.getTypeParameters().getBefore())
+            } else if (m.getPadding().getTypeParameters() != null) {
+                if (!m.getPadding().getTypeParameters().getBefore().getWhitespace().contains("\n")) {
+                    m = m.getPadding().withTypeParameters(
+                            m.getPadding().getTypeParameters().withBefore(
+                                    withNewline(m.getPadding().getTypeParameters().getBefore())
                             )
                     );
                 }
@@ -91,10 +92,12 @@ public class WrappingAndBracesVisitor<P> extends JavaIsoVisitor<P> {
             if (!j.getModifiers().isEmpty()) {
                 j = j.withModifiers(withNewline(j.getModifiers()));
             } else {
-                j = j.withKind(
-                        j.getKind().withBefore(
-                                j.getKind().getBefore().withWhitespace(
-                                        "\n" + j.getKind().getBefore().getWhitespace()
+                J.ClassDecl.Padding padding = j.getPadding();
+                JLeftPadded<J.ClassDecl.Kind> kind = padding.getKind();
+                j = padding.withKind(
+                        kind.withBefore(
+                                kind.getBefore().withWhitespace(
+                                        "\n" + kind.getBefore().getWhitespace()
                                 )
                         )
                 );

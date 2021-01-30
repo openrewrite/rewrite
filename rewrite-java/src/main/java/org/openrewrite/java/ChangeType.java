@@ -53,9 +53,8 @@ public class ChangeType extends Recipe {
         return new ChangeTypeVisitor(newFullyQualifiedTypeName);
     }
 
-
     private class ChangeTypeVisitor extends JavaVisitor<ExecutionContext> {
-        private JavaType targetType;
+        private final JavaType targetType;
 
         private ChangeTypeVisitor(String targetType) {
             JavaType type = JavaType.Primitive.fromKeyword(targetType);
@@ -101,11 +100,11 @@ public class ChangeType extends Recipe {
             J.ClassDecl c = visitAndCast(classDecl, ctx, super::visitClassDecl);
 
             if (c.getExtends() != null) {
-                c = c.withExtends(c.getExtends().map(this::transformName));
+                c = c.withExtends(transformName(c.getExtends()));
             }
 
             if (c.getImplements() != null) {
-                c = c.withImplements(c.getImplements().map(this::transformName));
+                c = c.withImplements(ListUtils.map(c.getImplements(), this::transformName));
             }
 
             return c;
@@ -153,7 +152,7 @@ public class ChangeType extends Recipe {
         public J visitMethod(J.MethodDecl method, ExecutionContext ctx) {
             J.MethodDecl m = visitAndCast(method, ctx, super::visitMethod);
             m = m.withReturnTypeExpr(transformName(m.getReturnTypeExpr()));
-            return m.withThrows(m.getThrows() == null ? null : m.getThrows().map(this::transformName));
+            return m.withThrows(m.getThrows() == null ? null : ListUtils.map(m.getThrows(), this::transformName));
         }
 
         @Override
@@ -161,13 +160,13 @@ public class ChangeType extends Recipe {
             J.MethodInvocation m = visitAndCast(method, ctx, super::visitMethodInvocation);
 
             if (m.getSelect() instanceof NameTree && m.getType() != null && m.getType().hasFlags(Flag.Static)) {
-                m = m.withSelect(m.getSelect().map(this::transformName));
+                m = m.withSelect(transformName(m.getSelect()));
             }
 
             if (m.getSelect() != null) {
-                JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getElem().getType());
+                JavaType.Class selectType = TypeUtils.asClass(m.getSelect().getType());
                 if (selectType != null && selectType.getFullyQualifiedName().equals(oldFullyQualifiedTypeName)) {
-                    m = m.withSelect(m.getSelect().map(s -> s.withType(targetType)));
+                    m = m.withSelect(m.getSelect().withType(targetType));
                 }
             }
 
@@ -184,7 +183,7 @@ public class ChangeType extends Recipe {
         @Override
         public J visitMultiCatch(J.MultiCatch multiCatch, ExecutionContext ctx) {
             J.MultiCatch m = visitAndCast(multiCatch, ctx, super::visitMultiCatch);
-            return m.withAlternatives(ListUtils.map(m.getAlternatives(), a -> a.map(this::transformName)));
+            return m.withAlternatives(ListUtils.map(m.getAlternatives(), this::transformName));
         }
 
         @Override
@@ -223,13 +222,13 @@ public class ChangeType extends Recipe {
         @Override
         public J visitTypeCast(J.TypeCast typeCast, ExecutionContext ctx) {
             J.TypeCast t = visitAndCast(typeCast, ctx, super::visitTypeCast);
-            return t.withClazz(t.getClazz().withTree(t.getClazz().getTree().map(this::transformName)));
+            return t.withClazz(t.getClazz().withTree(transformName(t.getClazz().getTree())));
         }
 
         @Override
         public J visitTypeParameter(J.TypeParameter typeParam, ExecutionContext ctx) {
             J.TypeParameter t = visitAndCast(typeParam, ctx, super::visitTypeParameter);
-            t = t.withBounds(t.getBounds() == null ? null : t.getBounds().map(this::transformName));
+            t = t.withBounds(t.getBounds() == null ? null : ListUtils.map(t.getBounds(), this::transformName));
             return t.withName(transformName(t.getName()));
         }
 
@@ -239,8 +238,7 @@ public class ChangeType extends Recipe {
             return w.withBoundedType(transformName(w.getBoundedType()));
         }
 
-        @Nullable
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"unchecked", "ConstantConditions"})
         private <T extends J> T transformName(@Nullable T nameField) {
             if (nameField instanceof NameTree) {
                 JavaType.Class nameTreeClass = TypeUtils.asClass(((NameTree) nameField).getType());

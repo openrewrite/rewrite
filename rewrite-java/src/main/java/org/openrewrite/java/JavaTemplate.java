@@ -172,34 +172,33 @@ public class JavaTemplate {
             J.Block b;
             if (!(parent.getValue() instanceof J.ClassDecl)) {
                 b = visitAndCast(block, insertionScope, this::visitEach);
-                b = b.withStatik(visitRightPadded(b.getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
+                b = b.getPadding().withStatic(visitRightPadded(b.getPadding().getStatic(), JRightPadded.Location.STATIC_INIT, insertionScope));
                 b = b.withPrefix(visitSpace(b.getPrefix(), Space.Location.BLOCK_PREFIX, insertionScope));
                 b = visitAndCast(b, insertionScope, this::visitStatement);
 
-                if (b.getStatements().stream().anyMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
+                if (b.getStatements().stream().anyMatch(insertionScope::isScopeInPath)) {
                     //If a statement in the block is in insertion scope, then this will render each statement
                     //up to the statement that is in insertion scope.
                     List<JRightPadded<Statement>> statementsInScope = new ArrayList<>();
-                    for (JRightPadded<Statement> statement : b.getStatements()) {
+                    for (JRightPadded<Statement> statement : b.getPadding().getStatements()) {
                         statementsInScope.add(visitRightPadded(statement, JRightPadded.Location.BLOCK_STATEMENT, insertionScope));
                         if (insertionScope.isScopeInPath(statement.getElem())) {
                             break;
                         }
                     }
-                    b = b.withStatements(statementsInScope);
+                    b = b.getPadding().withStatements(statementsInScope);
                 }
             } else {
                 b = super.visitBlock(block, insertionScope);
             }
 
             if (insertionScope.isScopeInPath(b)
-                    && b.getStatements().stream().noneMatch(s -> insertionScope.isScopeInPath(s.getElem()))) {
+                    && b.getStatements().stream().noneMatch(insertionScope::isScopeInPath)) {
                 //This can happen if the insertion scope was targeted to the block's end element. In this case,
                 //a new, empty element is inserted as the last statement in the block and will act as an insert
                 //point for those cases where a template should be generated as the last statement of a block.
                 J.Empty newInsertionPoint = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY );
-                b = b.withStatements(ListUtils.concat(b.getStatements(),
-                        new JRightPadded<>(newInsertionPoint, Space.EMPTY, Markers.EMPTY)));
+                b = b.withStatements(ListUtils.concat(b.getStatements(), newInsertionPoint));
                 insertionScope.putMessage("newInsertionPoint", newInsertionPoint);
             }
             return b;

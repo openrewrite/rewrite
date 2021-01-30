@@ -19,36 +19,39 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.internal.ListUtils;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 import static java.util.Collections.emptyList;
 
 /**
  * AST elements that contain lists of trees with some delimiter like parentheses, e.g. method arguments,
  * annotation arguments, catch variable declarations.
- *
+ * <p>
  * Sometimes the delimiter surrounds the list. Parentheses surround method arguments. Sometimes the delimiter only
  * precedes the list. Throws statements on method declarations are preceded by the "throws" keyword.
- *
+ * <p>
  * Sometimes containers are optional in the grammar, as in the
  * case of annotation arguments. Sometimes they are required, as in the case of method invocation arguments.
  *
  * @param <T> The type of the inner list of elements.
  */
 public class JContainer<T> implements Markable {
+    private transient Padding padding;
+
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
 
     private final Space before;
-    private final List<JRightPadded<T>> elem;
+    private final List<JRightPadded<T>> elems;
     private final Markers markers;
 
-    private JContainer(Space before, List<JRightPadded<T>> elem, Markers markers) {
+    private JContainer(Space before, List<JRightPadded<T>> elems, Markers markers) {
         this.before = before;
-        this.elem = elem;
+        this.elems = elems;
         this.markers = markers;
     }
 
@@ -69,20 +72,16 @@ public class JContainer<T> implements Markable {
     }
 
     public JContainer<T> withBefore(Space before) {
-        return build(before, elem, markers);
-    }
-
-    public JContainer<T> withElem(List<JRightPadded<T>> elem) {
-        return this.elem == elem ? this : build(getBefore(), elem, markers);
+        return build(before, elems, markers);
     }
 
     @SuppressWarnings("unchecked")
     public JContainer<T> withMarkers(Markers markers) {
-        return build(getBefore(), elem, markers);
+        return build(getBefore(), elems, markers);
     }
 
-    public List<JRightPadded<T>> getElem() {
-        return elem;
+    public List<T> getElems() {
+        return JRightPadded.getElems(elems);
     }
 
     public Space getBefore() {
@@ -94,13 +93,13 @@ public class JContainer<T> implements Markable {
         return markers;
     }
 
-    public JContainer<T> map(Function<T, T> map) {
-        return withElem(ListUtils.map(elem, t -> t.map(map)));
+    public JContainer<T> map(UnaryOperator<T> map) {
+        return getPadding().withElems(ListUtils.map(elems, t -> t.map(map)));
     }
 
     @JsonIgnore
     public Space getLastSpace() {
-        return elem.isEmpty() ? Space.EMPTY : elem.get(elem.size() - 1).getAfter();
+        return elems.isEmpty() ? Space.EMPTY : elems.get(elems.size() - 1).getAfter();
     }
 
     public enum Location {
@@ -131,5 +130,41 @@ public class JContainer<T> implements Markable {
         public JRightPadded.Location getElemLocation() {
             return elemLocation;
         }
+    }
+
+    public Padding getPadding() {
+        if (padding == null) {
+            this.padding = new Padding();
+        }
+        return padding;
+    }
+
+    public class Padding {
+        public List<JRightPadded<T>> getElems() {
+            return elems;
+        }
+
+        public JContainer<T> withElems(List<JRightPadded<T>> elem) {
+            return JContainer.this.elems == elem ? JContainer.this : build(getBefore(), elem, markers);
+        }
+    }
+
+    @Nullable
+    public static <J2 extends J> JContainer<J2> withElems(@Nullable JContainer<J2> before, @Nullable List<J2> view) {
+        if (before == null) {
+            if (view == null) {
+                return null;
+            }
+            return JContainer.build(Space.EMPTY, JRightPadded.withElems(emptyList(), view), Markers.EMPTY);
+        }
+        if (view == null) {
+            return null;
+        }
+        return before.getPadding().withElems(JRightPadded.withElems(before.elems, view));
+    }
+
+    @Override
+    public String toString() {
+        return "JContainer(before=" + before + ", elemCount=" + elems.size() + ')';
     }
 }

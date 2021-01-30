@@ -34,13 +34,13 @@ public class MethodDeclToString {
             if (!method.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
-            visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
+            visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
             if (method.getReturnTypeExpr() != null) {
                 acc.append(method.getReturnTypeExpr().printTrimmed()).append(' ');
             }
             acc.append(method.getSimpleName());
-            visitContainer("(", method.getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", unused);
-            visitContainer("throws", method.getThrows(), JContainer.Location.THROWS, ",", "", unused);
+            visitContainer("(", method.getPadding().getParams(), JContainer.Location.METHOD_DECL_ARGUMENTS, ",", ")", unused);
+            visitContainer("throws", method.getPadding().getThrows(), JContainer.Location.THROWS, ",", "", unused);
             return method;
         }
     };

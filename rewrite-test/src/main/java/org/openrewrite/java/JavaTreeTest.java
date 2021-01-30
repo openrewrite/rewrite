@@ -70,7 +70,7 @@ class JavaParserTestUtil {
         String printed;
         switch (nestingLevel) {
             case Block:
-                printed = cu.getClasses().iterator().next().getBody().getStatements().iterator().next().getElem().printTrimmed();
+                printed = cu.getClasses().iterator().next().getBody().getStatements().iterator().next().printTrimmed();
                 printed = printed.substring(1, printed.length() - 1);
                 break;
             case Class:

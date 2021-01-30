@@ -66,18 +66,18 @@ public class DeleteMethodArgument extends Recipe {
         @Override
         public J.MethodInvocation visitMethodInvocation(J.MethodInvocation method, ExecutionContext ctx) {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
-            List<JRightPadded<Expression>> originalArgs = m.getArgs().getElem();
+            List<Expression> originalArgs = m.getArgs();
             if (methodMatcher.matches(m) && originalArgs.stream()
-                    .filter(a -> !(a.getElem() instanceof J.Empty))
+                    .filter(a -> !(a instanceof J.Empty))
                     .count() >= argumentIndex + 1) {
-                List<JRightPadded<Expression>> args = new ArrayList<>(m.getArgs().getElem());
+                List<Expression> args = new ArrayList<>(m.getArgs());
 
                 args.remove((int) argumentIndex);
                 if (args.isEmpty()) {
-                    args = singletonList(new JRightPadded<>(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY), Space.EMPTY, Markers.EMPTY));
+                    args = singletonList(new J.Empty(randomId(), Space.EMPTY, Markers.EMPTY));
                 }
 
-                m = m.withArgs(m.getArgs().withElem(args));
+                m = m.withArgs(args);
             }
             return m;
         }

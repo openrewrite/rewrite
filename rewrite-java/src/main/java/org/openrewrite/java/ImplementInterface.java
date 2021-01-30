@@ -15,13 +15,10 @@
  */
 package org.openrewrite.java;
 
+import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static java.util.Collections.singletonList;
 import static org.openrewrite.Tree.randomId;
 import static org.openrewrite.java.tree.Space.format;
 
@@ -41,34 +38,22 @@ public class ImplementInterface<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl c = super.visitClassDecl(classDecl, p);
-        if (c.isScope(scope) && (c.getImplements() == null ||
-                c.getImplements().getElem().stream().noneMatch(f -> interfaceType.equals(f.getElem().getType())))) {
+        if (c.isScope(scope) && (c.getImplements() == null || c.getImplements().stream()
+                .noneMatch(f -> interfaceType.equals(f.getType())))) {
             maybeAddImport(interfaceType);
 
-            JRightPadded<TypeTree> lifeCycle = new JRightPadded<>(
-                    J.Ident.build(
-                            randomId(),
-                            format(" "),
-                            Markers.EMPTY,
-                            interfaceType.getClassName(),
-                            interfaceType
-                    ),
-                    Space.EMPTY,
-                    Markers.EMPTY
-            );
+            c = c.withImplements(ListUtils.concat(c.getImplements(), J.Ident.build(
+                    randomId(),
+                    format(" "),
+                    Markers.EMPTY,
+                    interfaceType.getClassName(),
+                    interfaceType
+            )));
 
-            if (c.getImplements() == null) {
-                c = c.withImplements(
-                        JContainer.build(
-                                format(" "),
-                                singletonList(lifeCycle),
-                                Markers.EMPTY
-                        )
-                );
-            } else {
-                List<JRightPadded<TypeTree>> implementings = new ArrayList<>(c.getImplements().getElem());
-                implementings.add(0, lifeCycle);
-                c = c.withImplements(c.getImplements().withElem(implementings));
+            JContainer<TypeTree> anImplements = c.getPadding().getImplements();
+            assert anImplements != null;
+            if (anImplements.getBefore().getWhitespace().isEmpty()) {
+                c = c.getPadding().withImplements(anImplements.withBefore(Space.format(" ")));
             }
         }
 
