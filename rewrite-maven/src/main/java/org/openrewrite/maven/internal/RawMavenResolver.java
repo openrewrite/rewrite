@@ -164,7 +164,6 @@ public class RawMavenResolver {
                     try {
                         assert groupId != null;
                         assert artifactId != null;
-                        //noinspection ConstantConditions
                         assert version != null;
                     } catch (AssertionError e) {
                         if(continueOnError) {
@@ -271,11 +270,21 @@ public class RawMavenResolver {
                         }
                     }
 
-                    // excluded
+                    // Handle dependency exclusions
                     for (GroupArtifact e : task.getExclusions()) {
-                        if (dep.getGroupId().matches(e.getGroupId()) &&
-                                dep.getArtifactId().matches(e.getArtifactId())) {
-                            return null;
+                        try {
+                            if (dep.getGroupId().matches(e.getGroupId()) &&
+                                    dep.getArtifactId().matches(e.getArtifactId())) {
+                                return null;
+                            }
+                        } catch (Exception exception) {
+                            if(continueOnError) {
+                                logger.warn("Problem determining dependency exclusion of {}:{}:{}. Unable to use {}:{} to determine if {}:{} should be excluded or not. Skipping application of this exclusion",
+                                        rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion(), dep.getGroupId(), dep.getArtifactId(), e.getGroupId(), e.getArtifactId());
+                                continue;
+                            } else {
+                                throw exception;
+                            }
                         }
                     }
 
@@ -283,56 +292,67 @@ public class RawMavenResolver {
                     String last;
 
                     // loop so that when dependencyManagement refers to a property that we take another pass to resolve the property.
-                    int i = 0;
-                    do {
-                        last = version;
-                        String result = null;
-                        if (last != null) {
-                            String partialMavenVersion = partialMaven.getVersion(last);
-                            if (partialMavenVersion != null) {
-                                result = partialMavenVersion;
-                            }
-                        }
-                        if (result == null) {
-                            OUTER:
-                            for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
-                                for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
-                                    if (groupId.equals(partialMaven.getGroupId(dependencyDescriptor.getGroupId())) &&
-                                            artifactId.equals(partialMaven.getArtifactId(dependencyDescriptor.getArtifactId()))) {
-                                        result = dependencyDescriptor.getVersion();
-                                        break OUTER;
-                                    }
+                    try {
+                        int i = 0;
+                        do {
+                            last = version;
+                            String result = null;
+                            if (last != null) {
+                                String partialMavenVersion = partialMaven.getVersion(last);
+                                if (partialMavenVersion != null) {
+                                    result = partialMavenVersion;
                                 }
                             }
+                            if (result == null) {
+                                OUTER:
+                                for (DependencyManagementDependency managed : partialMaven.getDependencyManagement().getDependencies()) {
+                                    for (DependencyDescriptor dependencyDescriptor : managed.getDependencies()) {
+                                        if (groupId.equals(partialMaven.getGroupId(dependencyDescriptor.getGroupId())) &&
+                                                artifactId.equals(partialMaven.getArtifactId(dependencyDescriptor.getArtifactId()))) {
+                                            result = dependencyDescriptor.getVersion();
+                                            break OUTER;
+                                        }
+                                    }
+                                }
 
-                            if (result == null && partialMaven.getParent() != null) {
-                                result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
+                                if (result == null && partialMaven.getParent() != null) {
+                                    result = partialMaven.getParent().getManagedVersion(groupId, artifactId);
+                                }
+                            }
+                            version = result;
+                        } while (i++ < 2 || !Objects.equals(version, last));
+
+                        // dependencyManagement takes precedence over the version specified on the dependency
+                        if (version == null) {
+                            String depVersion = dep.getVersion();
+                            if (depVersion != null) {
+                                version = partialMaven.getVersion(depVersion);
                             }
                         }
-                        version = result;
-                    } while (i++ < 2 || !Objects.equals(version, last));
-
-                    // dependencyManagement takes precedence over the version specified on the dependency
-                    if (version == null) {
-                        String depVersion = dep.getVersion();
-                        if (depVersion != null) {
-                            version = partialMaven.getVersion(depVersion);
+                    } catch (Exception e) {
+                        if(continueOnError) {
+                            logger.warn("Problem applying dependencyManagement to {}:{}:{}",
+                                    rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
+                            return null;
                         }
+                        throw e;
                     }
 
                     // for debugging...
                     if (version == null) {
-                        logger.error("Failed to determine version for {}:{}. Initial value was {}. Including POM is at {}",
-                                groupId, artifactId, dep.getVersion(),
-                                rawMaven.getSourcePath());
-
                         try {
                             //noinspection ConstantConditions
                             assert version != null;
                         } catch (AssertionError e) {
                             if(continueOnError) {
+                                logger.warn("Failed to determine version for {}:{}. Initial value was {}. Including POM is at {}",
+                                        groupId, artifactId, dep.getVersion(),
+                                        rawMaven.getSourcePath());
                                 return null;
                             } else {
+                                logger.error("Failed to determine version for {}:{}. Initial value was {}. Including POM is at {}",
+                                        groupId, artifactId, dep.getVersion(),
+                                        rawMaven.getSourcePath());
                                 throw e;
                             }
                         }
