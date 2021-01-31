@@ -15,10 +15,10 @@
  */
 package org.openrewrite.marker;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility;
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
@@ -33,11 +33,7 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
 
 @Incubating(since = "7.0.0")
-@JsonAutoDetect(
-        fieldVisibility = Visibility.ANY,
-        getterVisibility = Visibility.NONE,
-        setterVisibility = Visibility.NONE
-)
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Markers {
     public static final Markers EMPTY = new Markers(emptyList()) {
         @Override

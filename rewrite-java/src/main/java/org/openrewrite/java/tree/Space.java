@@ -15,9 +15,7 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
@@ -32,6 +30,7 @@ import static java.util.Collections.emptyList;
  * So whitespace and comments are like peanut butter and jelly.
  */
 @EqualsAndHashCode
+@JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@ref")
 public class Space implements Markable {
     public static final Space EMPTY = new Space("", emptyList(), Markers.EMPTY);
 
@@ -42,35 +41,32 @@ public class Space implements Markable {
     private static final Map<String, Space> flyweights = new HashMap<>();
 
     private final List<Comment> comments;
+
+    @Nullable
     private final String whitespace;
+
     private final Markers markers;
 
-    private Space(
-            @JsonProperty("whitespace") String whitespace,
-            @JsonProperty("comments") List<Comment> comments,
-            @JsonProperty("markers") Markers markers) {
+    private Space(@Nullable String whitespace, List<Comment> comments, Markers markers) {
         this.comments = comments;
-        this.whitespace = whitespace;
+        this.whitespace = whitespace == null || whitespace.isEmpty() ? null : whitespace;
         this.markers = markers;
     }
 
     @JsonCreator
-    public static Space build(
-            @JsonProperty("whitespace") String whitespace,
-            @JsonProperty("comments") List<Comment> comments,
-            @JsonProperty("markers") Markers markers) {
+    public static Space build(@Nullable String whitespace, List<Comment> comments, Markers markers) {
         if (comments.isEmpty()) {
-            if (whitespace.isEmpty()) {
+            if (whitespace == null || whitespace.isEmpty()) {
                 if (markers == Markers.EMPTY) {
                     return Space.EMPTY;
                 }
-                return flyweights.computeIfAbsent(whitespace, ws -> new Space(ws, emptyList(), Markers.EMPTY));
+                return flyweights.computeIfAbsent(whitespace == null ? "" : whitespace,
+                        ws -> new Space(ws, emptyList(), Markers.EMPTY));
             }
         }
         return new Space(whitespace, comments, markers);
     }
 
-    @JsonIgnore
     public String getIndent() {
         if (!comments.isEmpty()) {
             return getWhitespaceIndent(comments.get(comments.size() - 1).getSuffix());
@@ -78,15 +74,17 @@ public class Space implements Markable {
         return getWhitespaceIndent(whitespace);
     }
 
-    @JsonIgnore
     public String getLastWhitespace() {
         if (!comments.isEmpty()) {
             return comments.get(comments.size() - 1).getSuffix();
         }
-        return whitespace;
+        return whitespace == null ? "" : whitespace;
     }
 
-    private String getWhitespaceIndent(String whitespace) {
+    private String getWhitespaceIndent(@Nullable String whitespace) {
+        if (whitespace == null) {
+            return "";
+        }
         int lastNewline = whitespace.lastIndexOf('\n');
         if (lastNewline >= 0) {
             return whitespace.substring(lastNewline + 1);
@@ -101,7 +99,7 @@ public class Space implements Markable {
     }
 
     public String getWhitespace() {
-        return whitespace;
+        return whitespace == null ? "" : whitespace;
     }
 
     public Markers getMarkers() {
@@ -115,7 +113,7 @@ public class Space implements Markable {
     }
 
     public Space withComments(List<Comment> comments) {
-        if (comments.isEmpty() && whitespace.isEmpty()) {
+        if (comments.isEmpty() && (whitespace == null || whitespace.isEmpty())) {
             return Space.EMPTY;
         }
         return build(whitespace, comments, markers);
@@ -266,19 +264,21 @@ public class Space implements Markable {
     public String toString() {
         StringBuilder printedWs = new StringBuilder();
         int lastNewline = 0;
-        char[] charArray = whitespace.toCharArray();
-        for (int i = 0; i < charArray.length; i++) {
-            char c = charArray[i];
-            if (c == '\n') {
-                printedWs.append("\\n");
-                lastNewline = i + 1;
-            } else if (c == '\r') {
-                printedWs.append("\\r");
-                lastNewline = i + 1;
-            } else if (c == ' ') {
-                printedWs.append(spaces[(i - lastNewline) % 10]);
-            } else if (c == '\t') {
-                printedWs.append(tabs[(i - lastNewline) % 10]);
+        if (whitespace != null) {
+            char[] charArray = whitespace.toCharArray();
+            for (int i = 0; i < charArray.length; i++) {
+                char c = charArray[i];
+                if (c == '\n') {
+                    printedWs.append("\\n");
+                    lastNewline = i + 1;
+                } else if (c == '\r') {
+                    printedWs.append("\\r");
+                    lastNewline = i + 1;
+                } else if (c == ' ') {
+                    printedWs.append(spaces[(i - lastNewline) % 10]);
+                } else if (c == '\t') {
+                    printedWs.append(tabs[(i - lastNewline) % 10]);
+                }
             }
         }
 

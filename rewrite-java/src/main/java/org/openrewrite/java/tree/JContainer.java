@@ -16,8 +16,8 @@
 package org.openrewrite.java.tree;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.EqualsAndHashCode;
+import lombok.RequiredArgsConstructor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
@@ -41,7 +41,7 @@ import static java.util.Collections.emptyList;
  * @param <T> The type of the inner list of elements.
  */
 public class JContainer<T> implements Markable {
-    private transient Padding padding;
+    private transient Padding<T> padding;
 
     private static final JContainer<?> EMPTY = new JContainer<>(Space.EMPTY, emptyList(), Markers.EMPTY);
 
@@ -56,14 +56,11 @@ public class JContainer<T> implements Markable {
     }
 
     @JsonCreator
-    public static <T> JContainer<T> build(
-            @JsonProperty("before") Space before,
-            @JsonProperty("elem") List<JRightPadded<T>> elem,
-            @JsonProperty("markers") Markers markers) {
-        if (before.isEmpty() && elem.isEmpty()) {
+    public static <T> JContainer<T> build(Space before, List<JRightPadded<T>> elems, Markers markers) {
+        if (before.isEmpty() && elems.isEmpty()) {
             return empty();
         }
-        return new JContainer<>(before, elem, markers);
+        return new JContainer<>(before, elems, markers);
     }
 
     @SuppressWarnings("unchecked")
@@ -97,7 +94,6 @@ public class JContainer<T> implements Markable {
         return getPadding().withElems(ListUtils.map(elems, t -> t.map(map)));
     }
 
-    @JsonIgnore
     public Space getLastSpace() {
         return elems.isEmpty() ? Space.EMPTY : elems.get(elems.size() - 1).getAfter();
     }
@@ -132,20 +128,23 @@ public class JContainer<T> implements Markable {
         }
     }
 
-    public Padding getPadding() {
+    public Padding<T> getPadding() {
         if (padding == null) {
-            this.padding = new Padding();
+            this.padding = new Padding<>(this);
         }
         return padding;
     }
 
-    public class Padding {
+    @RequiredArgsConstructor
+    public static class Padding<T> {
+        private final JContainer<T> c;
+
         public List<JRightPadded<T>> getElems() {
-            return elems;
+            return c.elems;
         }
 
         public JContainer<T> withElems(List<JRightPadded<T>> elem) {
-            return JContainer.this.elems == elem ? JContainer.this : build(getBefore(), elem, markers);
+            return c.elems == elem ? c : build(c.before, elem, c.markers);
         }
     }
 
