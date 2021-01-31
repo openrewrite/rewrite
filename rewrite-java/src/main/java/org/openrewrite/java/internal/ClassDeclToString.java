@@ -35,7 +35,7 @@ public class ClassDeclToString {
             if (!classDecl.getModifiers().isEmpty()) {
                 acc.append(' ');
             }
-            switch (classDecl.getKind().getElem()) {
+            switch (classDecl.getKind()) {
                 case Class:
                     acc.append("class ");
                     break;
@@ -51,18 +51,18 @@ public class ClassDeclToString {
             }
             acc.append(classDecl.getName().printTrimmed());
             if (classDecl.getTypeParameters() != null) {
-                visitContainer("<", classDecl.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
+                visitContainer("<", classDecl.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
                 acc.append(' ');
             }
-            visitLeftPadded("extends", classDecl.getExtends(), JLeftPadded.Location.EXTENDS, unused);
+            visitLeftPadded("extends", classDecl.getPadding().getExtends(), JLeftPadded.Location.EXTENDS, unused);
             if (classDecl.getImplements() != null) {
-                if (J.ClassDecl.Kind.Interface.equals(classDecl.getKind().getElem())) {
+                if (J.ClassDecl.Kind.Interface.equals(classDecl.getKind())) {
                     acc.append("extends");
                 } else {
                     acc.append("implements");
                 }
             }
-            visitContainer("", classDecl.getImplements(), JContainer.Location.IMPLEMENTS, ",", "", unused);
+            visitContainer("", classDecl.getPadding().getImplements(), JContainer.Location.IMPLEMENTS, ",", "", unused);
             return classDecl;
         }
     };

@@ -70,7 +70,7 @@ interface ImplementInterfaceTest : RecipeTest {
             import b.B;
             import c.C;
             
-            class A implements B, C {
+            class A implements C, B {
             }
         """
     )

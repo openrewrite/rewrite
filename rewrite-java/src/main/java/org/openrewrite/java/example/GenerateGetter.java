@@ -78,7 +78,7 @@ public class GenerateGetter extends Recipe {
                 c = c.withBody(body.withStatements(
                         ListUtils.concat(
                                 body.getStatements(),
-                                new JRightPadded<>(generatedMethodDecls.get(0), Space.EMPTY, Markers.EMPTY)
+                                generatedMethodDecls.get(0)
                         )));
             }
             return c;

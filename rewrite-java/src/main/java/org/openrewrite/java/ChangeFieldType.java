@@ -50,9 +50,9 @@ public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
             );
 
             mv = mv.withVars(ListUtils.map(mv.getVars(), var -> {
-                JavaType.Class varType = TypeUtils.asClass(var.getElem().getType());
+                JavaType.Class varType = TypeUtils.asClass(var.getType());
                 if (varType != null && !varType.equals(type)) {
-                    return var.map(v -> v.withType(type).withName(v.getName().withType(type)));
+                    return var.withType(type).withName(var.getName().withType(type));
                 }
                 return var;
             }));

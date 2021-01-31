@@ -61,17 +61,13 @@ public class ChangeMethodTargetToStatic extends Recipe {
             if (methodMatcher.matches(method)) {
                 JavaType.FullyQualified classType = JavaType.Class.build(fullyQualifiedTargetTypeName);
 
-                m = method.withSelect(
-                        new JRightPadded<>(
-                                J.Ident.build(randomId(),
-                                        method.getSelect() == null ?
-                                                Space.EMPTY :
-                                                method.getSelect().getElem().getPrefix(),
-                                        Markers.EMPTY,
-                                        classType.getClassName(),
-                                        classType),
-                                Space.EMPTY,
-                                Markers.EMPTY
+                m = method.withSelect(J.Ident.build(randomId(),
+                        method.getSelect() == null ?
+                                Space.EMPTY :
+                                method.getSelect().getPrefix(),
+                        Markers.EMPTY,
+                        classType.getClassName(),
+                        classType
                         )
                 );
 
@@ -87,7 +83,6 @@ public class ChangeMethodTargetToStatic extends Recipe {
                         transformedType = transformedType.withFlags(flags);
                     }
                 }
-
                 m = m.withType(transformedType);
             }
             return m;

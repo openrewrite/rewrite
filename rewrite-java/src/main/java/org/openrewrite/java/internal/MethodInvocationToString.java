@@ -42,7 +42,7 @@ public class MethodInvocationToString {
                 acc.append(type.getDeclaringType().getFullyQualifiedName()
                         .replaceFirst("^java\\.lang\\.", ""));
                 acc.append('.');
-                visitContainer("<", method.getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
+                visitContainer("<", method.getPadding().getTypeParameters(), JContainer.Location.TYPE_PARAMETERS, ",", ">", unused);
                 acc.append(type.getName());
                 acc.append('(');
                 acc.append(String.join(",", type.getParamNames()));

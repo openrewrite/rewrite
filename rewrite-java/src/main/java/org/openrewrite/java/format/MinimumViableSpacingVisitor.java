@@ -17,6 +17,7 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
 public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
@@ -36,9 +37,11 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             first = false;
         }
 
-        if (c.getTypeParameters() != null && !c.getTypeParameters().getElem().isEmpty()) {
-            if (!first && !c.getTypeParameters().getBefore().getWhitespace().isEmpty()) {
-                c = c.withTypeParameters(c.getTypeParameters().withBefore(c.getTypeParameters().getBefore().withWhitespace(" ")));
+        J.ClassDecl.Padding padding = c.getPadding();
+        JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
+        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+            if (!first && !typeParameters.getBefore().getWhitespace().isEmpty()) {
+                c = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
         }
 
@@ -60,9 +63,11 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
             }
             first = false;
         }
-        if (m.getTypeParameters() != null && !m.getTypeParameters().getElem().isEmpty()) {
-            if (!first && m.getTypeParameters().getBefore().getWhitespace().isEmpty()) {
-                m = m.withTypeParameters(m.getTypeParameters().withBefore(m.getTypeParameters().getBefore().withWhitespace(" ")));
+        J.MethodDecl.Padding padding = m.getPadding();
+        JContainer<J.TypeParameter> typeParameters = padding.getTypeParameters();
+        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+            if (!first && typeParameters.getBefore().getWhitespace().isEmpty()) {
+                m = padding.withTypeParameters(typeParameters.withBefore(typeParameters.getBefore().withWhitespace(" ")));
             }
             first = false;
         }

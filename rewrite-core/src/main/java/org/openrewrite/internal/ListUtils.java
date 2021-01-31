@@ -15,19 +15,21 @@
  */
 package org.openrewrite.internal;
 
+import org.openrewrite.internal.lang.Nullable;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 public final class ListUtils {
     private ListUtils() {
     }
 
-    public static <T> List<T> mapLast(List<T> ls, Function<T, T> mapLast) {
+    public static <T> List<T> mapLast(List<T> ls, UnaryOperator<T> mapLast) {
         if (ls.isEmpty()) {
             return ls;
         }
@@ -45,7 +47,7 @@ public final class ListUtils {
         return ls;
     }
 
-    public static <T> List<T> mapFirst(List<T> ls, Function<T, T> mapFirst) {
+    public static <T> List<T> mapFirst(List<T> ls, UnaryOperator<T> mapFirst) {
         if (ls.isEmpty()) {
             return ls;
         }
@@ -87,11 +89,11 @@ public final class ListUtils {
         return newLs;
     }
 
-    public static <T> List<T> map(List<T> ls, Function<T, T> map) {
+    public static <T> List<T> map(List<T> ls, UnaryOperator<T> map) {
         return map(ls, (i, t) -> map.apply(t));
     }
 
-    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, Function<T, T> map) {
+    public static <T> List<T> map(List<T> ls, ForkJoinPool pool, UnaryOperator<T> map) {
         return map(ls, pool, (i, t) -> map.apply(t));
     }
 
@@ -129,19 +131,25 @@ public final class ListUtils {
         return newLs.get();
     }
 
-    public static <T> List<T> concat(List<T> ls, T t) {
-        List<T> newLs = new ArrayList<>(ls);
+    public static <T> List<T> concat(@Nullable List<T> ls, T t) {
+        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls);
         newLs.add(t);
         return newLs;
     }
 
-    public static <T> List<T> concat(T t, List<T> ls) {
-        List<T> newLs = new ArrayList<>(ls.size() + 1);
+    public static <T> List<T> concat(T t, @Nullable List<T> ls) {
+        List<T> newLs = ls == null ? new ArrayList<>(1) : new ArrayList<>(ls.size() + 1);
         newLs.add(t);
-        newLs.addAll(ls);
+        if (ls != null) {
+            newLs.addAll(ls);
+        }
         return newLs;
     }
-    public static <T> List<T> concatAll(List<T> ls, List<T> t) {
+
+    public static <T> List<T> concatAll(@Nullable List<T> ls, List<T> t) {
+        if(ls == null) {
+            return t;
+        }
         List<T> newLs = new ArrayList<>(ls);
         newLs.addAll(t);
         return newLs;

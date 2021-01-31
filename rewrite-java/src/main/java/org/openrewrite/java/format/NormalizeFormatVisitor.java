@@ -17,13 +17,13 @@ package org.openrewrite.java.format;
 
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.Space;
 
 /**
  * Ensures that whitespace is on the outermost AST element possible.
  */
 public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
-    @SuppressWarnings("ConstantConditions")
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl c = super.visitClassDecl(classDecl, p);
@@ -40,15 +40,16 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return c;
         }
 
-        if(!c.getKind().getBefore().isEmpty()) {
-            c = concatenatePrefix(c, c.getKind().getBefore());
-            c = c.withKind(c.getKind().withBefore(Space.EMPTY));
+        if(!c.getPadding().getKind().getBefore().isEmpty()) {
+            c = concatenatePrefix(c, c.getPadding().getKind().getBefore());
+            c = c.getPadding().withKind(c.getPadding().getKind().withBefore(Space.EMPTY));
             return c;
         }
 
-        if (c.getTypeParameters() != null && !c.getTypeParameters().getElem().isEmpty()) {
-            c = concatenatePrefix(c, c.getTypeParameters().getBefore());
-            c = c.withTypeParameters(c.getTypeParameters().withBefore(Space.EMPTY));
+        JContainer<J.TypeParameter> typeParameters = c.getPadding().getTypeParameters();
+        if (typeParameters != null && !typeParameters.getElems().isEmpty()) {
+            c = concatenatePrefix(c, typeParameters.getBefore());
+            c = c.getPadding().withTypeParameters(typeParameters.withBefore(Space.EMPTY));
             return c;
         }
 
@@ -72,9 +73,9 @@ public class NormalizeFormatVisitor<P> extends JavaIsoVisitor<P> {
             return m;
         }
 
-        if (m.getTypeParameters() != null && !m.getTypeParameters().getElem().isEmpty()) {
-            m = concatenatePrefix(m, m.getTypeParameters().getBefore());
-            m = m.withTypeParameters(m.getTypeParameters().withBefore(Space.EMPTY));
+        if (m.getPadding().getTypeParameters() != null && !m.getPadding().getTypeParameters().getElems().isEmpty()) {
+            m = concatenatePrefix(m, m.getPadding().getTypeParameters().getBefore());
+            m = m.getPadding().withTypeParameters(m.getPadding().getTypeParameters().withBefore(Space.EMPTY));
             return m;
         }
 

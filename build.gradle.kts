@@ -89,7 +89,9 @@ subprojects {
 
     tasks.withType(JavaCompile::class.java) {
         options.encoding = "UTF-8"
+        options.compilerArgs.add("-parameters")
     }
+
     tasks.named<JavaCompile>("compileJava") {
         sourceCompatibility = JavaVersion.VERSION_1_8.toString()
         targetCompatibility = JavaVersion.VERSION_1_8.toString()

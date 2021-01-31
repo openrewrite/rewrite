@@ -44,8 +44,8 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
                 variable.getSimpleName().equals(hasName)) {
             v = v.withName(v.getName().withName(toName));
         }
-        if (variable.getInitializer() != null) {
-            v = v.withInitializer(visitLeftPadded(variable.getInitializer(),
+        if (variable.getPadding().getInitializer() != null) {
+            v = v.getPadding().withInitializer(visitLeftPadded(variable.getPadding().getInitializer(),
                     JLeftPadded.Location.VARIABLE_INITIALIZER, p));
         }
         return v;
@@ -56,7 +56,7 @@ public class ChangeFieldName<P> extends JavaIsoVisitor<P> {
         J.FieldAccess f = super.visitFieldAccess(fieldAccess, p);
         if (matchesClass(fieldAccess.getTarget().getType()) &&
                 fieldAccess.getSimpleName().equals(hasName)) {
-            f = f.withName(f.getName().withElem(f.getName().getElem().withName(toName)));
+            f = f.getPadding().withName(f.getPadding().getName().withElem(f.getPadding().getName().getElem().withName(toName)));
         }
         return f;
     }

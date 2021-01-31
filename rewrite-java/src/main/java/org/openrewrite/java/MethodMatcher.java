@@ -56,6 +56,7 @@ import static java.util.stream.Collectors.joining;
  * my.org.MyClass *(boolean, ..)           - All method invocations where the first arg is a boolean in my.org.MyClass
  * </PRE>
  */
+@SuppressWarnings("NotNullFieldNotInitialized")
 @Getter
 public class MethodMatcher {
     private Pattern targetTypePattern;
@@ -85,8 +86,7 @@ public class MethodMatcher {
             return false;
         }
 
-        String signaturePattern = method.getParams().getElem().stream()
-                .map(JRightPadded::getElem)
+        String signaturePattern = method.getParams().stream()
                 .map(v -> {
                     if (v instanceof J.VariableDecls) {
                         J.VariableDecls vd = (J.VariableDecls) v;
@@ -134,8 +134,7 @@ public class MethodMatcher {
             return false;
         }
         String signaturePattern = Optional.ofNullable(constructor.getArgs())
-                .map(args -> args.getElem().stream()
-                        .map(JRightPadded::getElem)
+                .map(args -> args.getElems().stream()
                         .map(Expression::getType)
                         .filter(Objects::nonNull)
                         .map(this::typePattern)

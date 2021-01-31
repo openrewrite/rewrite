@@ -66,7 +66,7 @@ public class UseStaticImport extends Recipe {
                     }
                 }
 
-                m = m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getElem().getPrefix()));
+                m = m.withSelect(null).withName(m.getName().withPrefix(m.getSelect().getPrefix()));
             }
             return m;
         }

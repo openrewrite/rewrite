@@ -20,10 +20,14 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
+import java.util.*;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
 
 /**
  * A Java element that could have trailing space.
@@ -43,7 +47,7 @@ public class JRightPadded<T> implements Markable {
     @With
     Markers markers;
 
-    public JRightPadded<T> map(Function<T, T> map) {
+    public JRightPadded<T> map(UnaryOperator<T> map) {
         return withElem(map.apply(elem));
     }
 
@@ -93,5 +97,50 @@ public class JRightPadded<T> implements Markable {
         public Space.Location getAfterLocation() {
             return afterLocation;
         }
+    }
+
+    public static <T> List<T> getElems(List<JRightPadded<T>> ls) {
+        List<T> list = new ArrayList<>();
+        for (JRightPadded<T> l : ls) {
+            T elem = l.getElem();
+            list.add(elem);
+        }
+        return list;
+    }
+
+    @Nullable
+    public static <T> JRightPadded<T> withElem(@Nullable JRightPadded<T> before, @Nullable T elems) {
+        if (before == null) {
+            if (elems == null) {
+                return null;
+            }
+            return new JRightPadded<>(elems, Space.EMPTY, Markers.EMPTY);
+        }
+        if (elems == null) {
+            return null;
+        }
+        return before.withElem(elems);
+    }
+
+    public static <J2 extends J> List<JRightPadded<J2>> withElems(List<JRightPadded<J2>> before, List<J2> elems) {
+        List<JRightPadded<J2>> after = new ArrayList<>();
+        Map<UUID, JRightPadded<J2>> beforeById = before.stream().collect(Collectors
+                .toMap(j -> j.getElem().getId(), Function.identity()));
+
+        for (J2 t : elems) {
+            JRightPadded<J2> found = beforeById.get(t.getId());
+            if (found != null) {
+                after.add(found.withElem(t));
+            } else {
+                after.add(new JRightPadded<>(t, Space.EMPTY, Markers.EMPTY));
+            }
+        }
+
+        return after;
+    }
+
+    @Override
+    public String toString() {
+        return "JRightPadded(elem=" + elem.getClass().getSimpleName() + ", after=" + after + ')';
     }
 }

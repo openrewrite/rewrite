@@ -24,6 +24,7 @@ import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.java.tree.Statement;
 
+import java.util.Iterator;
 import java.util.List;
 
 class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
@@ -65,7 +66,7 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                         c.withSuffix(minimumLines(c.getSuffix(), style.getMinimum().getBeforeImports()))));
             }
         } else {
-            j = j.withImports(ListUtils.mapFirst(j.getImports(), i ->
+            j = j.getPadding().withImports(ListUtils.mapFirst(j.getPadding().getImports(), i ->
                     minimumLines(i, style.getMinimum().getAfterPackage())));
 
             if (j.getImports().isEmpty()) {
@@ -85,8 +86,8 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, P p) {
         J.ClassDecl j = super.visitClassDecl(classDecl, p);
-        List<JRightPadded<Statement>> statements = j.getBody().getStatements();
-        j = j.withBody(j.getBody().withStatements(ListUtils.map(statements, (i, s) -> {
+        List<JRightPadded<Statement>> statements = j.getBody().getPadding().getStatements();
+        j = j.withBody(j.getBody().getPadding().withStatements(ListUtils.map(statements, (i, s) -> {
             if (i == 0) {
                 s = minimumLines(s, style.getMinimum().getAfterClassHeader());
             } else if (statements.get(i - 1).getElem() instanceof J.Block) {
@@ -135,10 +136,10 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
     @Override
     public Statement visitStatement(Statement statement, P p) {
         Statement j = super.visitStatement(statement, p);
-        Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
-        if (parent.getParent() != null) {
-            Object parentTree = parent.getValue();
-            Object grandparentTree = parent.dropParentUntil(J.class::isInstance).getValue();
+        Iterator<Object> cursorPath = getCursor().getParentOrThrow().getPath(J.class::isInstance);
+        Object parentTree = cursorPath.next();
+        if (cursorPath.hasNext()) {
+            Object grandparentTree = cursorPath.next();
             if (grandparentTree instanceof J.ClassDecl && parentTree instanceof J.Block) {
                 J.Block block = (J.Block) parentTree;
                 J.ClassDecl classDecl = (J.ClassDecl) grandparentTree;
@@ -146,15 +147,15 @@ class BlankLinesVisitor<P> extends JavaIsoVisitor<P> {
                 j = keepMaximumLines(j, style.getKeepMaximum().getInDeclarations());
 
                 // don't adjust the first statement in a block
-                if (block.getStatements().iterator().next().getElem() != j) {
+                if (block.getStatements().iterator().next() != j) {
                     if (j instanceof J.VariableDecls) {
-                        if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
+                        if (classDecl.getKind() == J.ClassDecl.Kind.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundFieldInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundField());
                         }
                     } else if (j instanceof J.MethodDecl) {
-                        if (classDecl.getKind().getElem() == J.ClassDecl.Kind.Interface) {
+                        if (classDecl.getKind() == J.ClassDecl.Kind.Interface) {
                             j = minimumLines(j, style.getMinimum().getAroundMethodInInterface());
                         } else {
                             j = minimumLines(j, style.getMinimum().getAroundMethod());

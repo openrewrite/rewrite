@@ -3,6 +3,7 @@ dependencies {
 
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
 
     implementation("io.github.classgraph:classgraph:latest.release")
 

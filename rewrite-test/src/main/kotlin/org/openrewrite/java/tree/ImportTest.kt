@@ -48,7 +48,7 @@ interface ImportTest : JavaTreeTest {
         """.trimIndent()
         )[0]
 
-        val (b, c) = a.imports.map { it.elem }
+        val (b, c) = a.imports
 
         assertTrue(b < c)
         assertTrue(c > b)
@@ -63,7 +63,7 @@ interface ImportTest : JavaTreeTest {
         """.trimIndent()
         )[0]
 
-        val (b, c) = a.imports.map { it.elem }
+        val (b, c) = a.imports
 
         assertTrue(b < c)
         assertTrue(c > b)

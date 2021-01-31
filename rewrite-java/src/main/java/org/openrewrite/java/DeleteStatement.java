@@ -37,7 +37,7 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     public J.If visitIf(J.If iff, P p) {
         J.If i = super.visitIf(iff, p);
 
-        if (statement.isScope(i.getThenPart().getElem())) {
+        if (statement.isScope(i.getThenPart())) {
             i = i.withThenPart(emptyBlock());
         } else if (i.getElsePart() != null && statement.isScope(i.getElsePart())) {
             i = i.withElsePart(i.getElsePart().withBody(emptyBlock()));
@@ -48,27 +48,27 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
 
     @Override
     public J.ForLoop visitForLoop(J.ForLoop forLoop, P p) {
-        return statement.isScope(forLoop.getBody().getElem()) ?
+        return statement.isScope(forLoop.getBody()) ?
                 forLoop.withBody(emptyBlock()) :
                 super.visitForLoop(forLoop, p);
     }
 
     @Override
     public J.ForEachLoop visitForEachLoop(J.ForEachLoop forEachLoop, P p) {
-        return statement.isScope(forEachLoop.getBody().getElem()) ?
+        return statement.isScope(forEachLoop.getBody()) ?
                 forEachLoop.withBody(emptyBlock()) :
                 super.visitForEachLoop(forEachLoop, p);
     }
 
     @Override
     public J.WhileLoop visitWhileLoop(J.WhileLoop whileLoop, P p) {
-        return statement.isScope(whileLoop.getBody().getElem()) ? whileLoop.withBody(emptyBlock()) :
+        return statement.isScope(whileLoop.getBody()) ? whileLoop.withBody(emptyBlock()) :
                 super.visitWhileLoop(whileLoop, p);
     }
 
     @Override
     public J.DoWhileLoop visitDoWhileLoop(J.DoWhileLoop doWhileLoop, P p) {
-        return statement.isScope(doWhileLoop.getBody().getElem()) ? doWhileLoop.withBody(emptyBlock()) :
+        return statement.isScope(doWhileLoop.getBody()) ? doWhileLoop.withBody(emptyBlock()) :
                 super.visitDoWhileLoop(doWhileLoop, p);
     }
 
@@ -76,7 +76,7 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
     public J.Block visitBlock(J.Block block, P p) {
         J.Block b = super.visitBlock(block, p);
         return b.withStatements(ListUtils.map(b.getStatements(), s ->
-                statement.isScope(s.getElem()) ? null : s));
+                statement.isScope(s) ? null : s));
     }
 
     @Override
@@ -89,17 +89,13 @@ public class DeleteStatement<P> extends JavaIsoVisitor<P> {
         return super.visitEach(tree, p);
     }
 
-    private JRightPadded<Statement> emptyBlock() {
-        return new JRightPadded<>(
-                new J.Block(randomId(),
-                        Space.EMPTY,
-                        Markers.EMPTY,
-                        null,
-                        emptyList(),
-                        Space.EMPTY
-                ),
+    private Statement emptyBlock() {
+        return new J.Block(randomId(),
                 Space.EMPTY,
-                Markers.EMPTY
+                Markers.EMPTY,
+                null,
+                emptyList(),
+                Space.EMPTY
         );
     }
 }

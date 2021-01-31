@@ -44,6 +44,7 @@ public class SemanticallyEqual {
      * visitor pattern set up there; however, the necessity to return a J did not fit the purposes of
      * SemanticallyEqualVisitor, so while the equality is tracked in isEqual, all the visitors return null.
      */
+    @SuppressWarnings("ConstantConditions")
     private static class SemanticallyEqualVisitor extends JavaVisitor<J> {
         boolean isEqual;
 
@@ -60,15 +61,15 @@ public class SemanticallyEqual {
             J.Annotation secondAnnotation = (J.Annotation) second;
 
             if (firstAnnotation.getArgs() != null && secondAnnotation.getArgs() != null) {
-                if (firstAnnotation.getArgs().getElem() != null &&
-                        secondAnnotation.getArgs().getElem() != null &&
-                        firstAnnotation.getArgs().getElem().size() == secondAnnotation.getArgs().getElem().size()) {
+                if (firstAnnotation.getArgs() != null &&
+                        secondAnnotation.getArgs() != null &&
+                        firstAnnotation.getArgs().size() == secondAnnotation.getArgs().size()) {
 
-                    List<JRightPadded<Expression>> firstArgs = firstAnnotation.getArgs().getElem();
-                    List<JRightPadded<Expression>> secondArgs = secondAnnotation.getArgs().getElem();
+                    List<Expression> firstArgs = firstAnnotation.getArgs();
+                    List<Expression> secondArgs = secondAnnotation.getArgs();
 
                     for (int i = 0; i < firstArgs.size(); i++) {
-                        this.visit(firstArgs.get(i).getElem(), secondArgs.get(i).getElem());
+                        this.visit(firstArgs.get(i), secondArgs.get(i));
                     }
                 } else {
                     isEqual = false;
@@ -129,7 +130,7 @@ public class SemanticallyEqual {
             isEqual = isEqual &&
                     Objects.equals(firstAssign.getType(), secondAssign.getType()) &&
                     SemanticallyEqual.areEqual(firstAssign.getVariable(), secondAssign.getVariable()) &&
-                    SemanticallyEqual.areEqual(firstAssign.getAssignment().getElem(), secondAssign.getAssignment().getElem());
+                    SemanticallyEqual.areEqual(firstAssign.getAssignment(), secondAssign.getAssignment());
 
             return null;
         }
@@ -148,7 +149,7 @@ public class SemanticallyEqual {
         }
 
         @Override
-        public NameTree visitTypeName(NameTree firstTypeName, J second) {
+        public <N extends NameTree> N visitTypeName(N firstTypeName, J second) {
             if (!(second instanceof NameTree)) {
                 isEqual = false;
                 return null;

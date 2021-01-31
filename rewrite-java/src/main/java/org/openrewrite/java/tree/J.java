@@ -15,9 +15,12 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
@@ -25,9 +28,10 @@ import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
+import org.openrewrite.java.tree.Coordinates.ClassDeclCoordinates;
+import org.openrewrite.java.tree.Coordinates.MethodDeclCoordinates;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
-import org.openrewrite.java.tree.Coordinates.*;
 
 import java.io.Serializable;
 import java.nio.file.Path;
@@ -37,7 +41,6 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 import static java.util.Arrays.stream;
 import static java.util.Collections.emptyList;
@@ -74,7 +77,6 @@ public interface J extends Serializable, Tree {
 
     Space getPrefix();
 
-    @JsonIgnore
     default List<Comment> getComments() {
         return getPrefix().getComments();
     }
@@ -136,27 +138,44 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Annotation implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         NameTree annotationType;
 
         @Nullable
-        @With
         JContainer<Expression> args;
 
-        @JsonIgnore
+        @Nullable
+        public List<Expression> getArgs() {
+            return args == null ? null : args.getElems();
+        }
+
+        public Annotation withArgs(@Nullable List<Expression> args) {
+            return getPadding().withArgs(JContainer.withElems(this.args, args));
+        }
+
         @Override
         public JavaType getType() {
             return annotationType.getType();
@@ -171,6 +190,27 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitAnnotation(this, p);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Annotation t;
+
+            @Nullable
+            public JContainer<Expression> getArgs() {
+                return t.args;
+            }
+
+            public Annotation withArgs(@Nullable JContainer<Expression> args) {
+                return t.args == args ? t : new Annotation(t.id, t.prefix, t.markers, t.annotationType, args);
+            }
         }
     }
 
@@ -230,10 +270,7 @@ public interface J extends Serializable, Tree {
         @SuppressWarnings("unchecked")
         @Override
         public ArrayType withType(@Nullable JavaType type) {
-            if (type == getType()) {
-                return this;
-            }
-            return withElementType(elementType.withType(type));
+            return type == getType() ? this : withElementType(elementType.withType(type));
         }
 
         @Override
@@ -264,27 +301,45 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Assign implements J, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression variable;
 
-        @With
         JLeftPadded<Expression> assignment;
+
+        public Expression getAssignment() {
+            return assignment.getElem();
+        }
+
+        public Assign withAssignment(Expression assignment) {
+            return getPadding().withAssignment(this.assignment.withElem(assignment));
+        }
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
@@ -292,37 +347,75 @@ public interface J extends Serializable, Tree {
             return v.visitAssign(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Assign t;
+
+            public JLeftPadded<Expression> getAssignment() {
+                return t.assignment;
+            }
+
+            public Assign withAssignment(JLeftPadded<Expression> assignment) {
+                return t.assignment == assignment ? t : new Assign(t.id, t.prefix, t.markers, t.variable, assignment, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class AssignOp implements J, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression variable;
 
-        @With
         JLeftPadded<Type> operator;
 
+        public Type getOperator() {
+            return operator.getElem();
+        }
+
+        public AssignOp withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElem(operator));
+        }
+
         @With
+        @Getter
         Expression assignment;
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
@@ -330,7 +423,6 @@ public interface J extends Serializable, Tree {
             return v.visitAssignOp(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
@@ -349,12 +441,38 @@ public interface J extends Serializable, Tree {
             RightShift,
             UnsignedRightShift
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final AssignOp t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public AssignOp withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new AssignOp(t.id, t.prefix, t.markers, t.variable, operator, t.assignment, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     @Data
     final class Binary implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
         UUID id;
 
@@ -367,8 +485,15 @@ public interface J extends Serializable, Tree {
         @With
         Expression left;
 
-        @With
         JLeftPadded<Type> operator;
+
+        public Type getOperator() {
+            return operator.getElem();
+        }
+
+        public Binary withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElem(operator));
+        }
 
         @With
         Expression right;
@@ -382,7 +507,6 @@ public interface J extends Serializable, Tree {
             return v.visitBinary(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             List<Tree> sideEffects = new ArrayList<>(2);
@@ -412,12 +536,38 @@ public interface J extends Serializable, Tree {
             Or,
             And
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Binary t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Binary withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Binary(t.id, t.prefix, t.markers, t.left, operator, t.right, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Block implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -430,26 +580,25 @@ public interface J extends Serializable, Tree {
         @With
         Markers markers;
 
-        @With
         JRightPadded<Boolean> statik;
 
-        @JsonProperty("statik")
-        public JRightPadded<Boolean> getStatic() {
-            return statik;
-        }
-
-        @JsonIgnore
         public boolean isStatic() {
             return statik.getElem();
         }
 
-        public Block withStatic(@Nullable JRightPadded<Boolean> statik) {
-            return new Block(id, prefix, markers, statik, statements, end);
+        public Block withStatic(boolean statik) {
+            return getPadding().withStatic(this.statik.withElem(statik));
         }
 
-        @Getter
-        @With
         List<JRightPadded<Statement>> statements;
+
+        public List<Statement> getStatements() {
+            return JRightPadded.getElems(statements);
+        }
+
+        public Block withStatements(List<Statement> statements) {
+            return getPadding().withStatements(JRightPadded.withElems(this.statements, statements));
+        }
 
         @Getter
         @With
@@ -458,6 +607,34 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitBlock(this, p);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Block t;
+
+            public JRightPadded<Boolean> getStatic() {
+                return t.statik;
+            }
+
+            public Block withStatic(JRightPadded<Boolean> statik) {
+                return t.statik == statik ? t : new Block(t.id, t.prefix, t.markers, statik, t.statements, t.end);
+            }
+
+            public List<JRightPadded<Statement>> getStatements() {
+                return t.statements;
+            }
+
+            public Block withStatements(List<JRightPadded<Statement>> statements) {
+                return t.statements == statements ? t : new Block(t.id, t.prefix, t.markers, t.statik, statements, t.end);
+            }
         }
     }
 
@@ -484,35 +661,78 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Case implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression pattern;
 
-        @With
         JContainer<Statement> statements;
+
+        public List<Statement> getStatements() {
+            return statements.getElems();
+        }
+
+        public Case withStatements(List<Statement> statements) {
+            return getPadding().withStatements(this.statements.getPadding().withElems(JRightPadded.withElems(
+                    this.statements.getPadding().getElems(), statements)));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitCase(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Case t;
+
+            public JContainer<Statement> getStatements() {
+                return t.statements;
+            }
+
+            public Case withStatements(JContainer<Statement> statements) {
+                return t.statements == statements ? t : new Case(t.id, t.prefix, t.markers, t.pattern, statements);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ClassDecl implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -533,51 +753,54 @@ public interface J extends Serializable, Tree {
         @Getter
         List<Modifier> modifiers;
 
-        @With
-        @Getter
         JLeftPadded<Kind> kind;
+
+        public Kind getKind() {
+            return kind.getElem();
+        }
+
+        public ClassDecl withKind(Kind kind) {
+            return getPadding().withKind(this.kind.withElem(kind));
+        }
 
         @With
         @Getter
         Ident name;
 
-        @With
-        @Getter
         @Nullable
         JContainer<TypeParameter> typeParameters;
 
         @Nullable
-        JLeftPadded<TypeTree> extendings;
-
-        public ClassDecl withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
-            if (extendings == this.extendings) {
-                return this;
-            }
-            return new ClassDecl(id, prefix, markers, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type);
+        public List<TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElems();
         }
 
-        @JsonProperty("extendings")
+        public ClassDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+        }
+
         @Nullable
-        public JLeftPadded<TypeTree> getExtends() {
-            return extendings;
+        JLeftPadded<TypeTree> extendings;
+
+        @Nullable
+        public TypeTree getExtends() {
+            return extendings == null ? null : extendings.getElem();
+        }
+
+        public ClassDecl withExtends(@Nullable TypeTree extendings) {
+            return getPadding().withExtends(JLeftPadded.withElem(this.extendings, extendings));
         }
 
         @Nullable
         JContainer<TypeTree> implementings;
 
-        public ClassDecl withImplements(@Nullable JContainer<TypeTree> implementings) {
-            if (implementings == this.implementings) {
-                return this;
-            }
-            return new ClassDecl(id, prefix, markers, annotations, modifiers, kind, name,
-                    typeParameters, extendings, implementings, body, type);
+        @Nullable
+        public List<TypeTree> getImplements() {
+            return implementings == null ? null : implementings.getElems();
         }
 
-        @JsonProperty("implementings")
-        @Nullable
-        public JContainer<TypeTree> getImplements() {
-            return implementings;
+        public ClassDecl withImplements(@Nullable List<TypeTree> implementings) {
+            return getPadding().withImplements(JContainer.withElems(this.implementings, implementings));
         }
 
         @With
@@ -594,7 +817,6 @@ public interface J extends Serializable, Tree {
             return v.visitClassDecl(this, p);
         }
 
-        @JsonIgnore
         public String getSimpleName() {
             return name.getSimpleName();
         }
@@ -606,40 +828,6 @@ public interface J extends Serializable, Tree {
             Annotation
         }
 
-        @Nullable
-        public EnumValueSet getEnumValues() {
-            for (JRightPadded<Statement> stat : body.getStatements()) {
-                if (stat.getElem() instanceof EnumValueSet) {
-                    return (EnumValueSet) stat.getElem();
-                }
-            }
-            return null;
-        }
-
-        @JsonIgnore
-        public List<VariableDecls> getFields() {
-            List<VariableDecls> list = new ArrayList<>();
-            for (JRightPadded<Statement> stat : body.getStatements()) {
-                if (stat.getElem() instanceof VariableDecls) {
-                    VariableDecls variableDecls = (VariableDecls) stat.getElem();
-                    list.add(variableDecls);
-                }
-            }
-            return list;
-        }
-
-        @JsonIgnore
-        public List<MethodDecl> getMethods() {
-            List<MethodDecl> list = new ArrayList<>();
-            for (JRightPadded<Statement> stat : body.getStatements()) {
-                if (stat.getElem() instanceof MethodDecl) {
-                    MethodDecl methodDecl = (MethodDecl) stat.getElem();
-                    list.add(methodDecl);
-                }
-            }
-            return list;
-        }
-
         public boolean hasModifier(String modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
@@ -649,36 +837,112 @@ public interface J extends Serializable, Tree {
             return "ClassDecl(" + ClassDeclToString.toString(this) + ")";
         }
 
-        public ClassDeclCoordinates coordinates() {return new ClassDeclCoordinates(this); }
+        public ClassDeclCoordinates coordinates() {
+            return new ClassDeclCoordinates(this);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ClassDecl t;
+
+            public JLeftPadded<Kind> getKind() {
+                return t.kind;
+            }
+
+            public ClassDecl withKind(JLeftPadded<Kind> kind) {
+                return t.kind == kind ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, kind, t.name, t.typeParameters, t.extendings, t.implementings, t.body, t.type);
+            }
+
+            @Nullable
+            public JLeftPadded<TypeTree> getExtends() {
+                return t.extendings;
+            }
+
+            public ClassDecl withExtends(@Nullable JLeftPadded<TypeTree> extendings) {
+                return t.extendings == extendings ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, extendings, t.implementings, t.body, t.type);
+            }
+
+            @Nullable
+            public JContainer<TypeTree> getImplements() {
+                return t.implementings;
+            }
+
+            public ClassDecl withImplements(@Nullable JContainer<TypeTree> implementings) {
+                return t.implementings == implementings ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, t.typeParameters, t.extendings, implementings, t.body, t.type);
+            }
+
+            @Nullable
+            public JContainer<TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public ClassDecl withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new ClassDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.kind, t.name, typeParameters, t.extendings, t.implementings, t.body, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class CompilationUnit implements J, SourceFile {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Path sourcePath;
 
-        @With
         @Nullable
         JRightPadded<Package> packageDecl;
 
-        @With
+        @Nullable
+        public Package getPackageDecl() {
+            return packageDecl == null ? null : packageDecl.getElem();
+        }
+
+        public CompilationUnit withPackageDecl(Package packageDecl) {
+            return getPadding().withPackageDecl(JRightPadded.withElem(this.packageDecl, packageDecl));
+        }
+
         List<JRightPadded<Import>> imports;
 
+        public List<Import> getImports() {
+            return JRightPadded.getElems(imports);
+        }
+
+        public CompilationUnit withImports(List<Import> imports) {
+            return getPadding().withImports(JRightPadded.withElems(this.imports, imports));
+        }
+
         @With
+        @Getter
         List<ClassDecl> classes;
 
         @With
+        @Getter
         Space eof;
 
         @Override
@@ -690,14 +954,33 @@ public interface J extends Serializable, Tree {
             return FindTypes.find(this, clazz);
         }
 
-        @JsonIgnore
-        public Path getSourceSet() {
-            int packageLevelsUp = getPackageDecl() == null ? 0 :
-                    (int) getPackageDecl().getElem().printTrimmed().chars().filter(c -> c == '.').count();
-            // Jump over Java file name
-            return sourcePath.getParent().resolve(IntStream.range(0, packageLevelsUp + 1)
-                    .mapToObj(n -> "../")
-                    .collect(joining(""))).normalize();
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final CompilationUnit t;
+
+            @Nullable
+            public JRightPadded<Package> getPackageDecl() {
+                return t.packageDecl;
+            }
+
+            public CompilationUnit withPackageDecl(@Nullable JRightPadded<Package> packageDecl) {
+                return t.packageDecl == packageDecl ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, packageDecl, t.imports, t.classes, t.eof);
+            }
+
+            public List<JRightPadded<Import>> getImports() {
+                return t.imports;
+            }
+
+            public CompilationUnit withImports(List<JRightPadded<Import>> imports) {
+                return t.imports == imports ? t : new CompilationUnit(t.id, t.prefix, t.markers, t.sourcePath, t.packageDecl, imports, t.classes, t.eof);
+            }
         }
     }
 
@@ -724,28 +1007,79 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class DoWhileLoop implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JRightPadded<Statement> body;
 
-        @With
+        public Statement getBody() {
+            return body.getElem();
+        }
+
+        public DoWhileLoop withBody(Statement body) {
+            return getPadding().withBody(this.body.withElem(body));
+        }
+
         JLeftPadded<ControlParentheses<Expression>> whileCondition;
+
+        public ControlParentheses<Expression> getWhileCondition() {
+            return whileCondition.getElem();
+        }
+
+        public DoWhileLoop withWhileCondition(ControlParentheses<Expression> whileCondition) {
+            return getPadding().withWhileCondition(this.whileCondition.withElem(whileCondition));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitDoWhileLoop(this, p);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final DoWhileLoop t;
+
+            public JRightPadded<Statement> getBody() {
+                return t.body;
+            }
+
+            public DoWhileLoop withBody(JRightPadded<Statement> body) {
+                return t.body == body ? t : new DoWhileLoop(t.id, t.prefix, t.markers, body, t.whileCondition);
+            }
+
+            public JLeftPadded<ControlParentheses<Expression>> getWhileCondition() {
+                return t.whileCondition;
+            }
+
+            public DoWhileLoop withWhileCondition(JLeftPadded<ControlParentheses<Expression>> whileCondition) {
+                return t.whileCondition == whileCondition ? t : new DoWhileLoop(t.id, t.prefix, t.markers, t.body, whileCondition);
+            }
         }
     }
 
@@ -805,50 +1139,105 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class EnumValueSet implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         List<JRightPadded<EnumValue>> enums;
 
+        public List<EnumValue> getEnums() {
+            return JRightPadded.getElems(enums);
+        }
+
+        public EnumValueSet withEnums(List<EnumValue> enums) {
+            return getPadding().withEnums(JRightPadded.withElems(this.enums, enums));
+        }
+
+        @With
+        @Getter
         boolean terminatedWithSemicolon;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitEnumValueSet(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final EnumValueSet t;
+
+            public List<JRightPadded<EnumValue>> getEnums() {
+                return t.enums;
+            }
+
+            public EnumValueSet withEnums(List<JRightPadded<EnumValue>> enums) {
+                return t.enums == enums ? t : new EnumValueSet(t.id, t.prefix, t.markers, enums, t.terminatedWithSemicolon);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class FieldAccess implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression target;
 
-        @With
         JLeftPadded<Ident> name;
 
+        public Ident getName() {
+            return name.getElem();
+        }
+
+        public FieldAccess withName(Ident name) {
+            return getPadding().withName(this.name.withElem(name));
+        }
+
         @With
+        @Getter
         @Nullable
         JavaType type;
 
@@ -857,12 +1246,10 @@ public interface J extends Serializable, Tree {
             return v.visitFieldAccess(this, p);
         }
 
-        @JsonIgnore
         public String getSimpleName() {
             return name.getElem().getSimpleName();
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return target.getSideEffects();
@@ -915,7 +1302,7 @@ public interface J extends Serializable, Tree {
             if (!className.contains(".")) {
                 return false;
             }
-            if (!fieldAccess.getName().getElem().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
+            if (!fieldAccess.getName().getSimpleName().equals(className.substring(className.lastIndexOf('.') + 1))) {
                 return false;
             }
             if (fieldAccess.getTarget() instanceof J.FieldAccess) {
@@ -926,107 +1313,318 @@ public interface J extends Serializable, Tree {
             }
             return false;
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final FieldAccess t;
+
+            public JLeftPadded<Ident> getName() {
+                return t.name;
+            }
+
+            public FieldAccess withName(JLeftPadded<Ident> name) {
+                return t.name == name ? t : new FieldAccess(t.id, t.prefix, t.markers, t.target, name, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ForEachLoop implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Control control;
 
-        @With
         JRightPadded<Statement> body;
+
+        public Statement getBody() {
+            return body.getElem();
+        }
+
+        public ForEachLoop withBody(Statement body) {
+            return getPadding().withBody(this.body.withElem(body));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForEachLoop(this, p);
         }
 
+        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @RequiredArgsConstructor
+        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Control implements J {
+            @Nullable
+            @NonFinal
+            transient Padding padding;
+
             @EqualsAndHashCode.Include
+            @Getter
             UUID id;
 
             @With
+            @Getter
             Space prefix;
 
             @With
+            @Getter
             Markers markers;
 
-            @With
             JRightPadded<VariableDecls> variable;
 
-            @With
+            public VariableDecls getVariable() {
+                return variable.getElem();
+            }
+
+            public Control withVariable(VariableDecls variable) {
+                return getPadding().withVariable(this.variable.withElem(variable));
+            }
+
             JRightPadded<Expression> iterable;
+
+            public Expression getIterable() {
+                return iterable.getElem();
+            }
+
+            public Control withIterable(Expression iterable) {
+                return getPadding().withIterable(this.iterable.withElem(iterable));
+            }
 
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitForEachControl(this, p);
             }
+
+            public Padding getPadding() {
+                if (padding == null || padding.t != this) {
+                    this.padding = new Padding(this);
+                }
+                return padding;
+            }
+
+            @RequiredArgsConstructor
+            public static class Padding {
+                private final Control t;
+
+                public JRightPadded<VariableDecls> getVariable() {
+                    return t.variable;
+                }
+
+                public Control withVariable(JRightPadded<VariableDecls> variable) {
+                    return t.variable == variable ? t : new Control(t.id, t.prefix, t.markers, variable, t.iterable);
+                }
+
+                public JRightPadded<Expression> getIterable() {
+                    return t.iterable;
+                }
+
+                public Control withIterable(JRightPadded<Expression> iterable) {
+                    return t.iterable == iterable ? t : new Control(t.id, t.prefix, t.markers, t.variable, iterable);
+                }
+            }
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ForEachLoop t;
+
+            public JRightPadded<Statement> getBody() {
+                return t.body;
+            }
+
+            public ForEachLoop withBody(JRightPadded<Statement> body) {
+                return t.body == body ? t : new ForEachLoop(t.id, t.prefix, t.markers, t.control, body);
+            }
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ForLoop implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Control control;
 
-        @With
         JRightPadded<Statement> body;
+
+        public Statement getBody() {
+            return body.getElem();
+        }
+
+        public ForLoop withBody(Statement body) {
+            return getPadding().withBody(this.body.withElem(body));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitForLoop(this, p);
         }
 
+        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @RequiredArgsConstructor
+        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Control implements J {
+            @Nullable
+            @NonFinal
+            transient Padding padding;
+
             @EqualsAndHashCode.Include
+            @Getter
             UUID id;
 
             @With
+            @Getter
             Space prefix;
 
             @With
+            @Getter
             Markers markers;
 
-            @With
             JRightPadded<Statement> init;
 
-            @With
+            public Statement getInit() {
+                return init.getElem();
+            }
+
+            public Control withInit(Statement init) {
+                return getPadding().withInit(this.init.withElem(init));
+            }
+
             JRightPadded<Expression> condition;
 
-            @With
+            public Expression getCondition() {
+                return condition.getElem();
+            }
+
+            public Control withCondition(Expression condition) {
+                return getPadding().withCondition(this.condition.withElem(condition));
+            }
+
             List<JRightPadded<Statement>> update;
+
+            public List<Statement> getUpdate() {
+                return JRightPadded.getElems(update);
+            }
+
+            public Control withUpdate(List<Statement> update) {
+                return getPadding().withUpdate(JRightPadded.withElems(this.update, update));
+            }
 
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitForControl(this, p);
+            }
+
+            public Padding getPadding() {
+                if (padding == null || padding.t != this) {
+                    this.padding = new Padding(this);
+                }
+                return padding;
+            }
+
+            @RequiredArgsConstructor
+            public static class Padding {
+                private final Control t;
+
+                public JRightPadded<Statement> getInit() {
+                    return t.init;
+                }
+
+                public ForLoop.Control withInit(JRightPadded<Statement> init) {
+                    return t.init == init ? t : new ForLoop.Control(t.id, t.prefix, t.markers, init, t.condition, t.update);
+                }
+
+                public JRightPadded<Expression> getCondition() {
+                    return t.condition;
+                }
+
+                public ForLoop.Control withCondition(JRightPadded<Expression> condition) {
+                    return t.condition == condition ? t : new ForLoop.Control(t.id, t.prefix, t.markers, t.init, condition, t.update);
+                }
+
+                public List<JRightPadded<Statement>> getUpdate() {
+                    return t.update;
+                }
+
+                public ForLoop.Control withUpdate(List<JRightPadded<Statement>> update) {
+                    return t.update == update ? t : new ForLoop.Control(t.id, t.prefix, t.markers, t.init, t.condition, update);
+                }
+            }
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ForLoop t;
+
+            public JRightPadded<Statement> getBody() {
+                return t.body;
+            }
+
+            public ForLoop withBody(JRightPadded<Statement> body) {
+                return t.body == body ? t : new ForLoop(t.id, t.prefix, t.markers, t.control, body);
             }
         }
     }
@@ -1067,7 +1665,6 @@ public interface J extends Serializable, Tree {
             return build(id, prefix, markers, getSimpleName(), type);
         }
 
-        @JsonIgnore
         public String getSimpleName() {
             return ident.getSimpleName();
         }
@@ -1101,11 +1698,11 @@ public interface J extends Serializable, Tree {
         }
 
         @JsonCreator
-        public static Ident build(@JsonProperty("id") UUID id,
-                                  @JsonProperty("prefix") Space prefix,
-                                  @JsonProperty("metadata") Markers markers,
-                                  @JsonProperty("simpleName") String simpleName,
-                                  @JsonProperty("type") @Nullable JavaType type) {
+        public static Ident build(UUID id,
+                                  Space prefix,
+                                  Markers markers,
+                                  String simpleName,
+                                  @Nullable JavaType type) {
             synchronized (flyweights) {
                 return new Ident(
                         id,
@@ -1135,27 +1732,45 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class If implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         ControlParentheses<Expression> ifCondition;
 
-        @With
         JRightPadded<Statement> thenPart;
+
+        public Statement getThenPart() {
+            return thenPart.getElem();
+        }
+
+        public If withThenPart(Statement thenPart) {
+            return getPadding().withThenPart(this.thenPart.withElem(thenPart));
+        }
 
         @With
         @Nullable
+        @Getter
         Else elsePart;
 
         @Override
@@ -1163,33 +1778,94 @@ public interface J extends Serializable, Tree {
             return v.visitIf(this, p);
         }
 
+        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @RequiredArgsConstructor
+        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Else implements J {
+            @Nullable
+            @NonFinal
+            transient Padding padding;
+
             @EqualsAndHashCode.Include
+            @Getter
             UUID id;
 
             @With
+            @Getter
             Space prefix;
 
             @With
+            @Getter
             Markers markers;
 
-            @With
             JRightPadded<Statement> body;
+
+            public Statement getBody() {
+                return body.getElem();
+            }
+
+            public Else withBody(Statement body) {
+                return getPadding().withBody(this.body.withElem(body));
+            }
 
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitElse(this, p);
+            }
+
+            public Padding getPadding() {
+                if (padding == null || padding.t != this) {
+                    this.padding = new Padding(this);
+                }
+                return padding;
+            }
+
+            @RequiredArgsConstructor
+            public static class Padding {
+                private final Else t;
+
+                public JRightPadded<Statement> getBody() {
+                    return t.body;
+                }
+
+                public Else withBody(JRightPadded<Statement> body) {
+                    return t.body == body ? t : new Else(t.id, t.prefix, t.markers, body);
+                }
+            }
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final If t;
+
+            public JRightPadded<Statement> getThenPart() {
+                return t.thenPart;
+            }
+
+            public If withThenPart(JRightPadded<Statement> thenPart) {
+                return t.thenPart == thenPart ? t : new If(t.id, t.prefix, t.markers, t.ifCondition, thenPart, t.elsePart);
             }
         }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Import implements J, Comparable<Import> {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1209,14 +1885,12 @@ public interface J extends Serializable, Tree {
         @Getter
         FieldAccess qualid;
 
-        @JsonIgnore
         public boolean isStatic() {
             return statik.getElem();
         }
 
-        @JsonProperty("statik")
-        public JLeftPadded<Boolean> getStatic() {
-            return statik;
+        public Import withStatic(boolean statik) {
+            return getPadding().withStatic(this.statik.withElem(statik));
         }
 
         @Override
@@ -1224,7 +1898,6 @@ public interface J extends Serializable, Tree {
             return v.visitImport(this, p);
         }
 
-        @JsonIgnore
         public boolean isFromType(String clazz) {
             if ("*".equals(qualid.getSimpleName())) {
                 return qualid.target.printTrimmed().equals(Arrays.stream(clazz.split("\\."))
@@ -1246,7 +1919,7 @@ public interface J extends Serializable, Tree {
          * import static org.foo.A.bar; -> "org.foo"
          * import org.foo.*;            -> "org.foo"
          */
-        @JsonIgnore
+
         public String getPackageName() {
             JavaType.Class importType = TypeUtils.asClass(qualid.getType());
             if (importType != null) {
@@ -1290,62 +1963,157 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "Import(" + ImportToString.toString(this) + ")";
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Import t;
+
+            public JLeftPadded<Boolean> getStatic() {
+                return t.statik;
+            }
+
+            public Import withStatic(JLeftPadded<Boolean> statik) {
+                return t.statik == statik ? t : new Import(t.id, t.prefix, t.markers, statik, t.qualid);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class InstanceOf implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JRightPadded<Expression> expr;
 
+        public Expression getExpr() {
+            return expr.getElem();
+        }
+
+        public InstanceOf withExpr(Expression expr) {
+            return getPadding().withExpr(this.expr.withElem(expr));
+        }
+
         @With
+        @Getter
         J clazz;
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitInstanceOf(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final InstanceOf t;
+
+            public JRightPadded<Expression> getExpr() {
+                return t.expr;
+            }
+
+            public InstanceOf withExpr(JRightPadded<Expression> expr) {
+                return t.expr == expr ? t : new InstanceOf(t.id, t.prefix, t.markers, expr, t.clazz, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Label implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         /**
          * Right padded before the ':'
          */
-        @With
         JRightPadded<Ident> label;
 
+        public Ident getLabel() {
+            return label.getElem();
+        }
+
+        public Label withLabel(Ident label) {
+            return getPadding().withLabel(this.label.withElem(label));
+        }
+
         @With
+        @Getter
         Statement statement;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLabel(this, p);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Label t;
+
+            public JRightPadded<Ident> getLabel() {
+                return t.label;
+            }
+
+            public Label withLabel(JRightPadded<Ident> label) {
+                return t.label == label ? t : new Label(t.id, t.prefix, t.markers, label, t.statement);
+            }
         }
     }
 
@@ -1380,24 +2148,61 @@ public interface J extends Serializable, Tree {
             return v.visitLambda(this, p);
         }
 
+        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @RequiredArgsConstructor
+        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class Parameters implements J {
+            @Nullable
+            @NonFinal
+            transient Padding padding;
+
             @EqualsAndHashCode.Include
+            @Getter
             UUID id;
 
             @With
+            @Getter
             Space prefix;
 
             @With
+            @Getter
             Markers markers;
 
             @With
+            @Getter
             boolean parenthesized;
 
-            @With
             List<JRightPadded<J>> params;
+
+            public List<J> getParams() {
+                return JRightPadded.getElems(params);
+            }
+
+            public Parameters withParams(List<J> params) {
+                return getPadding().withParams(JRightPadded.withElems(this.params, params));
+            }
+
+            public Padding getPadding() {
+                if (padding == null || padding.t != this) {
+                    this.padding = new Padding(this);
+                }
+                return padding;
+            }
+
+            @RequiredArgsConstructor
+            public static class Padding {
+                private final Parameters t;
+
+                public List<JRightPadded<J>> getParams() {
+                    return t.params;
+                }
+
+                public Parameters withParams(List<JRightPadded<J>> params) {
+                    return t.params == params ? t : new Parameters(t.id, t.prefix, t.markers, t.parenthesized, params);
+                }
+            }
         }
     }
 
@@ -1462,45 +2267,105 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MemberReference implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression containing;
 
-        @With
         @Nullable
         JContainer<Expression> typeParameters;
 
-        @With
+        @Nullable
+        public List<Expression> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElems();
+        }
+
+        public MemberReference withTypeParameters(@Nullable List<Expression> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+        }
+
         JLeftPadded<Ident> reference;
+
+        public Ident getReference() {
+            return reference.getElem();
+        }
+
+        public MemberReference withReference(Ident reference) {
+            return getPadding().withReference(this.reference.withElem(reference));
+        }
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMemberReference(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MemberReference t;
+
+            @Nullable
+            public JContainer<Expression> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public MemberReference withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, typeParameters, t.reference, t.type);
+            }
+
+            public JLeftPadded<Ident> getReference() {
+                return t.reference;
+            }
+
+            public MemberReference withReference(JLeftPadded<Ident> reference) {
+                return t.reference == reference ? t : new MemberReference(t.id, t.prefix, t.markers, t.containing, t.typeParameters, reference, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MethodDecl implements J, Statement {
-        @Getter
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
@@ -1519,10 +2384,17 @@ public interface J extends Serializable, Tree {
         @Getter
         List<Modifier> modifiers;
 
-        @With
-        @Getter
         @Nullable
         JContainer<TypeParameter> typeParameters;
+
+        @Nullable
+        public List<TypeParameter> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElems();
+        }
+
+        public MethodDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+        }
 
         /**
          * Null for constructor declarations.
@@ -1536,25 +2408,26 @@ public interface J extends Serializable, Tree {
         @Getter
         Ident name;
 
-        @With
-        @Getter
         JContainer<Statement> params;
+
+        public List<Statement> getParams() {
+            return params.getElems();
+        }
+
+        public MethodDecl withParams(List<Statement> params) {
+            return getPadding().withParams(JContainer.withElems(this.params, params));
+        }
 
         @Nullable
         JContainer<NameTree> throwz;
 
-        public MethodDecl withThrows(@Nullable JContainer<NameTree> throwz) {
-            if (throwz == this.throwz) {
-                return this;
-            }
-            return new MethodDecl(id, prefix, markers, annotations, modifiers, typeParameters, returnTypeExpr,
-                    name, params, throwz, body, defaultValue, type);
+        @Nullable
+        public List<NameTree> getThrows() {
+            return throwz == null ? null : throwz.getElems();
         }
 
-        @JsonProperty("throwz")
-        @Nullable
-        public JContainer<NameTree> getThrows() {
-            return throwz;
+        public MethodDecl withThrows(@Nullable List<NameTree> throwz) {
+            return getPadding().withThrows(JContainer.withElems(this.throwz, throwz));
         }
 
         /**
@@ -1568,10 +2441,17 @@ public interface J extends Serializable, Tree {
         /**
          * For default values on definitions of annotation parameters.
          */
-        @With
-        @Getter
         @Nullable
         JLeftPadded<Expression> defaultValue;
+
+        @Nullable
+        public Expression getDefaultValue() {
+            return defaultValue == null ? null : defaultValue.getElem();
+        }
+
+        public MethodDecl withDefaultValue(@Nullable Expression defaultValue) {
+            return getPadding().withDefaultValue(JLeftPadded.withElem(this.defaultValue, defaultValue));
+        }
 
         @With
         @Getter
@@ -1583,17 +2463,14 @@ public interface J extends Serializable, Tree {
             return v.visitMethod(this, p);
         }
 
-        @JsonIgnore
         public boolean isAbstract() {
             return body == null;
         }
 
-        @JsonIgnore
         public boolean isConstructor() {
             return getReturnTypeExpr() == null;
         }
 
-        @JsonIgnore
         public String getSimpleName() {
             return name.getSimpleName();
         }
@@ -1612,39 +2489,114 @@ public interface J extends Serializable, Tree {
             return new MethodDeclCoordinates(this);
         }
 
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MethodDecl t;
+
+            @Nullable
+            public JContainer<TypeParameter> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public MethodDecl withTypeParameters(@Nullable JContainer<TypeParameter> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, typeParameters, t.returnTypeExpr, t.name, t.params, t.throwz, t.body, t.defaultValue, t.type);
+            }
+
+            public JContainer<Statement> getParams() {
+                return t.params;
+            }
+
+            public MethodDecl withParams(JContainer<Statement> params) {
+                return t.params == params ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, params, t.throwz, t.body, t.defaultValue, t.type);
+            }
+
+            @Nullable
+            public JContainer<NameTree> getThrows() {
+                return t.throwz;
+            }
+
+            public MethodDecl withThrows(@Nullable JContainer<NameTree> throwz) {
+                return t.throwz == throwz ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, t.params, throwz, t.body, t.defaultValue, t.type);
+            }
+
+            @Nullable
+            public JLeftPadded<Expression> getDefaultValue() {
+                return t.defaultValue;
+            }
+
+            public MethodDecl withDefaultValue(@Nullable JLeftPadded<Expression> defaultValue) {
+                return t.defaultValue == defaultValue ? t : new MethodDecl(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeParameters, t.returnTypeExpr, t.name, t.params, t.throwz, t.body, defaultValue, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MethodInvocation implements J, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         /**
          * Right padded before the '.'
          */
-        @With
         @Nullable
         JRightPadded<Expression> select;
 
-        @With
+        @Nullable
+        public Expression getSelect() {
+            return select == null ? null : select.getElem();
+        }
+
+        public MethodInvocation withSelect(@Nullable Expression select) {
+            return getPadding().withSelect(JRightPadded.withElem(this.select, select));
+        }
+
         @Nullable
         JContainer<Expression> typeParameters;
 
+        @Nullable
+        public List<Expression> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElems();
+        }
+
         @With
+        @Getter
         Ident name;
 
-        @With
         JContainer<Expression> args;
 
+        public List<Expression> getArgs() {
+            return args.getElems();
+        }
+
+        public MethodInvocation withArgs(List<Expression> args) {
+            return getPadding().withArgs(JContainer.withElems(this.args, args));
+        }
+
         @Nullable
+        @Getter
         JavaType.Method type;
 
         @SuppressWarnings("unchecked")
@@ -1672,19 +2624,16 @@ public interface J extends Serializable, Tree {
             return v.visitMethodInvocation(this, p);
         }
 
-        @JsonIgnore
         @Nullable
         public JavaType getReturnType() {
             return type == null ? null : type.getResolvedSignature() == null ? null :
                     type.getResolvedSignature().getReturnType();
         }
 
-        @JsonIgnore
         public String getSimpleName() {
             return name.getSimpleName();
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
@@ -1693,6 +2642,44 @@ public interface J extends Serializable, Tree {
         @Override
         public String toString() {
             return "MethodInvocation(" + MethodInvocationToString.toString(this) + ")";
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MethodInvocation t;
+
+            @Nullable
+            public JRightPadded<Expression> getSelect() {
+                return t.select;
+            }
+
+            public MethodInvocation withSelect(@Nullable JRightPadded<Expression> select) {
+                return t.select == select ? t : new MethodInvocation(t.id, t.prefix, t.markers, select, t.typeParameters, t.name, t.args, t.type);
+            }
+
+            @Nullable
+            public JContainer<Expression> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public MethodInvocation withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, typeParameters, t.name, t.args, t.type);
+            }
+
+            public JContainer<Expression> getArgs() {
+                return t.args;
+            }
+
+            public MethodInvocation withArgs(JContainer<Expression> args) {
+                return t.args == args ? t : new MethodInvocation(t.id, t.prefix, t.markers, t.select, t.typeParameters, t.name, args, t.type);
+            }
         }
     }
 
@@ -1733,21 +2720,37 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class MultiCatch implements J, TypeTree {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         List<JRightPadded<NameTree>> alternatives;
+
+        public List<NameTree> getAlternatives() {
+            return JRightPadded.getElems(alternatives);
+        }
+
+        public MultiCatch withAlternatives(List<NameTree> alternatives) {
+            return getPadding().withAlternatives(JRightPadded.withElems(this.alternatives, alternatives));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -1761,7 +2764,6 @@ public interface J extends Serializable, Tree {
             return this;
         }
 
-        @JsonIgnore
         @Override
         public JavaType getType() {
             return new JavaType.MultiCatch(alternatives.stream()
@@ -1769,68 +2771,167 @@ public interface J extends Serializable, Tree {
                     .map(alt -> alt.getElem().getType())
                     .collect(toList()));
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final MultiCatch t;
+
+            public List<JRightPadded<NameTree>> getAlternatives() {
+                return t.alternatives;
+            }
+
+            public MultiCatch withAlternatives(List<JRightPadded<NameTree>> alternatives) {
+                return t.alternatives == alternatives ? t : new MultiCatch(t.id, t.prefix, t.markers, alternatives);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class NewArray implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
         @Nullable
+        @Getter
         TypeTree typeExpr;
 
         @With
+        @Getter
         List<ArrayDimension> dimensions;
 
-        @With
         @Nullable
         JContainer<Expression> initializer;
 
+        @Nullable
+        public List<Expression> getInitializer() {
+            return initializer == null ? null : initializer.getElems();
+        }
+
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final NewArray t;
+
+            @Nullable
+            public JContainer<Expression> getInitializer() {
+                return t.initializer;
+            }
+
+            public NewArray withInitializer(@Nullable JContainer<Expression> initializer) {
+                return t.initializer == initializer ? t : new NewArray(t.id, t.prefix, t.markers, t.typeExpr, t.dimensions, initializer, t.type);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ArrayDimension implements J {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JRightPadded<Expression> index;
+
+        public Expression getIndex() {
+            return index.getElem();
+        }
+
+        public ArrayDimension withIndex(Expression index) {
+            return getPadding().withIndex(this.index.withElem(index));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitArrayDimension(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ArrayDimension t;
+
+            public JRightPadded<Expression> getIndex() {
+                return t.index;
+            }
+
+            public ArrayDimension withIndex(JRightPadded<Expression> index) {
+                return t.index == index ? t : new ArrayDimension(t.id, t.prefix, t.markers, index);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class NewClass implements J, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -1848,11 +2949,22 @@ public interface J extends Serializable, Tree {
          * Right padded before the '.'
          */
         @Nullable
-        @With
-        @Getter
         JRightPadded<Expression> encl;
 
+        @Nullable
+        public Expression getEncl() {
+            return encl == null ? null : encl.getElem();
+        }
+
+        public NewClass withEncl(Expression encl) {
+            return getPadding().withEncl(JRightPadded.withElem(this.encl, encl));
+        }
+
         Space nooh;
+
+        public Space getNew() {
+            return nooh;
+        }
 
         public NewClass withNew(Space nooh) {
             if (nooh == this.nooh) {
@@ -1861,20 +2973,22 @@ public interface J extends Serializable, Tree {
             return new NewClass(id, prefix, markers, encl, nooh, clazz, args, body, type);
         }
 
-        @JsonProperty("nooh")
-        public Space getNew() {
-            return nooh;
-        }
-
         @Nullable
         @With
         @Getter
         TypeTree clazz;
 
         @Nullable
-        @With
-        @Getter
         JContainer<Expression> args;
+
+        @Nullable
+        public JContainer<Expression> getArgs() {
+            return args;
+        }
+
+        public NewClass withArgs(@Nullable List<Expression> args) {
+            return getPadding().withArgs(JContainer.withElems(this.args, args));
+        }
 
         @With
         @Nullable
@@ -1891,10 +3005,39 @@ public interface J extends Serializable, Tree {
             return v.visitNewClass(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final NewClass t;
+
+            @Nullable
+            public JRightPadded<Expression> getEncl() {
+                return t.encl;
+            }
+
+            public NewClass withEncl(@Nullable JRightPadded<Expression> encl) {
+                return t.encl == encl ? t : new NewClass(t.id, t.prefix, t.markers, encl, t.nooh, t.clazz, t.args, t.body, t.type);
+            }
+
+            @Nullable
+            public JContainer<Expression> getArgs() {
+                return t.args;
+            }
+
+            public NewClass withArgs(@Nullable JContainer<Expression> args) {
+                return t.args == args ? t : new NewClass(t.id, t.prefix, t.markers, t.encl, t.nooh, t.clazz, args, t.body, t.type);
+            }
         }
     }
 
@@ -1920,25 +3063,43 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ParameterizedType implements J, TypeTree, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         NameTree clazz;
 
-        @With
         @Nullable
         JContainer<Expression> typeParameters;
+
+        @Nullable
+        public List<Expression> getTypeParameters() {
+            return typeParameters == null ? null : typeParameters.getElems();
+        }
+
+        public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
+            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+        }
 
         @Override
         public JavaType getType() {
@@ -1958,30 +3119,66 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParameterizedType(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final ParameterizedType t;
+
+            @Nullable
+            public JContainer<Expression> getTypeParameters() {
+                return t.typeParameters;
+            }
+
+            public ParameterizedType withTypeParameters(@Nullable JContainer<Expression> typeParameters) {
+                return t.typeParameters == typeParameters ? t : new ParameterizedType(t.id, t.prefix, t.markers, t.clazz, typeParameters);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     class Parentheses<J2 extends J> implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding<J2> padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JRightPadded<J2> tree;
+
+        public J2 getTree() {
+            return tree.getElem();
+        }
+
+        public Parentheses<J2> withTree(J2 tree) {
+            return getPadding().withTree(this.tree.withElem(tree));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParentheses(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
@@ -2001,30 +3198,65 @@ public interface J extends Serializable, Tree {
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
         }
+
+        public Padding<J2> getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding<>(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding<J2 extends J> {
+            private final Parentheses<J2> t;
+
+            public JRightPadded<J2> getTree() {
+                return t.tree;
+            }
+
+            public Parentheses<J2> withTree(JRightPadded<J2> tree) {
+                return t.tree == tree ? t : new Parentheses<>(t.id, t.prefix, t.markers, tree);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class ControlParentheses<J2 extends J> implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding<J2> padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JRightPadded<J2> tree;
+
+        public J2 getTree() {
+            return tree.getElem();
+        }
+
+        public ControlParentheses<J2> withTree(J2 tree) {
+            return getPadding().withTree(this.tree.withElem(tree));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitControlParentheses(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return tree instanceof Expression ? ((Expression) tree).getSideEffects() : emptyList();
@@ -2043,6 +3275,26 @@ public interface J extends Serializable, Tree {
             return tree instanceof Expression ? ((Expression) tree).withType(type) :
                     tree instanceof NameTree ? ((NameTree) tree).withType(type) :
                             this;
+        }
+
+        public Padding<J2> getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding<>(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding<J2 extends J> {
+            private final ControlParentheses<J2> t;
+
+            public JRightPadded<J2> getTree() {
+                return t.tree;
+            }
+
+            public ControlParentheses<J2> withTree(JRightPadded<J2> tree) {
+                return t.tree == tree ? t : new ControlParentheses<>(t.id, t.prefix, t.markers, tree);
+            }
         }
     }
 
@@ -2161,35 +3413,88 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Ternary implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         Expression condition;
 
-        @With
         JLeftPadded<Expression> truePart;
 
-        @With
+        public Expression getTruePart() {
+            return truePart.getElem();
+        }
+
+        public Ternary withTruePart(Expression truePart) {
+            return getPadding().withTruePart(this.truePart.withElem(truePart));
+        }
+
         JLeftPadded<Expression> falsePart;
+
+        public Expression getFalsePart() {
+            return falsePart.getElem();
+        }
+
+        public Ternary withFalsePart(Expression falsePart) {
+            return getPadding().withFalsePart(this.falsePart.withElem(falsePart));
+        }
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTernary(this, p);
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Ternary t;
+
+            public JLeftPadded<Expression> getTruePart() {
+                return t.truePart;
+            }
+
+            public Ternary withTruePart(JLeftPadded<Expression> truePart) {
+                return t.truePart == truePart ? t : new Ternary(t.id, t.prefix, t.markers, t.condition, truePart, t.falsePart, t.type);
+            }
+
+            public JLeftPadded<Expression> getFalsePart() {
+                return t.falsePart;
+            }
+
+            public Ternary withFalsePart(JLeftPadded<Expression> falsePart) {
+                return t.falsePart == falsePart ? t : new Ternary(t.id, t.prefix, t.markers, t.condition, t.truePart, falsePart, t.type);
+            }
         }
     }
 
@@ -2215,10 +3520,16 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @AllArgsConstructor
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Try implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @Getter
         @EqualsAndHashCode.Include
         UUID id;
@@ -2231,10 +3542,17 @@ public interface J extends Serializable, Tree {
         @Getter
         Markers markers;
 
-        @With
-        @Getter
         @Nullable
         JContainer<Resource> resources;
+
+        @Nullable
+        public List<Resource> getResources() {
+            return resources == null ? null : resources.getElems();
+        }
+
+        public Try withResources(List<Resource> resources) {
+            return getPadding().withResources(JContainer.withElems(this.resources, resources));
+        }
 
         @With
         @Getter
@@ -2247,17 +3565,13 @@ public interface J extends Serializable, Tree {
         @Nullable
         JLeftPadded<Block> finallie;
 
-        public Try withFinally(@Nullable JLeftPadded<Block> finallie) {
-            if (finallie == this.finallie) {
-                return this;
-            }
-            return new Try(id, prefix, markers, resources, body, catches, finallie);
+        @Nullable
+        public Block getFinally() {
+            return finallie == null ? null : finallie.getElem();
         }
 
-        @JsonProperty("finallie")
-        @Nullable
-        public JLeftPadded<Block> getFinally() {
-            return finallie;
+        public Try withFinally(Block finallie) {
+            return getPadding().withFinally(JLeftPadded.withElem(this.finallie, finallie));
         }
 
         @Override
@@ -2312,6 +3626,36 @@ public interface J extends Serializable, Tree {
                 return v.visitCatch(this, p);
             }
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Try t;
+
+            @Nullable
+            public JContainer<Resource> getResources() {
+                return t.resources;
+            }
+
+            public Try withResources(@Nullable JContainer<Resource> resources) {
+                return t.resources == resources ? t : new Try(t.id, t.prefix, t.markers, resources, t.body, t.catches, t.finallie);
+            }
+
+            @Nullable
+            public JLeftPadded<Block> getFinally() {
+                return t.finallie;
+            }
+
+            public Try withFinally(@Nullable JLeftPadded<Block> finallie) {
+                return t.finallie == finallie ? t : new Try(t.id, t.prefix, t.markers, t.resources, t.body, t.catches, finallie);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -2350,20 +3694,30 @@ public interface J extends Serializable, Tree {
         }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class TypeParameter implements J {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         List<Annotation> annotations;
 
         /**
@@ -2371,39 +3725,87 @@ public interface J extends Serializable, Tree {
          * every context where type parameters may be defined (e.g. not possible on new statements).
          */
         @With
+        @Getter
         Expression name;
 
-        @With
         @Nullable
         JContainer<TypeTree> bounds;
+
+        @Nullable
+        public List<TypeTree> getBounds() {
+            return bounds == null ? null : bounds.getElems();
+        }
+
+        public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
+            return getPadding().withBounds(JContainer.withElems(this.bounds, bounds));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeParameter(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final TypeParameter t;
+
+            @Nullable
+            public JContainer<TypeTree> getBounds() {
+                return t.bounds;
+            }
+
+            public TypeParameter withBounds(@Nullable JContainer<TypeTree> bounds) {
+                return t.bounds == bounds ? t : new TypeParameter(t.id, t.prefix, t.markers, t.annotations, t.name, bounds);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Unary implements J, Statement, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         JLeftPadded<Type> operator;
 
+        public Type getOperator() {
+            return operator.getElem();
+        }
+
+        public Unary withOperator(Type operator) {
+            return getPadding().withOperator(this.operator.withElem(operator));
+        }
+
         @With
+        @Getter
         Expression expr;
 
         @With
         @Nullable
+        @Getter
         JavaType type;
 
         @Override
@@ -2411,7 +3813,6 @@ public interface J extends Serializable, Tree {
             return v.visitUnary(this, p);
         }
 
-        @JsonIgnore
         @Override
         public List<Tree> getSideEffects() {
             return expr.getSideEffects();
@@ -2427,47 +3828,80 @@ public interface J extends Serializable, Tree {
             Complement,
             Not
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Unary t;
+
+            public JLeftPadded<Type> getOperator() {
+                return t.operator;
+            }
+
+            public Unary withOperator(JLeftPadded<Type> operator) {
+                return t.operator == operator ? t : new Unary(t.id, t.prefix, t.markers, operator, t.expr, t.type);
+            }
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class VariableDecls implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         List<Annotation> annotations;
 
+        @With
+        @Getter
         List<Modifier> modifiers;
-
-        public VariableDecls withModifiers(List<Modifier> modifiers) {
-            if (modifiers == this.modifiers) {
-                return this;
-            }
-            return new VariableDecls(id, prefix, markers, annotations, modifiers, typeExpr, varargs,
-                    dimensionsBeforeName, vars);
-        }
 
         @With
         @Nullable
+        @Getter
         TypeTree typeExpr;
 
         @With
         @Nullable
+        @Getter
         Space varargs;
 
         @With
+        @Getter
         List<JLeftPadded<Space>> dimensionsBeforeName;
 
-        @With
         List<JRightPadded<NamedVar>> vars;
+
+        public List<NamedVar> getVars() {
+            return JRightPadded.getElems(vars);
+        }
+
+        public VariableDecls withVars(List<NamedVar> vars) {
+            return getPadding().withVars(JRightPadded.withElems(this.vars, vars));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
@@ -2475,39 +3909,57 @@ public interface J extends Serializable, Tree {
         }
 
         @Nullable
-        @JsonIgnore
         public JavaType.Class getTypeAsClass() {
             return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
         }
 
+        @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-        @Data
+        @RequiredArgsConstructor
+        @AllArgsConstructor(access = AccessLevel.PRIVATE)
         public static final class NamedVar implements J, NameTree {
+            @Nullable
+            @NonFinal
+            transient Padding padding;
+
             @EqualsAndHashCode.Include
+            @Getter
             UUID id;
 
             @With
+            @Getter
             Space prefix;
 
             @With
+            @Getter
             Markers markers;
 
             @With
+            @Getter
             Ident name;
 
             @With
+            @Getter
             List<JLeftPadded<Space>> dimensionsAfterName;
 
-            @With
             @Nullable
             JLeftPadded<Expression> initializer;
 
+            @Nullable
+            public Expression getInitializer() {
+                return initializer == null ? null : initializer.getElem();
+            }
+
+            public NamedVar withInitializer(@Nullable Expression initializer) {
+                return getPadding().withInitializer(JLeftPadded.withElem(this.initializer, initializer));
+            }
+
             @With
             @Nullable
+            @Getter
             JavaType type;
 
-            @JsonIgnore
             public String getSimpleName() {
                 return name.getSimpleName();
             }
@@ -2517,7 +3969,6 @@ public interface J extends Serializable, Tree {
                 return v.visitVariable(this, p);
             }
 
-            @JsonIgnore
             public boolean isField(Cursor cursor) {
                 return cursor
                         .getParentOrThrow() // JRightPadded
@@ -2526,6 +3977,27 @@ public interface J extends Serializable, Tree {
                         .getParentOrThrow() // J.Block
                         .getParentOrThrow() // maybe J.ClassDecl
                         .getValue() instanceof J.ClassDecl;
+            }
+
+            public Padding getPadding() {
+                if (padding == null || padding.t != this) {
+                    this.padding = new Padding(this);
+                }
+                return padding;
+            }
+
+            @RequiredArgsConstructor
+            public static class Padding {
+                private final NamedVar t;
+
+                @Nullable
+                public JLeftPadded<Expression> getInitializer() {
+                    return t.initializer;
+                }
+
+                public NamedVar withInitializer(@Nullable JLeftPadded<Expression> initializer) {
+                    return t.initializer == initializer ? t : new NamedVar(t.id, t.prefix, t.markers, t.name, t.dimensionsAfterName, initializer, t.type);
+                }
             }
         }
 
@@ -2537,52 +4009,127 @@ public interface J extends Serializable, Tree {
         public String toString() {
             return "VariableDecls(" + VariableDeclsToString.toString(this) + ")";
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final VariableDecls t;
+
+            public List<JRightPadded<NamedVar>> getVars() {
+                return t.vars;
+            }
+
+            public VariableDecls withVars(List<JRightPadded<NamedVar>> vars) {
+                return t.vars == vars ? t : new VariableDecls(t.id, t.prefix, t.markers, t.annotations, t.modifiers, t.typeExpr, t.varargs, t.dimensionsBeforeName, vars);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class WhileLoop implements J, Statement {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
         @With
+        @Getter
         ControlParentheses<Expression> condition;
 
-        @With
         JRightPadded<Statement> body;
+
+        public Statement getBody() {
+            return body.getElem();
+        }
+
+        public WhileLoop withBody(Statement body) {
+            return getPadding().withBody(this.body.withElem(body));
+        }
 
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWhileLoop(this, p);
         }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final WhileLoop t;
+
+            public JRightPadded<Statement> getBody() {
+                return t.body;
+            }
+
+            public WhileLoop withBody(JRightPadded<Statement> body) {
+                return t.body == body ? t : new WhileLoop(t.id, t.prefix, t.markers, t.condition, body);
+            }
+        }
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
-    @Data
+    @RequiredArgsConstructor
+    @AllArgsConstructor(access = AccessLevel.PRIVATE)
     final class Wildcard implements J, Expression {
+        @Nullable
+        @NonFinal
+        transient Padding padding;
+
         @EqualsAndHashCode.Include
+        @Getter
         UUID id;
 
         @With
+        @Getter
         Space prefix;
 
         @With
+        @Getter
         Markers markers;
 
-        @With
         @Nullable
         JLeftPadded<Bound> bound;
 
+        @Nullable
+        public Bound getBound() {
+            return bound == null ? null : bound.getElem();
+        }
+
+        public Wildcard withBound(@Nullable Bound bound) {
+            return getPadding().withBound(JLeftPadded.withElem(this.bound, bound));
+        }
+
         @With
         @Nullable
+        @Getter
         NameTree boundedType;
 
         @Override
@@ -2604,6 +4151,27 @@ public interface J extends Serializable, Tree {
         public enum Bound {
             Extends,
             Super
+        }
+
+        public Padding getPadding() {
+            if (padding == null || padding.t != this) {
+                this.padding = new Padding(this);
+            }
+            return padding;
+        }
+
+        @RequiredArgsConstructor
+        public static class Padding {
+            private final Wildcard t;
+
+            @Nullable
+            public JLeftPadded<Bound> getBound() {
+                return t.bound;
+            }
+
+            public Wildcard withBound(@Nullable JLeftPadded<Bound> bound) {
+                return t.bound == bound ? t : new Wildcard(t.id, t.prefix, t.markers, bound, t.boundedType);
+            }
         }
     }
 }

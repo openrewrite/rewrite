@@ -27,7 +27,6 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.Data;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JLeftPadded;
 import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
@@ -345,9 +344,9 @@ public class ImportLayoutStyle implements JavaStyle {
                                     .anyMatch(it -> it.getElem().getQualid().getSimpleName().equals("*"));
                             if (importGroup.size() >= threshold || (starImportExists && importGroup.size() > 1)) {
                                 J.FieldAccess qualid = toStar.getElem().getQualid();
-                                JLeftPadded<J.Ident> name = qualid.getName();
+                                J.Ident name = qualid.getName();
                                 return Stream.of(toStar.withElem(toStar.getElem().withQualid(qualid.withName(
-                                        name.withElem(name.getElem().withName("*"))))));
+                                        name.withName("*")))));
                             } else {
                                 return importGroup.stream()
                                         .filter(distinctBy(t -> t.getElem().printTrimmed()));

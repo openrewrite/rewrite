@@ -56,7 +56,7 @@ import static org.openrewrite.java.tree.Space.format;
 
 /**
  * Maps the compiler internal AST to the the Rewrite {@link J} AST.
- *
+ * <p>
  * This visitor is not thread safe, as it maintains a {@link #cursor} and {@link #endPosTable}
  * for each compilation unit visited.
  */
@@ -330,7 +330,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
         Space paramPrefix = sourceBefore("(");
         J.VariableDecls paramDecl = convert(node.getParameter());
-        paramDecl = paramDecl.withVars(Space.formatLastSuffix(paramDecl.getVars(), sourceBefore(")")));
+        paramDecl = paramDecl.getPadding().withVars(Space.formatLastSuffix(paramDecl.getPadding().getVars(), sourceBefore(")")));
 
         J.ControlParentheses<J.VariableDecls> param = new J.ControlParentheses<>(randomId(), paramPrefix,
                 Markers.EMPTY, padRight(paramDecl, EMPTY));
@@ -1023,7 +1023,8 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 resourceVar = resourceVar.withPrefix(EMPTY); // moved to the containing Try.Resource
 
                 if (semicolonPresent) {
-                    resourceVar = resourceVar.withVars(Space.formatLastSuffix(resourceVar.getVars(), sourceBefore(";")));
+                    resourceVar = resourceVar.getPadding().withVars(Space.formatLastSuffix(resourceVar
+                            .getPadding().getVars(), sourceBefore(";")));
                 }
 
                 J.Try.Resource tryResource = new J.Try.Resource(randomId(), resourcePrefix, Markers.EMPTY,

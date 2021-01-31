@@ -13,6 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+/*
+ * CopyLeft 2020 the original author or authors.
+ * <p>
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * <p>
+ * https://www.apache.org/licenses/LICENSE-2.0
+ * <p>
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.openrewrite.java.tree;
 
 import lombok.AccessLevel;
@@ -20,10 +35,11 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.With;
 import lombok.experimental.FieldDefaults;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
-import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * A Java element that could have space preceding some delimiter.
@@ -46,7 +62,7 @@ public class JLeftPadded<T> implements Markable {
     @With
     Markers markers;
 
-    public JLeftPadded<T> map(Function<T, T> map) {
+    public JLeftPadded<T> map(UnaryOperator<T> map) {
         return withElem(map.apply(elem));
     }
 
@@ -66,7 +82,7 @@ public class JLeftPadded<T> implements Markable {
         UNARY_OPERATOR(Space.Location.UNARY_OPERATOR),
         VARIABLE_INITIALIZER(Space.Location.VARIABLE_INITIALIZER),
         WHILE_CONDITION(Space.Location.WHILE_CONDITION);
-        
+
         private final Space.Location beforeLocation;
 
         Location(Space.Location beforeLocation) {
@@ -76,5 +92,24 @@ public class JLeftPadded<T> implements Markable {
         public Space.Location getBeforeLocation() {
             return beforeLocation;
         }
+    }
+
+    @Nullable
+    public static <T> JLeftPadded<T> withElem(@Nullable JLeftPadded<T> before, @Nullable T elems) {
+        if (before == null) {
+            if (elems == null) {
+                return null;
+            }
+            return new JLeftPadded<>(Space.EMPTY, elems, Markers.EMPTY);
+        }
+        if (elems == null) {
+            return null;
+        }
+        return before.withElem(elems);
+    }
+
+    @Override
+    public String toString() {
+        return "JLeftPadded(before=" + before + ", elem=" + elem.getClass().getSimpleName() + ')';
     }
 }

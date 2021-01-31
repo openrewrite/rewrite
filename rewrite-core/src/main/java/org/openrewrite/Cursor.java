@@ -127,7 +127,9 @@ public class Cursor {
     public String toString() {
         return "Cursor{" +
                 stream(Spliterators.spliteratorUnknownSize(getPath(), 0), false)
-                        .map(t -> t.getClass().getSimpleName())
+                        .map(t -> t instanceof Tree ?
+                                t.getClass().getSimpleName() :
+                                t.toString())
                         .collect(Collectors.joining("->"))
                 + "}";
     }

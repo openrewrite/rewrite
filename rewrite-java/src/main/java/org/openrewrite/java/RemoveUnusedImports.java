@@ -55,10 +55,10 @@ public class RemoveUnusedImports extends Recipe {
             // At the end this list will contain only imports which are actually used
             final List<JRightPadded<J.Import>> importsWithUsage = new ArrayList<>();
 
-            for (JRightPadded<J.Import> anImport : cu.getImports()) {
+            for (JRightPadded<J.Import> anImport : cu.getPadding().getImports()) {
                 J.Import elem = anImport.getElem();
                 J.FieldAccess qualid = elem.getQualid();
-                JLeftPadded<J.Ident> name = qualid.getName();
+                J.Ident name = qualid.getName();
 
                 if (anImport.getElem().isStatic()) {
                     Set<String> methods = methodsByTypeName.get(anImport.getElem().getTypeName());
@@ -70,8 +70,7 @@ public class RemoveUnusedImports extends Recipe {
                     if ("*".equals(qualid.getSimpleName())) {
                         if (methods.size() < layoutStyle.getNameCountToUseStarImport()) {
                             methods.stream().sorted().forEach(method ->
-                                    importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withElem(name.getElem()
-                                            .withName(method))))))
+                                    importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withName(method)))))
                             );
                             changed = true;
                         } else {
@@ -89,8 +88,8 @@ public class RemoveUnusedImports extends Recipe {
                     if ("*".equals(anImport.getElem().getQualid().getSimpleName())) {
                         if (types.size() < layoutStyle.getClassCountToUseStarImport()) {
                             types.stream().map(JavaType.FullyQualified::getClassName).sorted().forEach(typeClassName ->
-                                    importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name.withElem(name.getElem()
-                                            .withName(typeClassName)))).withPrefix(Space.format("\n"))))
+                                    importsWithUsage.add(anImport.withElem(elem.withQualid(qualid.withName(name
+                                            .withName(typeClassName))).withPrefix(Space.format("\n"))))
                             );
                             changed = true;
                         } else {
@@ -101,7 +100,7 @@ public class RemoveUnusedImports extends Recipe {
                     }
                 }
             }
-            cu = changed ? cu.withImports(importsWithUsage) : cu;
+            cu = changed ? cu.getPadding().withImports(importsWithUsage) : cu;
             if (cu.getImports().isEmpty()) {
                 cu = cu.withClasses(
                         ListUtils.mapFirst(cu.getClasses(),
@@ -114,7 +113,7 @@ public class RemoveUnusedImports extends Recipe {
                 );
             } else {
                 if (cu.getPackageDecl() == null) {
-                    cu = cu.withImports(ListUtils.mapFirst(cu.getImports(), i -> i.withElem(i.getElem().withPrefix(Space.EMPTY))));
+                    cu = cu.getPadding().withImports(ListUtils.mapFirst(cu.getPadding().getImports(), i -> i.withElem(i.getElem().withPrefix(Space.EMPTY))));
                 }
             }
             return cu;

@@ -75,7 +75,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
             return cu;
         }
 
-        if (cu.getImports().stream().map(JRightPadded::getElem).anyMatch(i -> {
+        if (cu.getImports().stream().anyMatch(i -> {
             String ending = i.getQualid().getSimpleName();
             if (statik == null) {
                 return !i.isStatic() && i.getPackageName().equals(classType.getPackageName()) &&
@@ -97,7 +97,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
                 TypeTree.build(classType.getFullyQualifiedName() +
                         (statik == null ? "" : "." + statik)).withPrefix(Space.format(" ")));
 
-        List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getImports());
+        List<JRightPadded<J.Import>> imports = new ArrayList<>(cu.getPadding().getImports());
 
         if (imports.isEmpty()) {
             importToAdd = cu.getPackageDecl() == null ?
@@ -118,7 +118,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
         }
 
         imports.add(new JRightPadded<>(importToAdd, Space.EMPTY, Markers.EMPTY));
-        cu = cu.withImports(imports);
+        cu = cu.getPadding().withImports(imports);
 
         OrderImports orderImports = new OrderImports(false);
         doAfterVisit(orderImports);

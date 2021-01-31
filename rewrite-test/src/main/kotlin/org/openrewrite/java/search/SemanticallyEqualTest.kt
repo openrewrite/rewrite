@@ -148,7 +148,7 @@ interface SemanticallyEqualTest {
                 "class SlowTest {}"
         )
 
-        val firstFieldAccess = cu[0].classes[0].annotations[0].args?.elem?.first()?.elem
+        val firstFieldAccess = cu[0].classes[0].annotations[0].args!!.first()
         val secondFieldAccess = J.FieldAccess(
                 randomId(),
                 Space.EMPTY,
@@ -173,7 +173,7 @@ interface SemanticallyEqualTest {
                 ),
                 JavaType.Class.build("java.lang.Class")
         )
-        val thirdFieldAccess = cu[0].classes[0].annotations[1].args?.elem?.first()?.elem
+        val thirdFieldAccess = cu[0].classes[0].annotations[1].args!!.first()
 
         assertThat(
                 SemanticallyEqual
@@ -202,7 +202,7 @@ interface SemanticallyEqualTest {
                 "@interface MyAnnotation { boolean value(); }"
         )
 
-        val firstAssign = cu[0].classes[0].annotations[0].args?.elem?.first()?.elem
+        val firstAssign = cu[0].classes[0].annotations[0].args!!.first()
         val secondAssign = J.Assign(
                 randomId(),
                 Space.EMPTY,
@@ -232,9 +232,7 @@ interface SemanticallyEqualTest {
                 (secondAssign.variable as J.Ident).withName("otherValue")
         )
         val fourthAssign = secondAssign.withAssignment(
-                secondAssign.assignment.withElem(
-                        (secondAssign.assignment.elem as J.Literal).withValue(false)
-                )
+                (secondAssign.assignment as J.Literal).withValue(false)
         )
 
         assertThat(
@@ -274,9 +272,9 @@ interface SemanticallyEqualTest {
             """
         )
 
-        val intLiteral = (cu[0].classes[0].body.statements[0].elem as J.VariableDecls).vars[0].elem.initializer.elem
-        val strLiteral = (cu[0].classes[0].body.statements[1].elem as J.VariableDecls).vars[0].elem.initializer.elem
-        val nullLiteral = (cu[0].classes[0].body.statements[2].elem as J.VariableDecls).vars[0].elem.initializer.elem
+        val intLiteral = (cu[0].classes[0].body.statements[0] as J.VariableDecls).vars[0].initializer
+        val strLiteral = (cu[0].classes[0].body.statements[1] as J.VariableDecls).vars[0].initializer
+        val nullLiteral = (cu[0].classes[0].body.statements[2] as J.VariableDecls).vars[0].initializer
 
         assertThat(
                 SemanticallyEqual

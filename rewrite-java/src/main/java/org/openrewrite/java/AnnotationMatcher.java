@@ -78,11 +78,11 @@ public class AnnotationMatcher {
                 .map(pair -> new AnnotationParameter(pair.Identifier().getText(), pair.elementValue().getText()))
                 .collect(toList());
 
-        return annotation.getArgs() != null && annotation.getArgs().getElem().stream()
+        return annotation.getArgs() != null && annotation.getArgs().stream()
                 .map(arg -> {
-                    J.Assign assign = (J.Assign) arg.getElem();
+                    J.Assign assign = (J.Assign) arg;
                     return new AnnotationParameter(assign.getVariable().printTrimmed(),
-                            assign.getAssignment().getElem().printTrimmed());
+                            assign.getAssignment().printTrimmed());
                 })
                 .allMatch(param -> matchArgs.stream().anyMatch(param::equals));
     }
@@ -92,12 +92,11 @@ public class AnnotationMatcher {
             return true;
         }
 
-        return annotation.getArgs() == null || annotation.getArgs().getElem().stream()
+        return annotation.getArgs() == null || annotation.getArgs().stream()
                 .findAny()
-                .map(JRightPadded::getElem)
                 .map(arg -> {
                     if (arg instanceof J.Assign) {
-                        return ((J.Assign) arg).getAssignment().getElem().printTrimmed().equals(match.elementValue().getText());
+                        return ((J.Assign) arg).getAssignment().printTrimmed().equals(match.elementValue().getText());
                     }
                     if (arg instanceof J.Literal) {
                         return ((J.Literal) arg).getValueSource().equals(match.elementValue().getText());

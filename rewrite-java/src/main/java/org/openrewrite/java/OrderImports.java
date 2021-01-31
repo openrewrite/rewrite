@@ -57,14 +57,14 @@ public class OrderImports extends Recipe {
             ImportLayoutStyle layoutStyle = Optional.ofNullable(cu.getStyle(ImportLayoutStyle.class))
                     .orElse(IntelliJ.importLayout());
 
-            List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getImports());
+            List<JRightPadded<J.Import>> orderedImports = layoutStyle.orderImports(cu.getPadding().getImports());
 
             if (orderedImports.size() != cu.getImports().size()) {
-                cu = cu.withImports(orderedImports);
+                cu = cu.getPadding().withImports(orderedImports);
             } else {
                 for (int i = 0; i < orderedImports.size(); i++) {
-                    if (orderedImports.get(i) != cu.getImports().get(i)) {
-                        cu = cu.withImports(orderedImports);
+                    if (orderedImports.get(i) != cu.getPadding().getImports().get(i)) {
+                        cu = cu.getPadding().withImports(orderedImports);
                         break;
                     }
                 }

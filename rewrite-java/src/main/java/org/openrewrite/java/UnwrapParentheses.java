@@ -29,7 +29,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         return scope.isScope(parens) && isUnwrappable(getCursor()) ?
-                parens.getTree().getElem().withPrefix(parens.getPrefix()) :
+                parens.getTree().withPrefix(parens.getPrefix()) :
                 super.visitParentheses(parens, p);
     }
 
@@ -46,7 +46,7 @@ public class UnwrapParentheses<P> extends JavaVisitor<P> {
                 parent instanceof J.WhileLoop) {
             return false;
         } else if (parent instanceof J.DoWhileLoop) {
-            return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition().getElem());
+            return !(parensScope.getValue() == ((J.DoWhileLoop) parent).getWhileCondition());
         }
         return true;
     }

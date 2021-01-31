@@ -77,8 +77,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         }
         if (c.getImports().size() == 1) {
             if (c.getPackageDecl() == null) {
-                c = c.withImports(
-                        ListUtils.mapFirst(c.getImports(),
+                c = c.getPadding().withImports(
+                        ListUtils.mapFirst(c.getPadding().getImports(),
                                 i -> i.withElem(
                                         i.getElem().withPrefix(
                                                 i.getElem().getPrefix().withWhitespace(
@@ -147,8 +147,8 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
         } else if (starImport != null && referencedTypes.isEmpty()) {
             return delete(cu, starImport);
         } else if (starImport != null && referencedTypes.size() == 1) {
-            return cu.withImports(
-                    ListUtils.map(cu.getImports(), im -> im.map(i -> i == starImport ?
+            return cu.getPadding().withImports(
+                    ListUtils.map(cu.getPadding().getImports(), im -> im.map(i -> i == starImport ?
                             new J.Import(randomId(),
                                     i.getPrefix(),
                                     Markers.EMPTY,
@@ -192,6 +192,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     }
 
     private J.CompilationUnit delete(J.CompilationUnit cu, J.Import impoort) {
-        return cu.withImports(ListUtils.map(cu.getImports(), i -> i.getElem() == impoort ? null : i));
+        return cu.getPadding().withImports(ListUtils.map(cu.getPadding().getImports(), i -> i.getElem() == impoort ? null : i));
     }
 }
