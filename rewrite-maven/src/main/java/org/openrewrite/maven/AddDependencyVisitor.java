@@ -54,8 +54,6 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
 
     private final String groupId;
     private final String artifactId;
-
-    @Nullable
     private final String version;
 
     @Nullable
@@ -79,7 +77,7 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
 
     public AddDependencyVisitor(String groupId,
                                 String artifactId,
-                                @Nullable String version,
+                                String version,
                                 @Nullable String metadataPattern,
                                 boolean releasesOnly,
                                 @Nullable String classifier,
@@ -106,11 +104,10 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
             versionComparator = versionValidation.getValue();
         }
 
-        if (skipIfPresent && findDependencies(groupId, artifactId).stream()
-                .anyMatch(d -> (version == null || version.equals(d.getVersion())) &&
+        if (skipIfPresent && findDependencies(groupId, artifactId).stream().anyMatch(d ->
+                version.equals(d.getVersion()) &&
                         (classifier == null || classifier.equals(d.getClassifier())) &&
-                        d.getScope().isInClasspathOf(Scope.fromName(scope))
-                )) {
+                        d.getScope().isInClasspathOf(Scope.fromName(scope)))) {
             return maven;
         }
 
@@ -186,7 +183,6 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
 
     private String findVersionToUse(String groupId, String artifactId) {
         if (versionComparator == null) {
-            assert version != null;
             return version;
         }
 
@@ -194,7 +190,6 @@ public class AddDependencyVisitor<P> extends MavenVisitor<P> {
                 .downloadMetadata(groupId, artifactId, emptyList());
 
         LatestRelease latest = new LatestRelease(metadataPattern);
-        //noinspection ConstantConditions
         return mavenMetadata.getVersioning().getVersions().stream()
                 .filter(versionComparator::isValid)
                 .filter(v -> !releasesOnly || latest.isValid(v))

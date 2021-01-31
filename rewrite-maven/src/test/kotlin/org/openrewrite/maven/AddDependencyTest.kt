@@ -31,9 +31,10 @@ class AddDependencyTest : RecipeTest {
         get() = AddDependency(
             "org.springframework.boot",
             "spring-boot",
-            "1.5.22.RELEASE").apply {
-                setSkipIfPresent(false)
-            }
+            "1.5.22.RELEASE"
+        ).apply {
+            isSkipIfPresent = false
+        }
 
     override val parser: Parser<*>?
         get() = MavenParser.builder()
@@ -122,8 +123,9 @@ class AddDependencyTest : RecipeTest {
         recipe = AddDependency(
             "org.springframework.boot",
             "spring-boot",
-            "1.4.X").apply {
-            setSkipIfPresent(false)
+            "1.4.X"
+        ).apply {
+            isSkipIfPresent = false
         },
         before = """
             <project>
@@ -156,8 +158,8 @@ class AddDependencyTest : RecipeTest {
     @Test
     fun addTestDependenciesAfterCompile() = assertChanged(
         recipe = AddDependency("org.junit.jupiter", "junit-jupiter-api", "5.7.0").apply {
-            setScope("test")
-            setSkipIfPresent(false)
+            scope = "test"
+            isSkipIfPresent = false
         },
         before = """
             <project>
@@ -206,7 +208,7 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun maybeAddDependencyDoesntAddWhenExistingDependency() = assertUnchanged(
-        recipe = recipe.apply { setSkipIfPresent(true) },
+        recipe = recipe.apply { isSkipIfPresent = true },
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -226,7 +228,7 @@ class AddDependencyTest : RecipeTest {
 
     @Test
     fun maybeAddDependencyDoesntAddWhenExistingAsTransitiveDependency() = assertUnchanged(
-        recipe = recipe.apply { setSkipIfPresent(true) },
+        recipe = recipe.apply { isSkipIfPresent = true },
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -249,7 +251,8 @@ class AddDependencyTest : RecipeTest {
         recipe = AddDependency(
             "com.fasterxml.jackson.core",
             "jackson-databind",
-            "2.12.0"),
+            "2.12.0"
+        ),
         before = """
             <project>
               <modelVersion>4.0.0</modelVersion>
@@ -302,8 +305,8 @@ class AddDependencyTest : RecipeTest {
             "jackson-databind",
             "2.12.0"
         ).apply {
-            setFamilyPattern("com.fasterxml.jackson*")
-            setSkipIfPresent(false)
+            familyPattern = "com.fasterxml.jackson*"
+            isSkipIfPresent = false
         },
         before = """
             <project>
@@ -356,12 +359,13 @@ class AddDependencyTest : RecipeTest {
             assertThat(maven.model.findDependencies("com.fasterxml.jackson.core", "jackson-databind")).isNotEmpty()
         }
     )
+
     @Suppress("NULLABILITY_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     @Test
     fun checkValidation() {
         var recipe = AddDependency(null, null, null)
         var valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(3)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("groupId")
@@ -369,21 +373,20 @@ class AddDependencyTest : RecipeTest {
 
         recipe = AddDependency(null, "rewrite-maven", null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("groupId")
         assertThat(valid.failures()[1].property).isEqualTo("version")
 
         recipe = AddDependency("org.openrewrite", null, null)
         valid = recipe.validate()
-        assertThat(valid.isValid).isFalse()
+        assertThat(valid.isValid).isFalse
         assertThat(valid.failures()).hasSize(2)
         assertThat(valid.failures()[0].property).isEqualTo("artifactId")
         assertThat(valid.failures()[1].property).isEqualTo("version")
 
-        recipe = AddDependency("org.openrewrite", "rewrite-maven","1.0.0")
+        recipe = AddDependency("org.openrewrite", "rewrite-maven", "1.0.0")
         valid = recipe.validate()
-        assertThat(valid.isValid).isTrue()
+        assertThat(valid.isValid).isTrue
     }
-
 }

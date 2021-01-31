@@ -18,6 +18,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-xml:latest.release")
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
 
     implementation("org.slf4j:slf4j-api:1.7.+")
 

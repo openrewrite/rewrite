@@ -27,7 +27,8 @@ import org.openrewrite.java.style.IntelliJ;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * This recipe will group and order the imports for a compilation unit using the rules defined by an {@link ImportLayoutStyle}.

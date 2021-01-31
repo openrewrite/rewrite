@@ -15,24 +15,16 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.ctc.wstx.stax.WstxInputFactory;
-import com.ctc.wstx.stax.WstxOutputFactory;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlFactory;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
 import org.openrewrite.xml.tree.Xml;
 
-import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -47,23 +39,7 @@ import static java.util.Collections.singletonList;
 @AllArgsConstructor
 @Getter
 public class RawMaven {
-    private static final ObjectMapper xmlMapper;
-
-    static {
-        // disable namespace handling, as some POMs contain undefined namespaces like Xlint in
-        // https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
-        XMLInputFactory input = new WstxInputFactory();
-        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
-        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
-        xmlMapper = new XmlMapper(new XmlFactory(input, new WstxOutputFactory()))
-                .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
-                .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-    }
-
     Xml.Document document;
-
-    @With
     RawPom pom;
 
     @Override
@@ -96,9 +72,9 @@ public class RawMaven {
                 .iterator().next();
 
         try {
-            RawPom pom = xmlMapper.readValue(source.getSource(), RawPom.class);
+            RawPom pom = MavenXmlMapper.readMapper().readValue(source.getSource(), RawPom.class);
             if (snapshotVersion != null) {
-                pom = pom.withSnapshotVersion(snapshotVersion);
+                pom.setSnapshotVersion(snapshotVersion);
             }
             return new RawMaven(document, pom);
         } catch (IOException e) {

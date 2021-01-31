@@ -17,7 +17,6 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JRightPadded;
 import org.openrewrite.java.tree.Space;
 
 import java.util.stream.Collectors;

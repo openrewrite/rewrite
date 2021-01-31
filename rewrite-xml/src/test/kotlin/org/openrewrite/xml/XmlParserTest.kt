@@ -18,8 +18,8 @@ package org.openrewrite.xml
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.Issue
 import org.openrewrite.ExecutionContext
+import org.openrewrite.Issue
 import org.openrewrite.TreePrinter
 import org.openrewrite.internal.StringUtils
 import org.openrewrite.xml.internal.XmlPrinter

@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.maven.tree.Maven;
 import org.openrewrite.maven.tree.Pom;
 import org.openrewrite.xml.RemoveContentVisitor;
@@ -29,7 +28,6 @@ import org.openrewrite.xml.tree.Xml;
 import java.util.List;
 
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Validated.required;
 
 @Data
 @EqualsAndHashCode(callSuper = true)

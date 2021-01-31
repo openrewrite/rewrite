@@ -15,9 +15,12 @@
  */
 package org.openrewrite.java.search;
 
-import org.openrewrite.*;
+import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.NameTree;
 
 import java.util.List;
 import java.util.Objects;

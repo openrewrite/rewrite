@@ -17,7 +17,6 @@ package org.openrewrite.java.tree;
 
 import lombok.AccessLevel;
 import lombok.Data;
-import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 

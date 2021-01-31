@@ -17,7 +17,6 @@ package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.Space;
 
 public class LiteralToString {
     public static String toString(J.Literal clazz) {

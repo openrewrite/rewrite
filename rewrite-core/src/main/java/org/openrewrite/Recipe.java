@@ -27,7 +27,8 @@ import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Function;
 
-import static java.util.Collections.*;
+import static java.util.Collections.emptyList;
+import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.*;
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will

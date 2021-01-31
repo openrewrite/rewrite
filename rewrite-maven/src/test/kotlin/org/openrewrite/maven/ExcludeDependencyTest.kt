@@ -27,84 +27,84 @@ class ExcludeDependencyTest : RecipeTest {
     @Test
     fun excludeJUnitVintageEngineSpringBoot2_3() = assertChanged(
         before = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.3.6.RELEASE</version>
-                  </parent>
-                  
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter</artifactId>
-                    </dependency>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-test</artifactId>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """,
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>2.3.6.RELEASE</version>
+              </parent>
+              
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter</artifactId>
+                </dependency>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-test</artifactId>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """,
         after = """
-                <project>
-                  <modelVersion>4.0.0</modelVersion>
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.3.6.RELEASE</version>
-                  </parent>
-                  
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <version>0.0.1-SNAPSHOT</version>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter</artifactId>
-                    </dependency>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-test</artifactId>
-                      <scope>test</scope>
-                      <exclusions>
-                        <exclusion>
-                          <groupId>org.junit.vintage</groupId>
-                          <artifactId>junit-vintage-engine</artifactId>
-                        </exclusion>
-                      </exclusions>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+            <project>
+              <modelVersion>4.0.0</modelVersion>
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>2.3.6.RELEASE</version>
+              </parent>
+              
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <version>0.0.1-SNAPSHOT</version>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter</artifactId>
+                </dependency>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-test</artifactId>
+                  <scope>test</scope>
+                  <exclusions>
+                    <exclusion>
+                      <groupId>org.junit.vintage</groupId>
+                      <artifactId>junit-vintage-engine</artifactId>
+                    </exclusion>
+                  </exclusions>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Test
     fun jUnitVintageEngineDoesntNeedExclusionFromSpringBoot2_4() = assertUnchanged(
         before = """
-                <project>
-                  <parent>
-                    <groupId>org.springframework.boot</groupId>
-                    <artifactId>spring-boot-starter-parent</artifactId>
-                    <version>2.4.0</version>
-                  </parent>
-                  
-                  <groupId>com.example</groupId>
-                  <artifactId>demo</artifactId>
-                  <dependencies>
-                    <dependency>
-                      <groupId>org.springframework.boot</groupId>
-                      <artifactId>spring-boot-starter-test</artifactId>
-                      <scope>test</scope>
-                    </dependency>
-                  </dependencies>
-                </project>
-            """
+            <project>
+              <parent>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-starter-parent</artifactId>
+                <version>2.4.0</version>
+              </parent>
+              
+              <groupId>com.example</groupId>
+              <artifactId>demo</artifactId>
+              <dependencies>
+                <dependency>
+                  <groupId>org.springframework.boot</groupId>
+                  <artifactId>spring-boot-starter-test</artifactId>
+                  <scope>test</scope>
+                </dependency>
+              </dependencies>
+            </project>
+        """
     )
 
     @Issue("#92")

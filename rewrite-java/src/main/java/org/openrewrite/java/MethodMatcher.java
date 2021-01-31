@@ -24,7 +24,10 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.internal.grammar.AspectJLexer;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParser;
 import org.openrewrite.java.internal.grammar.RefactorMethodSignatureParserBaseVisitor;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.TypeUtils;
 
 import java.util.ArrayList;
 import java.util.List;

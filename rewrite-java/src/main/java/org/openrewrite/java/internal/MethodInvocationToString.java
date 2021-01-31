@@ -19,9 +19,6 @@ import org.openrewrite.TreePrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JavaType;
-import org.openrewrite.java.tree.Space;
-
-import java.util.stream.Collectors;
 
 public class MethodInvocationToString {
     public static String toString(J.MethodInvocation method) {

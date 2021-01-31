@@ -22,9 +22,11 @@ import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
+import lombok.experimental.NonFinal;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.tree.GroupArtifact;
 
+import javax.xml.bind.annotation.XmlRootElement;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -36,8 +38,9 @@ import static java.util.Collections.singletonList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Data
+@XmlRootElement(name = "project")
 public class RawPom {
-    @Getter
     @Nullable
     Parent parent;
 
@@ -46,7 +49,6 @@ public class RawPom {
     @Nullable
     String groupId;
 
-    @Getter
     @EqualsAndHashCode.Include
     @ToString.Include
     String artifactId;
@@ -56,25 +58,22 @@ public class RawPom {
     @Nullable
     String version;
 
-    @With
-    @Getter
     @EqualsAndHashCode.Include
     @ToString.Include
     @Nullable
+    @NonFinal
+    @Setter(AccessLevel.PACKAGE)
     String snapshotVersion;
 
-    @Getter
     @Nullable
     String packaging;
 
     @Nullable
     Dependencies dependencies;
 
-    @Getter
     @Nullable
     DependencyManagement dependencyManagement;
 
-    @Getter
     @Nullable
     Map<String, String> properties;
 
@@ -87,33 +86,6 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
-    @JsonCreator
-    public RawPom(@JsonProperty("parent") @Nullable Parent parent,
-                  @JsonProperty("groupId") @Nullable String groupId,
-                  @JsonProperty("artifactId") String artifactId,
-                  @JsonProperty("version") @Nullable String version,
-                  @Nullable @JsonProperty("snapshotVersion") String snapshotVersion,
-                  @JsonProperty("packaging") @Nullable String packaging,
-                  @JsonProperty("dependencies") @Nullable Dependencies dependencies,
-                  @JsonProperty("dependencyManagement") @Nullable DependencyManagement dependencyManagement,
-                  @JsonProperty("properties") @Nullable Map<String, String> properties,
-                  @JsonProperty("repositories") @Nullable RawRepositories repositories,
-                  @JsonProperty("licenses") @Nullable Licenses licenses,
-                  @JsonProperty("profiles") @Nullable Profiles profiles) {
-        this.parent = parent;
-        this.groupId = groupId;
-        this.artifactId = artifactId;
-        this.version = version;
-        this.snapshotVersion = snapshotVersion;
-        this.packaging = packaging;
-        this.dependencies = dependencies;
-        this.dependencyManagement = dependencyManagement;
-        this.properties = properties;
-        this.repositories = repositories;
-        this.licenses = licenses;
-        this.profiles = profiles;
-    }
-
     @JsonIgnore
     public Map<String, String> getActiveProperties(Collection<String> activeProfiles) {
         Map<String, String> activeProperties = new HashMap<>();
@@ -123,7 +95,7 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            for (RawPom.Profile profile : getProfiles()) {
+            for (RawPom.Profile profile : getInnerProfiles()) {
                 if (profile.isActive(activeProfiles) && profile.getProperties() != null) {
                     activeProperties.putAll(profile.getProperties());
                 }
@@ -142,10 +114,10 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            for (Profile profile : getProfiles()) {
+            for (Profile profile : getInnerProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     if (profile.dependencies != null) {
-                        activeDependencies.addAll(profile.dependencies);
+                        activeDependencies.addAll(profile.dependencies.dependencies);
                     }
                 }
             }
@@ -162,7 +134,7 @@ public class RawPom {
         }
 
         if (profiles != null) {
-            for (Profile profile : getProfiles()) {
+            for (Profile profile : getInnerProfiles()) {
                 if (profile.isActive(activeProfiles)) {
                     if (profile.repositories != null) {
                         activeRepositories.addAll(profile.repositories.getRepositories());
@@ -175,12 +147,12 @@ public class RawPom {
     }
 
     @JsonIgnore
-    public List<License> getLicenses() {
+    public List<License> getInnerLicenses() {
         return licenses == null ? emptyList() : licenses.getLicenses();
     }
 
     @JsonIgnore
-    public List<Profile> getProfiles() {
+    public List<Profile> getInnerProfiles() {
         return profiles == null ? emptyList() : profiles.getProfiles();
     }
 
@@ -206,6 +178,7 @@ public class RawPom {
         Boolean optional;
 
         @Nullable
+        @JacksonXmlElementWrapper(useWrapping = true)
         Set<GroupArtifact> exclusions;
 
         /**
@@ -216,39 +189,61 @@ public class RawPom {
         }
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
-    @Setter
     public static class DependencyManagement {
         @Nullable
-        Dependencies dependencies;
+        private final Dependencies dependencies;
+
+        public DependencyManagement() {
+            this.dependencies = null;
+        }
+
+        @JsonCreator
+        public DependencyManagement(@JsonProperty("dependencies") @Nullable Dependencies dependencies) {
+            this.dependencies = dependencies;
+        }
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
-    @Setter
     public static class Dependencies {
-        @JacksonXmlProperty(localName = "dependency")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<Dependency> dependencies = emptyList();
+        private final List<Dependency> dependencies;
+
+        public Dependencies() {
+            this.dependencies = emptyList();
+        }
+
+        @JsonCreator
+        public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
+            this.dependencies = dependencies;
+        }
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
-    @Setter
     public static class Licenses {
-        @JacksonXmlProperty(localName = "license")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<License> licenses = emptyList();
+        private final List<License> licenses;
+
+        public Licenses() {
+            this.licenses = emptyList();
+        }
+
+        @JsonCreator
+        public Licenses(@JacksonXmlProperty(localName = "license") List<License> licenses) {
+            this.licenses = licenses;
+        }
     }
 
-    @FieldDefaults(level = AccessLevel.PRIVATE)
     @Getter
-    @Setter
     public static class Profiles {
-        @JacksonXmlProperty(localName = "profile")
-        @JacksonXmlElementWrapper(useWrapping = false)
-        List<Profile> profiles = emptyList();
+        private final List<Profile> profiles;
+
+        public Profiles() {
+            this.profiles = emptyList();
+        }
+
+        @JsonCreator
+        public Profiles(@JacksonXmlProperty(localName = "profile") List<Profile> profiles) {
+            this.profiles = profiles;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -262,10 +257,21 @@ public class RawPom {
         String relativePath;
     }
 
+    @ToString
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @EqualsAndHashCode
+    @Getter
     public static class License {
         String name;
+
+        public License() {
+            this.name = "";
+        }
+
+        @JsonCreator
+        public License(@JsonProperty("name") String name) {
+            this.name = name;
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -281,7 +287,7 @@ public class RawPom {
         Map<String, String> properties;
 
         @Nullable
-        List<Dependency> dependencies;
+        Dependencies dependencies;
 
         @Nullable
         RawRepositories repositories;
@@ -301,12 +307,10 @@ public class RawPom {
         @Nullable
         Map<String, String> property;
 
-        @JsonIgnore
         public boolean isActive() {
             return isActiveByJdk() || isActiveByProperty();
         }
 
-        @JsonIgnore
         private boolean isActiveByJdk() {
             if (jdk == null) {
                 return false;
@@ -324,7 +328,6 @@ public class RawPom {
             return version.startsWith(requestedVersion.nearestVersion());
         }
 
-        @JsonIgnore
         private boolean isActiveByProperty() {
             if (property == null || property.isEmpty()) {
                 return false;

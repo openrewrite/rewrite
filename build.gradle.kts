@@ -1,11 +1,13 @@
-import io.spring.gradle.bintray.SpringBintrayExtension
-import nl.javadude.gradle.plugins.license.LicenseExtension
-import java.util.*
-import nebula.plugin.info.InfoBrokerPlugin
-import nebula.plugin.contacts.*
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import org.jfrog.gradle.plugin.artifactory.dsl.*
 import com.github.jk1.license.LicenseReportExtension
+import io.spring.gradle.bintray.SpringBintrayExtension
+import nebula.plugin.contacts.Contact
+import nebula.plugin.contacts.ContactsExtension
+import nebula.plugin.info.InfoBrokerPlugin
+import nl.javadude.gradle.plugins.license.LicenseExtension
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.jfrog.gradle.plugin.artifactory.dsl.ArtifactoryPluginConvention
+import org.jfrog.gradle.plugin.artifactory.dsl.PublisherConfig
+import java.util.*
 
 buildscript {
     repositories {

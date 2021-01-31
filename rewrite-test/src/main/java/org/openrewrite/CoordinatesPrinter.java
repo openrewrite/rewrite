@@ -15,15 +15,10 @@
  */
 package org.openrewrite;
 
-import org.junit.jupiter.api.parallel.Execution;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.JavaIsoVisitor;
-import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.Space;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Utility to print a compilation unit with tree coordinates embedded in the output.

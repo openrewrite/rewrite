@@ -16,7 +16,6 @@
 package org.openrewrite.text;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.SourceFile;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
@@ -32,9 +31,9 @@ public class PlainText implements SourceFile, Tree {
     private final String text;
 
     @JsonCreator
-    public PlainText(@JsonProperty("id") UUID id,
-                     @JsonProperty("markers") Markers markers,
-                     @JsonProperty("text") String text) {
+    public PlainText(UUID id,
+                     Markers markers,
+                     String text) {
         this.id = id;
         this.markers = markers;
         this.text = text;

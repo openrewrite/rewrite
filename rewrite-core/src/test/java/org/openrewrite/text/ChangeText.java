@@ -31,6 +31,7 @@ public class ChangeText extends Recipe {
     public ChangeText(@JsonProperty("toText") String toText) {
         this.toText = toText;
     }
+
     @Override
     protected TreeVisitor<?, ExecutionContext> getVisitor() {
         return new ChangeTextVisitor();

@@ -17,13 +17,12 @@ package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
-import org.openrewrite.marker.Marker;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.marker.Marker;
 
 import java.net.URI;
 import java.net.URL;
@@ -74,19 +73,19 @@ public class Pom implements Marker {
     Collection<Repository> repositories;
     Map<String, String> properties;
 
-    public Pom(@Nullable @JsonProperty("sourcePath") Path sourcePath,
-               @Nullable @JsonProperty("groupId") String groupId,
-               @JsonProperty("artifactId") String artifactId,
-               @Nullable @JsonProperty("version") String version,
-               @Nullable @JsonProperty("snapshotVersion") String snapshotVersion,
-               @Nullable @JsonProperty("type") String type,
-               @Nullable @JsonProperty("classifier") String classifier,
-               @Nullable @JsonProperty("parent") Pom parent,
-               @JsonProperty("dependencies") Collection<Dependency> dependencies,
-               @JsonProperty("dependencyManagement") DependencyManagement dependencyManagement,
-               @JsonProperty("licenses") Collection<License> licenses,
-               @JsonProperty("repositories") Collection<Repository> repositories,
-               @JsonProperty("properties") Map<String, String> properties) {
+    public Pom(@Nullable Path sourcePath,
+               @Nullable String groupId,
+               String artifactId,
+               @Nullable String version,
+               @Nullable String snapshotVersion,
+               @Nullable String type,
+               @Nullable String classifier,
+               @Nullable Pom parent,
+               Collection<Dependency> dependencies,
+               DependencyManagement dependencyManagement,
+               Collection<License> licenses,
+               Collection<Repository> repositories,
+               Map<String, String> properties) {
         this.sourcePath = sourcePath;
         this.groupId = groupId;
         this.artifactId = artifactId;

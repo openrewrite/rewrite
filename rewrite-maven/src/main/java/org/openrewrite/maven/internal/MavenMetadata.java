@@ -15,11 +15,13 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.AccessLevel;
 import lombok.Data;
+import lombok.Getter;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.xml.XmlParser;
@@ -28,15 +30,13 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.Collection;
+import java.util.List;
 
 import static java.util.Collections.emptyList;
 
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-@Data
+@Getter
 public class MavenMetadata {
-    private static final ObjectMapper xmlMapper = new XmlMapper()
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-
     private static final XmlParser xmlParser = new XmlParser() {
         @Override
         public boolean accept(Path path) {
@@ -48,18 +48,31 @@ public class MavenMetadata {
 
     Versioning versioning;
 
+    @JsonCreator
+    public MavenMetadata(@JsonProperty("versioning") Versioning versioning) {
+        this.versioning = versioning;
+    }
+
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-    @Data
+    @Getter
     public static class Versioning {
-        Collection<String> versions;
+        List<String> versions;
 
         @Nullable
         Snapshot snapshot;
+
+        @JsonCreator
+        public Versioning(
+                @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
+                @Nullable Snapshot snapshot) {
+            this.versions = versions;
+            this.snapshot = snapshot;
+        }
     }
 
     public static MavenMetadata parse(byte[] document) {
         try {
-            return xmlMapper.readValue(document, MavenMetadata.class);
+            return MavenXmlMapper.readMapper().readValue(document, MavenMetadata.class);
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

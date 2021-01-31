@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.*;
+import org.openrewrite.Cursor;
+import org.openrewrite.Incubating;
+import org.openrewrite.Tree;
+import org.openrewrite.TreePrinter;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;

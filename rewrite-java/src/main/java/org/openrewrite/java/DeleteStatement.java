@@ -17,7 +17,10 @@ package org.openrewrite.java;
 
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.search.FindReferencedTypes;
-import org.openrewrite.java.tree.*;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
+import org.openrewrite.java.tree.Space;
+import org.openrewrite.java.tree.Statement;
 import org.openrewrite.marker.Markers;
 
 import static java.util.Collections.emptyList;

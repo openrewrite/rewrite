@@ -17,7 +17,6 @@ package org.openrewrite.marker;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
@@ -49,7 +48,7 @@ public class Markers {
     }
 
     @JsonCreator
-    public static Markers build(@JsonProperty("markers") Collection<? extends Marker> markers) {
+    public static Markers build(Collection<? extends Marker> markers) {
         return markers.isEmpty() ? EMPTY : new Markers(markers);
     }
 

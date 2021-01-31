@@ -15,15 +15,9 @@
  */
 package org.openrewrite.maven;
 
-import com.ctc.wstx.stax.WstxInputFactory;
-import com.ctc.wstx.stax.WstxOutputFactory;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.dataformat.xml.XmlFactory;
-import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -31,18 +25,13 @@ import lombok.experimental.FieldDefaults;
 import lombok.experimental.NonFinal;
 import org.openrewrite.Parser;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.maven.internal.MavenXmlMapper;
 import org.openrewrite.maven.internal.RawRepositories;
 
-import javax.xml.stream.XMLInputFactory;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static java.util.Collections.emptyList;
@@ -51,20 +40,6 @@ import static java.util.Collections.emptyList;
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 public class MavenSettings {
-    private static final ObjectMapper xmlMapper;
-
-    static {
-        // disable namespace handling, as some POMs contain undefined namespaces like Xlint in
-        // https://repo.maven.apache.org/maven2/com/sun/istack/istack-commons/3.0.11/istack-commons-3.0.11.pom
-        XMLInputFactory input = new WstxInputFactory();
-        input.setProperty(XMLInputFactory.IS_REPLACING_ENTITY_REFERENCES, false);
-        input.setProperty(XMLInputFactory.IS_NAMESPACE_AWARE, false);
-        xmlMapper = new XmlMapper(new XmlFactory(input, new WstxOutputFactory()))
-                .disable(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT)
-                .disable(DeserializationFeature.ACCEPT_EMPTY_ARRAY_AS_NULL_OBJECT)
-                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
-    }
-
     @Nullable
     Profiles profiles;
 
@@ -82,10 +57,10 @@ public class MavenSettings {
 
     @JsonCreator
     MavenSettings(
-            @JsonProperty("profiles") @Nullable Profiles profiles,
-            @JsonProperty("activeProfiles") @Nullable ActiveProfiles activeProfiles,
-            @JsonProperty("mirrors") @Nullable Mirrors mirrors,
-            @JsonProperty("servers") @Nullable Servers servers) {
+            @Nullable Profiles profiles,
+            @Nullable ActiveProfiles activeProfiles,
+            @Nullable Mirrors mirrors,
+            @Nullable Servers servers) {
         this.profiles = profiles;
         this.activeProfiles = activeProfiles;
         this.mirrors = mirrors;
@@ -94,7 +69,7 @@ public class MavenSettings {
 
     public static MavenSettings parse(Parser.Input source) {
         try {
-            return xmlMapper.readValue(source.getSource(), MavenSettings.class);
+            return MavenXmlMapper.readMapper().readValue(source.getSource(), MavenSettings.class);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to parse " + source.getPath(), e);
         }

@@ -15,7 +15,9 @@
  */
 package org.openrewrite.java.style;
 
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Data;
+import lombok.With;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.java.JavaStyle;
 

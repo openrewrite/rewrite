@@ -26,10 +26,9 @@ import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
-import org.openrewrite.java.tree.*
-import org.openrewrite.marker.Markers
+import org.openrewrite.java.tree.J
+import org.openrewrite.java.tree.Statement
 import org.slf4j.LoggerFactory
-import kotlin.streams.toList
 
 interface JavaTemplateTest : RecipeTest {
     companion object {

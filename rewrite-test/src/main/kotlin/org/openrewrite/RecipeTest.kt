@@ -15,6 +15,11 @@
  */
 package org.openrewrite
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
 import org.openrewrite.java.JavaVisitor
@@ -51,9 +56,26 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
+        val m = ObjectMapper()
+            .registerModule(ParameterNamesModule())
+            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+
+        val recipeMapper = m.setVisibility(
+            m.serializationConfig.defaultVisibilityChecker
+                .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
+                .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                .withFieldVisibility(JsonAutoDetect.Visibility.ANY)
+        )
+
+        assertThat(recipeMapper.readValue(recipeMapper.writeValueAsString(recipe), recipe!!.javaClass))
+            .`as`("Recipe must be serializable/deserializable")
+            .isEqualTo(recipe)
+
         val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
 
-        val results = recipe!!.run(listOf(source),
+        val results = recipe.run(listOf(source),
             ExecutionContext.builder()
                 .maxCycles(1)
                 .doOnError { t: Throwable? -> fail<Any>("Recipe threw an exception", t) }

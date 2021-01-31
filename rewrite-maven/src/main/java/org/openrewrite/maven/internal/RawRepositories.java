@@ -16,8 +16,6 @@
 package org.openrewrite.maven.internal;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.*;
@@ -70,7 +68,7 @@ public class RawRepositories {
         boolean enabled;
 
         @JsonCreator
-        public ArtifactPolicy(@JsonProperty("enabled") @Nullable Boolean enabled) {
+        public ArtifactPolicy(@Nullable Boolean enabled) {
             this.enabled = enabled == null || enabled;
         }
 

@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format;
 
-import org.openrewrite.Cursor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.JavaIsoVisitor;
 import org.openrewrite.java.style.BlankLinesStyle;

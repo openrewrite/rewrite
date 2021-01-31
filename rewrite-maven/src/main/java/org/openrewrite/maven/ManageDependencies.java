@@ -20,7 +20,6 @@ import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
-import org.openrewrite.Validated;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.maven.internal.InsertDependencyComparator;
 import org.openrewrite.maven.internal.Version;
@@ -39,7 +38,6 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 import static java.util.stream.Collectors.toList;
-import static org.openrewrite.Validated.required;
 
 /**
  * Make existing dependencies "dependency managed", moving the version to the dependencyManagement

@@ -47,8 +47,8 @@ class RawMavenTest {
 
         assertThat(maven.pom.dependencyManagement?.dependencies).isNull()
         assertThat(maven.pom.getActiveRepositories(emptyList())).isEmpty()
-        assertThat(maven.pom.licenses).isEmpty()
-        assertThat(maven.pom.profiles).isEmpty()
+        assertThat(maven.pom.innerLicenses).isEmpty()
+        assertThat(maven.pom.innerProfiles).isEmpty()
     }
 
     @Test

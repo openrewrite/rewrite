@@ -189,12 +189,12 @@ public interface JavaType extends Serializable {
         }
 
         @JsonCreator
-        public static Class build(@JsonProperty("fullyQualifiedName") String fullyQualifiedName,
-                                  @JsonProperty("members") List<Var> members,
-                                  @JsonProperty("typeParameters") List<JavaType> typeParameters,
-                                  @JsonProperty("interfaces") List<JavaType> interfaces,
-                                  @JsonProperty("constructors") List<Method> constructors,
-                                  @JsonProperty("supertype") @Nullable Class supertype) {
+        public static Class build(String fullyQualifiedName,
+                                  List<Var> members,
+                                  List<JavaType> typeParameters,
+                                  List<JavaType> interfaces,
+                                  List<Method> constructors,
+                                  @Nullable Class supertype) {
             return build(fullyQualifiedName, members, typeParameters, interfaces, constructors, supertype, false);
         }
 
@@ -442,12 +442,12 @@ public interface JavaType extends Serializable {
         }
 
         @JsonCreator
-        public static Method build(@JsonProperty("declaringType") FullyQualified declaringType,
-                                   @JsonProperty("name") String name,
-                                   @JsonProperty("genericSignature") Signature genericSignature,
-                                   @JsonProperty("resolvedSignature") Signature resolvedSignature,
-                                   @JsonProperty("paramNames") List<String> paramNames,
-                                   @JsonProperty("flags") Set<Flag> flags) {
+        public static Method build(FullyQualified declaringType,
+                                   String name,
+                                   Signature genericSignature,
+                                   Signature resolvedSignature,
+                                   List<String> paramNames,
+                                   Set<Flag> flags) {
             Method test = new Method(declaringType, name, genericSignature, resolvedSignature, paramNames, flags);
 
             synchronized (flyweights) {

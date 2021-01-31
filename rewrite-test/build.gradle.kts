@@ -2,6 +2,9 @@ dependencies {
     api(project(":rewrite-core"))
     api(project(":rewrite-java"))
 
+    implementation("com.fasterxml.jackson.core:jackson-databind:latest.release")
+    implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
+
     compileOnly("io.micrometer:micrometer-registry-prometheus:latest.release")
 
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
