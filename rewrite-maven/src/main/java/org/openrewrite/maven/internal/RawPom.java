@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
@@ -85,7 +84,6 @@ public class RawPom {
     @Nullable
     Profiles profiles;
 
-    @JsonIgnore
     public Map<String, String> getActiveProperties(Collection<String> activeProfiles) {
         Map<String, String> activeProperties = new HashMap<>();
 
@@ -104,7 +102,6 @@ public class RawPom {
         return activeProperties;
     }
 
-    @JsonIgnore
     public List<Dependency> getActiveDependencies(Collection<String> activeProfiles) {
         List<Dependency> activeDependencies = new ArrayList<>();
 
@@ -145,12 +142,10 @@ public class RawPom {
         return activeRepositories;
     }
 
-    @JsonIgnore
     public List<License> getInnerLicenses() {
         return licenses == null ? emptyList() : licenses.getLicenses();
     }
 
-    @JsonIgnore
     public List<Profile> getInnerProfiles() {
         return profiles == null ? emptyList() : profiles.getProfiles();
     }
@@ -286,7 +281,6 @@ public class RawPom {
         @Nullable
         RawRepositories repositories;
 
-        @JsonIgnore
         public boolean isActive(Collection<String> activeProfiles) {
             return (id != null && activeProfiles.contains(id)) || (activation != null && activation.isActive());
         }

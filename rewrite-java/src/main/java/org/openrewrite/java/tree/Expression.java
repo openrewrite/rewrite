@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Tree;
 import org.openrewrite.internal.lang.Nullable;
 
@@ -34,7 +33,6 @@ public interface Expression extends J {
      * So for a binary operation, there are up to two potential side effects (the left and right side) and as
      * few as zero if both sides of the expression are something like constants or variable references.
      */
-    @JsonIgnore
     default List<Tree> getSideEffects() {
         return emptyList();
     }

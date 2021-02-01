@@ -16,7 +16,6 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
@@ -290,22 +289,18 @@ public class Pom implements Marker {
 
         Set<GroupArtifact> exclusions;
 
-        @JsonIgnore
         public String getGroupId() {
             return model.getGroupId();
         }
 
-        @JsonIgnore
         public String getArtifactId() {
             return model.getArtifactId();
         }
 
-        @JsonIgnore
         public String getVersion() {
             return model.getVersion();
         }
 
-        @JsonIgnore
         public URI getArtifactUri() {
             return model.getSourcePath().toUri()
                     .resolve(getArtifactId() + '-' + getVersion() +
@@ -314,7 +309,6 @@ public class Pom implements Marker {
                     .normalize();
         }
 
-        @JsonIgnore
         public String getCoordinates() {
             return model.getGroupId() + ':' + model.getArtifactId() + ':' + model.getVersion() +
                     (classifier == null ? "" : ':' + classifier);

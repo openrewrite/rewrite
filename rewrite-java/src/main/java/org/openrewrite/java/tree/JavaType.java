@@ -72,7 +72,6 @@ public interface JavaType extends Serializable {
     abstract class FullyQualified implements JavaType {
         public abstract String getFullyQualifiedName();
 
-        @JsonIgnore
         public String getClassName() {
             AtomicBoolean dropWhile = new AtomicBoolean(false);
             return Arrays.stream(getFullyQualifiedName().split("\\."))
@@ -83,7 +82,6 @@ public interface JavaType extends Serializable {
                     .collect(joining("."));
         }
 
-        @JsonIgnore
         public String getPackageName() {
             AtomicBoolean takeWhile = new AtomicBoolean(true);
             return Arrays.stream(getFullyQualifiedName().split("\\."))
@@ -94,7 +92,6 @@ public interface JavaType extends Serializable {
                     .collect(joining("."));
         }
 
-        @JsonIgnore
         public boolean isAssignableFrom(@Nullable JavaType.Class clazz) {
             return clazz != null && (this == Class.OBJECT ||
                     getFullyQualifiedName().equals(clazz.fullyQualifiedName) ||
@@ -329,7 +326,6 @@ public interface JavaType extends Serializable {
             }
         }
 
-        @JsonIgnore
         public List<JavaType.Var> getVisibleSupertypeMembers() {
             List<JavaType.Var> members = new ArrayList<>();
             if (supertype != null) {
@@ -524,14 +520,15 @@ public interface JavaType extends Serializable {
 
     @Data
     class Array implements JavaType {
+        @Nullable
         private final JavaType elemType;
 
-        public Array(JavaType elemType) {
+        public Array(@Nullable JavaType elemType) {
             this.elemType = elemType;
         }
 
         @Override
-        public boolean deepEquals(JavaType type) {
+        public boolean deepEquals(@Nullable JavaType type) {
             return type instanceof Array && (this == type || (elemType != null && elemType.deepEquals(((Array) type).elemType)));
         }
     }
@@ -567,7 +564,6 @@ public interface JavaType extends Serializable {
             return null;
         }
 
-        @JsonIgnore
         public String getKeyword() {
             return this.keyword;
         }

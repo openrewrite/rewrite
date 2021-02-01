@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -50,7 +49,6 @@ public class RawMaven {
         return getSourcePath().equals(rawMaven.getSourcePath());
     }
 
-    @JsonIgnore
     public Path getSourcePath() {
         return document.getSourcePath();
     }

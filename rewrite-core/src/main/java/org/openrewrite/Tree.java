@@ -15,7 +15,6 @@
  */
 package org.openrewrite;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -31,7 +30,6 @@ public interface Tree extends Markable {
         return UUID.randomUUID();
     }
 
-    @JsonIgnore
     @Nullable
     default <S extends Style> S getStyle(Class<S> style) {
         return NamedStyles.merge(style, getMarkers().findAll(NamedStyles.class));
@@ -49,8 +47,8 @@ public interface Tree extends Markable {
      * type contains a field that is of a type with a hierarchy. The visitor doesn't have to figure out which visit
      * method to call by using instanceof.
      *
-     * @param v visitor
-     * @param p visit context
+     * @param v   visitor
+     * @param p   visit context
      * @param <R> visitor return type
      * @param <P> visit context type
      * @return visitor result

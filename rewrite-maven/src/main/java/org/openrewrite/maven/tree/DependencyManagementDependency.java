@@ -16,7 +16,6 @@
 package org.openrewrite.maven.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
@@ -56,7 +55,6 @@ public interface DependencyManagementDependency {
 
         Set<GroupArtifact> exclusions;
 
-        @JsonIgnore
         @Override
         public List<DependencyDescriptor> getDependencies() {
             return Collections.singletonList(this);
@@ -77,7 +75,6 @@ public interface DependencyManagementDependency {
         String requestedVersion;
         Pom maven;
 
-        @JsonIgnore
         @Override
         public List<DependencyDescriptor> getDependencies() {
             return maven.getEffectiveDependencyManagement().getDependencies().stream()
@@ -85,7 +82,6 @@ public interface DependencyManagementDependency {
                     .collect(Collectors.toList());
         }
 
-        @JsonIgnore
         @Override
         public Map<String, String> getProperties() {
             // FIXME should be active properties by profile as well? also parent properties?

@@ -16,7 +16,6 @@
 package org.openrewrite.java.style;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.style.NamedStyles;
 import org.openrewrite.style.Style;
 
@@ -41,7 +40,6 @@ public class IntelliJ extends NamedStyles {
         return INSTANCE;
     }
 
-    @JsonIgnore
     @Override
     public Collection<Style> getStyles() {
         return super.getStyles();

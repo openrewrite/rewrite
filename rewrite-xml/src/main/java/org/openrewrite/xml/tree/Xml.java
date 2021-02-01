@@ -16,7 +16,6 @@
 package org.openrewrite.xml.tree;
 
 import com.fasterxml.jackson.annotation.JsonIdentityInfo;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.AccessLevel;
@@ -221,7 +220,6 @@ public interface Xml extends Serializable, Tree {
         @Nullable
         List<? extends Content> content;
 
-        @JsonIgnore
         public Optional<Tag> getChild(String name) {
             return content == null ? Optional.empty() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -230,7 +228,6 @@ public interface Xml extends Serializable, Tree {
                     .findAny();
         }
 
-        @JsonIgnore
         public List<Tag> getChildren(String name) {
             return content == null ? emptyList() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -239,7 +236,6 @@ public interface Xml extends Serializable, Tree {
                     .collect(toList());
         }
 
-        @JsonIgnore
         public List<Tag> getChildren() {
             return content == null ? emptyList() : content.stream()
                     .filter(t -> t instanceof Xml.Tag)
@@ -271,7 +267,6 @@ public interface Xml extends Serializable, Tree {
         /**
          * @return If this tag's content is only character data, consider it the value.
          */
-        @JsonIgnore
         public Optional<String> getValue() {
             if (content == null) {
                 return Optional.empty();
@@ -291,17 +286,15 @@ public interface Xml extends Serializable, Tree {
          * @param name The name of the child element to look for.
          * @return The character data of the first child element matching the provided name, if any.
          */
-        @JsonIgnore
         public Optional<String> getChildValue(String name) {
             return getChild(name).flatMap(Tag::getValue);
         }
 
-        @JsonIgnore
         public Optional<Tag> getSibling(String name, Cursor cursor) {
-            Xml.Tag parent = cursor.getParent().getValue();
-            if (parent == null) {
+            if (cursor.getParent() == null) {
                 return Optional.empty();
             }
+            Xml.Tag parent = cursor.getParent().getValue();
             return parent.getChild(name);
         }
 
@@ -431,12 +424,10 @@ public interface Xml extends Serializable, Tree {
             String value;
         }
 
-        @JsonIgnore
         public String getKeyAsString() {
             return key.getName();
         }
 
-        @JsonIgnore
         public String getValueAsString() {
             return value.getValue();
         }

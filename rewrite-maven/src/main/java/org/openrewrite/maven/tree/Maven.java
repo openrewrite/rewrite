@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.tree;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.lang.Nullable;
@@ -55,17 +54,14 @@ public class Maven extends Xml.Document {
                 .orElse(emptyList());
     }
 
-    @JsonIgnore
     public Pom getModel() {
         return model;
     }
 
-    @JsonIgnore
     public Collection<Pom> getModules() {
         return modules;
     }
 
-    @JsonIgnore
     public MavenSettings getSettings() {
         return settings;
     }

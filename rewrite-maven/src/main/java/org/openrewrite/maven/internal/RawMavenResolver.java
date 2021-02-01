@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 import lombok.experimental.FieldDefaults;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -251,7 +250,7 @@ public class RawMavenResolver {
                         try {
                             assert groupId != null;
                         } catch (AssertionError e) {
-                            if(continueOnError) {
+                            if (continueOnError) {
                                 logger.warn("Problem resolving dependency of {}:{}:{}. Unable to determine groupId. Omitting the problematic dependency and continuing.",
                                         rawMaven.getPom().getGroupId(), rawMaven.getPom().getArtifactId(), rawMaven.getPom().getVersion());
                                 return null;
@@ -700,7 +699,6 @@ public class RawMavenResolver {
         @Nullable
         LinkedHashSet<PartialTreeKey> seenParentPoms;
 
-        @JsonIgnore
         public Set<GroupArtifact> getExclusions() {
             return exclusions == null ? emptySet() : exclusions;
         }
