@@ -20,6 +20,7 @@ import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
+import org.junit.jupiter.api.Assertions.*
 
 interface MethodDeclTest : JavaTreeTest {
 
@@ -72,6 +73,21 @@ interface MethodDeclTest : JavaTreeTest {
             public native void foo();
         """
     )
+
+    @Test
+    fun hasModifier(jp: JavaParser) {
+        val a = jp.parse("""
+            public class A {
+                private static boolean foo() { return true; };
+            }
+        """)[0]
+
+        val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDecl>().first()
+        assertTrue(inv.hasModifier("private"))
+        assertTrue(inv.hasModifier("static"))
+        assertFalse(inv.hasModifier("sTaTiC"))
+        assertFalse(inv.hasModifier("fake"))
+    }
 
     @Test
     fun methodWithSuffixMultiComment(jp: JavaParser) = assertParsePrintAndProcess(

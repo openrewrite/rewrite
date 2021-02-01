@@ -2881,8 +2881,7 @@ public interface J extends Serializable, Tree {
     @Data
     final class Modifier implements J {
         public static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
-            return modifiers.stream().anyMatch(m -> m.getClass().getSimpleName()
-                    .toLowerCase().equals(modifier));
+            return modifiers.stream().anyMatch(m -> m.getType().toString().toLowerCase().equals(modifier));
         }
 
         @EqualsAndHashCode.Include
