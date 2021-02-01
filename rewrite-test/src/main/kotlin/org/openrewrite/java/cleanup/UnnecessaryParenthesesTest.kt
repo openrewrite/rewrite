@@ -244,7 +244,6 @@ interface UnnecessaryParenthesesTest : RecipeTest {
     )
 
     @Test
-    @Disabled
     fun unwrapAssignment(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
             withAssign(true)

@@ -21,6 +21,7 @@ import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.JavaType;
 
 @Incubating(since = "7.0.0")
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
@@ -52,7 +53,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 //                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
 //                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
 //                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
-////            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) l).visit(l, p, getCursor()); // TODO
+////            getCursor().getParent()
+////            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) (Expression) l).visit(l, p, getCursor()); // TODO
 //        }
 //        return l;
 //    }
@@ -60,10 +62,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitAssignOp(J.AssignOp assignOp, P p) {
         J.AssignOp a = visitAndCast(assignOp, p, super::visitAssignOp);
-
-        Expression assignment = a.getAssignment();
         J.AssignOp.Type op = a.getOperator();
-        if (assignment instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
+        if (a.getAssignment() instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
                 (style.isBorAssign() && op == J.AssignOp.Type.BitOr) ||
                 (style.isBsrAssign() && op == J.AssignOp.Type.UnsignedRightShift) ||
                 (style.isBxorAssign() && op == J.AssignOp.Type.BitXor) ||
@@ -82,7 +82,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitAssign(J.Assign assign, P p) {
         J.Assign a = visitAndCast(assign, p, super::visitAssign);
-        if (style.isAssign()) {
+        if (style.isAssign() && a.getAssignment() instanceof J.Parentheses) {
             a = (J.Assign) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
