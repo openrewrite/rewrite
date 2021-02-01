@@ -15,11 +15,11 @@
  */
 package org.openrewrite.java.cleanup;
 
+import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
-import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 
@@ -27,6 +27,8 @@ import org.openrewrite.java.tree.JavaType;
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
 
     private final UnnecessaryParenthesesStyle style;
+
+    private static final String UNNECESSARY_PARENTHESES_MARKER = "unnecessaryParenthesesUnwrapTarget";
 
     public UnnecessaryParenthesesVisitor(UnnecessaryParenthesesStyle style) {
         this.style = style;
@@ -36,28 +38,40 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J par = super.visitParentheses(parens, p);
-        if (style.isIdent() && ((J.Parentheses<T>) par).getTree() instanceof J.Ident) {
+        Cursor c = getCursor().pollNearestMessage(UNNECESSARY_PARENTHESES_MARKER);
+        if (c != null && (c.getValue() instanceof J.Literal || c.getValue() instanceof J.Ident)) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
         return par;
     }
 
-//    @Override
-//    public J visitLiteral(J.Literal literal, P p) {
-//        J.Literal l = visitAndCast(literal, p, super::visitLiteral);
-//        JavaType.Primitive type = l.getType();
-//        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
-//                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
-//                (style.isNumLong() && type == JavaType.Primitive.Long) ||
-//                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
-//                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
-//                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
-//                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
-////            getCursor().getParent()
-////            l = (J.Literal) new UnwrapParentheses<>((J.Parentheses<?>) (Expression) l).visit(l, p, getCursor()); // TODO
-//        }
-//        return l;
-//    }
+    @Override
+    public J visitIdentifier(J.Ident ident, P p) {
+        J.Ident i = visitAndCast(ident, p, super::visitIdentifier);
+        if (style.isIdent() && getCursor().getParent().getParent().getValue() instanceof J.Parentheses) {
+            getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
+        }
+        return i;
+    }
+
+    @Override
+    public J visitLiteral(J.Literal literal, P p) {
+        J.Literal l = visitAndCast(literal, p, super::visitLiteral);
+        JavaType.Primitive type = l.getType();
+        if ((style.isNumInt() && type == JavaType.Primitive.Int) ||
+                (style.isNumDouble() && type == JavaType.Primitive.Double) ||
+                (style.isNumLong() && type == JavaType.Primitive.Long) ||
+                (style.isNumFloat() && type == JavaType.Primitive.Float) ||
+                (style.isStringLiteral() && type == JavaType.Primitive.String) ||
+                (style.isLiteralNull() && type == JavaType.Primitive.Null) ||
+                (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
+                (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
+            if (getCursor().getParent().getParent().getValue() instanceof J.Parentheses) {
+                getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
+            }
+        }
+        return l;
+    }
 
     @Override
     public J visitAssignOp(J.AssignOp assignOp, P p) {

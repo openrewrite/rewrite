@@ -28,6 +28,16 @@ interface UnnecessaryParenthesesTest : RecipeTest {
     override val recipe: Recipe?
         get() = UnnecessaryParentheses()
 
+    /**
+     * Setting all options to false to enable individually toggling configuration flags.
+     *
+     * This is a little aggressive to have this large wall of "false, false, false...", I know.
+     * The reason for having an "all false" style set is to individually test each style rule.
+     * This allows each configuration flag to be tested on a more fine-grained level,
+     * and it allows these tests to be more descriptive of what situation each flag is concerned with.
+     * For example, did you know bsrAssign was "UNSIGNED RIGHT-SHIFT ASSIGNMENT", or where it was applicable?
+     * I didn't either. Hopefully some of these tests, although sometimes redundant, can help clarify.
+     */
     fun unnecessaryParentheses(with: UnnecessaryParenthesesStyle.() -> UnnecessaryParenthesesStyle = { this }) =
         listOf(
             NamedStyles(
@@ -125,14 +135,16 @@ interface UnnecessaryParenthesesTest : RecipeTest {
         before = """
                 public class A {
                     void doNothing() {
-                        double num = (1.0 + 1.0) + 2.0;
+                        int a = ((1 + 2) + 3);
+                        int b = (a + a) * a;
                     }
                 }
             """,
         after = """
                 public class A {
                     void doNothing() {
-                        double num = 1.0 + 1.0 + 2.0;
+                        int a = 1 + 2 + 3;
+                        int b = (a + a) * a;
                     }
                 }
             """
@@ -162,44 +174,48 @@ interface UnnecessaryParenthesesTest : RecipeTest {
     )
 
     @Test
-    @Disabled
     fun unwrapNum(jp: JavaParser.Builder<*, *>) = assertChanged(
         jp.styles(unnecessaryParentheses {
             withNumDouble(true)
-            withNumFloat(true)
-            withNumInt(true)
-            withNumLong(true)
+                .withNumFloat(true)
+                .withNumInt(true)
+                .withNumLong(true)
         }).build(),
         before = """
                 public class A {
                     void doNothing() {
-                        double a = (1.0);
-                        float b = (1.0);
-                        int c = (1);
-                        long d = (1.0L);
+                        double a = (1000.0);
+                        if ((1000.0) == a) {
+                            a = (1000.0);
+                        }
+                        float b = (1000.0f);
+                        int c = (1000);
+                        long d = (1000L);
                     }
                 }
             """,
         after = """
                 public class A {
                     void doNothing() {
-                        double a = 1.0;
-                        float b = 1.0;
-                        int c = 1;
-                        long d = 1.0L;
+                        double a = 1000.0;
+                        if (1000.0 == a) {
+                            a = 1000.0;
+                        }
+                        float b = 1000.0f;
+                        int c = 1000;
+                        long d = 1000L;
                     }
                 }
             """
     )
 
     @Test
-    @Disabled
     fun unwrapLiteral(jp: JavaParser.Builder<*, *>) = assertChanged(
-        jp.styles(unnecessaryParentheses{
+        jp.styles(unnecessaryParentheses {
             withLiteralTrue(true)
-            withLiteralFalse(true)
-            withLiteralNull(true)
-            withStringLiteral(true)
+                .withLiteralFalse(true)
+                .withLiteralNull(true)
+                .withStringLiteral(true)
         }).build(),
         before = """
                 public class A {
@@ -207,16 +223,17 @@ interface UnnecessaryParenthesesTest : RecipeTest {
                         boolean a = (true);
                         boolean b = (false);
                         if (a == (true)) {
-                          b = (false);
+                            b = (false);
                         } else if (b == (false)) {
-                          a = (true);
+                            a = (true);
                         }
                         
-                        String s = ("literallyString"); 
+                        String s = ("literallyString");
+                        String t = ("literallyString" + "stringLiteral");
                         if (s == (null)) {
                             s = (null);
-                        } else if (("someLiteral").equals(s)) {
-                            s = (null);
+                        } else if ((("someLiteral").toLowerCase()).equals(s)) {
+                            s = null;
                         }
                     }
                 }
@@ -224,19 +241,20 @@ interface UnnecessaryParenthesesTest : RecipeTest {
         after = """
                 public class A {
                     void doNothing() {
-                        boolean a = (true);
-                        boolean b = (false);
-                        if (a == (true)) {
-                          b = (false);
-                        } else if (b == (false)) {
-                          a = (true);
+                        boolean a = true;
+                        boolean b = false;
+                        if (a == true) {
+                            b = false;
+                        } else if (b == false) {
+                            a = true;
                         }
                         
-                        String s = ("literallyString"); 
-                        if (s == (null)) {
-                            s = (null);
-                        } else if (("someLiteral").equals(s)) {
-                            s = (null);
+                        String s = "literallyString";
+                        String t = ("literallyString" + "stringLiteral");
+                        if (s == null) {
+                            s = null;
+                        } else if (("someLiteral".toLowerCase()).equals(s)) {
+                            s = null;
                         }
                     }
                 }
