@@ -30,8 +30,8 @@ import java.util.Objects;
 
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
-    @Incubating(since="7.0.0")
-    public <J2 extends J> J2 generate(JavaTemplate template, JavaCoordinates coordinates, Object... parameters ) {
+    @Incubating(since = "7.0.0")
+    public <J2 extends J> J2 generate(JavaTemplate template, JavaCoordinates coordinates, Object... parameters) {
         //TODO Not Implemented.
         return null;
     }
@@ -43,7 +43,6 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
      * @param parameters Template parameters
      * @param <J2>       Expected type returned from the template.
      * @return A list of generated elements
-     *
      * @deprecated This method is deprecated and will be removed in 7.0.
      */
     @Deprecated
@@ -847,7 +846,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
             if (childScope instanceof J.ClassDecl) {
                 J.ClassDecl childClass = (J.ClassDecl) childScope;
                 if (!(childClass.getKind().equals(J.ClassDecl.Kind.Class)) ||
-                        childClass.hasModifier("static")) {
+                        childClass.hasModifier(J.Modifier.Type.Static)) {
                     //Short circuit the search if a terminating element is encountered.
                     return false;
                 }
