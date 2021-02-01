@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.Issue
 import org.openrewrite.java.JavaParser
@@ -95,4 +97,19 @@ interface ClassDeclTest : JavaTreeTest {
             public strictfp class A {}
         """
     )
+
+    @Test
+    fun hasModifier(jp: JavaParser) {
+        val a = jp.parse(
+            """
+            public strictfp class A {}
+        """
+        )[0]
+
+        val inv = a.classes[0]
+        assertThat(inv.modifiers).hasSize(2)
+        assertTrue(inv.hasModifier(J.Modifier.Type.Public))
+        assertTrue(inv.hasModifier(J.Modifier.Type.Strictfp))
+    }
+
 }

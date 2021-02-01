@@ -15,6 +15,8 @@
  */
 package org.openrewrite.java.tree
 
+import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
@@ -77,4 +79,21 @@ interface VariableDeclsTest : JavaTreeTest {
             public /* static */ final static Integer n = 0;
         """
     )
+
+    @Test
+    fun hasModifier(jp: JavaParser) {
+        val a = jp.parse(
+            """
+            class A {
+                protected static final Integer n = 0;
+            }
+        """
+        )[0]
+
+        val inv = a.classes[0].body.statements.filterIsInstance<J.VariableDecls>().first()
+        assertThat(inv.modifiers).hasSize(3)
+        assertTrue(inv.hasModifier(J.Modifier.Type.Protected))
+        assertTrue(inv.hasModifier(J.Modifier.Type.Static))
+        assertTrue(inv.hasModifier(J.Modifier.Type.Final))
+    }
 }

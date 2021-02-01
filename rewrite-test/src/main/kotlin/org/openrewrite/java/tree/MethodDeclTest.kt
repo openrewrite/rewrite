@@ -15,7 +15,7 @@
  */
 package org.openrewrite.java.tree
 
-import org.junit.jupiter.api.Assertions.assertFalse
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
@@ -76,6 +76,13 @@ interface MethodDeclTest : JavaTreeTest {
     )
 
     @Test
+    fun methodWithSuffixMultiComment(jp: JavaParser) = assertParsePrintAndProcess(
+        jp, Class, """
+            public void foo() { }/*Comments*/
+        """
+    )
+
+    @Test
     fun hasModifier(jp: JavaParser) {
         val a = jp.parse(
             """
@@ -86,16 +93,8 @@ interface MethodDeclTest : JavaTreeTest {
         )[0]
 
         val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDecl>().first()
+        assertThat(inv.modifiers).hasSize(2)
         assertTrue(inv.hasModifier(J.Modifier.Type.Private))
         assertTrue(inv.hasModifier(J.Modifier.Type.Static))
-        assertFalse(inv.hasModifier(J.Modifier.Type.Default))
     }
-
-    @Test
-    fun methodWithSuffixMultiComment(jp: JavaParser) = assertParsePrintAndProcess(
-        jp, Class, """
-            public void foo() { }/*Comments*/
-        """
-    )
-
 }
