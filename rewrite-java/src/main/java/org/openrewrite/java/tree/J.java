@@ -877,7 +877,7 @@ public interface J extends Serializable, Tree {
             Annotation
         }
 
-        public boolean hasModifier(String modifier) {
+        public boolean hasModifier(Modifier.Type modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
@@ -2652,7 +2652,7 @@ public interface J extends Serializable, Tree {
             return name.getSimpleName();
         }
 
-        public boolean hasModifier(String modifier) {
+        public boolean hasModifier(Modifier.Type modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 
@@ -2880,8 +2880,8 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Data
     final class Modifier implements J {
-        public static boolean hasModifier(Collection<Modifier> modifiers, String modifier) {
-            return modifiers.stream().anyMatch(m -> m.getType().toString().toLowerCase().equals(modifier));
+        public static boolean hasModifier(Collection<Modifier> modifiers, Modifier.Type modifier) {
+            return modifiers.stream().anyMatch(m -> m.getType() == modifier);
         }
 
         @EqualsAndHashCode.Include
@@ -4289,7 +4289,7 @@ public interface J extends Serializable, Tree {
             }
         }
 
-        public boolean hasModifier(String modifier) {
+        public boolean hasModifier(Modifier.Type modifier) {
             return Modifier.hasModifier(getModifiers(), modifier);
         }
 

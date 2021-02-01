@@ -15,12 +15,13 @@
  */
 package org.openrewrite.java.tree
 
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.openrewrite.java.JavaParser
 import org.openrewrite.java.JavaTreeTest
 import org.openrewrite.java.JavaTreeTest.NestingLevel.Class
 import org.openrewrite.java.JavaTreeTest.NestingLevel.CompilationUnit
-import org.junit.jupiter.api.Assertions.*
 
 interface MethodDeclTest : JavaTreeTest {
 
@@ -76,17 +77,18 @@ interface MethodDeclTest : JavaTreeTest {
 
     @Test
     fun hasModifier(jp: JavaParser) {
-        val a = jp.parse("""
+        val a = jp.parse(
+            """
             public class A {
                 private static boolean foo() { return true; };
             }
-        """)[0]
+        """
+        )[0]
 
         val inv = a.classes[0].body.statements.filterIsInstance<J.MethodDecl>().first()
-        assertTrue(inv.hasModifier("private"))
-        assertTrue(inv.hasModifier("static"))
-        assertFalse(inv.hasModifier("sTaTiC"))
-        assertFalse(inv.hasModifier("fake"))
+        assertTrue(inv.hasModifier(J.Modifier.Type.Private))
+        assertTrue(inv.hasModifier(J.Modifier.Type.Static))
+        assertFalse(inv.hasModifier(J.Modifier.Type.Default))
     }
 
     @Test
