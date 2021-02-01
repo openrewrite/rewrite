@@ -58,7 +58,6 @@ public interface JavaType extends Serializable {
     class MultiCatch implements JavaType {
         private final List<JavaType> throwableTypes;
 
-        @JsonCreator
         public MultiCatch(List<JavaType> throwableTypes) {
             this.throwableTypes = throwableTypes;
         }
@@ -114,7 +113,6 @@ public interface JavaType extends Serializable {
     class ShallowClass extends FullyQualified {
         private final String fullyQualifiedName;
 
-        @JsonCreator
         public ShallowClass(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
         }
@@ -371,7 +369,6 @@ public interface JavaType extends Serializable {
     class Cyclic extends FullyQualified {
         private final String fullyQualifiedName;
 
-        @JsonCreator
         public Cyclic(String fullyQualifiedName) {
             this.fullyQualifiedName = fullyQualifiedName;
         }
@@ -529,7 +526,6 @@ public interface JavaType extends Serializable {
     class Array implements JavaType {
         private final JavaType elemType;
 
-        @JsonCreator
         public Array(JavaType elemType) {
             this.elemType = elemType;
         }

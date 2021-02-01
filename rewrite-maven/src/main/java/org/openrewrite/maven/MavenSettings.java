@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
@@ -39,6 +38,7 @@ import static java.util.Collections.emptyList;
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
 @ToString(onlyExplicitlyIncluded = true)
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
+@Data
 public class MavenSettings {
     @Nullable
     Profiles profiles;
@@ -54,18 +54,6 @@ public class MavenSettings {
     @Getter
     @With
     Servers servers;
-
-    @JsonCreator
-    MavenSettings(
-            @Nullable Profiles profiles,
-            @Nullable ActiveProfiles activeProfiles,
-            @Nullable Mirrors mirrors,
-            @Nullable Servers servers) {
-        this.profiles = profiles;
-        this.activeProfiles = activeProfiles;
-        this.mirrors = mirrors;
-        this.servers = servers;
-    }
 
     public static MavenSettings parse(Parser.Input source) {
         try {
@@ -207,6 +195,7 @@ public class MavenSettings {
         @Nullable
         String mirrorOf;
 
+        @Nullable
         @NonFinal
         private ApplicabilitySpec applicabilitySpec = null;
 
@@ -277,10 +266,7 @@ public class MavenSettings {
                     return true;
                 }
                 // Best-effort basis, by no means a full guarantee of detecting all possible local URIs
-                if (repoUri.getHost().equals("localhost") || repoUri.getHost().equals("127.0.0.1")) {
-                    return true;
-                }
-                return false;
+                return repoUri.getHost().equals("localhost") || repoUri.getHost().equals("127.0.0.1");
             }
         }
 

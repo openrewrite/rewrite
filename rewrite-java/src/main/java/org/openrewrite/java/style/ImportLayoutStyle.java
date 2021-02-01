@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.style;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.core.JsonGenerator;
@@ -26,9 +25,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
-import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.ToString;
 import org.openrewrite.java.JavaStyle;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JRightPadded;
@@ -89,7 +86,6 @@ public class ImportLayoutStyle implements JavaStyle {
     @JsonSerialize(using = BlockSerializer.class)
     private final List<Block> layout;
 
-    @JsonCreator
     public ImportLayoutStyle(@JsonProperty("classCountToUseStarImport") int classCountToUseStarImport,
                              @JsonProperty("nameCountToUseStarImport") int nameCountToUseStarImport,
                              @JsonProperty("layout") List<Block> layout) {

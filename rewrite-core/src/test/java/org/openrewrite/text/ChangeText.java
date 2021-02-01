@@ -15,8 +15,6 @@
  */
 package org.openrewrite.text;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.openrewrite.ExecutionContext;
 import org.openrewrite.Recipe;
 import org.openrewrite.TreeVisitor;
@@ -27,8 +25,7 @@ import static org.openrewrite.Validated.required;
 public class ChangeText extends Recipe {
     private final String toText;
 
-    @JsonCreator
-    public ChangeText(@JsonProperty("toText") String toText) {
+    public ChangeText(String toText) {
         this.toText = toText;
     }
 

@@ -30,7 +30,6 @@ public class PlainText implements SourceFile, Tree {
     private Markers markers;
     private final String text;
 
-    @JsonCreator
     public PlainText(UUID id,
                      Markers markers,
                      String text) {

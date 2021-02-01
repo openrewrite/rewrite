@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
@@ -35,7 +34,6 @@ public class ChangePropertyValue extends Recipe {
         return new ChangePropertyValueVisitor();
     }
 
-    @JsonCreator
     public ChangePropertyValue(String key, String newValue) {
         //Customizing lombok constructor to replace the property markers.
         //noinspection ConstantConditions

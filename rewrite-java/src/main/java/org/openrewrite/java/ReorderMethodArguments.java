@@ -15,8 +15,9 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.AllArgsConstructor;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonPOJOBuilder;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.ExecutionContext;
@@ -37,8 +38,9 @@ import java.util.List;
  * array of parameter names.
  */
 @Data
+@JsonDeserialize(builder = ReorderMethodArguments.Builder.class)
+@Builder(builderClassName = "Builder", toBuilder = true)
 @EqualsAndHashCode(callSuper = true)
-@AllArgsConstructor
 public class ReorderMethodArguments extends Recipe {
 
     /**
@@ -57,12 +59,10 @@ public class ReorderMethodArguments extends Recipe {
      * in which the arguments were arranged.
      */
     @Nullable
-    private String[] oldParameterNames = new String[0];
+    private String[] oldParameterNames;
 
-    @JsonCreator
-    public ReorderMethodArguments(String methodPattern, String[] orderedArgumentNames) {
-        this.methodPattern = methodPattern;
-        this.newParameterNames = orderedArgumentNames;
+    @JsonPOJOBuilder(withPrefix = "")
+    public static class Builder {
     }
 
     @Override
@@ -82,8 +82,10 @@ public class ReorderMethodArguments extends Recipe {
             J.MethodInvocation m = super.visitMethodInvocation(method, ctx);
 
             if (methodMatcher.matches(m) && m.getType() != null) {
-                List<String> paramNames = oldParameterNames.length == 0 ? m.getType().getParamNames() :
-                        Arrays.asList(oldParameterNames);
+                @SuppressWarnings("ConstantConditions") List<String> paramNames =
+                        oldParameterNames == null || oldParameterNames.length == 0 ?
+                                m.getType().getParamNames() :
+                                Arrays.asList(oldParameterNames);
 
                 if (paramNames == null) {
                     throw new IllegalStateException("There is no source attachment for method " + m.getType().getDeclaringType().getFullyQualifiedName() +

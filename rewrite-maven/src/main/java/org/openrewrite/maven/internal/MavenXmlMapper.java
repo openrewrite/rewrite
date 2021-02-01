@@ -20,6 +20,7 @@ import com.ctc.wstx.stax.WstxOutputFactory;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
 import com.fasterxml.jackson.dataformat.xml.XmlFactory;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import com.fasterxml.jackson.module.jaxb.JaxbAnnotationModule;
@@ -40,6 +41,7 @@ public class MavenXmlMapper {
         XmlFactory xmlFactory = new XmlFactory(input, new WstxOutputFactory());
         {
             ObjectMapper m = XmlMapper.builder(xmlFactory)
+                    .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
                     .defaultUseWrapper(false)
                     .build()
                     .registerModule(new ParameterNamesModule())

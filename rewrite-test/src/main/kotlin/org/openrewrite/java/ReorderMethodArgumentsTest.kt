@@ -29,21 +29,24 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArguments(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(String, Integer, Integer)", arrayOf("n", "m", "s"))
-        .doNext(
-            object : Recipe() {
-                override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-                    return object: JavaVisitor<ExecutionContext>() {
-                        override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {
-                            if(literal.type == JavaType.Primitive.String) {
-                                doAfterVisit(ChangeLiteral(literal) { "anotherstring" })
+        recipe = ReorderMethodArguments.builder()
+            .methodPattern("a.A foo(String, Integer, Integer)")
+            .newParameterNames(arrayOf("n", "m", "s"))
+            .build()
+            .doNext(
+                object : Recipe() {
+                    override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
+                        return object : JavaVisitor<ExecutionContext>() {
+                            override fun visitLiteral(literal: J.Literal, p: ExecutionContext): J {
+                                if (literal.type == JavaType.Primitive.String) {
+                                    doAfterVisit(ChangeLiteral(literal) { "anotherstring" })
+                                }
+                                return super.visitLiteral(literal, p)
                             }
-                            return super.visitLiteral(literal, p)
                         }
                     }
                 }
-            }
-        ),
+            ),
         dependsOn = arrayOf(
             """
                 package a;
@@ -84,7 +87,11 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWithNoSourceAttachment(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("n", "s"), arrayOf("s", "n")),
+        recipe = ReorderMethodArguments.builder()
+            .methodPattern("a.A foo(..)")
+            .oldParameterNames(arrayOf("n", "s"))
+            .newParameterNames(arrayOf("s", "n"))
+            .build(),
         dependsOn = arrayOf(
             """
                 package a;
@@ -117,7 +124,10 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWhereOneOfTheOriginalArgumentsIsVararg(jp: JavaParser) = assertChanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("s", "o", "n")),
+        recipe = ReorderMethodArguments.builder()
+            .methodPattern("a.A foo(..)")
+            .newParameterNames(arrayOf("s", "o", "n"))
+            .build(),
         dependsOn = arrayOf(
             """
                 package a;
@@ -150,7 +160,10 @@ interface ReorderMethodArgumentsTest : RecipeTest {
     @Test
     fun reorderArgumentsWhereTheLastArgumentIsVarargAndNotPresentInInvocation(jp: JavaParser) = assertUnchanged(
         jp,
-        recipe = ReorderMethodArguments("a.A foo(..)", arrayOf("o", "s")),
+        recipe = ReorderMethodArguments.builder()
+            .methodPattern("a.A foo(..)")
+            .newParameterNames(arrayOf("o", "s"))
+            .build(),
         dependsOn = arrayOf(
             """
                 package a;
@@ -186,13 +199,13 @@ interface ReorderMethodArgumentsTest : RecipeTest {
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
         assertThat(valid.failures()[1].property).isEqualTo("newParameterNames")
 
-        cm = ReorderMethodArguments(null, arrayOf("a"),null)
+        cm = ReorderMethodArguments(null, arrayOf("a"), null)
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)
         assertThat(valid.failures()[0].property).isEqualTo("methodPattern")
 
-        cm = ReorderMethodArguments("b.B foo()", null,null)
+        cm = ReorderMethodArguments("b.B foo()", null, null)
         valid = cm.validate()
         assertThat(valid.isValid).isFalse()
         assertThat(valid.failures()).hasSize(1)

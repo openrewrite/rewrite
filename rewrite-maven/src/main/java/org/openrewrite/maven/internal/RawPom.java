@@ -15,7 +15,6 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
@@ -198,7 +197,6 @@ public class RawPom {
             this.dependencies = null;
         }
 
-        @JsonCreator
         public DependencyManagement(@JsonProperty("dependencies") @Nullable Dependencies dependencies) {
             this.dependencies = dependencies;
         }
@@ -212,7 +210,6 @@ public class RawPom {
             this.dependencies = emptyList();
         }
 
-        @JsonCreator
         public Dependencies(@JacksonXmlProperty(localName = "dependency") List<Dependency> dependencies) {
             this.dependencies = dependencies;
         }
@@ -226,7 +223,6 @@ public class RawPom {
             this.licenses = emptyList();
         }
 
-        @JsonCreator
         public Licenses(@JacksonXmlProperty(localName = "license") List<License> licenses) {
             this.licenses = licenses;
         }
@@ -240,7 +236,6 @@ public class RawPom {
             this.profiles = emptyList();
         }
 
-        @JsonCreator
         public Profiles(@JacksonXmlProperty(localName = "profile") List<Profile> profiles) {
             this.profiles = profiles;
         }
@@ -268,7 +263,6 @@ public class RawPom {
             this.name = "";
         }
 
-        @JsonCreator
         public License(@JsonProperty("name") String name) {
             this.name = name;
         }

@@ -67,7 +67,6 @@ public class RawRepositories {
     public static class ArtifactPolicy {
         boolean enabled;
 
-        @JsonCreator
         public ArtifactPolicy(@Nullable Boolean enabled) {
             this.enabled = enabled == null || enabled;
         }

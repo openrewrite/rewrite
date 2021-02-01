@@ -15,8 +15,6 @@
  */
 package org.openrewrite.java;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -52,7 +50,6 @@ public class RemoveImport<P> extends JavaIsoVisitor<P> {
     private final Set<String> referencedFields = new HashSet<>();
     private final Set<J.Import> staticNamedImports = Collections.newSetFromMap(new IdentityHashMap<>());
 
-    @JsonCreator
     public RemoveImport(String type) {
         this.type = type;
         this.methodMatcher = new MethodMatcher(type + " *(..)");

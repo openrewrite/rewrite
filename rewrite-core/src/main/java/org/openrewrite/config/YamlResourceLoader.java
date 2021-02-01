@@ -18,6 +18,9 @@ package org.openrewrite.config;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import org.openrewrite.Recipe;
 import org.openrewrite.Validated;
 import org.openrewrite.internal.PropertyPlaceholderHelper;
@@ -38,7 +41,10 @@ import static java.util.stream.Collectors.toList;
 import static org.openrewrite.Validated.invalid;
 
 public class YamlResourceLoader implements ResourceLoader {
-    private static final ObjectMapper mapper = new ObjectMapper()
+    private static final ObjectMapper mapper = JsonMapper.builder()
+            .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+            .build()
+            .registerModule(new ParameterNamesModule())
             .enable(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES)
             .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 

@@ -15,10 +15,7 @@
  */
 package org.openrewrite.maven.internal;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper;
-import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlProperty;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.Getter;
@@ -29,7 +26,6 @@ import org.openrewrite.xml.XmlParser;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.List;
 
 import static java.util.Collections.emptyList;
@@ -48,8 +44,7 @@ public class MavenMetadata {
 
     Versioning versioning;
 
-    @JsonCreator
-    public MavenMetadata(@JsonProperty("versioning") Versioning versioning) {
+    public MavenMetadata(Versioning versioning) {
         this.versioning = versioning;
     }
 
@@ -61,7 +56,6 @@ public class MavenMetadata {
         @Nullable
         Snapshot snapshot;
 
-        @JsonCreator
         public Versioning(
                 @JacksonXmlElementWrapper(localName = "versions") List<String> versions,
                 @Nullable Snapshot snapshot) {
