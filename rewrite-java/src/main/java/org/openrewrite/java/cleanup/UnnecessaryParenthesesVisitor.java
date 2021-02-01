@@ -21,7 +21,6 @@ import org.openrewrite.java.UnwrapParentheses;
 import org.openrewrite.java.style.UnnecessaryParenthesesStyle;
 import org.openrewrite.java.tree.Expression;
 import org.openrewrite.java.tree.J;
-import org.openrewrite.java.tree.JavaType;
 
 @Incubating(since = "7.0.0")
 public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
@@ -36,7 +35,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public <T extends J> J visitParentheses(J.Parentheses<T> parens, P p) {
         J par = super.visitParentheses(parens, p);
-        if (style.isIdent() && ((J.Parentheses<T>) par).getTree().getElem() instanceof J.Ident) {
+        if (style.isIdent() && ((J.Parentheses<T>) par).getTree() instanceof J.Ident) {
             par = new UnwrapParentheses<>((J.Parentheses<?>) par).visit(par, p, getCursor());
         }
         return par;
@@ -63,7 +62,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.AssignOp a = visitAndCast(assignOp, p, super::visitAssignOp);
 
         Expression assignment = a.getAssignment();
-        J.AssignOp.Type op = a.getOperator().getElem();
+        J.AssignOp.Type op = a.getOperator();
         if (assignment instanceof J.Parentheses && ((style.isBandAssign() && op == J.AssignOp.Type.BitAnd) ||
                 (style.isBorAssign() && op == J.AssignOp.Type.BitOr) ||
                 (style.isBsrAssign() && op == J.AssignOp.Type.UnsignedRightShift) ||
@@ -84,7 +83,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     public J visitAssign(J.Assign assign, P p) {
         J.Assign a = visitAndCast(assign, p, super::visitAssign);
         if (style.isAssign()) {
-            a = (J.Assign) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment().getElem()).visit(a, p, getCursor());
+            a = (J.Assign) new UnwrapParentheses<>((J.Parentheses<?>) a.getAssignment()).visit(a, p, getCursor());
         }
         return a;
     }
@@ -92,8 +91,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitVariable(J.VariableDecls.NamedVar variable, P p) {
         J.VariableDecls.NamedVar v = visitAndCast(variable, p, super::visitVariable);
-        if (style.isAssign() && v.getInitializer() != null && v.getInitializer().getElem() instanceof J.Parentheses) {
-            v = (J.VariableDecls.NamedVar) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer().getElem()).visit(v, p, getCursor());
+        if (style.isAssign() && v.getInitializer() != null && v.getInitializer() instanceof J.Parentheses) {
+            v = (J.VariableDecls.NamedVar) new UnwrapParentheses<>((J.Parentheses<?>) v.getInitializer()).visit(v, p, getCursor());
         }
         return v;
     }
@@ -103,8 +102,8 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
         J.Lambda l = visitAndCast(lambda, p, super::visitLambda);
         if (l.getParameters().getParams().size() == 1 &&
                 l.getParameters().isParenthesized() &&
-                l.getParameters().getParams().get(0).getElem() instanceof J.VariableDecls &&
-                ((J.VariableDecls) l.getParameters().getParams().get(0).getElem()).getTypeExpr() == null) {
+                l.getParameters().getParams().get(0) instanceof J.VariableDecls &&
+                ((J.VariableDecls) l.getParameters().getParams().get(0)).getTypeExpr() == null) {
             l = l.withParameters(l.getParameters().withParenthesized(false));
         }
         return l;
