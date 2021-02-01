@@ -15,6 +15,7 @@
  */
 package org.openrewrite;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.NullUtils;
@@ -30,22 +31,26 @@ import java.util.function.Function;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singleton;
 import static java.util.stream.Collectors.*;
+
 /**
  * Provides a formalized link list data structure of {@link Recipe recipes} and a {@link Recipe#run(List)} method which will
  * apply each recipes {@link TreeVisitor visitor} visit method to a list of {@link SourceFile sourceFiles}
- *
+ * <p>
  * Requires a name, {@link TreeVisitor visitor}.
  * Optionally a subsequent Recipe can be linked via {@link #doNext(Recipe)}}
- *
+ * <p>
  * An {@link ExecutionContext} controls parallel execution and lifecycle while providing a message bus
  * for sharing state between recipes and their visitors
- *
+ * <p>
  * returns a list of {@link Result results} for each modified {@link SourceFile}
- *
  */
 public class Recipe {
-
     private static final Logger logger = LoggerFactory.getLogger(Recipe.class);
+
+    @JsonProperty("@c")
+    public String getJacksonPolymorphicTypeTag() {
+        return getClass().getName();
+    }
 
     /**
      * This tree printer is used when comparing before/after source files and reifies any markers as a list of
@@ -203,7 +208,7 @@ public class Recipe {
                 } else {
                     //printing both the before and after (and including markers in the output) and then comparing the
                     //output to dermine if a change has been made.
-                    if(!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
+                    if (!original.print(MARKER_ID_PRINTER, ctx).equals(s.print(MARKER_ID_PRINTER, ctx))) {
                         results.add(new Result(original, s, s.getMarkers()
                                 .findFirst(RecipeThatMadeChanges.class)
                                 .orElseThrow(() -> new IllegalStateException("SourceFile changed but no recipe reported making a change?"))

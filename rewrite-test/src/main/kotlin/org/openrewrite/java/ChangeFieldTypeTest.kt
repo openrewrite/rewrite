@@ -17,17 +17,12 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeVisitor
 import org.openrewrite.java.tree.JavaType
 
 interface ChangeFieldTypeTest : RecipeTest {
-    fun changeFieldType(from: String, to: String) = object : Recipe() {
-        override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-            return ChangeFieldType(JavaType.Class.build(from), to)
-        }
-    }
+    fun changeFieldType(from: String, to: String) =
+        ChangeFieldType<ExecutionContext>(JavaType.Class.build(from), to).toRecipe()
 
     @Test
     fun changeFieldTypeDeclarative(jp: JavaParser) = assertChanged(

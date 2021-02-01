@@ -18,7 +18,8 @@ package org.openrewrite
 import com.fasterxml.jackson.annotation.JsonAutoDetect
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector
+import com.fasterxml.jackson.databind.json.JsonMapper
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule
 import org.assertj.core.api.Assertions.*
 import org.junit.jupiter.api.fail
@@ -56,22 +57,26 @@ interface RecipeTest {
     ) {
         assertThat(recipe).`as`("A recipe must be specified").isNotNull
 
-        val m = ObjectMapper()
-            .registerModule(ParameterNamesModule())
-            .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-            .setSerializationInclusion(JsonInclude.Include.NON_NULL)
+        if (recipe !is AdHocRecipe) {
+            val m = JsonMapper.builder()
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .build()
+                .registerModule(ParameterNamesModule())
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .setSerializationInclusion(JsonInclude.Include.NON_NULL)
 
-        val recipeMapper = m.setVisibility(
-            m.serializationConfig.defaultVisibilityChecker
-                .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
-                .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
-                .withFieldVisibility(JsonAutoDetect.Visibility.ANY)
-        )
+            val recipeMapper = m.setVisibility(
+                m.serializationConfig.defaultVisibilityChecker
+                    .withCreatorVisibility(JsonAutoDetect.Visibility.PUBLIC_ONLY)
+                    .withGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                    .withIsGetterVisibility(JsonAutoDetect.Visibility.NONE)
+                    .withFieldVisibility(JsonAutoDetect.Visibility.ANY)
+            )
 
-        assertThat(recipeMapper.readValue(recipeMapper.writeValueAsString(recipe), recipe!!.javaClass))
-            .`as`("Recipe must be serializable/deserializable")
-            .isEqualTo(recipe)
+            assertThat(recipeMapper.readValue(recipeMapper.writeValueAsString(recipe), recipe!!.javaClass))
+                .`as`("Recipe must be serializable/deserializable")
+                .isEqualTo(recipe)
+        }
 
         val source = parser!!.parse(*(arrayOf(before.trimIndent()) + dependsOn)).first()
 
@@ -182,12 +187,18 @@ interface RecipeTest {
         }
     }
 
-    fun JavaVisitor<ExecutionContext>.toRecipe(cursored: Boolean = false) = object : Recipe() {
+    fun JavaVisitor<ExecutionContext>.toRecipe(cursored: Boolean = false) =
+        AdHocRecipe(cursored, this)
+
+    class AdHocRecipe(
+        private val cursored: Boolean,
+        private val visitor: JavaVisitor<ExecutionContext>
+    ) : Recipe() {
         override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-            if(cursored) {
-                this@toRecipe.setCursoringOn()
+            if (cursored) {
+                visitor.setCursoringOn()
             }
-            return this@toRecipe
+            return visitor
         }
     }
 }

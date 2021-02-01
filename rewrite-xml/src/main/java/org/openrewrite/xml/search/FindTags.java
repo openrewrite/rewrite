@@ -30,7 +30,6 @@ import java.util.Set;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class FindTags extends Recipe {
-
     private final String xPath;
 
     @Override

@@ -21,6 +21,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.cfg.ConstructorDetector;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.dataformat.smile.SmileFactory;
 import com.fasterxml.jackson.dataformat.smile.SmileGenerator;
@@ -47,7 +49,11 @@ public class TreeSerializer<S extends SourceFile> {
         SmileFactory f = new SmileFactory();
         f.configure(SmileGenerator.Feature.CHECK_SHARED_STRING_VALUES, true);
 
-        ObjectMapper m = new ObjectMapper(f)
+        ObjectMapper m = JsonMapper.builder(f)
+                // to be able to construct classes that have @Data and a single field
+                // see https://cowtowncoder.medium.com/jackson-2-12-most-wanted-3-5-246624e2d3d0
+                .constructorDetector(ConstructorDetector.USE_PROPERTIES_BASED)
+                .build()
                 .registerModule(markerModule)
                 .registerModule(new ParameterNamesModule())
                 .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)

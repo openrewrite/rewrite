@@ -17,17 +17,11 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.Test
 import org.openrewrite.ExecutionContext
-import org.openrewrite.Recipe
 import org.openrewrite.RecipeTest
-import org.openrewrite.TreeVisitor
 
 interface RemoveImportTest : RecipeTest {
-    fun removeImport(type: String) = object : Recipe() {
-        override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-            return RemoveImport(type)
-        }
-
-    }
+    fun removeImport(type: String) =
+        RemoveImport<ExecutionContext>(type).toRecipe()
 
     @Test
     fun removeNamedImport(jp: JavaParser) = assertChanged(

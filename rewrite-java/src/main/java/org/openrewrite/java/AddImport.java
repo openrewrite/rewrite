@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.search.FindMethods;
@@ -54,6 +55,7 @@ public class AddImport<P> extends JavaIsoVisitor<P> {
 
     private final JavaType.Class classType;
 
+    @JsonCreator
     public AddImport(String type, @Nullable String statik, boolean onlyIfReferenced) {
         this.type = type;
         this.classType = JavaType.Class.build(type);

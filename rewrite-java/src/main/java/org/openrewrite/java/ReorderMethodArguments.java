@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -58,6 +59,7 @@ public class ReorderMethodArguments extends Recipe {
     @Nullable
     private String[] oldParameterNames = new String[0];
 
+    @JsonCreator
     public ReorderMethodArguments(String methodPattern, String[] orderedArgumentNames) {
         this.methodPattern = methodPattern;
         this.newParameterNames = orderedArgumentNames;

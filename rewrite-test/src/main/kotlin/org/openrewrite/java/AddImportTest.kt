@@ -21,13 +21,7 @@ import org.openrewrite.java.tree.J
 
 interface AddImportTest : RecipeTest {
     fun addImports(vararg adds: AddImport<ExecutionContext>): Recipe = adds
-        .map { add ->
-            object : Recipe() {
-                override fun getVisitor(): TreeVisitor<*, ExecutionContext> {
-                    return add
-                }
-            }
-        }
+        .map { add -> add.toRecipe() }
         .reduce { r1, r2 -> return r1.doNext(r2) }
 
     @Test

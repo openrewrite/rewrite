@@ -15,20 +15,19 @@
  */
 package org.openrewrite.java;
 
+import lombok.Data;
+import lombok.EqualsAndHashCode;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.TypeUtils;
 import org.openrewrite.marker.Markers;
 
+@EqualsAndHashCode(callSuper = true)
+@Data
 public class ChangeFieldType<P> extends JavaIsoVisitor<P> {
     private final JavaType.Class type;
     private final String targetType;
-
-    public ChangeFieldType(JavaType.Class type, String targetType) {
-        this.type = type;
-        this.targetType = targetType;
-    }
 
     @Override
     public J.VariableDecls visitMultiVariable(J.VariableDecls multiVariable, P p) {
