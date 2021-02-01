@@ -34,6 +34,7 @@ import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
 import java.io.Serializable;
+import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -146,7 +147,7 @@ public interface J extends Serializable, Tree {
     final class Annotation implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -193,10 +194,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -309,7 +318,7 @@ public interface J extends Serializable, Tree {
     final class Assign implements J, Statement, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -353,10 +362,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -381,7 +398,7 @@ public interface J extends Serializable, Tree {
     final class AssignOp implements J, Statement, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -443,10 +460,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -471,7 +496,7 @@ public interface J extends Serializable, Tree {
     final class Binary implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -538,10 +563,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -566,7 +599,7 @@ public interface J extends Serializable, Tree {
     final class Block implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @Getter
         @EqualsAndHashCode.Include
@@ -610,10 +643,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -669,7 +710,7 @@ public interface J extends Serializable, Tree {
     final class Case implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -704,10 +745,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -731,7 +780,7 @@ public interface J extends Serializable, Tree {
     final class ClassDecl implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @Getter
         @EqualsAndHashCode.Include
@@ -842,10 +891,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -897,7 +954,7 @@ public interface J extends Serializable, Tree {
     final class CompilationUnit implements J, SourceFile {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -955,10 +1012,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1015,7 +1080,7 @@ public interface J extends Serializable, Tree {
     final class DoWhileLoop implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1055,10 +1120,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1147,7 +1220,7 @@ public interface J extends Serializable, Tree {
     final class EnumValueSet implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1181,10 +1254,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1208,7 +1289,7 @@ public interface J extends Serializable, Tree {
     final class FieldAccess implements J, TypeTree, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1315,10 +1396,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1343,7 +1432,7 @@ public interface J extends Serializable, Tree {
     final class ForEachLoop implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1384,7 +1473,7 @@ public interface J extends Serializable, Tree {
         public static final class Control implements J {
             @Nullable
             @NonFinal
-            transient Padding padding;
+            transient WeakReference<Padding> padding;
 
             @EqualsAndHashCode.Include
             @Getter
@@ -1424,10 +1513,18 @@ public interface J extends Serializable, Tree {
             }
 
             public Padding getPadding() {
-                if (padding == null || padding.t != this) {
-                    this.padding = new Padding(this);
+                Padding p;
+                if (this.padding == null) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                } else {
+                    p = this.padding.get();
+                    if (p == null || p.t != this) {
+                        p = new Padding(this);
+                        this.padding = new WeakReference<>(p);
+                    }
                 }
-                return padding;
+                return p;
             }
 
             @RequiredArgsConstructor
@@ -1453,10 +1550,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1481,7 +1586,7 @@ public interface J extends Serializable, Tree {
     final class ForLoop implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1522,7 +1627,7 @@ public interface J extends Serializable, Tree {
         public static final class Control implements J {
             @Nullable
             @NonFinal
-            transient Padding padding;
+            transient WeakReference<Padding> padding;
 
             @EqualsAndHashCode.Include
             @Getter
@@ -1572,10 +1677,18 @@ public interface J extends Serializable, Tree {
             }
 
             public Padding getPadding() {
-                if (padding == null || padding.t != this) {
-                    this.padding = new Padding(this);
+                Padding p;
+                if (this.padding == null) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                } else {
+                    p = this.padding.get();
+                    if (p == null || p.t != this) {
+                        p = new Padding(this);
+                        this.padding = new WeakReference<>(p);
+                    }
                 }
-                return padding;
+                return p;
             }
 
             @RequiredArgsConstructor
@@ -1609,10 +1722,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1633,7 +1754,7 @@ public interface J extends Serializable, Tree {
     @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
     @Getter
     final class Ident implements J, TypeTree, Expression {
-        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new HashMap<>();
+        private static final Map<String, Map<JavaType, IdentFlyweight>> flyweights = new WeakHashMap<>();
 
         @EqualsAndHashCode.Include
         UUID id;
@@ -1740,7 +1861,7 @@ public interface J extends Serializable, Tree {
     final class If implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -1786,7 +1907,7 @@ public interface J extends Serializable, Tree {
         public static final class Else implements J {
             @Nullable
             @NonFinal
-            transient Padding padding;
+            transient WeakReference<Padding> padding;
 
             @EqualsAndHashCode.Include
             @Getter
@@ -1816,10 +1937,18 @@ public interface J extends Serializable, Tree {
             }
 
             public Padding getPadding() {
-                if (padding == null || padding.t != this) {
-                    this.padding = new Padding(this);
+                Padding p;
+                if (this.padding == null) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                } else {
+                    p = this.padding.get();
+                    if (p == null || p.t != this) {
+                        p = new Padding(this);
+                        this.padding = new WeakReference<>(p);
+                    }
                 }
-                return padding;
+                return p;
             }
 
             @RequiredArgsConstructor
@@ -1837,10 +1966,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1864,7 +2001,7 @@ public interface J extends Serializable, Tree {
     final class Import implements J, Comparable<Import> {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @Getter
         @EqualsAndHashCode.Include
@@ -1965,10 +2102,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -1993,7 +2138,7 @@ public interface J extends Serializable, Tree {
     final class InstanceOf implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2032,10 +2177,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2060,7 +2213,7 @@ public interface J extends Serializable, Tree {
     final class Label implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2097,10 +2250,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2156,7 +2317,7 @@ public interface J extends Serializable, Tree {
         public static final class Parameters implements J {
             @Nullable
             @NonFinal
-            transient Padding padding;
+            transient WeakReference<Padding> padding;
 
             @EqualsAndHashCode.Include
             @Getter
@@ -2185,10 +2346,18 @@ public interface J extends Serializable, Tree {
             }
 
             public Padding getPadding() {
-                if (padding == null || padding.t != this) {
-                    this.padding = new Padding(this);
+                Padding p;
+                if (this.padding == null) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                } else {
+                    p = this.padding.get();
+                    if (p == null || p.t != this) {
+                        p = new Padding(this);
+                        this.padding = new WeakReference<>(p);
+                    }
                 }
-                return padding;
+                return p;
             }
 
             @RequiredArgsConstructor
@@ -2275,7 +2444,7 @@ public interface J extends Serializable, Tree {
     final class MemberReference implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2326,10 +2495,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2362,7 +2539,7 @@ public interface J extends Serializable, Tree {
     final class MethodDecl implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2490,10 +2667,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2544,7 +2729,7 @@ public interface J extends Serializable, Tree {
     final class MethodInvocation implements J, Statement, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2645,10 +2830,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2728,7 +2921,7 @@ public interface J extends Serializable, Tree {
     final class MultiCatch implements J, TypeTree {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2773,10 +2966,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2801,7 +3002,7 @@ public interface J extends Serializable, Tree {
     final class NewArray implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2843,10 +3044,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2872,7 +3081,7 @@ public interface J extends Serializable, Tree {
     final class ArrayDimension implements J {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -2902,10 +3111,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -2930,7 +3147,7 @@ public interface J extends Serializable, Tree {
     final class NewClass implements J, Statement, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @Getter
         @EqualsAndHashCode.Include
@@ -3011,10 +3228,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3071,7 +3296,7 @@ public interface J extends Serializable, Tree {
     final class ParameterizedType implements J, TypeTree, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3121,10 +3346,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3150,7 +3383,7 @@ public interface J extends Serializable, Tree {
     class Parentheses<J2 extends J> implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding<J2> padding;
+        transient WeakReference<Padding<J2>> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3200,10 +3433,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding<J2> getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding<>(this);
+            Padding<J2> p;
+            if (this.padding == null) {
+                p = new Padding<>(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding<>(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3228,7 +3469,7 @@ public interface J extends Serializable, Tree {
     final class ControlParentheses<J2 extends J> implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding<J2> padding;
+        transient WeakReference<Padding<J2>> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3278,10 +3519,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding<J2> getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding<>(this);
+            Padding<J2> p;
+            if (this.padding == null) {
+                p = new Padding<>(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding<>(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3421,7 +3670,7 @@ public interface J extends Serializable, Tree {
     final class Ternary implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3470,10 +3719,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3528,7 +3785,7 @@ public interface J extends Serializable, Tree {
     final class Try implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @Getter
         @EqualsAndHashCode.Include
@@ -3628,10 +3885,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3702,7 +3967,7 @@ public interface J extends Serializable, Tree {
     final class TypeParameter implements J {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3746,10 +4011,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3775,7 +4048,7 @@ public interface J extends Serializable, Tree {
     final class Unary implements J, Statement, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3830,10 +4103,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -3857,7 +4138,7 @@ public interface J extends Serializable, Tree {
     final class VariableDecls implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -3921,7 +4202,7 @@ public interface J extends Serializable, Tree {
         public static final class NamedVar implements J, NameTree {
             @Nullable
             @NonFinal
-            transient Padding padding;
+            transient WeakReference<Padding> padding;
 
             @EqualsAndHashCode.Include
             @Getter
@@ -3980,10 +4261,18 @@ public interface J extends Serializable, Tree {
             }
 
             public Padding getPadding() {
-                if (padding == null || padding.t != this) {
-                    this.padding = new Padding(this);
+                Padding p;
+                if (this.padding == null) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                } else {
+                    p = this.padding.get();
+                    if (p == null || p.t != this) {
+                        p = new Padding(this);
+                        this.padding = new WeakReference<>(p);
+                    }
                 }
-                return padding;
+                return p;
             }
 
             @RequiredArgsConstructor
@@ -4011,10 +4300,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -4039,7 +4336,7 @@ public interface J extends Serializable, Tree {
     final class WhileLoop implements J, Statement {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -4073,10 +4370,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor
@@ -4101,7 +4406,7 @@ public interface J extends Serializable, Tree {
     final class Wildcard implements J, Expression {
         @Nullable
         @NonFinal
-        transient Padding padding;
+        transient WeakReference<Padding> padding;
 
         @EqualsAndHashCode.Include
         @Getter
@@ -4154,10 +4459,18 @@ public interface J extends Serializable, Tree {
         }
 
         public Padding getPadding() {
-            if (padding == null || padding.t != this) {
-                this.padding = new Padding(this);
+            Padding p;
+            if (this.padding == null) {
+                p = new Padding(this);
+                this.padding = new WeakReference<>(p);
+            } else {
+                p = this.padding.get();
+                if (p == null || p.t != this) {
+                    p = new Padding(this);
+                    this.padding = new WeakReference<>(p);
+                }
             }
-            return padding;
+            return p;
         }
 
         @RequiredArgsConstructor

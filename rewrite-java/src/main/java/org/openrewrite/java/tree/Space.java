@@ -24,9 +24,9 @@ import org.openrewrite.marker.Markable;
 import org.openrewrite.marker.Markers;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 import static java.util.Collections.emptyList;
 
@@ -43,7 +43,7 @@ public class Space implements Markable {
      * Most occurrences of spaces will have no comments or markers, and there is a lot of repetition
      * of occurrences of, for example, the single space between elements.
      */
-    private static final Map<String, Space> flyweights = new HashMap<>();
+    private static final Map<String, Space> flyweights = new WeakHashMap<>();
 
     private final List<Comment> comments;
 

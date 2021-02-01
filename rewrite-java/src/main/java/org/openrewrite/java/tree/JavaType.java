@@ -15,7 +15,10 @@
  */
 package org.openrewrite.java.tree;
 
-import com.fasterxml.jackson.annotation.*;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -129,7 +132,7 @@ public interface JavaType extends Serializable {
     @Getter
     class Class extends FullyQualified {
         // there shouldn't be too many distinct types represented by the same fully qualified name
-        private static final Map<String, Set<Class>> flyweights = new HashMap<>();
+        private static final Map<String, Set<Class>> flyweights = new WeakHashMap<>();
 
         public static final Class OBJECT = build("java.lang.Object");
 
@@ -412,7 +415,7 @@ public interface JavaType extends Serializable {
 
     @Getter
     class Method implements JavaType {
-        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new HashMap<>();
+        private static final Map<FullyQualified, Map<String, Set<Method>>> flyweights = new WeakHashMap<>();
 
         @With
         private final FullyQualified declaringType;
