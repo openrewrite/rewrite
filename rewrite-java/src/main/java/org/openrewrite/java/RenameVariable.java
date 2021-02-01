@@ -16,40 +16,48 @@
 package org.openrewrite.java;
 
 import org.openrewrite.Cursor;
-import org.openrewrite.Validated;
-import org.openrewrite.ValidationException;
 import org.openrewrite.java.tree.J;
 
 public class RenameVariable<P> extends JavaIsoVisitor<P> {
-    private final Cursor scope;
+    private final J.VariableDecls.NamedVar variable;
     private final String toName;
 
-    private String scopeVariableName;
-
-    public RenameVariable(Cursor scope, String toName) {
-        this.scope = scope;
-        Validated validated = Validated.test("scope", "Must be a cursor to a J.VariableDecls.NamedVar",
-                scope, s -> s.getValue() instanceof J.VariableDecls.NamedVar);
-        if (validated.isInvalid()) {
-            throw new ValidationException(validated);
-        }
+    public RenameVariable(J.VariableDecls.NamedVar variable, String toName) {
+        this.variable = variable;
         this.toName = toName;
         setCursoringOn();
     }
 
     @Override
-    public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
-        scopeVariableName = ((J.VariableDecls.NamedVar) scope.getValue()).getSimpleName();
-        return super.visitCompilationUnit(cu, p);
+    public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, P p) {
+        if (variable.equals(this.variable)) {
+            doAfterVisit(new RenameVariableByCursor(getCursor()));
+            return variable;
+        }
+        return super.visitVariable(variable, p);
     }
 
-    @Override
-    public J.Ident visitIdentifier(J.Ident ident, P p) {
-        if (ident.getSimpleName().equals(scopeVariableName) &&
-                isInSameNameScope(scope, getCursor()) &&
-                !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
-            return ident.withName(toName);
+    private class RenameVariableByCursor extends JavaIsoVisitor<P> {
+        private final Cursor scope;
+
+        public RenameVariableByCursor(Cursor scope) {
+            this.scope = scope;
+            setCursoringOn();
         }
-        return super.visitIdentifier(ident, p);
+
+        @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, P p) {
+            return super.visitCompilationUnit(cu, p);
+        }
+
+        @Override
+        public J.Ident visitIdentifier(J.Ident ident, P p) {
+            if (ident.getSimpleName().equals(variable.getSimpleName()) &&
+                    isInSameNameScope(scope, getCursor()) &&
+                    !(getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.FieldAccess)) {
+                return ident.withName(toName);
+            }
+            return super.visitIdentifier(ident, p);
+        }
     }
 }

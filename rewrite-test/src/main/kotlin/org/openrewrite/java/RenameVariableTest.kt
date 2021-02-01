@@ -27,14 +27,13 @@ interface RenameVariableTest : RecipeTest {
         jp,
         recipe = object : JavaVisitor<ExecutionContext>() {
             override fun visitMultiVariable(multiVariable: J.VariableDecls, p: ExecutionContext): J {
-                val varCursor = Cursor(cursor, multiVariable.vars[0])
                 if (cursor.dropParentUntil { it is J }.getValue<J>() is J.MethodDecl) {
-                    doAfterVisit(RenameVariable(varCursor, "n2"))
+                    doAfterVisit(RenameVariable(multiVariable.vars[0], "n2"))
                 } else if (cursor
                         .dropParentUntil { it is J }
                         .dropParentUntil { it is J }
                         .getValue<J>() !is J.ClassDecl) {
-                    doAfterVisit(RenameVariable(varCursor, "n1"))
+                    doAfterVisit(RenameVariable(multiVariable.vars[0], "n1"))
                 }
                 return super.visitMultiVariable(multiVariable, p)
             }

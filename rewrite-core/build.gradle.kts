@@ -46,6 +46,7 @@ configure<PublishingExtension> {
             artifact(tasks.withType<ShadowJar>().first())
 
             pom.withXml {
+                asElement().removeChild(asElement().getElementsByTagName("packaging").item(0))
                 (asElement().getElementsByTagName("dependencies").item(0) as org.w3c.dom.Element).let { dependencies ->
                     dependencies.getElementsByTagName("dependency").let { dependencyList ->
                         var i = 0
