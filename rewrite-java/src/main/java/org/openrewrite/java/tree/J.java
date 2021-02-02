@@ -174,7 +174,7 @@ public interface J extends Serializable, Tree {
         }
 
         public Annotation withArgs(@Nullable List<Expression> args) {
-            return getPadding().withArgs(JContainer.withElems(this.args, args));
+            return getPadding().withArgs(JContainer.withElemsNullable(this.args, args));
         }
 
         @Override
@@ -825,7 +825,7 @@ public interface J extends Serializable, Tree {
         }
 
         public ClassDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
         }
 
         @Nullable
@@ -849,7 +849,7 @@ public interface J extends Serializable, Tree {
         }
 
         public ClassDecl withImplements(@Nullable List<TypeTree> implementings) {
-            return getPadding().withImplements(JContainer.withElems(this.implementings, implementings));
+            return getPadding().withImplements(JContainer.withElemsNullable(this.implementings, implementings));
         }
 
         @With
@@ -2471,7 +2471,7 @@ public interface J extends Serializable, Tree {
         }
 
         public MemberReference withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
         }
 
         JLeftPadded<Ident> reference;
@@ -2570,7 +2570,7 @@ public interface J extends Serializable, Tree {
         }
 
         public MethodDecl withTypeParameters(@Nullable List<TypeParameter> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
         }
 
         /**
@@ -2604,7 +2604,7 @@ public interface J extends Serializable, Tree {
         }
 
         public MethodDecl withThrows(@Nullable List<NameTree> throwz) {
-            return getPadding().withThrows(JContainer.withElems(this.throwz, throwz));
+            return getPadding().withThrows(JContainer.withElemsNullable(this.throwz, throwz));
         }
 
         /**
@@ -3203,7 +3203,7 @@ public interface J extends Serializable, Tree {
         }
 
         public NewClass withArgs(@Nullable List<Expression> args) {
-            return getPadding().withArgs(JContainer.withElems(this.args, args));
+            return getPadding().withArgs(JContainer.withElemsNullable(this.args, args));
         }
 
         @With
@@ -3322,7 +3322,7 @@ public interface J extends Serializable, Tree {
         }
 
         public ParameterizedType withTypeParameters(@Nullable List<Expression> typeParameters) {
-            return getPadding().withTypeParameters(JContainer.withElems(this.typeParameters, typeParameters));
+            return getPadding().withTypeParameters(JContainer.withElemsNullable(this.typeParameters, typeParameters));
         }
 
         @Override
@@ -3806,8 +3806,8 @@ public interface J extends Serializable, Tree {
             return resources == null ? null : resources.getElems();
         }
 
-        public Try withResources(List<Resource> resources) {
-            return getPadding().withResources(JContainer.withElems(this.resources, resources));
+        public Try withResources(@Nullable List<Resource> resources) {
+            return getPadding().withResources(JContainer.withElemsNullable(this.resources, resources));
         }
 
         @With
@@ -4001,7 +4001,7 @@ public interface J extends Serializable, Tree {
         }
 
         public TypeParameter withBounds(@Nullable List<TypeTree> bounds) {
-            return getPadding().withBounds(JContainer.withElems(this.bounds, bounds));
+            return getPadding().withBounds(JContainer.withElemsNullable(this.bounds, bounds));
         }
 
         @Override

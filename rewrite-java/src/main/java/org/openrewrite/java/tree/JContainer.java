@@ -148,17 +148,24 @@ public class JContainer<T> implements Markable {
     }
 
     @Nullable
-    public static <J2 extends J> JContainer<J2> withElems(@Nullable JContainer<J2> before, @Nullable List<J2> view) {
+    public static <J2 extends J> JContainer<J2> withElemsNullable(@Nullable JContainer<J2> before, @Nullable List<J2> elems) {
         if (before == null) {
-            if (view == null) {
+            if (elems == null || elems.isEmpty()) {
                 return null;
             }
-            return JContainer.build(Space.EMPTY, JRightPadded.withElems(emptyList(), view), Markers.EMPTY);
+            return JContainer.build(Space.EMPTY, JRightPadded.withElems(emptyList(), elems), Markers.EMPTY);
         }
-        if (view == null) {
+        if (elems == null || elems.isEmpty()) {
             return null;
         }
-        return before.getPadding().withElems(JRightPadded.withElems(before.elems, view));
+        return before.getPadding().withElems(JRightPadded.withElems(before.elems, elems));
+    }
+
+    public static <J2 extends J> JContainer<J2> withElems(JContainer<J2> before, @Nullable List<J2> elems) {
+        if (elems == null) {
+            return before.getPadding().withElems(emptyList());
+        }
+        return before.getPadding().withElems(JRightPadded.withElems(before.elems, elems));
     }
 
     @Override
