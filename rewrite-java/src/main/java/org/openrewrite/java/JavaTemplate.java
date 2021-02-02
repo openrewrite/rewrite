@@ -23,7 +23,6 @@ import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
-import org.openrewrite.java.internal.JavaPrinter;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.slf4j.Logger;

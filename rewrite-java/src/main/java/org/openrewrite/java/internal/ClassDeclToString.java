@@ -16,6 +16,7 @@
 package org.openrewrite.java.internal;
 
 import org.openrewrite.TreePrinter;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JContainer;
 import org.openrewrite.java.tree.JLeftPadded;

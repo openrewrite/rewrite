@@ -24,6 +24,7 @@ import lombok.experimental.NonFinal;
 import org.openrewrite.*;
 import org.openrewrite.internal.lang.NonNull;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.JavaPrinter;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
@@ -98,7 +99,7 @@ public interface J extends Serializable, Tree {
         return trees;
     }
 
-    default Coordinates coordinates() {
+    default Coordinates<?> coordinates() {
         throw new UnsupportedOperationException("Not Implemented");
     }
 
@@ -2176,7 +2177,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.InstanceOf> coordinates() {
             return new Coordinates.InstanceOf(this);
         }
 
@@ -2254,7 +2255,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Label> coordinates() {
             return new Coordinates.Label(this);
         }
 
@@ -2319,7 +2320,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Lambda> coordinates() {
             return new Coordinates.Lambda(this);
         }
 
@@ -2360,7 +2361,7 @@ public interface J extends Serializable, Tree {
             }
 
             @Override
-            public Coordinates coordinates() {
+            public Coordinates<J.Lambda.Parameters> coordinates() {
                 return new Coordinates.Lambda.Parameters(this);
             }
 
@@ -2437,7 +2438,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Literal> coordinates() {
             return new Coordinates.Literal(this);
         }
 
@@ -2519,7 +2520,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.MemberReference> coordinates() {
             return new Coordinates.MemberReference(this);
         }
 
@@ -2691,7 +2692,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates.MethodDecl coordinates() {
+        public Coordinates<J.MethodDecl> coordinates() {
             return new Coordinates.MethodDecl(this);
         }
 
@@ -2839,7 +2840,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.MethodInvocation> coordinates() {
             return new Coordinates.MethodInvocation(this);
         }
 
@@ -2946,7 +2947,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Modifier> coordinates() {
             return new Coordinates.Modifier(this);
         }
     }
@@ -2989,7 +2990,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.MultiCatch> coordinates() {
             return new Coordinates.MultiCatch(this);
         }
 
@@ -3087,7 +3088,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.NewArray> coordinates() {
             return new Coordinates.NewArray(this);
         }
 
@@ -3271,7 +3272,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.NewClass> coordinates() {
             return new Coordinates.NewClass(this);
         }
 
@@ -3341,7 +3342,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Package> coordinates() {
             return new Coordinates.Package(this);
         }
     }
@@ -3404,7 +3405,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.ParameterizedType> coordinates() {
             return new Coordinates.ParameterizedType(this);
         }
 
@@ -3476,7 +3477,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Parentheses<J2>> coordinates() {
             return new Coordinates.Parentheses<>(this);
         }
 
@@ -3657,7 +3658,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Primitive> coordinates() {
             return new Coordinates.Primitive(this);
         }
     }
@@ -3685,7 +3686,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Return> coordinates() {
             return new Coordinates.Return(this);
         }
     }
@@ -3715,7 +3716,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Switch> coordinates() {
             return new Coordinates.Switch(this);
         }
     }
@@ -3745,7 +3746,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Synchronized> coordinates() {
             return new Coordinates.Synchronized(this);
         }
     }
@@ -3807,7 +3808,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Ternary> coordinates() {
             return new Coordinates.Ternary(this);
         }
 
@@ -3870,7 +3871,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Throw> coordinates() {
             return new Coordinates.Throw(this);
         }
     }
@@ -3935,7 +3936,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Try> coordinates() {
             return new Coordinates.Try(this);
         }
 
@@ -3962,7 +3963,7 @@ public interface J extends Serializable, Tree {
             boolean terminatedWithSemicolon;
 
             @Override
-            public Coordinates coordinates() {
+            public Coordinates<J.Try.Resource> coordinates() {
                 return new Coordinates.Try.Resource(this);
             }
         }
@@ -3992,7 +3993,7 @@ public interface J extends Serializable, Tree {
             }
 
             @Override
-            public Coordinates coordinates() {
+            public Coordinates<J.Try.Catch> coordinates() {
                 return new Coordinates.Try.Catch(this);
             }
         }
@@ -4072,7 +4073,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.TypeCast> coordinates() {
             return new Coordinates.TypeCast(this);
         }
     }
@@ -4129,7 +4130,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.TypeParameter> coordinates() {
             return new Coordinates.TypeParameter(this);
         }
 
@@ -4210,7 +4211,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Unary> coordinates() {
             return new Coordinates.Unary(this);
         }
 
@@ -4318,7 +4319,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.VariableDecls> coordinates() {
             return new Coordinates.VariableDecls(this);
         }
 
@@ -4384,7 +4385,7 @@ public interface J extends Serializable, Tree {
             }
 
             @Override
-            public Coordinates coordinates() {
+            public Coordinates<J.VariableDecls.NamedVar> coordinates() {
                 return new Coordinates.VariableDecls.NamedVar(this);
             }
 
@@ -4508,7 +4509,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.WhileLoop> coordinates() {
             return new Coordinates.WhileLoop(this);
         }
 
@@ -4597,7 +4598,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates coordinates() {
+        public Coordinates<J.Wildcard> coordinates() {
             return new Coordinates.Wildcard(this);
         }
 
