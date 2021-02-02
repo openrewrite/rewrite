@@ -28,6 +28,44 @@ import org.openrewrite.java.tree.Statement
 
 interface JavaTemplateTest : RecipeTest {
 
+    @Disabled
+    @Test
+    fun lamdaMethodParameterTest(jp: JavaParser) = assertChanged(
+        jp,
+        recipe = object : JavaIsoVisitor<ExecutionContext>() {
+            init {
+                setCursoringOn()
+            }
+
+            override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
+                var m = super.visitMethodInvocation(method, p)
+                m = m.withArgs(JavaTemplate.builder("() -> \"test\"").build().generate(cursor));
+                return m
+            }
+        }.toRecipe(),
+        before = """
+            import java.util.function.Supplier;
+            class A {
+                void test() {
+                    printStuff("test");
+                }
+                void printStuff(String string) {}
+                void printStuff(Supplier<String> stringSupplier) {}
+            }
+        """,
+        after = """
+            import java.util.function.Supplier;
+            class A {
+                void test() {
+                    printStuff(() -> "test");
+                }
+                void printStuff(String string) {}
+                void printStuff(Supplier<String> stringSupplier) {}
+            } 
+        """,
+        afterConditions = { cu -> cu.classes }
+    )
+
     @Test
     fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(
         jp,
