@@ -915,7 +915,7 @@ public class JavaPrinter<P> extends JavaVisitor<P> {
                     acc.append(';');
                 }
 
-                visitSpace(resource.getAfter(), Space.Location.TRY_RESOURCES_SUFFIX,  p);
+                visitSpace(resource.getAfter(), Space.Location.TRY_RESOURCE_SUFFIX,  p);
             }
             acc.append(')');
         }

@@ -86,7 +86,7 @@ public class JRightPadded<T> implements Markable {
         PARENTHESES(Space.Location.PARENTHESES_SUFFIX),
         STATIC_INIT(Space.Location.STATIC_INIT_SUFFIX),
         THROWS(Space.Location.THROWS_SUFFIX),
-        TRY_RESOURCES(Space.Location.TRY_RESOURCES_SUFFIX),
+        TRY_RESOURCE(Space.Location.TRY_RESOURCE_SUFFIX),
         TYPE_PARAMETER(Space.Location.TYPE_PARAMETER_SUFFIX),
         TYPE_BOUND(Space.Location.TYPE_BOUND_SUFFIX),
         WHILE_BODY(Space.Location.WHILE_BODY_SUFFIX);

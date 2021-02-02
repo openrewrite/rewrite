@@ -404,7 +404,7 @@ public class Space implements Markable {
         TRY_PREFIX,
         TRY_RESOURCE,
         TRY_RESOURCES,
-        TRY_RESOURCES_SUFFIX,
+        TRY_RESOURCE_SUFFIX,
         TYPE_BOUNDS,
         TYPE_BOUND_SUFFIX,
         TYPE_CAST_PREFIX,

@@ -106,7 +106,7 @@ public class JContainer<T> implements Markable {
         NEW_ARRAY_INITIALIZER(Space.Location.NEW_ARRAY_INITIALIZER, JRightPadded.Location.NEW_ARRAY_INITIALIZER),
         NEW_CLASS_ARGS(Space.Location.NEW_CLASS_ARGS, JRightPadded.Location.NEW_CLASS_ARGS),
         THROWS(Space.Location.THROWS, JRightPadded.Location.THROWS),
-        TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCES),
+        TRY_RESOURCES(Space.Location.TRY_RESOURCES, JRightPadded.Location.TRY_RESOURCE),
         TYPE_BOUNDS(Space.Location.TYPE_BOUNDS, JRightPadded.Location.TYPE_BOUND),
         TYPE_PARAMETERS(Space.Location.TYPE_PARAMETERS, JRightPadded.Location.TYPE_PARAMETER);
 
