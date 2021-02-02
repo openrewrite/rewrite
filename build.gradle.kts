@@ -51,7 +51,13 @@ subprojects {
         mavenCentral()
     }
 
+    tasks.withType(GenerateModuleMetadata::class.java) {
+        enabled = false
+    }
+
     dependencies {
+        "compileOnly"("com.google.code.findbugs:jsr305:latest.release")
+
         "compileOnly"("org.projectlombok:lombok:latest.release")
         "annotationProcessor"("org.projectlombok:lombok:latest.release")
 

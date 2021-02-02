@@ -16,8 +16,6 @@ dependencies {
     implementation("org.yaml:snakeyaml:latest.release")
 
     implementation("org.slf4j:slf4j-api:1.7.+")
-
-    api("com.google.code.findbugs:jsr305:latest.release")
 }
 
 tasks.withType<ShadowJar> {
