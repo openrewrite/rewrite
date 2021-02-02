@@ -17,6 +17,7 @@ package org.openrewrite.java
 
 import org.junit.jupiter.api.extension.ExtendWith
 import org.openrewrite.DebugOnly
+import org.openrewrite.java.cleanup.*
 import org.openrewrite.java.example.GenerateGetterTest
 import org.openrewrite.java.format.*
 import org.openrewrite.java.search.*
@@ -141,6 +142,10 @@ class Java11TabsAndIndentsTest : Java11Test, TabsAndIndentsTest
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
 class Java11TypeTreeTest : Java11Test, TypeTreeTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
+class Java11UnnecessaryParenthesesTest : Java11Test, UnnecessaryParenthesesTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
