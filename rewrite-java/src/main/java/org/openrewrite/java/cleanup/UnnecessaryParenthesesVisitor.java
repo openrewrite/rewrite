@@ -48,7 +48,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
     @Override
     public J visitIdentifier(J.Ident ident, P p) {
         J.Ident i = visitAndCast(ident, p, super::visitIdentifier);
-        if (style.isIdent() && getCursor().getParent().getParent().getValue() instanceof J.Parentheses) {
+        if (style.isIdent() && getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
             getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
         }
         return i;
@@ -66,7 +66,7 @@ public class UnnecessaryParenthesesVisitor<P> extends JavaVisitor<P> {
                 (style.isLiteralNull() && type == JavaType.Primitive.Null) ||
                 (style.isLiteralFalse() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(false)) ||
                 (style.isLiteralTrue() && type == JavaType.Primitive.Boolean && l.getValue() == Boolean.valueOf(true))) {
-            if (getCursor().getParent().getParent().getValue() instanceof J.Parentheses) {
+            if (getCursor().dropParentUntil(J.class::isInstance).getValue() instanceof J.Parentheses) {
                 getCursor().putMessageOnFirstEnclosing(J.Parentheses.class, UNNECESSARY_PARENTHESES_MARKER, getCursor());
             }
         }
