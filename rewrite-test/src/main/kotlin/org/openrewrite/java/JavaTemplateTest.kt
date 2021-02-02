@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java
 
-import ch.qos.logback.classic.Level
-import ch.qos.logback.classic.Logger
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.openrewrite.Cursor
@@ -28,16 +25,8 @@ import org.openrewrite.internal.ListUtils
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Statement
-import org.slf4j.LoggerFactory
 
 interface JavaTemplateTest : RecipeTest {
-    companion object {
-        @JvmStatic
-        @BeforeAll
-        fun turnUpLogging() {
-            (LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME) as Logger).level = Level.TRACE
-        }
-    }
 
     @Test
     fun beforeMethodBodyStatement(jp: JavaParser) = assertChanged(

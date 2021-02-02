@@ -29,8 +29,6 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 import org.openrewrite.style.NamedStyles;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
@@ -61,13 +59,14 @@ import static org.openrewrite.java.tree.Space.format;
  * for each compilation unit visited.
  */
 public class Java11ParserVisitor extends TreePathScanner<J, Space> {
-    private static final Logger logger = LoggerFactory.getLogger(Java11ParserVisitor.class);
 
     private final Path sourcePath;
     private final String source;
     private final boolean relaxedClassTypeMatching;
     private final Collection<NamedStyles> styles;
     private final Map<String, JavaType.Class> sharedClassTypes;
+    @Nullable
+    private final LoggingHandler loggingHandler;
 
     @SuppressWarnings("NotNullFieldNotInitialized")
     private EndPosTable endPosTable;
@@ -78,12 +77,14 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     private static final Pattern whitespaceSuffixPattern = Pattern.compile("\\s*[^\\s]+(\\s*)");
 
     public Java11ParserVisitor(Path sourcePath, String source, boolean relaxedClassTypeMatching,
-                               Collection<NamedStyles> styles, Map<String, JavaType.Class> sharedClassTypes) {
+                               Collection<NamedStyles> styles, Map<String, JavaType.Class> sharedClassTypes,
+                               @Nullable LoggingHandler loggingHandler) {
         this.sourcePath = sourcePath;
         this.source = source;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.styles = styles;
         this.sharedClassTypes = sharedClassTypes;
+        this.loggingHandler = loggingHandler;
     }
 
     @Override
@@ -431,7 +432,6 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
 
     @Override
     public J visitCompilationUnit(CompilationUnitTree node, Space fmt) {
-        logger.debug("Building AST for: " + sourcePath);
 
         JCCompilationUnit cu = (JCCompilationUnit) node;
         fmt = format(source.substring(0, cu.getStartPosition()));
@@ -1300,8 +1300,10 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
             return j;
         } catch (Throwable ex) {
             // this SHOULD never happen, but is here simply as a diagnostic measure in the event of unexpected exceptions
-            logger.error("Failed to convert " + t.getClass().getSimpleName() + " for the following cursor stack:");
-            logCurrentPathAsError();
+            if (loggingHandler != null) {
+                loggingHandler.onError("Failed to convert " + t.getClass().getSimpleName() + " for the following cursor stack:");
+                logCurrentPathAsError();
+            }
             throw ex;
         }
     }
@@ -1314,23 +1316,25 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
     }
 
     private void logCurrentPathAsError() {
-        logger.error("--- BEGIN PATH ---");
+        if (loggingHandler != null) {
+            loggingHandler.onError("--- BEGIN PATH ---");
 
-        List<Tree> paths = stream(getCurrentPath().spliterator(), false).collect(toList());
-        for (int i = paths.size(); i-- > 0; ) {
-            JCTree tree = (JCTree) paths.get(i);
-            if (tree instanceof JCCompilationUnit) {
-                logger.error("JCCompilationUnit(sourceFile = " + ((JCCompilationUnit) tree).sourcefile.getName() + ")");
-            } else if (tree instanceof JCClassDecl) {
-                logger.error("JCClassDecl(name = " + ((JCClassDecl) tree).name + ", line = " + lineNumber(tree) + ")");
-            } else if (tree instanceof JCVariableDecl) {
-                logger.error("JCVariableDecl(name = " + ((JCVariableDecl) tree).name + ", line = " + lineNumber(tree) + ")");
-            } else {
-                logger.error(tree.getClass().getSimpleName() + "(line = " + lineNumber(tree) + ")");
+            List<Tree> paths = stream(getCurrentPath().spliterator(), false).collect(toList());
+            for (int i = paths.size(); i-- > 0; ) {
+                JCTree tree = (JCTree) paths.get(i);
+                if (tree instanceof JCCompilationUnit) {
+                    loggingHandler.onError("JCCompilationUnit(sourceFile = " + ((JCCompilationUnit) tree).sourcefile.getName() + ")");
+                } else if (tree instanceof JCClassDecl) {
+                    loggingHandler.onError("JCClassDecl(name = " + ((JCClassDecl) tree).name + ", line = " + lineNumber(tree) + ")");
+                } else if (tree instanceof JCVariableDecl) {
+                    loggingHandler.onError("JCVariableDecl(name = " + ((JCVariableDecl) tree).name + ", line = " + lineNumber(tree) + ")");
+                } else {
+                    loggingHandler.onError(tree.getClass().getSimpleName() + "(line = " + lineNumber(tree) + ")");
+                }
             }
-        }
 
-        logger.error("--- END PATH ---");
+            loggingHandler.onError("--- END PATH ---");
+        }
     }
 
     private long lineNumber(Tree tree) {

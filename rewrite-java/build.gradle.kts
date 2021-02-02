@@ -18,7 +18,6 @@ dependencies {
 
     implementation("org.antlr:antlr4:4.8-1")
 
-    implementation("org.slf4j:slf4j-api:1.7.+")
     implementation("commons-lang:commons-lang:latest.release")
 
     api("com.fasterxml.jackson.core:jackson-annotations:latest.release")

@@ -31,15 +31,10 @@ import org.openrewrite.java.tree.J;
 import org.openrewrite.java.tree.JavaType;
 import org.openrewrite.java.tree.Space;
 import org.openrewrite.style.NamedStyles;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.tools.JavaFileManager;
 import javax.tools.StandardLocation;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.io.UncheckedIOException;
-import java.io.Writer;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.*;
@@ -53,7 +48,6 @@ import static java.util.stream.Collectors.toList;
  */
 @NonNullApi
 public class Java11Parser implements JavaParser {
-    private static final Logger logger = LoggerFactory.getLogger(Java11Parser.class);
 
     @Nullable
     private final Collection<Path> classpath;
@@ -76,16 +70,21 @@ public class Java11Parser implements JavaParser {
 
     private final Collection<NamedStyles> styles;
 
+    @Nullable
+    private final LoggingHandler loggingHandler;
+
     private Java11Parser(@Nullable Collection<Path> classpath,
                          Charset charset,
                          boolean relaxedClassTypeMatching,
                          boolean suppressMappingErrors,
                          boolean logCompilationWarningsAndErrors,
-                         Collection<NamedStyles> styles) {
+                         Collection<NamedStyles> styles,
+                         @Nullable LoggingHandler loggingHandler) {
         this.classpath = classpath;
         this.relaxedClassTypeMatching = relaxedClassTypeMatching;
         this.suppressMappingErrors = suppressMappingErrors;
         this.styles = styles;
+        this.loggingHandler = loggingHandler;
 
         this.context = new Context();
         this.compilerLog = new ResettableLog(context);
@@ -123,10 +122,10 @@ public class Java11Parser implements JavaParser {
         compilerLog.setWriters(new PrintWriter(new Writer() {
             @Override
             public void write(char[] cbuf, int off, int len) {
-                if (logCompilationWarningsAndErrors && logger.isWarnEnabled()) {
+                if (logCompilationWarningsAndErrors && loggingHandler != null) {
                     String log = new String(Arrays.copyOfRange(cbuf, off, len));
                     if (!log.isBlank()) {
-                        logger.warn(log);
+                        loggingHandler.onWarn(log);
                     }
                 }
             }
@@ -197,7 +196,9 @@ public class Java11Parser implements JavaParser {
         } catch (Throwable t) {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
-            logger.warn("Failed symbol entering or attribution", t);
+            if (loggingHandler != null) {
+                loggingHandler.onWarn("Failed symbol entering or attribution", t);
+            }
         }
 
         Map<String, JavaType.Class> sharedClassTypes = new HashMap<>();
@@ -205,12 +206,11 @@ public class Java11Parser implements JavaParser {
                 .map(cuByPath -> {
                     Timer.Sample sample = Timer.start();
                     Input input = cuByPath.getKey();
-                    logger.trace("Building AST for {}", input.getPath());
                     try {
                         Java11ParserVisitor parser = new Java11ParserVisitor(
                                 input.getRelativePath(relativeTo),
                                 StringUtils.readFully(input.getSource()),
-                                relaxedClassTypeMatching, styles, sharedClassTypes);
+                                relaxedClassTypeMatching, styles, sharedClassTypes, loggingHandler);
                         J.CompilationUnit cu = (J.CompilationUnit) parser.scan(cuByPath.getValue(), Space.EMPTY);
                         sample.stop(Timer.builder("rewrite.parse")
                                 .description("The time spent mapping the OpenJDK AST to Rewrite's AST")
@@ -309,10 +309,19 @@ public class Java11Parser implements JavaParser {
     }
 
     public static class Builder extends JavaParser.Builder<Java11Parser, Builder> {
+
+        @Nullable
+        private LoggingHandler loggingHandler;
+
+        public Builder loggingHandler(LoggingHandler loggingHandler) {
+            this.loggingHandler = loggingHandler;
+            return this;
+        }
+
         @Override
         public Java11Parser build() {
             return new Java11Parser(classpath, charset, relaxedClassTypeMatching,
-                    suppressMappingErrors, logCompilationWarningsAndErrors, styles);
+                    suppressMappingErrors, logCompilationWarningsAndErrors, styles, loggingHandler);
         }
     }
 }
