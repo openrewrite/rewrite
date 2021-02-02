@@ -102,10 +102,12 @@ public class SpacesStyle implements JavaStyle {
     @Data
     @With
     public static class Within {
-        /*
-        Based on testing in IntelliJ, within codeBraces only affects whether or not a space is inserted
-        into empty interface and class braces, not functions, logical blocks, or lambda braces */
+        /**
+         * Based on testing in IntelliJ, within codeBraces only affects whether or not a space is inserted
+         * into empty interface and class braces, not functions, logical blocks, or lambda braces.
+         */
         boolean codeBraces;
+
         boolean brackets;
         boolean arrayInitializerBraces;
         boolean emptyArrayInitializerBraces;

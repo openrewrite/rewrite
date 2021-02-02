@@ -15,6 +15,7 @@
  */
 package org.openrewrite.java.format;
 
+import org.abego.treelayout.internal.util.java.util.ListUtil;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
@@ -206,6 +207,7 @@ public class SpacesVisitor<P> extends JavaIsoVisitor<P> {
         if (padding.getArgs() != null) {
             a = padding.withArgs(spaceBefore(padding.getArgs(),
                     style.getBeforeParentheses().isAnnotationParameters()));
+            a = a.withArgs(ListUtils.map(a.getArgs(), arg -> spaceBefore(arg, style.getWithin().isAnnotationParentheses())));
         }
         return a;
     }

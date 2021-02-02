@@ -21,6 +21,7 @@ import org.openrewrite.Tree;
 import org.openrewrite.TreeVisitor;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.lang.Nullable;
+import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
@@ -65,6 +66,14 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         if (clazz != null) {
             maybeAddImport(clazz.getFullyQualifiedName());
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
+        if(before != after) {
+            return (J2) new AutoFormatVisitor<>().visit(after, p, getCursor());
+        }
+        return after;
     }
 
     /**
