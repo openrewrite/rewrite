@@ -26,7 +26,6 @@ import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
-import java.io.StringWriter;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -34,6 +33,14 @@ import static java.util.stream.Collectors.toList;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
+
+    public interface TemplateEventHandler {
+
+        void afterVariableSubstitution(String substitutedTemplate);
+
+        void beforeParseTemplate(String generatedTemplate);
+
+    }
 
     private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
     private static final String SNIPPET_MARKER_END = "<<<<END>>>>";
@@ -44,15 +51,15 @@ public class JavaTemplate {
     private final Set<String> imports;
     private final String parameterMarker;
     @Nullable
-    private final StringWriter tap;
+    private final TemplateEventHandler templateEventHandler;
 
-    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable StringWriter tap) {
+    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable TemplateEventHandler templateEventHandler) {
         this.parser = parser;
         this.code = code;
         this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
         this.parameterMarker = parameterMarker;
-        this.tap = tap;
+        this.templateEventHandler = templateEventHandler;
     }
 
     public static Builder builder(String code) {
@@ -67,6 +74,10 @@ public class JavaTemplate {
 
         //Substitute parameter markers with the string representation of each parameter.
         String printedTemplate = substituteParameters(parameters);
+
+        if (templateEventHandler != null) {
+            templateEventHandler.afterVariableSubstitution(printedTemplate);
+        }
 
         J.CompilationUnit cu = insertionScope.firstEnclosingOrThrow(J.CompilationUnit.class);
 
@@ -109,8 +120,8 @@ public class JavaTemplate {
         String generatedSource = new TemplatePrinter(memberVariableInitializer, insertionScope, imports)
                 .print(pruned, printedTemplate);
 
-        if (tap != null) {
-            tap.write("Generated Source:\n-------------------\n" + generatedSource + "\n-------------------");
+        if (templateEventHandler != null) {
+            templateEventHandler.beforeParseTemplate(generatedSource);
         }
 
         parser.reset();
@@ -394,7 +405,7 @@ public class JavaTemplate {
         private String parameterMarker = "#{}";
 
         @Nullable
-        private StringWriter tap;
+        private TemplateEventHandler templateEventHandler;
 
         Builder(String code) {
             this.code = code.trim();
@@ -458,13 +469,13 @@ public class JavaTemplate {
             return this;
         }
 
-        public Builder tap(StringWriter tap) {
-            this.tap = tap;
+        public Builder templateEventHandler(TemplateEventHandler templateEventHandler) {
+            this.templateEventHandler = templateEventHandler;
             return this;
         }
 
         public JavaTemplate build() {
-            return new JavaTemplate(javaParser, code, imports, parameterMarker, tap);
+            return new JavaTemplate(javaParser, code, imports, parameterMarker, templateEventHandler);
         }
     }
 }

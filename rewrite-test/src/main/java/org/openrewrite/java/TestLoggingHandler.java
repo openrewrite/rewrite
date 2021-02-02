@@ -15,13 +15,30 @@
  */
 package org.openrewrite.java;
 
-public interface LoggingHandler {
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-    default void onError(String message) {}
+public class TestLoggingHandler implements LoggingHandler {
 
-    default void onError(String message, Throwable t) {}
+    private static final Logger logger = LoggerFactory.getLogger(TestLoggingHandler.class);
 
-    default void onWarn(String message) {}
+    @Override
+    public void onError(String message, Throwable t) {
+        logger.error(message, t);
+    }
 
-    default void onWarn(String message, Throwable t) {}
+    @Override
+    public void onError(String message) {
+        logger.error(message);
+    }
+
+    @Override
+    public void onWarn(String message, Throwable t) {
+        logger.error(message, t);
+    }
+
+    @Override
+    public void onWarn(String message) {
+        logger.error(message);
+    }
 }

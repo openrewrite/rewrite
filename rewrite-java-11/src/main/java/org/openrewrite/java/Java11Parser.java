@@ -197,9 +197,7 @@ public class Java11Parser implements JavaParser {
             // when symbol entering fails on problems like missing types, attribution can often times proceed
             // unhindered, but it sometimes cannot (so attribution is always a BEST EFFORT in the presence of errors)
             if (loggingHandler != null) {
-                StringWriter traceWriter = new StringWriter();
-                t.printStackTrace(new PrintWriter(traceWriter));
-                loggingHandler.onWarn("Failed symbol entering or attribution " + traceWriter.toString());
+                loggingHandler.onWarn("Failed symbol entering or attribution", t);
             }
         }
 
