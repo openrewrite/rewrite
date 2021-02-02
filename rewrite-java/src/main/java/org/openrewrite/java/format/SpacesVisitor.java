@@ -15,7 +15,6 @@
  */
 package org.openrewrite.java.format;
 
-import org.abego.treelayout.internal.util.java.util.ListUtil;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.java.JavaIsoVisitor;
