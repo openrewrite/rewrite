@@ -42,15 +42,20 @@ public class Environment {
         return recipes;
     }
 
-    public Recipe activateRecipes(String... activeRecipes) {
+    public Recipe activateRecipes(Iterable<String> activeRecipes) {
         Recipe root = new Recipe();
-        List<String> activeRecipeList = Arrays.asList(activeRecipes);
         for (Recipe recipe : listRecipes()) {
-            if (activeRecipeList.contains(recipe.getName())) {
-                root.doNext(recipe);
+            for (String activeRecipe : activeRecipes) {
+                if (activeRecipe.equals(recipe.getName())) {
+                    root.doNext(recipe);
+                }
             }
         }
         return root;
+    }
+
+    public Recipe activateRecipes(String... activeRecipes) {
+        return activateRecipes(Arrays.asList(activeRecipes));
     }
 
     /**
@@ -62,8 +67,8 @@ public class Environment {
                 .collect(toList());
     }
 
-    public List<NamedStyles> activateStyles(String... activeStyles) {
-        List<NamedStyles> activated = new ArrayList<>(activeStyles.length);
+    public List<NamedStyles> activateStyles(Iterable<String> activeStyles) {
+        List<NamedStyles> activated = new ArrayList<>();
         List<NamedStyles> styles = listStyles();
         for (String activeStyle : activeStyles) {
             for (NamedStyles style : styles) {
@@ -73,6 +78,10 @@ public class Environment {
             }
         }
         return activated;
+    }
+
+    public List<NamedStyles> activateStyles(String... activeStyles) {
+        return activateStyles(Arrays.asList(activeStyles));
     }
 
     public Environment(Collection<? extends ResourceLoader> resourceLoaders) {
