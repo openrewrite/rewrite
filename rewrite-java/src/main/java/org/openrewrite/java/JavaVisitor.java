@@ -546,7 +546,7 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
                 mod -> mod.withPrefix(visitSpace(mod.getPrefix(), Space.Location.MODIFIER_PREFIX, p))));
         m = m.withTypeExpr(visitAndCast(m.getTypeExpr(), p));
         m = m.withDimensionsBeforeName(ListUtils.map(m.getDimensionsBeforeName(), dim ->
-                dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION, p))
+                dim.withBefore(visitSpace(dim.getBefore(), Space.Location.DIMENSION_PREFIX, p))
                         .withElem(visitSpace(dim.getElem(), Space.Location.DIMENSION, p))
         ));
         m = m.withTypeExpr(m.getTypeExpr() == null ?

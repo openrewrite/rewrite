@@ -29,7 +29,6 @@ import org.openrewrite.java.MethodMatcher;
 import org.openrewrite.java.internal.*;
 import org.openrewrite.java.search.FindTypes;
 import org.openrewrite.java.tree.Coordinates.ClassDeclCoordinates;
-import org.openrewrite.java.tree.Coordinates.MethodDeclCoordinates;
 import org.openrewrite.marker.Marker;
 import org.openrewrite.marker.Markers;
 
@@ -2176,6 +2175,11 @@ public interface J extends Serializable, Tree {
             return v.visitInstanceOf(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.InstanceOf(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -2249,6 +2253,11 @@ public interface J extends Serializable, Tree {
             return v.visitLabel(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Label(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -2309,6 +2318,11 @@ public interface J extends Serializable, Tree {
             return v.visitLambda(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Lambda(this);
+        }
+
         @ToString
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
@@ -2343,6 +2357,11 @@ public interface J extends Serializable, Tree {
 
             public Parameters withParams(List<J> params) {
                 return getPadding().withParams(JRightPadded.withElems(this.params, params));
+            }
+
+            @Override
+            public Coordinates coordinates() {
+                return new Coordinates.Lambda.Parameters(this);
             }
 
             public Padding getPadding() {
@@ -2415,6 +2434,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitLiteral(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Literal(this);
         }
 
         public <T> String transformValue(Function<T, Object> transform) {
@@ -2492,6 +2516,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMemberReference(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.MemberReference(this);
         }
 
         public Padding getPadding() {
@@ -2662,8 +2691,8 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public MethodDeclCoordinates coordinates() {
-            return new MethodDeclCoordinates(this);
+        public Coordinates.MethodDecl coordinates() {
+            return new Coordinates.MethodDecl(this);
         }
 
         public Padding getPadding() {
@@ -2809,6 +2838,11 @@ public interface J extends Serializable, Tree {
             return v.visitMethodInvocation(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.MethodInvocation(this);
+        }
+
         @Nullable
         public JavaType getReturnType() {
             return type == null ? null : type.getResolvedSignature() == null ? null :
@@ -2910,6 +2944,11 @@ public interface J extends Serializable, Tree {
             Transient,
             Volatile,
         }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Modifier(this);
+        }
     }
 
     @ToString
@@ -2947,6 +2986,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitMultiCatch(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.MultiCatch(this);
         }
 
         @SuppressWarnings("unchecked")
@@ -3040,6 +3084,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitNewArray(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.NewArray(this);
         }
 
         public Padding getPadding() {
@@ -3222,6 +3271,11 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
+        public Coordinates coordinates() {
+            return new Coordinates.NewClass(this);
+        }
+
+        @Override
         public List<Tree> getSideEffects() {
             return singletonList(this);
         }
@@ -3285,6 +3339,11 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPackage(this, p);
         }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Package(this);
+        }
     }
 
     @ToString
@@ -3342,6 +3401,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParameterizedType(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.ParameterizedType(this);
         }
 
         public Padding getPadding() {
@@ -3409,6 +3473,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitParentheses(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Parentheses<>(this);
         }
 
         @Override
@@ -3586,6 +3655,11 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitPrimitive(this, p);
         }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Primitive(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3608,6 +3682,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitReturn(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Return(this);
         }
     }
 
@@ -3634,6 +3713,11 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitSwitch(this, p);
         }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Switch(this);
+        }
     }
 
     @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3658,6 +3742,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitSynchronized(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Synchronized(this);
         }
     }
 
@@ -3717,6 +3806,11 @@ public interface J extends Serializable, Tree {
             return v.visitTernary(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Ternary(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -3773,6 +3867,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitThrow(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Throw(this);
         }
     }
 
@@ -3835,6 +3934,11 @@ public interface J extends Serializable, Tree {
             return v.visitTry(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Try(this);
+        }
+
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
         @EqualsAndHashCode(callSuper = false, onlyExplicitlyIncluded = true)
         @Data
@@ -3856,6 +3960,11 @@ public interface J extends Serializable, Tree {
              */
             @With
             boolean terminatedWithSemicolon;
+
+            @Override
+            public Coordinates coordinates() {
+                return new Coordinates.Try.Resource(this);
+            }
         }
 
         @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
@@ -3880,6 +3989,11 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitCatch(this, p);
+            }
+
+            @Override
+            public Coordinates coordinates() {
+                return new Coordinates.Try.Catch(this);
             }
         }
 
@@ -3956,6 +4070,11 @@ public interface J extends Serializable, Tree {
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeCast(this, p);
         }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.TypeCast(this);
+        }
     }
 
     @ToString
@@ -4007,6 +4126,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitTypeParameter(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.TypeParameter(this);
         }
 
         public Padding getPadding() {
@@ -4083,6 +4207,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitUnary(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Unary(this);
         }
 
         @Override
@@ -4188,6 +4317,11 @@ public interface J extends Serializable, Tree {
             return v.visitMultiVariable(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.VariableDecls(this);
+        }
+
         @Nullable
         public JavaType.Class getTypeAsClass() {
             return typeExpr == null ? null : TypeUtils.asClass(typeExpr.getType());
@@ -4247,6 +4381,11 @@ public interface J extends Serializable, Tree {
             @Override
             public <P> J acceptJava(JavaVisitor<P> v, P p) {
                 return v.visitVariable(this, p);
+            }
+
+            @Override
+            public Coordinates coordinates() {
+                return new Coordinates.VariableDecls.NamedVar(this);
             }
 
             public boolean isField(Cursor cursor) {
@@ -4368,6 +4507,11 @@ public interface J extends Serializable, Tree {
             return v.visitWhileLoop(this, p);
         }
 
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.WhileLoop(this);
+        }
+
         public Padding getPadding() {
             Padding p;
             if (this.padding == null) {
@@ -4450,6 +4594,11 @@ public interface J extends Serializable, Tree {
         @Override
         public <P> J acceptJava(JavaVisitor<P> v, P p) {
             return v.visitWildcard(this, p);
+        }
+
+        @Override
+        public Coordinates coordinates() {
+            return new Coordinates.Wildcard(this);
         }
 
         public enum Bound {
