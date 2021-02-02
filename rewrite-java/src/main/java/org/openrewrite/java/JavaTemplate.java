@@ -25,9 +25,8 @@ import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import java.io.StringWriter;
 import java.util.*;
 
 import static java.util.Collections.emptyList;
@@ -35,7 +34,6 @@ import static java.util.stream.Collectors.toList;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
-    private static final Logger logger = LoggerFactory.getLogger(JavaTemplate.class);
 
     private static final String SNIPPET_MARKER_START = "<<<<START>>>>";
     private static final String SNIPPET_MARKER_END = "<<<<END>>>>";
@@ -45,13 +43,16 @@ public class JavaTemplate {
     private final int parameterCount;
     private final Set<String> imports;
     private final String parameterMarker;
+    @Nullable
+    private final StringWriter tap;
 
-    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker) {
+    private JavaTemplate(JavaParser parser, String code, Set<String> imports, String parameterMarker, @Nullable StringWriter tap) {
         this.parser = parser;
         this.code = code;
         this.parameterCount = StringUtils.countOccurrences(code, parameterMarker);
         this.imports = imports;
         this.parameterMarker = parameterMarker;
+        this.tap = tap;
     }
 
     public static Builder builder(String code) {
@@ -108,7 +109,9 @@ public class JavaTemplate {
         String generatedSource = new TemplatePrinter(memberVariableInitializer, insertionScope, imports)
                 .print(pruned, printedTemplate);
 
-        logger.trace("Generated Source:\n-------------------\n{}\n-------------------", generatedSource);
+        if (tap != null) {
+            tap.write("Generated Source:\n-------------------\n" + generatedSource + "\n-------------------");
+        }
 
         parser.reset();
         J.CompilationUnit synthetic = parser.parse(generatedSource).iterator().next();
@@ -390,6 +393,9 @@ public class JavaTemplate {
 
         private String parameterMarker = "#{}";
 
+        @Nullable
+        private StringWriter tap;
+
         Builder(String code) {
             this.code = code.trim();
         }
@@ -452,8 +458,13 @@ public class JavaTemplate {
             return this;
         }
 
+        public Builder tap(StringWriter tap) {
+            this.tap = tap;
+            return this;
+        }
+
         public JavaTemplate build() {
-            return new JavaTemplate(javaParser, code, imports, parameterMarker);
+            return new JavaTemplate(javaParser, code, imports, parameterMarker, tap);
         }
     }
 }

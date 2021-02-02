@@ -10,9 +10,6 @@ dependencies {
     api("org.junit.jupiter:junit-jupiter-api:latest.release")
     api("org.junit.jupiter:junit-jupiter-params:latest.release")
 
-    implementation("org.slf4j:slf4j-api:1.7.+")
-    implementation("ch.qos.logback:logback-classic:1.0.13")
-
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("io.github.classgraph:classgraph:latest.release")

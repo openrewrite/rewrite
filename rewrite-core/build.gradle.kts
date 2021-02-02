@@ -14,8 +14,6 @@ dependencies {
     implementation("io.github.classgraph:classgraph:latest.release")
 
     implementation("org.yaml:snakeyaml:latest.release")
-
-    implementation("org.slf4j:slf4j-api:1.7.+")
 }
 
 tasks.withType<ShadowJar> {
