@@ -37,248 +37,259 @@ public abstract class Coordinates <J2 extends J> {
 
     public abstract JavaCoordinates before();
 
-    public static class AnnotatedTypeCoordinates extends Coordinates {
+    public static class AnnotatedType extends Coordinates<J.AnnotatedType> {
 
-        protected AnnotatedTypeCoordinates(J.ClassDecl tree) {super(tree); }
-
-        @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
-    }
-    public static class AnnotationCoordinates extends Coordinates {
-
-        protected AnnotationCoordinates(J.ClassDecl tree) {super(tree); }
+        protected AnnotatedType(J.AnnotatedType tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ANNOTATED_TYPE_PREFIX); }
     }
-    public static class ArrayAccessCoordinates extends Coordinates {
+    public static class Annotation extends Coordinates<J.Annotation> {
 
-        protected ArrayAccessCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Annotation(J.Annotation tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ANNOTATION_PREFIX); }
     }
-    public static class ArrayDimensionCoordinates extends Coordinates {
+    public static class ArrayAccess extends Coordinates<J.ArrayAccess> {
 
-        protected ArrayDimensionCoordinates(J.ClassDecl tree) {super(tree); }
+        protected ArrayAccess(J.ArrayAccess tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ARRAY_ACCESS_PREFIX); }
     }
-    public static class ArrayTypeCoordinates extends Coordinates {
 
-        protected ArrayTypeCoordinates(J.ClassDecl tree) {super(tree); }
+    public static class ArrayDimension extends Coordinates<J.ArrayDimension> {
+
+        protected ArrayDimension(J.ArrayDimension tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.DIMENSION_PREFIX); }
     }
-    public static class AssertCoordinates extends Coordinates {
 
-        protected AssertCoordinates(J.ClassDecl tree) {super(tree); }
+    public static class ArrayType extends Coordinates<J.ArrayType> {
+
+        protected ArrayType(J.ArrayType tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ARRAY_TYPE_PREFIX); }
     }
-    public static class AssignCoordinates extends Coordinates {
+    public static class Assert extends Coordinates<J.Assert> {
 
-        protected AssignCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Assert(J.Assert tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ASSERT_PREFIX); }
     }
-    public static class AssignOpCoordinates extends Coordinates {
+    public static class Assign extends Coordinates<J.Assign> {
 
-        protected AssignOpCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Assign(J.Assign tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ASSIGN_PREFIX); }
     }
-    public static class BinaryCoordinates extends Coordinates {
+    public static class AssignOp extends Coordinates<J.AssignOp> {
 
-        protected BinaryCoordinates(J.ClassDecl tree) {super(tree); }
+        protected AssignOp(J.AssignOp tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ASSIGN_OP_OPERATOR); }
     }
-    public static class BlockCoordinates extends Coordinates {
+    public static class Binary extends Coordinates<J.Binary> {
 
-        protected BlockCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Binary(J.Binary tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.BINARY_PREFIX); }
     }
-    public static class BreakCoordinates extends Coordinates {
+    public static class Block extends Coordinates<J.Block> {
 
-        protected BreakCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Block(J.Block tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.BLOCK_PREFIX); }
     }
-    public static class CaseCoordinates extends Coordinates {
+    public static class Break extends Coordinates<J.Break> {
 
-        protected CaseCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Break(J.Break tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.BREAK_PREFIX); }
     }
-    public static class ClassDeclCoordinates extends Coordinates {
+    public static class Case extends Coordinates<J.Case> {
 
-        protected ClassDeclCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Case(J.Case tree) {super(tree); }
+
+        @Override
+        public JavaCoordinates before() { return create(Space.Location.CASE_PREFIX); }
+    }
+    public static class ClassDecl extends Coordinates<J.ClassDecl> {
+
+        protected ClassDecl(J.ClassDecl tree) {super(tree); }
 
         @Override
         public JavaCoordinates before() { return create(Space.Location.CLASS_DECL_PREFIX); }
-        public JavaCoordinates extending() {return create(Space.Location.EXTENDS); }
 
-        //TODO MOAR!
+        /**
+         * Intended to add an annotation (represented by the JavaTemplate) as the last annotation associated with the
+         * class.
+         *
+         * @return annotations replacement coordinates
+         */
+        public JavaCoordinates lastAnnotation() {
+            if (tree.getModifiers() != null) {
+                return create(Space.Location.MODIFIER_PREFIX);
+            } else {
+                return create(Space.Location.CLASS_DECL_PREFIX);
+            }
+        }
+
+        /**
+         * Intended for replacement semantics, where the type parameters will be entirely replaced by the code
+         * generated via JavaTemplate
+         *
+         * @return type parameters replacement coordinates
+         */
+        public JavaCoordinates typeParameters() {return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
+
+        /**
+         * Intended for replacement semantics, where the extends clause will be entirely replaced by the code
+         * generated via JavaTemplate
+         *
+         * @return extends clause replacement coordinates
+         */
+        public JavaCoordinates extendsClause() { return create(Space.Location.EXTENDS); }
+
+        /**
+         * Intended for replacement semantics, where the implements clause will be entirely replaced by the code
+         * generated via JavaTemplate
+         *
+         * @return implements clause replacement coordinates
+         */
+        public JavaCoordinates implementsClause() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
+
+        /**
+         * Intended for replacement semantics, where the class body will be entirely replaced by the code
+         * generated via JavaTemplate
+         *
+         * @return class body replacement coordinates
+         */
+        public JavaCoordinates body() { return create(Space.Location.BLOCK_END); }
+
     }
-    public static class CompilationUnitCoordinates extends Coordinates {
+    public static class CompilationUnit extends Coordinates<J.CompilationUnit> {
 
-        protected CompilationUnitCoordinates(J.ClassDecl tree) {super(tree); }
+        protected CompilationUnit(J.CompilationUnit tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.COMPILATION_UNIT_PREFIX); }
     }
-    public static class ContinueCoordinates extends Coordinates {
+    public static class Continue extends Coordinates<J.Continue> {
 
-        protected ContinueCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Continue(J.Continue tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.CONTINUE_PREFIX); }
     }
-    public static class ControlParenthesesCoordinates extends Coordinates {
+    public static class ControlParentheses<J2 extends J> extends Coordinates<J.ControlParentheses<J2>> {
 
-        protected ControlParenthesesCoordinates(J.ClassDecl tree) {super(tree); }
+        protected ControlParentheses(J.ControlParentheses<J2> tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.CONTROL_PARENTHESES_PREFIX); }
     }
-    public static class DoWhileLoopCoordinates extends Coordinates {
+    public static class DoWhileLoop extends Coordinates<J.DoWhileLoop> {
 
-        protected DoWhileLoopCoordinates(J.ClassDecl tree) {super(tree); }
+        protected DoWhileLoop(J.DoWhileLoop tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.DO_WHILE_PREFIX); }
     }
-    public static class EmptyCoordinates extends Coordinates {
+    public static class Empty extends Coordinates<J.Empty> {
 
-        protected EmptyCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Empty(J.Empty tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.EMPTY_PREFIX); }
     }
-    public static class EnumValueCoordinates extends Coordinates {
+    public static class EnumValue extends Coordinates<J.EnumValue> {
 
-        protected EnumValueCoordinates(J.ClassDecl tree) {super(tree); }
+        protected EnumValue(J.EnumValue tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ENUM_VALUE_PREFIX); }
     }
-    public static class EnumValueSetCoordinates extends Coordinates {
+    public static class EnumValueSet extends Coordinates<J.EnumValueSet> {
 
-        protected EnumValueSetCoordinates(J.ClassDecl tree) {super(tree); }
+        protected EnumValueSet(J.EnumValueSet tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.ENUM_VALUE_SET_PREFIX); }
     }
-    public static class FieldAccessCoordinates extends Coordinates {
+    public static class FieldAccess extends Coordinates<J.FieldAccess> {
 
-        protected FieldAccessCoordinates(J.ClassDecl tree) {super(tree); }
+        protected FieldAccess(J.FieldAccess tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.FIELD_ACCESS_PREFIX); }
     }
-    public static class ForEachLoopCoordinates extends Coordinates {
+    public static class ForEachLoop extends Coordinates<J.ForEachLoop> {
 
-        protected ForEachLoopCoordinates(J.ClassDecl tree) {super(tree); }
+        protected ForEachLoop(J.ForEachLoop tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { return create(Space.Location.FOR_EACH_LOOP_PREFIX); }
 
-        //TODO MOAR!
+        public static class Control extends Coordinates<J.ForEachLoop.Control> {
+            protected Control(J.ForEachLoop.Control tree) {super(tree); }
+
+            @Override
+            public JavaCoordinates before() { return create(Space.Location.FOR_EACH_CONTROL_PREFIX); }
+        }
     }
-    public static class ForLoopCoordinates extends Coordinates {
+    public static class ForLoop extends Coordinates<J.ForLoop> {
 
-        protected ForLoopCoordinates(J.ClassDecl tree) {super(tree); }
+        protected ForLoop(J.ForLoop tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { return create(Space.Location.FOR_PREFIX); }
 
-        //TODO MOAR!
+
+        public static class Control extends Coordinates<J.ForLoop.Control> {
+            protected Control(J.ForLoop.Control tree) {super(tree); }
+
+            @Override
+            public JavaCoordinates before() { return create(Space.Location.FOR_CONTROL_PREFIX); }
+        }
     }
-    public static class IdentCoordinates extends Coordinates {
+    public static class Ident extends Coordinates<J.Ident> {
 
-        protected IdentCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Ident(J.Ident tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.IDENTIFIER_PREFIX); }
     }
-    public static class IfCoordinates extends Coordinates {
+    public static class If extends Coordinates<J.If> {
 
-        protected IfCoordinates(J.ClassDecl tree) {super(tree); }
+        protected If(J.If tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
+        public JavaCoordinates before() { return create(Space.Location.IF_PREFIX); }
 
-        //TODO MOAR!
+        public static class Else extends Coordinates<J.If.Else> {
+            protected Else(J.If.Else tree) {super(tree); }
+
+            @Override
+            public JavaCoordinates before() { return create(Space.Location.FOR_CONTROL_PREFIX); }
+        }
     }
-    public static class ImportCoordinates extends Coordinates {
+    public static class Import extends Coordinates<J.Import> {
 
-        protected ImportCoordinates(J.ClassDecl tree) {super(tree); }
+        protected Import(J.Import tree) {super(tree); }
 
         @Override
-        public JavaCoordinates before() { throw new UnsupportedOperationException("Not Implemented"); }
-
-        //TODO MOAR!
+        public JavaCoordinates before() { return create(Space.Location.IMPORT_PREFIX); }
     }
-
-// --------------------------------
-// --------------------------------
-// --------------------------------
-// --------------------------------
-// --------------------------------
-// --------------------------------
 
     public static class InstanceOf extends Coordinates<J.InstanceOf> {
 
@@ -363,8 +374,12 @@ public abstract class Coordinates <J2 extends J> {
             return create(Space.Location.METHOD_DECL_PREFIX);
         }
 
-        public JavaCoordinates annotations() {
-            return create(Space.Location.METHOD_DECL_PREFIX);
+        public JavaCoordinates lastAnnotation() {
+            if (tree.getModifiers() != null) {
+                return create(Space.Location.MODIFIER_PREFIX);
+            } else {
+                return create(Space.Location.METHOD_DECL_PREFIX);
+            }
         }
 
         public JavaCoordinates lastParameter() {
