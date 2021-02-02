@@ -39,8 +39,9 @@ interface JavaTemplateTest : RecipeTest {
         }
     }
 
+    @Disabled
     @Test
-    fun jLamdaTest(jp: JavaParser) = assertChanged(
+    fun lamdaMethodParameterTest(jp: JavaParser) = assertChanged(
         jp,
         recipe = object : JavaIsoVisitor<ExecutionContext>() {
             init {
@@ -49,7 +50,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 var m = super.visitMethodInvocation(method, p)
-                JavaTemplate.builder("() -> \"test\"").build().generate<J>(cursor)
+                m = m.withArgs(JavaTemplate.builder("() -> \"test\"").build().generate(cursor));
                 return m
             }
         }.toRecipe(),
