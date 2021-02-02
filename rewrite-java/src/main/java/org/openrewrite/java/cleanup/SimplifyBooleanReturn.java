@@ -27,5 +27,3 @@ public class SimplifyBooleanReturn extends Recipe {
         return new SimplifyBooleanReturnVisitor();
     }
 }
-
-
