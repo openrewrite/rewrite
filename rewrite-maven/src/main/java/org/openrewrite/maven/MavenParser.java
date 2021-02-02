@@ -33,6 +33,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -49,6 +50,8 @@ public class MavenParser implements Parser<Maven> {
     private final boolean resolveOptional;
     private final boolean continueOnError;
 
+    @Nullable
+    private final Consumer<Throwable> onError;
     /**
      *
      * @param mavenCache The cache to be used to speed up dependency resolution
@@ -56,14 +59,16 @@ public class MavenParser implements Parser<Maven> {
      * @param mavenSettings The parsed settings.xml file to retrieve profiles, credentials, mirrors, etc. from
      * @param resolveOptional When set to 'true' resolve dependencies marked as optional
      * @param continueOnError When set to 'true' make a best-effort attempt to continue execution and return partial results even when there are parsing errors.
+     * @param onError An optional, user supplied error handler.
      */
     private MavenParser(MavenCache mavenCache, Collection<String> activeProfiles,
-                        @Nullable MavenSettings mavenSettings, boolean resolveOptional, boolean continueOnError) {
+                        @Nullable MavenSettings mavenSettings, boolean resolveOptional, boolean continueOnError, @Nullable Consumer<Throwable> onError) {
         this.mavenCache = mavenCache;
         this.activeProfiles = activeProfiles;
         this.mavenSettings = mavenSettings;
         this.resolveOptional = resolveOptional;
         this.continueOnError = continueOnError;
+        this.onError = onError;
     }
 
     @Override
@@ -78,7 +83,7 @@ public class MavenParser implements Parser<Maven> {
 
         List<Maven> parsed = projectPoms.stream()
                 .map(raw -> new RawMavenResolver(downloader, false, activeProfiles,
-                        mavenSettings, resolveOptional, continueOnError).resolve(raw))
+                        mavenSettings, resolveOptional, continueOnError, onError).resolve(raw))
                 .filter(Objects::nonNull)
                 .map(xmlDoc -> new Maven(xmlDoc, mavenSettings))
                 .collect(toCollection(ArrayList::new));
@@ -141,6 +146,7 @@ public class MavenParser implements Parser<Maven> {
         @Nullable
         private MavenSettings mavenSettings;
         private boolean continueOnError;
+        @Nullable private Consumer<Throwable> onError;
 
         public Builder resolveOptional(@Nullable Boolean optional) {
             this.resolveOptional = optional == null || optional;
@@ -185,9 +191,14 @@ public class MavenParser implements Parser<Maven> {
             return this;
         }
 
+        public Builder onError(@Nullable Consumer<Throwable> onError) {
+            this.onError = onError;
+            return this;
+        }
+
         public MavenParser build() {
             return new MavenParser(mavenCache, activeProfiles,
-                    mavenSettings, resolveOptional, continueOnError);
+                    mavenSettings, resolveOptional, continueOnError, onError);
         }
     }
 }
