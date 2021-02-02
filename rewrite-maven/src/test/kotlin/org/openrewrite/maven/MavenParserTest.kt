@@ -227,4 +227,32 @@ class MavenParserTest {
         assertThatThrownBy { parserStrict.parse(invalidPom) }
         parserLenient.parse(invalidPom)
     }
+
+    @Issue("https://github.com/openrewrite/rewrite/issues/199")
+    @Test
+    fun continueOnErrorMalformedExclusion() {
+        val invalidPom = """
+            <project>
+                <modelVersion>4.0.0</modelVersion>
+
+                <groupId>com.mycompany.app</groupId>
+                <artifactId>my-app</artifactId>
+                <version>1</version>
+                <dependencies>
+                    <dependency>
+                            <groupId>io.github.resilience4j</groupId>
+                            <artifactId>resilience4j-retry</artifactId>
+                            <version>1.7.0</version>
+                            <exclusions>
+                                <exclusion>
+                                    <groupId>${"$"}{missing.property}</groupId>
+                                </exclusion>
+                            </exclusions> 
+                    </dependency>
+                </dependencies>
+            </project>
+        """
+        assertThatThrownBy { parserStrict.parse(invalidPom) }
+        parserLenient.parse(invalidPom)
+    }
 }

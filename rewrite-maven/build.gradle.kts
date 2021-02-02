@@ -20,8 +20,6 @@ dependencies {
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-smile:latest.release")
     implementation("com.fasterxml.jackson.module:jackson-module-parameter-names:latest.release")
 
-    implementation("org.slf4j:slf4j-api:1.7.+")
-
     compileOnly("org.mapdb:mapdb:latest.release")
 
     implementation("io.micrometer:micrometer-core:latest.release")
