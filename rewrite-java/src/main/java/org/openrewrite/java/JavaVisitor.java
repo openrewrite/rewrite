@@ -32,27 +32,8 @@ import java.util.Objects;
 public class JavaVisitor<P> extends TreeVisitor<J, P> {
 
     @Incubating(since = "7.0.0")
-    public <J2 extends J> J2 generate(JavaTemplate template, JavaCoordinates coordinates, Object... parameters) {
-        //TODO Not Implemented.
-        return null;
-    }
-
-    /**
-     * This overload can be used to generate a template's contents as the last statement in a block.
-     *
-     * @param template   A template instance
-     * @param parameters Template parameters
-     * @param <J2>       Expected type returned from the template.
-     * @return A list of generated elements
-     * @deprecated This method is deprecated and will be removed in 7.0.
-     */
-    @Deprecated
-    public <J2 extends J> List<J2> generateLastInBlock(JavaTemplate template, Cursor blockCursor, Object... parameters) {
-        if (blockCursor.getValue() instanceof J.Block) {
-            return template.generate(new Cursor(blockCursor, ((J.Block) blockCursor.getValue()).getEnd()), parameters);
-        } else {
-            throw new IllegalArgumentException("The cursor must reference a J.Block");
-        }
+    public <J2 extends J> List<J2> generate(JavaTemplate template, JavaCoordinates<?> coordinates, Object... parameters) {
+        return template.generate(getCursor(), coordinates, parameters);
     }
 
     /**

@@ -682,7 +682,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates<J.Block> coordinates() {
+        public Coordinates.Block coordinates() {
             return new Coordinates.Block(this);
         }
 
@@ -922,7 +922,7 @@ public interface J extends Serializable, Tree {
         }
 
         @Override
-        public Coordinates<J.ClassDecl> coordinates() {
+        public Coordinates.ClassDecl coordinates() {
             return new Coordinates.ClassDecl(this);
         }
 
