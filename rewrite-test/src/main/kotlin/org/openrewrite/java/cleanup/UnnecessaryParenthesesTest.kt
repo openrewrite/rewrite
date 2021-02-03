@@ -83,47 +83,47 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             )
         ).build(),
         before = """
-                import java.util.*;
-                public class A {
-                    int square(int a, int b) {
-                        int square = (a * b);
-    
-                        int sumOfSquares = 0;
-                        for(int i = (0); i < 10; i++) {
-                          sumOfSquares += (square(i * i, i));
-                        }
-                        double num = (10.0);
-    
-                        List<String> list = Arrays.asList("a1", "b1", "c1");
-                        list.stream()
-                          .filter((s) -> s.startsWith("c"))
-                          .forEach(System.out::println);
-    
-                        return (square);
+            import java.util.*;
+            public class A {
+                int square(int a, int b) {
+                    int square = (a * b);
+
+                    int sumOfSquares = 0;
+                    for(int i = (0); i < 10; i++) {
+                      sumOfSquares += (square(i * i, i));
                     }
+                    double num = (10.0);
+
+                    List<String> list = Arrays.asList("a1", "b1", "c1");
+                    list.stream()
+                      .filter((s) -> s.startsWith("c"))
+                      .forEach(System.out::println);
+
+                    return (square);
                 }
-            """,
+            }
+        """,
         after = """
-                import java.util.*;
-                public class A {
-                    int square(int a, int b) {
-                        int square = a * b;
-    
-                        int sumOfSquares = 0;
-                        for(int i = 0; i < 10; i++) {
-                          sumOfSquares += square(i * i, i);
-                        }
-                        double num = 10.0;
-    
-                        List<String> list = Arrays.asList("a1", "b1", "c1");
-                        list.stream()
-                          .filter(s -> s.startsWith("c"))
-                          .forEach(System.out::println);
-    
-                        return square;
+            import java.util.*;
+            public class A {
+                int square(int a, int b) {
+                    int square = a * b;
+
+                    int sumOfSquares = 0;
+                    for(int i = 0; i < 10; i++) {
+                      sumOfSquares += square(i * i, i);
                     }
+                    double num = 10.0;
+
+                    List<String> list = Arrays.asList("a1", "b1", "c1");
+                    list.stream()
+                      .filter(s -> s.startsWith("c"))
+                      .forEach(System.out::println);
+
+                    return square;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -133,21 +133,21 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withExpr(true)
         }).build(),
         before = """
-                public class A {
-                    void doNothing() {
-                        int a = ((1 + 2) + 3);
-                        int b = (a + a) * a;
-                    }
+            public class A {
+                void doNothing() {
+                    int a = ((1 + 2) + 3);
+                    int b = (a + a) * a;
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    void doNothing() {
-                        int a = 1 + 2 + 3;
-                        int b = (a + a) * a;
-                    }
+            public class A {
+                void doNothing() {
+                    int a = 1 + 2 + 3;
+                    int b = (a + a) * a;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -156,21 +156,21 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withIdent(true)
         }).build(),
         before = """
-                public class A {
-                    double doNothing() {
-                        double num = (10.0);
-                        return (num);
-                    }
+            public class A {
+                double doNothing() {
+                    double num = (10.0);
+                    return (num);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    double doNothing() {
-                        double num = (10.0);
-                        return num;
-                    }
+            public class A {
+                double doNothing() {
+                    double num = (10.0);
+                    return num;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -182,31 +182,31 @@ interface UnnecessaryParenthesesTest : RecipeTest {
                 .withNumLong(true)
         }).build(),
         before = """
-                public class A {
-                    void doNothing() {
-                        double a = (1000.0);
-                        if ((1000.0) == a) {
-                            a = (1000.0);
-                        }
-                        float b = (1000.0f);
-                        int c = (1000);
-                        long d = (1000L);
+            public class A {
+                void doNothing() {
+                    double a = (1000.0);
+                    if ((1000.0) == a) {
+                        a = (1000.0);
                     }
+                    float b = (1000.0f);
+                    int c = (1000);
+                    long d = (1000L);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    void doNothing() {
-                        double a = 1000.0;
-                        if (1000.0 == a) {
-                            a = 1000.0;
-                        }
-                        float b = 1000.0f;
-                        int c = 1000;
-                        long d = 1000L;
+            public class A {
+                void doNothing() {
+                    double a = 1000.0;
+                    if (1000.0 == a) {
+                        a = 1000.0;
                     }
+                    float b = 1000.0f;
+                    int c = 1000;
+                    long d = 1000L;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -218,47 +218,47 @@ interface UnnecessaryParenthesesTest : RecipeTest {
                 .withStringLiteral(true)
         }).build(),
         before = """
-                public class A {
-                    void doNothing() {
-                        boolean a = (true);
-                        boolean b = (false);
-                        if (a == (true)) {
-                            b = (false);
-                        } else if (b == (false)) {
-                            a = (true);
-                        }
-                        
-                        String s = ("literallyString");
-                        String t = ("literallyString" + "stringLiteral");
-                        if (s == (null)) {
-                            s = (null);
-                        } else if ((("someLiteral").toLowerCase()).equals(s)) {
-                            s = null;
-                        }
+            public class A {
+                void doNothing() {
+                    boolean a = (true);
+                    boolean b = (false);
+                    if (a == (true)) {
+                        b = (false);
+                    } else if (b == (false)) {
+                        a = (true);
+                    }
+                    
+                    String s = ("literallyString");
+                    String t = ("literallyString" + "stringLiteral");
+                    if (s == (null)) {
+                        s = (null);
+                    } else if ((("someLiteral").toLowerCase()).equals(s)) {
+                        s = null;
                     }
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    void doNothing() {
-                        boolean a = true;
-                        boolean b = false;
-                        if (a == true) {
-                            b = false;
-                        } else if (b == false) {
-                            a = true;
-                        }
-                        
-                        String s = "literallyString";
-                        String t = ("literallyString" + "stringLiteral");
-                        if (s == null) {
-                            s = null;
-                        } else if (("someLiteral".toLowerCase()).equals(s)) {
-                            s = null;
-                        }
+            public class A {
+                void doNothing() {
+                    boolean a = true;
+                    boolean b = false;
+                    if (a == true) {
+                        b = false;
+                    } else if (b == false) {
+                        a = true;
+                    }
+                    
+                    String s = "literallyString";
+                    String t = ("literallyString" + "stringLiteral");
+                    if (s == null) {
+                        s = null;
+                    } else if (("someLiteral".toLowerCase()).equals(s)) {
+                        s = null;
                     }
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -267,45 +267,45 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withAssign(true)
         }).build(),
         before = """
-                public class A {
-                    void doNothing() {
-                        double a = (10.0);
-                        a = (10.0);
-                        double b = (a);
-                        b = b; // identity assignment
-                        b += (b);
-                        double c = (a + (b));
-                        c = (a + b);
-                        c = a + b; // binary operation
-                        c *= (c);
+            public class A {
+                void doNothing() {
+                    double a = (10.0);
+                    a = (10.0);
+                    double b = (a);
+                    b = b; // identity assignment
+                    b += (b);
+                    double c = (a + (b));
+                    c = (a + b);
+                    c = a + b; // binary operation
+                    c *= (c);
 
-                        String d = ("example") + ("assignment");
-                        d = ("example" + "assignment");
-                        d += ("example") + ("assignment");
-                        d = (("example") + ("assignment"));
-                    }
+                    String d = ("example") + ("assignment");
+                    d = ("example" + "assignment");
+                    d += ("example") + ("assignment");
+                    d = (("example") + ("assignment"));
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    void doNothing() {
-                        double a = 10.0;
-                        a = 10.0;
-                        double b = a;
-                        b = b; // identity assignment
-                        b += (b);
-                        double c = a + (b);
-                        c = a + b;
-                        c = a + b; // binary operation
-                        c *= (c);
+            public class A {
+                void doNothing() {
+                    double a = 10.0;
+                    a = 10.0;
+                    double b = a;
+                    b = b; // identity assignment
+                    b += (b);
+                    double c = a + (b);
+                    c = a + b;
+                    c = a + b; // binary operation
+                    c *= (c);
 
-                        String d = ("example") + ("assignment");
-                        d = "example" + "assignment";
-                        d += ("example") + ("assignment");
-                        d = ("example") + ("assignment");
-                    }
+                    String d = ("example") + ("assignment");
+                    d = "example" + "assignment";
+                    d += ("example") + ("assignment");
+                    d = ("example") + ("assignment");
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -314,25 +314,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withBandAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 5;
-                    int b = 7;
-                    void bitwiseAnd() {
-                        int c = (a & b);
-                        c &= (c);
-                    }
+            public class A {
+                int a = 5;
+                int b = 7;
+                void bitwiseAnd() {
+                    int c = (a & b);
+                    c &= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 5;
-                    int b = 7;
-                    void bitwiseAnd() {
-                        int c = (a & b);
-                        c &= c;
-                    }
+            public class A {
+                int a = 5;
+                int b = 7;
+                void bitwiseAnd() {
+                    int c = (a & b);
+                    c &= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -341,25 +341,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withBorAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 5;
-                    int b = 7;
-                    void bitwiseOr() {
-                        int c = (a | b);
-                        c |= (c);
-                    }
+            public class A {
+                int a = 5;
+                int b = 7;
+                void bitwiseOr() {
+                    int c = (a | b);
+                    c |= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 5;
-                    int b = 7;
-                    void bitwiseOr() {
-                        int c = (a | b);
-                        c |= c;
-                    }
+            public class A {
+                int a = 5;
+                int b = 7;
+                void bitwiseOr() {
+                    int c = (a | b);
+                    c |= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -368,23 +368,23 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withBsrAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = -1;
-                    void unsignedRightShiftAssignment() {
-                        int b = a >>> 1;
-                        b >>>= (b);
-                    }
+            public class A {
+                int a = -1;
+                void unsignedRightShiftAssignment() {
+                    int b = a >>> 1;
+                    b >>>= (b);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = -1;
-                    void unsignedRightShiftAssignment() {
-                        int b = a >>> 1;
-                        b >>>= b;
-                    }
+            public class A {
+                int a = -1;
+                void unsignedRightShiftAssignment() {
+                    int b = a >>> 1;
+                    b >>>= b;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -393,25 +393,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withBxorAssign(true)
         }).build(),
         before = """
-                public class A {
-                    boolean a = true;
-                    boolean b = false;
-                    void bitwiseExclusiveOr() {
-                        boolean c = (a ^ b);
-                        c ^= (c);
-                    }
+            public class A {
+                boolean a = true;
+                boolean b = false;
+                void bitwiseExclusiveOr() {
+                    boolean c = (a ^ b);
+                    c ^= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    boolean a = true;
-                    boolean b = false;
-                    void bitwiseExclusiveOr() {
-                        boolean c = (a ^ b);
-                        c ^= c;
-                    }
+            public class A {
+                boolean a = true;
+                boolean b = false;
+                void bitwiseExclusiveOr() {
+                    boolean c = (a ^ b);
+                    c ^= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -420,25 +420,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withDivAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 10;
-                    int b = 5;
-                    void divisionAssignmentOperator() {
-                        int c = (a / b);
-                        c /= (c);
-                    }
+            public class A {
+                int a = 10;
+                int b = 5;
+                void divisionAssignmentOperator() {
+                    int c = (a / b);
+                    c /= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 10;
-                    int b = 5;
-                    void divisionAssignmentOperator() {
-                        int c = (a / b);
-                        c /= c;
-                    }
+            public class A {
+                int a = 10;
+                int b = 5;
+                void divisionAssignmentOperator() {
+                    int c = (a / b);
+                    c /= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -447,25 +447,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withMinusAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 10;
-                    int b = 5;
-                    void minusAssignment() {
-                        int c = (a - b);
-                        c -= (c);
-                    }
+            public class A {
+                int a = 10;
+                int b = 5;
+                void minusAssignment() {
+                    int c = (a - b);
+                    c -= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 10;
-                    int b = 5;
-                    void minusAssignment() {
-                        int c = (a - b);
-                        c -= c;
-                    }
+            public class A {
+                int a = 10;
+                int b = 5;
+                void minusAssignment() {
+                    int c = (a - b);
+                    c -= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -474,25 +474,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withModAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 5;
-                    int b = 3;
-                    void remainderAssignment() {
-                        int c = a % b;
-                        c %= (c);
-                    }
+            public class A {
+                int a = 5;
+                int b = 3;
+                void remainderAssignment() {
+                    int c = a % b;
+                    c %= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 5;
-                    int b = 3;
-                    void remainderAssignment() {
-                        int c = a % b;
-                        c %= c;
-                    }
+            public class A {
+                int a = 5;
+                int b = 3;
+                void remainderAssignment() {
+                    int c = a % b;
+                    c %= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -501,25 +501,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withPlusAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void plusAssignment() {
-                        int c = a + b;
-                        c += (c);
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void plusAssignment() {
+                    int c = a + b;
+                    c += (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void plusAssignment() {
-                        int c = a + b;
-                        c += c;
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void plusAssignment() {
+                    int c = a + b;
+                    c += c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -528,25 +528,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withSlAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void leftShiftAssignment() {
-                        int c = a << b;
-                        c <<= (c);
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void leftShiftAssignment() {
+                    int c = a << b;
+                    c <<= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void leftShiftAssignment() {
-                        int c = a << b;
-                        c <<= c;
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void leftShiftAssignment() {
+                    int c = a << b;
+                    c <<= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -555,25 +555,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withSrAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void signedRightShiftAssignment() {
-                        int c = a >> b;
-                        c >>= (c);
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void signedRightShiftAssignment() {
+                    int c = a >> b;
+                    c >>= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void signedRightShiftAssignment() {
-                        int c = a >> b;
-                        c >>= c;
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void signedRightShiftAssignment() {
+                    int c = a >> b;
+                    c >>= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -582,25 +582,25 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withStarAssign(true)
         }).build(),
         before = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void multiplicationAssignmentOperator() {
-                        int c = a * b;
-                        c *= (c);
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void multiplicationAssignmentOperator() {
+                    int c = a * b;
+                    c *= (c);
                 }
-            """,
+            }
+        """,
         after = """
-                public class A {
-                    int a = 1;
-                    int b = 1;
-                    void multiplicationAssignmentOperator() {
-                        int c = a * b;
-                        c *= c;
-                    }
+            public class A {
+                int a = 1;
+                int b = 1;
+                void multiplicationAssignmentOperator() {
+                    int c = a * b;
+                    c *= c;
                 }
-            """
+            }
+        """
     )
 
     @Test
@@ -609,26 +609,27 @@ interface UnnecessaryParenthesesTest : RecipeTest {
             withLambda(true)
         }).build(),
         before = """
-                import java.util.*;
-                public class A {
-                    void doNothing() {
-                        List<String> list = Arrays.asList("a1", "b1", "c1");
-                        list.stream()
-                          .filter((s) -> s.startsWith("c"))
-                          .forEach(System.out::println);
-                    }
+            import java.util.*;
+            public class A {
+                void doNothing() {
+                    List<String> list = Arrays.asList("a1", "b1", "c1");
+                    list.stream()
+                      .filter((s) -> s.startsWith("c"))
+                      .forEach(System.out::println);
                 }
-            """,
+            }
+        """,
         after = """
-                import java.util.*;
-                public class A {
-                    void doNothing() {
-                        List<String> list = Arrays.asList("a1", "b1", "c1");
-                        list.stream()
-                          .filter(s -> s.startsWith("c"))
-                          .forEach(System.out::println);
-                    }
+            import java.util.*;
+            public class A {
+                void doNothing() {
+                    List<String> list = Arrays.asList("a1", "b1", "c1");
+                    list.stream()
+                      .filter(s -> s.startsWith("c"))
+                      .forEach(System.out::println);
                 }
-            """
+            }
+        """
     )
+
 }

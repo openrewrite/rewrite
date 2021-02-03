@@ -21,7 +21,6 @@ import org.openrewrite.RecipeTest
 import org.openrewrite.java.JavaParser
 
 interface SimplifyBooleanReturnTest : RecipeTest {
-
     override val recipe: Recipe?
         get() = SimplifyBooleanReturn()
 
