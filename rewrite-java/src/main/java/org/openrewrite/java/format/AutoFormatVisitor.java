@@ -31,6 +31,8 @@ public class AutoFormatVisitor<P> extends JavaVisitor<P> {
 
         J t = new NormalizeFormatVisitor<>().visit(tree, p, cursor);
 
+        t = new MinimumViableSpacingVisitor<>().visit(t, p, cursor);
+
         t = new RemoveTrailingWhitespaceVisitor<>().visit(t, p, cursor);
 
         t = new BlankLinesVisitor<>(Optional.ofNullable(cu.getStyle(BlankLinesStyle.class))

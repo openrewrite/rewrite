@@ -97,7 +97,7 @@ interface SimplifyBooleanReturnTest : RecipeTest {
             public class A {
                 public boolean absurdEquals(Object o) {
                     if(this == o)
-                        if(this == 0) 
+                        if(this == null) 
                             return true;
                     return false;
                 }

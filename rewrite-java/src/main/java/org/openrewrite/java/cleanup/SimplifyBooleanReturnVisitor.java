@@ -17,13 +17,13 @@ package org.openrewrite.java.cleanup;
 
 import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
+import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
 import org.openrewrite.java.JavaVisitor;
 import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
@@ -54,33 +54,26 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
             if (followingStatements.isEmpty() || singleFollowingStatement.map(r -> isLiteralFalse(r) || isLiteralTrue(r)).orElse(false)) {
                 J.Return retrn = getReturnIfOnlyStatementInThen(iff).orElse(null);
-                if (retrn == null) {
-                    throw new NoSuchElementException("No return statement");
-                }
+                assert retrn != null;
 
                 Expression ifCondition = i.getIfCondition().getTree();
 
                 if (isLiteralTrue(retrn.getExpr())) {
                     if (singleFollowingStatement.map(this::isLiteralFalse).orElse(false) && i.getElsePart() == null) {
-                        doAfterVisit(new DeleteStatement<>(followingStatements.get(0)));
-                        return retrn
-                                .withExpr(ifCondition.withPrefix(Space.format(" ")))
-                                .withPrefix(i.getPrefix());
+                        doAfterVisit(new DeleteStatement<>(followingStatements().get(0)));
+                        return maybeAutoFormat(retrn, retrn.withExpr(ifCondition), p, parent);
                     } else if (!singleFollowingStatement.isPresent() &&
                             getReturnExprIfOnlyStatementInElseThen(i).map(this::isLiteralFalse).orElse(false)) {
                         if (i.getElsePart() != null) {
                             doAfterVisit(new DeleteStatement<>(i.getElsePart().getBody()));
                         }
-
-                        return retrn
-                                .withExpr(ifCondition.withPrefix(Space.format(" ")))
-                                .withPrefix(i.getPrefix());
+                        return maybeAutoFormat(retrn, retrn.withExpr(ifCondition), p, parent);
                     }
                 } else if (isLiteralFalse(retrn.getExpr())) {
                     boolean returnThenPart = false;
 
                     if (singleFollowingStatement.map(this::isLiteralTrue).orElse(false) && i.getElsePart() == null) {
-                        doAfterVisit(new DeleteStatement<>(followingStatements.get(0)));
+                        doAfterVisit(new DeleteStatement<>(followingStatements().get(0)));
                         returnThenPart = true;
                     } else if (!singleFollowingStatement.isPresent() && getReturnExprIfOnlyStatementInElseThen(i)
                             .map(this::isLiteralTrue).orElse(false)) {
@@ -101,16 +94,15 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
                                 ) :
                                 ifCondition;
 
-                        return retrn
+                        return maybeAutoFormat(retrn, retrn
                                 .withExpr(new J.Unary(
                                         randomId(),
-                                        Space.format(" "),
+                                        Space.EMPTY,
                                         Markers.EMPTY,
                                         new JLeftPadded<>(Space.EMPTY, J.Unary.Type.Not, Markers.EMPTY),
                                         maybeParenthesizedCondition,
                                         JavaType.Primitive.Boolean)
-                                )
-                                .withPrefix(i.getPrefix());
+                                ), p, parent);
                     }
                 }
             }
@@ -141,11 +133,11 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
                 .collect(Collectors.toList());
     }
 
-    private boolean isLiteralTrue(J tree) {
+    private boolean isLiteralTrue(@Nullable J tree) {
         return tree instanceof J.Literal && ((J.Literal) tree).getValue() == Boolean.valueOf(true);
     }
 
-    private boolean isLiteralFalse(J tree) {
+    private boolean isLiteralFalse(@Nullable J tree) {
         return tree instanceof J.Literal && ((J.Literal) tree).getValue() == Boolean.valueOf(false);
     }
 

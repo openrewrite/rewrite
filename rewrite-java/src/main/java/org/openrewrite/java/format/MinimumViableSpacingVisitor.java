@@ -84,4 +84,13 @@ public class MinimumViableSpacingVisitor<P> extends JavaIsoVisitor<P> {
 
         return m;
     }
+
+    @Override
+    public J.Return visitReturn(J.Return retrn, P p) {
+        J.Return r = super.visitReturn(retrn, p);
+        if (r.getExpr() != null && r.getExpr().getPrefix().getWhitespace().isEmpty()) {
+            r = r.withExpr(r.getExpr().withPrefix(r.getExpr().getPrefix().withWhitespace(" ")));
+        }
+        return r;
+    }
 }
