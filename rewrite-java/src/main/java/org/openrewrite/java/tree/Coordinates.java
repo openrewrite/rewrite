@@ -31,8 +31,8 @@ public abstract class Coordinates <J2 extends J> {
         return new JavaCoordinates<>(tree, location);
     }
 
-    public JavaCoordinates<?> around() {
-        return create(null);
+    public JavaCoordinates<?> replaceThis() {
+        return create(Space.Location.REPLACE);
     }
 
     public abstract JavaCoordinates<?> before();
@@ -44,6 +44,7 @@ public abstract class Coordinates <J2 extends J> {
         @Override
         public JavaCoordinates<?> before() { return create(Space.Location.ANNOTATED_TYPE_PREFIX); }
     }
+
     public static class Annotation extends Coordinates<J.Annotation> {
 
         protected Annotation(J.Annotation tree) {super(tree); }
@@ -152,7 +153,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return type parameters replacement coordinates
          */
-        public JavaCoordinates<?> typeParameters() {return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
+        public JavaCoordinates<?> replaceTypeParameters() {return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
 
         /**
          * Intended for replacement semantics, where the extends clause will be entirely replaced by the code
@@ -160,7 +161,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return extends clause replacement coordinates
          */
-        public JavaCoordinates<?> extendsClause() { return create(Space.Location.EXTENDS); }
+        public JavaCoordinates<?> replaceExtendsClause() { return create(Space.Location.EXTENDS); }
 
         /**
          * Intended for replacement semantics, where the implements clause will be entirely replaced by the code
@@ -168,7 +169,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return implements clause replacement coordinates
          */
-        public JavaCoordinates<?> replaceImplements() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
+        public JavaCoordinates<?> replaceImplementsClause() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
 
         /**
          * Intended for replacement semantics, where the class body will be entirely replaced by the code
@@ -176,7 +177,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return class body replacement coordinates
          */
-        public JavaCoordinates<?> body() { return create(Space.Location.BLOCK_END); }
+        public JavaCoordinates<?> replaceBody() { return create(Space.Location.BLOCK_END); }
 
     }
     public static class CompilationUnit extends Coordinates<J.CompilationUnit> {
@@ -384,10 +385,9 @@ public abstract class Coordinates <J2 extends J> {
             }
         }
 
-        public JavaCoordinates<?> lastParameter() {
-            List<Statement> params = tree.getParams();
-            return new JavaCoordinates<>(params.get(params.size() - 1), Space.Location.METHOD_DECL_ARGUMENT_SUFFIX);
-        }
+        public JavaCoordinates<?> replaceTypeParameters() { return create(Space.Location.TYPE_PARAMETER_SUFFIX); }
+        public JavaCoordinates<?> replaceParameters() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
+        public JavaCoordinates<?> replaceReturnType() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
 
         /**
          * Intended for replacement semantics, where the method body specified will be entirely replaced by the code
@@ -395,9 +395,12 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return method body replacement coordinates
          */
-        public JavaCoordinates<?> body() {
+        public JavaCoordinates<?> replaceBody() {
             return create(Space.Location.BLOCK_END);
         }
+
+        public JavaCoordinates<?> replaceThrows() { return create(Space.Location.METHOD_DECL_ARGUMENT_SUFFIX); }
+
     }
 
     public static class MethodInvocation extends Coordinates<J.MethodInvocation> {

@@ -16,7 +16,6 @@
 package org.openrewrite.java;
 
 import org.openrewrite.*;
-import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -194,7 +193,7 @@ public class JavaTemplate {
                 return super.visitClassDecl(classDecl, insertionScope);
             }
             J.ClassDecl c = super.visitClassDecl(classDecl, insertionScope);
-            if (coordinates.getTree().getId().equals(classDecl.getId()) && coordinates.getSpaceLocation() != null) {
+            if (coordinates.getTree().getId().equals(classDecl.getId())) {
                 switch (coordinates.getSpaceLocation()) {
                     case TYPE_PARAMETER_SUFFIX:
                         //Regardless if the type parameters are null or have one or more types, these are replaced
@@ -203,23 +202,23 @@ public class JavaTemplate {
                                 new J.TypeParameter(Tree.randomId(), EMPTY, Markers.EMPTY, null,
                                         new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY), null)
                         ));
-                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().around());
+                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().replaceThis());
                         break;
                     case EXTENDS:
                         if (c.getExtends() == null) {
                             c = c.withExtends(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY));
                         }
-                        insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().around());
+                        insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().replaceThis());
                         break;
                     case IMPLEMENTS_SUFFIX:
                         //Regardless if the implements clause is null or has one or more elements, these are replaced
                         //with a single element list and this element's around semantics are used to replace all elements
                         //of the implements clause
                         c = classDecl.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY)));
-                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().around());
+                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().replaceThis());
                         break;
                     case BLOCK_END:
-                        insertionScope.putMessage("newCoordinates", c.getBody().coordinates().around());
+                        insertionScope.putMessage("newCoordinates", c.getBody().coordinates().replaceThis());
                         break;
                     default:
                 }
@@ -234,7 +233,7 @@ public class JavaTemplate {
                 return method.withAnnotations(emptyList()).withBody(null);
             }
             J.MethodDecl m = super.visitMethod(method, insertionScope);
-            if (coordinates.getTree().getId().equals(m.getId()) && coordinates.getSpaceLocation() != null) {
+            if (coordinates.getTree().getId().equals(m.getId())) {
                 switch (coordinates.getSpaceLocation()) {
 
                 }
@@ -314,7 +313,7 @@ public class JavaTemplate {
 
         @Override
         public @Nullable J visit(@Nullable Tree tree, String template) {
-            if (coordinates.getSpaceLocation() == null && tree !=null && tree.getId().equals(coordinates.getTree().getId())) {
+            if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree !=null && tree.getId().equals(coordinates.getTree().getId())) {
                 getPrinterAcc().append(getMarkedTemplate(template));
                 return (J) tree;
             }

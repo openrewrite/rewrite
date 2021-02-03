@@ -18,12 +18,9 @@ package org.openrewrite.java
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
-import org.openrewrite.CoordinatesPrinter
-import org.openrewrite.Cursor
 import org.openrewrite.ExecutionContext
 import org.openrewrite.RecipeTest
 import org.openrewrite.internal.ListUtils
-import org.openrewrite.java.format.AutoFormatVisitor
 import org.openrewrite.java.format.MinimumViableSpacingVisitor
 import org.openrewrite.java.tree.J
 import org.openrewrite.java.tree.Statement
@@ -41,7 +38,7 @@ interface JavaTemplateTest : RecipeTest {
 
             override fun visitMethodInvocation(method: J.MethodInvocation, p: ExecutionContext): J.MethodInvocation {
                 var m = super.visitMethodInvocation(method, p)
-                m = m.withArgs(template.generate(cursor,  m.args[0].coordinates().around()))
+                m = m.withArgs(template.generate(cursor,  m.args[0].coordinates().replaceThis()))
                 return m
             }
         }.toRecipe(),
@@ -263,7 +260,7 @@ interface JavaTemplateTest : RecipeTest {
                 val c = super.visitClassDecl(classDecl, p)
 
                 //Replace body.
-                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().body())
+                val generatedBlocks = template.generate<J.Block>(cursor, c.coordinates().replaceBody())
                 assertThat(generatedBlocks[0].statements).`as`("The list of generated statements should be 1.")
                     .hasSize(1)
                 val generatedVariableDecls = generatedBlocks[0].statements[0] as J.VariableDecls
@@ -436,7 +433,7 @@ interface JavaTemplateTest : RecipeTest {
                 if (m.name.ident.simpleName != "countLetters") return m
                 val argument = m.args[0]
 
-                val generated = template.generate<J>(cursor, m.coordinates().around(), argument)
+                val generated = template.generate<J>(cursor, m.coordinates().replaceThis(), argument)
                 assertThat(generated).`as`("The list of generated invocations should be 1.").hasSize(1)
                 return generated[0].withPrefix(method.prefix)
             }

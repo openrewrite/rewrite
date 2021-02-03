@@ -26,6 +26,5 @@ public class JavaCoordinates <J2 extends J>{
 
     J2 tree;
 
-    @Nullable
     Space.Location spaceLocation;
 }
