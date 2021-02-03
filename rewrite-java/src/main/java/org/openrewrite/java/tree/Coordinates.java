@@ -147,7 +147,8 @@ public abstract class Coordinates <J2 extends J> {
 
         /**
          * Intended for replacement semantics, where the type parameters will be entirely replaced by the code
-         * generated via JavaTemplate
+         * generated via JavaTemplate. Any template should EXCLUDE &lt; and &gt; as those are rendered by the
+         * container.
          *
          * @return type parameters replacement coordinates
          */
@@ -167,7 +168,7 @@ public abstract class Coordinates <J2 extends J> {
          *
          * @return implements clause replacement coordinates
          */
-        public JavaCoordinates<?> implementsClause() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
+        public JavaCoordinates<?> replaceImplements() { return create(Space.Location.IMPLEMENTS_SUFFIX); }
 
         /**
          * Intended for replacement semantics, where the class body will be entirely replaced by the code

@@ -15,10 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
+import org.openrewrite.*;
 import org.openrewrite.internal.ListUtils;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
@@ -31,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.java.tree.Space.EMPTY;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -80,25 +78,24 @@ public class JavaTemplate {
             templateEventHandler.afterVariableSubstitution(printedTemplate);
         }
 
-        //Walk down from the parent scope to find the tree element within the coordinates.
+        J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
+
+        //Prune down the original AST to just the elements in scope at the insertion point.
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor(coordinates, imports).visit(cu, parentScope);
+
+        //As part of the pruning process, the coordinates may have changed if a parent tree is used with coordinates
+        //that use replace semantics with an immediate child element.
+        JavaCoordinates<?> newCoordinates = parentScope.pollMessage("newCoordinates");
+        if (newCoordinates != null) {
+            coordinates = newCoordinates;
+        }
+
+        //Walk down from the parent scope to find the tree element mapped by the coordinates.
         AtomicReference<Cursor> cursorReference = new AtomicReference<>();
         new FindCoordinateCursor(parentScope, coordinates).visit(parentScope.getValue(), cursorReference);
         Cursor insertionScope = cursorReference.get();
         if (insertionScope == null) {
             insertionScope = parentScope;
-        }
-        J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
-
-
-        //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor(coordinates, imports).visit(cu, insertionScope);
-
-        //To solve for cases where a template should be generated as the last statement of a block or the last element
-        //of a JContainer, the pruned tree may insert an J.Empty as an insertion point for this use case. The inserted
-        //element is passed via the message cursor.
-        J.Empty newInsertionPoint = insertionScope.pollMessage("newInsertionPoint");
-        if (newInsertionPoint != null) {
-            insertionScope = new Cursor(insertionScope, newInsertionPoint);
         }
 
         String generatedSource = new TemplatePrinter(coordinates).print(pruned, printedTemplate);
@@ -119,7 +116,7 @@ public class JavaTemplate {
 
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
-                .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
+                .map(snippet -> (J2) new AutoFormatVisitor<String>().visit(snippet, "", formatScope))
                 .collect(toList());
     }
 
@@ -196,9 +193,39 @@ public class JavaTemplate {
             if (!insertionScope.isScopeInPath(classDecl)) {
                 return super.visitClassDecl(classDecl, insertionScope);
             }
+            J.ClassDecl c = super.visitClassDecl(classDecl, insertionScope);
+            if (coordinates.getTree().getId().equals(classDecl.getId()) && coordinates.getSpaceLocation() != null) {
+                switch (coordinates.getSpaceLocation()) {
+                    case TYPE_PARAMETER_SUFFIX:
+                        //Regardless if the type parameters are null or have one or more types, these are replaced
+                        //with a single element list and this element's around semantics are used to replace all types
+                        c = classDecl.withTypeParameters(Collections.singletonList(
+                                new J.TypeParameter(Tree.randomId(), EMPTY, Markers.EMPTY, null,
+                                        new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY), null)
+                        ));
+                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().around());
+                        break;
+                    case EXTENDS:
+                        if (c.getExtends() == null) {
+                            c = c.withExtends(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY));
+                        }
+                        insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().around());
+                        break;
+                    case IMPLEMENTS_SUFFIX:
+                        //Regardless if the implements clause is null or has one or more elements, these are replaced
+                        //with a single element list and this element's around semantics are used to replace all elements
+                        //of the implements clause
+                        c = classDecl.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY)));
+                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().around());
+                        break;
+                    case BLOCK_END:
+                        insertionScope.putMessage("newCoordinates", c.getBody().coordinates().around());
+                        break;
+                    default:
+                }
+            }
 
-            //TODO handle various coordinates for class declarations.
-            return super.visitClassDecl(classDecl, insertionScope);
+            return c;
         }
 
         @Override
@@ -206,9 +233,13 @@ public class JavaTemplate {
             if (!insertionScope.isScopeInPath(method)) {
                 return method.withAnnotations(emptyList()).withBody(null);
             }
+            J.MethodDecl m = super.visitMethod(method, insertionScope);
+            if (coordinates.getTree().getId().equals(m.getId()) && coordinates.getSpaceLocation() != null) {
+                switch (coordinates.getSpaceLocation()) {
 
-            //TODO handle various coordinates for method declarations.
-            return super.visitMethod(method, insertionScope);
+                }
+            }
+            return m;
         }
 
         @Override
