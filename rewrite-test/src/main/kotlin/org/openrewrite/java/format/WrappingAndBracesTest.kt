@@ -47,6 +47,20 @@ interface WrappingAndBracesTest : RecipeTest {
     )
 
     @Test
+    fun blockEndOnOwnLine(jp: JavaParser) = assertChanged(
+        jp,
+        before = """
+            class Test {
+                int n = 0;}
+        """,
+        after = """
+            class Test {
+                int n = 0;
+            }
+        """
+    )
+
+    @Test
     fun annotatedMethod(jp: JavaParser) = assertChanged(
             jp,
             before = """
