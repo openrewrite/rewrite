@@ -133,6 +133,10 @@ class Java11ReorderMethodArgumentsTest : Java11Test, ReorderMethodArgumentsTest
 
 @DebugOnly
 @ExtendWith(JavaParserResolver::class)
+class Java11SimplifyBooleanExpressionTest : Java11Test, SimplifyBooleanExpressionTest
+
+@DebugOnly
+@ExtendWith(JavaParserResolver::class)
 class Java11SimplifyBooleanReturnTest : Java11Test, SimplifyBooleanReturnTest
 
 @DebugOnly

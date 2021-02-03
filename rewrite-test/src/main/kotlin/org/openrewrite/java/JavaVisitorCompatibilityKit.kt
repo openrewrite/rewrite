@@ -105,6 +105,9 @@ abstract class JavaVisitorCompatibilityKit {
     inner class SemanticallyEqualTck : SemanticallyEqualTest
 
     @Nested
+    inner class SimplifyBooleanExpressionTck : SimplifyBooleanExpressionTest
+
+    @Nested
     inner class SimplifyBooleanReturnTck : SimplifyBooleanReturnTest
 
     @Nested
