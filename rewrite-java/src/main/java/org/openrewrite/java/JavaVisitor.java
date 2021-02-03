@@ -68,10 +68,15 @@ public class JavaVisitor<P> extends TreeVisitor<J, P> {
         }
     }
 
-    @SuppressWarnings({"unchecked", "ConstantConditions"})
+
     public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p) {
+        return maybeAutoFormat(before, after, p, getCursor());
+    }
+
+    @SuppressWarnings({"unchecked", "ConstantConditions"})
+    public <J2 extends J> J2 maybeAutoFormat(J2 before, J2 after, P p, Cursor cursor) {
         if(before != after) {
-            return (J2) new AutoFormatVisitor<>().visit(after, p, getCursor());
+            return (J2) new AutoFormatVisitor<>().visit(after, p, cursor);
         }
         return after;
     }
