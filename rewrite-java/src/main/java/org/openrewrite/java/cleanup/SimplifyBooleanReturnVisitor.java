@@ -19,19 +19,21 @@ import org.openrewrite.Cursor;
 import org.openrewrite.Incubating;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.DeleteStatement;
+import org.openrewrite.java.JavaTemplate;
 import org.openrewrite.java.JavaVisitor;
-import org.openrewrite.java.tree.*;
-import org.openrewrite.marker.Markers;
+import org.openrewrite.java.tree.Expression;
+import org.openrewrite.java.tree.J;
+import org.openrewrite.java.tree.Statement;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
-import static org.openrewrite.Tree.randomId;
-
 @Incubating(since = "7.0.0")
 public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
+
+    private static final JavaTemplate NOT_IF_CONDITION_RETURN = JavaTemplate.builder("return !(#{});").build();
 
     public SimplifyBooleanReturnVisitor() {
         setCursoringOn();
@@ -85,24 +87,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
                     if (returnThenPart) {
                         // we need to NOT the expression inside the if condition
-                        Expression maybeParenthesizedCondition = ifCondition instanceof J.Binary || ifCondition instanceof J.Ternary ?
-                                new J.Parentheses<>(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        new JRightPadded<>(ifCondition, Space.EMPTY, Markers.EMPTY)
-                                ) :
-                                ifCondition;
-
-                        return maybeAutoFormat(retrn, retrn
-                                .withExpr(new J.Unary(
-                                        randomId(),
-                                        Space.EMPTY,
-                                        Markers.EMPTY,
-                                        new JLeftPadded<>(Space.EMPTY, J.Unary.Type.Not, Markers.EMPTY),
-                                        maybeParenthesizedCondition,
-                                        JavaType.Primitive.Boolean)
-                                ), p, parent);
+                        return NOT_IF_CONDITION_RETURN.generate(getCursor(), ifCondition).get(0);
                     }
                 }
             }
