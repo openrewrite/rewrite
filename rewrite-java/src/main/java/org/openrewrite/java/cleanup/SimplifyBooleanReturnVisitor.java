@@ -87,7 +87,7 @@ public class SimplifyBooleanReturnVisitor<P> extends JavaVisitor<P> {
 
                     if (returnThenPart) {
                         // we need to NOT the expression inside the if condition
-                        return NOT_IF_CONDITION_RETURN.generate(getCursor(), ifCondition).get(0);
+                        return NOT_IF_CONDITION_RETURN.generate(getCursor(), i.coordinates().replaceThis(), ifCondition).get(0);
                     }
                 }
             }

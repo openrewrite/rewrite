@@ -15,11 +15,7 @@
  */
 package org.openrewrite.java;
 
-import org.openrewrite.Cursor;
-import org.openrewrite.Incubating;
-import org.openrewrite.Tree;
-import org.openrewrite.TreePrinter;
-import org.openrewrite.internal.ListUtils;
+import org.openrewrite.*;
 import org.openrewrite.internal.StringUtils;
 import org.openrewrite.internal.lang.Nullable;
 import org.openrewrite.java.format.AutoFormatVisitor;
@@ -27,9 +23,11 @@ import org.openrewrite.java.tree.*;
 import org.openrewrite.marker.Markers;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.toList;
+import static org.openrewrite.java.tree.Space.EMPTY;
 
 @Incubating(since = "7.0.0")
 public class JavaTemplate {
@@ -66,7 +64,7 @@ public class JavaTemplate {
         return new Builder(code);
     }
 
-    public <J2 extends J> List<J2> generate(Cursor insertionScope, Object... parameters) {
+    public <J2 extends J> List<J2> generate(Cursor parentScope, JavaCoordinates<?> coordinates, Object... parameters) {
 
         if (parameters.length != parameterCount) {
             throw new IllegalArgumentException("This template requires " + parameterCount + " parameters.");
@@ -79,46 +77,27 @@ public class JavaTemplate {
             templateEventHandler.afterVariableSubstitution(printedTemplate);
         }
 
-        J.CompilationUnit cu = insertionScope.firstEnclosingOrThrow(J.CompilationUnit.class);
-
-        //Walk up the insertion scope and find the first element that is an immediate child of a J.Block. The template
-        //will always be inserted into a block.
-        boolean memberVariableInitializer = false;
-
-        while (insertionScope.getParent() != null &&
-                !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.CompilationUnit) &&
-                !(insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.Block)
-        ) {
-
-            if (insertionScope.dropParentUntil(J.class::isInstance).getValue() instanceof J.VariableDecls.NamedVar) {
-                //There is one edge case that can trip up compilation: If the insertion scope is the initializer
-                //of a member variable and that scope is not itself in a nested block. In this case, a class block
-                //must be created to correctly compile the template
-
-                //Find the first block's parent and if that parent is a class declaration, account for the edge case.
-                Iterator<Object> index = insertionScope.getPath();
-                while (index.hasNext()) {
-                    if (index.next() instanceof J.Block && index.hasNext() && index.next() instanceof J.ClassDecl) {
-                        memberVariableInitializer = true;
-                    }
-                }
-            }
-            insertionScope = insertionScope.getParent();
-        }
+        J.CompilationUnit cu = parentScope.firstEnclosingOrThrow(J.CompilationUnit.class);
 
         //Prune down the original AST to just the elements in scope at the insertion point.
-        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor().visit(cu, insertionScope);
+        J.CompilationUnit pruned = (J.CompilationUnit) new TemplateVisitor(coordinates, imports).visit(cu, parentScope);
 
-        //To solve for cases where a template should be generated as the last statement of a block or the last element
-        //of a JContainer, the pruned tree may insert an J.Empty as an insertion point for this use case. The inserted
-        //element is passed via the message cursor.
-        J.Empty newInsertionPoint = insertionScope.pollMessage("newInsertionPoint");
-        if (newInsertionPoint != null) {
-            insertionScope = new Cursor(insertionScope, newInsertionPoint);
+        //As part of the pruning process, the coordinates may have changed if a parent tree is used with coordinates
+        //that use replace semantics with an immediate child element.
+        JavaCoordinates<?> newCoordinates = parentScope.pollMessage("newCoordinates");
+        if (newCoordinates != null) {
+            coordinates = newCoordinates;
         }
 
-        String generatedSource = new TemplatePrinter(memberVariableInitializer, insertionScope, imports)
-                .print(pruned, printedTemplate);
+        //Walk down from the parent scope to find the tree element mapped by the coordinates.
+        AtomicReference<Cursor> cursorReference = new AtomicReference<>();
+        new FindCoordinateCursor(parentScope, coordinates).visit(parentScope.getValue(), cursorReference);
+        Cursor insertionScope = cursorReference.get();
+        if (insertionScope == null) {
+            insertionScope = parentScope;
+        }
+
+        String generatedSource = new TemplatePrinter(coordinates).print(pruned, printedTemplate);
 
         if (templateEventHandler != null) {
             templateEventHandler.beforeParseTemplate(generatedSource);
@@ -136,7 +115,7 @@ public class JavaTemplate {
 
         //noinspection unchecked
         return extractionContext.getSnippets().stream()
-                .map(snippet -> (J2) new AutoFormatVisitor<Void>().visit(snippet, null, formatScope))
+                .map(snippet -> (J2) new AutoFormatVisitor<String>().visit(snippet, "", formatScope))
                 .collect(toList());
     }
 
@@ -168,20 +147,105 @@ public class JavaTemplate {
         return parameter.toString();
     }
 
+    public class FindCoordinateCursor extends JavaVisitor<AtomicReference<Cursor>> {
+        private final UUID elementId;
+
+        public FindCoordinateCursor(Cursor parentCursor, JavaCoordinates<?> coordinates) {
+            this.elementId = coordinates.getTree().getId();
+            setCursoringOn();
+            setCursor(parentCursor);
+        }
+
+        @Override
+        public J visit(@Nullable Tree tree, AtomicReference<Cursor> cursorReference) {
+            if (tree != null && tree.getId().equals(elementId)) {
+                cursorReference.set(getCursor());
+            }
+            return super.visit(tree, cursorReference);
+        }
+    }
     /**
      * A java visitor that prunes the original AST down to just the things needed to compile the template code.
      * The typed Cursor represents the insertion point within the original AST.
      */
     private static class TemplateVisitor extends JavaIsoVisitor<Cursor> {
 
-        TemplateVisitor() {
+        private final JavaCoordinates<?> coordinates;
+        private final Set<String> imports;
+
+        TemplateVisitor(JavaCoordinates<?> coordinates, Set<String> imports) {
+            this.coordinates = coordinates;
+            this.imports = imports;
             setCursoringOn();
+        }
+
+        @Override
+        public J.CompilationUnit visitCompilationUnit(J.CompilationUnit cu, Cursor insertionScope) {
+            for (String impoort : imports) {
+                doAfterVisit(new AddImport<>(impoort, null, false));
+            }
+            return super.visitCompilationUnit(cu, insertionScope);
+        }
+
+        @Override
+        public J.ClassDecl visitClassDecl(J.ClassDecl classDecl, Cursor insertionScope) {
+            if (!insertionScope.isScopeInPath(classDecl)) {
+                return super.visitClassDecl(classDecl, insertionScope);
+            }
+            J.ClassDecl c = super.visitClassDecl(classDecl, insertionScope);
+            if (coordinates.getTree().getId().equals(classDecl.getId())) {
+                switch (coordinates.getSpaceLocation()) {
+                    case TYPE_PARAMETER_SUFFIX:
+                        //Regardless if the type parameters are null or have one or more types, these are replaced
+                        //with a single element list and this element's around semantics are used to replace all types
+                        c = classDecl.withTypeParameters(Collections.singletonList(
+                                new J.TypeParameter(Tree.randomId(), EMPTY, Markers.EMPTY, null,
+                                        new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY), null)
+                        ));
+                        insertionScope.putMessage("newCoordinates", c.getTypeParameters().get(0).coordinates().replaceThis());
+                        break;
+                    case EXTENDS:
+                        if (c.getExtends() == null) {
+                            c = c.withExtends(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY));
+                        }
+                        insertionScope.putMessage("newCoordinates", c.getExtends().coordinates().replaceThis());
+                        break;
+                    case IMPLEMENTS_SUFFIX:
+                        //Regardless if the implements clause is null or has one or more elements, these are replaced
+                        //with a single element list and this element's around semantics are used to replace all elements
+                        //of the implements clause
+                        c = classDecl.withImplements(Collections.singletonList(new J.Empty(Tree.randomId(), EMPTY, Markers.EMPTY)));
+                        insertionScope.putMessage("newCoordinates", c.getImplements().get(0).coordinates().replaceThis());
+                        break;
+                    case BLOCK_END:
+                        insertionScope.putMessage("newCoordinates", c.getBody().coordinates().replaceThis());
+                        break;
+                    default:
+                }
+            }
+
+            return c;
+        }
+
+        @Override
+        public J.MethodDecl visitMethod(J.MethodDecl method, Cursor insertionScope) {
+            if (!insertionScope.isScopeInPath(method)) {
+                return method.withAnnotations(emptyList()).withBody(null);
+            }
+            J.MethodDecl m = super.visitMethod(method, insertionScope);
+            if (coordinates.getTree().getId().equals(m.getId())) {
+                switch (coordinates.getSpaceLocation()) {
+
+                }
+            }
+            return m;
         }
 
         @Override
         public J.Block visitBlock(J.Block block, Cursor insertionScope) {
             Cursor parent = getCursor().dropParentUntil(J.class::isInstance);
-            if (!insertionScope.isScopeInPath(block) && !(parent.getValue() instanceof J.ClassDecl)) {
+            if (coordinates.getTree().getId().equals(block.getId()) ||
+                    (!insertionScope.isScopeInPath(block) && !(parent.getValue() instanceof J.ClassDecl))) {
                 return block.withStatements(emptyList());
             }
 
@@ -208,38 +272,16 @@ public class JavaTemplate {
                 b = super.visitBlock(block, insertionScope);
             }
 
-            if (insertionScope.isScopeInPath(b)
-                    && b.getStatements().stream().noneMatch(insertionScope::isScopeInPath)) {
-                //This can happen if the insertion scope was targeted to the block's end element. In this case,
-                //a new, empty element is inserted as the last statement in the block and will act as an insert
-                //point for those cases where a template should be generated as the last statement of a block.
-                J.Empty newInsertionPoint = new J.Empty(Tree.randomId(), Space.EMPTY, Markers.EMPTY );
-                b = b.withStatements(ListUtils.concat(b.getStatements(), newInsertionPoint));
-                insertionScope.putMessage("newInsertionPoint", newInsertionPoint);
-            }
             return b;
-        }
-
-        @Override
-        public J.MethodDecl visitMethod(J.MethodDecl method, Cursor insertionScope) {
-            //If the method is within insertion scope, then we must traverse the method.
-            if (insertionScope.isScopeInPath(method)) {
-                return super.visitMethod(method, insertionScope);
-            }
-
-            return method.withAnnotations(emptyList())
-                    .withBody(null);
         }
 
         @Override
         public J.VariableDecls.NamedVar visitVariable(J.VariableDecls.NamedVar variable, Cursor insertionScope) {
             if (!insertionScope.isScopeInPath(variable)) {
-                //Variables in the original AST only need to be declared, this nulls out the initializers.
-                variable = variable.withInitializer(null);
-            } else {
-                //A variable within the insertion scope, we must mutate
-                variable = variable.withName(variable.getName().withName("_" + variable.getSimpleName()));
+                //Variables in the original AST only need to be declared, nulls out the initializers.
+                return super.visitVariable(variable.withInitializer(null), insertionScope);
             }
+
             return super.visitVariable(variable, insertionScope);
         }
     }
@@ -249,37 +291,38 @@ public class JavaTemplate {
      */
     private static class TemplatePrinter extends JavaPrinter<String> {
 
-        private final Set<String> imports;
+        private final JavaCoordinates<?> coordinates;
 
-        private TemplatePrinter(boolean memberVariableInitializer, Cursor insertionScope, Set<String> imports) {
-            super(new TreePrinter<String>() {
-
-                //Note: A block is added around the template and markers when the insertion point is within a
-                //      member variable initializer to prevent compiler issues.
-                private final String blockStart = memberVariableInitializer ? "{" : "";
-                private final String blockEnd = memberVariableInitializer ? "}" : "";
-                private final Object insertionValue = insertionScope.getValue();
-
-                @Override
-                public void doBefore(Tree tree, StringBuilder printerAcc, String printedTemplate) {
-                    // individual statement, but block doLast which is invoking this adds the ;
-                    if (insertionValue instanceof Tree && ((Tree) insertionValue).getId().equals(tree.getId())) {
-                        String templateCode = blockStart + "/*" + SNIPPET_MARKER_START + "*/" +
-                                printedTemplate + "/*" + SNIPPET_MARKER_END + "*/" + blockEnd;
-
-                        printerAcc.append(templateCode);
-                    }
-                }
-            });
-            this.imports = imports;
+        private TemplatePrinter(JavaCoordinates<?> coordinates) {
+            super(TreePrinter.identity());
+            this.coordinates = coordinates;
+            setCursoringOn();
         }
 
         @Override
-        public J visitCompilationUnit(J.CompilationUnit cu, String acc) {
-            for (String impoort : imports) {
-                doAfterVisit(new AddImport<>(impoort, null, false));
+        public Space visitSpace(Space space, Space.Location location, String template) {
+            J parent = getCursor().firstEnclosing(J.class);
+            if (parent != null && parent.getId().equals(coordinates.getTree().getId())
+                    && location == coordinates.getSpaceLocation()) {
+                getPrinterAcc().append(getMarkedTemplate(template));
+                return space;
+            } else {
+                return super.visitSpace(space, location, template);
             }
-            return super.visitCompilationUnit(cu, acc);
+        }
+
+        @Override
+        public @Nullable J visit(@Nullable Tree tree, String template) {
+            if (coordinates.getSpaceLocation() == Space.Location.REPLACE && tree !=null && tree.getId().equals(coordinates.getTree().getId())) {
+                getPrinterAcc().append(getMarkedTemplate(template));
+                return (J) tree;
+            }
+            return super.visit(tree, template);
+        }
+
+        private String getMarkedTemplate(String template) {
+            return "/*" + SNIPPET_MARKER_START + "*/" + template
+                 + "/*" + SNIPPET_MARKER_END + "*/";
         }
     }
 
@@ -336,7 +379,7 @@ public class JavaTemplate {
                 //that element will not be collected.
                 context.collectElements = false;
 
-                if (context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
+                while(context.collectedElements.size() > 1 && getCursor().isScopeInPath(context.collectedElements.get(0).element)) {
                     //If we have collected more than one element and the ending element is on the path of the first element, then
                     //the first element does not belong to the template, exclude it and move the start depth up.
                     context.collectedElements.remove(0);

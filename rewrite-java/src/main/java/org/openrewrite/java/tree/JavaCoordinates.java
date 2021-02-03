@@ -22,10 +22,9 @@ import org.openrewrite.internal.lang.Nullable;
 
 @Data
 @FieldDefaults(makeFinal = true, level = AccessLevel.PRIVATE)
-public class JavaCoordinates {
+public class JavaCoordinates <J2 extends J>{
 
-    J tree;
+    J2 tree;
 
-    @Nullable
     Space.Location spaceLocation;
 }
