@@ -28,7 +28,7 @@ class XmlDocumentSerializerTest {
     fun roundTripSerialization() {
         val serializer = TreeSerializer<Xml.Document>()
         val a = XmlParser().parse("<root></root>")[0].withMarkers(
-                Markers.build(listOf(SearchResult()))
+                Markers.build(listOf(SearchResult(null)))
         )
 
         val aBytes = serializer.write(a)
@@ -41,9 +41,9 @@ class XmlDocumentSerializerTest {
     fun roundTripSerializationList() {
         val serializer = TreeSerializer<Xml.Document>()
         val x1 = XmlParser().parse("<root></root>")[0]
-                .withMarkers(Markers.build(listOf(SearchResult())))
+                .withMarkers(Markers.build(listOf(SearchResult(null))))
         val x2 = XmlParser().parse("<another></another>")[0]
-                .withMarkers(Markers.build(listOf(SearchResult())))
+                .withMarkers(Markers.build(listOf(SearchResult(null))))
 
         val serialized = serializer.write(listOf(x1, x2))
         val deserialized = serializer.readList(serialized)

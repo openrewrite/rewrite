@@ -15,7 +15,7 @@
  */
 package org.openrewrite.marker;
 
-import lombok.EqualsAndHashCode;
+import lombok.Data;
 import org.openrewrite.Incubating;
 import org.openrewrite.Tree;
 import org.openrewrite.TreePrinter;
@@ -27,7 +27,7 @@ import org.openrewrite.internal.lang.Nullable;
  * contextualized in the tree that they are found in.
  */
 @Incubating(since = "7.0.0")
-@EqualsAndHashCode
+@Data
 public class SearchResult implements Marker {
     public static final TreePrinter<Void> PRINTER = new TreePrinter<Void>() {
 
@@ -56,14 +56,6 @@ public class SearchResult implements Marker {
 
     @Nullable
     private final String description;
-
-    public SearchResult() {
-        this(null);
-    }
-
-    public SearchResult(@Nullable String description) {
-        this.description = description;
-    }
 
     @Nullable
     public String getDescription() {

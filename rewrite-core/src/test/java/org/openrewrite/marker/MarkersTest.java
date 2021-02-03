@@ -24,8 +24,8 @@ public class MarkersTest {
     @Test
     public void addPreventsDuplicates() {
         Markers markers = Markers.EMPTY;
-        markers = markers.add(new SearchResult());
-        markers = markers.add(new SearchResult());
+        markers = markers.add(new SearchResult(null));
+        markers = markers.add(new SearchResult(null));
         assertThat(markers.findAll(SearchResult.class)).hasSize(1);
     }
 

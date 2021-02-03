@@ -55,7 +55,7 @@ public class FindTags extends Recipe {
         @Override
         public Xml visitTag(Xml.Tag tag, ExecutionContext ctx) {
             if (xPathMatcher.matches(getCursor())) {
-                return tag.mark(new SearchResult());
+                return tag.withMarker(new SearchResult(null));
             }
             return super.visitTag(tag, ctx);
         }

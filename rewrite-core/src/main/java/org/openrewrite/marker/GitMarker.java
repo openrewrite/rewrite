@@ -15,17 +15,14 @@
  */
 package org.openrewrite.marker;
 
-public interface Markable {
 
-    Markers getMarkers();
+import lombok.Data;
+import org.openrewrite.Incubating;
 
-    <M extends Markable> M withMarkers(Markers markers);
-
-    default <M extends Markable> M withMarker(Marker... add) {
-        Markers markers = getMarkers();
-        for (Marker marker : add) {
-            markers = markers.add(marker);
-        }
-        return withMarkers(markers);
-    }
+@Incubating(since = "7.0.0")
+@Data
+public class GitMarker implements Marker {
+    private final String origin;
+    private final String branch;
+    private final String change;
 }

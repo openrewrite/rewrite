@@ -53,7 +53,7 @@ public class FindProperties extends Recipe {
         public Properties visitEntry(Properties.Entry entry, ExecutionContext ctx) {
             Properties p = super.visitEntry(entry, ctx);
             if (entry.getKey().equals(propertyKey)) {
-                p = p.mark(new SearchResult());
+                p = p.withMarker(new SearchResult(null));
             }
             return p;
         }

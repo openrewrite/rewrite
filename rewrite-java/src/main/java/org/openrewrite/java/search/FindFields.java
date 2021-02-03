@@ -58,7 +58,7 @@ public class FindFields extends Recipe {
             }
             if (multiVariable.getTypeExpr() != null && TypeUtils.hasElementType(multiVariable.getTypeExpr()
                     .getType(), fullyQualifiedTypeName)) {
-                return multiVariable.mark(new SearchResult());
+                return multiVariable.withMarker(new SearchResult(null));
             }
             return multiVariable;
         }

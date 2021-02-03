@@ -125,7 +125,8 @@ interface ChangeFieldNameTest : RecipeTest {
             class Test {
                 List collection = null;
                 class Nested {
-                    Object collection = A.this.collection;
+                    Object collection = Test.this.collection;
+                    Object collection2 = A.this.collection;
                 }
             }
         """,
@@ -134,9 +135,11 @@ interface ChangeFieldNameTest : RecipeTest {
             class Test {
                 List list = null;
                 class Nested {
-                    Object collection = A.this.list;
+                    Object collection = Test.this.list;
+                    Object collection2 = A.this.collection;
                 }
             }
-        """
+        """,
+        dependsOn = arrayOf("class A { Object collection; }")
     )
 }

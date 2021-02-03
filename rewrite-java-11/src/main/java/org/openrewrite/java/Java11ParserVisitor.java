@@ -455,7 +455,7 @@ public class Java11ParserVisitor extends TreePathScanner<J, Space> {
                 convertAll(node.getImports(), this::statementDelim, this::statementDelim),
                 convertAll(node.getTypeDecls().stream().filter(JCClassDecl.class::isInstance).collect(toList())),
                 format(source.substring(cursor))
-        ).mark(styles.toArray(NamedStyles[]::new));
+        ).withMarker(styles.toArray(NamedStyles[]::new));
     }
 
     @Override
